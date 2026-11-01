@@ -15,7 +15,7 @@ set -euo pipefail
 # the transport is Brevo, never this.
 
 container="${OPENEDBOT_MAILPIT_CONTAINER:-infra-mailpit}"
-ui_url="${OPENEDBOT_MAILPIT_URL:-http://127.0.0.1:8025}"
+ui_url="${E2E_MAILPIT_URL:-http://127.0.0.1:8025}"
 
 if ! command -v docker >/dev/null 2>&1; then
   printf 'Docker is required to reach the Mailpit container %s.\n' "$container" >&2
