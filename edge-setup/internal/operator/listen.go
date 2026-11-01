@@ -16,8 +16,11 @@ import (
 )
 
 // Listen creates the socket at path, readable and writable by root and the
-// connector group only, and serves h until ctx ends.
-func Listen(ctx context.Context, path string, h http.Handler) error {
+// connector group only, and serves h until ctx ends. Every accepted
+// connection is then checked against ConnectorPeers (SO_PEERCRED plus the
+// peer's systemd unit): the file mode decides who may open the socket, the
+// peer check decides which process is actually talking.
+func Listen(ctx context.Context, path string, h http.Handler, logf func(string, ...any)) error {
 	gid, mode := SocketOwnership(connectorGID())
 	dir := layout.OperatorRunDir
 	if err := fsx.EnsureDir(dir, 0o750, fsx.Owner{UID: 0, GID: gid}); err != nil {
@@ -44,6 +47,7 @@ func Listen(ctx context.Context, path string, h http.Handler) error {
 		ln.Close()
 		return err
 	}
+	ln = guardPeers(ln, ConnectorPeers(), logf)
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second}
 	go func() {
 		<-ctx.Done()
@@ -64,6 +68,24 @@ func SocketOwnership(gid int, err error) (int, os.FileMode) {
 		return 0, 0o600
 	}
 	return gid, 0o660
+}
+
+// ConnectorPeers is the peer policy of the root operator socket: root, or
+// the service user from the connector's own system unit. When the service
+// user cannot be resolved the policy admits root only, like the socket mode.
+func ConnectorPeers() PeerPolicy {
+	policy := PeerPolicy{ServiceUID: -1, ServiceGID: -1, Units: []string{layout.ConnectorUnit, layout.ConnectorTemplateUnit}}
+	u, err := user.Lookup(layout.ConnectorUser)
+	if err != nil {
+		return policy
+	}
+	uid, uidErr := strconv.Atoi(u.Uid)
+	gid, gidErr := strconv.Atoi(u.Gid)
+	if uidErr != nil || gidErr != nil || uid <= 0 {
+		return policy
+	}
+	policy.ServiceUID, policy.ServiceGID = uid, gid
+	return policy
 }
 
 func connectorGID() (int, error) {

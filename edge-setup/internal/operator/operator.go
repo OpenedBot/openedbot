@@ -256,7 +256,7 @@ func (s *Server) Handler() http.Handler {
 	s.mu.Lock()
 	s.loadSkillOperationsLocked()
 	s.mu.Unlock()
-	mux := http.NewServeMux()
+	mux := strictMux{http.NewServeMux()}
 	mux.HandleFunc("GET /capabilities", func(w http.ResponseWriter, r *http.Request) {
 		s.refreshMultiplex(r.Context())
 		features := s.features()
@@ -339,7 +339,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "ROUTE_UNKNOWN", "the operator serves provider credentials, bounded account usage, the toolset and MCP verbs, MCP OAuth, the gateway restart, the profile inventory, the session inventory and the bounded A2A Agent Card read only")
 	})
-	return mux
+	return strictPath(mux)
 }
 
 // features returns the static operator verbs backed by configured functions.
