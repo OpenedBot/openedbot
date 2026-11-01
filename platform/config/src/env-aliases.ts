@@ -18,7 +18,6 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_TAILSCALE_FUNNEL_ENABLED: "OPENEDBOT_TAILSCALE_FUNNEL_ENABLED",
   OHB_COMPUTER_BOX_TOKEN: "OPENEDBOT_COMPUTER_BOX_TOKEN",
   OHB_LOG_DIR: "OPENEDBOT_LOG_DIR",
-  OHB_CONSOLE_SOLO: "OPENEDBOT_CONSOLE_SOLO",
   OHB_CONSOLE_MODULE_REPORT: "OPENEDBOT_CONSOLE_MODULE_REPORT",
   OHB_PUBLIC_URL: "OPENEDBOT_PUBLIC_URL",
   OHB_CONSOLE_URL: "OPENEDBOT_CONSOLE_URL",
@@ -104,6 +103,12 @@ export const ENV_MERGES: readonly EnvMerge[] = [
     from: ["OHB_LOG_TO_FILES"],
     into: "OPENEDBOT_LOG_DIR",
     convert: (env) => (env.OHB_LOG_TO_FILES?.trim() === "0" ? "off" : undefined),
+  },
+  {
+    // `1` assumed a solo console build; it becomes CONSOLE_MODE=solo.
+    from: ["OHB_CONSOLE_SOLO"],
+    into: "OPENEDBOT_CONSOLE_MODE",
+    convert: (env) => (env.OHB_CONSOLE_SOLO?.trim() === "1" ? "solo" : undefined),
   },
 ];
 

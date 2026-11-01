@@ -364,7 +364,7 @@ build-admin: ## [deploy] Construit le backoffice staff (plug-in externe, ADMIN_D
 
 # `make build` livre les artefacts du rôle alpha : même garde qu'un déploiement
 # dès que la console en fait partie (une console solo par oubli de
-# OPENEDBOT_CONSOLE_PLUGINS est refusée, OPENEDBOT_CONSOLE_SOLO=1 l'assume). La garde passe
+# OPENEDBOT_CONSOLE_PLUGINS est refusée, OPENEDBOT_CONSOLE_MODE=solo l'assume). La garde passe
 # AVANT tout build, y compris en -j : les builds sont relancés après elle.
 build: $(if $(filter console,$(DEPLOY_APP_LIST)),prod-console-guard) ## [deploy] Construit les artefacts des applications actives (ou APP=console,admin).
 	@$(MAKE) --no-print-directory $(addprefix build-,$(DEPLOY_APP_LIST))
@@ -377,10 +377,10 @@ deploy: ## Refuse : le déploiement n'est pas dans ce dépôt ; make build const
 # La console hébergée porte les écrans des plug-ins (étape 9) : sans OPENEDBOT_CONSOLE_PLUGINS,
 # `build-console` sortirait une console solo, sans agence, facturation ni
 # règles de permission. Refus avant tout déploiement et avant tout
-# build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_SOLO=1 pour une console solo
+# build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_MODE=solo pour une console solo
 # assumée. Contrat : tests/scripts/console-build-guard-contract.sh.
 prod-console-guard:
-	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_SOLO)" != "1" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_SOLO=1.\n' >&2; exit 2; fi
+	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_MODE)" != "solo" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_MODE=solo.\n' >&2; exit 2; fi
 
 # L'origine de production, celle que la console affiche dans sa commande
 # d'appairage. `link-prod` en est le pendant `make` : la bascule inverse de

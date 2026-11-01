@@ -109,4 +109,10 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
     applyEnvAliases(on, () => {});
     expect(on).toEqual({});
   });
+
+  test("OHB_CONSOLE_SOLO=1 becomes OPENEDBOT_CONSOLE_MODE=solo", () => {
+    const env: Record<string, string | undefined> = { OHB_CONSOLE_SOLO: "1" }; // rename:keep
+    applyEnvAliases(env, () => {});
+    expect(env).toEqual({ OPENEDBOT_CONSOLE_MODE: "solo" });
+  });
 });

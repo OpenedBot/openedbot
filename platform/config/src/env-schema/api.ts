@@ -47,13 +47,13 @@ export const API_ENV: readonly EnvVar[] = [
     doc:
       "Build time: comma-separated console modules of the pro packages (absolute paths to `packages/pro-*/console/index.ts`, " +
       "or a core seam such as `@openedbot/console/agency`); empty or unset builds a solo console with no pro screen. " +
-      "The hosted console is built with it (`make build` refuses without it, or OPENEDBOT_CONSOLE_SOLO=1).",
+      "The hosted console is built with it (`make build` refuses without it, or OPENEDBOT_CONSOLE_MODE=solo).",
   },
   {
-    name: "OPENEDBOT_CONSOLE_SOLO",
+    name: "OPENEDBOT_CONSOLE_MODE",
     scope: "scripts",
     tier: "default_only",
-    doc: "`1`: `make build` accepts an empty OPENEDBOT_CONSOLE_PLUGINS and ships a solo console (no agency, billing or permission-rule screens).",
+    doc: "`solo`: `make build` accepts an empty OPENEDBOT_CONSOLE_PLUGINS and ships a solo console (no agency, billing or permission-rule screens).",
   },
   {
     name: "OPENEDBOT_CONSOLE_MODULE_REPORT",
