@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -133,6 +134,16 @@ func (b *box) writeFile(path, content string, mode string) {
 	if out, code := b.exec(time.Minute, "sh", "-c", fmt.Sprintf("umask 077; printf '%%s' '%s' > %s && chmod %s %s", strings.ReplaceAll(content, "'", `'\''`), path, mode, path)); code != 0 {
 		b.t.Fatalf("write %s: %s", path, out)
 	}
+}
+
+// adminPassword is a random sudo password for hermes-admin.
+func adminPassword(t *testing.T) string {
+	t.Helper()
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		t.Fatal(err)
+	}
+	return "it-" + hex.EncodeToString(b)
 }
 
 // adminKey generates an ed25519 keypair; returns the authorized_keys line and
@@ -268,9 +279,19 @@ func TestHardeningLifecycle(t *testing.T) {
 	b := startBox(t)
 	pub, priv := adminKey(t)
 	b.writeFile("/root/admin.pub", pub+"\n", "0600")
-	out, code := b.setup(40*time.Minute, "up", "--ssh-hardening", "--quarantine-cloud-user", "--firewall", "--allow-inbound", "22/tcp", "--fail2ban", "--disable-llmnr", "--password-policy", "--sudo-logging", "--unattended-upgrades", "--admin-key", "/root/admin.pub", "--console-confirmed", "--detach", "--yes")
+	// The default sudo rule asks hermes-admin's password; without a terminal
+	// it comes from a 0600 file.
+	password := adminPassword(t)
+	b.writeFile("/root/admin.password", password+"\n", "0600")
+	out, code := b.setup(40*time.Minute, "up", "--ssh-hardening", "--quarantine-cloud-user", "--firewall", "--allow-inbound", "22/tcp", "--fail2ban", "--disable-llmnr", "--password-policy", "--sudo-logging", "--unattended-upgrades", "--admin-key", "/root/admin.pub", "--admin-password-file", "/root/admin.password", "--console-confirmed", "--detach", "--yes")
 	if code != 0 {
 		t.Fatalf("up: %d\n%s", code, out)
+	}
+	if strings.Contains(out, password) {
+		t.Fatal("up printed the sudo password")
+	}
+	if out, code := b.exec(time.Minute, "cat", "/etc/sudoers.d/80-hermes-admin"); code != 0 || strings.TrimSpace(out) != "hermes-admin ALL=(ALL:ALL) ALL" {
+		t.Fatalf("sudoers rule: %d %q", code, out)
 	}
 	if out, code := b.exec(time.Minute, "cat", "/var/lib/hermes-host-hardening/active"); code != 0 || !strings.Contains(out, "state=armed") {
 		t.Fatalf("not armed: %s", out)
@@ -279,8 +300,14 @@ func TestHardeningLifecycle(t *testing.T) {
 	// with the new admin key: this is the "new session".
 	b.writeFile("/root/admin.key", string(priv), "0600")
 	sshCmd := "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i /root/admin.key hermes-admin@127.0.0.1"
-	if out, code := b.exec(2*time.Minute, "sh", "-c", sshCmd+" sudo -n /usr/local/sbin/edge-setup verify-access"); code != 0 {
+	if out, code := b.exec(2*time.Minute, "sh", "-c", sshCmd+" sudo -n true"); code == 0 || !strings.Contains(out, "password is required") {
+		t.Fatalf("sudo without the password must be refused: %d\n%s", code, out)
+	}
+	if out, code := b.exec(2*time.Minute, "sh", "-c", "cat /root/admin.password | "+sshCmd+" sudo -S /usr/local/sbin/edge-setup verify-access"); code != 0 {
 		t.Fatalf("verify-access over ssh: %d\n%s", code, out)
+	}
+	if _, code := b.exec(time.Minute, "grep", "-rqF", password, "/var/lib/hermes-setup", "/var/lib/hermes-host-hardening", "/etc/sudoers.d", "/var/log"); code == 0 {
+		t.Fatal("the sudo password is written on the host")
 	}
 	if out, code := b.exec(time.Minute, "cat", "/var/lib/hermes-host-hardening/finalized"); code != 0 || !strings.Contains(out, "admin=hermes-admin") {
 		t.Fatalf("not finalized: %s", out)
@@ -318,9 +345,42 @@ func TestRollbackRestoresAccess(t *testing.T) {
 		t.Skip("set EDGE_SETUP_IT_ROLLBACK=1 to run the 10-minute rollback scenario")
 	}
 	b := startBox(t)
+	rollbackScenario(t, b, "--admin-sudo=nopasswd")
+}
+
+// TestRollbackRestoresAccessAdminPassword is the same scenario with the
+// default sudo rule: hermes-admin gets a password from a 0600 file. The
+// rollback must also remove that account and its rule, and the password must
+// appear nowhere on the host but in the caller's file.
+func TestRollbackRestoresAccessAdminPassword(t *testing.T) {
+	if os.Getenv("EDGE_SETUP_IT_ROLLBACK") == "" {
+		t.Skip("set EDGE_SETUP_IT_ROLLBACK=1 to run the 10-minute rollback scenario")
+	}
+	b := startBox(t)
+	password := adminPassword(t)
+	b.writeFile("/root/admin.password", password+"\n", "0600")
+	out := rollbackScenario(t, b, "--admin-password-file", "/root/admin.password")
+	if strings.Contains(out, password) {
+		t.Fatal("up printed the sudo password")
+	}
+	if out, code := b.exec(time.Minute, "sh", "-c", "test ! -e /etc/sudoers.d/80-hermes-admin && ! getent passwd hermes-admin && ! grep -q '^hermes-admin:' /etc/shadow && test ! -e /home/hermes-admin"); code != 0 {
+		t.Fatalf("hermes-admin, its password or its sudo rule survived the rollback: %s", out)
+	}
+	if out, code := b.exec(time.Minute, "grep", "-rlF", password, "/var/lib/hermes-setup", "/var/lib/hermes-host-hardening", "/etc", "/var/log"); code != 1 {
+		t.Fatalf("the sudo password is stored on the host (grep %d): %s", code, out)
+	}
+}
+
+// rollbackScenario arms every access protection, never runs verify-access,
+// and checks the timer restores the previous access. It returns up's output.
+func rollbackScenario(t *testing.T, b *box, adminSudo ...string) string {
+	t.Helper()
 	pub, _ := adminKey(t)
 	b.writeFile("/root/admin.pub", pub+"\n", "0600")
-	if out, code := b.setup(40*time.Minute, "up", "--ssh-hardening", "--quarantine-cloud-user", "--firewall", "--allow-inbound", "22/tcp", "--fail2ban", "--disable-llmnr", "--password-policy", "--sudo-logging", "--unattended-upgrades", "--admin-key", "/root/admin.pub", "--console-confirmed", "--detach", "--yes"); code != 0 {
+	args := append([]string{"up", "--ssh-hardening"}, adminSudo...)
+	args = append(args, "--quarantine-cloud-user", "--firewall", "--allow-inbound", "22/tcp", "--fail2ban", "--disable-llmnr", "--password-policy", "--sudo-logging", "--unattended-upgrades", "--admin-key", "/root/admin.pub", "--console-confirmed", "--detach", "--yes")
+	out, code := b.setup(40*time.Minute, args...)
+	if code != 0 {
 		t.Fatalf("up: %d\n%s", code, out)
 	}
 	// Do not verify: let the timer fire.
@@ -340,4 +400,5 @@ func TestRollbackRestoresAccess(t *testing.T) {
 	if out, code := b.exec(time.Minute, "sh", "-c", "ufw status | head -1"); code != 0 || !strings.Contains(out, "inactive") {
 		t.Fatalf("ufw not restored: %s", out)
 	}
+	return out
 }

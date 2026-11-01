@@ -36,7 +36,11 @@ import (
 )
 
 type upOptions struct {
-	adminKeyFile        string
+	adminKeyFile      string
+	adminSudo         string
+	adminPasswordFile string
+	// adminPassword is filled by runUp, never by a flag.
+	adminPassword       string
 	yes                 bool
 	console             bool
 	detach              bool
@@ -95,6 +99,8 @@ func (o *upOptions) requestedFeatures() state.Features {
 func bindUpFlags(fs *flag.FlagSet) *upOptions {
 	o := &upOptions{}
 	fs.StringVar(&o.adminKeyFile, "admin-key", "", "file with the single ssh-ed25519 public key of the administrator")
+	fs.StringVar(&o.adminSudo, "admin-sudo", layout.AdminSudoPassword, "sudo rule of hermes-admin with --ssh-hardening: password (asked on the terminal, or generated and shown once) or nopasswd")
+	fs.StringVar(&o.adminPasswordFile, "admin-password-file", "", "0600 file with the sudo password of hermes-admin (--admin-sudo=password without a terminal)")
 	fs.BoolVar(&o.yes, "yes", false, "confirm the mutation")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "print what up would do, change nothing (same as `plan`)")
 	fs.BoolVar(&o.console, "console-confirmed", false, "confirm out-of-band access exists for an access-changing option")
@@ -158,6 +164,13 @@ func runUp(env cli.Env, args []string) int {
 	if requested.SSHHardening && !previousFeatures.SSHHardening && o.adminKeyFile == "" {
 		return fail(env, cli.ExitRefused, "--admin-key FILE (one ssh-ed25519 public key) is required for SSH hardening")
 	}
+	newAdmin := requested.SSHHardening && !previousFeatures.SSHHardening
+	if o.adminSudo != layout.AdminSudoPassword && o.adminSudo != layout.AdminSudoNoPasswd {
+		return fail(env, cli.ExitUsage, "--admin-sudo must be %s or %s", layout.AdminSudoPassword, layout.AdminSudoNoPasswd)
+	}
+	if o.adminPasswordFile != "" && (!newAdmin || o.adminSudo != layout.AdminSudoPassword) {
+		return fail(env, cli.ExitRefused, "--admin-password-file only applies to a new --ssh-hardening with --admin-sudo=%s", layout.AdminSudoPassword)
+	}
 	if requested.QuarantineCloudUser && !(requested.SSHHardening || previousFeatures.SSHHardening) {
 		return fail(env, cli.ExitRefused, "--quarantine-cloud-user requires --ssh-hardening")
 	}
@@ -166,6 +179,14 @@ func runUp(env cli.Env, args []string) int {
 	}
 	if o.detach && !newAccessChange {
 		return fail(env, cli.ExitRefused, "--detach only applies to a newly selected access policy")
+	}
+	if newAdmin && o.adminSudo == layout.AdminSudoPassword {
+		// Asked before anything changes: a refusal here leaves the host as it was.
+		p, err := adminSudoPassword(o.adminPasswordFile, openAdminTTY)
+		if err != nil {
+			return fail(env, cli.ExitRefused, "%v", err)
+		}
+		o.adminPassword = p
 	}
 	ctx, cancel := ctxWithSignals()
 	defer cancel()
@@ -308,7 +329,7 @@ func up(ctx context.Context, env cli.Env, o *upOptions, features, selectedChange
 		_ = st.Save()
 	}
 	// P7 harden
-	hopts := hardening.Options{Features: selectedChanges, Guarded: newAccessChange, QuarantineExpectedKey: st.QuarantineKeyFingerprint}
+	hopts := hardening.Options{Features: selectedChanges, Guarded: newAccessChange, QuarantineExpectedKey: st.QuarantineKeyFingerprint, AdminSudo: o.adminSudo, AdminPassword: o.adminPassword}
 	if features.SSHHardening && o.adminKeyFile != "" {
 		key, err := os.ReadFile(o.adminKeyFile)
 		if err != nil {
@@ -374,6 +395,7 @@ func up(ctx context.Context, env cli.Env, o *upOptions, features, selectedChange
 	if prep.AdminKeyFingerprint != "" {
 		st.AdminUser = layout.AdminUser
 		st.AdminKeyFingerprint = prep.AdminKeyFingerprint
+		st.AdminSudo = o.adminSudo
 	}
 	if prep.QuarantineApplies {
 		st.QuarantineUser = layout.QuarantineUser

@@ -193,9 +193,12 @@ type File struct {
 	Hostname string `json:"hostname,omitempty"`
 	PublicIP string `json:"public_ip,omitempty"`
 	// Legacy summary fields remain for schema-1 and status compatibility.
-	SSHHardening             bool     `json:"ssh_hardening"`
-	AdminUser                string   `json:"admin_user,omitempty"`
-	AdminKeyFingerprint      string   `json:"admin_key_fingerprint,omitempty"`
+	SSHHardening        bool   `json:"ssh_hardening"`
+	AdminUser           string `json:"admin_user,omitempty"`
+	AdminKeyFingerprint string `json:"admin_key_fingerprint,omitempty"`
+	// AdminSudo is the sudo rule given to AdminUser: "password", "nopasswd",
+	// or empty for a host hardened before the choice existed (nopasswd).
+	AdminSudo                string   `json:"admin_sudo,omitempty"`
 	QuarantineUser           string   `json:"quarantine_user,omitempty"`
 	QuarantineKeyFingerprint string   `json:"quarantine_key_fingerprint,omitempty"`
 	DockerEnabled            bool     `json:"docker_enabled"`
