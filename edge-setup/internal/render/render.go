@@ -189,9 +189,10 @@ func Fail2banJail(ignoreIP string) (string, error) {
 	return render("sshd.local.tmpl", map[string]any{"SSHPort": layout.SSHPort, "IgnoreIP": ignoreIP})
 }
 
-// SudoersAdmin renders /etc/sudoers.d/80-hermes-admin.
-func SudoersAdmin(adminUser string) (string, error) {
-	return render("80-hermes-admin.tmpl", map[string]any{"AdminUser": adminUser})
+// SudoersAdmin renders /etc/sudoers.d/80-hermes-admin: sudo asks the
+// administrator's own password, unless noPasswd (`--admin-sudo=nopasswd`).
+func SudoersAdmin(adminUser string, noPasswd bool) (string, error) {
+	return render("80-hermes-admin.tmpl", map[string]any{"AdminUser": adminUser, "NoPasswd": noPasswd})
 }
 
 // SudoersLogging renders /etc/sudoers.d/81-hermes-logging.

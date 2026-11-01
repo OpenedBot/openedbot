@@ -27,6 +27,11 @@ const (
 	LegacyConnectorUser = "hermes-connector"
 	// AdminUser is the key-only SSH administrator created by the harden phase.
 	AdminUser = "hermes-admin"
+	// AdminSudoPassword (the default) makes sudo ask hermes-admin's own
+	// password; AdminSudoNoPasswd keeps the former NOPASSWD rule
+	// (`--admin-sudo=nopasswd`).
+	AdminSudoPassword = "password"
+	AdminSudoNoPasswd = "nopasswd"
 	// QuarantineUser is the cloud-init account put in quarantine.
 	QuarantineUser = "debian"
 	// QuarantineSudoers is the cloud-init sudoers drop-in backed up then removed.

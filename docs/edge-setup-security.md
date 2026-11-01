@@ -160,10 +160,21 @@ unattended upgrades, persistent journal, sudo logging, cloud-init account
 quarantine.
 
 **`--ssh-hardening` creates an administrator.** It creates `hermes-admin`,
-key-only SSH login, with `NOPASSWD: ALL` in `/etc/sudoers.d/80-hermes-admin`,
-to replace the cloud-init account it quarantines. Without that flag, no
-sudoers file is written. `audit` fails if a file of `/etc/sudoers.d` grants a
-rule to `hermes`, or if the administrator rule exists without `--ssh-hardening`.
+key-only SSH login, to replace the cloud-init account it quarantines. Its rule
+in `/etc/sudoers.d/80-hermes-admin` asks its own password for every `sudo`
+(`--admin-sudo=password`, the default): a stolen SSH key alone does not give
+root. `up` asks that password twice on the terminal, without echo, or
+generates one, shows it once on the terminal and waits for the operator to
+confirm it is stored; without a terminal it reads `--admin-password-file`
+(a 0600 file owned by the caller). The password is never printed on stdout or
+stderr, never written to the journal or the state file, and is set with
+`chpasswd` on stdin only after the reloaded sshd is proved to refuse passwords.
+It must be at least as long as the password policy's minimum (14).
+`--admin-sudo=nopasswd` keeps the former `NOPASSWD: ALL` rule, and hosts
+hardened before this option keep theirs. Without `--ssh-hardening`, no sudoers
+file is written. `audit` fails if a file of `/etc/sudoers.d` grants a rule to
+`hermes`, if the administrator rule exists without `--ssh-hardening`, or if it
+grants `NOPASSWD` where a password was chosen.
 
 Network destinations of the binary:
 

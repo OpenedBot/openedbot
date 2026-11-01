@@ -192,7 +192,7 @@ var SystemPackages = []string{
 
 // HardeningPackages are installed by the base phase for the harden phase.
 var HardeningPackages = []string{
-	"fail2ban", "libpam-pwquality", "logrotate", "ufw", "unattended-upgrades",
+	"fail2ban", "libpam-pwquality", "cracklib-runtime", "logrotate", "ufw", "unattended-upgrades",
 }
 
 // DockerRootlessPrereqs are installed before the rootless daemon.

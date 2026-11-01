@@ -218,6 +218,8 @@ func TestLoopbackListenersAreNotPublic(t *testing.T) {
 
 func TestSudoersGrantNothingToTheServiceAccount(t *testing.T) {
 	withHardening := &state.File{Features: state.Features{SSHHardening: true}}
+	withPassword := &state.File{Features: state.Features{SSHHardening: true}, AdminSudo: layout.AdminSudoPassword}
+	withNoPasswd := &state.File{Features: state.Features{SSHHardening: true}, AdminSudo: layout.AdminSudoNoPasswd}
 	for _, c := range []struct {
 		name  string
 		files map[string]string
@@ -230,6 +232,9 @@ func TestSudoersGrantNothingToTheServiceAccount(t *testing.T) {
 		{"rule for the hermes group", map[string]string{"/etc/sudoers.d/zz-local": "%hermes ALL=(root) /usr/bin/true\n"}, nil, Fail},
 		{"admin rule without --ssh-hardening", map[string]string{layout.SudoersAdmin: "hermes-admin ALL=(ALL:ALL) NOPASSWD: ALL\n"}, nil, Fail},
 		{"admin rule with --ssh-hardening", map[string]string{layout.SudoersAdmin: "hermes-admin ALL=(ALL:ALL) NOPASSWD: ALL\n"}, withHardening, Pass},
+		{"password rule as chosen", map[string]string{layout.SudoersAdmin: "hermes-admin ALL=(ALL:ALL) ALL\n"}, withPassword, Pass},
+		{"NOPASSWD rule where a password was chosen", map[string]string{layout.SudoersAdmin: "hermes-admin ALL=(ALL:ALL) NOPASSWD: ALL\n"}, withPassword, Fail},
+		{"NOPASSWD rule as chosen", map[string]string{layout.SudoersAdmin: "hermes-admin ALL=(ALL:ALL) NOPASSWD: ALL\n"}, withNoPasswd, Pass},
 	} {
 		a := fixture(t, c.files)
 		a.State = c.st

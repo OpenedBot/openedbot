@@ -68,7 +68,7 @@ Aucun fichier modifiable par tous n'a été trouvé dans les écrits du binaire.
 | Compte | Création | Shell | sudo | Rôle |
 |---|---|---|---|---|
 | `hermes` | `useradd --system --user-group --shell /usr/sbin/nologin` | nologin | non | gateway et connecteur (même uid, isolés par espaces de noms systemd) |
-| `hermes-admin` | `--ssh-hardening` seulement | `/bin/bash` | **`NOPASSWD: ALL`** (`/etc/sudoers.d/80-hermes-admin`) | administrateur SSH par clé, remplace le compte cloud-init |
+| `hermes-admin` | `--ssh-hardening` seulement | `/bin/bash` | `ALL` avec son mot de passe (`/etc/sudoers.d/80-hermes-admin`) ; `NOPASSWD: ALL` seulement avec `--admin-sudo=nopasswd` | administrateur SSH par clé, remplace le compte cloud-init |
 | `debian` (existant) | `--quarantine-cloud-user` | passé en nologin, verrouillé | retiré | compte cloud-init mis en quarantaine |
 
 ## 4. Services systemd
@@ -157,6 +157,16 @@ Aucun fichier modifiable par tous n'a été trouvé dans les écrits du binaire.
 2. **`hermes-admin` en `NOPASSWD: ALL`.** Créé uniquement avec
    `--ssh-hardening` ; il remplace le compte cloud-init qui avait le même droit.
    Le supprimer sans autre accès d'administration verrouillerait l'hôte.
+   *Tranché :* sudo demande désormais le mot de passe de `hermes-admin` par
+   défaut (`--admin-sudo=password`), saisi ou généré sur le terminal, ou lu
+   dans `--admin-password-file` (0600), posé par `chpasswd` sur stdin une fois
+   sshd prouvé fermé aux mots de passe. `--admin-sudo=nopasswd` reste possible
+   et les hôtes déjà durcis gardent leur règle ; `audit` échoue si la règle
+   contient `NOPASSWD` alors qu'un mot de passe a été choisi.
+   Sans `verify-access`, le rollback supprime `hermes-admin`, son mot de passe
+   et `80-hermes-admin`, mais garde volontairement la journalisation sudo
+   (`81-hermes-logging`) ; la copie de la règle conservée dans
+   `/var/lib/hermes-host-hardening` ne contient aucun secret.
 3. **Opérateur root.** Nécessaire pour `runuser -u hermes` ; c'est
    l'« action privilégiée documentée et limitée » au sens du point 2, mais son
    score `systemd-analyze security` ne descendra pas à 2.0.
@@ -186,7 +196,7 @@ Relevé à la fin de la branche `fix/opened-bot-release` ; le détail est dans
 | 1 | Versions épinglées | l'amorçage installe sa `PINNED_VERSION` ; `latest` et `--version` explicites ; `upgrade --version` |
 | 1 | `main` en fin de script, `set -eu` + `pipefail` | oui (POSIX `sh`, `pipefail` là où le shell l'a) |
 | 2 | Moindre privilège | compte `hermes` sans shell ni sudo (nom conservé) ; `fsx` refuse tout mode modifiable par tous ; umask hérité resserré (`\| 022`) ; audit `privileged_files` sur tous les arbres gérés ; contrôle `sudoers` |
-| 2 | sudoers | aucune règle sans `--ssh-hardening` ; `hermes-admin NOPASSWD: ALL` conservé en option documentée |
+| 2 | sudoers | aucune règle sans `--ssh-hardening` ; `hermes-admin` en `ALL` avec mot de passe par défaut, `NOPASSWD: ALL` seulement avec `--admin-sudo=nopasswd` (ou hôte durci avant cette option) |
 | 3 | systemd ≤ 2.0 | connecteur 1.3 ; garde loopback 1.8 (réinstallé par `upgrade` si l'unité diffère) ; opérateur (root, voulu) 3.1 ; gateway 4.1 (charges d'agent) ; upgrade 7.0 ; rollback d'accès 8.8 inchangé (filet anti-verrouillage : il doit pouvoir réécrire sshd, UFW et sudoers) |
 | 4 | Réseau, appairage | aucun port entrant ; ticket 5 min, usage unique, jamais en argv ni en en-tête autre qu'`Authorization` (tests) |
 | 5 | `--dry-run` | `up`, `upgrade`, `uninstall`, `reset`, amorçage |

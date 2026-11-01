@@ -60,6 +60,9 @@ edge-setup verify-access
 `--ssh-hardening`, it also proves the admin account, its key, sudo and the sshd
 policy. Without a commit, the timer restores only the components selected in
 this transaction (SSH, UFW, fail2ban or the cloud-init account).
+The rollback deletes `hermes-admin`, its password and its sudo rule, but
+deliberately keeps sudo logging (`81-hermes-logging`); the copy of the rule
+kept in `/var/lib/hermes-host-hardening` holds no secret.
 
 Options:
 
@@ -75,6 +78,8 @@ Options:
 | `--allow-inbound PORT/tcp\|udp` | Declares an inbound UFW opening; repeatable, and valid only with `--firewall`. SSH is never opened implicitly. |
 | `--fail2ban` | Installs and enables the fail2ban SSH jail. |
 | `--ssh-hardening` | Creates `hermes-admin`, enforces the SSH key and hardens sshd. Requires `--admin-key`. A later `up` keeps the extra keys already present in `authorized_keys`, as long as the verified key stays there. |
+| `--admin-sudo password\|nopasswd` | sudo rule of `hermes-admin` with `--ssh-hardening`. `password` (default): sudo asks `hermes-admin`'s password, typed twice without echo, or generated and shown once on the terminal; 14 characters minimum. `nopasswd`: the former `NOPASSWD: ALL` rule. A host already hardened keeps its rule. |
+| `--admin-password-file FILE` | Without a terminal, reads `hermes-admin`'s sudo password from a 0600 file owned by the caller (delete it afterwards). The password is never printed or logged. |
 | `--quarantine-cloud-user` | Quarantines the cloud-init `debian` account. Requires SSH hardening to be selected or already active. |
 | `--detach` | Returns control after arming instead of waiting for `verify-access`. |
 

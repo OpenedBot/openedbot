@@ -91,7 +91,7 @@ func TestPrepareRefusedByALaterSnapshotTakesTheEarlierOnesBack(t *testing.T) {
 	h.SSHDropin = filepath.Join(t.TempDir(), "00-hermes.conf")
 	fake.On("/usr/bin/systemctl is-active --quiet fail2ban", exec.Result{ExitCode: 3})
 	fake.On("/usr/sbin/sshd -t", exec.Result{ExitCode: 255, Stderr: "bad configuration\n"})
-	requireRefusedTwice(t, h, Options{Features: state.Features{Fail2Ban: true, SSHHardening: true}, Guarded: true}, "does not validate")
+	requireRefusedTwice(t, h, Options{Features: state.Features{Fail2Ban: true, SSHHardening: true}, Guarded: true, AdminPassword: "correct-horse-battery"}, "does not validate")
 }
 
 // Only what the refused run itself took goes: the snapshots of an earlier run

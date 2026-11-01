@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/account"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/apt"
@@ -36,6 +38,13 @@ type Options struct {
 	Guarded bool
 	// AdminPublicKey is the single ed25519 public key of the administrator.
 	AdminPublicKey string
+	// AdminSudo is layout.AdminSudoPassword (empty means the same) or
+	// layout.AdminSudoNoPasswd.
+	AdminSudo string
+	// AdminPassword is hermes-admin's sudo password in password mode. It is
+	// set only once sshd refuses passwords, through chpasswd's stdin, and
+	// never appears in an argument, a log line or an error.
+	AdminPassword string
 	// QuarantineExpectedKey, when set, is the fingerprint the cloud-init
 	// account must still carry (drift refusal on replay).
 	QuarantineExpectedKey string
@@ -170,6 +179,13 @@ var ufwFiles = []struct{ Path, Backup string }{
 // hardening state".
 func (h *Hardener) Prepare(ctx context.Context, o Options) (res PrepareResult, err error) {
 	g := h.Guard
+	if o.Features.SSHHardening {
+		// Before any change: a password mode without a usable password is
+		// refused here, not after the account exists.
+		if _, err := adminNoPasswd(o); err != nil {
+			return res, err
+		}
+	}
 	if err := g.EnsureDirs(); err != nil {
 		return res, err
 	}
@@ -219,7 +235,10 @@ func (h *Hardener) Prepare(ctx context.Context, o Options) (res PrepareResult, e
 		packages = append(packages, "fail2ban")
 	}
 	if o.Features.PasswordPolicy {
-		packages = append(packages, "libpam-pwquality")
+		// cracklib-runtime carries the dictionary pam_pwquality checks against:
+		// apt runs without recommends, and without it every password change
+		// (chpasswd included) fails with "error loading dictionary".
+		packages = append(packages, "libpam-pwquality", "cracklib-runtime")
 	}
 	if o.Features.SudoLogging {
 		packages = append(packages, "logrotate")
@@ -309,7 +328,11 @@ func (h *Hardener) Prepare(ctx context.Context, o Options) (res PrepareResult, e
 		return res, err
 	}
 	res.AdminKeyFingerprint = fp
-	if err := h.installAdminSudoers(ctx); err != nil {
+	noPasswd, err := adminNoPasswd(o)
+	if err != nil {
+		return res, err
+	}
+	if err := h.installAdminSudoers(ctx, noPasswd); err != nil {
 		return res, err
 	}
 	if !o.Guarded {
@@ -762,9 +785,26 @@ func (h *Hardener) installSudoLogging(ctx context.Context) error {
 	return err
 }
 
-// installAdminSudoers grants the admin account passwordless sudo.
-func (h *Hardener) installAdminSudoers(ctx context.Context) error {
-	admin, err := render.SudoersAdmin(layout.AdminUser)
+// adminNoPasswd reads the sudo mode of the options and refuses a password
+// mode without a password: hermes-admin would then hold a rule nobody can use.
+func adminNoPasswd(o Options) (bool, error) {
+	switch o.AdminSudo {
+	case "", layout.AdminSudoPassword:
+		if err := ValidAdminPassword(o.AdminPassword); err != nil {
+			return false, err
+		}
+		return false, nil
+	case layout.AdminSudoNoPasswd:
+		return true, nil
+	}
+	return false, fmt.Errorf("--admin-sudo must be %s or %s", layout.AdminSudoPassword, layout.AdminSudoNoPasswd)
+}
+
+// installAdminSudoers grants the admin account sudo: with its own password
+// (the default), or without one for --admin-sudo=nopasswd. The candidate goes
+// through visudo -cf before it is published, then the whole policy does.
+func (h *Hardener) installAdminSudoers(ctx context.Context, noPasswd bool) error {
+	admin, err := render.SudoersAdmin(layout.AdminUser, noPasswd)
 	if err != nil {
 		return err
 	}
@@ -1229,7 +1269,55 @@ func (h *Hardener) Enforce(ctx context.Context, o Options) error {
 		if _, err := exec.Must(ctx, h.Runner, exec.Cmd{Path: "/usr/sbin/sshd", Args: []string{"-t"}}); err != nil {
 			return err
 		}
-		return sd.Reload(ctx, "ssh")
+		if err := sd.Reload(ctx, "ssh"); err != nil {
+			return err
+		}
+		if noPasswd, err := adminNoPasswd(o); err != nil || noPasswd {
+			return err
+		}
+		return h.setAdminPassword(ctx, run, o.AdminPassword)
+	}
+	return nil
+}
+
+// setAdminPassword gives hermes-admin its sudo password, last, once the
+// reloaded sshd refuses passwords: the account never holds a password while
+// SSH could still accept one. If anything here fails, sudo stays unusable for
+// hermes-admin, verify-access cannot run and the rollback timer restores the
+// previous access: a missing password cannot lock the host.
+func (h *Hardener) setAdminPassword(ctx context.Context, run func(exec.Cmd) error, password string) error {
+	if err := ValidAdminPassword(password); err != nil {
+		return err
+	}
+	out, err := exec.Output(ctx, h.Runner, "/usr/sbin/sshd", "-T", "-C", "user="+layout.AdminUser+",host=localhost,addr=127.0.0.1")
+	if err != nil {
+		return err
+	}
+	if err := RequireSSHDHardened(SSHDEffective(out), layout.AdminUser); err != nil {
+		return fmt.Errorf("refusing to give %s a password while sshd may accept it: %w", layout.AdminUser, err)
+	}
+	err = run(exec.Cmd{Path: "/usr/sbin/chpasswd", Stdin: []byte(layout.AdminUser + ":" + password + "\n")})
+	if err != nil {
+		// chpasswd does not echo its input, but an error must never carry it.
+		return fmt.Errorf("set the sudo password of %s: %s", layout.AdminUser, strings.ReplaceAll(err.Error(), password, "[redacted]"))
+	}
+	return nil
+}
+
+// ValidAdminPassword is the floor this tool enforces before chpasswd (and,
+// with --password-policy, pam_pwquality) sees it: one line of
+// layout.PasswordMinLength to 256 characters without control characters. The
+// floor is the password policy's minlen, so a password accepted here is not
+// refused by pam_pwquality halfway through the transaction for its length.
+func ValidAdminPassword(p string) error {
+	n := utf8.RuneCountInString(p)
+	if n < layout.PasswordMinLength || len(p) > 256 || !utf8.ValidString(p) {
+		return fmt.Errorf("the sudo password of %s must be %d to 256 characters", layout.AdminUser, layout.PasswordMinLength)
+	}
+	for _, r := range p {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("the sudo password of %s must not contain control characters", layout.AdminUser)
+		}
 	}
 	return nil
 }
