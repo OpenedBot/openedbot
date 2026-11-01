@@ -9,7 +9,7 @@
 
 import { isUuid } from "@openedbot/contracts-primitives";
 import { RelayFrameError } from "./relay-frame-error";
-import { decodeYoloFrame, isYoloFrameType, type RelayYoloFrame } from "./relay-frames-yolo";
+import { decodeYoloFrame, isYoloFrameType, parseYoloLeaseKeys, type RelayYoloFrame, type YoloLeaseKey } from "./relay-frames-yolo";
 
 /** Version du protocole annoncée dans `hello`. */
 export const RELAY_PROTOCOL = 1 as const;
@@ -183,6 +183,8 @@ export type RelayLinkContextFrame = {
    * inconnus, alors qu'une trame de plus aurait fini en « unknown frame type ».
    */
   limits?: RelayLinkContextLimits;
+  /** Clés publiques des baux YOLO, épinglées par l'hôte (`relay-frames-yolo.ts`). */
+  leaseKeys?: YoloLeaseKey[];
 };
 export type RelayReqFrame = {
   t: "req";
@@ -371,6 +373,7 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
         ...withOptional("latestVersion", optionalString(frame, "latestVersion")),
         ...withOptional("minimumVersion", optionalString(frame, "minimumVersion")),
         ...withOptional("limits", optionalLinkContextLimits(frame)),
+        ...withOptional("leaseKeys", parseYoloLeaseKeys(frame.leaseKeys)),
       };
     }
     case "req": {

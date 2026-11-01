@@ -143,6 +143,8 @@ func MacHost(runner exec.Runner, token string, cfg MacHostConfig, logf func(stri
 	server.ApprovalPolicyRead = approvalPolicy.state
 	server.ApprovalPolicyWrite = approvalPolicy.write
 	server.GatewayRestarted = approvalPolicy.gatewayRestarted
+	yolo := yoloService{runtimeRoot: p.RuntimeRoot, owner: fsx.Current(), logf: logf}
+	server.YoloApply, server.YoloDrain, server.YoloDrained = yolo.apply, yolo.drain, yolo.drained
 	if !macProbeInstalled(p.Probe, inventoryProbeScript) {
 		return server, nil
 	}

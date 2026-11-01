@@ -561,6 +561,9 @@ CONTRACT_COPIES := \
 	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.bin=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.bin \
 	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.json=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.json \
 	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.key.txt=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.key.txt \
+	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.bin=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.bin \
+	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.json=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.json \
+	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.key.txt=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.key.txt \
 	$(CONTRACT_GO)/test/golden/yolo-hardline/hardline.json=modules/execution/tests/fixtures/yolo-hardline.json \
 	$(CONTRACT_GO)/test/golden/yolo-lease/lease-v1.json=modules/execution/tests/fixtures/yolo-lease/lease-v1.json
 

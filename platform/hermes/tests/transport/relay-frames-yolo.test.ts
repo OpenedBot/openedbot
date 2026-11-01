@@ -14,18 +14,18 @@ import {
 type Vector = { name: string; frame: Record<string, unknown>; valid: boolean };
 
 /**
- * Les trames `yolo.*` du mode YOLO. Leurs vecteurs vivent à part de
- * `relay-frames.vectors.json` tant que `DecodeText` côté Go ne les connaît
- * pas (PR 3 du mode YOLO) : copiés dans le golden Go aujourd'hui, ils y
- * feraient échouer chaque vecteur valide. Ils rejoindront alors les deux
- * copies de `vectors.json`, sous `make contract-check`.
+ * Les trames `yolo.*` du mode YOLO et `link.context.leaseKeys`. Leurs vecteurs
+ * sont dans `relay-frames.vectors.json`, copie de celui d'edge-setup
+ * (`test/golden/relay-frames/vectors.json`) : `DecodeText` côté Go les tient
+ * aux mêmes règles, sous `make contract-check`. Ici, en plus de valide /
+ * invalide, une trame valide doit se relire à l'identique.
  */
-const vectors = JSON.parse(
-  readFileSync(new URL("../fixtures/relay-frames-yolo.vectors.json", import.meta.url), "utf8"),
-) as Vector[];
 const shared = JSON.parse(
   readFileSync(new URL("../fixtures/relay-frames.vectors.json", import.meta.url), "utf8"),
-) as Array<{ frame?: { t?: string } }>;
+) as Array<Vector & { binary?: unknown }>;
+const vectors = shared.filter(
+  (vector) => !vector.binary && (String(vector.frame.t).startsWith("yolo.") || "leaseKeys" in vector.frame),
+);
 
 describe("relay frames yolo.*: vectors", () => {
   test("every frame type is covered, valid and invalid, under unique names", () => {
@@ -36,8 +36,9 @@ describe("relay frames yolo.*: vectors", () => {
     }
   });
 
-  test("not in the vectors shared with Go yet (its decoder would refuse them)", () => {
-    expect(shared.some((vector) => vector.frame?.t?.startsWith("yolo."))).toBe(false);
+  test("link.context lease keys are covered, valid and invalid", () => {
+    expect(vectors.some((vector) => vector.frame.t === "link.context" && vector.valid)).toBe(true);
+    expect(vectors.some((vector) => vector.frame.t === "link.context" && !vector.valid)).toBe(true);
   });
 
   for (const vector of vectors) {

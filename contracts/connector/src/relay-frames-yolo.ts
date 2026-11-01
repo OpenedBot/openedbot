@@ -4,12 +4,15 @@
  * l'audit local de ses auto-approbations. `decodeTextFrame` (`relay-frames.ts`)
  * délègue ici chaque type `yolo.*`.
  *
- * Mêmes règles qu'attendra `DecodeText` côté Go (edge-setup, PR 3 du mode
- * YOLO) : tant que l'hôte ne connaît pas ces trames, il les refuse comme tout
- * type inconnu, et openedbot ne les pousse qu'à un hôte qui annonce
- * `yolo_lease`. Les vecteurs vivent dans
- * `platform/hermes/tests/fixtures/relay-frames-yolo.vectors.json` jusqu'à ce
- * que le décodeur Go les accepte ; ils rejoindront alors `vectors.json`.
+ * Mêmes règles que `DecodeText` côté Go (edge-setup,
+ * `internal/connector/frames_yolo.go`) ; un hôte plus ancien les refuse comme
+ * tout type inconnu, et openedbot ne les pousse qu'à un hôte qui annonce
+ * `yolo_lease`. Les vecteurs sont dans les deux copies de `vectors.json`
+ * (`relay-frames.vectors.json` ici), sous `make contract-check`.
+ *
+ * `link.context.leaseKeys` (les clés publiques que l'hôte épingle) est lu ici
+ * aussi, en forme seulement : l'épinglage (premier usage, puis seulement une
+ * clé endossée par une clé déjà épinglée) est la décision de l'hôte.
  *
  * Le bail n'est qu'une forme ici : sa signature, ses bornes de durée et la
  * cohérence de sa portée sont vérifiées par le domaine
@@ -136,6 +139,44 @@ const CODE_PATTERN = /^[a-z0-9_]{1,64}$/;
 const GATE_KIND_PATTERN = /^[a-z_]{1,32}$/;
 const MAX_RUNTIME_ID = 128;
 const MAX_TOOL_KEY = 256;
+
+/** `link.context` annonce au plus autant de clés de bail. */
+export const YOLO_MAX_LEASE_KEYS = 8;
+/**
+ * Préfixe de domaine d'un endossement : `prefix || keyId || "\n" || publicKey`,
+ * signé Ed25519 par la clé `endorsedBy`, déjà épinglée par l'hôte.
+ */
+export const YOLO_KEY_ENDORSEMENT_PREFIX = "ohb-yolo-key/v1\n";
+
+/** Une clé publique de bail (32 octets bruts en base64) ; `keyId` = 16 premiers octets hex de sha256(clé). */
+export type YoloLeaseKey = { keyId: string; publicKey: string; endorsedBy?: string; endorsement?: string };
+
+const BASE64_32_PATTERN = /^[A-Za-z0-9+/]{43}=$/;
+
+/** `link.context.leaseKeys` : absent ou `null` = aucune annonce. Champs inconnus ignorés, comme en Go. */
+export function parseYoloLeaseKeys(value: unknown): YoloLeaseKey[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) throw new RelayFrameError("field leaseKeys must be an array");
+  if (value.length > YOLO_MAX_LEASE_KEYS) throw new RelayFrameError(`field leaseKeys lists ${value.length} keys, more than ${YOLO_MAX_LEASE_KEYS}`);
+  return value.map((entry) => {
+    const key = object(entry, "lease key");
+    const keyId = text(key, "keyId") ?? "";
+    const publicKey = text(key, "publicKey") ?? "";
+    if (!KEY_ID_PATTERN.test(keyId) || !BASE64_32_PATTERN.test(publicKey)) {
+      throw new RelayFrameError("link.context lease key requires a 32-hex keyId and a 32-byte base64 publicKey");
+    }
+    const endorsedBy = text(key, "endorsedBy");
+    const endorsement = text(key, "endorsement");
+    if ((endorsedBy === undefined || endorsedBy === "") !== (endorsement === undefined || endorsement === "")) {
+      throw new RelayFrameError("link.context lease key endorsement requires endorsedBy and a 64-byte base64 endorsement together");
+    }
+    if (!endorsedBy) return { keyId, publicKey };
+    if (!KEY_ID_PATTERN.test(endorsedBy) || !BASE64_64_PATTERN.test(endorsement!)) {
+      throw new RelayFrameError("link.context lease key endorsement requires endorsedBy and a 64-byte base64 endorsement together");
+    }
+    return { keyId, publicKey, endorsedBy, endorsement: endorsement! };
+  });
+}
 
 export function isYoloFrameType(t: string): t is RelayYoloFrame["t"] {
   return YOLO_FRAME_TYPES.has(t);

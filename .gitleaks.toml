@@ -17,6 +17,7 @@ paths = [
   '''^apps/console/tests/lib/run/tool-progress-label\.test\.tsx$''',
   '''^apps/console/tests/screens/settings/installation/runtime-link-rotation\.test\.tsx$''',
   '''^edge-setup/internal/connector/testdata/creation-audit-v2\.json$''',
+  '''^edge-setup/internal/connector/testdata/creation-audit-v2-yolo\.json$''',
   '''^edge-setup/internal/journal/journal_test\.go$''',
   '''^modules/execution/tests/gate-identity\.test\.ts$''',
   '''^modules/execution/tests/review-verdict\.test\.ts$''',
@@ -24,6 +25,7 @@ paths = [
   '''^modules/notifications/tests/email-templates\.test\.ts$''',
   '''^platform/hermes/tests/a2a-policy\.test\.ts$''',
   '''^platform/hermes/tests/fixtures/creation-audit/creation-audit-v2\.json$''',
+  '''^platform/hermes/tests/fixtures/creation-audit/creation-audit-v2-yolo\.json$''',
   '''^platform/hermes/tests/fixtures/relay-frames\.vectors\.json$''',
   '''^platform/integrations/tests/apns\.test\.ts$''',
 ]
@@ -79,6 +81,7 @@ condition = "AND"
 paths = [
   '''^edge-setup/test/golden/yolo-lease/lease-v1\.json$''',
   '''^modules/execution/tests/fixtures/yolo-lease/lease-v1\.json$''',
-  '''^platform/hermes/tests/fixtures/relay-frames-yolo\.vectors\.json$''',
+  '''^edge-setup/test/golden/relay-frames/vectors\.json$''',
+  '''^platform/hermes/tests/fixtures/relay-frames\.vectors\.json$''',
 ]
 regexes = ['''^08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279$''']

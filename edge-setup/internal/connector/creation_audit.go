@@ -50,6 +50,34 @@ type CreationAuditEvent struct {
 	Status             int    `json:"status,omitempty"`
 	RemoteID           string `json:"remoteId,omitempty"`
 	Outcome            string `json:"outcome,omitempty"`
+	// An auto-approval under a YOLO lease (kind yolo_auto_approved, phase
+	// "decision"): additive, schemaVersion stays 2, and a run event leaves
+	// these fields out. ArgsHash is the hash of the arguments, never them.
+	Kind     string `json:"kind,omitempty"`
+	LeaseID  string `json:"leaseId,omitempty"`
+	ToolKey  string `json:"toolKey,omitempty"`
+	GateKind string `json:"gateKind,omitempty"`
+	ArgsHash string `json:"argsHash,omitempty"`
+}
+
+// CreationAuditKindYolo marks an auto-approval sealed from the YOLO audit.
+const CreationAuditKindYolo = "yolo_auto_approved"
+
+// SealYolo seals one YOLO auto-approval (YoloAudit.SetSealer).
+func (a *CreationAudit) SealYolo(entry YoloAuditEntry) error { return a.appendYolo(entry) }
+
+// appendYolo seals one YOLO auto-approval. ErrAuditKeyMissing while the link
+// has not armed the file: the entry stays pending in yolo-pending.jsonl.
+func (a *CreationAudit) appendYolo(entry YoloAuditEntry) error {
+	toolKey := ""
+	if entry.ToolKey != nil {
+		toolKey = *entry.ToolKey
+	}
+	return a.append(CreationAuditEvent{
+		EventID: entry.EventID, AttemptID: entry.EventID, Phase: "decision",
+		OccurredAt: time.Unix(entry.OccurredAt, 0).UTC().Format(time.RFC3339Nano), RuntimeID: a.runtimeID, Profile: entry.Profile,
+		Kind: CreationAuditKindYolo, LeaseID: entry.LeaseID, ToolKey: toolKey, GateKind: entry.GateKind, ArgsHash: entry.ArgsHash,
+	})
 }
 
 // CreationAuditSnapshot is the plaintext of snapshot.bin. Base is the chain

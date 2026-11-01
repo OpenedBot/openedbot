@@ -43,6 +43,9 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 			return approvalPolicyState{Mode: request.Mode, PluginEnabled: true}, nil
 		},
 		SkillsHubReady: true,
+		YoloApply:      func(context.Context, []yoloApplied) error { return nil },
+		YoloDrain:      func(context.Context) ([]yoloSpoolRecord, error) { return nil, nil },
+		YoloDrained:    func(context.Context) error { return nil },
 	}
 }
 
@@ -61,9 +64,11 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 // mcp_live_reload: an API that drops it keeps asking for a gateway restart
 // after an MCP change, which stays correct. The ninth is
 // gateway_graceful_restart: an API that drops it warns that a restart
-// interrupts the running turns, which is only pessimistic. The API in this
-// repository announces a bound of 64.
-const beyondDefaultAcknowledged = 9
+// interrupts the running turns, which is only pessimistic. The tenth and
+// eleventh are yolo_lease and yolo_thread_scope: an API that drops them
+// grants this host no YOLO lease and keeps asking a human, the behavior of
+// every host before them. The API in this repository announces a bound of 64.
+const beyondDefaultAcknowledged = 11
 
 // The guard behind the incident where the next operator feature would have made
 // every updated host's hello 17 names long. It reads the REAL operator, in every

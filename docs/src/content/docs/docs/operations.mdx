@@ -343,6 +343,29 @@ development one. Each instance then has its own device key, unit and state,
 and `--rekey` takes the same `--name` as `link`; `status` lists them all.
 See [Named instances](/docs/commands#named-instances).
 
+## YOLO mode
+
+A YOLO lease, granted in openedbot by an owner or an admin, gets the gates of a
+runtime, a bot or a thread approved without a human for at most 24 h. The host
+only verifies and applies: it never creates a lease. The hard line
+(credentials, `/etc/hermes`, self-modification of the approval plugin), the
+lease's deny-list and its protections are never approved by a lease. The
+commands below work offline, with the daemon running or not:
+
+```bash
+edge-setup yolo status
+edge-setup yolo off --yes
+edge-setup yolo on --yes
+```
+
+`status` lists, per instance, the leases held, their expiry and the
+auto-approvals openedbot has not acknowledged yet (`--json` for a machine).
+`off` writes `yolo-kill.json` in the connector state and removes the profiles'
+`yolo.json`: the plugin asks again from its next call, a running daemon cuts
+everything within 2 s and reports it to openedbot on the next link. Every lease
+issued before that moment stays refused, even after `on`, which only lifts the
+local refusal of the next ones. Without `--yes`, nothing is changed.
+
 ## Backup and destruction
 
 What is worth backing up fits in `/srv/hermes/data`
