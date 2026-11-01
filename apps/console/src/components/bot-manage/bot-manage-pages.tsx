@@ -19,6 +19,7 @@ import { GatewayRestartCard } from "../../screens/settings/installation/connecto
 import { ThreadModelPicker } from "../composer-model-picker";
 import { PermissionModeList, usePermissionContext, useSetPermissionMode } from "../boardui/permission-picker";
 import { ThreadActivityList } from "../thread-activity-panel";
+import { YoloBotSection } from "../yolo/yolo-bot-section";
 import { BotPermissionRules, useHasProPermissions } from "../../pro-console/slots";
 
 // The runtime pane is the whole `/settings/runtime` screen: loaded when opened.
@@ -118,6 +119,7 @@ export function ApprovalsPage({ bot }: { bot: BotDto }) {
         onSelect={(mode) => { if (mode !== current) setMode.mutate(mode); }}
         ariaLabel={t("boardui.permissions")}
       />
+      <YoloBotSection bot={bot} />
       <BotToolPolicies bot={bot} />
       {hasProPermissions ? (
         <details className="group rounded-xl border border-border" data-review-advanced="">

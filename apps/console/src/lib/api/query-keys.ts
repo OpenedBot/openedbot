@@ -91,6 +91,12 @@ export const queryKeys = {
     workspaceQueryKey(activeOrganizationId(), "bot-permission-grants", botId),
   runtimePermissionSettings: (runtimeId: string) =>
     workspaceQueryKey(activeOrganizationId(), "runtime-permission-settings", runtimeId),
+  /** Every `GET /yolo/leases` read sits under this root: a grant, a revoke or a kill invalidates them all. */
+  get yoloLeasesRoot() { return workspaceQueryKey(activeOrganizationId(), "yolo-leases"); },
+  yoloLeases: (filters: { runtimeId?: string; botId?: string; threadId?: string } = {}) =>
+    workspaceQueryKey(activeOrganizationId(), "yolo-leases", filters.runtimeId ?? "", filters.botId ?? "", filters.threadId ?? ""),
+  get yoloConsent() { return workspaceQueryKey(activeOrganizationId(), "yolo-consent"); },
+  get yoloAudit() { return workspaceQueryKey(activeOrganizationId(), "yolo-audit"); },
   botRuntimeMemory: (botId: string) =>
     workspaceQueryKey(activeOrganizationId(), "bot-runtime-memory", botId),
   personaDraft: (botId: string) =>

@@ -20,6 +20,7 @@ import { overviewApi } from "./api/overview";
 import { authApi } from "./api/auth";
 import { accountApi } from "./api/account";
 import { notificationsApi } from "./api/notifications";
+import { yoloApi } from "./api/yolo";
 import { mergeApiParts } from "./api/merge";
 import { bindApi } from "./api/self";
 
@@ -55,6 +56,7 @@ export const api = mergeApiParts(
   authApi,
   accountApi,
   notificationsApi,
+  yoloApi,
 );
 bindApi(api);
 

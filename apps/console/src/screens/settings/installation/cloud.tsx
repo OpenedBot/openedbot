@@ -30,6 +30,7 @@ import { linkHealthErrorText } from "../../../lib/runtime/link-health-error";
 import { RuntimeRemoval, RuntimeReplacement } from "./cloud/cloud-registry";
 import { RuntimeTerminalSwitch } from "./cloud/cloud-terminal-switch";
 import { RuntimeAlertsSection } from "./cloud/cloud-alerts";
+import { YoloLeasesCard } from "../../../components/yolo/yolo-leases-card";
 
 export { isRuntimeSection, type RuntimeSection } from "./cloud/cloud-shared";
 export { HermesTokenHelpDialog } from "./cloud/cloud-token-help";
@@ -269,6 +270,7 @@ function RuntimeConnectionForm({
         </SettingsCard>
       ) : null}
       {runtime?.id ? <RuntimeTerminalSwitch runtimeId={runtime.id} /> : null}
+      {runtime?.id ? <YoloLeasesCard runtimeId={runtime.id} /> : null}
       <ProviderIncidentDialog incidents={runtime?.providerIncidents} />
     </>
   );
