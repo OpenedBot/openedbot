@@ -17,9 +17,11 @@ describe("classifyLocalEnvEntry", () => {
     expect(classifyLocalEnvEntry({ name: "DEV_BUNDLED_HERMES_TOKEN", value: "x" }, "external")).toBe("remove");
   });
 
-  test("removes a runtime admin mode other than disabled", () => {
-    expect(classifyLocalEnvEntry({ name: "OHB_RUNTIME_ADMIN_MODE", value: "local" }, "external")).toBe("remove");
-    expect(classifyLocalEnvEntry({ name: "OHB_RUNTIME_ADMIN_MODE", value: "disabled" }, "external")).not.toBe("remove");
+  test("removes the dropped runtime variables, whatever their value", () => {
+    for (const value of ["local", "disabled", "external"]) {
+      expect(classifyLocalEnvEntry({ name: "OHB_RUNTIME_ADMIN_MODE", value }, "external")).toBe("remove"); // rename:keep
+      expect(classifyLocalEnvEntry({ name: "OHB_RUNTIME_MODE", value }, "external")).toBe("remove"); // rename:keep
+    }
   });
 });
 

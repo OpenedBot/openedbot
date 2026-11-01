@@ -85,11 +85,6 @@ async function runCheck(): Promise<void> {
   // une autre, sans que rien ne le signale.
   assertSameDatabase(values);
 
-  // OHB-15 : le canal SSH sortant a été retiré du code. `ssh` n'est plus une
-  // valeur dégradée, c'est une valeur qui n'existe plus.
-  if (values.OHB_RUNTIME_ADMIN_MODE && !new Set(["disabled", "local"]).has(values.OHB_RUNTIME_ADMIN_MODE)) {
-    throw new Error("OHB_RUNTIME_ADMIN_MODE must be disabled or local.");
-  }
   // La PWA appelle `/api` sur sa propre origine en développement et Vite relaie
   // vers l'API : une valeur locale ferait sortir le navigateur du proxy et
   // casserait CORS et les cookies. Ce n'est pas un réglage optionnel.
@@ -180,9 +175,6 @@ async function runCheck(): Promise<void> {
     if (!values.FILES_CDN_URL?.startsWith("https://")) throw new Error("Production FILES_CDN_URL must use HTTPS.");
     if (values.DEV_HERMES_URL?.startsWith("http://")) {
       throw new Error("Production configuration must not contain a plaintext Hermes URL.");
-    }
-    if ((values.OHB_RUNTIME_ADMIN_MODE ?? "disabled") !== "disabled") {
-      throw new Error("Production requires OHB_RUNTIME_ADMIN_MODE=disabled.");
     }
     const legalMaxBytes = values.LEGAL_MAX_BYTES ? Number(values.LEGAL_MAX_BYTES) : DEFAULT_LEGAL_MAX_BYTES;
     if (!Number.isSafeInteger(legalMaxBytes) || legalMaxBytes < 1 || legalMaxBytes > MAX_LEGAL_MAX_BYTES) {

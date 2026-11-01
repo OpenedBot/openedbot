@@ -41,7 +41,7 @@ anchors=(
   "expiryValue|apps/api/src/routes/conversation/approval-routes.ts|\"APPROVAL_NOT_PENDING\""
   "expiryValue|apps/api/src/routes/conversation/approval-routes.ts|if (new Date(approval.expiresAt).getTime() <= Date.now()) {"
   "rolesValue|contracts/api/src/identity/workspaces.ts|return role === \"owner\" || role === \"admin\" || role === \"agency\";"
-  "adminChannelValue|platform/config/src/api-config.ts|type RuntimeAdminRequest = \"disabled\" | \"local\";"
+  "adminChannelValue|platform/config/src/api-config.ts|const runtimeAdminChannels: RuntimeAdminChannels = { local: false };"
   "draftValue|apps/api/src/routes/runtimes/runtime-routes.ts|routes.post(\"/test-draft\""
   "secretsValue|apps/api/src/routes/runtimes/runtime-admin-routes.ts|client.providerCredentialAdd(provider, apiKey, label)"
   "secretsValue|modules/roster/src/application/bot-profiles.ts|client.hostSetProfileCredential(profile, credential.provider, credential.apiKey, credential.label)"

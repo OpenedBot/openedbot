@@ -148,23 +148,15 @@ describe("production configuration", () => {
     expect(() => assertProductionConfig(readApiConfig(production))).toThrow(/LEGAL_MENTIONS_FILE/);
   });
 
-  // OHB-15 : le canal SSH sortant n'est plus interdit en production, il
-  // n'existe plus du tout. La configuration le refuse avant même d'arriver au
-  // garde de production.
-  test("refuses the removed SSH administration channel outright", () => {
-    expect(() => readApiConfig({
-      ...production,
-      OHB_RUNTIME_ADMIN_MODE: "ssh",
-    })).toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
-  });
-
-  test("forbids the local administration channel in production cloud mode", () => {
-    expect(() => assertProductionConfig(readApiConfig({
-      ...production,
-      OHB_RUNTIME_ADMIN_MODE: "local",
-      DEV_HERMES_DASHBOARD_USERNAME: "dashboard",
-      DEV_HERMES_DASHBOARD_PASSWORD: "dashboard-secret",
-    }))).toThrow(/Runtime administration channels are forbidden/i);
+  // OHB-15 : le canal SSH sortant n'existe plus du tout, et la variable qui
+  // réglait l'administration est retirée : en production comme ailleurs, sa
+  // valeur est ignorée et aucun canal ne s'ouvre.
+  test("ignores the retired administration variable in production, whatever its value", () => {
+    for (const value of ["ssh", "local", "disabled"]) {
+      const config = readApiConfig({ ...production, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
+      expect(config.runtimeAdminChannels).toEqual({ local: false });
+      expect(() => assertProductionConfig(config)).not.toThrow(/administration|ADMIN_MODE/i);
+    }
   });
 
   test("requires an HTTPS web URL: the payment provider returns the browser there", () => {
@@ -247,29 +239,13 @@ describe("canaux d’administration du déploiement", () => {
     expect(readApiConfig(development).runtimeAdminChannels).toEqual({ local: false });
   });
 
-  test("une demande explicite n’ouvre que le canal demandé", () => {
-    expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "local" })
-      .runtimeAdminChannels).toEqual({ local: false });
-  });
-
-  // Y compris en développement : une frontière que le poste local peut
-  // contourner n'est pas une frontière.
-  test("`ssh` est refusé jusque dans l’environnement de développement", () => {
-    expect(() => readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "ssh" }))
-      .toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
-  });
-
-  // Une valeur inconnue valait auparavant « les deux canaux » en
-  // développement. Elle échoue désormais partout : un mode d'administration
-  // deviné est exactement ce que cette US retire.
-  test("rejects an unknown administration override, development included", () => {
-    expect(() => readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "auto" }))
-      .toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
-  });
-
-  test("honors disabled administration on an external development runtime", () => {
-    expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "disabled" })
-      .runtimeAdminChannels).toEqual({ local: false });
+  // L'ancienne variable d'administration est retirée : aucune valeur, même
+  // `ssh` ou `local`, n'ouvre de canal, développement compris.
+  test("la variable d’administration retirée n’ouvre aucun canal", () => {
+    for (const value of ["local", "ssh", "auto", "disabled"]) {
+      expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: value }) // rename:keep
+        .runtimeAdminChannels).toEqual({ local: false });
+    }
   });
 
   test("requires a strong runtime token encryption key in development", () => {

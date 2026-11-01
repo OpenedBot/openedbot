@@ -153,14 +153,6 @@ export const API_ENV: readonly EnvVar[] = [
     tier: "default_only",
     doc: "Days a closed support thread is kept before purge (default 180).",
   },
-  {
-    name: "OHB_RUNTIME_ADMIN_MODE",
-    scope: "api",
-    tier: "production",
-    requiredWhen: { environment: ["production"] },
-    doc: "`disabled` or `local`; production requires `disabled`.",
-    example: "disabled",
-  },
   // DEV_HERMES_URL / DEV_HERMES_TOKEN are read by apps/api/scripts/seed.ts
   // only under the fake profile, which itself runs in the external runtime mode
   // and writes both values through scripts/setup.sh. The fake and external

@@ -35,8 +35,7 @@ export function assertUniqueEnvNames(path: string, names: readonly string[]): vo
  *
  *   - `rename`: an old OHB_* name of the OPENEDBOT_* rename, rewritten under
  *     its new name with its value (removed when the new name is already set);
- *   - `remove`: deprecated, unused in this runtime mode, an admin mode other
- *     than `disabled`, or an empty non-local variable;
+ *   - `remove`: deprecated, unused in this runtime mode, or an empty non-local variable;
  *   - `preserve`: a non-empty production / default-only variable, reported
  *     by name but kept;
  *   - `keep`: a local variable, or one unknown to the schema.
@@ -46,7 +45,6 @@ export type LocalEnvDecision = "keep" | "preserve" | "remove" | "rename";
 export function classifyLocalEnvEntry(entry: EnvEntry, runtimeMode: RuntimeMode): LocalEnvDecision {
   if (renamedEnvName(entry.name)) return "rename";
   if (isDeprecatedEnvName(entry.name) || envUnusedForRuntimeMode(runtimeMode).has(entry.name)) return "remove";
-  if (entry.name === "OHB_RUNTIME_ADMIN_MODE" && entry.value.trim() !== "disabled") return "remove";
   const tier = envSchemaEntry(entry.name)?.tier;
   if (tier !== "production" && tier !== "default_only") return "keep";
   return entry.value.trim() ? "preserve" : "remove";
