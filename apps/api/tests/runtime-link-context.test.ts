@@ -12,7 +12,7 @@ afterAll(() => stopLinkSessions());
 
 describe("link.context remis à la liaison", () => {
   test("nomme le palier, l'origine, l'organisation et son owner, après audit.key et sans secret", async () => {
-    const config = linkConfig({ OHB_DEPLOY_ENV: "preprod", API_PUBLIC_URL: "https://preprod.openedbot.app" });
+    const config = linkConfig({ OPENEDBOT_DEPLOY_ENV: "preprod", API_PUBLIC_URL: "https://preprod.openedbot.app" });
     const session = await openLinkSession({ registeredDeviceKey: null, features: [RELAY_FEATURE_CREATION_AUDIT_V2], auditKeyRows: [], config });
     const frame = await session.waitFrame((entry) => entry.t === "link.context");
     if (frame.t !== "link.context") throw new Error("unreachable");

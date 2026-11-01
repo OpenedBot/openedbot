@@ -47,7 +47,7 @@ export const onboardingApi = {
   /**
    * Outil de développement : rejoue l'accueil pour la personne connectée
    * (`completed` retombe) et efface la sortie de l'espace courant. La route
-   * n'existe qu'en OHB_ENV=development côté cloud API: 404 partout ailleurs.
+   * n'existe qu'en OPENEDBOT_ENV=development côté cloud API: 404 partout ailleurs.
    *
    * `scope` choisit ce que le cloud API remet à zéro, et le défaut est le
    * geste le moins destructeur : `"flag"` ne touche que le parcours de la

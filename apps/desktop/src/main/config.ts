@@ -37,7 +37,7 @@ export const DEV_CONSOLE_URL = "http://localhost:1420";
 // Precedence: environment variable > userData/config.json > packaged
 // defaults.json > built-in default (DEV_CONSOLE_URL for a dev run). Inside each
 // source an explicit field (consoleUrl, apiOrigin) beats that source's
-// `target` (OHB_TARGET: prod, preprod or an API URL, see target.ts), which
+// `target` (OPENEDBOT_TARGET: prod, preprod or an API URL, see target.ts), which
 // fills in both. So a target never overrides a more specific setting of a
 // higher source, and without any target the built-in default stays production.
 // The user file exists so a tester can aim
@@ -47,11 +47,11 @@ export const DEV_CONSOLE_URL = "http://localhost:1420";
 type ConfigSource = Partial<Record<keyof DesktopConfig | "target", unknown>>;
 
 const ENV_KEYS: Record<keyof DesktopConfig | "target", string> = {
-  consoleUrl: "OHB_CONSOLE_URL",
-  apiOrigin: "OHB_API_ORIGIN",
+  consoleUrl: "OPENEDBOT_CONSOLE_URL",
+  apiOrigin: "OPENEDBOT_API_ORIGIN",
   clientId: "OHB_CLIENT_ID",
-  signinTemplate: "OHB_SIGNIN_TEMPLATE",
-  target: "OHB_TARGET",
+  signinTemplate: "OPENEDBOT_SIGNIN_TEMPLATE",
+  target: "OPENEDBOT_TARGET",
 };
 
 function readEnvConfig(): ConfigSource {
@@ -122,8 +122,8 @@ export function getConfig(): DesktopConfig {
     return DEFAULTS[key];
   };
   cached = {
-    consoleUrl: normalizeUrl("OHB_CONSOLE_URL", pick("consoleUrl"), true),
-    apiOrigin: normalizeUrl("OHB_API_ORIGIN", pick("apiOrigin"), false),
+    consoleUrl: normalizeUrl("OPENEDBOT_CONSOLE_URL", pick("consoleUrl"), true),
+    apiOrigin: normalizeUrl("OPENEDBOT_API_ORIGIN", pick("apiOrigin"), false),
     clientId: pick("clientId"),
     // A template name becomes a file name: letters, digits and dashes only.
     signinTemplate: /^[a-z0-9-]{1,40}$/.test(pick("signinTemplate")) ? pick("signinTemplate") : DEFAULTS.signinTemplate,

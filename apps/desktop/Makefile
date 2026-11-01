@@ -37,7 +37,7 @@ compile: ## Bundle main and preload to dist/ as CommonJS (electron-vite build)
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
 
-# make dev aims production unless OHB_CONSOLE_URL is set: the console on
+# make dev aims production unless OPENEDBOT_CONSOLE_URL is set: the console on
 # https://console.openedbot.app, the API on https://api.openedbot.app (the native
 # clients' host). The operator works on the shell against the real service
 # (2026-10-17).
@@ -48,22 +48,22 @@ PROD_CONSOLE_URL := https://console.openedbot.app
 PROD_API_ORIGIN := https://api.openedbot.app
 LOCAL_CONSOLE_URL := http://localhost:1420
 
-dev: ## Electron with reload (electron-vite dev --watch) on production (console console.openedbot.app, API api.openedbot.app): real account, Google sign-in; OHB_CONSOLE_URL=... aims elsewhere
+dev: ## Electron with reload (electron-vite dev --watch) on production (console console.openedbot.app, API api.openedbot.app): real account, Google sign-in; OPENEDBOT_CONSOLE_URL=... aims elsewhere
 	@command -v bun >/dev/null 2>&1 || { printf "$(C_ERR)[make] bun is not installed (https://bun.sh)$(C_RESET)\n"; exit 1; }
-	@if [ -z "$$OHB_CONSOLE_URL" ]; then printf "$(C_WARN)[make] electron-vite dev on PRODUCTION ($(PROD_CONSOLE_URL), API $(PROD_API_ORIGIN)): real account, real data$(C_RESET)\n"; \
-	else printf "$(C_WARN)[make] electron-vite dev (OHB_CONSOLE_URL=$$OHB_CONSOLE_URL)$(C_RESET)\n"; fi
-	@if [ -z "$$OHB_CONSOLE_URL" ]; then export OHB_CONSOLE_URL="$(PROD_CONSOLE_URL)" OHB_API_ORIGIN="$${OHB_API_ORIGIN:-$(PROD_API_ORIGIN)}"; \
-	else export OHB_API_ORIGIN="$${OHB_API_ORIGIN:-$$OHB_CONSOLE_URL}"; fi; bun run dev
+	@if [ -z "$$OPENEDBOT_CONSOLE_URL" ]; then printf "$(C_WARN)[make] electron-vite dev on PRODUCTION ($(PROD_CONSOLE_URL), API $(PROD_API_ORIGIN)): real account, real data$(C_RESET)\n"; \
+	else printf "$(C_WARN)[make] electron-vite dev (OPENEDBOT_CONSOLE_URL=$$OPENEDBOT_CONSOLE_URL)$(C_RESET)\n"; fi
+	@if [ -z "$$OPENEDBOT_CONSOLE_URL" ]; then export OPENEDBOT_CONSOLE_URL="$(PROD_CONSOLE_URL)" OPENEDBOT_API_ORIGIN="$${OPENEDBOT_API_ORIGIN:-$(PROD_API_ORIGIN)}"; \
+	else export OPENEDBOT_API_ORIGIN="$${OPENEDBOT_API_ORIGIN:-$$OPENEDBOT_CONSOLE_URL}"; fi; bun run dev
 
 dev-local: ## Electron with reload on the local console :1420 (../.. make dev), seeded dev accounts, console HMR
 	@command -v bun >/dev/null 2>&1 || { printf "$(C_ERR)[make] bun is not installed (https://bun.sh)$(C_RESET)\n"; exit 1; }
 	@curl -s -o /dev/null --max-time 2 "$(LOCAL_CONSOLE_URL)" || \
 		printf "$(C_WARN)[make] nothing answers on $(LOCAL_CONSOLE_URL): start the console first (cd ../.. && make db-up && make dev); the window retries every 5 s$(C_RESET)\n"
-	@printf "$(C_WARN)[make] electron-vite dev (OHB_CONSOLE_URL=$(LOCAL_CONSOLE_URL))$(C_RESET)\n"
-	@OHB_CONSOLE_URL="$(LOCAL_CONSOLE_URL)" OHB_API_ORIGIN="$(LOCAL_CONSOLE_URL)" bun run dev
+	@printf "$(C_WARN)[make] electron-vite dev (OPENEDBOT_CONSOLE_URL=$(LOCAL_CONSOLE_URL))$(C_RESET)\n"
+	@OPENEDBOT_CONSOLE_URL="$(LOCAL_CONSOLE_URL)" OPENEDBOT_API_ORIGIN="$(LOCAL_CONSOLE_URL)" bun run dev
 
 start: compile ## Build once, then launch Electron on the configured console (no reload: see make dev)
-	@printf "$(C_WARN)[make] launching Electron (OHB_CONSOLE_URL=$${OHB_CONSOLE_URL:-default})$(C_RESET)\n"
+	@printf "$(C_WARN)[make] launching Electron (OPENEDBOT_CONSOLE_URL=$${OPENEDBOT_CONSOLE_URL:-default})$(C_RESET)\n"
 	@bun run start
 
 # The diagnostics journal (src/main/diagnostics.ts) of one userData: "openedbot

@@ -5,7 +5,7 @@ const apiOrigin = required("API_INTERNAL_URL").replace(/\/+$/, "");
 const metricsToken = required("METRICS_INTERNAL_TOKEN");
 const webhookUrl = validatedWebhook(required("ALERT_WEBHOOK_URL"));
 const context: AlertContext = {
-  environment: deployEnvironment(process.env.OHB_DEPLOY_ENV, process.env.OHB_ENV),
+  environment: deployEnvironment(process.env.OPENEDBOT_DEPLOY_ENV, process.env.OPENEDBOT_ENV),
   host: new URL(process.env.API_PUBLIC_URL?.trim() || apiOrigin).host,
 };
 const intervalMs = positiveInteger("ALERT_INTERVAL_SECONDS", 30) * 1_000;

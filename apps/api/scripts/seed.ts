@@ -13,7 +13,7 @@ import { HermesClient } from "@openedbot/hermes";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { initializeProductFeatures, isExplicitDevelopmentEnvironment } from "@openedbot/identity/application/product-features";
 
-if ((process.env.OHB_ENV ?? process.env.NODE_ENV) === "production") throw new Error("Development seed is forbidden in production.");
+if ((process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV) === "production") throw new Error("Development seed is forbidden in production.");
 // No development password is versioned: a missing one is generated now and
 // stored in the env file `make` loaded; only its location is printed.
 const devEnvFile = devEnvFilePath(process.env, resolve(import.meta.dir, "../../.."));
@@ -43,8 +43,8 @@ const token = process.env.DEV_HERMES_TOKEN?.trim() || null;
 // gateway needs a pre-registered runtime to answer. External hosts register
 // theirs through the application (enrollment or the runtime form), so seeding
 // one here would shadow the real registration path.
-// `OHB_DEV_PROFILE` is exported by the Makefile (`make db-seed`).
-const devProfile = process.env.OHB_DEV_PROFILE?.trim() ?? "";
+// `OPENEDBOT_DEV_PROFILE` is exported by the Makefile (`make db-seed`).
+const devProfile = process.env.OPENEDBOT_DEV_PROFILE?.trim() ?? "";
 const seedRuntimeRow = devProfile === "fake";
 let runtimeReadiness: { providerReady: boolean } | null = null;
 /** Vrai seulement si la ligne du faux Hermes a réellement été écrite. */

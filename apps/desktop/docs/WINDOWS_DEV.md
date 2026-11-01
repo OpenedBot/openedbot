@@ -49,7 +49,7 @@ bun run typecheck; bun test
 
    ```powershell
    cd apps\desktop
-   $env:OHB_TARGET = "<api-origin>"; bun run dev
+   $env:OPENEDBOT_TARGET = "<api-origin>"; bun run dev
    ```
 
    A change in `src/main` restarts the app, in `src/preload` or `src/renderer`
@@ -60,11 +60,11 @@ The API and the console are separate settings (environment wins over
 
 | Setting | Meaning |
 |---|---|
-| `OHB_TARGET` | `prod`, or an API URL (a LAN host, for example `http://10.0.0.50:8790`). Fills in both of the next two. |
-| `OHB_API_ORIGIN` | The API base for sign-in. Beats the target. |
-| `OHB_CONSOLE_URL` | The console the window loads. Beats the target. Default for a URL target: `http://localhost:1420`. |
+| `OPENEDBOT_TARGET` | `prod`, or an API URL (a LAN host, for example `http://10.0.0.50:8790`). Fills in both of the next two. |
+| `OPENEDBOT_API_ORIGIN` | The API base for sign-in. Beats the target. |
+| `OPENEDBOT_CONSOLE_URL` | The console the window loads. Beats the target. Default for a URL target: `http://localhost:1420`. |
 
-Same thing with another console: `$env:OHB_TARGET="<api-origin>"; $env:OHB_CONSOLE_URL="http://localhost:5173"; bun run dev`.
+Same thing with another console: `$env:OPENEDBOT_TARGET="<api-origin>"; $env:OPENEDBOT_CONSOLE_URL="http://localhost:5173"; bun run dev`.
 
 The console's proxy and the shell must name the same API. If the console proxies
 to a local API while the shell signed in elsewhere, every call is refused.
@@ -75,10 +75,10 @@ in `tokens-<host>.bin` and a dev run in its own folder (`openedbot (dev prod)`,
 folder. A shell that is not on production says so in the window title and the
 tray tooltip, and logs a warning.
 
-Sign-in: an API that runs with `OHB_DEPLOY_ENV=preprod` offers the e-mail and
+Sign-in: an API that runs with `OPENEDBOT_DEPLOY_ENV=preprod` offers the e-mail and
 password form next to Google, and the sign-in page shows "API préprod". Such an
 API never publishes credentials, so a dev run aimed at it reads the development
-accounts from the development API (`OHB_DEV_ACCOUNTS_API`, default
+accounts from the development API (`OPENEDBOT_DEV_ACCOUNTS_API`, default
 `http://localhost:1420`). Google needs
 `<API_PUBLIC_URL>/api/auth/google/callback` registered on the API's Google client.
 
@@ -119,5 +119,5 @@ fails on a symbolic link, turn on Windows Developer Mode.
 - `make logs` reads a macOS path; on Windows open
   `%APPDATA%\<userData folder>\diagnostics.sqlite` with any SQLite tool.
 - Not verified on a Windows machine by the author of the target switch: run
-  `bun run dev` with `OHB_TARGET=<api-origin>` once and check the window title
+  `bun run dev` with `OPENEDBOT_TARGET=<api-origin>` once and check the window title
   shows the API host.

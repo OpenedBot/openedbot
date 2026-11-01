@@ -1,7 +1,7 @@
 /**
  * Writes, after a build, which source modules each output chunk carries:
  * `scripts/solo-bundle-check.ts` proves from it that a solo console holds no
- * pro screen (`make solo-check`). Off unless `OHB_CONSOLE_MODULE_REPORT` names
+ * pro screen (`make solo-check`). Off unless `OPENEDBOT_CONSOLE_MODULE_REPORT` names
  * the file; the report is written outside `dist`, never deployed.
  */
 import { mkdirSync, writeFileSync } from "node:fs";

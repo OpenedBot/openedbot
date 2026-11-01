@@ -85,14 +85,14 @@ launches it with `--hosted`.
 ## Configuration
 
 No environment variables are needed to run it. In the app, *Settings* has pages for General, Account, Models, Journal,
-Notch, Menu bar, Announcements and Demo. For tests, `OHB_SNAPSHOT_DIR` enables the
+Notch, Menu bar, Announcements and Demo. For tests, `OPENEDBOT_SNAPSHOT_DIR` enables the
 PNG snapshots (see [Testing](#testing)).
 
 ## Testing
 
 ```sh
 make test                                                  # swift test
-OHB_SNAPSHOT_DIR=/tmp/notch-ui swift test --filter Snapshot  # render views to PNG, no windows
+OPENEDBOT_SNAPSHOT_DIR=/tmp/notch-ui swift test --filter Snapshot  # render views to PNG, no windows
 ```
 
 ## Project structure

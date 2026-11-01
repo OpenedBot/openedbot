@@ -1,4 +1,4 @@
-import { OHB_SUPPORT_DISCORD_URL } from "../discord";
+import { OPENEDBOT_SUPPORT_DISCORD_URL } from "../discord";
 import { type EmailDocument, renderEmailHtml, renderEmailText } from "./design";
 import { type TransactionalEmailKind, transactionalEmailLocale, type TransactionalEmailLocale } from "@openedbot/contracts-api";
 import type { Template } from "./templates/helpers";
@@ -9,7 +9,7 @@ import { STAFF_TEMPLATES } from "./templates/staff";
 import { WAITLIST_TEMPLATES } from "./templates/waitlist";
 import { SUPPORT_TEMPLATES } from "./templates/support";
 
-export { OHB_SUPPORT_DISCORD_URL };
+export { OPENEDBOT_SUPPORT_DISCORD_URL };
 
 export type RenderedEmail = {
   subject: string;

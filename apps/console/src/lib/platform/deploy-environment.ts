@@ -3,7 +3,7 @@ import { api, queryKeys } from "../api";
 
 /**
  * The tier of THIS openedbot, as the API says it (`/api/health`, its
- * OHB_DEPLOY_ENV). One host can be linked to a dev, a preprod and a prod openedbot
+ * OPENEDBOT_DEPLOY_ENV). One host can be linked to a dev, a preprod and a prod openedbot
  * at once, one connector instance each, and the desktop app can aim any of
  * them: without a badge a dev console looks exactly like production. `null`
  * while unknown, and for an API that predates the field.

@@ -19,7 +19,7 @@ import {
 } from "../src/routes/runtimes/runtime-link-routes";
 
 const encryptionKey = Buffer.alloc(32, 7).toString("base64");
-const config = readApiConfig({ OHB_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey });
+const config = readApiConfig({ OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey });
 
 const LINK_TOKEN = "link-token-secret";
 const PREVIOUS_LINK_TOKEN = "link-token-before-rotation";

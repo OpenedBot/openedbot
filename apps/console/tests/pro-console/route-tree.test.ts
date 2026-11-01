@@ -4,7 +4,7 @@ import { proConsole } from "../../src/pro-console/registry";
 
 /**
  * The route snapshot of each pass of `make test-dual`: solo
- * (`OHB_PRO_CONSOLE` empty) registers none of the pro routes, pro registers
+ * (`OPENEDBOT_CONSOLE_PLUGINS` empty) registers none of the pro routes, pro registers
  * all of them. A solo console therefore has no URL whose screen would call a
  * pro endpoint (and read its 404).
  */
@@ -20,7 +20,7 @@ const PRO_ROUTES = [
   "/summary",
 ];
 
-const pro = Boolean(process.env.OHB_PRO_CONSOLE?.trim());
+const pro = Boolean(process.env.OPENEDBOT_CONSOLE_PLUGINS?.trim());
 const paths = Object.values(router.routesById as Record<string, { fullPath: string }>).map((route) => route.fullPath);
 
 describe(`route tree (${pro ? "pro" : "solo"})`, () => {

@@ -1,4 +1,4 @@
-import { OHB_SUPPORT_DISCORD_URL } from "../../discord";
+import { OPENEDBOT_SUPPORT_DISCORD_URL } from "../../discord";
 import type { EmailBlock, EmailDocument } from "../design";
 import { type AccessTier, isAccessTier, type TransactionalEmailKind, type TransactionalEmailLocale } from "@openedbot/contracts-api";
 
@@ -60,7 +60,7 @@ export function loginButton(data: Record<string, unknown>, label: string): Email
 export function discordSupportBlocks(paragraphText: string, buttonLabel: string): EmailBlock[] {
   return [
     { kind: "paragraph", text: paragraphText },
-    { kind: "button", label: buttonLabel, url: OHB_SUPPORT_DISCORD_URL },
+    { kind: "button", label: buttonLabel, url: OPENEDBOT_SUPPORT_DISCORD_URL },
   ];
 }
 

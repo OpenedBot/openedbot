@@ -4,11 +4,11 @@ import SwiftUI
 import Testing
 @testable import OHBPopup
 
-/// La page Réglages › Modèles en PNG, comme `SnapshotExportTests` : seulement avec `OHB_SNAPSHOT_DIR`.
+/// La page Réglages › Modèles en PNG, comme `SnapshotExportTests` : seulement avec `OPENEDBOT_SNAPSHOT_DIR`.
 @Suite(.french) @MainActor
 struct ModelsSnapshotTests {
     @Test func export() async throws {
-        guard let dir = ProcessInfo.processInfo.environment["OHB_SNAPSHOT_DIR"] else { return }
+        guard let dir = ProcessInfo.processInfo.environment["OPENEDBOT_SNAPSHOT_DIR"] else { return }
         func shoot(_ name: String, _ view: some View, size: CGSize = CGSize(width: 720, height: 760)) throws {
             let host = NSHostingView(rootView: view.frame(width: size.width, height: size.height, alignment: .topLeading)
                 .background(Surface.window).preferredColorScheme(.dark))

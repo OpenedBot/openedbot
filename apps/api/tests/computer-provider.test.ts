@@ -60,9 +60,9 @@ describe("Computer providers", () => {
       }
       if (url.pathname.endsWith("/boxes/box-1/commands") && method === "POST") {
         const command = JSON.parse(String(init?.body)).command as string;
-        expect(command).toContain("OHB_CAPTURED");
+        expect(command).toContain("OPENEDBOT_CAPTURED");
         expect(command).not.toContain("box_secret");
-        return json({ exitCode: 0, stdout: "OHB_CAPTURED\n", stderr: "" });
+        return json({ exitCode: 0, stdout: "OPENEDBOT_CAPTURED\n", stderr: "" });
       }
       if (url.pathname.endsWith("/boxes/box-1/artifacts") && method === "GET") return new Response(jpeg);
       if (url.pathname.endsWith("/boxes/box-1/stop") && method === "POST") {

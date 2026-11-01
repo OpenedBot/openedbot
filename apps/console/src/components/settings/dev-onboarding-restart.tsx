@@ -22,7 +22,7 @@ import { clearOnboardingDraft } from "../../lib/session/onboarding-draft";
 
 /**
  * L'interrupteur, et le seul : le cloud API publie `devSignIn` sur
- * `/api/auth/providers` en `OHB_ENV=development` et nulle part ailleurs.
+ * `/api/auth/providers` en `OPENEDBOT_ENV=development` et nulle part ailleurs.
  * C'est le même qui MONTE la route ; un build de production ne peut donc ni
  * montrer le geste ni l'atteindre. Le champ porte les identifiants du compte
  * de dev : sa PRÉSENCE est le booléen, jamais sa valeur.

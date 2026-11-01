@@ -1,7 +1,7 @@
 /**
  * The fleet routes moved to a plug-in in open-core step 11.2: an
  * integration test that drives them loads the plug-in that brings the
- * fleet capability from `OHB_PRO_PLUGINS` and mounts it exactly as the API
+ * fleet capability from `OPENEDBOT_PLUGINS` and mounts it exactly as the API
  * does (`proPublicRoutes` before the session, `proSessionRoutes` after it,
  * `context.host.fleet` lent by `fleetHost`). Solo, there is none: the test
  * says so on one line and exits 0.
@@ -18,7 +18,7 @@ import type { ApiConfig } from "../../apps/api/src/infrastructure/config";
 
 /** The loaded plug-in that provides `fleet.workspaces`, or `null` (solo). */
 export async function loadFleetPlugin(): Promise<ProPlugin | null> {
-  const { plugins } = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS);
+  const { plugins } = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS);
   return plugins.find((plugin) => plugin.manifest.entitlements.includes(CAPABILITY_ENTITLEMENTS.fleetWorkspaces)) ?? null;
 }
 
@@ -26,7 +26,7 @@ export async function loadFleetPlugin(): Promise<ProPlugin | null> {
 export async function requireFleetPlugin(test: string): Promise<ProPlugin> {
   const plugin = await loadFleetPlugin();
   if (plugin) return plugin;
-  console.log(`${test}: skipped, no plug-in provides ${CAPABILITY_ENTITLEMENTS.fleetWorkspaces} (set OHB_PRO_PLUGINS)`);
+  console.log(`${test}: skipped, no plug-in provides ${CAPABILITY_ENTITLEMENTS.fleetWorkspaces} (set OPENEDBOT_PLUGINS)`);
   process.exit(0);
 }
 

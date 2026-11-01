@@ -16,7 +16,7 @@ import { useVisibleSettingsGroups } from "../../src/components/dashboard/setting
  * slot renders and no pro endpoint is called, whatever the session says.
  * Pro: a screen appears only when the session holds its entitlement.
  */
-const pro = Boolean(process.env.OHB_PRO_CONSOLE?.trim());
+const pro = Boolean(process.env.OPENEDBOT_CONSOLE_PLUGINS?.trim());
 const realFetch = globalThis.fetch;
 let calls: string[] = [];
 

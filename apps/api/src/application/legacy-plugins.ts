@@ -1,14 +1,14 @@
 /**
  * Legacy install: plug-ins the API would install itself, without
- * `OHB_PRO_PLUGINS`, resolved from `apps/api`'s own dependencies. Empty since
+ * `OPENEDBOT_PLUGINS`, resolved from `apps/api`'s own dependencies. Empty since
  * step 8: the backoffice (`staff`) became an external plug-in
- * (`@openedbot/pro-staff/plugin`) and loads through `OHB_PRO_PLUGINS` like
+ * (`@openedbot/pro-staff/plugin`) and loads through `OPENEDBOT_PLUGINS` like
  * every pro plug-in. Without it the API runs solo: no backoffice, no support
  * session.
  *
  * The mechanism stays for a later move that has to keep serving a feature
  * during the switch: a legacy plug-in absent from the image is skipped with a
- * warning, and one that `OHB_PRO_PLUGINS` already loaded (same id) is not
+ * warning, and one that `OPENEDBOT_PLUGINS` already loaded (same id) is not
  * installed twice.
  */
 import { loadProPlugins, type PluginSkip, type ProPlugin } from "@openedbot/platform-plugins";

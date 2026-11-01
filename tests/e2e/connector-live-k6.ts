@@ -91,8 +91,8 @@ try {
   await Bun.write(join(artifacts, "journal-before.json"), redact(JSON.stringify(publicEvents(before), null, 2)));
   const summaryPath = join(artifacts, "k6-summary.json");
   const child = Bun.spawn([k6, "run", "--no-usage-report", new URL("./connector-live.k6.js", import.meta.url).pathname], {
-    env: { PATH: process.env.PATH, HOME: process.env.HOME, OHB_RUNTIME_ID: runtime.id, OHB_INTERNAL_TOKEN: token,
-      OHB_K6_API_URL: base, OHB_K6_SUMMARY: summaryPath }, stdout: "pipe", stderr: "pipe",
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, OPENEDBOT_K6_RUNTIME_ID: runtime.id, OPENEDBOT_K6_INTERNAL_TOKEN: token,
+      OPENEDBOT_K6_API_URL: base, OPENEDBOT_K6_SUMMARY: summaryPath }, stdout: "pipe", stderr: "pipe",
   });
   const [exitCode, stdout, stderr] = await Promise.all([child.exited, collect(child.stdout), collect(child.stderr)]);
   await Promise.all([Bun.write(join(artifacts, "k6.stdout.log"), stdout), Bun.write(join(artifacts, "k6.stderr.log"), stderr)]);

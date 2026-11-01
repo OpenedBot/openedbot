@@ -8,7 +8,7 @@ import {
   type BotSpeechRate,
 } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { OHB_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
 import { isUuid } from "@openedbot/contracts-primitives";
 import { assertString } from "@openedbot/platform-config/http-body";
 import { AUTONOMY_CEILINGS, AUTONOMY_DEFAULTS, type AutonomyPolicy } from "./autonomous-workflow";
@@ -142,7 +142,7 @@ export function slugify(input: string): string {
   const slug = input.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 63);
   if (!slug) throw new HttpError(400, "BOT_SLUG_INVALID", "Le slug du bot est invalide.");
-  return HERMES_RESERVED_PROFILE_NAMES.has(slug) || OHB_SERVICE_PROFILES.has(slug) ? `${slug}-bot` : slug;
+  return HERMES_RESERVED_PROFILE_NAMES.has(slug) || OPENEDBOT_SERVICE_PROFILES.has(slug) ? `${slug}-bot` : slug;
 }
 
 export function isFace(value: unknown): value is BotFaceSpec {

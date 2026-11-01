@@ -62,7 +62,7 @@ export async function readSigninContext(config: DesktopConfig): Promise<SigninCo
     getJson(config, "/api/legal").catch(() => null),
     getJson(config, "/api/health").catch(() => null),
   ]);
-  // The API's own word wins (../.. OHB_DEPLOY_ENV): a LAN host may well be a
+  // The API's own word wins (../.. OPENEDBOT_DEPLOY_ENV): a LAN host may well be a
   // preprod. Without it, the origin decides (target.ts).
   const said = record(health).environment;
   const environment: DeployEnvironment =
@@ -83,11 +83,11 @@ export async function readSigninContext(config: DesktopConfig): Promise<SigninCo
   // production build on a COPY of the development data: the seeded accounts exist there,
   // but a production API never publishes credentials (assertProductionConfig).
   // A dev run aimed at preprod takes them from the development API instead
-  // (OHB_DEV_ACCOUNTS_API, default the dev PC's console), so the page offers
+  // (OPENEDBOT_DEV_ACCOUNTS_API, default the dev PC's console), so the page offers
   // the same autofill; signing in still goes to preprod. Never in a packaged
   // build, and never against production.
   if (devAccounts.length === 0 && environment === "preprod" && isElectronViteDev) {
-    const source = process.env.OHB_DEV_ACCOUNTS_API?.trim().replace(/\/+$/, "") || DEV_CONSOLE_URL;
+    const source = process.env.OPENEDBOT_DEV_ACCOUNTS_API?.trim().replace(/\/+$/, "") || DEV_CONSOLE_URL;
     devAccounts = await getJsonAt(source, "/api/auth/providers")
       .then((published) => seededAccounts(record(published)))
       .catch((error: unknown) => {

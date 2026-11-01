@@ -156,10 +156,10 @@ user.
 Both cards stay visible in the console, but disabled until
 the deployment enables them:
 
-- **openedbot-managed tunnel**: `OHB_CF_ACCOUNT_ID`, `OHB_CF_API_TOKEN` and
-  `OHB_CF_ZONE_ID` set on the API and worker side; `OHB_MANAGED_TUNNEL_SUFFIX`
+- **openedbot-managed tunnel**: `OPENEDBOT_CF_ACCOUNT_ID`, `OPENEDBOT_CF_API_TOKEN` and
+  `OPENEDBOT_CF_ZONE_ID` set on the API and worker side; `OPENEDBOT_MANAGED_TUNNEL_SUFFIX`
   defaults to `rt.openedbot.app`;
-- **Tailscale Funnel**: `OHB_TAILSCALE_FUNNEL_ENABLED`.
+- **Tailscale Funnel**: `OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`.
 
 Otherwise, the API answers `MANAGED_TUNNEL_UNAVAILABLE` or
 `TAILSCALE_FUNNEL_UNAVAILABLE`.

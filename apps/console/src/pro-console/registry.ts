@@ -2,7 +2,7 @@
  * The pro console modules this build carries, and the gate of each feature:
  * its module is present AND the session holds its entitlement.
  *
- * Solo (`OHB_PRO_CONSOLE` empty), `virtual:ohb-pro-console` is an empty list:
+ * Solo (`OPENEDBOT_CONSOLE_PLUGINS` empty), `virtual:ohb-pro-console` is an empty list:
  * every feature reads `undefined`, so no route, nav entry or card exists and
  * no pro endpoint is ever called.
  */

@@ -19,7 +19,7 @@ import (
 // Production connector; deliberately synthetic inference and persistence. This
 // host is controlled only by the isolated TypeScript separation E2E harness.
 func TestSeparatedGatewayE2EHost(t *testing.T) {
-	linkURL, controlURL := os.Getenv("OHB_LINK_E2E_WS_URL"), os.Getenv("OHB_LINK_E2E_CONTROL_URL")
+	linkURL, controlURL := os.Getenv("OPENEDBOT_LINK_E2E_WS_URL"), os.Getenv("OPENEDBOT_LINK_E2E_CONTROL_URL")
 	if linkURL == "" || controlURL == "" {
 		t.Skip("run apps/api/tests/runtime-link-separation.e2e.test.ts in OpenedBot/openedbot")
 	}

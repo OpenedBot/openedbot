@@ -1,16 +1,16 @@
 // Opt-in deployed connector smoke: loopback API -> existing VPS /health only.
-// Pass OHB_RUNTIME_ID and OHB_INTERNAL_TOKEN in the process environment.
+// Pass OPENEDBOT_K6_RUNTIME_ID and OPENEDBOT_K6_INTERNAL_TOKEN in the process environment.
 // No model calls, credentials changes, lifecycle actions or fault injection.
 import http from "k6/http";
 import { check, sleep } from "k6";
 
-const runtimeId = __ENV.OHB_RUNTIME_ID;
-if (!/^[a-f0-9-]{36}$/i.test(runtimeId || "") || !__ENV.OHB_INTERNAL_TOKEN) {
-  throw new Error("OHB_RUNTIME_ID and OHB_INTERNAL_TOKEN are required");
+const runtimeId = __ENV.OPENEDBOT_K6_RUNTIME_ID;
+if (!/^[a-f0-9-]{36}$/i.test(runtimeId || "") || !__ENV.OPENEDBOT_K6_INTERNAL_TOKEN) {
+  throw new Error("OPENEDBOT_K6_RUNTIME_ID and OPENEDBOT_K6_INTERNAL_TOKEN are required");
 }
-const apiUrl = (__ENV.OHB_K6_API_URL || "http://127.0.0.1:8790").replace(/\/+$/, "");
+const apiUrl = (__ENV.OPENEDBOT_K6_API_URL || "http://127.0.0.1:8790").replace(/\/+$/, "");
 if (!/^https:\/\/[^/?#@]+$/i.test(apiUrl) && !/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::[0-9]+)?$/i.test(apiUrl)) {
-  throw new Error("OHB_K6_API_URL must be an HTTPS origin or HTTP loopback origin");
+  throw new Error("OPENEDBOT_K6_API_URL must be an HTTPS origin or HTTP loopback origin");
 }
 const url = `${apiUrl}/internal/runtime-links/${runtimeId}/proxy/health`;
 
@@ -23,7 +23,7 @@ export const options = {
 
 export default function () {
   const response = http.get(url, {
-    headers: { Authorization: `Bearer ${__ENV.OHB_INTERNAL_TOKEN}` },
+    headers: { Authorization: `Bearer ${__ENV.OPENEDBOT_K6_INTERNAL_TOKEN}` },
     timeout: "3s",
     redirects: 0,
     tags: { name: "deployed connector health" },
@@ -34,7 +34,7 @@ export default function () {
 
 export function handleSummary(data) {
   return {
-    [__ENV.OHB_K6_SUMMARY || "/tmp/ohb-live-connector-k6-summary.json"]: JSON.stringify(data, null, 2),
+    [__ENV.OPENEDBOT_K6_SUMMARY || "/tmp/ohb-live-connector-k6-summary.json"]: JSON.stringify(data, null, 2),
     stdout: JSON.stringify({
       requests: data.metrics.http_reqs.values.count,
       failedRate: data.metrics.http_req_failed.values.rate,

@@ -120,7 +120,7 @@ describe("fake Hermes gateway", () => {
 
     const completed = await client.getRunStatus(runId);
     expect(completed.status).toBe("completed");
-    expect(completed.output).toBe("OHB_CANARY_OK ping");
+    expect(completed.output).toBe("OPENEDBOT_CANARY_OK ping");
     expect(completed.usage).toEqual({ inputTokens: 2, outputTokens: 3, totalTokens: 5 });
     expect(completed.pendingSteer).toBe("focus");
 
@@ -197,9 +197,9 @@ test("streams the extra deltas it was asked for, spaced in time, and keeps them 
     for await (const event of streamingClient.events(runId, new AbortController().signal)) {
       if (event.event === "message.delta") deltas.push({ at: performance.now(), text: String(event.delta) });
     }
-    expect(deltas.map((delta) => delta.text)).toEqual(["OHB_", "chunk0 ", "chunk1 ", "chunk2 ", "CANARY_OK"]);
+    expect(deltas.map((delta) => delta.text)).toEqual(["OPENEDBOT_", "chunk0 ", "chunk1 ", "chunk2 ", "CANARY_OK"]);
     expect(deltas[3]!.at - deltas[0]!.at).toBeGreaterThanOrEqual(50);
-    expect((await streamingClient.getRunStatus(runId)).output).toBe("OHB_chunk0 chunk1 chunk2 CANARY_OK ping");
+    expect((await streamingClient.getRunStatus(runId)).output).toBe("OPENEDBOT_chunk0 chunk1 chunk2 CANARY_OK ping");
   } finally {
     streaming.stop(true);
   }

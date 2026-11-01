@@ -195,7 +195,7 @@ function start(): void {
           status: "error",
           code: "CONSOLE_UNSUPPORTED",
           params: { host },
-          message: `La console ${host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OHB_CONSOLE_URL ou config.json).`,
+          message: `La console ${host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OPENEDBOT_CONSOLE_URL ou config.json).`,
         });
       },
     });
@@ -306,7 +306,7 @@ if (isElectronViteDev) {
 // packaged build, where any local process could use it to read the session
 // through the bridge. Must be set before `ready`.
 if (isElectronViteDev) {
-  app.commandLine.appendSwitch("remote-debugging-port", process.env.OHB_REMOTE_DEBUGGING_PORT ?? "9333");
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.OPENEDBOT_REMOTE_DEBUGGING_PORT ?? "9333");
 }
 
 // The console's copy buttons use navigator.clipboard, which Chromium only

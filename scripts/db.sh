@@ -14,12 +14,12 @@ fi
 
 db_up() {
   # PostgreSQL only, and never created here. The development database lives in
-  # the shared dev-infra container (OHB_POSTGRES_CONTAINER, default
+  # the shared dev-infra container (OPENEDBOT_POSTGRES_CONTAINER, default
   # infra-postgres) owned by another compose project: this script starts it when
   # it is stopped and waits for it, but refuses to invent one when it is absent.
   # Never starts Hermes: this repository does not provision one.
 
-  container="${OHB_POSTGRES_CONTAINER:-infra-postgres}"
+  container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
 
   if ! command -v docker >/dev/null 2>&1; then
     printf 'Docker is required. Install Docker Engine with the Compose plugin, then rerun make setup.\n' >&2
@@ -60,8 +60,8 @@ db_up() {
 }
 
 db_migrate() {
-  container="${OHB_POSTGRES_CONTAINER:-infra-postgres}"
-  database="${OHB_DATABASE_NAME:-ohb}"
+  container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
+  database="${OPENEDBOT_DATABASE_NAME:-ohb}"
 
   if ! docker inspect "$container" >/dev/null 2>&1; then
     printf 'PostgreSQL container %s is not available. Run make infra-up first.\n' "$container" >&2
@@ -115,12 +115,12 @@ SQL
   done
 
   # Pro plug-in migrations, after every core one. Solo mode
-  # (OHB_PRO_PLUGINS empty or unset) never gets here: nothing else runs.
+  # (OPENEDBOT_PLUGINS empty or unset) never gets here: nothing else runs.
   # scripts/pro-migrations.ts prints `<id>:<file>\t<path>` lines; the version
   # is recorded by this script, in the same transaction as the file, so a
   # plug-in migration needs no insert of its own.
-  if [ -n "${OHB_PRO_PLUGINS:-}" ]; then
-    pro_plan="$(cd "$root" && OHB_PRO_PLUGINS="$OHB_PRO_PLUGINS" bun scripts/pro-migrations.ts)"
+  if [ -n "${OPENEDBOT_PLUGINS:-}" ]; then
+    pro_plan="$(cd "$root" && OPENEDBOT_PLUGINS="$OPENEDBOT_PLUGINS" bun scripts/pro-migrations.ts)"
     while IFS="$(printf '\t')" read -r version migration; do
       [ -n "$version" ] || continue
       if ! printf '%s' "$version" | grep -Eq '^[a-z][a-z0-9-]{1,39}:[0-9]{4}_[a-z0-9_]+$'; then
@@ -147,7 +147,7 @@ EOF_PRO_PLAN
 
 db_reset() {
   # Drops and recreates the openedbot development database inside the shared
-  # dev-infra PostgreSQL container (OHB_POSTGRES_CONTAINER, default
+  # dev-infra PostgreSQL container (OPENEDBOT_POSTGRES_CONTAINER, default
   # infra-postgres). Exactly one database is touched: the container, its volume
   # and every other database it hosts (other projects, the maintenance database)
   # are left alone. The roles are not dropped; scripts/db.sh --migrate recreates
@@ -156,8 +156,8 @@ db_reset() {
   # Refuses without --yes. --dry-run prints the SQL that would run and never
   # calls docker.
 
-  container="${OHB_POSTGRES_CONTAINER:-infra-postgres}"
-  database="${OHB_DATABASE_NAME:-ohb}"
+  container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
+  database="${OPENEDBOT_DATABASE_NAME:-ohb}"
   dry_run=0
   confirmed=0
   for flag in "$@"; do
@@ -182,7 +182,7 @@ db_reset() {
       ;;
   esac
   if ! printf '%s' "$database" | grep -Eq '^[a-z_][a-z0-9_]{0,62}$'; then
-    printf 'OHB_DATABASE_NAME must be a plain lowercase identifier, not %s.\n' "$database" >&2
+    printf 'OPENEDBOT_DATABASE_NAME must be a plain lowercase identifier, not %s.\n' "$database" >&2
     exit 1
   fi
 

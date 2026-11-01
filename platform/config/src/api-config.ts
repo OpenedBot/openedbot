@@ -141,7 +141,7 @@ export type ComputerProviderConfig =
 export type ApiConfig = {
   environment: ApiEnvironment;
   /**
-   * Palier de déploiement (`OHB_DEPLOY_ENV`, sinon dérivé de `OHB_ENV`) :
+   * Palier de déploiement (`OPENEDBOT_DEPLOY_ENV`, sinon dérivé de `OPENEDBOT_ENV`) :
    * nommé dans chaque alerte et poussé aux connecteurs (`link.context`),
    * puisque plusieurs déploiements partagent un canal Discord.
    */
@@ -364,7 +364,7 @@ export type ApiConfig = {
 };
 
 export function readApiConfig(env: Record<string, string | undefined> = process.env): ApiConfig {
-  const environment = readEnvironment(env.OHB_ENV ?? env.NODE_ENV);
+  const environment = readEnvironment(env.OPENEDBOT_ENV ?? env.NODE_ENV);
   // R2 quand il est configuré, sinon le volume du serveur, même en production (`blob-driver.ts`).
   const blobChoice = resolveBlobDriver(env, environment === "production");
   const blobDriver = blobChoice.driver;
@@ -413,7 +413,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
   const runtimeAdminChannels: RuntimeAdminChannels = { local: false };
   const base = {
     environment,
-    deployEnvironment: deployEnvironment(env.OHB_DEPLOY_ENV, env.OHB_ENV),
+    deployEnvironment: deployEnvironment(env.OPENEDBOT_DEPLOY_ENV, env.OPENEDBOT_ENV),
     host: env.API_HOST?.trim() || "127.0.0.1",
     port: readApiPort(env.API_PORT),
     databaseUrl:
@@ -474,7 +474,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     trustProxy: /^(1|true)$/i.test(env.API_TRUST_PROXY?.trim() ?? ""),
     billingEnforced: readBooleanDefault(env.BILLING_ENFORCED, environment === "production"),
     managedTunnel: readManagedTunnelConfig(env),
-    tailscaleFunnelEnabled: readBooleanDefault(env.OHB_TAILSCALE_FUNNEL_ENABLED, false),
+    tailscaleFunnelEnabled: readBooleanDefault(env.OPENEDBOT_TAILSCALE_FUNNEL_ENABLED, false),
     google: {
       clientId: optional(env.GOOGLE_CLIENT_ID),
       clientSecret: optional(env.GOOGLE_CLIENT_SECRET),
@@ -529,7 +529,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
 }
 
 export function assertProductionConfig(config: ApiConfig): void {
-  if (config.environment !== "production") throw new Error("OHB_ENV=production is required.");
+  if (config.environment !== "production") throw new Error("OPENEDBOT_ENV=production is required.");
   if (config.devSignIn) throw new Error("Development sign-in credentials must not be published in production.");
   if (config.staffDevSignIn) throw new Error("Development staff sign-in credentials must not be published in production.");
   if (!config.publicUrl.startsWith("https://")) throw new Error("API_PUBLIC_URL must use HTTPS in production.");
@@ -704,14 +704,14 @@ function readComputerProvider(
   env: Record<string, string | undefined>,
   environment: ApiEnvironment,
 ): ComputerProviderConfig {
-  const provider = env.OHB_COMPUTER_PROVIDER?.trim() || "disabled";
+  const provider = env.OPENEDBOT_COMPUTER_PROVIDER?.trim() || "disabled";
   if (provider === "disabled") return { provider: "disabled" };
   if (provider !== "box") {
-    throw new Error("OHB_COMPUTER_PROVIDER must be either disabled or box.");
+    throw new Error("OPENEDBOT_COMPUTER_PROVIDER must be either disabled or box.");
   }
-  const token = optional(env.OHB_COMPUTER_BOX_TOKEN);
-  if (!token) throw new Error("OHB_COMPUTER_BOX_TOKEN is required when OHB_COMPUTER_PROVIDER=box.");
-  if (token.length > 4_096) throw new Error("OHB_COMPUTER_BOX_TOKEN is too long.");
+  const token = optional(env.OPENEDBOT_COMPUTER_BOX_TOKEN);
+  if (!token) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is required when OPENEDBOT_COMPUTER_PROVIDER=box.");
+  if (token.length > 4_096) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is too long.");
 
   // A configurable provider origin would turn the API into an authenticated
   // SSRF proxy. Only tests may point at a loopback fixture; real deployments

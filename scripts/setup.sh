@@ -10,9 +10,9 @@ env_file="${ENV_FILE:-.env.local}"
 #   fake     -> OHB_RUNTIME_MODE=external, pointed at tests/fake-hermes (default)
 #   bundled  -> OHB_RUNTIME_MODE=bundled, operator-provided Hermes + dashboard credentials
 #   external -> OHB_RUNTIME_MODE=external, operator-provided DEV_HERMES_URL/TOKEN
-# `make` always passes OHB_DEV_PROFILE; a direct call falls back to the runtime
+# `make` always passes OPENEDBOT_DEV_PROFILE; a direct call falls back to the runtime
 # mode it was given, and only then to the fake profile.
-profile="${OHB_DEV_PROFILE:-}"
+profile="${OPENEDBOT_DEV_PROFILE:-}"
 if [ -z "$profile" ]; then
   case "${OHB_RUNTIME_MODE:-}" in
     bundled) profile="bundled" ;;
@@ -31,7 +31,7 @@ case "$profile" in
   bundled) runtime_mode="bundled" ;;
   external) runtime_mode="external" ;;
   *)
-    printf 'OHB_DEV_PROFILE must be fake, bundled or external, not %s.\n' "$profile" >&2
+    printf 'OPENEDBOT_DEV_PROFILE must be fake, bundled or external, not %s.\n' "$profile" >&2
     exit 1
     ;;
 esac
@@ -66,7 +66,7 @@ bun install --frozen-lockfile
 declare -A env_file_of=()
 while IFS=$'\t' read -r mapped_name mapped_path; do
   [ -n "$mapped_name" ] && env_file_of["$mapped_name"]="$mapped_path"
-done < <(OHB_ENV_FILE="$env_file" bun scripts/env.ts --file-of)
+done < <(OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --file-of)
 
 # The private file a variable belongs to; the root one for anything the schema
 # does not know, which is where env-audit also keeps unknown names.
@@ -205,8 +205,8 @@ elif [ "$profile" = "external" ]; then
   fi
 fi
 
-OHB_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --audit --apply
-OHB_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --check
+OPENEDBOT_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --audit --apply
+OPENEDBOT_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --check
 
 # The seed probes DEV_HERMES_URL (health, capabilities, toolsets, model
 # options). With the fake profile that gateway is this repository's own

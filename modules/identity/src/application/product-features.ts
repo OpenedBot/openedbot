@@ -99,7 +99,7 @@ export function invalidateProductFeatureReaders(db: Db): void {
 
 /** Use only the explicitly selected environment, never readApiConfig's dev fallback. */
 export function isExplicitDevelopmentEnvironment(env: Record<string, string | undefined> = process.env): boolean {
-  return (env.OHB_ENV ?? env.NODE_ENV) === "development";
+  return (env.OPENEDBOT_ENV ?? env.NODE_ENV) === "development";
 }
 
 /**

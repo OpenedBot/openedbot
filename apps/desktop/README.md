@@ -11,7 +11,7 @@
 openedbot is the cloud console that drives AI agents installed on your own servers. This
 repository is a thin Electron shell around it; it re-implements **nothing** of the product. It:
 
-- loads the full openedbot web console (`OHB_CONSOLE_URL`);
+- loads the full openedbot web console (`OPENEDBOT_CONSOLE_URL`);
 - handles native sign-in, always with PKCE: Google through the system browser, or e-mail and
   password;
 - exposes a minimal bridge to the page, `window.__OHB_NATIVE__`;
@@ -90,13 +90,13 @@ Precedence: environment variable, then `config.json`, then build-time defaults
 
 | Setting | Variable | `config.json` key | Default |
 |---|---|---|---|
-| Web console | `OHB_CONSOLE_URL` | `consoleUrl` | `https://console.openedbot.app` |
-| API origin | `OHB_API_ORIGIN` | `apiOrigin` | `https://api.openedbot.app` |
+| Web console | `OPENEDBOT_CONSOLE_URL` | `consoleUrl` | `https://console.openedbot.app` |
+| API origin | `OPENEDBOT_API_ORIGIN` | `apiOrigin` | `https://api.openedbot.app` |
 | OAuth client id | `OHB_CLIENT_ID` | `clientId` | `ohb-desktop-windows` |
-| Sign-in template | `OHB_SIGNIN_TEMPLATE` | `signinTemplate` | `console-split` |
+| Sign-in template | `OPENEDBOT_SIGNIN_TEMPLATE` | `signinTemplate` | `console-split` |
 
-Development-only variables: `OHB_TARGET` (`prod` or an API URL), `OHB_POPUP_APP` (path to a popup bundle),
-`OHB_REMOTE_DEBUGGING_PORT`.
+Development-only variables: `OPENEDBOT_TARGET` (`prod` or an API URL), `OPENEDBOT_POPUP_APP` (path to a popup bundle),
+`OPENEDBOT_REMOTE_DEBUGGING_PORT`.
 
 `config.json` lives in `%APPDATA%\openedbot\` (Windows) or
 `~/Library/Application Support/openedbot/` (macOS). Plain `http://` is accepted only for
@@ -161,7 +161,8 @@ docs/           developer notes (Windows workstation)
 - Product documentation: <https://docs.openedbot.app>
 - [`docs/WINDOWS_DEV.md`](docs/WINDOWS_DEV.md): developing from a Windows workstation
 
-Names such as `OHB_*`, `ohb://`, `window.__OHB_NATIVE__` and `OHBPopup.app` are technical
+Variables are named `OPENEDBOT_*` (legacy `OHB_*` names are still read for one release).
+Names such as `ohb://`, `window.__OHB_NATIVE__` and `OHBPopup.app` are technical
 identifiers kept for compatibility.
 
 ## License

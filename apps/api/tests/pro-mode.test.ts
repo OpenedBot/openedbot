@@ -1,5 +1,5 @@
 /**
- * Pro mode: the plug-ins listed in `OHB_PRO_PLUGINS` (absolute paths into a
+ * Pro mode: the plug-ins listed in `OPENEDBOT_PLUGINS` (absolute paths into a
  * local plug-in checkout, see `make test-dual`) load and mount like in
  * production. Skipped in solo (unset), so `make test-unit` never needs any
  * external plug-in.
@@ -22,9 +22,9 @@ import { paymentWebhookRoute } from "../src/routes/payments/payment-webhook-rout
 import type { ApiConfig } from "../src/infrastructure/config";
 import { HttpError } from "../src/interfaces/http/http-error";
 
-const listed = parsePluginList(process.env.OHB_PRO_PLUGINS);
+const listed = parsePluginList(process.env.OPENEDBOT_PLUGINS);
 const skipped: PluginSkip[] = [];
-const { plugins } = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS, { warn: (skip) => skipped.push(skip) });
+const { plugins } = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS, { warn: (skip) => skipped.push(skip) });
 const staff = plugins.filter((plugin) => plugin.manifest.id === "staff");
 const agency = plugins.filter((plugin) => plugin.manifest.id === "agency");
 const permissions = plugins.filter((plugin) => plugin.manifest.id === "permissions");
@@ -57,7 +57,7 @@ function apiLike(loaded: readonly ProPlugin[], hosts: Record<string, unknown>, w
   return app;
 }
 
-describe.skipIf(listed.length === 0)("pro mode (OHB_PRO_PLUGINS)", () => {
+describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
   // Step 11.4: the runtime drops an alias over a core route; this pins that
   // none of the published ones would be dropped. Every router `index.ts`
   // mounts over an alias's path must be in the table, or the test fails.

@@ -20,7 +20,7 @@ import {
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { hermesBundleImportRoutes } from "./hermes-bundle-import-routes";
-import { OHB_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
 
 type RuntimeReader = typeof readRuntimeSecret;
 type ProfileClient = Pick<HermesClient, "hostCapabilities" | "hostProfileInventory" | "hostProfileAvatar" | "probeProfileIsolation" | "modelOptions">;
@@ -57,7 +57,7 @@ export function teamImportRoutes(
     }
     const requested: string[] = [];
     for (const entry of body.profiles) {
-      if (typeof entry !== "string" || !PROFILE_SLUG_PATTERN.test(entry) || entry === "default" || OHB_SERVICE_PROFILES.has(entry)) {
+      if (typeof entry !== "string" || !PROFILE_SLUG_PATTERN.test(entry) || entry === "default" || OPENEDBOT_SERVICE_PROFILES.has(entry)) {
         throw new HttpError(400, "PROFILE_SLUG_INVALID", "Un slug de profil est invalide.");
       }
       requested.push(entry);

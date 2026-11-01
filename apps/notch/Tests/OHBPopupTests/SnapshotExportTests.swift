@@ -5,11 +5,11 @@ import Testing
 @testable import OHBPopup
 
 /// Exporte les vues en PNG pour les regarder sans ouvrir de fenêtre (une fenêtre volerait le focus).
-/// Ne tourne que si `OHB_SNAPSHOT_DIR` est défini : `OHB_SNAPSHOT_DIR=/tmp/ohb-ui swift test --filter SnapshotExport`.
+/// Ne tourne que si `OPENEDBOT_SNAPSHOT_DIR` est défini : `OPENEDBOT_SNAPSHOT_DIR=/tmp/ohb-ui swift test --filter SnapshotExport`.
 @MainActor
 struct SnapshotExportTests {
     @Test func export() async throws {
-        guard let dir = ProcessInfo.processInfo.environment["OHB_SNAPSHOT_DIR"] else { return }
+        guard let dir = ProcessInfo.processInfo.environment["OPENEDBOT_SNAPSHOT_DIR"] else { return }
         let model = NotchModel()
         let feed = MockBotFeed(model: model, timeScale: 0)
         model.sections = MockBotFeed.sections

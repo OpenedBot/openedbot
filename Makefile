@@ -122,22 +122,22 @@ help-all: ## Toutes les commandes documentées, par section.
 # ─── Mode dev : installation du poste ────────────────────────────────────────
 
 setup: ## Prépare entièrement le développement local (env, dépendances, PostgreSQL et données).
-	ENV_FILE="$(ENV_FILE)" OHB_DEV_PROFILE="$(MODE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bash scripts/setup.sh
+	ENV_FILE="$(ENV_FILE)" OPENEDBOT_DEV_PROFILE="$(MODE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bash scripts/setup.sh
 
 env-check: ## Valide strictement .env.local.
-	OHB_ENV_FILE="$(ENV_FILE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bun scripts/env.ts --check
+	OPENEDBOT_ENV_FILE="$(ENV_FILE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bun scripts/env.ts --check
 
 env-audit: ## Vérifie les templates et affiche uniquement les noms superflus de .env.local.
-	OHB_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit
+	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit
 
 env-prune: ## Retire de .env.local les variables hors-dev uniquement lorsqu'elles sont vides.
-	OHB_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit --apply
+	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit --apply
 
 env-template: ## Régénère .env.example depuis platform/config/src/env-schema.ts.
 	bun scripts/env.ts --template --write
 
 env-where: ## Où une variable est déclarée et quel fichier doit la porter (NAME=API_PORT ; sans NAME, tout le schéma).
-	@OHB_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --where $(NAME)
+	@OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --where $(NAME)
 
 env-prod-list: ## Imprime le modèle de production (aucun fichier de prod n'est versionné ; valeurs au gestionnaire de secrets).
 	@bun scripts/env.ts --template --print-production
@@ -164,7 +164,7 @@ db-migrate: ## [DB] Applique les migrations; exige une infrastructure déjà dé
 	$(LOAD_ENV_OPT) bash scripts/db.sh --migrate
 
 db-seed: db-migrate env-check ## Crée le compte, l’organisation, l’abonnement et Hermes de dev.
-	$(LOAD_ENV) OHB_ENV_FILE="$(abspath $(ENV_FILE))" OHB_DEV_PROFILE="$(MODE)" bun run --filter api seed
+	$(LOAD_ENV) OPENEDBOT_ENV_FILE="$(abspath $(ENV_FILE))" OPENEDBOT_DEV_PROFILE="$(MODE)" bun run --filter api seed
 
 # env-check runs before the database is dropped: an invalid .env.local must
 # fail while the data is still there. The reset is a drop/create of the single
@@ -190,7 +190,7 @@ ifneq ($(CONFIRM),yes)
 	$(error db-reset-keep-users détruit les données applicatives locales (bots, fils, runs, runtimes...). La partie utilisateur est conservée. Relancez avec CONFIRM=yes pour confirmer)
 endif
 	$(LOAD_ENV_OPT) bash scripts/db.sh --up
-	$(LOAD_ENV_OPT) OHB_DEV_RESET_CONFIRM=yes bun apps/api/scripts/dev-reset-data.ts
+	$(LOAD_ENV_OPT) OPENEDBOT_DEV_RESET_CONFIRM=yes bun apps/api/scripts/dev-reset-data.ts
 	@printf '$(C_OK)[make]$(C_RESET) Données applicatives vidées ; vous êtes toujours connecté, l’accueil se rejoue.\n'
 
 runtime-token-rotate: db-migrate env-check ## Ré-encrypte atomiquement les tokens avec la clé courante.
@@ -369,7 +369,7 @@ build-admin: ## [deploy] Construit le backoffice staff (plug-in externe, ADMIN_D
 
 # `make build` livre les artefacts du rôle alpha : même garde qu'un déploiement
 # dès que la console en fait partie (une console solo par oubli de
-# OHB_PRO_CONSOLE est refusée, OHB_CONSOLE_SOLO=1 l'assume). La garde passe
+# OPENEDBOT_CONSOLE_PLUGINS est refusée, OPENEDBOT_CONSOLE_SOLO=1 l'assume). La garde passe
 # AVANT tout build, y compris en -j : les builds sont relancés après elle.
 build: $(if $(filter console,$(DEPLOY_APP_LIST)),prod-console-guard) ## [deploy] Construit les artefacts des applications actives (ou APP=console,admin).
 	@$(MAKE) --no-print-directory $(addprefix build-,$(DEPLOY_APP_LIST))
@@ -379,13 +379,13 @@ deploy: ## Refuse : le déploiement n'est pas dans ce dépôt ; make build const
 
 # ─── Mode prod : garde de build et lien de production ─────────────────────────
 
-# La console hébergée porte les écrans des plug-ins (étape 9) : sans OHB_PRO_CONSOLE,
+# La console hébergée porte les écrans des plug-ins (étape 9) : sans OPENEDBOT_CONSOLE_PLUGINS,
 # `build-console` sortirait une console solo, sans agence, facturation ni
 # règles de permission. Refus avant tout déploiement et avant tout
-# build (`make build`, rôle alpha) ; OHB_CONSOLE_SOLO=1 pour une console solo
+# build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_SOLO=1 pour une console solo
 # assumée. Contrat : tests/scripts/console-build-guard-contract.sh.
 prod-console-guard:
-	@if [ -z "$(OHB_PRO_CONSOLE)" ] && [ "$(OHB_CONSOLE_SOLO)" != "1" ]; then printf '$(C_ERR)[make]$(C_RESET) OHB_PRO_CONSOLE vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OHB_PRO_CONSOLE=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OHB_CORE_DIR=$(CURDIR)), ou OHB_CONSOLE_SOLO=1.\n' >&2; exit 2; fi
+	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_SOLO)" != "1" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_SOLO=1.\n' >&2; exit 2; fi
 
 # L'origine de production, celle que la console affiche dans sa commande
 # d'appairage. `link-prod` en est le pendant `make` : la bascule inverse de
@@ -394,22 +394,22 @@ prod-console-guard:
 # masquée sur le VPS, d'où le `ssh -t`.
 # Origine du lien de la prod (RUNTIME_LINK_PUBLIC_URL du VPS) : un nouveau lien
 # vise toujours celle-ci ; openedbot.app (API_PUBLIC_URL) reste acceptée.
-OHB_PUBLIC_URL ?= https://link.openedbot.app
+OPENEDBOT_PUBLIC_URL ?= https://link.openedbot.app
 # La console où l'opérateur ouvre le ticket (API_PUBLIC_URL du VPS).
-OHB_CONSOLE_URL ?= https://openedbot.app
+OPENEDBOT_CONSOLE_URL ?= https://openedbot.app
 
 link-prod: ## [OPS] Bascule le VPS sur la production ; le ticket est demandé à l’invite masquée du VPS (HOST=user@vps).
 	@set -eo pipefail; \
 	if [ -z "$(HOST)" ]; then \
 		printf '$(C_ERR)[make]$(C_RESET) HOST est requis : make link-prod HOST=user@vps.\n' >&2; exit 2; \
 	fi; \
-	case "$(OHB_PUBLIC_URL)" in \
+	case "$(OPENEDBOT_PUBLIC_URL)" in \
 		https://*) ;; \
-		*) printf '$(C_ERR)[make]$(C_RESET) OHB_PUBLIC_URL doit être une origine https.\n' >&2; exit 2 ;; \
+		*) printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_PUBLIC_URL doit être une origine https.\n' >&2; exit 2 ;; \
 	esac; \
-	printf '$(C_OK)[make]$(C_RESET) Ouvrez un ticket dans %s, onglet Runtimes, « Ajouter un runtime ».\n' "$(OHB_CONSOLE_URL)"; \
+	printf '$(C_OK)[make]$(C_RESET) Ouvrez un ticket dans %s, onglet Runtimes, « Ajouter un runtime ».\n' "$(OPENEDBOT_CONSOLE_URL)"; \
 	printf '$(C_OK)[make]$(C_RESET) Collez-le à l’invite masquée ci-dessous ; il ne passe ni par argv ni par l’historique.\n'; \
-	ssh -t "$(HOST)" sudo edge-setup link --ohb "$(OHB_PUBLIC_URL)" --yes
+	ssh -t "$(HOST)" sudo edge-setup link --ohb "$(OPENEDBOT_PUBLIC_URL)" --yes
 
 # ─── Qualité ─────────────────────────────────────────────────────────────────
 
@@ -470,8 +470,8 @@ test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et
 
 # Solo et avec plug-ins, mêmes tests : `test-unit` une fois sans plug-in, puis
 # avec les plug-ins du répertoire plugins/ (voir plugins_dir) chargés par
-# OHB_PRO_PLUGINS (chemins absolus). Ce répertoire est relié à CE checkout du cœur avant
-# (`make link-core OHB_CORE_DIR=…`), pour que cœur et plug-ins partagent une
+# OPENEDBOT_PLUGINS (chemins absolus). Ce répertoire est relié à CE checkout du cœur avant
+# (`make link-core OPENEDBOT_CORE_DIR=…`), pour que cœur et plug-ins partagent une
 # seule copie de chaque module. Les tests d'or des permissions jouent dans
 # les deux modes ; `apps/api/tests/pro-mode.test.ts` ne joue qu'en pro.
 # Sans plugins/, le cœur ne nomme aucun chemin de plug-in et le solo n'en
@@ -483,7 +483,7 @@ pro_empty :=
 pro_space := $(pro_empty) $(pro_empty)
 PRO_PLUGINS_LIST = $(subst $(pro_space),$(pro_comma),$(strip $(if $(plugins_dir),$(foreach entry,$(PRO_PLUGIN_ENTRIES),$(plugins_dir)/$(entry)))))
 # Les écrans pro de la console (étape 9) : un module console par paquet pro
-# (`console/index.ts`), chargé par OHB_PRO_CONSOLE (`apps/console/vite-pro-console.ts`,
+# (`console/index.ts`), chargé par OPENEDBOT_CONSOLE_PLUGINS (`apps/console/vite-pro-console.ts`,
 # et `test-setup.ts` pour les tests). La facturation a son paquet depuis
 # l'étape 8d (`pro-billing/console`) ; plus aucune amorce du cœur ici.
 PRO_CONSOLE_ENTRIES ?= packages/pro-agency/console/index.ts packages/pro-permissions/console/index.ts packages/pro-billing/console/index.ts
@@ -491,15 +491,15 @@ PRO_CONSOLE_CORE_MODULES ?=
 PRO_CONSOLE_LIST = $(subst $(pro_space),$(pro_comma),$(strip $(if $(plugins_dir),$(foreach entry,$(PRO_CONSOLE_ENTRIES),$(plugins_dir)/$(entry))) $(PRO_CONSOLE_CORE_MODULES)))
 
 test-dual: ## Tests unitaires deux fois : solo (sans plug-in), puis avec les plug-ins externes (./plugins).
-	@echo "== test-dual : solo (OHB_PRO_PLUGINS et OHB_PRO_CONSOLE vides)"
-	OHB_PRO_PLUGINS= OHB_PRO_CONSOLE= $(MAKE) test-unit
+	@echo "== test-dual : solo (OPENEDBOT_PLUGINS et OPENEDBOT_CONSOLE_PLUGINS vides)"
+	OPENEDBOT_PLUGINS= OPENEDBOT_CONSOLE_PLUGINS= $(MAKE) test-unit
 	@test -f "plugins/packages/pro-staff/src/plugin.ts" || { echo "test-dual : pas de plug-ins dans ./plugins (clonez ou liez le checkout des plug-ins en ./plugins)"; exit 2; }
-	$(MAKE) -C plugins link-core OHB_CORE_DIR=$(CURDIR)
-	@echo "== test-dual : pro (OHB_PRO_PLUGINS=$(PRO_PLUGINS_LIST) OHB_PRO_CONSOLE=$(PRO_CONSOLE_LIST))"
-	OHB_PRO_PLUGINS=$(PRO_PLUGINS_LIST) OHB_PRO_CONSOLE=$(PRO_CONSOLE_LIST) $(MAKE) test-unit
+	$(MAKE) -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)
+	@echo "== test-dual : pro (OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
+	OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) $(MAKE) test-unit
 
 # La console solo ne contient aucun écran pro (agence, facturation, règles de
-# permission) : un build Vite sans OHB_PRO_CONSOLE, dont le rapport de modules
+# permission) : un build Vite sans OPENEDBOT_CONSOLE_PLUGINS, dont le rapport de modules
 # (`vite-module-report.ts`) est lu par `apps/console/scripts/solo-bundle-check.ts`,
 # puis le contrôle inverse (le build pro les contient tous), puis deps-check
 # (règle `console-sans-ecrans-pro`) et test-dual (instantanés de routes et
@@ -512,13 +512,13 @@ SOLO_CHECK_MESSAGES = $(if $(plugins_dir),$(sort $(wildcard $(plugins_dir)/packa
 solo-check: ## Console solo sans aucun écran pro (bundle et routes), contrôle pro, deps-check et test-dual.
 	@test -f "plugins/packages/pro-staff/src/plugin.ts" || { echo "solo-check : pas de plug-ins dans ./plugins (clonez ou liez le checkout des plug-ins en ./plugins)"; exit 2; }
 	@rm -rf "$(SOLO_CHECK_DIR)" && mkdir -p "$(SOLO_CHECK_DIR)"
-	@echo "== solo-check : build solo (OHB_PRO_CONSOLE vide)"
-	cd apps/console && OHB_PRO_CONSOLE= OHB_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/solo.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/solo" --emptyOutDir
+	@echo "== solo-check : build solo (OPENEDBOT_CONSOLE_PLUGINS vide)"
+	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/solo.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/solo" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts solo "$(SOLO_CHECK_DIR)/solo.json"
 	bun apps/console/scripts/solo-bundle-strings.ts solo "$(SOLO_CHECK_DIR)/solo" $(SOLO_CHECK_MESSAGES)
-	$(MAKE) -C plugins link-core OHB_CORE_DIR=$(CURDIR)
-	@echo "== solo-check : build pro (OHB_PRO_CONSOLE=$(PRO_CONSOLE_LIST))"
-	cd apps/console && OHB_PRO_CONSOLE=$(PRO_CONSOLE_LIST) OHB_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/pro.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/pro" --emptyOutDir
+	$(MAKE) -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)
+	@echo "== solo-check : build pro (OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
+	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/pro.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/pro" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts pro "$(SOLO_CHECK_DIR)/pro.json"
 	bun apps/console/scripts/solo-bundle-strings.ts pro "$(SOLO_CHECK_DIR)/pro" $(SOLO_CHECK_MESSAGES)
 	@rm -rf "$(SOLO_CHECK_DIR)"
@@ -534,7 +534,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/worker-tenant-scope.ts
 	bun tests/integration/worker-queue-probe.ts
 	# Les routes de flotte sont celles du plug-in (étape 11.2) : chargé depuis ./plugins s'il existe, sinon le test le dit et passe.
-	OHB_PRO_PLUGINS=$(PRO_PLUGINS_LIST) bun tests/integration/agency-workspaces.ts
+	OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) bun tests/integration/agency-workspaces.ts
 	bun tests/integration/thread-history.ts
 	bun tests/integration/runtime-link-alerts.ts
 	bun tests/integration/alert-channels.ts
@@ -674,7 +674,7 @@ e2e-link-load: ## k6 E2E du lien réel API → VPS : santé, charge bornée, jou
 
 e2e-link-separation: ## Vérifie la passerelle isolée, les flux et les coupures sur des processus de test jetables.
 	@printf '$(C_SECTION)[make]$(C_RESET) Régression transport Go/TS avec redémarrages API simulés.\n'
-	@OHB_LINK_GATEWAY_E2E=1 bun test apps/api/tests/runtime-link-separation.e2e.test.ts
+	@OPENEDBOT_LINK_GATEWAY_E2E=1 bun test apps/api/tests/runtime-link-separation.e2e.test.ts
 
 e2e-link-continuity: ## Recette réelle opt-in : fournisseur explicite, cycle bot et observation du lien.
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : E2E_ALLOW_REAL_RUNS=1 et runtime/modèle explicites requis.\n'

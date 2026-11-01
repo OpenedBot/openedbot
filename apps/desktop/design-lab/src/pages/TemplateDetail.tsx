@@ -85,7 +85,7 @@ export function TemplateDetail() {
       <p className="description">{template.description}</p>
       {message ? <p className="message">{message}</p> : null}
       <p className="muted">
-        Ou en variable d’environnement : <code>OHB_SIGNIN_TEMPLATE={template.name} make start</code>
+        Ou en variable d’environnement : <code>OPENEDBOT_SIGNIN_TEMPLATE={template.name} make start</code>
       </p>
       <div className="detail-previews">
         {themes.map((theme) => (

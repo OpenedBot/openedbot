@@ -25,7 +25,7 @@ const vapidPublic = (() => {
 const vapidPrivate = Buffer.alloc(32, 9).toString("base64url");
 
 const production = {
-  OHB_ENV: "production",
+  OPENEDBOT_ENV: "production",
   API_PUBLIC_URL: "https://api.ohb.example",
   WEB_APP_URL: "https://app.ohb.example",
   API_DATABASE_URL: "postgres://api:secret@db/ohb",
@@ -59,7 +59,7 @@ const production = {
 };
 
 const development = {
-  OHB_ENV: "development",
+  OPENEDBOT_ENV: "development",
   OHB_RUNTIME_MODE: "external",
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
 };
@@ -275,7 +275,7 @@ describe("canaux d’administration du déploiement", () => {
   });
 
   test("requires a strong runtime token encryption key in development", () => {
-    expect(() => readApiConfig({ OHB_ENV: "development" })).toThrow(/RUNTIME_TOKEN_ENCRYPTION_KEY/);
+    expect(() => readApiConfig({ OPENEDBOT_ENV: "development" })).toThrow(/RUNTIME_TOKEN_ENCRYPTION_KEY/);
   });
 
   test("does not keep a hardcoded former development encryption key", () => {
@@ -319,7 +319,7 @@ describe("staff development sign-in", () => {
       email: DEV_STAFF_EMAIL,
       password: "generated-staff",
     });
-    expect(readApiConfig({ ...development, DEV_STAFF_PASSWORD: "generated-staff", OHB_ENV: "test" }).staffDevSignIn).toBeNull();
+    expect(readApiConfig({ ...development, DEV_STAFF_PASSWORD: "generated-staff", OPENEDBOT_ENV: "test" }).staffDevSignIn).toBeNull();
   });
 
   test("never falls back to a versioned password: without one, nothing is published", () => {
@@ -339,12 +339,12 @@ describe("Computer provider configuration", () => {
   });
 
   test("requires an environment-owned Box token", () => {
-    expect(() => readApiConfig({ ...development, OHB_COMPUTER_PROVIDER: "box" }))
-      .toThrow(/OHB_COMPUTER_BOX_TOKEN/);
+    expect(() => readApiConfig({ ...development, OPENEDBOT_COMPUTER_PROVIDER: "box" }))
+      .toThrow(/OPENEDBOT_COMPUTER_BOX_TOKEN/);
     expect(readApiConfig({
       ...development,
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_COMPUTER_PROVIDER: "box",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
     }).computer).toEqual({
       provider: "box",
       apiUrl: "https://ascii.dev/api/box/v1",
@@ -355,17 +355,17 @@ describe("Computer provider configuration", () => {
   test("only lets tests override Box with a loopback fixture", () => {
     const configured = readApiConfig({
       ...development,
-      OHB_ENV: "test",
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_ENV: "test",
+      OPENEDBOT_COMPUTER_PROVIDER: "box",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "http://127.0.0.1:18799/provider/",
     });
     expect(configured.computer).toMatchObject({ apiUrl: "http://127.0.0.1:18799/provider" });
     expect(() => readApiConfig({
       ...development,
-      OHB_ENV: "test",
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_ENV: "test",
+      OPENEDBOT_COMPUTER_PROVIDER: "box",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "https://attacker.example/provider",
     })).toThrow(/loopback/);
   });
@@ -374,7 +374,7 @@ describe("Computer provider configuration", () => {
 describe("development web origins", () => {
   test("defaults the browser and OAuth callback to localhost", () => {
     const config = readApiConfig({
-      OHB_ENV: "development",
+      OPENEDBOT_ENV: "development",
       OHB_RUNTIME_MODE: "external",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     });
@@ -388,7 +388,7 @@ describe("development web origins", () => {
 
   test("auto-includes ADMIN_PUBLIC_URL in CORS without listing it in CORS_ALLOWED_ORIGINS", () => {
     const config = readApiConfig({
-      OHB_ENV: "development",
+      OPENEDBOT_ENV: "development",
       OHB_RUNTIME_MODE: "external",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
       ADMIN_PUBLIC_URL: "http://admin.local:1421",
@@ -443,7 +443,7 @@ describe("Hermes endpoint configuration", () => {
 
   test("keeps a fake HTTP endpoint scoped to test", () => {
     expect(readApiConfig({
-      OHB_ENV: "test",
+      OPENEDBOT_ENV: "test",
       RUNTIME_TOKEN_ENCRYPTION_KEY: development.RUNTIME_TOKEN_ENCRYPTION_KEY,
       TEST_HERMES_URL: "http://127.0.0.1:18642",
     }).testHermesUrl).toBe(

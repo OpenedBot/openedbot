@@ -5,7 +5,7 @@
 From the repository root, run:
 
 ```sh
-OHB_LINK_GATEWAY_E2E=1 bun test apps/api/tests/runtime-link-separation.e2e.test.ts
+OPENEDBOT_LINK_GATEWAY_E2E=1 bun test apps/api/tests/runtime-link-separation.e2e.test.ts
 ```
 
 This starts only disposable test processes and loopback listeners. It uses the

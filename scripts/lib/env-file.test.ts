@@ -32,8 +32,8 @@ describe("parseEnvEntries", () => {
 });
 
 describe("classifyLocalEnvEntry: plug-in variables", () => {
-  test("a set OHB_PRO_<ID>__<KEY> is preserved, an empty one removed", () => {
-    expect(classifyLocalEnvEntry({ name: "OHB_PRO_BILLING__API_KEY", value: "x" }, "external")).toBe("preserve");
-    expect(classifyLocalEnvEntry({ name: "OHB_PRO_BILLING__API_KEY", value: "" }, "external")).toBe("remove");
+  test("a set OPENEDBOT_PLUGIN_<ID>__<KEY> is preserved, an empty one removed", () => {
+    expect(classifyLocalEnvEntry({ name: "OPENEDBOT_PLUGIN_BILLING__API_KEY", value: "x" }, "external")).toBe("preserve");
+    expect(classifyLocalEnvEntry({ name: "OPENEDBOT_PLUGIN_BILLING__API_KEY", value: "" }, "external")).toBe("remove");
   });
 });

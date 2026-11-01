@@ -48,7 +48,7 @@ async function runCheck(): Promise<void> {
   const mode = process.argv.includes("--production") ? "production" : "development";
   // One file for the monorepo (ENV_DIR_OF_SCOPE): validate it, and say
   // which file a missing or wrong value belongs to.
-  const path = basename(process.env.OHB_ENV_FILE?.trim() || ".env.local");
+  const path = basename(process.env.OPENEDBOT_ENV_FILE?.trim() || ".env.local");
   const files = await readEnvFiles(path);
   if (!files.length) {
     throw new Error(`No ${path} found. Run \`make setup\`, or copy each .env.example next to it.`);
@@ -75,9 +75,9 @@ async function runCheck(): Promise<void> {
   // misspelled one would silently never reach its plug-in.
   const malformed = Object.keys(values).filter(isMalformedPluginEnvName);
   if (malformed.length) {
-    throw new Error(`${malformed.join(", ")}: not a plug-in variable; expected OHB_PRO_PLUGINS or OHB_PRO_<ID>__<KEY>.`);
+    throw new Error(`${malformed.join(", ")}: not a plug-in variable; expected OPENEDBOT_PLUGINS or OPENEDBOT_PLUGIN_<ID>__<KEY>.`);
   }
-  // Le nom de la base est écrit trois fois : OHB_DATABASE_NAME pour les scripts
+  // Le nom de la base est écrit trois fois : OPENEDBOT_DATABASE_NAME pour les scripts
   // (db-migrate, db-reset), et à l'intérieur des deux DSN pour l'API et le
   // worker, qui ont chacun leur rôle PostgreSQL. Les trois doivent désigner la
   // même base : sinon `make db-migrate` migre une base et les apps tournent sur
@@ -209,12 +209,12 @@ async function runCheck(): Promise<void> {
   }
 
   function assertSameDatabase(values: Record<string, string | undefined>): void {
-    const declared = values.OHB_DATABASE_NAME?.trim() || "ohb";
+    const declared = values.OPENEDBOT_DATABASE_NAME?.trim() || "ohb";
     for (const name of ["API_DATABASE_URL", "WORKER_DATABASE_URL"] as const) {
       const database = databaseOfDsn(values[name]);
       if (database && database !== declared) {
         throw new Error(
-          `${name} points at the database "${database}" while OHB_DATABASE_NAME is "${declared}". ` +
+          `${name} points at the database "${database}" while OPENEDBOT_DATABASE_NAME is "${declared}". ` +
             "Migrations and the applications would use different databases.",
         );
       }
@@ -239,7 +239,7 @@ async function runAudit(): Promise<void> {
    */
 
   const DEV_TEMPLATE = ".env.example";
-  const localName = basename(process.env.OHB_ENV_FILE?.trim() || ".env.local");
+  const localName = basename(process.env.OPENEDBOT_ENV_FILE?.trim() || ".env.local");
   const apply = process.argv.includes("--apply");
 
   const templates = await readEnvFiles(DEV_TEMPLATE);
@@ -317,7 +317,7 @@ async function runAudit(): Promise<void> {
  *   --print-production  write the production template to stdout. Deployment
  *                       values are secret-manager owned, so the repository
  *                       keeps no production file to drift from the schema.
- *   --write-local       rewrite OHB_ENV_FILE (default .env.local) in schema
+ *   --write-local       rewrite OPENEDBOT_ENV_FILE (default .env.local) in schema
  *                       order, keeping every existing value and applying the
  *                       same removal rules as `env-audit --apply`. Never
  *                       prints a value.
@@ -405,7 +405,7 @@ async function runTemplate(): Promise<void> {
   } else if (mode === "--print-production") {
     process.stdout.write(productionTemplate());
   } else if (mode === "--write-local") {
-    await writeLocal(basename(process.env.OHB_ENV_FILE?.trim() || ".env.local"));
+    await writeLocal(basename(process.env.OPENEDBOT_ENV_FILE?.trim() || ".env.local"));
   } else {
     console.error("usage: bun scripts/env.ts --template --check | --write | --print-production | --write-local");
     process.exit(2);
@@ -592,10 +592,10 @@ function runWhere(): void {
    *   bun scripts/env.ts --where PORT            every name containing PORT
    *   bun scripts/env.ts --where                 every declared variable, one line each
    *
-   *   OHB_ENV_FILE   name of the private file (default .env.local).
+   *   OPENEDBOT_ENV_FILE   name of the private file (default .env.local).
    */
 
-  const fileName = (process.env.OHB_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
+  const fileName = (process.env.OPENEDBOT_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
   const query = process.argv[2]?.trim().toUpperCase();
 
   /** Where the variable would sit if it were set, template or private file. */
@@ -653,10 +653,10 @@ function runFileOf(): void {
    * cannot import the schema, and asking Bun once per variable would pay a
    * process start each time — so the whole map is emitted in one call.
    *
-   *   OHB_ENV_FILE   name of the private file (default .env.local).
+   *   OPENEDBOT_ENV_FILE   name of the private file (default .env.local).
    */
 
-  const fileName = (process.env.OHB_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
+  const fileName = (process.env.OPENEDBOT_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
   const lines = ENV_SCHEMA.map((entry) => `${entry.name}\t${envFilePath(ENV_DIR_OF_SCOPE[entry.scope], fileName)}`);
   process.stdout.write(`${lines.join("\n")}\n`);
 }

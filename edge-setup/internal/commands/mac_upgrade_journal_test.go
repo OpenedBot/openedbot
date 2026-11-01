@@ -31,7 +31,7 @@ type macCrashFixture struct {
 }
 
 func TestMacUpgradeCrashHelper(t *testing.T) {
-	root, phase := os.Getenv("OHB_TEST_MAC_CRASH_ROOT"), os.Getenv("OHB_TEST_MAC_CRASH_PHASE")
+	root, phase := os.Getenv("OPENEDBOT_TEST_MAC_CRASH_ROOT"), os.Getenv("OPENEDBOT_TEST_MAC_CRASH_PHASE")
 	if root == "" || phase == "" {
 		return
 	}
@@ -100,7 +100,7 @@ func TestMacUpgradeSIGKILLRecovery(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			cmd := osexec.CommandContext(ctx, os.Args[0], "-test.run=^TestMacUpgradeCrashHelper$")
-			cmd.Env = append(os.Environ(), "TMPDIR="+root, "OHB_TEST_MAC_CRASH_ROOT="+root, "OHB_TEST_MAC_CRASH_PHASE="+phase)
+			cmd.Env = append(os.Environ(), "TMPDIR="+root, "OPENEDBOT_TEST_MAC_CRASH_ROOT="+root, "OPENEDBOT_TEST_MAC_CRASH_PHASE="+phase)
 			var output bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &output, &output
 			if err := cmd.Start(); err != nil {

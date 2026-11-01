@@ -7,8 +7,8 @@ set -euo pipefail
 # (« unexpected EOF while looking for matching `'"'"'` »). Écrire ces
 # commentaires sans apostrophe.
 
-container="${OHB_POSTGRES_CONTAINER:-infra-postgres}"
-database="${OHB_INTEGRATION_DATABASE:-ohb_integration}"
+container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
+database="${OPENEDBOT_INTEGRATION_DATABASE:-ohb_integration}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 database_url="${INTEGRATION_DATABASE_URL:-}"
 admin_url="${INTEGRATION_ADMIN_DATABASE_URL:-}"

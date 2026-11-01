@@ -209,7 +209,7 @@ make release     # the same, unsigned (only the release workflow signs), and a .
 | `make test-update` | Regenerate the golden files (review the diff) |
 | `make integration` | Integration tests in a Debian 13 + systemd container (network required) |
 | `make integration-vm` | Full `up` in a Debian 13 QEMU VM |
-| `make contract-check` | Link contract on both sides; needs the monorepo root `..` (`OHB_DIR`) |
+| `make contract-check` | Link contract on both sides; needs the monorepo root `..` (`OPENEDBOT_DIR`) |
 | `make check-docs` | Checks the documentation site in `../docs` (`DOCS_DIR`) against `docs/` |
 
 CI ([`.github/workflows/edge-setup-ci.yml`](../.github/workflows/edge-setup-ci.yml) at the monorepo

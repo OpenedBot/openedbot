@@ -18,7 +18,7 @@ gateway on `127.0.0.1` and opens a single outbound WebSocket to the openedbot li
 
 This monorepo holds the open core and its clients. Optional plug-ins (staff back office,
 billing, agency features) and deployment code are not part of it: the core loads plug-ins from
-an external directory at run time (`OHB_PRO_PLUGINS`) and runs fully without them.
+an external directory at run time (`OPENEDBOT_PLUGINS`) and runs fully without them.
 
 ## Layout
 
@@ -59,7 +59,8 @@ directory ignored by git: clone or symlink the plug-in checkout there
 `plugins/admin`, and the checkout's `make/*.mk` fragments, if any, are included by the
 Makefile.
 
-> The packages are named `@openedbot/*`; `OHB_*` variables and `X-OHB-*` headers are technical
+> The packages are named `@openedbot/*` and the variables `OPENEDBOT_*` (the legacy `OHB_*`
+> names are still read for one release, with a warning); `X-OHB-*` headers are technical
 > names kept for compatibility.
 
 ## License

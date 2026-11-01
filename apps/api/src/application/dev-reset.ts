@@ -104,7 +104,7 @@ export type DevResetReport = {
  */
 export function assertDevResetAllowed(input: { environment: string; databaseUrl: string }): void {
   if (input.environment !== "development") {
-    throw new Error(`Le vidage de développement est refusé hors development (OHB_ENV=${input.environment}).`);
+    throw new Error(`Le vidage de développement est refusé hors development (OPENEDBOT_ENV=${input.environment}).`);
   }
   let host: string;
   let database: string;

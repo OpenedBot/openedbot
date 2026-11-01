@@ -4,7 +4,7 @@
  * the last sign of life. Older rows keep the previous wording, matched here
  * so a host that never reconnects still reads the dated sentence.
  */
-const OHB_RESTART_ERRORS = new Set([
+const OPENEDBOT_RESTART_ERRORS = new Set([
   "L’instance openedbot qui tenait le lien s’est arrêtée.",
   "L’instance openedbot qui tenait le lien s’est arrêtée avant la fin du drainage.",
   "openedbot a redémarré ; l’hôte ne s’est pas reconnecté depuis.",
@@ -23,6 +23,6 @@ export function linkHealthErrorText(
 ): string | null {
   const text = error?.trim();
   if (!text) return null;
-  if (lastSeenAt && OHB_RESTART_ERRORS.has(text)) return restarted(lastSeenAt);
+  if (lastSeenAt && OPENEDBOT_RESTART_ERRORS.has(text)) return restarted(lastSeenAt);
   return text;
 }

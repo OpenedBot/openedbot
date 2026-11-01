@@ -134,10 +134,10 @@ const productFeatures = await readProductFeatures(db);
 // Features basculées depuis le backoffice : relues à chaud, jamais figées au boot.
 const liveFeatures = liveProductFeatures(db);
 const blobs = createBlobStore(baseConfig.blob);
-// Plug-ins pro : `OHB_PRO_PLUGINS` vide ou absent = mode solo, et
+// Plug-ins pro : `OPENEDBOT_PLUGINS` vide ou absent = mode solo, et
 // aucune route n'est ajoutée. Un plug-in absent, invalide ou refusé est ignoré
 // avec un avertissement : l'API démarre quand même.
-const loadedPro = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS, {
+const loadedPro = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS, {
   warn: (skip) => logger.warn({ event: "api.pro_plugin_skipped", ...describeSkip(skip) }, "pro plug-in skipped"),
 });
 // Une variable de déploiement (`manifest.env`) n'a qu'un plug-in : deux
@@ -158,11 +158,11 @@ const pro = {
 const proMode = proModeLabel(pro.plugins);
 logger.info({ event: "api.mode", mode: proMode, plugins: pro.plugins.map((plugin) => plugin.manifest.id) }, proMode);
 // Installation legacy : vide depuis l'étape 8, le backoffice (`staff`) vient
-// d'un plug-in externe par OHB_PRO_PLUGINS et sert `/api/pro/staff`. Sans lui :
+// d'un plug-in externe par OPENEDBOT_PLUGINS et sert `/api/pro/staff`. Sans lui :
 // solo, sans backoffice.
 const legacyPlugins = await loadLegacyPlugins(pro.plugins, {
   skipped: (skip) => logger.warn({ event: "api.legacy_plugin_skipped", ...describeSkip(skip) }, "legacy plug-in skipped"),
-  superseded: (event) => logger.info({ event: "api.legacy_plugin_superseded", ...event }, "legacy plug-in already loaded by OHB_PRO_PLUGINS"),
+  superseded: (event) => logger.info({ event: "api.legacy_plugin_superseded", ...event }, "legacy plug-in already loaded by OPENEDBOT_PLUGINS"),
 });
 logger.info({ event: "api.legacy_plugins", plugins: legacyPlugins.map((plugin) => plugin.manifest.id) }, "legacy plug-ins installed");
 const installedPlugins: readonly ProPlugin[] = [...pro.plugins, ...legacyPlugins];

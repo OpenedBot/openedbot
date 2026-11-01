@@ -7,8 +7,8 @@ from pathlib import Path
 # configuration through Hermes' own config API, scoped to this profile, like
 # a2a_policy_host.py. Measured on the lab on 2026-10-22: `import yaml` failed
 # there, so the policy could never be proven.
-root = Path(os.environ["OHB_APPROVAL_ROOT"])
-slug = os.environ["OHB_APPROVAL_PROFILE"]
+root = Path(os.environ["OPENEDBOT_APPROVAL_ROOT"])
+slug = os.environ["OPENEDBOT_APPROVAL_PROFILE"]
 home = (root / "profiles" / slug).absolute()
 config = home / "config.yaml"
 os.environ["HERMES_HOME"] = str(home)
@@ -30,7 +30,7 @@ try:
     # server). Startup only honours an existing PM selection and never prepares
     # one (pm/environments.py), so a config write loads the plugin on the
     # existing venv.
-    enable = os.environ.get("OHB_APPROVAL_ENABLE") == "1"
+    enable = os.environ.get("OPENEDBOT_APPROVAL_ENABLE") == "1"
     data = (load_config() if enable else load_config_readonly()) or {}
     if not isinstance(data, dict):
         raise ValueError("profile configuration must be a mapping")
@@ -58,7 +58,7 @@ try:
     # load is proven by a re-read. A profile the gateway does not serve yet has
     # no plugin manager: its first use discovers the plugin on its own.
     load = None
-    if os.environ.get("OHB_APPROVAL_RELOAD") == "1" and "ohb_approval_policy" in enabled:
+    if os.environ.get("OPENEDBOT_APPROVAL_RELOAD") == "1" and "ohb_approval_policy" in enabled:
         try:
             from gateway.control_socket import reload_gateway_plugins
             answer = reload_gateway_plugins(root, profile_home=home, timeout=20.0)

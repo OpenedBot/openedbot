@@ -30,7 +30,7 @@ func (r *approvalPolicyRunner) Run(_ context.Context, cmd hostexec.Cmd) (hostexe
 		r.cliEnables++
 		return hostexec.Result{}, nil
 	}
-	if strings.Contains(cmd.Path, "python") && strings.Contains(strings.Join(cmd.Env, " "), "OHB_APPROVAL_ENABLE=1") {
+	if strings.Contains(cmd.Path, "python") && strings.Contains(strings.Join(cmd.Env, " "), "OPENEDBOT_APPROVAL_ENABLE=1") {
 		r.enableRuns++
 		config := filepath.Join(r.root, "profiles", "scout", "config.yaml")
 		return hostexec.Result{}, os.WriteFile(config, []byte("plugins:\n  enabled:\n    - ohb_approval_policy\n"), 0o600)
@@ -187,9 +187,9 @@ func TestApprovalPolicyConfigScriptValidatesListsAndClearsDisabledEntry(t *testi
 		t.Helper()
 		cmd := exec.Command(python, "-")
 		cmd.Stdin = strings.NewReader(string(program))
-		cmd.Env = append(os.Environ(), "OHB_APPROVAL_ROOT="+root, "OHB_APPROVAL_PROFILE=scout", "PYTHONPATH="+stubs)
+		cmd.Env = append(os.Environ(), "OPENEDBOT_APPROVAL_ROOT="+root, "OPENEDBOT_APPROVAL_PROFILE=scout", "PYTHONPATH="+stubs)
 		if clear {
-			cmd.Env = append(cmd.Env, "OHB_APPROVAL_ENABLE=1")
+			cmd.Env = append(cmd.Env, "OPENEDBOT_APPROVAL_ENABLE=1")
 		}
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -221,7 +221,7 @@ func TestApprovalPolicyConfigScriptValidatesListsAndClearsDisabledEntry(t *testi
 	}
 	cmd := exec.Command(python, "-")
 	cmd.Stdin = strings.NewReader(string(program))
-	cmd.Env = append(os.Environ(), "OHB_APPROVAL_ROOT="+root, "OHB_APPROVAL_PROFILE=scout", "PYTHONPATH="+stubs)
+	cmd.Env = append(os.Environ(), "OPENEDBOT_APPROVAL_ROOT="+root, "OPENEDBOT_APPROVAL_PROFILE=scout", "PYTHONPATH="+stubs)
 	if err := cmd.Run(); err == nil {
 		t.Fatal("invalid plugin list was accepted")
 	}

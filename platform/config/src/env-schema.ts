@@ -101,15 +101,15 @@ export type EnvPattern = {
   secret?: boolean;
 };
 
-/** Prefix shared by the plug-in variables; `OHB_PRO_PLUGINS` is the list itself. */
-export const PRO_PLUGIN_ENV_PREFIX = "OHB_PRO_";
+/** Prefix shared by the plug-in variables; `OPENEDBOT_PLUGINS` is the list itself. */
+export const PLUGIN_ENV_PREFIX = "OPENEDBOT_PLUGIN_";
 
 export const ENV_SCHEMA_PATTERNS: readonly EnvPattern[] = [
   // Plug-in variables the core itself documents, before the generic family
   // (first match wins). Still a pattern: a plug-in variable never enters a template.
   {
-    label: "OHB_PRO_AUDIT__RETENTION_DAYS",
-    pattern: /^OHB_PRO_AUDIT__RETENTION_DAYS$/,
+    label: "OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS",
+    pattern: /^OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS$/,
     scope: "worker",
     tier: "default_only",
     doc:
@@ -117,17 +117,17 @@ export const ENV_SCHEMA_PATTERNS: readonly EnvPattern[] = [
       "Unset: every row is archived with no end date, until the legal retention is decided. An invalid value fails the purge.",
   },
   {
-    label: "OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS",
-    pattern: /^OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS$/,
+    label: "OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS",
+    pattern: /^OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS$/,
     scope: "api",
     tier: "default_only",
     doc: "Plug-in `audit`: comma-separated organization ids granted `audit.anchor` (a failed external anchoring blocks their writes). Unset: none.",
   },
   {
-    label: "OHB_PRO_<ID>__<KEY>",
+    label: "OPENEDBOT_PLUGIN_<ID>__<KEY>",
     // <ID>: the plug-in id upper-cased, `-` as `_` (apps/api pluginConfigPrefix);
     // <KEY>: upper-case words joined by single `_`.
-    pattern: /^OHB_PRO_[A-Z][A-Z0-9_]{1,39}__[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
+    pattern: /^OPENEDBOT_PLUGIN_[A-Z][A-Z0-9_]{1,39}__[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
     scope: "api",
     tier: "default_only",
     doc: "Configuration of one loaded plug-in; the plug-in receives <KEY> and nothing else of the environment.",
@@ -146,9 +146,9 @@ export function envSchemaEntry(name: string): EnvVar | undefined {
   return entry;
 }
 
-/** An `OHB_PRO_*` name that is neither the plug-in list nor a well-formed plug-in variable. */
+/** An `OPENEDBOT_PLUGIN_*` name that is neither the plug-in list nor a well-formed plug-in variable. */
 export function isMalformedPluginEnvName(name: string): boolean {
-  return name.startsWith(PRO_PLUGIN_ENV_PREFIX) && !envSchemaEntry(name);
+  return name.startsWith(PLUGIN_ENV_PREFIX) && !envSchemaEntry(name);
 }
 
 /**

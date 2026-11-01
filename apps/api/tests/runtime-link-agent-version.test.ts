@@ -11,7 +11,7 @@ import { publicRuntime, type RuntimeRow } from "../src/routes/runtimes/runtime-r
 const versions = { minimumVersion: "v0.2.0", latestVersion: "v0.3.0" };
 const seenAt = "2026-09-06T22:00:00.000Z";
 const config = (env: Record<string, string> = {}) => readApiConfig({
-  OHB_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"), ...env,
+  OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"), ...env,
 });
 
 describe("versions du connecteur OHB-72", () => {

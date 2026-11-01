@@ -185,16 +185,16 @@ derived_bundled_plan="$(dry_run_with_env "$bundled_env" dev)"
 assert_literal_count "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
 assert_not_contains "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="external"'
 derived_bundled_seed_plan="$(dry_run_with_env "$bundled_env" db-seed)"
-assert_literal_count "db-seed (env bundled)" "$derived_bundled_seed_plan" 'OHB_DEV_PROFILE="bundled"' 1
+assert_literal_count "db-seed (env bundled)" "$derived_bundled_seed_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 derived_external_plan="$(dry_run_with_env "$external_env" dev)"
 assert_literal_count "dev (env external)" "$derived_external_plan" 'OHB_RUNTIME_MODE="external"' 2
 derived_external_seed_plan="$(dry_run_with_env "$external_env" db-seed)"
-assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OHB_DEV_PROFILE="external"' 1
+assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OPENEDBOT_DEV_PROFILE="external"' 1
 derived_fake_seed_plan="$(dry_run_with_env "$fake_env" db-seed)"
-assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OHB_DEV_PROFILE="fake"' 1
+assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
 assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OHB_RUNTIME_MODE="external"' 1
 derived_empty_seed_plan="$(dry_run_with_env 'OHB_RUNTIME_MODE=' db-seed)"
-assert_literal_count "db-seed (env empty mode)" "$derived_empty_seed_plan" 'OHB_DEV_PROFILE="fake"' 1
+assert_literal_count "db-seed (env empty mode)" "$derived_empty_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
 # An explicit MODE= keeps priority over the env file.
 explicit_fake_plan="$(dry_run_with_env "$bundled_env" dev MODE=fake)"
 assert_literal_count "dev MODE=fake (env bundled)" "$explicit_fake_plan" 'OHB_RUNTIME_MODE="external"' 2
@@ -203,20 +203,20 @@ assert_literal_count "dev MODE=bundled (env external)" "$explicit_bundled_plan" 
 
 setup_plan="$(dry_run setup)"
 assert_not_contains setup "$setup_plan" "hermes-image-tag.ts"
-assert_literal_count setup "$setup_plan" 'OHB_DEV_PROFILE="fake"' 1
+assert_literal_count setup "$setup_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
 assert_literal_count setup "$setup_plan" 'OHB_RUNTIME_MODE="external"' 1
 assert_literal_count setup "$setup_plan" "scripts/setup.sh" 1
 
 bundled_setup_plan="$(dry_run setup MODE=bundled)"
 assert_not_contains "setup MODE=bundled" "$bundled_setup_plan" "hermes-image-tag.ts"
-assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OHB_DEV_PROFILE="bundled"' 1
+assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OHB_RUNTIME_MODE="bundled"' 1
 
 # infra-up only proves PostgreSQL now: the bundled Hermes container tooling
 # was removed with deprecated/infra.
 infra_plan="$(dry_run infra-up)"
 assert_literal_count infra-up "$infra_plan" "scripts/db.sh --up" 1
-assert_not_contains infra-up "$infra_plan" "OHB_DEV_PROFILE"
+assert_not_contains infra-up "$infra_plan" "OPENEDBOT_DEV_PROFILE"
 assert_not_contains infra-up "$infra_plan" "scripts/hermes.sh"
 bundled_infra_plan="$(dry_run infra-up MODE=bundled)"
 assert_literal_count "infra-up MODE=bundled" "$bundled_infra_plan" "scripts/db.sh --up" 1

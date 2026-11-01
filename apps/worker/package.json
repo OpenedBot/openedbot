@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "dev": "OHB_ENV=development bun ../../scripts/dev-watch.ts src/index.ts",
+    "dev": "OPENEDBOT_ENV=development bun ../../scripts/dev-watch.ts src/index.ts",
     "start": "bun src/index.ts",
     "test": "bun test tests",
     "typecheck": "tsc --noEmit"

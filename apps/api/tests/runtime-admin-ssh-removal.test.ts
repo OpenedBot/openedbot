@@ -79,7 +79,7 @@ describe("OHB-15 : aucun canal shell vers un hôte client", () => {
 
 describe("OHB-15 : la configuration refuse le canal SSH", () => {
   const base = {
-    OHB_ENV: "development",
+    OPENEDBOT_ENV: "development",
     OHB_RUNTIME_MODE: "external",
     RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     WORKER_INTERNAL_TOKEN: "worker-secret",
@@ -90,7 +90,7 @@ describe("OHB-15 : la configuration refuse le canal SSH", () => {
     for (const environment of ["development", "staging"]) {
       expect(() => readApiConfig({
         ...base,
-        OHB_ENV: environment,
+        OPENEDBOT_ENV: environment,
         OHB_RUNTIME_ADMIN_MODE: "ssh",
       })).toThrow(/OHB_RUNTIME_ADMIN_MODE/u);
     }

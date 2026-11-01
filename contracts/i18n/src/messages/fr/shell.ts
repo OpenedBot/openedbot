@@ -62,7 +62,7 @@ export const featureLab = {
   scenariosLabel: "Scénarios disponibles",
   approvalTitle: "Demande d’autorisation",
   approvalDescription: "Vérifie la pause Hermes, le détail de l’action et les décisions Autoriser ou Refuser.",
-  approvalPrompt: "Utilise exactement l’outil `execute_code` pour exécuter ce code Python sans effet de bord : `print(\"OHB_APPROVAL_TEST\")`. N’utilise aucun autre outil et attends mon autorisation avant de poursuivre.",
+  approvalPrompt: "Utilise exactement l’outil `execute_code` pour exécuter ce code Python sans effet de bord : `print(\"OPENEDBOT_APPROVAL_TEST\")`. N’utilise aucun autre outil et attends mon autorisation avant de poursuivre.",
   questionTitle: "Question interactive",
   questionDescription: "Vérifie une question à choix et la reprise du tour après votre réponse.",
   questionPrompt: "Pose-moi une question interactive avant de continuer. N’appelle pas un outil nommé `ask_user` : termine ce tour exactement par `@user Quelle priorité dois-je privilégier ?`, puis ajoute trois lignes d’option : `- Rapidité`, `- Qualité`, `- Économie`. Attends ma réponse avant de poursuivre.",

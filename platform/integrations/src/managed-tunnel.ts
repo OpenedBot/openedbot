@@ -19,11 +19,11 @@ export const DEFAULT_MANAGED_TUNNEL_SUFFIX = "rt.openedbot.app";
 const SUFFIX_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
 export function readManagedTunnelConfig(env: Record<string, string | undefined>): ManagedTunnelConfig | null {
-  const accountId = env.OHB_CF_ACCOUNT_ID?.trim() ?? "";
-  const apiToken = env.OHB_CF_API_TOKEN?.trim() ?? "";
-  const zoneId = env.OHB_CF_ZONE_ID?.trim() ?? "";
+  const accountId = env.OPENEDBOT_CF_ACCOUNT_ID?.trim() ?? "";
+  const apiToken = env.OPENEDBOT_CF_API_TOKEN?.trim() ?? "";
+  const zoneId = env.OPENEDBOT_CF_ZONE_ID?.trim() ?? "";
   if (!accountId || !apiToken || !zoneId) return null;
-  const hostSuffix = (env.OHB_MANAGED_TUNNEL_SUFFIX?.trim() || DEFAULT_MANAGED_TUNNEL_SUFFIX).toLowerCase().replace(/^\.+|\.+$/g, "");
-  if (!SUFFIX_PATTERN.test(hostSuffix)) throw new Error("OHB_MANAGED_TUNNEL_SUFFIX must be a bare DNS suffix such as rt.openedbot.app.");
+  const hostSuffix = (env.OPENEDBOT_MANAGED_TUNNEL_SUFFIX?.trim() || DEFAULT_MANAGED_TUNNEL_SUFFIX).toLowerCase().replace(/^\.+|\.+$/g, "");
+  if (!SUFFIX_PATTERN.test(hostSuffix)) throw new Error("OPENEDBOT_MANAGED_TUNNEL_SUFFIX must be a bare DNS suffix such as rt.openedbot.app.");
   return { accountId, apiToken, zoneId, hostSuffix };
 }

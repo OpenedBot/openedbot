@@ -113,7 +113,7 @@ export function stopLinkSessions(): void {
 }
 
 export function linkConfig(overrides: Record<string, string> = {}): ApiConfig {
-  return readApiConfig({ OHB_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: LINK_ENCRYPTION_KEY, API_TRUST_PROXY: "1", ...overrides });
+  return readApiConfig({ OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: LINK_ENCRYPTION_KEY, API_TRUST_PROXY: "1", ...overrides });
 }
 
 function fixtureDb(options: SessionOptions, statements: Statement[]): SQL {

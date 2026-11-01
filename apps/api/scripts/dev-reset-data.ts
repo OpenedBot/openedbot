@@ -26,9 +26,9 @@ async function resolveDatabaseUrl(): Promise<string> {
   const explicit = process.env.DEV_RESET_DATABASE_URL?.trim();
   if (explicit) return explicit;
 
-  const container = process.env.OHB_POSTGRES_CONTAINER?.trim() || "infra-postgres";
-  const database = process.env.OHB_DATABASE_NAME?.trim() || "ohb";
-  const port = process.env.OHB_POSTGRES_PORT?.trim() || "5432";
+  const container = process.env.OPENEDBOT_POSTGRES_CONTAINER?.trim() || "infra-postgres";
+  const database = process.env.OPENEDBOT_DATABASE_NAME?.trim() || "ohb";
+  const port = process.env.OPENEDBOT_POSTGRES_PORT?.trim() || "5432";
   const probe = Bun.spawnSync([
     "docker",
     "exec",
@@ -51,14 +51,14 @@ async function resolveDatabaseUrl(): Promise<string> {
   return `postgres://${credentials}@127.0.0.1:${port}/${database}`;
 }
 
-if (process.env.OHB_DEV_RESET_CONFIRM !== "yes") {
+if (process.env.OPENEDBOT_DEV_RESET_CONFIRM !== "yes") {
   fail(
     "Refus : le vidage supprime les données applicatives locales. " +
       "Relancez avec `make db-reset-keep-users CONFIRM=yes`.",
   );
 }
 
-const environment = (process.env.OHB_ENV ?? process.env.NODE_ENV ?? "development").trim();
+const environment = (process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV ?? "development").trim();
 const databaseUrl = await resolveDatabaseUrl();
 try {
   assertDevResetAllowed({ environment, databaseUrl });

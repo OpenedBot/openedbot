@@ -62,7 +62,7 @@ export const featureLab = {
   scenariosLabel: "Available scenarios",
   approvalTitle: "Authorization request",
   approvalDescription: "Checks the Hermes pause, action details, and Allow or Deny decisions.",
-  approvalPrompt: "Use exactly the `execute_code` tool to run this side-effect-free Python code: `print(\"OHB_APPROVAL_TEST\")`. Do not use any other tool, and wait for my authorization before continuing.",
+  approvalPrompt: "Use exactly the `execute_code` tool to run this side-effect-free Python code: `print(\"OPENEDBOT_APPROVAL_TEST\")`. Do not use any other tool, and wait for my authorization before continuing.",
   questionTitle: "Interactive question",
   questionDescription: "Checks a choice question and resumes the turn after your answer.",
   questionPrompt: "Ask me an interactive question before continuing. Do not call a tool named `ask_user`: end this turn exactly with `@user Which priority should I favor?`, followed by three option lines: `- Speed`, `- Quality`, `- Savings`. Wait for my answer before continuing.",

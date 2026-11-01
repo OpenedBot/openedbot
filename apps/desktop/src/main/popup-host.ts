@@ -64,13 +64,13 @@ export type PopupHost = {
 
 /**
  * The popup bundle: next to the app when packaged (Contents/Helpers, see
- * electron-builder.yml), otherwise OHB_POPUP_APP or the sibling checkout's
+ * electron-builder.yml), otherwise OPENEDBOT_POPUP_APP or the sibling checkout's
  * build (`make -C ../notch bundle`). null when none has the executable.
  */
 export function locatePopupBundle(): string | null {
   const candidates = app.isPackaged
     ? [path.join(process.resourcesPath, "..", "Helpers", BUNDLE_NAME)]
-    : [process.env.OHB_POPUP_APP?.trim(), path.resolve(app.getAppPath(), "..", "notch", "dist", BUNDLE_NAME)];
+    : [process.env.OPENEDBOT_POPUP_APP?.trim(), path.resolve(app.getAppPath(), "..", "notch", "dist", BUNDLE_NAME)];
   for (const candidate of candidates) {
     if (candidate && existsSync(path.join(candidate, EXECUTABLE))) return candidate;
   }

@@ -4,7 +4,7 @@
  * The console builds its pro screens from `virtual:ohb-pro-console`
  * (`vite-pro-console.ts`): solo, the list is empty and no fleet, billing or
  * permission-rules screen enters the bundle; pro, each entry of
- * `OHB_PRO_CONSOLE` is one of these modules. A feature is shown only when its
+ * `OPENEDBOT_CONSOLE_PLUGINS` is one of these modules. A feature is shown only when its
  * module is present AND the session holds its entitlement (`/api/auth/me`).
  *
  * The slot types are written out here (open-core step 11): the screens live

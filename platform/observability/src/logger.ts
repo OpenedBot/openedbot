@@ -37,7 +37,7 @@ export const REQUEST_ID_HEADER = "X-Request-Id";
  * - stdout : pino-pretty en développement, JSON en production (journald)
  * - fichiers : `apps/api/var/logs/{dev|prod}.log` plus un fichier par canal
  *
- * `OHB_LOG_TO_FILES=0` coupe les fichiers. `OHB_LOG_DIR` change le dossier.
+ * `OPENEDBOT_LOG_TO_FILES=0` coupe les fichiers. `OPENEDBOT_LOG_DIR` change le dossier.
  *
  * La couleur des niveaux est forcée : `make dev` pipe la sortie de l'API dans
  * son formateur de lignes, pino-pretty ne voit donc jamais un TTY et couperait
@@ -46,11 +46,11 @@ export const REQUEST_ID_HEADER = "X-Request-Id";
  * Le mixin colle `requestId` (ALS) et `channel` (préfixe de l'événement) sur
  * la ligne sérialisée, sans les ajouter à l'objet du call site.
  *
- * Sans `OHB_ENV` ni `NODE_ENV`, le logger se tient pour en production : JSON
+ * Sans `OPENEDBOT_ENV` ni `NODE_ENV`, le logger se tient pour en production : JSON
  * sur stdout, niveau `info`. Le mode lisible (`log-pretty.ts`) ne se charge
  * que sur `development` explicite, ce que `.env.example` pose en local.
  */
-const isDevelopment = (process.env.OHB_ENV ?? process.env.NODE_ENV ?? "production") === "development";
+const isDevelopment = (process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV ?? "production") === "development";
 const level = isDevelopment ? "debug" : "info";
 
 const consoleStream = isDevelopment

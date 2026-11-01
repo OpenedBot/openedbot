@@ -47,10 +47,10 @@ export default defineConfig(({ command, mode, isPreview }) => {
     // Au build : la CSP en tête de index.html (`vite-csp.ts`).
     contentSecurityPolicy(),
     // The pro screens (agency, billing, permission rules): only what
-    // `OHB_PRO_CONSOLE` lists; empty is the solo console (`vite-pro-console.ts`).
-    proConsole(proConsoleEntries(process.env.OHB_PRO_CONSOLE)),
+    // `OPENEDBOT_CONSOLE_PLUGINS` lists; empty is the solo console (`vite-pro-console.ts`).
+    proConsole(proConsoleEntries(process.env.OPENEDBOT_CONSOLE_PLUGINS)),
     // `make solo-check`: which source modules each chunk carries (`vite-module-report.ts`).
-    moduleReport(process.env.OHB_CONSOLE_MODULE_REPORT),
+    moduleReport(process.env.OPENEDBOT_CONSOLE_MODULE_REPORT),
     {
       name: "ohb-dev-app-name",
       transformIndexHtml(html) {

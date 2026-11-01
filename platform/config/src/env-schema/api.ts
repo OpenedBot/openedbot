@@ -35,28 +35,28 @@ export const API_ENV: readonly EnvVar[] = [
     doc: "Bun idle timeout of the API server in seconds, 1 to 255 (default 255).",
   },
   {
-    name: "OHB_PRO_PLUGINS",
+    name: "OPENEDBOT_PLUGINS",
     scope: "api",
     tier: "default_only",
     doc: "Comma-separated module specifiers of pro plug-ins (@openedbot/pro-*); empty or unset is solo mode.",
   },
   {
-    name: "OHB_PRO_CONSOLE",
+    name: "OPENEDBOT_CONSOLE_PLUGINS",
     scope: "web",
     tier: "default_only",
     doc:
       "Build time: comma-separated console modules of the pro packages (absolute paths to `packages/pro-*/console/index.ts`, " +
       "or a core seam such as `@openedbot/console/agency`); empty or unset builds a solo console with no pro screen. " +
-      "The hosted console is built with it (`make build` refuses without it, or OHB_CONSOLE_SOLO=1).",
+      "The hosted console is built with it (`make build` refuses without it, or OPENEDBOT_CONSOLE_SOLO=1).",
   },
   {
-    name: "OHB_CONSOLE_SOLO",
+    name: "OPENEDBOT_CONSOLE_SOLO",
     scope: "scripts",
     tier: "default_only",
-    doc: "`1`: `make build` accepts an empty OHB_PRO_CONSOLE and ships a solo console (no agency, billing or permission-rule screens).",
+    doc: "`1`: `make build` accepts an empty OPENEDBOT_CONSOLE_PLUGINS and ships a solo console (no agency, billing or permission-rule screens).",
   },
   {
-    name: "OHB_CONSOLE_MODULE_REPORT",
+    name: "OPENEDBOT_CONSOLE_MODULE_REPORT",
     scope: "scripts",
     tier: "default_only",
     doc: "Build time: path where the console build writes its chunk/module report (`make solo-check`). Unset: no report.",
@@ -189,7 +189,7 @@ export const API_ENV: readonly EnvVar[] = [
     name: "E2E_EMAIL",
     scope: "web",
     tier: "local",
-    doc: "Account seeded by `make db-seed`; in OHB_ENV=development /login pre-fills it.",
+    doc: "Account seeded by `make db-seed`; in OPENEDBOT_ENV=development /login pre-fills it.",
     example: "dev@ohb.local",
   },
   {

@@ -48,7 +48,7 @@ export type SigninContext = {
   legal: LegalSlug[];
   /**
    * The deployment tier: what the API says (`/api/health`, its
-   * OHB_DEPLOY_ENV), else what the shell infers from the API origin. The page
+   * OPENEDBOT_DEPLOY_ENV), else what the shell infers from the API origin. The page
    * badges every tier but production.
    */
   environment: DeployEnvironment;
