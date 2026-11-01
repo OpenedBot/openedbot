@@ -205,9 +205,18 @@ func TestUpConnectorNoSSHHardening(t *testing.T) {
 	if out, code := b.exec(time.Minute, "stat", "-c", "%U:%G:%a", "/run/hermes-operator/operator.sock"); code != 0 || strings.TrimSpace(out) != "root:hermes:660" {
 		t.Fatalf("operator socket: %s", out)
 	}
+	// The socket mode lets the hermes group connect, but the operator's peer
+	// check only serves root and the connector's own system unit: any other
+	// hermes process is closed before a byte of HTTP is read.
 	probe := "curl -s -o /dev/null -w '%{http_code}' --unix-socket /run/hermes-operator/operator.sock http://hermes-operator/providers/anthropic/oauth/nope"
-	if out, code := b.exec(time.Minute, "runuser", "-u", "hermes", "--", "sh", "-c", probe); code != 0 || strings.TrimSpace(out) != "404" {
-		t.Fatalf("operator probe as hermes: %d %s", code, out)
+	if out, code := b.exec(time.Minute, "runuser", "-u", "hermes", "--", "sh", "-c", probe); code == 0 || strings.TrimSpace(out) != "000" {
+		t.Fatalf("operator probe as hermes outside the connector unit must be refused: %d %s", code, out)
+	}
+	if out, code := b.exec(time.Minute, "sh", "-c", probe); code != 0 || strings.TrimSpace(out) != "404" {
+		t.Fatalf("operator probe as root: %d %s", code, out)
+	}
+	if out, code := b.exec(time.Minute, "sh", "-c", "journalctl -u hermes-operator --no-pager | grep -q 'operator: connection refused'"); code != 0 {
+		t.Fatalf("operator did not log the refused peer: %s", out)
 	}
 	if out, code := b.exec(time.Minute, "sh", "-c", "systemctl cat hermes-gateway | grep -q 'InaccessiblePaths=.*hermes-operator'"); code != 0 {
 		t.Fatalf("gateway unit does not hide the operator socket: %s", out)
