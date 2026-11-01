@@ -27,8 +27,6 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_ENV_FILE: "ENV_FILE",
   OHB_DEV_PROFILE: "OPENEDBOT_DEV_PROFILE",
   OHB_POSTGRES_CONTAINER: "OPENEDBOT_POSTGRES_CONTAINER",
-  OHB_DATABASE_NAME: "OPENEDBOT_DATABASE_NAME",
-  OHB_POSTGRES_PORT: "OPENEDBOT_POSTGRES_PORT",
   OHB_DEV_RESET_CONFIRM: "OPENEDBOT_DEV_RESET_CONFIRM",
   OHB_MAILPIT_CONTAINER: "OPENEDBOT_MAILPIT_CONTAINER",
   OHB_MAILPIT_URL: "OPENEDBOT_MAILPIT_URL",
@@ -142,6 +140,14 @@ export function foldEnvMerges(env: Record<string, string | undefined>): { name: 
 /** Old names that are no longer read at all: warned about, then ignored. */
 export const ENV_DROPPED: readonly string[] = ["OHB_RUNTIME_MODE", "OHB_RUNTIME_ADMIN_MODE"];
 
+/** Old names whose value now comes from another variable: warned about, then ignored. */
+export const ENV_DERIVED: Readonly<Record<string, string>> = {
+  OHB_DATABASE_NAME: "API_DATABASE_URL",
+  OHB_POSTGRES_PORT: "API_DATABASE_URL",
+  OPENEDBOT_DATABASE_NAME: "API_DATABASE_URL",
+  OPENEDBOT_POSTGRES_PORT: "API_DATABASE_URL",
+};
+
 /** The new name of a renamed variable (plain rename, no value change), or undefined. */
 export function renamedEnvName(name: string): string | undefined {
   if (Object.hasOwn(ENV_RENAMES, name)) return ENV_RENAMES[name];
@@ -179,6 +185,10 @@ export function applyEnvAliases(
     if (value === undefined) continue;
     if (ENV_DROPPED.includes(name)) {
       emit(name, `${name} is retired and ignored: remove it from the environment.`);
+      continue;
+    }
+    if (Object.hasOwn(ENV_DERIVED, name)) {
+      emit(name, `${name} is retired and ignored: its value now comes from ${ENV_DERIVED[name]}; remove it.`);
       continue;
     }
     const next = renamedEnvName(name);

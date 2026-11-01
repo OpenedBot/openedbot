@@ -50,7 +50,7 @@ run_migrate() {
     FAKE_ROOT="$root" \
     FAKE_DOCKER_STDIN="$stdin_log" \
     OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
-    OPENEDBOT_DATABASE_NAME=ohb \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
     "$@" /bin/bash scripts/db.sh --migrate
 }
 

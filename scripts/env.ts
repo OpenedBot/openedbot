@@ -78,11 +78,10 @@ async function runCheck(): Promise<void> {
   if (malformed.length) {
     throw new Error(`${malformed.join(", ")}: not a plug-in variable; expected OPENEDBOT_PLUGINS or OPENEDBOT_PLUGIN_<ID>__<KEY>.`);
   }
-  // Le nom de la base est écrit trois fois : OPENEDBOT_DATABASE_NAME pour les scripts
-  // (db-migrate, db-reset), et à l'intérieur des deux DSN pour l'API et le
-  // worker, qui ont chacun leur rôle PostgreSQL. Les trois doivent désigner la
-  // même base : sinon `make db-migrate` migre une base et les apps tournent sur
-  // une autre, sans que rien ne le signale.
+  // Le nom de la base est écrit deux fois, dans les DSN de l'API et du worker,
+  // qui ont chacun leur rôle PostgreSQL ; les scripts (db-migrate, db-reset)
+  // le lisent dans celui de l'API. Les deux doivent désigner la même base :
+  // sinon `make db-migrate` migre une base et le worker tourne sur une autre.
   assertSameDatabase(values);
 
   // La PWA appelle `/api` sur sa propre origine en développement et Vite relaie
@@ -202,15 +201,13 @@ async function runCheck(): Promise<void> {
   }
 
   function assertSameDatabase(values: Record<string, string | undefined>): void {
-    const declared = values.OPENEDBOT_DATABASE_NAME?.trim() || "ohb";
-    for (const name of ["API_DATABASE_URL", "WORKER_DATABASE_URL"] as const) {
-      const database = databaseOfDsn(values[name]);
-      if (database && database !== declared) {
-        throw new Error(
-          `${name} points at the database "${database}" while OPENEDBOT_DATABASE_NAME is "${declared}". ` +
-            "Migrations and the applications would use different databases.",
-        );
-      }
+    const declared = databaseOfDsn(values.API_DATABASE_URL) ?? "ohb";
+    const database = databaseOfDsn(values.WORKER_DATABASE_URL);
+    if (database && database !== declared) {
+      throw new Error(
+        `WORKER_DATABASE_URL points at the database "${database}" while API_DATABASE_URL points at "${declared}". ` +
+          "Migrations and the worker would use different databases.",
+      );
     }
   }
 

@@ -117,4 +117,13 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
     applyEnvAliases(env, () => {});
     expect(env).toEqual({ OPENEDBOT_CONSOLE_MODE: "solo" });
   });
+
+  test("the database name and port copies are ignored: API_DATABASE_URL carries them", () => {
+    const warnings: string[] = [];
+    const env: Record<string, string | undefined> = { OHB_DATABASE_NAME: "ohb", OHB_POSTGRES_PORT: "5433" }; // rename:keep
+    applyEnvAliases(env, (message) => warnings.push(message));
+    expect(env.OPENEDBOT_DATABASE_NAME).toBeUndefined();
+    expect(warnings.join("\n")).toContain("comes from API_DATABASE_URL");
+    expect(warnings.join("\n")).not.toContain("5433");
+  });
 });

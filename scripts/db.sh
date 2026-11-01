@@ -61,9 +61,20 @@ db_up() {
   exit 0
 }
 
+# The development database is the one API_DATABASE_URL names (the path of
+# the DSN, before any query string); ohb when the DSN is unset or names none.
+database_of_url() {
+  local rest="${1#*://}"
+  if [ -z "$1" ] || [ "$rest" = "$1" ]; then printf 'ohb'; return; fi
+  rest="${rest##*@}"
+  case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
+  rest="${rest%%\?*}"
+  printf '%s' "${rest:-ohb}"
+}
+
 db_migrate() {
   container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
-  database="${OPENEDBOT_DATABASE_NAME:-ohb}"
+  database="$(database_of_url "${API_DATABASE_URL:-}")"
 
   if ! docker inspect "$container" >/dev/null 2>&1; then
     printf 'PostgreSQL container %s is not available. Run make infra-up first.\n' "$container" >&2
@@ -159,7 +170,7 @@ db_reset() {
   # calls docker.
 
   container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
-  database="${OPENEDBOT_DATABASE_NAME:-ohb}"
+  database="$(database_of_url "${API_DATABASE_URL:-}")"
   dry_run=0
   confirmed=0
   for flag in "$@"; do
@@ -184,7 +195,7 @@ db_reset() {
       ;;
   esac
   if ! printf '%s' "$database" | grep -Eq '^[a-z_][a-z0-9_]{0,62}$'; then
-    printf 'OPENEDBOT_DATABASE_NAME must be a plain lowercase identifier, not %s.\n' "$database" >&2
+    printf 'The database of API_DATABASE_URL must be a plain lowercase identifier, not %s.\n' "$database" >&2
     exit 1
   fi
 

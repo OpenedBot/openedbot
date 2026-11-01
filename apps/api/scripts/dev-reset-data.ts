@@ -23,13 +23,22 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+function databaseOfApiUrl(value: string | undefined): { database: string; port: string } {
+  try {
+    const url = new URL(value?.trim() ?? "");
+    return { database: decodeURIComponent(url.pathname.replace(/^\//u, "")) || "ohb", port: url.port || "5432" };
+  } catch {
+    return { database: "ohb", port: "5432" };
+  }
+}
+
 async function resolveDatabaseUrl(): Promise<string> {
   const explicit = process.env.DEV_RESET_DATABASE_URL?.trim();
   if (explicit) return explicit;
 
   const container = process.env.OPENEDBOT_POSTGRES_CONTAINER?.trim() || "infra-postgres";
-  const database = process.env.OPENEDBOT_DATABASE_NAME?.trim() || "ohb";
-  const port = process.env.OPENEDBOT_POSTGRES_PORT?.trim() || "5432";
+  // Same database and host port as the API: both come from its DSN.
+  const { database, port } = databaseOfApiUrl(process.env.API_DATABASE_URL);
   const probe = Bun.spawnSync([
     "docker",
     "exec",

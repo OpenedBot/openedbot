@@ -42,7 +42,10 @@ describe("classifyLocalEnvEntry: plug-in variables", () => {
 
 describe("OHB_* -> OPENEDBOT_* rename (one release)", () => {
   test("an old name is renamed, never removed, even when empty", () => {
-    expect(classifyLocalEnvEntry({ name: "OHB_DATABASE_NAME", value: "ohb" }, "external")).toBe("rename"); // rename:keep
+    expect(classifyLocalEnvEntry({ name: "OHB_POSTGRES_CONTAINER", value: "pg" }, "external")).toBe("rename"); // rename:keep
+    // The database name now comes from API_DATABASE_URL: the copy is removed.
+    expect(classifyLocalEnvEntry({ name: "OHB_DATABASE_NAME", value: "ohb" }, "external")).toBe("remove"); // rename:keep
+    expect(classifyLocalEnvEntry({ name: "OPENEDBOT_POSTGRES_PORT", value: "5432" }, "external")).toBe("remove");
     expect(classifyLocalEnvEntry({ name: "OHB_CF_API_TOKEN", value: "" }, "external")).toBe("rename"); // rename:keep
     expect(classifyLocalEnvEntry({ name: "OHB_PRO_BILLING__API_KEY", value: "x" }, "external")).toBe("rename"); // rename:keep
   });
@@ -52,8 +55,8 @@ describe("OHB_* -> OPENEDBOT_* rename (one release)", () => {
   });
 
   test("the values fold into the new names, the new name winning", () => {
-    expect(withRenamedEnvValues({ OHB_DATABASE_NAME: "a", OHB_ENV: "test", OPENEDBOT_ENV: "development", X: "1" })).toEqual({ // rename:keep
-      OPENEDBOT_DATABASE_NAME: "a",
+    expect(withRenamedEnvValues({ OHB_POSTGRES_CONTAINER: "a", OHB_ENV: "test", OPENEDBOT_ENV: "development", X: "1" })).toEqual({ // rename:keep
+      OPENEDBOT_POSTGRES_CONTAINER: "a",
       OPENEDBOT_ENV: "development",
       X: "1",
     });

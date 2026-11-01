@@ -33,7 +33,7 @@ run_reset() {
   PATH="$fake_bin:/usr/bin:/bin" \
     FAKE_DOCKER_EVENTS="$docker_events" \
     OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
-    OPENEDBOT_DATABASE_NAME=ohb \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
     /bin/bash scripts/db.sh --reset "$@"
 }
 
@@ -87,7 +87,7 @@ fi
 # 3. A system or malformed database name is refused before any docker call.
 for bad_name in postgres template0 'ohb"; drop database devhub; --' 'Weird Name'; do
   if PATH="$fake_bin:/usr/bin:/bin" FAKE_DOCKER_EVENTS="$docker_events" \
-      OPENEDBOT_DATABASE_NAME="$bad_name" \
+      API_DATABASE_URL="postgres://openedbot_api@127.0.0.1:5432/$bad_name" \
       /bin/bash scripts/db.sh --reset --yes --dry-run >/dev/null 2>&1; then
     fail "database name '$bad_name' must be refused."
   fi

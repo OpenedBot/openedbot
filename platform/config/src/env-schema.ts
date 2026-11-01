@@ -193,6 +193,10 @@ export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
  *   retiré, avec son contrôle de production, lors du passage à OPENEDBOT_.
  * - `OHB_MIGRATION_VERSION` : jamais lue par `scripts/db.sh --migrate` ni par
  *   aucune autre source.
+ * - `OHB_DATABASE_NAME`, `OHB_POSTGRES_PORT` (and their short-lived
+ *   `OPENEDBOT_` names) : le nom de la base et le port se lisent dans
+ *   API_DATABASE_URL (scripts/db.sh, dev-reset-data.ts, env-check), qui les
+ *   portait déjà ; une seconde copie ne pouvait que diverger.
  * - `REPLACE` : `make link-dev-up REPLACE=1` used to re-enroll an instance
  *   linked elsewhere. `edge-setup link` has no `--replace` any more and always
  *   replaces the link of the instance it targets (`scripts/lib/link-dev.ts`),
@@ -218,12 +222,16 @@ export const DEPRECATED_ENV_NAMES: readonly string[] = [
   "NEXT_PUBLIC_RUNTIME_DOCS_URL",
   "NEXT_PUBLIC_SITE_URL",
   "OHB_AGENCY_ENABLED",
+  "OHB_DATABASE_NAME",
   "OHB_GOOGLE_ALLOWED_EMAILS",
   "OHB_GOOGLE_CLIENT_ID",
   "OHB_GOOGLE_CLIENT_SECRET",
   "OHB_MIGRATION_VERSION",
+  "OHB_POSTGRES_PORT",
   "OHB_RUNTIME_ADMIN_MODE",
   "OHB_RUNTIME_MODE",
+  "OPENEDBOT_DATABASE_NAME",
+  "OPENEDBOT_POSTGRES_PORT",
   "REPLACE",
   "WEB_ORIGINS",
   "WEB_PUBLIC_URL",

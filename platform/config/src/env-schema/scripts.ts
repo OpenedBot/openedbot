@@ -23,19 +23,6 @@ export const SCRIPTS_ENV: readonly EnvVar[] = [
     example: "infra-postgres",
   },
   {
-    name: "OPENEDBOT_DATABASE_NAME",
-    scope: "scripts",
-    tier: "local",
-    doc: "Name of the local development database.",
-    example: "ohb",
-  },
-  {
-    name: "OPENEDBOT_POSTGRES_PORT",
-    scope: "scripts",
-    tier: "default_only",
-    doc: "Host port of the shared dev-infra PostgreSQL container, read by dev-reset-data.ts (default 5432).",
-  },
-  {
     name: "OPENEDBOT_DEV_RESET_CONFIRM",
     scope: "scripts",
     tier: "default_only",
