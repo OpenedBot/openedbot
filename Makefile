@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
+include scripts/lib/env-aliases.mk
 
 ENV_FILE ?= .env.local
 # Development profile: fake (default, tests/fake-hermes), bundled (Docker Hermes)
@@ -40,7 +41,7 @@ endif
 # Vite compris ; un `bun run --cwd apps/api dev` lancé à la main ne charge
 # donc plus rien.
 ENV_FILES = $(ENV_FILE)
-LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a;
+LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a; . "$(CURDIR)/scripts/lib/env-aliases.sh";
 LOAD_ENV = if [ ! -f "$(ENV_FILE)" ]; then printf '%s is missing. Run make setup.\n' "$(ENV_FILE)" >&2; exit 1; fi; $(LOAD_ENV_FILES)
 LOAD_ENV_OPT = $(LOAD_ENV_FILES)
 

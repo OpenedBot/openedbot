@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
 import { SQL } from "bun";
 import {
   assertDevResetAllowed,

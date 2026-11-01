@@ -2,6 +2,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/env-aliases.sh
+. "$root/scripts/lib/env-aliases.sh" # OHB_* -> OPENEDBOT_* fallback, one release
 
 usage() {
   printf 'usage: scripts/db.sh --up | --migrate | --reset [--yes] [--dry-run]\n' >&2

@@ -1,3 +1,4 @@
+import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";

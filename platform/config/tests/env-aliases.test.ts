@@ -1,0 +1,53 @@
+import { describe, expect, test, beforeEach } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { applyEnvAliases, ENV_RENAMES, renamedEnvName, resetEnvAliasWarnings } from "../src/env-aliases";
+import { envSchemaEntry } from "../src/env-schema";
+
+const root = join(import.meta.dir, "..", "..", "..");
+
+describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
+  beforeEach(() => resetEnvAliasWarnings());
+
+  test("copies an old name to its unset new name, once, with a warning naming no value", () => {
+    const env: Record<string, string | undefined> = { OHB_ENV: "production", OHB_PRO_AUDIT__RETENTION_DAYS: "30" };
+    const warnings: string[] = [];
+    applyEnvAliases(env, (message) => warnings.push(message));
+    expect(env.OPENEDBOT_ENV).toBe("production");
+    expect(env.OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS).toBe("30");
+    expect(warnings).toHaveLength(2);
+    expect(warnings.join("\n")).not.toContain("production");
+    applyEnvAliases(env, (message) => warnings.push(message));
+    expect(warnings).toHaveLength(2);
+  });
+
+  test("the new name wins when both are set", () => {
+    const env: Record<string, string | undefined> = { OHB_LOG_DIR: "/old", OPENEDBOT_LOG_DIR: "/new" };
+    const warnings: string[] = [];
+    applyEnvAliases(env, (message) => warnings.push(message));
+    expect(env.OPENEDBOT_LOG_DIR).toBe("/new");
+    expect(warnings[0]).toContain("OPENEDBOT_LOG_DIR wins");
+  });
+
+  test("exact names before the plug-in prefix", () => {
+    expect(renamedEnvName("OHB_PRO_PLUGINS")).toBe("OPENEDBOT_PLUGINS");
+    expect(renamedEnvName("OHB_PRO_CONSOLE")).toBe("OPENEDBOT_CONSOLE_PLUGINS");
+    expect(renamedEnvName("OHB_PRO_BILLING__API_KEY")).toBe("OPENEDBOT_PLUGIN_BILLING__API_KEY");
+    expect(renamedEnvName("OPENEDBOT_ENV")).toBeUndefined();
+    expect(renamedEnvName("OHB_GOOGLE_CLIENT_ID")).toBeUndefined();
+  });
+
+  test("every new name of the table is new-style, and no old name is still declared", () => {
+    for (const [old, next] of Object.entries(ENV_RENAMES)) {
+      expect([old, next.startsWith("OPENEDBOT_")]).toEqual([old, true]);
+      expect([old, envSchemaEntry(old)]).toEqual([old, undefined]);
+    }
+  });
+
+  test("the shell table (scripts/lib/env-aliases.sh) is the same table", () => {
+    const sh = readFileSync(join(root, "scripts/lib/env-aliases.sh"), "utf8");
+    const block = sh.split("<<'TABLE'\n")[1]?.split("\nTABLE")[0] ?? "";
+    const pairs = Object.fromEntries(block.trim().split("\n").map((line) => line.trim().split(/\s+/) as [string, string]));
+    expect(pairs).toEqual({ ...ENV_RENAMES });
+  });
+});

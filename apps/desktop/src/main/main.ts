@@ -1,3 +1,4 @@
+import "./env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback
 import { app, dialog, Menu } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

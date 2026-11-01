@@ -1,3 +1,4 @@
+import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
 import { Hono } from "hono";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { assertProductionConfig, readApiConfig } from "@openedbot/platform-config/api-config";
