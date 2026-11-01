@@ -98,4 +98,15 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
     applyEnvAliases(off, () => {});
     expect(off).toEqual({});
   });
+
+  test("OHB_LOG_TO_FILES=0 becomes OPENEDBOT_LOG_DIR=off; any other value changes nothing", () => {
+    const off: Record<string, string | undefined> = { OHB_LOG_TO_FILES: "0", OHB_LOG_DIR: "/var/log/x" }; // rename:keep
+    applyEnvAliases(off, () => {});
+    expect(off.OPENEDBOT_LOG_DIR).toBe("off");
+    expect("OHB_LOG_TO_FILES" in off).toBe(false); // rename:keep
+    resetEnvAliasWarnings();
+    const on: Record<string, string | undefined> = { OHB_LOG_TO_FILES: "1" }; // rename:keep
+    applyEnvAliases(on, () => {});
+    expect(on).toEqual({});
+  });
 });

@@ -104,6 +104,7 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   },
   { path: "apps/api/src/index.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/observability/src/logger.ts", pattern: TS_ENV_READ, strip: stripComments },
+  { path: "platform/observability/src/log/files.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "modules/runtime-link/src/application/config.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "apps/api/scripts/dev-reset-data.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/config/src/hermes-timeouts.ts", pattern: TS_ENV_READ, strip: stripComments },

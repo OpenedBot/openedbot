@@ -7,7 +7,8 @@ const CHANNEL_SET = new Set<string>(LOG_CHANNELS);
 
 /**
  * Répertoire Monolog de l'API : `apps/api/var/logs`.
- * Surcharge : `OPENEDBOT_LOG_DIR` (tests, autre disque).
+ * Surcharge : `OPENEDBOT_LOG_DIR` (tests, autre disque) ; `off` coupe les
+ * fichiers (logFilesEnabled), le journal reste sur stdout.
  *
  * Le chemin part de ce fichier (platform/observability/src/log) et remonte à
  * la racine du dépôt : le dossier par défaut reste celui de l'API, dans le
@@ -15,7 +16,7 @@ const CHANNEL_SET = new Set<string>(LOG_CHANNELS);
  */
 export function logsDirectory(): string {
   const override = process.env.OPENEDBOT_LOG_DIR?.trim();
-  if (override) return override;
+  if (override && override.toLowerCase() !== LOG_DIR_OFF) return override;
   return join(import.meta.dir, "../../../../apps/api/var/logs");
 }
 
@@ -117,8 +118,9 @@ export function tryCreateLogFileStream(options: LogFileStreamOptions): pino.Dest
   }
 }
 
+/** `OPENEDBOT_LOG_DIR=off`: no log file, stdout only. */
+export const LOG_DIR_OFF = "off";
+
 export function logFilesEnabled(): boolean {
-  if (process.env.OPENEDBOT_LOG_TO_FILES === "0") return false;
-  if (process.env.OPENEDBOT_LOG_TO_FILES === "1") return true;
-  return true;
+  return process.env.OPENEDBOT_LOG_DIR?.trim().toLowerCase() !== LOG_DIR_OFF;
 }

@@ -37,7 +37,7 @@ export const REQUEST_ID_HEADER = "X-Request-Id";
  * - stdout : pino-pretty en développement, JSON en production (journald)
  * - fichiers : `apps/api/var/logs/{dev|prod}.log` plus un fichier par canal
  *
- * `OPENEDBOT_LOG_TO_FILES=0` coupe les fichiers. `OPENEDBOT_LOG_DIR` change le dossier.
+ * `OPENEDBOT_LOG_DIR` change le dossier ; `OPENEDBOT_LOG_DIR=off` coupe les fichiers.
  *
  * La couleur des niveaux est forcée : `make dev` pipe la sortie de l'API dans
  * son formateur de lignes, pino-pretty ne voit donc jamais un TTY et couperait

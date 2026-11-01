@@ -12,6 +12,12 @@ export const SHARED_ENV: readonly EnvVar[] = [
     productionExample: "production",
   },
   {
+    name: "OPENEDBOT_LOG_DIR",
+    scope: "shared",
+    tier: "default_only",
+    doc: "Directory of the API and worker log files (default apps/api/var/logs); `off` writes no file, stdout only.",
+  },
+  {
     name: "NODE_ENV",
     scope: "shared",
     tier: "default_only",

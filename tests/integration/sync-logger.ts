@@ -6,4 +6,4 @@
  * exit 1. These scripts log nothing worth a file: only the synchronous stdout
  * destination is kept.
  */
-process.env.OPENEDBOT_LOG_TO_FILES = "0";
+process.env.OPENEDBOT_LOG_DIR = "off";
