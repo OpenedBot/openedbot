@@ -81,7 +81,7 @@ const userData = mkdtempSync(path.join(tmpdir(), "ohb-config-"));
 // the mock: bun keeps one electron mock across files, and a missing name (net)
 // fails the link of the next file that imports it.
 mock.module("electron", () => ({ app: { isPackaged: false, getPath: () => userData }, net: {}, shell: {}, ipcMain: { handle() {}, on() {} }, nativeTheme: {}, safeStorage: { isEncryptionAvailable: () => false } }));
-const ENV_NAMES = ["OPENEDBOT_TARGET", "OPENEDBOT_CONSOLE_URL", "OPENEDBOT_API_ORIGIN", "OHB_CLIENT_ID", "OPENEDBOT_SIGNIN_TEMPLATE", "NODE_ENV_ELECTRON_VITE"];
+const ENV_NAMES = ["OPENEDBOT_TARGET", "OPENEDBOT_CONSOLE_URL", "OPENEDBOT_API_ORIGIN", "OPENEDBOT_SIGNIN_TEMPLATE", "NODE_ENV_ELECTRON_VITE"];
 let imports = 0;
 
 async function configWith(env: Record<string, string>) {

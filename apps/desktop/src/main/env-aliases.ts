@@ -15,7 +15,7 @@ export const DESKTOP_ENV_RENAMES: Readonly<Record<string, string>> = {
 };
 
 /** No longer read: the OAuth client id comes from config.json (`clientId`) only. */
-export const DESKTOP_ENV_DROPPED: readonly string[] = [];
+export const DESKTOP_ENV_DROPPED: readonly string[] = ["OHB_CLIENT_ID"];
 
 export function applyDesktopEnvAliases(
   env: Record<string, string | undefined> = process.env,

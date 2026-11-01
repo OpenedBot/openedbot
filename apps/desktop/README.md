@@ -92,7 +92,7 @@ Precedence: environment variable, then `config.json`, then build-time defaults
 |---|---|---|---|
 | Web console | `OPENEDBOT_CONSOLE_URL` | `consoleUrl` | `https://console.openedbot.app` |
 | API origin | `OPENEDBOT_API_ORIGIN` | `apiOrigin` | `https://api.openedbot.app` |
-| OAuth client id | `OHB_CLIENT_ID` | `clientId` | `ohb-desktop-windows` |
+| OAuth client id | — (no override) | `clientId` | `ohb-desktop-windows` |
 | Sign-in template | `OPENEDBOT_SIGNIN_TEMPLATE` | `signinTemplate` | `console-split` |
 
 Development-only variables: `OPENEDBOT_TARGET` (`prod` or an API URL), `OPENEDBOT_POPUP_APP` (path to a popup bundle),

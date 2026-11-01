@@ -46,10 +46,11 @@ export const DEV_CONSOLE_URL = "http://localhost:1420";
 // so a test build targets the right console out of the box.
 type ConfigSource = Partial<Record<keyof DesktopConfig | "target", unknown>>;
 
-const ENV_KEYS: Record<keyof DesktopConfig | "target", string> = {
+// The OAuth client id has no environment override: it identifies the build,
+// so it comes from config.json or the built-in default only.
+const ENV_KEYS: Record<Exclude<keyof DesktopConfig, "clientId"> | "target", string> = {
   consoleUrl: "OPENEDBOT_CONSOLE_URL",
   apiOrigin: "OPENEDBOT_API_ORIGIN",
-  clientId: "OHB_CLIENT_ID",
   signinTemplate: "OPENEDBOT_SIGNIN_TEMPLATE",
   target: "OPENEDBOT_TARGET",
 };
