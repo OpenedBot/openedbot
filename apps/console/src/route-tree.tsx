@@ -558,16 +558,16 @@ function BotConversationEntry() {
 
 /**
  * `/dev/thread-lab`: the current thread and composer next to a prototype,
- * on a scripted event stream (`screens/dev/thread-lab.tsx`). Dev server only:
+ * on a scripted event stream (`screens/dev/thread-lab.tsx`). `/dev/math`: the
+ * math + mermaid fixture (`screens/dev/math-lab.tsx`). Dev server only:
  * Vite replaces `import.meta.env.DEV` with `false` in a build, so the route
  * and its chunk are dropped. `=== true` for the reason in `dev-settings-ui.ts`.
  */
 const devRoutes = import.meta.env.DEV === true
-  ? [createRoute({
-      getParentRoute: () => appFrameRoute,
-      path: "/dev/thread-lab",
-      component: lazyRouteComponent(() => import("./screens/dev/thread-lab"), "ThreadLabScreen"),
-    })]
+  ? [
+      createRoute({ getParentRoute: () => appFrameRoute, path: "/dev/thread-lab", component: lazyRouteComponent(() => import("./screens/dev/thread-lab"), "ThreadLabScreen") }),
+      createRoute({ getParentRoute: () => appFrameRoute, path: "/dev/math", component: lazyRouteComponent(() => import("./screens/dev/math-lab"), "MathLabScreen") }),
+    ]
   : [];
 
 /** Ancienne session extra : `/cs/:botId?task=`. Le bot n'a plus qu'un fil. */

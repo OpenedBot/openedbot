@@ -25,6 +25,9 @@
     "typecheck": "make typecheck",
     "test": "make test"
   },
+  "overrides": {
+    "katex": "^0.18.2"
+  },
   "devDependencies": {
     "@openedbot/contracts-api": "workspace:*",
     "@openedbot/contracts-connector": "workspace:*",
