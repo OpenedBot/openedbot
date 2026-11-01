@@ -263,10 +263,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    // apps/desktop and apps/notch are standalone clients imported
-    // into the monorepo with their own dependencies (not Bun workspaces of the
-    // core): their boundaries are not the core's.
-    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/(desktop|notch)/" },
+    // apps/desktop is a standalone client with its own dependencies (not a
+    // Bun workspace of the core): its boundaries are not the core's.
+    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop/" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {
