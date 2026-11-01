@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArchive } from "@tabler/icons-react";
 import { Loader2 } from "lucide-react";
 import type { BotDto, GroupDto } from "@openedbot/contracts-api";
-import { partitionThreadVisibility } from "@/lib/thread-visibility";
+import { partitionThreadVisibility } from "@/lib/thread/thread-visibility";
 import { Badge, Dialog, cn, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../../lib/api";
 import { useT } from "../../../lib/i18n";

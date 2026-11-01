@@ -2,8 +2,8 @@ import { IconCloud, IconServer, IconServerBolt } from "@tabler/icons-react";
 import type { RuntimePublicDto } from "@openedbot/contracts-api";
 import { Tooltip, TooltipContent, TooltipTrigger, cn } from "@openedbot/browser-ui-kit";
 import { useT, type Locale } from "../../lib/i18n";
-import { runtimeHealthLabel } from "../../lib/runtime-health";
-import type { RuntimeHealthReading } from "../../lib/use-runtime-health";
+import { runtimeHealthLabel } from "../../lib/runtime/runtime-health";
+import type { RuntimeHealthReading } from "../../lib/runtime/use-runtime-health";
 
 export const RUNTIME_SETTINGS_PATH = "/settings/runtime";
 

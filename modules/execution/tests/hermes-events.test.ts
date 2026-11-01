@@ -16,7 +16,7 @@ const UPSTREAM_PROVIDER_FAILURE =
   "to choose a provider and model, or set an API key (OPENROUTER_API_KEY, OPENAI_API_KEY, etc.) in ~/.hermes/.env.";
 
 test("MODEL_UNAVAILABLE_CODE garde la valeur que la console épingle", () => {
-  // `apps/console/src/lib/model-unavailable.ts` recopie cette valeur sans
+  // `apps/console/src/lib/run/model-unavailable.ts` recopie cette valeur sans
   // importer le paquet : la changer casse l'alerte de la console.
   expect(MODEL_UNAVAILABLE_CODE).toBe("MODEL_UNAVAILABLE");
 });

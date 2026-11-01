@@ -7,7 +7,7 @@ import { RiAddFill, RiArrowLeftSLine, RiArrowRightSLine, RiSearchLine, RiSideBar
 import type { BotDto } from "@openedbot/contracts-api";
 import { cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
-import { shortcutLabel } from "../../lib/shortcut-label";
+import { shortcutLabel } from "../../lib/shell/shortcut-label";
 import { useT } from "../../lib/i18n";
 import { BotFace } from "../bot-face";
 import { DeployEnvironmentBadge } from "../deploy-environment-badge";

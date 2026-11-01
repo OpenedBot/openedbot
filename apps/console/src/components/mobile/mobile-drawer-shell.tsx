@@ -13,17 +13,17 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { cn } from "@openedbot/browser-ui-kit";
-import { haptics } from "../../lib/haptics";
+import { haptics } from "../../lib/platform/haptics";
 import { useT } from "../../lib/i18n";
 import { clamp } from "../../lib/format";
-import { releaseComposerKeyboard } from "../../lib/composer-keyboard";
+import { releaseComposerKeyboard } from "../../lib/composer/composer-keyboard";
 import {
   DRAWER_EDGE_WIDTH,
   decideDrawerOpen,
   drawerPathChange,
   drawerWidthFor,
   edgeSwipePreventsScroll,
-} from "../../lib/mobile-navigation";
+} from "../../lib/shell/mobile-navigation";
 import { sheetOwnsEdgeSwipe } from "./sheet-stack";
 
 /** iOS retarde le `click` synthétique (~300 ms). En dessous, le garde lâche. */

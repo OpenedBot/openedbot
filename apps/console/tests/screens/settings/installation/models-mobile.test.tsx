@@ -25,7 +25,7 @@ import {
   PROVIDER_RECONNECT_TTL_MS,
   requestProviderReconnect,
   useProviderReconnectRequest,
-} from "../../../../src/lib/provider-auth";
+} from "../../../../src/lib/runtime/provider-auth";
 
 const providerReconnectRequest = () => renderHook(() => useProviderReconnectRequest()).result.current;
 

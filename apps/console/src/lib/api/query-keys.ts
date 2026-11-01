@@ -1,4 +1,4 @@
-import { activeFleetId, activeOrganizationId } from "../cloud-session";
+import { activeFleetId, activeOrganizationId } from "../session/cloud-session";
 import type { LegalSlug } from "@openedbot/contracts-api";
 
 /** Personal and delegated views of the same client never share cached data or privileges. */

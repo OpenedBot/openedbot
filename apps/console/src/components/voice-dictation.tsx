@@ -8,10 +8,10 @@ import {
   mergeVoiceTranscript,
   type VoiceRecognitionAdapter,
   type VoiceRecognitionFailure,
-} from "../lib/web-voice-recognition";
+} from "../lib/voice/web-voice-recognition";
 import { VoicePanel } from "./voice-panel";
 import { SpeechOutputSettings } from "./speech-output-settings";
-import type { SpeechSynthesisAdapter } from "../lib/web-speech-synthesis";
+import type { SpeechSynthesisAdapter } from "../lib/voice/web-speech-synthesis";
 import { BUTTON } from "./settings/primitives";
 
 export type VoiceDictationProps = {

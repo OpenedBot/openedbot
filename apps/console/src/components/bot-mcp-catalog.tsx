@@ -8,20 +8,20 @@ import {
   type McpConnectorEntry,
 } from "@openedbot/runtimes/domain/mcp-connector-catalog";
 import { api, queryKeys, runtimesQueryOptions } from "../lib/api";
-import { hasMcpLiveReload } from "../lib/mcp-live-reload";
+import { hasMcpLiveReload } from "../lib/runtime/mcp-live-reload";
 import { useT } from "../lib/i18n";
-import { McpOauthDialog } from "../screens/settings/installation/connectors-mcp-oauth";
-import { GatewayRestartCard } from "../screens/settings/installation/connectors-mcp-gateway";
+import { McpOauthDialog } from "../screens/settings/installation/connectors/connectors-mcp-oauth";
+import { GatewayRestartCard } from "../screens/settings/installation/connectors/connectors-mcp-gateway";
 import {
   CATEGORY_LABEL,
   connectorDescriptionKey,
   mcpConnectBlocker,
   type McpConnectBlocker,
-} from "../screens/settings/installation/connectors-catalog-model";
+} from "../screens/settings/installation/connectors/connectors-catalog-model";
 import { CONNECTOR_PILL, McpConnectorLogo, McpConnectorRow } from "./mcp-connector-row";
 import { Note } from "./settings/primitives";
 
-export type { McpConnectBlocker } from "../screens/settings/installation/connectors-catalog-model";
+export type { McpConnectBlocker } from "../screens/settings/installation/connectors/connectors-catalog-model";
 
 /**
  * La connexion d'une entrée du catalogue à CE bot, partagée par la section

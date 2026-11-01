@@ -17,8 +17,8 @@ import {
   type Entry,
   type TimelineModel,
   type TimelineModelInput,
-} from "../../src/lib/thread-timeline-model";
-import { THREAD_LIVE_TURN_WINDOW, windowTimelineEntries } from "../../src/lib/thread-window";
+} from "../../src/lib/thread/thread-timeline-model";
+import { THREAD_LIVE_TURN_WINDOW, windowTimelineEntries } from "../../src/lib/thread/thread-window";
 import { appendEvent, modelInput, threadFixture } from "./thread-timeline-fixture";
 
 const DELTAS = 300;

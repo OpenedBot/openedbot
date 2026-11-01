@@ -16,7 +16,7 @@ Une valeur absente se mappe sur `null`. L'absence du backend produit
 produit `unsupported / VOICE_MICROPHONE_NOT_REPORTED`. Aucun bouton Start ne
 doit etre rendu ou execute dans ces etats.
 
-Sur le web, `apps/console/src/lib/web-voice-recognition.ts` traite la presence
+Sur le web, `apps/console/src/lib/voice/web-voice-recognition.ts` traite la presence
 reelle de `SpeechRecognition` / `webkitSpeechRecognition` dans un contexte
 securise comme la capacite de transcription. Il consulte `Permissions API`
 quand elle sait repondre pour `microphone`, puis laisse le moteur demander
@@ -41,7 +41,7 @@ et l'envoi sont deux gestes explicites. Aucun `onresult` ne demarre un run.
 
 ## Lecture des reponses sur le web
 
-`apps/console/src/lib/web-speech-synthesis.ts` utilise uniquement
+`apps/console/src/lib/voice/web-speech-synthesis.ts` utilise uniquement
 `window.speechSynthesis` et `SpeechSynthesisUtterance`. Quand l'une des deux
 primitives manque, le client ne rend aucune commande de lecture : il ne joue
 pas un audio factice et n'appelle pas un backend de secours non configure.

@@ -11,8 +11,8 @@ import { DevRenderProfiler } from "../dev/dev-render-profiler";
 import { AgentEditorPanel } from "./agent-editor-panel";
 import { BoardSidebar, OrganizationHead } from "./board-sidebar";
 import { BOARD_SIDEBAR_ID, BoardHeaderSlotProvider, BoardTopBar, COLLAPSE_MOTION, useBoardChrome } from "./board-chrome";
-import { rememberAppPath } from "../../lib/settings-return";
-import { useAccountLayout } from "../../lib/account-layout";
+import { rememberAppPath } from "../../lib/shell/settings-return";
+import { useAccountLayout } from "../../lib/shell/account-layout";
 import { BoardIconRail } from "./board-rails";
 
 /**

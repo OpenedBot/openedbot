@@ -4,7 +4,7 @@ import type { SQL } from "bun";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import type { ComputerProvider } from "../src/infrastructure/computer-provider";
 import { ComputerProviderError } from "../src/infrastructure/computer-provider";
-import { computerRoutes } from "../src/interfaces/http/computer-routes";
+import { computerRoutes } from "../src/routes/roster/computer-routes";
 import { HttpError } from "../src/interfaces/http/http-error";
 
 const owner: AuthContext = {

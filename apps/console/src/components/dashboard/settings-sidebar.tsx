@@ -15,9 +15,9 @@ import {
   IconUsers,
   IconBuildingStore,
 } from "@tabler/icons-react";
-import { SHOW_DEV_SETTINGS } from "../../lib/dev-settings-ui";
+import { SHOW_DEV_SETTINGS } from "../../lib/shell/dev-settings-ui";
 import type { MessageKey } from "../../lib/i18n";
-import type { FLEET_OWN_SETTINGS_PATHS } from "../../lib/workspace-location";
+import type { FLEET_OWN_SETTINGS_PATHS } from "../../lib/workspace/workspace-location";
 import { hasFleetConsole } from "../../pro-console/slots";
 import { useProFeature } from "../../pro-console/registry";
 

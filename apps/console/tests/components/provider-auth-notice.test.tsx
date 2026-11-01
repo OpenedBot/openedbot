@@ -4,14 +4,14 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Router
 import { PROVIDER_AUTH_REQUIRED_CODE } from "@openedbot/contracts-errors";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
-import type { SpeechSynthesisAdapter } from "../../src/lib/web-speech-synthesis";
+import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
 import {
   clearProviderReconnect,
   PROVIDER_AUTH_REQUIRED,
   providerAuthRequiredSlug,
   useProviderReconnectRequest,
-} from "../../src/lib/provider-auth";
+} from "../../src/lib/runtime/provider-auth";
 
 /**
  * Bug 1b (2026-10-24): an expired xAI login is no longer answered by another

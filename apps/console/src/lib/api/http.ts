@@ -1,8 +1,8 @@
-import { activeFleetId, activeOrganizationId, clearCloudSession, readCloudSession, readWebCsrfToken, reportWorkspaceRevoked } from "../cloud-session";
+import { activeFleetId, activeOrganizationId, clearCloudSession, readCloudSession, readWebCsrfToken, reportWorkspaceRevoked } from "../session/cloud-session";
 import { LOCALE_STORAGE_KEY } from "../i18n";
-import { nativeBridge } from "../native-bridge";
-import { clearOnboardingDraft } from "../onboarding-draft";
-import { rememberAccountWorkspaces } from "../workspace-directory";
+import { nativeBridge } from "../platform/native-bridge";
+import { clearOnboardingDraft } from "../session/onboarding-draft";
+import { rememberAccountWorkspaces } from "../workspace/workspace-directory";
 import { ApiClientError } from "@openedbot/browser-api-client";
 import { DEFAULT_LOCALE, normalizeLocale, t } from "@openedbot/browser-i18n";
 import type { AccountWorkspacesDto } from "@openedbot/contracts-api";
@@ -249,7 +249,7 @@ export function assertFleetClientRequestContext(context: FleetClientRequestConte
 
 /**
  * Le web s'authentifie par le cookie HttpOnly de session ; la coque native
- * (`lib/native-bridge.ts`) par un bearer lu sur le pont ; le token override
+ * (`lib/platform/native-bridge.ts`) par un bearer lu sur le pont ; le token override
  * reste réservé aux tests unitaires.
  */
 export async function request<T>(path: string, init?: RequestInit, options: RequestOptions = {}): Promise<T> {

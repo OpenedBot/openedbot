@@ -5,7 +5,7 @@ import {
   SSE_MAX_PENDING_EVENTS,
   SSE_MAX_QUEUED_BYTES,
   sseSlowConsumerClosures,
-} from "../src/interfaces/http/event-routes";
+} from "../src/routes/events/event-routes";
 import { frameReader, sseTestApp, storedRow, streamEvent } from "./fixtures/event-stream";
 import { fakeRunEventsDb } from "./fixtures/run-events-db";
 

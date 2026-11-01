@@ -5,8 +5,8 @@ import { FleetClientSettingsContext } from "../../pro-console/slots";
 import { proConsole, useProFeature } from "../../pro-console/registry";
 import { CardSkeleton } from "../../components/settings/primitives";
 import { useT, type MessageKey } from "../../lib/i18n";
-import { useSettingsOverlay, type OverlaySettingsPath } from "../../lib/settings-overlay";
-import { isRuntimeSection } from "./installation/cloud-shared";
+import { useSettingsOverlay, type OverlaySettingsPath } from "../../lib/shell/settings-overlay";
+import { isRuntimeSection } from "./installation/cloud/cloud-shared";
 import { SettingsPane } from "./pane";
 
 // Each settings body is its own chunk: the console boots on a conversation,
@@ -21,7 +21,7 @@ const ArchivesSettings = lazyRouteComponent(() => import("./general/archives"), 
 const NotificationsSettings = lazyRouteComponent(() => import("./general/notifications"), "NotificationsSettings");
 const AgentsSettings = lazyRouteComponent(() => import("./installation/agents"), "AgentsSettings");
 const CloudRuntimeSettings = lazyRouteComponent(() => import("./installation/cloud"), "CloudRuntimeSettings");
-const CloudSettingsOverview = lazyRouteComponent(() => import("./installation/cloud-overview"), "CloudSettingsOverview");
+const CloudSettingsOverview = lazyRouteComponent(() => import("./installation/cloud/cloud-overview"), "CloudSettingsOverview");
 const ConnectorsSettings = lazyRouteComponent(() => import("./installation/connectors"), "ConnectorsSettings");
 const ModelsSettings = lazyRouteComponent(() => import("./installation/models"), "ModelsSettings");
 const DecisionsSettings = lazyRouteComponent(() => import("./journal/decisions"), "DecisionsSettings");

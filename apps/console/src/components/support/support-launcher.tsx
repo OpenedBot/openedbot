@@ -3,14 +3,14 @@ import { useRouterState } from "@tanstack/react-router";
 import { IconMessageCircle2 } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
-import { isSupportLauncherVisible, useOnSupportPage } from "../../lib/support-launcher-visibility";
+import { isSupportLauncherVisible, useOnSupportPage } from "../../lib/support/support-launcher-visibility";
 import {
   closeSupportPanel,
   openSupportPanel,
   useSupportPanelOpen,
-} from "../../lib/support-panel-session";
-import { useSupportDeskAvailable } from "../../lib/support-desk-availability";
-import { useSupportUnread, useSupportWatch } from "../../lib/support-watch";
+} from "../../lib/support/support-panel-session";
+import { useSupportDeskAvailable } from "../../lib/support/support-desk-availability";
+import { useSupportUnread, useSupportWatch } from "../../lib/support/support-watch";
 import { SupportPanel } from "./support-panel";
 import { SupportUnreadDot } from "./support-unread-dot";
 

@@ -1,5 +1,5 @@
-import { nativeBridge } from "../native-bridge";
-import { normalizeWorkflowCounters } from "@/lib/workflow-display";
+import { nativeBridge } from "../platform/native-bridge";
+import { normalizeWorkflowCounters } from "@/lib/run/workflow-display";
 import type { CreateMessageVersionInput, InboxDto, MessageVersionCreatedDto, MessageVersionFamilyListDto, ThreadCompactResult, WorkflowHistoryPageDto } from "@openedbot/contracts-api";
 import type { MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
 import { API_ORIGIN, ApiError, authHeadersFor, cloudHeaders, request } from "./http";

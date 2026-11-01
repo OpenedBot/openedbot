@@ -13,7 +13,7 @@ import { ThreadWebhooksPanel } from "./bot-webhooks-panel";
 import { isBotManagePageParked } from "./bot-manage/bot-manage-dialog";
 import { MoveToSectionDialog } from "./move-to-section-dialog";
 import { useT } from "../lib/i18n";
-import { useOpenedOnce } from "../lib/use-opened-once";
+import { useOpenedOnce } from "../lib/hooks/use-opened-once";
 
 /**
  * Menu contextuel d'un groupe, au clic droit, le pendant de `BotContextMenu`

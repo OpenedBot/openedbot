@@ -12,7 +12,7 @@ import { BotFace } from "../bot-face";
 import { BUTTON } from "../settings/primitives";
 import { ProviderIcon } from "../provider-icon";
 import { UsageBar } from "../usage-bar";
-import { useSecondaryReadsReady } from "../../lib/after-first-paint";
+import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
 
 /**
  * Le relevé des abonnements fournisseur, et lui seul.

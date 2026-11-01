@@ -37,7 +37,7 @@ import {
   useProviderLimits,
   type ProviderLimits,
 } from "./dashboard/provider-limits-panel";
-import { useSecondaryReadsReady } from "../lib/after-first-paint";
+import { useSecondaryReadsReady } from "../lib/shell/after-first-paint";
 import { canvasChromeButton, useAttachmentCanvas } from "./attachment-canvas";
 
 /**

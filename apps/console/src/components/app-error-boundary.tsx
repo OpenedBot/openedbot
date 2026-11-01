@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from "react";
 import { useFallbackT } from "../lib/i18n";
-import { APP_HOME_HREF } from "../lib/workspace-location";
+import { APP_HOME_HREF } from "../lib/workspace/workspace-location";
 import { FailureState } from "./failure-state";
 import { BUTTON } from "./settings/primitives";
 

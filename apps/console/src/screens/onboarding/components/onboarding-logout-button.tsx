@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@openedbot/browser-ui-kit";
 import { ObButton } from "@openedbot/browser-ui-kit/components/onboarding";
 import { api, queryKeys } from "../../../lib/api";
-import { signOut } from "../../../lib/sign-out";
+import { signOut } from "../../../lib/session/sign-out";
 import { useT } from "../../../lib/i18n";
 
 /**

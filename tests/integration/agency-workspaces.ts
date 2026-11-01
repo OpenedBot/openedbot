@@ -11,7 +11,7 @@ import { authMiddleware, type AppVariables } from "../../apps/api/src/routes/ide
 import { memberRoutes } from "../../apps/api/src/routes/identity/member-routes";
 import { workspaceRoutes } from "../../apps/api/src/routes/identity/workspace-routes";
 import { fleetMounts, requireFleetPlugin } from "./pro-fleet";
-import { eventRoutes } from "../../apps/api/src/interfaces/http/event-routes";
+import { eventRoutes } from "../../apps/api/src/routes/events/event-routes";
 import { hashCredential } from "../../platform/db/src/credential";
 import { hasLiveWorkspaceSession } from "../../modules/identity/src/sql/session-access";
 import { EventHub } from "../../modules/notifications/src/application/event-hub";

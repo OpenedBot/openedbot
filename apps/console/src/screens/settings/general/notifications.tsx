@@ -20,7 +20,7 @@ import {
   webNotificationPermissionState,
   WEB_NOTIFICATION_PREFERENCE_EVENT,
   type WebNotificationPermissionState,
-} from "../../../lib/web-workflow-notifications";
+} from "../../../lib/run/web-workflow-notifications";
 import { InsetGroupedSection, InsetGroupedStatic } from "../../../components/mobile/inset-grouped";
 import { SettingsPane } from "../pane";
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@openedbot/browser-ui-kit";
 import type { BotDto, RuntimePublicDto } from "@openedbot/contracts-api";
-import { ApiKeyForm, type ApiKeySaveResult } from "../../screens/settings/installation/models-provider-dialog";
+import { ApiKeyForm, type ApiKeySaveResult } from "../../screens/settings/installation/models/models-provider-dialog";
 import { ApiError, api, queryKeys } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { ACTIONS, BUTTON, Note } from "../settings/primitives";

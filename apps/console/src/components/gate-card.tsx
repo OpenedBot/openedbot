@@ -4,7 +4,7 @@ import { Check, ChevronDown, Copy, ShieldAlert } from "lucide-react";
 import type { ApprovalAlwaysChoice, ApprovalRequestDto } from "@openedbot/contracts-api";
 import { Button, cn, toast } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../lib/api";
-import { gatePhrase } from "../lib/gate-phrase";
+import { gatePhrase } from "../lib/runtime/gate-phrase";
 import { useT } from "../lib/i18n";
 
 type GateChoice = "once" | "deny" | ApprovalAlwaysChoice;

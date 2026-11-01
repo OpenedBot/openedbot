@@ -3,9 +3,9 @@ import { useIsMobile } from "@openedbot/browser-ui-kit";
 import { BoardFrame } from "../boardui/board-frame";
 import { SettingsModal, SettingsPage, SettingsPageSidebar } from "../boardui/settings-modal";
 import { useFleetFrameContext } from "../../pro-console/slots";
-import { FaceMotionProvider } from "../../lib/face-motion";
+import { FaceMotionProvider } from "../../lib/faces/face-motion";
 import { MobileFrame } from "./mobile-frame";
-import { useSettingsDisplay } from "../../lib/settings-display";
+import { useSettingsDisplay } from "../../lib/shell/settings-display";
 
 /**
  * On mobile, settings stay in the conversation shell. The overview is a drawer

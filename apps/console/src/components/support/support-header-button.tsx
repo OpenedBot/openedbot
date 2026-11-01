@@ -2,9 +2,9 @@ import { IconMessageCircle2 } from "@tabler/icons-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
-import { useOnSupportPage } from "../../lib/support-launcher-visibility";
-import { useSupportDeskAvailable } from "../../lib/support-desk-availability";
-import { useSupportUnread } from "../../lib/support-watch";
+import { useOnSupportPage } from "../../lib/support/support-launcher-visibility";
+import { useSupportDeskAvailable } from "../../lib/support/support-desk-availability";
+import { useSupportUnread } from "../../lib/support/support-watch";
 import { ChromeIconButton } from "../mobile/mobile-header";
 import { SupportUnreadDot } from "./support-unread-dot";
 

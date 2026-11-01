@@ -20,7 +20,7 @@ import {
 import { BUTTON, EmptyState } from "../../components/settings/primitives";
 import { WorkflowRecoveryDialog } from "../../components/workflow-recovery-dialog";
 import { useT, type MessageKey } from "../../lib/i18n";
-import { useWorkflowRecovery } from "../../lib/use-workflow-recovery";
+import { useWorkflowRecovery } from "../../lib/run/use-workflow-recovery";
 
 type Filter = "all" | InboxItemKind;
 type OpenDialog =

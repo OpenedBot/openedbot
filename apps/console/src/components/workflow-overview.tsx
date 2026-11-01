@@ -6,12 +6,12 @@ import {
   groupWorkflowRuns,
   isWorkflowInFlight,
   visibleWorkflowGroups,
-} from "@/lib/workflow-display";
+} from "@/lib/run/workflow-display";
 import type { RunDto, WorkflowDto, WorkflowStatus } from "@openedbot/contracts-api";
 import { queryKeys } from "../lib/api";
 import { useT, type MessageKey } from "../lib/i18n";
 import { WorkflowRecoveryDialog } from "./workflow-recovery-dialog";
-import { useWorkflowRecovery } from "../lib/use-workflow-recovery";
+import { useWorkflowRecovery } from "../lib/run/use-workflow-recovery";
 
 const STATUS_KEYS: Record<WorkflowStatus, MessageKey> = {
   queued: "workflowOverview.status.queued",

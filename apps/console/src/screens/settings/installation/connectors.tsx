@@ -17,9 +17,9 @@ import {
   InsetGroupedStatic,
 } from "../../../components/mobile/inset-grouped";
 import { FailureState } from "../../../components/failure-state";
-import { McpPanel } from "./connectors-mcp";
-import { ConnectorsDesktop } from "./connectors-desktop";
-import { InventoryAlerts, SkillDialog, ToolsetDialog, groupSkills, toolsetStatusMap } from "./connectors-parts";
+import { McpPanel } from "./connectors/connectors-mcp";
+import { ConnectorsDesktop } from "./connectors/connectors-desktop";
+import { InventoryAlerts, SkillDialog, ToolsetDialog, groupSkills, toolsetStatusMap } from "./connectors/connectors-parts";
 import { SettingsPane } from "../pane";
 import {
   BUTTON,

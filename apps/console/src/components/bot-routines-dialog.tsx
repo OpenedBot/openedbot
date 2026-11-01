@@ -26,7 +26,7 @@ import { ApiError, api, queryKeys } from "../lib/api";
 import { randomId } from "../lib/random-id";
 import { useT } from "../lib/i18n";
 import { RoutineExecutionsList } from "./routine-executions-list";
-import { GatewayRestartCard } from "../screens/settings/installation/connectors-mcp";
+import { GatewayRestartCard } from "../screens/settings/installation/connectors/connectors-mcp";
 import { BUTTON } from "./settings/primitives";
 
 /**

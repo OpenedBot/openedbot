@@ -1,5 +1,5 @@
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
-import { useAgentEditor } from "../lib/agent-editor";
+import { useAgentEditor } from "../lib/bots/agent-editor";
 import { useT } from "../lib/i18n";
 import { BotFace } from "./bot-face";
 

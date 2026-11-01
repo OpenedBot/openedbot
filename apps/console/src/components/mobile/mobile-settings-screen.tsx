@@ -5,9 +5,9 @@ import { IconLogout, IconRestore } from "@tabler/icons-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { api, queryKeys, runtimeQueryOptions } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { runtimeHealthLabel } from "../../lib/runtime-health";
-import { signOut } from "../../lib/sign-out";
-import { SHOW_DEV_SETTINGS } from "../../lib/dev-settings-ui";
+import { runtimeHealthLabel } from "../../lib/runtime/runtime-health";
+import { signOut } from "../../lib/session/sign-out";
+import { SHOW_DEV_SETTINGS } from "../../lib/shell/dev-settings-ui";
 import { SETTINGS_GROUPS, useVisibleSettingsGroups } from "../dashboard/settings-sidebar";
 import {
   DevOnboardingRestartDialog,

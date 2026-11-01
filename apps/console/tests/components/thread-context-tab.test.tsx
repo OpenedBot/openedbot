@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RunDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../src/lib/i18n";
 import { ThreadContextTab, lastContextReading } from "../../src/components/thread-context-tab";
-import { openSecondaryReads } from "../../src/lib/after-first-paint";
+import { openSecondaryReads } from "../../src/lib/shell/after-first-paint";
 
 /**
  * L'onglet de contexte du composer. Sa règle tient en une phrase : il ne

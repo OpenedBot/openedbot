@@ -5,7 +5,7 @@ import { Dialog } from "@openedbot/browser-ui-kit";
 import { BUTTON } from "./primitives";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { clearOnboardingDraft } from "../../lib/onboarding-draft";
+import { clearOnboardingDraft } from "../../lib/session/onboarding-draft";
 
 /**
  * « Repartir de zéro » : le geste de développement qui vide les données

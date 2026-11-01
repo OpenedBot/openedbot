@@ -2,7 +2,7 @@
  * Thread lab prototype composer (dev only). The "Box" variant of
  * streaming-ui.pulseview.app/composers and a "Pill" that opens like the Grok
  * Bot prompt (`lib/dev/thread-lab-composer.ts`), on BoardUI tokens, with the
- * console's keyboard contract kept (`lib/composer-keyboard.ts`): desktop
+ * console's keyboard contract kept (`lib/composer/composer-keyboard.ts`): desktop
  * Enter sends, finger Enter is a newline and Send fires on pointerdown, then
  * blurs.
  *
@@ -18,7 +18,7 @@ import {
   resizeComposerField,
   shouldSendComposerOnPointerDown,
   shouldSubmitComposerOnEnter,
-} from "../../../lib/composer-keyboard";
+} from "../../../lib/composer/composer-keyboard";
 import {
   nextPillExpanded,
   PILL_LEADING_PX,

@@ -5,7 +5,7 @@ import type { BotDto } from "@openedbot/contracts-api";
 import { Card, CardContent, Skeleton, Switch, toast } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { GatewayRestartCard } from "../../screens/settings/installation/connectors-mcp";
+import { GatewayRestartCard } from "../../screens/settings/installation/connectors/connectors-mcp";
 
 /**
  * L'interrupteur `bot_settings_propose` : le bot PROPOSE de changer sa persona

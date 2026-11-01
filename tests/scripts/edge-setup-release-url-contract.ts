@@ -22,7 +22,7 @@ const FILES: { path: string; mustContain: string[] }[] = [
   // Since deba06f the console installs through the signed bootstrap
   // (docs.openedbot.app/install), which pins the release itself: the console
   // carries no release origin any more, only the forbidden patterns apply.
-  { path: "apps/console/src/screens/settings/installation/cloud-enrollment.tsx", mustContain: [] },
+  { path: "apps/console/src/screens/settings/installation/cloud/cloud-enrollment.tsx", mustContain: [] },
   { path: "platform/config/src/api-config.ts", mustContain: [ANCHOR] },
   { path: "platform/config/src/env-schema/shared.ts", mustContain: [ANCHOR] },
   { path: "modules/runtime-link/src/application/connector-release-feed.ts", mustContain: [] },

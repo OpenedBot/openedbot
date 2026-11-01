@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { MobileHeader } from "../mobile/mobile-header";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { SettingsModalHeader, SettingsOpenAsWindowButton, useSettingsModal } from "../boardui/settings-modal";
-import { useSettingsPage } from "../../lib/settings-modal-context";
+import { useSettingsPage } from "../../lib/shell/settings-modal-context";
 import { RuntimeHealthBadge } from "./runtime-health-badge";
 import { SupportHeaderButton } from "../support/support-header-button";
 import { BoardHeader } from "../boardui/board-chrome";

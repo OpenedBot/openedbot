@@ -12,7 +12,7 @@ import {
 import { SidebarProvider } from "@openedbot/browser-ui-kit";
 import type { BotDto, GroupDto, RosterDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../../src/lib/i18n";
-import { clearCloudSession } from "../../../src/lib/cloud-session";
+import { clearCloudSession } from "../../../src/lib/session/cloud-session";
 import { queryKeys, type ThreadView } from "../../../src/lib/api";
 import { ConversationScreen } from "../../../src/screens/conversation/conversation";
 import { GroupConversationScreen } from "../../../src/screens/conversation/group-conversation";

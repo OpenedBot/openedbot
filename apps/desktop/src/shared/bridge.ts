@@ -80,7 +80,7 @@ export type IpcChannel =
   | "auth:state";
 
 // Réglages › Apparence › Taille du texte of the console (10 to 14 px on a
-// 14 px design base, ../.. apps/console/src/lib/text-size.ts): the page zoom
+// 14 px design base, ../.. apps/console/src/lib/shell/text-size.ts): the page zoom
 // factors the shell accepts. The preload repeats these literals (it cannot
 // import runtime values); change all three together.
 export const TEXT_ZOOM_FACTORS: readonly number[] = [10, 11, 12, 13, 14].map((size) => size / 14);

@@ -3,9 +3,9 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { WorkspaceAccessBoundary } from "../../../src/components/workspace/workspace-access-boundary";
 import { queryKeys } from "../../../src/lib/api";
-import { reportWorkspaceRevoked, saveCloudSession } from "../../../src/lib/cloud-session";
+import { reportWorkspaceRevoked, saveCloudSession } from "../../../src/lib/session/cloud-session";
 import { I18nProvider } from "../../../src/lib/i18n";
-import { rememberWorkspaces } from "../../../src/lib/workspace-directory";
+import { rememberWorkspaces } from "../../../src/lib/workspace/workspace-directory";
 
 const clientId = "90000000-0000-4000-8000-000000000001";
 const fleetA = "90000000-0000-4000-8000-000000000002";

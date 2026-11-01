@@ -7,7 +7,7 @@ import type { SQL } from "bun";
  *
  * Deux chemins l'appellent, et cette liste est la seule qui existe :
  * `POST /api/onboarding/reset` avec `{"scope":"full"}`
- * (`interfaces/http/misc-routes.ts`) et `make db-reset-keep-users`
+ * (`routes/overview/misc-routes.ts`) et `make db-reset-keep-users`
  * (`apps/api/scripts/dev-reset-data.ts`).
  */
 
@@ -171,7 +171,7 @@ async function assertCascadeStaysAwayFromPreserved(sql: SQL, truncated: readonly
  * Le vidage lui-même, en une transaction. Il ne prend NI utilisateur NI
  * organisation : c'est la base locale entière qui repart à zéro, exactement
  * comme la cible `make`. Le flag d'accueil retombe donc pour toute personne
- * connectée, ce que `apps/console/src/lib/onboarding-gate.ts` lit comme le seul
+ * connectée, ce que `apps/console/src/lib/session/onboarding-gate.ts` lit comme le seul
  * déclencheur du parcours.
  */
 export async function performDevDataReset(sql: SQL): Promise<DevResetReport> {

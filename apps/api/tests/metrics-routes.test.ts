@@ -3,7 +3,7 @@ import { BlobMetrics, type BlobStore } from "../src/infrastructure/blob-store";
 import type { ApiConfig } from "../src/infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
-import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics } from "../src/interfaces/http/metrics-routes";
+import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics } from "../src/routes/platform/metrics-routes";
 
 const aggregateRow = {
   runStatusCounts: { queued: 3, unknown: 1 },

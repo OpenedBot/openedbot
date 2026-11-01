@@ -6,7 +6,7 @@ import type { RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import { I18nProvider } from "../../src/lib/i18n";
-import type { SpeechSynthesisAdapter } from "../../src/lib/web-speech-synthesis";
+import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
 import { ThreadMarkdown } from "../../src/components/thread-markdown";
 import { ActivityRow, TurnActivity } from "../../src/components/thread-turn-activity";

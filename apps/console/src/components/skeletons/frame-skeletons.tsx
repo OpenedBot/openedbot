@@ -13,13 +13,13 @@ import { Skeleton, SkeletonListRow, SkeletonRegion, useIsMobile } from "@openedb
 import { Loader2 } from "lucide-react";
 import { activeOwnFleetHint } from "../../pro-console/slots";
 import { useT } from "../../lib/i18n";
-import { readBootIdentityLabel } from "../../lib/boot-identity";
-import { readCloudSession } from "../../lib/cloud-session";
+import { readBootIdentityLabel } from "../../lib/session/boot-identity";
+import { readCloudSession } from "../../lib/session/cloud-session";
 import { BotFace } from "../bot-face";
-import { fleetAccountInPath, fleetInPath } from "../../lib/workspace-location";
-import { isConversationPath, readBootSidebarShape, type BootSidebarShape } from "../../lib/boot-shape";
+import { fleetAccountInPath, fleetInPath } from "../../lib/workspace/workspace-location";
+import { isConversationPath, readBootSidebarShape, type BootSidebarShape } from "../../lib/session/boot-shape";
 import { BAR_ICON_BUTTON, useBoardChrome } from "../boardui/board-chrome";
-import { useAccountLayout } from "../../lib/account-layout";
+import { useAccountLayout } from "../../lib/shell/account-layout";
 import { ConversationBodySkeleton, HeaderActionsSkeleton, HeaderTitleSkeleton } from "../thread-skeleton";
 
 /**
@@ -50,7 +50,7 @@ function PinTileSkeleton() {
   );
 }
 
-/** The desktop roster, drawn from the shape the last loaded roster left (`lib/boot-shape.ts`). */
+/** The desktop roster, drawn from the shape the last loaded roster left (`lib/session/boot-shape.ts`). */
 function RosterShape({ shape }: { shape: BootSidebarShape }) {
   return (
     <>
@@ -174,7 +174,7 @@ function TopBarSkeleton({ conversation, organization }: { conversation: boolean;
       {collapsed || !organization ? null : (
         <span aria-hidden className="flex h-[30px] items-center gap-2 px-1.5">
           {/* The fixed organization face and the label recorded on the last
-              visit (`lib/boot-identity.ts`): only an unknown label pulses. */}
+              visit (`lib/session/boot-identity.ts`): only an unknown label pulses. */}
           <BotFace name="openedbot" seed="ohb-organization" face={null} animated={false} className="size-[18px] shrink-0" />
           {bootLabel
             ? <span className="truncate text-body-2-medium font-semibold text-text-primary">{bootLabel}</span>

@@ -14,7 +14,7 @@ paths = [
   '''^apps/api/tests/permission-rule-routes\.test\.ts$''',
   '''^apps/console/tests/components/agency/a2a-policy\.test\.tsx$''',
   '''^apps/console/tests/components/support/support-panel\.test\.tsx$''',
-  '''^apps/console/tests/lib/tool-progress-label\.test\.tsx$''',
+  '''^apps/console/tests/lib/run/tool-progress-label\.test\.tsx$''',
   '''^apps/console/tests/screens/settings/installation/runtime-link-rotation\.test\.tsx$''',
   '''^edge-setup/internal/connector/testdata/creation-audit-v2\.json$''',
   '''^edge-setup/internal/journal/journal_test\.go$''',

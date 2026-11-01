@@ -2,9 +2,9 @@ import { memo, useMemo } from "react";
 import type { ApprovalRequestDto, MessageAuthorBot, RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { useT } from "../lib/i18n";
-import { deriveRunActivity, type RunActivityState } from "../lib/thread-activity";
-import { toolProgressLabel } from "../lib/tool-progress-label";
-import { useHeldValue } from "../lib/use-held-value";
+import { deriveRunActivity, type RunActivityState } from "../lib/thread/thread-activity";
+import { toolProgressLabel } from "../lib/run/tool-progress-label";
+import { useHeldValue } from "../lib/hooks/use-held-value";
 
 type RunActivityDockProps = {
   runs: readonly RunDto[];

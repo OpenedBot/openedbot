@@ -540,7 +540,7 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("pagehide", () => observer.disconnect(), { once: true });
 });
 
-// The console's text size (Réglages › Apparence, ../.. apps/console/src/lib/text-size.ts)
+// The console's text size (Réglages › Apparence, ../.. apps/console/src/lib/shell/text-size.ts)
 // zooms the whole window, read from `<html data-ohb-text-zoom>` like the theme
 // above, without extending the frozen bridge. Applied here first
 // (webFrame, before the page paints at 100 %), then told to the main process,

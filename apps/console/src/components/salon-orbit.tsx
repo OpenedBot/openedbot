@@ -5,7 +5,7 @@ import type { BotFrame } from "@openedbot/browser-face/bloub/engine";
 import { NOTIF_BLUE } from "@openedbot/browser-face/bloub/decor";
 import { mixHex } from "@openedbot/browser-face/bloub/skins";
 import { DEMI_VIEWBOX, RAYON } from "@openedbot/browser-face/bloub/repere";
-import { memeArbre, poser } from "../lib/face-frame";
+import { memeArbre, poser } from "../lib/faces/face-frame";
 
 /**
  * Le galet du foyer : même montage que bloub `#etat=orbit&stop` : état

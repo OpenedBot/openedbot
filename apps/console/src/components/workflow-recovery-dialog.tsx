@@ -1,6 +1,6 @@
 import { Dialog } from "@openedbot/browser-ui-kit";
 import { useT } from "../lib/i18n";
-import type { useWorkflowRecovery } from "../lib/use-workflow-recovery";
+import type { useWorkflowRecovery } from "../lib/run/use-workflow-recovery";
 import { BUTTON } from "./settings/primitives";
 
 /**

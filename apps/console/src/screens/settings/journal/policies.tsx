@@ -15,7 +15,7 @@ import {
 import { InsetGroupedRow, InsetGroupedSection, InsetGroupedStatic } from "../../../components/mobile/inset-grouped";
 import { FleetA2APolicySettings, OrganizationPermissionRulesSettings } from "../../../pro-console/slots";
 import { OrganizationPermissionPolicySettings } from "../../../components/settings/organization-permission-policy";
-import { useSettingsModal } from "../../../lib/settings-modal-context";
+import { useSettingsModal } from "../../../lib/shell/settings-modal-context";
 import { SettingsPane } from "../pane";
 
 /**

@@ -8,7 +8,7 @@ import {
   releaseProviderReconnect,
   requestProviderReconnect,
   useProviderReconnectRequest,
-} from "../../src/lib/provider-auth";
+} from "../../src/lib/runtime/provider-auth";
 
 afterEach(clearProviderReconnect);
 

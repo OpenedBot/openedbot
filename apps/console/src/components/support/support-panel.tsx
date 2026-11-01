@@ -20,7 +20,7 @@ import {
   SUPPORT_ATTACHMENT_ACCEPT,
   type MessageAttachmentInput,
 } from "@openedbot/conversation/domain/attachments";
-import { prepareAttachments, type AttachmentError } from "../../lib/attachments";
+import { prepareAttachments, type AttachmentError } from "../../lib/composer/attachments";
 import { SupportImage } from "./support-image";
 import { SupportMarkdown } from "./support-markdown";
 import { useQuery } from "@tanstack/react-query";
@@ -40,7 +40,7 @@ import { api, ApiError, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { useBoardAside } from "../boardui/board-frame";
 import { randomId } from "../../lib/random-id";
-import { readCloudSession } from "../../lib/cloud-session";
+import { readCloudSession } from "../../lib/session/cloud-session";
 import {
   composerFieldMaxHeight,
   keepSoftKeyboard,
@@ -48,21 +48,21 @@ import {
   resizeComposerField,
   shouldSendComposerOnPointerDown,
   shouldSubmitComposerOnEnter,
-} from "../../lib/composer-keyboard";
-import { isMobileShellPath } from "../../lib/mobile-navigation";
-import { useVisualViewportInset } from "../../lib/use-visual-viewport-height";
+} from "../../lib/composer/composer-keyboard";
+import { isMobileShellPath } from "../../lib/shell/mobile-navigation";
+import { useVisualViewportInset } from "../../lib/platform/use-visual-viewport-height";
 import {
   clearSupportSession,
   readSupportSession,
   writeSupportSession,
-} from "../../lib/support-session";
+} from "../../lib/support/support-session";
 import {
   applySupportFrame,
   frameAttachmentCount,
   mergeSupportSnapshot,
   pendingMessage,
-} from "../../lib/support-snapshot";
-import { openSupportStream, type SupportStreamHandle } from "../../lib/support-stream";
+} from "../../lib/support/support-snapshot";
+import { openSupportStream, type SupportStreamHandle } from "../../lib/support/support-stream";
 
 /**
  * Le panneau du guichet : la porte e-mail, le fil, le composer.

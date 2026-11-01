@@ -9,7 +9,7 @@ import { responseCompression } from "./interfaces/http/compression";
 import { assertProductionConfig, readApiConfig } from "./infrastructure/config";
 import { createDatabase } from "@openedbot/platform-db";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
-import { createOrderedReplayPump, eventRoutes, internalEventRoutes, replayPagesUntil, shouldEmitSseCursor } from "./interfaces/http/event-routes";
+import { createOrderedReplayPump, eventRoutes, internalEventRoutes, replayPagesUntil, shouldEmitSseCursor } from "./routes/events/event-routes";
 import { runtimeRoutes } from "./routes/runtimes/runtime-routes";
 import { connectorReleaseRoutes } from "./routes/runtimes/connector-release-routes";
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
@@ -61,27 +61,27 @@ import { createPostgresOAuthAttemptStore } from "@openedbot/identity/sql/oauth-a
 import { pushSubscriptionRoutes } from "./routes/notifications/push-subscription-routes";
 import { apnsDeviceRoutes } from "./routes/notifications/apns-device-routes";
 import { alertChannelRoutes } from "./routes/notifications/alert-channel-routes";
-import { miscRoutes } from "./interfaces/http/misc-routes";
+import { miscRoutes } from "./routes/overview/misc-routes";
 import { groupRoutes } from "./routes/roster/group-routes";
 import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
-import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./interfaces/http/metrics-routes";
+import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
 import { unhandledErrorBody } from "./interfaces/http/unhandled-error";
 import { HermesEndpointError } from "@openedbot/hermes";
 import { accessLogMiddleware, logger, recordErrorCode, requestIdOf } from "@openedbot/platform-observability";
 import { API_RATE_RULES, rateLimiter } from "./interfaces/http/rate-limit";
 import { apiSecurityHeaders } from "./interfaces/http/security-headers";
-import { legalRoutes } from "./interfaces/http/legal-routes";
+import { legalRoutes } from "./routes/legal/legal-routes";
 import { waitlistRoutes } from "./routes/identity/waitlist-routes";
 import { workflowRoutes } from "./routes/execution/workflow-routes";
 import { teamImportRoutes } from "./routes/portability/team-import-routes";
-import { computerRoutes } from "./interfaces/http/computer-routes";
+import { computerRoutes } from "./routes/roster/computer-routes";
 import { createComputerProvider } from "./infrastructure/computer-provider";
-import { webhookIngressRoutes } from "./interfaces/http/webhook-ingress-routes";
-import { webhookManagementRoutes } from "./interfaces/http/webhook-management-routes";
+import { webhookIngressRoutes } from "./routes/webhooks/webhook-ingress-routes";
+import { webhookManagementRoutes } from "./routes/webhooks/webhook-management-routes";
 import { searchRoutes } from "./routes/conversation/search-routes";
-import { inboxRoutes } from "./interfaces/http/inbox-routes";
+import { inboxRoutes } from "./routes/inbox/inbox-routes";
 import { messageVersionRoutes } from "./routes/conversation/message-version-routes";
 import {
   initializeProductFeatures,
@@ -118,7 +118,7 @@ import {
   type MountWarning,
 } from "./application/pro-plugins";
 import { loadLegacyPlugins } from "./application/legacy-plugins";
-import { removedApiRoutes } from "./interfaces/http/removed-routes";
+import { removedApiRoutes } from "./routes/platform/removed-routes";
 import { isSessionlessCorePath } from "./interfaces/http/sessionless-paths";
 
 /** Plafond du corps HTTP: borne l'abus mémoire (défaut Bun ≈ 128 Mo). Les pièces

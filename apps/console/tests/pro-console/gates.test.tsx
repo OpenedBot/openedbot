@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { BotDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../src/lib/i18n";
 import { queryKeys } from "../../src/lib/api";
-import { saveCloudSession } from "../../src/lib/cloud-session";
+import { saveCloudSession } from "../../src/lib/session/cloud-session";
 import { PRO_CONSOLE_ENTITLEMENTS, type ProConsoleModule } from "../../src/pro-console/contract";
 import { proConsole, setProConsoleModulesForTest } from "../../src/pro-console/registry";
 import { BotPermissionRules, hasFleetConsole, OrganizationPermissionRulesSettings } from "../../src/pro-console/slots";

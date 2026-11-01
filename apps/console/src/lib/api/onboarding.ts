@@ -23,7 +23,7 @@ export const onboardingApi = {
   /**
    * L'état persistant du parcours d'accueil : les réponses, le nom de
    * l'espace, et la sortie. L'étape courante n'en fait PAS partie: elle vit
-   * en mémoire, chaque entrée recommence à l'accueil (`@/lib/onboarding`).
+   * en mémoire, chaque entrée recommence à l'accueil (`@/lib/session/onboarding`).
    */
   onboarding: () => request<OnboardingStateDto>("/api/onboarding"),
   /**

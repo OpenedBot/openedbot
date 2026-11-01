@@ -1,7 +1,7 @@
 /*
  * Le motion du fil et du composer, relevé sur Grok Bot 0.78.1 (capture
  * image par image d'un envoi réel, le 30-10). Durées et courbes sont les
- * siennes ; `lib/thread-motion.ts` porte celles que le JS joue (entrée des
+ * siennes ; `lib/thread/thread-motion.ts` porte celles que le JS joue (entrée des
  * rangées, ressort du composer).
  */
 

@@ -1,4 +1,4 @@
-import { DEPLOY_ENVIRONMENT_BADGE, useDeployEnvironment } from "../lib/deploy-environment";
+import { DEPLOY_ENVIRONMENT_BADGE, useDeployEnvironment } from "../lib/platform/deploy-environment";
 import { ToneBadge } from "./settings/primitives";
 
 /**

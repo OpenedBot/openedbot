@@ -3,7 +3,7 @@ import { BOT_TOOL_POLICY_VALUES, canOperateWorkspace, isBotToolPolicyAlwaysRefus
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast } from "@openedbot/browser-ui-kit";
 import { ApiError, api, errorMessage, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { toolPolicyGroups, type ToolPolicyGroup, type ToolPolicyRow } from "../../lib/tool-policy-groups";
+import { toolPolicyGroups, type ToolPolicyGroup, type ToolPolicyRow } from "../../lib/bots/tool-policy-groups";
 import { BUTTON, ListRow, ListRowsSkeleton, ListSection, Note } from "../settings/primitives";
 
 /**

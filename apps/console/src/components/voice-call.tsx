@@ -3,18 +3,18 @@ import { IconPhone, IconPhoneOff, IconSend, IconVolume } from "@tabler/icons-rea
 import type { ProductRunStatus, ThreadMessageDto } from "@openedbot/contracts-api";
 import { splitAskUser } from "@openedbot/roster/domain/ask-user";
 import { useT, type MessageKey } from "../lib/i18n";
-import { markdownToSpeechText } from "../lib/speech-text";
+import { markdownToSpeechText } from "../lib/voice/speech-text";
 import { normalizeChoice } from "../lib/format";
 import {
   createBrowserVoiceRecognitionAdapter,
   mergeVoiceTranscript,
   type VoiceRecognitionAdapter,
-} from "../lib/web-voice-recognition";
+} from "../lib/voice/web-voice-recognition";
 import {
   createBrowserSpeechSynthesisAdapter,
   readSpeechOutputSettings,
   type SpeechSynthesisAdapter,
-} from "../lib/web-speech-synthesis";
+} from "../lib/voice/web-speech-synthesis";
 import { SpeechOutputSettings } from "./speech-output-settings";
 import { BUTTON } from "./settings/primitives";
 

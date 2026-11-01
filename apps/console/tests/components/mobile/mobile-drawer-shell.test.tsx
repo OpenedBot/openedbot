@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { DRAWER_EDGE_WIDTH } from "../../../src/lib/mobile-navigation";
+import { DRAWER_EDGE_WIDTH } from "../../../src/lib/shell/mobile-navigation";
 
 const SHELL = readFileSync(new URL("../../../src/components/mobile/mobile-drawer-shell.tsx", import.meta.url), "utf8");
 const ACCOUNT_MENU = readFileSync(new URL("../../../src/components/boardui/account-menu.tsx", import.meta.url), "utf8");

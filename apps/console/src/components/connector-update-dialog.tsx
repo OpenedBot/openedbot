@@ -5,7 +5,7 @@ import { Alert, Dialog, cn } from "@openedbot/browser-ui-kit";
 import { SupportMarkdown } from "@openedbot/browser-ui-kit/components/support-markdown";
 import { canOperateWorkspace, type ConnectorReleaseDto, type RuntimePublicDto } from "@openedbot/contracts-api";
 import { api, queryKeys, runtimeQueryOptions } from "../lib/api";
-import { connectorUpgradeLevel, type ConnectorUpgradeLevel } from "../lib/connector-upgrade";
+import { connectorUpgradeLevel, type ConnectorUpgradeLevel } from "../lib/runtime/connector-upgrade";
 import { useT } from "../lib/i18n";
 import { BUTTON, CopyButton } from "./settings/primitives";
 

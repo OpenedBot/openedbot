@@ -16,7 +16,7 @@
  * `apps/admin/vite.config.ts` importent `client-env` par chemin relatif, parce
  * qu'esbuild laisse externe un nom de paquet quand il charge une config Vite ;
  * `apps/api/tests/early-fanout-sse.test.ts` éprouve la dédup SSE du client
- * (`apps/console/src/lib/thread-stream-live.ts`) contre le fan-out de l'API.
+ * (`apps/console/src/lib/stream/thread-stream-live.ts`) contre le fan-out de l'API.
  */
 const TESTS = "(\\.test\\.tsx?$|/e2e/|/tests/)";
 

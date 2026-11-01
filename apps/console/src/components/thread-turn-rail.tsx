@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requestThreadReveal, type ThreadRailTurn } from "../lib/thread-turn-rail";
+import { requestThreadReveal, type ThreadRailTurn } from "../lib/thread/thread-turn-rail";
 import { useT } from "../lib/i18n";
 
 const targetSelector = (targetId: string) =>

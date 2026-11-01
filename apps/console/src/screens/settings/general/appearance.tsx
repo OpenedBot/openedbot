@@ -6,10 +6,10 @@ import { ACTIONS, CardHeading, SectionHeading, SettingsCard } from "../../../com
 import { AccountLayoutPicker } from "../../../components/settings/account-layout-picker";
 import { InsetGroupedRow, InsetGroupedSection } from "../../../components/mobile/inset-grouped";
 import { SettingsPane } from "../pane";
-import { TEXT_SIZES, setTextSize, useTextSize } from "../../../lib/text-size";
-import { setSettingsDisplay, useSettingsDisplay, type SettingsDisplay } from "../../../lib/settings-display";
-import { useSettingsModal, useSettingsPage } from "../../../lib/settings-modal-context";
-import { BOT_ACCENT_MODES, setBotAccentMode, useBotAccentMode, type BotAccentMode } from "../../../lib/bot-accent-preference";
+import { TEXT_SIZES, setTextSize, useTextSize } from "../../../lib/shell/text-size";
+import { setSettingsDisplay, useSettingsDisplay, type SettingsDisplay } from "../../../lib/shell/settings-display";
+import { useSettingsModal, useSettingsPage } from "../../../lib/shell/settings-modal-context";
+import { BOT_ACCENT_MODES, setBotAccentMode, useBotAccentMode, type BotAccentMode } from "../../../lib/bots/bot-accent-preference";
 
 const THEME_LABEL_KEY = {
   light: "settings.appearance.themeLight",

@@ -1,9 +1,9 @@
 import { experimental_createQueryPersister, type AsyncStorage, type PersistedQuery } from "@tanstack/query-persist-client-core";
 import { clear, createStore, del, get, set } from "idb-keyval";
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
-import { clearAppAccessHint } from "./app-access-hint";
-import { clearBootIdentity } from "./boot-identity";
-import { readCloudSession } from "./cloud-session";
+import { clearAppAccessHint } from "./session/app-access-hint";
+import { clearBootIdentity } from "./session/boot-identity";
+import { readCloudSession } from "./session/cloud-session";
 
 /**
  * After a refresh the in-memory cache is empty, so the conversation waited for

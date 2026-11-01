@@ -10,8 +10,8 @@ import type {
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import type { MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
 import type { MentionableBot } from "@openedbot/roster/domain/mentions";
-import type { OutgoingUserInput } from "../lib/thread-anchor";
-import type { SpeechSynthesisAdapter } from "../lib/web-speech-synthesis";
+import type { OutgoingUserInput } from "../lib/thread/thread-anchor";
+import type { SpeechSynthesisAdapter } from "../lib/voice/web-speech-synthesis";
 import type { MessageAttachmentChip } from "./attachment-canvas";
 
 export type ThreadTimelineProps = {

@@ -15,7 +15,7 @@ import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { Button, Dialog, toast } from "@openedbot/browser-ui-kit";
 import { api, ApiError, queryKeys, runtimesQueryOptions } from "../lib/api";
 import { useT } from "../lib/i18n";
-import { modelUnavailableByBot, type ModelUnavailableState } from "../lib/model-unavailable";
+import { modelUnavailableByBot, type ModelUnavailableState } from "../lib/run/model-unavailable";
 import { BotFace } from "./bot-face";
 import {
   botContextReading,

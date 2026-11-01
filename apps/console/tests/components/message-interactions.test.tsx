@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Profiler } from "react";
-import { useThreadEditAvailability } from "../../src/lib/thread-edit-availability";
+import { useThreadEditAvailability } from "../../src/lib/thread/thread-edit-availability";
 import {
   MessageInteractionShell,
   reactionPickerPosition,

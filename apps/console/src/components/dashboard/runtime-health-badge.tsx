@@ -1,11 +1,11 @@
 import { useRouterState } from "@tanstack/react-router";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
-import { displayedRuntimeHealth, runtimeHealthLabel } from "../../lib/runtime-health";
-import { useRuntimeHealth } from "../../lib/use-runtime-health";
-import { linkHealthErrorText } from "../../lib/link-health-error";
+import { displayedRuntimeHealth, runtimeHealthLabel } from "../../lib/runtime/runtime-health";
+import { useRuntimeHealth } from "../../lib/runtime/use-runtime-health";
+import { linkHealthErrorText } from "../../lib/runtime/link-health-error";
 import { ALIVE_BADGE, ToneBadge, type Tone } from "../settings/primitives";
-import { connectorUpgradeLevel } from "../../lib/connector-upgrade";
+import { connectorUpgradeLevel } from "../../lib/runtime/connector-upgrade";
 import { ConnectorUpgradeDot } from "./connector-upgrade-badge";
 
 const TONE_DOT: Record<Tone, string> = {

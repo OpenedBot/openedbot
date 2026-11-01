@@ -11,7 +11,7 @@ import {
   usageByModel,
   usageByBot,
   usageSeries,
-} from "../src/interfaces/http/misc-routes";
+} from "../src/routes/overview/misc-routes";
 
 /** Tag SQL factice : enregistre statements et bindings, renvoie des fixtures. */
 function fakeTx(rows: unknown[], statements: string[], bindings: unknown[][]): Bun.TransactionSQL {

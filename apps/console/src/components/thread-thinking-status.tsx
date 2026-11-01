@@ -2,8 +2,8 @@ import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { useT } from "../lib/i18n";
-import { useExitGhost } from "../lib/thread-motion";
-import { useHeldValue } from "../lib/use-held-value";
+import { useExitGhost } from "../lib/thread/thread-motion";
+import { useHeldValue } from "../lib/hooks/use-held-value";
 
 /** How often the elapsed timer repaints (the reference ticks every 100 ms). */
 export const THINKING_TICK_MS = 100;

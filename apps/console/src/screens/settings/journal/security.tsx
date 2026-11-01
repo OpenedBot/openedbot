@@ -16,8 +16,8 @@ import { passwordProblem } from "@openedbot/identity/domain/password";
 import type { AccountAuthMethodDto, AccountSessionDto } from "@openedbot/contracts-api";
 import { Dialog, Tabs, TabsContent, TabsList, TabsTrigger, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys } from "../../../lib/api";
-import { signOut } from "../../../lib/sign-out";
-import { resetAuthStatus } from "../../../lib/auth-status";
+import { signOut } from "../../../lib/session/sign-out";
+import { resetAuthStatus } from "../../../lib/session/auth-status";
 import { useT } from "../../../lib/i18n";
 import {
   ACTIONS,
@@ -372,7 +372,7 @@ export function CloudSecuritySettings() {
       {/*
         Le compte a été créé par l'équipe avec un mot de passe temporaire :
         c'est le seul écran que l'application ouvre tant qu'il n'a pas été
-        remplacé (`lib/password-change-gate.ts`). La note dit pourquoi on est
+        remplacé (`lib/session/password-change-gate.ts`). La note dit pourquoi on est
         ici, sinon la redirection passerait pour une panne.
       */}
       {data?.mustChangePassword ? (

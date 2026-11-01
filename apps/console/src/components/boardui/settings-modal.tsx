@@ -5,20 +5,20 @@ import { RiArrowLeftLine, RiLogoutBoxRLine, RiShieldLine, RiUserLine } from "@re
 import { IconArrowsMaximize, IconArrowsMinimize } from "@tabler/icons-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
-import { signOut } from "../../lib/sign-out";
+import { signOut } from "../../lib/session/sign-out";
 import { useT } from "../../lib/i18n";
-import type { FLEET_OWN_SETTINGS_PATHS } from "../../lib/workspace-location";
+import type { FLEET_OWN_SETTINGS_PATHS } from "../../lib/workspace/workspace-location";
 import { FLEET_CLIENT_SETTINGS_GROUPS, FLEET_SETTINGS_GROUPS, isSettingsEntryActive, SETTINGS_GROUPS, useVisibleSettingsGroups } from "../dashboard/settings-sidebar";
 import { fleetSectionOf, useFleetFrameContext } from "../../pro-console/slots";
 import { BuiCloseGlyph } from "./menu";
-import { isOverlaySettingsPath, useSettingsOverlay } from "../../lib/settings-overlay";
-import { forgetSettingsReturn, settingsCloseHref } from "../../lib/settings-return";
-import { textZoom, useTextSize } from "../../lib/text-size";
-import { SettingsModalContext, SettingsPageContext, useSettingsModal, useSettingsPage } from "../../lib/settings-modal-context";
-import { queueSettingsOverlay, setSettingsDisplay } from "../../lib/settings-display";
+import { isOverlaySettingsPath, useSettingsOverlay } from "../../lib/shell/settings-overlay";
+import { forgetSettingsReturn, settingsCloseHref } from "../../lib/shell/settings-return";
+import { textZoom, useTextSize } from "../../lib/shell/text-size";
+import { SettingsModalContext, SettingsPageContext, useSettingsModal, useSettingsPage } from "../../lib/shell/settings-modal-context";
+import { queueSettingsOverlay, setSettingsDisplay } from "../../lib/shell/settings-display";
 import { BOARD_SIDEBAR_CARD } from "./board-sidebar-card";
 
-export { useSettingsModal } from "../../lib/settings-modal-context";
+export { useSettingsModal } from "../../lib/shell/settings-modal-context";
 
 const NAV_ITEM =
   "flex w-full cursor-pointer items-center gap-2 rounded-2lg p-2 text-start outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring";

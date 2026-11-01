@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GroupAnswerMode, GroupDefaultResponder, GroupDto } from "@openedbot/contracts-api";
 import { GROUP_MEMBERS_MAX, GROUP_MEMBERS_MIN } from "@openedbot/contracts-api";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import {
   Dialog,
   Input,

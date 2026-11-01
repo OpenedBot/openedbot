@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Profiler } from "react";
 import { act, cleanup, render } from "@testing-library/react";
 import type { BotFaceSpec } from "@openedbot/contracts-api";
-import { FaceMotionProvider } from "../../src/lib/face-motion";
+import { FaceMotionProvider } from "../../src/lib/faces/face-motion";
 import { BotFace } from "../../src/components/bot-face";
 
 /**

@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@openedbot/browser-ui-kit";
 import type { BotDto } from "@openedbot/contracts-api";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { Skeleton } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
 import { listTimestamp } from "../../lib/format";

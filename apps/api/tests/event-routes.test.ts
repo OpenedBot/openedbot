@@ -13,7 +13,7 @@ import {
   replayPagesUntil,
   rowIdentity,
   shouldEmitSseCursor,
-} from "../src/interfaces/http/event-routes";
+} from "../src/routes/events/event-routes";
 
 function event(cursor: number): OrganizationEvent & { cursor: number } {
   return {

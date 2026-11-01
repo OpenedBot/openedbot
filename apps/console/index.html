@@ -45,7 +45,7 @@
       // Réglages › Apparence › Taille du texte, avant la première peinture :
       // la coque de bureau zoome la fenêtre d'après cet attribut. Posé par
       // `main.tsx` seulement, il arrivait après la silhouette, peinte à 100 %
-      // puis rétrécie d'un coup. Jumeau de `src/lib/text-size.ts` (clé,
+      // puis rétrécie d'un coup. Jumeau de `src/lib/shell/text-size.ts` (clé,
       // tailles, défaut 11, base 14).
       (function () {
         var size = 11;
@@ -74,7 +74,7 @@
           var outside = /(^|\/)(login|legal|change-password|onboarding)(\/|$)/.test(path);
           var session = !!window.__OHB_NATIVE__ || !!localStorage.getItem("ohb:cloud-session");
           // `/` is the app on every host (the public page lives on the public
-          // site, `src/lib/public-site.ts`): it gets the app silhouette too.
+          // site, `src/lib/session/public-site.ts`): it gets the app silhouette too.
           if (session && !outside) document.documentElement.setAttribute("data-ohb-booting", "");
           // Fleet addresses (twin of FLEET_ADDRESS in the agency console module)
           // and client addresses share the agency frame (rail, bar, client list).
@@ -82,7 +82,7 @@
           var fleetClient = /^\/o\/[^/]+\/clients\/[^/]+(?:\/|$)/.test(path);
           // `/` opens an agency's fleet when the tab's organization is an own
           // agency (`route-tree.tsx`, index route): read it from the same
-          // stores as `lib/cloud-session.ts` and `lib/workspace-directory.ts`.
+          // stores as `lib/session/cloud-session.ts` and `lib/workspace/workspace-directory.ts`.
           var directory = JSON.parse(sessionStorage.getItem("ohb:workspace-directory") || "{}");
           function ownFleet(key) {
             var wanted = String(key).toLowerCase();
@@ -100,7 +100,7 @@
           // workspace (`/support`, `/inbox`, `/settings/...`), with or without
           // the `/o/<agency>` prefix. Twin of `activeOwnFleetHint` in
           // the agency console module (`agency-hint.ts`) and `fleetAccountInPath` in
-          // `src/lib/workspace-location.ts`.
+          // `src/lib/workspace/workspace-location.ts`.
           var framed = path.match(/^\/o\/([^/]+)(\/.*)?$/i);
           var fleetAccount = !fleet && !fleetClient && session && !outside
             && (framed ? !!framed[2] && framed[2] !== "/" && ownFleet(framed[1]) : path !== "/" && ownFleet(activeOrganization));
@@ -115,7 +115,7 @@
           if (localStorage.getItem("ohb:sidebar-collapsed") === "1") document.documentElement.setAttribute("data-ohb-sidebar-collapsed", "");
           // La disposition C, celle par défaut : le rail d'icônes de
           // `BoardIconRail`. Jumeau de `readAccountLayout` dans
-          // `src/lib/account-layout.ts` (clé, valeurs, défaut) : une valeur
+          // `src/lib/shell/account-layout.ts` (clé, valeurs, défaut) : une valeur
           // absente ou inconnue vaut « c ». L'ancienne clé de dev
           // (`ohb.dev.accountLayout`) dessinait la coque sans rail alors que
           // l'application, elle, en avait un.
@@ -153,7 +153,7 @@
           au rayon 24 et au liseré blanc (`BOARD_SIDEBAR_CARD`), ses trois
           boutons, les liens Salon et À traiter avec leur libellé, puis le
           roster dessiné d'après sa dernière forme (`ohb:boot-sidebar`,
-          `lib/boot-shape.ts`) : tuiles épinglées, intitulés de section,
+          `lib/session/boot-shape.ts`) : tuiles épinglées, intitulés de section,
           rangées de 44 px. La ligne du compte de 50 px en bas.
         - Carte principale grise au rayon 24, sans bord ni ombre ; sur
           `/bot/:id` ou `/g/:id`, la colonne de lecture du fil (48rem, 56rem
@@ -262,7 +262,7 @@
       }
       /* The organization face is fixed artwork (seed "ohb-organization" in
          BotFace), the label the one recorded on the last visit
-         (`ohb:boot-identity`, `src/lib/boot-identity.ts`): neither pulses. */
+         (`ohb:boot-identity`, `src/lib/session/boot-identity.ts`): neither pulses. */
       #ohb-boot .org .orgface {
         flex: 0 0 18px;
         object-fit: contain;
@@ -864,7 +864,7 @@
     </div>
     <script>
       // Ce que la page ne connaît qu'au chargement : la langue des libellés,
-      // la forme du dernier roster (`lib/boot-shape.ts`, mêmes bornes) et si
+      // la forme du dernier roster (`lib/session/boot-shape.ts`, mêmes bornes) et si
       // l'adresse est une conversation (`isConversationPath`).
       (function () {
         var boot = document.getElementById("ohb-boot");

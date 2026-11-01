@@ -2,13 +2,13 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { BotDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
-import { useBotDialogs } from "../../lib/bot-dialogs";
-import { useOpenedOnce } from "../../lib/use-opened-once";
+import { useBotDialogs } from "../../lib/bots/bot-dialogs";
+import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
 import { CreateBotSheet } from "../bot-create/create-bot-sheet";
 import { BotManageDialog } from "./bot-manage-dialog";
 
 /**
- * The one mount of the creation sheet and of the bot page (`lib/bot-dialogs.ts`),
+ * The one mount of the creation sheet and of the bot page (`lib/bots/bot-dialogs.ts`),
  * placed by the app frames next to the agent editor. Both dialogs mount on
  * their first opening only, so a cold frame pays nothing for them.
  */

@@ -30,10 +30,10 @@ import { cn } from "@openedbot/browser-ui-kit";
 import {
   parseGithubAlertMarker,
   type GithubAlertType,
-} from "../lib/assistant-article-sections";
+} from "../lib/stream/assistant-article-sections";
 import { useT } from "../lib/i18n";
-import { splitMarkdownBlocks } from "../lib/streaming-markdown";
-import { rehypeReveal, rehypeStreamTail } from "../lib/stream-tail-rehype";
+import { splitMarkdownBlocks } from "../lib/stream/streaming-markdown";
+import { rehypeReveal, rehypeStreamTail } from "../lib/stream/stream-tail-rehype";
 import type { ThemeRegistration } from "shiki";
 
 /**

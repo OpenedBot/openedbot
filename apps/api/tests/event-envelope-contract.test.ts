@@ -4,7 +4,7 @@ import { organizationEventEnvelope } from "@openedbot/contracts-events";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import type { Db } from "@openedbot/platform-db";
 import type { ApiConfig } from "../src/infrastructure/config";
-import { eventRoutes, internalEventRoutes } from "../src/interfaces/http/event-routes";
+import { eventRoutes, internalEventRoutes } from "../src/routes/events/event-routes";
 import type { AppVariables } from "../src/routes/identity/auth";
 import { fakeRunEventsDb as fakeDb, type StoredRow } from "./fixtures/run-events-db";
 

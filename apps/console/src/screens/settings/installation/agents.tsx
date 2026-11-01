@@ -23,7 +23,7 @@ import { HermesBundleImport } from "../../../components/hermes-bundle-import";
 import { ProfileImportReport } from "../../../components/profile-import-report";
 import { ACTIONS, ALIVE_BADGE, BUTTON, EmptyState, Note, SectionHeading, SettingsCard, ToneBadge } from "../../../components/settings/primitives";
 import { SettingsPane } from "../pane";
-import { HostProfilesTable } from "./agents-table";
+import { HostProfilesTable } from "./agents/agents-table";
 
 type AgentsTab = "host" | "archive";
 

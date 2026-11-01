@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, Check } from "lucide-react";
-import { ONBOARDING_STEP_ORDER, railIndex, type OnboardingStep, type RailStep } from "@/lib/onboarding";
+import { ONBOARDING_STEP_ORDER, railIndex, type OnboardingStep, type RailStep } from "@/lib/session/onboarding";
 import { cn } from "@openedbot/browser-ui-kit";
 import {
   DotSphere,

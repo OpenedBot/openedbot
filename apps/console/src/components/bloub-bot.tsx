@@ -12,8 +12,8 @@ import {
   observerLeVisage,
   phaseDuVisage,
   tempsDesVisages,
-} from "../lib/face-clock";
-import { memeArbre, poser } from "../lib/face-frame";
+} from "../lib/faces/face-clock";
+import { memeArbre, poser } from "../lib/faces/face-frame";
 
 /**
  * Demi-viewBox de l'avatar. Plus serré que celui de bloub (158) : sa marge

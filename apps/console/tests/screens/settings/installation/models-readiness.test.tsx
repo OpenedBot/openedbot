@@ -18,7 +18,7 @@ import type {
 } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../../../src/lib/i18n";
 import { ModelsSettings } from "../../../../src/screens/settings/installation/models";
-import { runtimeReadiness } from "../../../../src/screens/settings/installation/models-readiness";
+import { runtimeReadiness } from "../../../../src/screens/settings/installation/models/models-readiness";
 
 const realFetch = globalThis.fetch;
 

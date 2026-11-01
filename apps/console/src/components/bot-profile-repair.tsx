@@ -14,7 +14,7 @@ import {
 } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, runtimesQueryOptions } from "../lib/api";
 import { useT } from "../lib/i18n";
-import { catalogModelView } from "../lib/model-catalog";
+import { catalogModelView } from "../lib/bots/model-catalog";
 import { BUTTON } from "./settings/primitives";
 
 type RepairMode = "transfer" | "reset";

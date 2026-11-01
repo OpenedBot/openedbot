@@ -3,7 +3,7 @@
  * (Réglages › Apparence › « Accent : Couleur du Bot »). L'écran de
  * conversation pose `data-bot-accent`, `--bot-tint` et `--bot-tint-text` sur
  * la colonne du fil (en-tête, fil, composer), seulement pour un visage
- * coloré et si le réglage le veut (`lib/bot-tint.ts`, `botAccentColor`).
+ * coloré et si le réglage le veut (`lib/bots/bot-tint.ts`, `botAccentColor`).
  *
  * Les jetons dérivés (`--primary`, `--ring`, les dégradés…) sont résolus sur
  * `:root` : redéfinir les seuls paliers ne les changerait pas. Ils sont donc

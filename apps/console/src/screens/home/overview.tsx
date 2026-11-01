@@ -10,7 +10,7 @@ import { ChromeIconButton } from "../../components/mobile/mobile-header";
 import { useT } from "../../lib/i18n";
 import { cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { SalonOrbit } from "../../components/salon-orbit";
-import { useBotDialogs } from "../../lib/bot-dialogs";
+import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "../../lib/api";
 

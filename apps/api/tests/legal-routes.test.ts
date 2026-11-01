@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { LEGAL_SLUGS } from "@openedbot/contracts-api";
-import { legalRoutes } from "../src/interfaces/http/legal-routes";
+import { legalRoutes } from "../src/routes/legal/legal-routes";
 import type { LegalConfig } from "../src/infrastructure/config";
 
 function fixture(content: string): string {

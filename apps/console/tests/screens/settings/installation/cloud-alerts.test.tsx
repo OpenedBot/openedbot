@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AlertChannelDto } from "@openedbot/contracts-api";
 import { queryKeys } from "../../../../src/lib/api";
 import { I18nProvider } from "../../../../src/lib/i18n";
-import { RuntimeAlertsSection } from "../../../../src/screens/settings/installation/cloud-alerts";
+import { RuntimeAlertsSection } from "../../../../src/screens/settings/installation/cloud/cloud-alerts";
 
 const realFetch = globalThis.fetch;
 const WEBHOOK = `https://discord.com/api/webhooks/1459685375038591192/${"t".repeat(68)}`;

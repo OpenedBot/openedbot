@@ -4,10 +4,10 @@
  */
 import { Fragment, memo } from "react";
 import Markdown, { type Options } from "react-markdown";
-import { splitMarkdownBlocks } from "../../../lib/streaming-markdown";
-import { useSmoothText } from "../../../lib/use-smooth-text";
+import { splitMarkdownBlocks } from "../../../lib/stream/streaming-markdown";
+import { useSmoothText } from "../../../lib/stream/use-smooth-text";
 import { rehypeLabWords } from "../../../lib/dev/thread-lab-rehype";
-import { rehypeStreamTail } from "../../../lib/stream-tail-rehype";
+import { rehypeStreamTail } from "../../../lib/stream/stream-tail-rehype";
 import { ThreadMarkdown, threadMarkdownSetup } from "../../thread-markdown";
 
 export type LabTextMode = "smooth" | "instant" | "words" | "tail";

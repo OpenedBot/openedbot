@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { PLUGIN_API_VERSION, type ProPlugin } from "@openedbot/platform-plugins";
 import type { Db } from "@openedbot/platform-db";
 import { LEGACY_PLUGIN_SPECIFIERS, loadLegacyPlugins } from "../src/application/legacy-plugins";
-import { removedApiRoutes } from "../src/interfaces/http/removed-routes";
+import { removedApiRoutes } from "../src/routes/platform/removed-routes";
 import { impersonationSourceOf, proPluginContext, proPublicPathMatcher, proPublicRoutes } from "../src/application/pro-plugins";
 import { HttpError } from "../src/interfaces/http/http-error";
 

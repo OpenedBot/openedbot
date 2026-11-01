@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { activeFleetId, activeOrganizationId } from "../../lib/cloud-session";
+import { activeFleetId, activeOrganizationId } from "../../lib/session/cloud-session";
 import { useFallbackT } from "../../lib/i18n";
 import { clearPersistedQueries } from "../../lib/query-persister";
 
