@@ -1,3 +1,4 @@
+import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";
@@ -9,7 +10,7 @@ import { responseCompression } from "./interfaces/http/compression";
 import { assertProductionConfig, readApiConfig } from "./infrastructure/config";
 import { createDatabase } from "@openedbot/platform-db";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
-import { createOrderedReplayPump, eventRoutes, internalEventRoutes, replayPagesUntil, shouldEmitSseCursor } from "./interfaces/http/event-routes";
+import { createOrderedReplayPump, eventRoutes, internalEventRoutes, replayPagesUntil, shouldEmitSseCursor } from "./routes/events/event-routes";
 import { runtimeRoutes } from "./routes/runtimes/runtime-routes";
 import { connectorReleaseRoutes } from "./routes/runtimes/connector-release-routes";
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
@@ -61,27 +62,27 @@ import { createPostgresOAuthAttemptStore } from "@openedbot/identity/sql/oauth-a
 import { pushSubscriptionRoutes } from "./routes/notifications/push-subscription-routes";
 import { apnsDeviceRoutes } from "./routes/notifications/apns-device-routes";
 import { alertChannelRoutes } from "./routes/notifications/alert-channel-routes";
-import { miscRoutes } from "./interfaces/http/misc-routes";
+import { miscRoutes } from "./routes/overview/misc-routes";
 import { groupRoutes } from "./routes/roster/group-routes";
 import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
-import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./interfaces/http/metrics-routes";
+import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
 import { unhandledErrorBody } from "./interfaces/http/unhandled-error";
 import { HermesEndpointError } from "@openedbot/hermes";
 import { accessLogMiddleware, logger, recordErrorCode, requestIdOf } from "@openedbot/platform-observability";
 import { API_RATE_RULES, rateLimiter } from "./interfaces/http/rate-limit";
 import { apiSecurityHeaders } from "./interfaces/http/security-headers";
-import { legalRoutes } from "./interfaces/http/legal-routes";
+import { legalRoutes } from "./routes/legal/legal-routes";
 import { waitlistRoutes } from "./routes/identity/waitlist-routes";
 import { workflowRoutes } from "./routes/execution/workflow-routes";
 import { teamImportRoutes } from "./routes/portability/team-import-routes";
-import { computerRoutes } from "./interfaces/http/computer-routes";
+import { computerRoutes } from "./routes/roster/computer-routes";
 import { createComputerProvider } from "./infrastructure/computer-provider";
-import { webhookIngressRoutes } from "./interfaces/http/webhook-ingress-routes";
-import { webhookManagementRoutes } from "./interfaces/http/webhook-management-routes";
+import { webhookIngressRoutes } from "./routes/webhooks/webhook-ingress-routes";
+import { webhookManagementRoutes } from "./routes/webhooks/webhook-management-routes";
 import { searchRoutes } from "./routes/conversation/search-routes";
-import { inboxRoutes } from "./interfaces/http/inbox-routes";
+import { inboxRoutes } from "./routes/inbox/inbox-routes";
 import { messageVersionRoutes } from "./routes/conversation/message-version-routes";
 import {
   initializeProductFeatures,
@@ -118,7 +119,7 @@ import {
   type MountWarning,
 } from "./application/pro-plugins";
 import { loadLegacyPlugins } from "./application/legacy-plugins";
-import { removedApiRoutes } from "./interfaces/http/removed-routes";
+import { removedApiRoutes } from "./routes/platform/removed-routes";
 import { isSessionlessCorePath } from "./interfaces/http/sessionless-paths";
 
 /** Plafond du corps HTTP: borne l'abus mémoire (défaut Bun ≈ 128 Mo). Les pièces
@@ -134,10 +135,10 @@ const productFeatures = await readProductFeatures(db);
 // Features basculées depuis le backoffice : relues à chaud, jamais figées au boot.
 const liveFeatures = liveProductFeatures(db);
 const blobs = createBlobStore(baseConfig.blob);
-// Plug-ins pro : `OHB_PRO_PLUGINS` vide ou absent = mode solo, et
+// Plug-ins pro : `OPENEDBOT_PLUGINS` vide ou absent = mode solo, et
 // aucune route n'est ajoutée. Un plug-in absent, invalide ou refusé est ignoré
 // avec un avertissement : l'API démarre quand même.
-const loadedPro = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS, {
+const loadedPro = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS, {
   warn: (skip) => logger.warn({ event: "api.pro_plugin_skipped", ...describeSkip(skip) }, "pro plug-in skipped"),
 });
 // Une variable de déploiement (`manifest.env`) n'a qu'un plug-in : deux
@@ -158,11 +159,11 @@ const pro = {
 const proMode = proModeLabel(pro.plugins);
 logger.info({ event: "api.mode", mode: proMode, plugins: pro.plugins.map((plugin) => plugin.manifest.id) }, proMode);
 // Installation legacy : vide depuis l'étape 8, le backoffice (`staff`) vient
-// d'un plug-in externe par OHB_PRO_PLUGINS et sert `/api/pro/staff`. Sans lui :
+// d'un plug-in externe par OPENEDBOT_PLUGINS et sert `/api/pro/staff`. Sans lui :
 // solo, sans backoffice.
 const legacyPlugins = await loadLegacyPlugins(pro.plugins, {
   skipped: (skip) => logger.warn({ event: "api.legacy_plugin_skipped", ...describeSkip(skip) }, "legacy plug-in skipped"),
-  superseded: (event) => logger.info({ event: "api.legacy_plugin_superseded", ...event }, "legacy plug-in already loaded by OHB_PRO_PLUGINS"),
+  superseded: (event) => logger.info({ event: "api.legacy_plugin_superseded", ...event }, "legacy plug-in already loaded by OPENEDBOT_PLUGINS"),
 });
 logger.info({ event: "api.legacy_plugins", plugins: legacyPlugins.map((plugin) => plugin.manifest.id) }, "legacy plug-ins installed");
 const installedPlugins: readonly ProPlugin[] = [...pro.plugins, ...legacyPlugins];

@@ -7,11 +7,11 @@ import { ThemeProvider, paintStoredTheme } from "@openedbot/browser-ui-kit/theme
 import { I18nProvider } from "./lib/i18n";
 import { queryClient } from "./lib/query-client";
 import { AppErrorBoundary } from "./components/app-error-boundary";
-import { retireLegacyServiceWorker } from "./lib/legacy-service-worker";
+import { retireLegacyServiceWorker } from "./lib/platform/legacy-service-worker";
 import { router } from "./route-tree";
-import { applyNativeTitlebar } from "./lib/native-titlebar";
-import { trackPointerFocus } from "./lib/pointer-focus";
-import { applyStoredTextSize } from "./lib/text-size";
+import { applyNativeTitlebar } from "./lib/platform/native-titlebar";
+import { trackPointerFocus } from "./lib/shell/pointer-focus";
+import { applyStoredTextSize } from "./lib/shell/text-size";
 import "katex/dist/katex.min.css";
 import "./styles/globals.css";
 
@@ -22,19 +22,19 @@ paintStoredTheme();
 
 // Coque native macOS sans barre de titre : la place des feux tricolores et la
 // poignée de la fenêtre sont posées avant le premier paint (voir
-// `lib/native-titlebar.ts`). Sans la coque, ne fait rien.
+// `lib/platform/native-titlebar.ts`). Sans la coque, ne fait rien.
 applyNativeTitlebar();
 
 // Un bouton cliqué ne prend pas l'anneau de focus à la touche suivante (Échap
-// qui ferme les réglages) ; Tab le rend. Voir `lib/pointer-focus.ts`.
+// qui ferme les réglages) ; Tab le rend. Voir `lib/shell/pointer-focus.ts`.
 trackPointerFocus();
 
 // La taille du texte (Apparence) : la coque native zoome la fenêtre dès le
-// chargement, avant que React ne peigne (voir `lib/text-size.ts`).
+// chargement, avant que React ne peigne (voir `lib/shell/text-size.ts`).
 applyStoredTextSize();
 
 // La console n'est plus une PWA : un service worker resté de l'ancienne
-// version est désinscrit (voir `lib/legacy-service-worker.ts`).
+// version est désinscrit (voir `lib/platform/legacy-service-worker.ts`).
 retireLegacyServiceWorker();
 
 // La silhouette du cadre (`#ohb-boot`, `index.html`) couvre la page jusqu'au

@@ -5,7 +5,7 @@ import { PRO_CONSOLE_VIRTUAL_ID, proConsoleEntries, proConsoleModuleSource } fro
 
 /**
  * `virtual:ohb-pro-console` as Vite builds it (`vite-pro-console.ts`):
- * `OHB_PRO_CONSOLE` empty is a solo console, the pro pass of `make test-dual`
+ * `OPENEDBOT_CONSOLE_PLUGINS` empty is a solo console, the pro pass of `make test-dual`
  * lists the pro modules. They import the console's host surface as
  * `@openedbot/console/*`, which the external plug-in checkout links to `src/pro-console`
  * (`make link-core` there).
@@ -14,7 +14,7 @@ plugin({
   name: "ohb-pro-console",
   setup(build) {
     build.module(PRO_CONSOLE_VIRTUAL_ID, () => ({
-      contents: proConsoleModuleSource(proConsoleEntries(process.env.OHB_PRO_CONSOLE)),
+      contents: proConsoleModuleSource(proConsoleEntries(process.env.OPENEDBOT_CONSOLE_PLUGINS)),
       loader: "js",
     }));
   },

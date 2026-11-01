@@ -4,7 +4,7 @@ import type { SQL } from "bun";
 import type { InboxItemDto } from "@openedbot/contracts-api";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
-import { inboxRoutes, readInboxLimit, sortInboxItems } from "../src/interfaces/http/inbox-routes";
+import { inboxRoutes, readInboxLimit, sortInboxItems } from "../src/routes/inbox/inbox-routes";
 
 const owner: AuthContext = {
   sessionId: "session-1",

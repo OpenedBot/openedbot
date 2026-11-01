@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { t } from "@openedbot/browser-i18n";
 import type { Locale, MessageKey } from "@openedbot/browser-i18n";
-import { MODEL_UNAVAILABLE, readableRunFailure, runFailureExplainedInThread } from "../../src/lib/model-unavailable";
-import { PROVIDER_AUTH_REQUIRED, runProviderAuthLabel, runProviderAuthSlug } from "../../src/lib/provider-auth";
+import { MODEL_UNAVAILABLE, readableRunFailure, runFailureExplainedInThread } from "../../src/lib/run/model-unavailable";
+import { PROVIDER_AUTH_REQUIRED, runProviderAuthLabel, runProviderAuthSlug } from "../../src/lib/runtime/provider-auth";
 
 // The run's stored `error` is the worker's French-only text with a raw slug:
 // the toast and the composer banner must never fall back to it for this code.

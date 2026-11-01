@@ -5,12 +5,12 @@ import { ArrowRight, Plus } from "lucide-react";
 import { RUNTIME_MEMORY_DEFAULT_LIMITS } from "@openedbot/roster/domain/bot-memory";
 import type { BotDto } from "@openedbot/contracts-api";
 import { stripHandlePrefix } from "@openedbot/roster/domain/ask-user";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { api, queryKeys } from "../../lib/api";
 import { listTimestamp } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { BotFace } from "../../components/bot-face";
-import { useBotDialogs } from "../../lib/bot-dialogs";
+import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 
 /**
  * L'accueil de `/bot`, quand aucun fil n'est ouvert, le registre des

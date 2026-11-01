@@ -1,5 +1,5 @@
 /**
- * Pro mode: the plug-ins listed in `OHB_PRO_PLUGINS` (absolute paths into a
+ * Pro mode: the plug-ins listed in `OPENEDBOT_PLUGINS` (absolute paths into a
  * local plug-in checkout, see `make test-dual`) load and mount like in
  * production. Skipped in solo (unset), so `make test-unit` never needs any
  * external plug-in.
@@ -11,20 +11,20 @@ import type { PluginSkip, ProPlugin } from "@openedbot/platform-plugins";
 import { compatAliasesOf, declaredEntitlements, parsePluginList } from "@openedbot/platform-plugins";
 import { compatPathRedirects, installCompatAliases, requestHeader, requestQuery, shadowsCoreRoute } from "../src/application/compat-aliases";
 import { authRoutes, protectedAuthRoutes } from "../src/routes/identity/auth";
-import { miscRoutes } from "../src/interfaces/http/misc-routes";
+import { miscRoutes } from "../src/routes/overview/misc-routes";
 import { searchRoutes } from "../src/routes/conversation/search-routes";
-import { inboxRoutes } from "../src/interfaces/http/inbox-routes";
+import { inboxRoutes } from "../src/routes/inbox/inbox-routes";
 import { memberRoutes } from "../src/routes/identity/member-routes";
 import { createEntitlementSource, PRO_ENTITLEMENTS } from "@openedbot/identity/application/entitlements";
-import { removedApiRoutes } from "../src/interfaces/http/removed-routes";
+import { removedApiRoutes } from "../src/routes/platform/removed-routes";
 import { hookEntitlementCheck, impersonationSourceOf, supportDeskOf, supportDeskRoutes, loadApiProPlugins, organizationCreatingHookOf, proPluginContext, proPublicPathMatcher, proPublicRoutes, proSessionRoutes, paymentWebhookMountOf, paymentWebhookOf, subscriptionPortOf, type ProCaller } from "../src/application/pro-plugins";
 import { paymentWebhookRoute } from "../src/routes/payments/payment-webhook-route";
 import type { ApiConfig } from "../src/infrastructure/config";
 import { HttpError } from "../src/interfaces/http/http-error";
 
-const listed = parsePluginList(process.env.OHB_PRO_PLUGINS);
+const listed = parsePluginList(process.env.OPENEDBOT_PLUGINS);
 const skipped: PluginSkip[] = [];
-const { plugins } = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS, { warn: (skip) => skipped.push(skip) });
+const { plugins } = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS, { warn: (skip) => skipped.push(skip) });
 const staff = plugins.filter((plugin) => plugin.manifest.id === "staff");
 const agency = plugins.filter((plugin) => plugin.manifest.id === "agency");
 const permissions = plugins.filter((plugin) => plugin.manifest.id === "permissions");
@@ -57,7 +57,7 @@ function apiLike(loaded: readonly ProPlugin[], hosts: Record<string, unknown>, w
   return app;
 }
 
-describe.skipIf(listed.length === 0)("pro mode (OHB_PRO_PLUGINS)", () => {
+describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
   // Step 11.4: the runtime drops an alias over a core route; this pins that
   // none of the published ones would be dropped. Every router `index.ts`
   // mounts over an alias's path must be in the table, or the test fails.

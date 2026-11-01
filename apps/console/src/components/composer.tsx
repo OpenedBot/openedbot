@@ -47,11 +47,11 @@ import {
   resizeComposerField,
   shouldSendComposerOnPointerDown,
   shouldSubmitComposerOnEnter,
-} from "../lib/composer-keyboard";
-import { nextComposerExpanded } from "../lib/composer-pill";
-import { animateComposerExpand } from "../lib/thread-motion";
-import { focusComposerField } from "../lib/composer-desktop-focus";
-import { isNativeShell } from "../lib/native-bridge";
+} from "../lib/composer/composer-keyboard";
+import { nextComposerExpanded } from "../lib/composer/composer-pill";
+import { animateComposerExpand } from "../lib/thread/thread-motion";
+import { focusComposerField } from "../lib/composer/composer-desktop-focus";
+import { isNativeShell } from "../lib/platform/native-bridge";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_LIMITS,
@@ -59,7 +59,7 @@ import {
   type MessageAttachmentInput,
 } from "@openedbot/conversation/domain/attachments";
 import { formatBytes } from "@openedbot/browser-i18n";
-import { prepareAttachments, type AttachmentError } from "../lib/attachments";
+import { prepareAttachments, type AttachmentError } from "../lib/composer/attachments";
 import {
   applyMention,
   bestPlainMatch,
@@ -69,19 +69,19 @@ import {
   type MentionableBot,
   type TextRange,
 } from "@openedbot/roster/domain/mentions";
-import { attachmentKindFor } from "@/lib/attachments-file";
-import { segmentMcpPlugins } from "@/lib/mcp-plugins";
+import { attachmentKindFor } from "@/lib/composer/attachments-file";
+import { segmentMcpPlugins } from "@/lib/runtime/mcp-plugins";
 import {
   caretOffsetLeft,
   markMentions,
   mentionEndingAt,
   mentionRanges,
   removeRange,
-} from "../lib/composer-mentions";
+} from "../lib/composer/composer-mentions";
 import { ComposerAttachmentTile } from "./composer-attachment-tile";
 import { MentionSuggestions, mentionOptionId } from "./mention-suggestions";
 import { draftAttachmentCanvasItem, useAttachmentCanvas } from "./attachment-canvas";
-import { haptics } from "../lib/haptics";
+import { haptics } from "../lib/platform/haptics";
 import { useT } from "../lib/i18n";
 import { BUTTON } from "./settings/primitives";
 import { ComposerLoader } from "./composer-loader";
@@ -321,7 +321,7 @@ export function Composer({
   const fileInput = useRef<HTMLInputElement>(null);
   // Coque native : le champ prend le focus quand le fil devient disponible
   // (ouverture, changement de bot, gate tranchée) et au retour dans la
-  // fenêtre (`lib/composer-desktop-focus.ts`).
+  // fenêtre (`lib/composer/composer-desktop-focus.ts`).
   const nativeShell = isNativeShell();
   useEffect(() => {
     if (nativeShell && !disabled) focusComposerField(textarea.current);
@@ -526,7 +526,7 @@ export function Composer({
   /**
    * Pilule (bureau) : une rangée `+` | champ | actions tant que le texte tient
    * sur une ligne, une carte (texte en pleine largeur, actions dessous) dès
-   * qu'il en demande une deuxième. La règle est dans `lib/composer-pill.ts` ;
+   * qu'il en demande une deuxième. La règle est dans `lib/composer/composer-pill.ts` ;
    * le shell mobile pose sa propre grille (`mobile.css`) et l'ignore.
    */
   const [expanded, setExpanded] = useState(false);

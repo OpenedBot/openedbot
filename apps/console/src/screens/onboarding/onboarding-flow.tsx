@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@openedbot/browser-ui-kit";
-import { nextStep, prevStep, type OnboardingStep } from "@/lib/onboarding";
+import { nextStep, prevStep, type OnboardingStep } from "@/lib/session/onboarding";
 import type { OnboardingCompletionPath, OnboardingStateDto, RosterDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
@@ -10,7 +10,7 @@ import {
   clearOnboardingDraft,
   readOnboardingDraft,
   writeOnboardingDraft,
-} from "../../lib/onboarding-draft";
+} from "../../lib/session/onboarding-draft";
 import { StepShell } from "./components/step-shell";
 import { OnboardingLogoutButton } from "./components/onboarding-logout-button";
 import { StepWelcome } from "./steps/step-welcome";
@@ -23,7 +23,7 @@ import { StepRuntime } from "./steps/step-runtime";
  * ensuite dans l'application.
  *
  * L'étape courante vit ICI, et un brouillon local la suit
- * (`lib/onboarding-draft.ts`) : un rafraîchissement en plein parcours doit
+ * (`lib/session/onboarding-draft.ts`) : un rafraîchissement en plein parcours doit
  * rendre l'écran où on l'a laissé, pas renvoyer à l'accueil. Ce que le cloud
  * API connaît (le nom de l'espace, le handle, la sortie,
  * `OnboardingStateDto`) reste lu chez lui ; le brouillon ne porte que ce

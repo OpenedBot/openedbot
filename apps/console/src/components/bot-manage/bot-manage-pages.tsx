@@ -15,7 +15,7 @@ import { BUTTON } from "../settings/primitives";
 import { PersonaEditor } from "../persona-editor";
 import { SettingsToolCard } from "./bot-settings-tool-card";
 import { BotToolPolicies } from "./bot-tool-policies";
-import { GatewayRestartCard } from "../../screens/settings/installation/connectors-mcp";
+import { GatewayRestartCard } from "../../screens/settings/installation/connectors/connectors-mcp";
 import { ThreadModelPicker } from "../composer-model-picker";
 import { PermissionModeList, usePermissionContext, useSetPermissionMode } from "../boardui/permission-picker";
 import { ThreadActivityList } from "../thread-activity-panel";

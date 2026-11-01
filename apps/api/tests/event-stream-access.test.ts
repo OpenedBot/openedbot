@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Hono } from "hono";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import type { Db } from "@openedbot/platform-db";
-import { eventRoutes } from "../src/interfaces/http/event-routes";
+import { eventRoutes } from "../src/routes/events/event-routes";
 import type { AppVariables } from "../src/routes/identity/auth";
 import { frameReader, streamEvent } from "./fixtures/event-stream";
 import { fakeRunEventsDb } from "./fixtures/run-events-db";

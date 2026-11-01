@@ -6,7 +6,7 @@ The core never imports a plug-in statically; it passes module specifiers to
 (with a warning) anything missing, invalid, incompatible or not licensed.
 
 Wired into the API (`apps/api/src/application/pro-plugins.ts`): the list
-comes from `OHB_PRO_PLUGINS` (empty or unset is solo mode, logged as
+comes from `OPENEDBOT_PLUGINS` (empty or unset is solo mode, logged as
 « mode: solo »); `api` mounts are served under `/api/pro/<id><prefix>` behind
 the core `/api/*` middlewares, `session` mounts behind the session and their
 entitlement; `migrations` are applied by `scripts/db.sh --migrate` (and any deployment
@@ -52,7 +52,7 @@ logic: billing loaded but refused by the role guard answers
 
 `manifest.env` declares deployment variables a plug-in reads under their
 deployed name, for names that already are a deploy contract (step 11.5).
-The loader refuses `OHB_*` names, names of the core environment schema and
+The loader refuses `OPENEDBOT_*` names (and the legacy `OHB_*` prefix), names of the core environment schema and
 duplicates; the hooks and mounts get the declared values that are set as
 `context.env`, and in production the API does not start while a loaded
 plug-in misses one marked `requiredInProduction`.
@@ -68,5 +68,5 @@ at boot and a job it switches off is logged (`worker.pro_job_disabled`) and
 never scheduled. Not wired yet: the console (`console.module`).
 
 Every hook gets, as its last argument, a `HookContext` holding the plug-in's
-own configuration only (`OHB_PRO_<ID>__<KEY>`, indexed by KEY, see
+own configuration only (`OPENEDBOT_PLUGIN_<ID>__<KEY>`, indexed by KEY, see
 `pluginConfig`), the same one its API mounts receive.

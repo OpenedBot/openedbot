@@ -4,7 +4,7 @@ import { SiteHeader } from "../dashboard/site-header";
 import { BotFace } from "../bot-face";
 import { BUTTON } from "../settings/primitives";
 import { useT } from "../../lib/i18n";
-import { usePendingBotCreation } from "../../lib/pending-bot-creations";
+import { usePendingBotCreation } from "../../lib/bots/pending-bot-creations";
 
 /**
  * L'écran d'un bot en cours de création, affiché dès le clic sur « Créer ».

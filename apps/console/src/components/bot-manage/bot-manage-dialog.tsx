@@ -29,9 +29,9 @@ import { normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-wor
 import { Dialog, cn, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, runtimesQueryOptions } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
-import { haptics } from "../../lib/haptics";
-import { useAgentEditor } from "../../lib/agent-editor";
-import { useBotDialogs, type BotManagePage } from "../../lib/bot-dialogs";
+import { haptics } from "../../lib/platform/haptics";
+import { useAgentEditor } from "../../lib/bots/agent-editor";
+import { useBotDialogs, type BotManagePage } from "../../lib/bots/bot-dialogs";
 import { BotFace } from "../bot-face";
 import { BotProfileRepair, useBotProfileStatus } from "../bot-profile-repair";
 import { BotCapabilitiesPanel, botCapabilitiesQueryOptions } from "../bot-capabilities-panel";

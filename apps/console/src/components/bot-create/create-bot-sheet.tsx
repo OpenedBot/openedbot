@@ -10,13 +10,13 @@ import { randomFace } from "@openedbot/browser-face/presets";
 import { randomBotArtwork } from "@openedbot/browser-face/artworks";
 import { ApiError, api, queryKeys, runtimesQueryOptions } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
-import { creationAttempts } from "../../lib/creation-attempts";
+import { creationAttempts } from "../../lib/bots/creation-attempts";
 import {
   failPendingBotCreation,
   resumePendingBotCreation,
   settlePendingBotCreation,
   startPendingBotCreation,
-} from "../../lib/pending-bot-creations";
+} from "../../lib/bots/pending-bot-creations";
 import { BotFace } from "../bot-face";
 import { FaceFields } from "../face-fields";
 import { BUTTON } from "../settings/primitives";

@@ -17,8 +17,8 @@ import type { AuthService } from "./auth";
 import type { DesktopConfig } from "./config";
 import { log } from "./log";
 
-// The popup is ../notch (openedbot Notch), embedded as a built bundle and never
-// as source. We run its executable directly as a child with `--hosted` and
+// The popup is openedbot Notch (OpenedBot/openedbot-notch, its own repository),
+// embedded as a built bundle and never as source. We run its executable directly as a child with `--hosted` and
 // talk over stdin/stdout (src/shared/popup-protocol.ts): a private channel with
 // no socket to authenticate, and the popup's life is tied to ours (EOF on its
 // stdin makes it quit, even if we crash).
@@ -64,13 +64,14 @@ export type PopupHost = {
 
 /**
  * The popup bundle: next to the app when packaged (Contents/Helpers, see
- * electron-builder.yml), otherwise OHB_POPUP_APP or the sibling checkout's
- * build (`make -C ../notch bundle`). null when none has the executable.
+ * electron-builder.yml), otherwise OPENEDBOT_POPUP_APP or the build of an
+ * openedbot-notch checkout next to this repository (`make bundle` there).
+ * null when none has the executable.
  */
 export function locatePopupBundle(): string | null {
   const candidates = app.isPackaged
     ? [path.join(process.resourcesPath, "..", "Helpers", BUNDLE_NAME)]
-    : [process.env.OHB_POPUP_APP?.trim(), path.resolve(app.getAppPath(), "..", "notch", "dist", BUNDLE_NAME)];
+    : [process.env.OPENEDBOT_POPUP_APP?.trim(), path.resolve(app.getAppPath(), "..", "..", "..", "openedbot-notch", "dist", BUNDLE_NAME)];
   for (const candidate of candidates) {
     if (candidate && existsSync(path.join(candidate, EXECUTABLE))) return candidate;
   }
@@ -82,7 +83,7 @@ type PopupProcess = ChildProcessByStdio<Writable, Readable, null>;
 
 /**
  * The host protocol a bundle declares (`OHBHostedProtocol` in its Info.plist,
- * written as XML by `make -C ../notch bundle`). null when absent: a build
+ * written as XML by `make bundle` in openedbot-notch). null when absent: a build
  * from before hosted mode, which would ignore --hosted and start on its own
  * (its own sign-in, its own Keychain) instead of talking to us.
  */

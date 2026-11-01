@@ -17,7 +17,7 @@ import { proConsole } from "../../src/pro-console/registry";
  * passe pro de `make test-dual`. En solo, aucun écran de facturation.
  */
 const BillingSettings = proConsole().billing?.BillingSettings;
-const pro = Boolean(process.env.OHB_PRO_CONSOLE?.trim());
+const pro = Boolean(process.env.OPENEDBOT_CONSOLE_PLUGINS?.trim());
 
 const realFetch = globalThis.fetch;
 

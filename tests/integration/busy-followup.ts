@@ -8,7 +8,7 @@ import { claimRun } from "../../modules/execution/src/application/queue";
 import { forwardNextRunSteer } from "../../modules/execution/src/application/run-steering";
 import { failRunsOnDisconnectedRuntimes } from "../../modules/runtime-link/src/application/runtime-links";
 import { conversationRoutes } from "../../apps/api/src/routes/conversation/conversation-routes";
-import { eventRoutes } from "../../apps/api/src/interfaces/http/event-routes";
+import { eventRoutes } from "../../apps/api/src/routes/events/event-routes";
 import type { ApiConfig } from "../../apps/api/src/infrastructure/config";
 import type { BlobStore } from "../../apps/api/src/infrastructure/blob-store";
 import type { AppVariables } from "../../apps/api/src/routes/identity/auth";

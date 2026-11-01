@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { SupportPanel } from "../../components/support/support-panel";
 import { useT } from "../../lib/i18n";
-import { SUPPORT_ROUTE_ID } from "../../lib/support-launcher-visibility";
+import { SUPPORT_ROUTE_ID } from "../../lib/support/support-launcher-visibility";
 
 /**
  * Le guichet dans l'application : `/support`, et `/support/:id` pour un fil.

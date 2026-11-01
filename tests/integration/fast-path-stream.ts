@@ -5,8 +5,8 @@ import { persistEvents } from "../../modules/execution/src/application/runner";
 import { HermesEventNormalizer } from "../../modules/execution/src/domain/hermes-events";
 import type { AppVariables } from "../../apps/api/src/routes/identity/auth";
 import type { ApiConfig } from "../../apps/api/src/infrastructure/config";
-import { eventRoutes, internalEventRoutes } from "../../apps/api/src/interfaces/http/event-routes";
-import { acceptLiveEvent, createLiveDedupe } from "../../apps/console/src/lib/thread-stream-live";
+import { eventRoutes, internalEventRoutes } from "../../apps/api/src/routes/events/event-routes";
+import { acceptLiveEvent, createLiveDedupe } from "../../apps/console/src/lib/stream/thread-stream-live";
 import { withDisposablePostgres } from "./disposable-postgres";
 
 const assert: (condition: unknown, message: string) => asserts condition = (condition, message) => {

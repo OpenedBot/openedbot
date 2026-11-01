@@ -3,7 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { IconChevronLeft, IconMenu2 } from "@tabler/icons-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
-import { mobileBackTarget } from "../../lib/mobile-navigation";
+import { mobileBackTarget } from "../../lib/shell/mobile-navigation";
 import { insetBackClassName } from "./inset-grouped";
 import { useMobileDrawer } from "./mobile-drawer-shell";
 

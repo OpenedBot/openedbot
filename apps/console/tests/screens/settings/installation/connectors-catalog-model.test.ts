@@ -10,7 +10,7 @@ import {
   catalogSections,
   connectorDescriptionKey,
   mcpConnectBlocker,
-} from "../../../../src/screens/settings/installation/connectors-catalog-model";
+} from "../../../../src/screens/settings/installation/connectors/connectors-catalog-model";
 import { MCP_CONNECTOR_MARKS } from "../../../../src/components/mcp-connector-marks";
 import { connectorInitial } from "../../../../src/components/mcp-connector-row";
 

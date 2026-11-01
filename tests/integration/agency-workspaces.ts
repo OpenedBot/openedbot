@@ -11,7 +11,7 @@ import { authMiddleware, type AppVariables } from "../../apps/api/src/routes/ide
 import { memberRoutes } from "../../apps/api/src/routes/identity/member-routes";
 import { workspaceRoutes } from "../../apps/api/src/routes/identity/workspace-routes";
 import { fleetMounts, requireFleetPlugin } from "./pro-fleet";
-import { eventRoutes } from "../../apps/api/src/interfaces/http/event-routes";
+import { eventRoutes } from "../../apps/api/src/routes/events/event-routes";
 import { hashCredential } from "../../platform/db/src/credential";
 import { hasLiveWorkspaceSession } from "../../modules/identity/src/sql/session-access";
 import { EventHub } from "../../modules/notifications/src/application/event-hub";
@@ -30,7 +30,7 @@ async function capture(command: string[]): Promise<string> {
 
 async function adminUrl(): Promise<URL> {
   if (process.env.INTEGRATION_ADMIN_DATABASE_URL) return new URL(process.env.INTEGRATION_ADMIN_DATABASE_URL);
-  const container = process.env.OHB_POSTGRES_CONTAINER ?? "infra-postgres";
+  const container = process.env.OPENEDBOT_POSTGRES_CONTAINER ?? "infra-postgres";
   const port = (await capture(["docker", "port", container, "5432/tcp"])).split("\n").find((line) => line.startsWith("127.0.0.1:") || line.startsWith("0.0.0.0:"))?.split(":").at(-1);
   if (!port || !/^\d+$/.test(port)) throw new Error("Existing PostgreSQL must expose a loopback port, or supply INTEGRATION_ADMIN_DATABASE_URL.");
   // Credentials are captured in memory only, never printed or passed in argv.
@@ -98,10 +98,10 @@ const fleetPlugin = await requireFleetPlugin("agency-workspaces");
 // As the API does with the plug-in billing loaded (steps 8d, 11.4): its port
 // gives the member limits, its onOrganizationCreating hook writes the welcome
 // subscription in the creation transaction; not the solo default.
-const { plugins: loadedPlugins } = await loadApiProPlugins(process.env.OHB_PRO_PLUGINS);
+const { plugins: loadedPlugins } = await loadApiProPlugins(process.env.OPENEDBOT_PLUGINS);
 const billingPort = subscriptionPortOf(loadedPlugins);
 const welcomeHook = organizationCreatingHookOf(loadedPlugins, process.env);
-if (!billingPort || !welcomeHook) throw new Error("agency-workspaces: the scenarios need the plug-in billing in OHB_PRO_PLUGINS");
+if (!billingPort || !welcomeHook) throw new Error("agency-workspaces: the scenarios need the plug-in billing in OPENEDBOT_PLUGINS");
 installSubscriptionPort(billingPort);
 installOrganizationCreatingListener(welcomeHook);
 const root = resolve(import.meta.dir, "../..");

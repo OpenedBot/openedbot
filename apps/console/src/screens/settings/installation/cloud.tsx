@@ -20,21 +20,21 @@ import {
   ToneBadge,
 } from "../../../components/settings/primitives";
 import { ProviderIncidentDialog } from "../../../components/provider-incident-banner";
-import { RUNTIME_DISCONNECTED_REFETCH_MS, RUNTIME_REFETCH_MS, type RuntimeSection } from "./cloud-shared";
-import { CopyableCommand } from "./cloud-token-help";
-import { RuntimeFormSkeleton, RuntimeOwnershipHelp, RuntimeSectionRail } from "./cloud-runtime-chrome";
-import { RuntimeLinkHero } from "./cloud-link-hero";
-import { ConnectorUpgradeNotice, RetiredLinkNotice, RuntimeLinkCheck } from "./cloud-link-check";
+import { RUNTIME_DISCONNECTED_REFETCH_MS, RUNTIME_REFETCH_MS, type RuntimeSection } from "./cloud/cloud-shared";
+import { CopyableCommand } from "./cloud/cloud-token-help";
+import { RuntimeFormSkeleton, RuntimeOwnershipHelp, RuntimeSectionRail } from "./cloud/cloud-runtime-chrome";
+import { RuntimeLinkHero } from "./cloud/cloud-link-hero";
+import { ConnectorUpgradeNotice, RetiredLinkNotice, RuntimeLinkCheck } from "./cloud/cloud-link-check";
 import { ConnectorReleaseNotesButton } from "../../../components/connector-update-dialog";
-import { linkHealthErrorText } from "../../../lib/link-health-error";
-import { RuntimeRemoval, RuntimeReplacement } from "./cloud-registry";
-import { RuntimeTerminalSwitch } from "./cloud-terminal-switch";
-import { RuntimeAlertsSection } from "./cloud-alerts";
+import { linkHealthErrorText } from "../../../lib/runtime/link-health-error";
+import { RuntimeRemoval, RuntimeReplacement } from "./cloud/cloud-registry";
+import { RuntimeTerminalSwitch } from "./cloud/cloud-terminal-switch";
+import { RuntimeAlertsSection } from "./cloud/cloud-alerts";
 
-export { isRuntimeSection, type RuntimeSection } from "./cloud-shared";
-export { HermesTokenHelpDialog } from "./cloud-token-help";
-export { CloudSettingsOverview } from "./cloud-overview";
-export { RuntimeReplacement } from "./cloud-registry";
+export { isRuntimeSection, type RuntimeSection } from "./cloud/cloud-shared";
+export { HermesTokenHelpDialog } from "./cloud/cloud-token-help";
+export { CloudSettingsOverview } from "./cloud/cloud-overview";
+export { RuntimeReplacement } from "./cloud/cloud-registry";
 
 export function CloudRuntimeSettings({
   section,

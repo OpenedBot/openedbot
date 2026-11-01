@@ -18,8 +18,8 @@ import { CreateBotSheet } from "../../../src/components/bot-create/create-bot-sh
 import { CreatePersonaSection } from "../../../src/components/bot-create/persona-sheet";
 import { BotCreatingScreen } from "../../../src/components/bot-create/bot-creating-screen";
 import { BotDialogsHost } from "../../../src/components/bot-manage/bot-dialogs-host";
-import { isPendingBotId } from "../../../src/lib/pending-bot-creations";
-import { useBotDialogs } from "../../../src/lib/bot-dialogs";
+import { isPendingBotId } from "../../../src/lib/bots/pending-bot-creations";
+import { useBotDialogs } from "../../../src/lib/bots/bot-dialogs";
 import { OverviewScreen } from "../../../src/screens/home/overview";
 
 const realFetch = globalThis.fetch;

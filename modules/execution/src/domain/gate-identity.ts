@@ -54,7 +54,7 @@ export const GATE_COMMAND_MAX_CHARS = 2000;
 const PATTERN_KEY_MAX_CHARS = 200;
 
 const PLUGIN_RULE_PREFIX = "plugin_rule:";
-const OHB_RULE_PREFIX = `${PLUGIN_RULE_PREFIX}ohb/v1/`;
+const OPENEDBOT_RULE_PREFIX = `${PLUGIN_RULE_PREFIX}ohb/v1/`;
 const DESCRIPTOR_LINE = /^ohb-gate\/v1 ([0-9a-f]{64}) (\{.*\})$/;
 const DESCRIPTOR_PREFIX = "ohb-gate/";
 const NATIVE_TOOL_KEY = /^[a-z][a-z0-9_]{0,63}$/;
@@ -150,8 +150,8 @@ const UNKNOWN = { gateKind: "unknown", toolKey: null, gateArgs: null, descriptor
 export function readGateIdentity(raw: Record<string, unknown>): GateIdentity {
   const hermesRequestId = requestId(raw);
   const patternKey = typeof raw.pattern_key === "string" ? raw.pattern_key : "";
-  if (patternKey.startsWith(OHB_RULE_PREFIX)) {
-    const toolKey = patternKey.slice(OHB_RULE_PREFIX.length);
+  if (patternKey.startsWith(OPENEDBOT_RULE_PREFIX)) {
+    const toolKey = patternKey.slice(OPENEDBOT_RULE_PREFIX.length);
     if (!NATIVE_TOOL_KEY.test(toolKey) && !MCP_TOOL_KEY.test(toolKey)) return { hermesRequestId, ...UNKNOWN };
     const descriptor = parseDescriptor(descriptorLine(raw.description), toolKey);
     if (!descriptor) return { hermesRequestId, ...UNKNOWN };

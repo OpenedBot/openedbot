@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { RiFlaskLine, RiGroupLine, RiMoreFill, RiSettings3Line } from "@remixicon/react";
 import type { BotDto } from "@openedbot/contracts-api";
-import { useAgentEditor } from "../../lib/agent-editor";
+import { useAgentEditor } from "../../lib/bots/agent-editor";
 import { useT } from "../../lib/i18n";
-import { useOpenedOnce } from "../../lib/use-opened-once";
-import { useAccountLayout } from "../../lib/account-layout";
+import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
+import { useAccountLayout } from "../../lib/shell/account-layout";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { AccountMenu } from "./account-menu";
 import { BotFace } from "../bot-face";

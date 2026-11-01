@@ -18,7 +18,7 @@ import type {
 } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../../../src/lib/i18n";
 import { ConnectorsSettings } from "../../../../src/screens/settings/installation/connectors";
-import { filterCatalog } from "../../../../src/screens/settings/installation/connectors-mcp";
+import { filterCatalog } from "../../../../src/screens/settings/installation/connectors/connectors-mcp";
 
 const realFetch = globalThis.fetch;
 

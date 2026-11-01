@@ -1,6 +1,6 @@
 import { Children, isValidElement, useState, type ComponentProps, type ReactNode } from "react";
 import { Badge, cn, useIsMobile } from "@openedbot/browser-ui-kit";
-import { useSettingsModal } from "../../lib/settings-modal-context";
+import { useSettingsModal } from "../../lib/shell/settings-modal-context";
 
 /**
  * Les briques communes des écrans de réglages : l'équivalent, chez nous, de

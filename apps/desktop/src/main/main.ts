@@ -1,3 +1,4 @@
+import "./env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback
 import { app, dialog, Menu } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -195,7 +196,7 @@ function start(): void {
           status: "error",
           code: "CONSOLE_UNSUPPORTED",
           params: { host },
-          message: `La console ${host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OHB_CONSOLE_URL ou config.json).`,
+          message: `La console ${host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OPENEDBOT_CONSOLE_URL ou config.json).`,
         });
       },
     });
@@ -273,7 +274,7 @@ function popupGiveUpMessage(reason: PopupGiveUpReason): string {
       return `La popup s’est arrêtée ${reason.failures} fois de suite. openedbot repasse en mode Fenêtre.`;
     case "protocol":
       return reason.version === 0
-        ? "Cette version d’openedbot notch est antérieure au mode popup d’openedbot : reconstruisez-la (make -C ../notch bundle). openedbot repasse en mode Fenêtre."
+        ? "Cette version d’openedbot notch est antérieure au mode popup d’openedbot : reconstruisez-la (make bundle dans openedbot-notch). openedbot repasse en mode Fenêtre."
         : `Cette popup parle une autre version du protocole (${reason.version}). openedbot repasse en mode Fenêtre.`;
     case "fatal":
       return reason.code === "STANDALONE_RUNNING"
@@ -306,7 +307,7 @@ if (isElectronViteDev) {
 // packaged build, where any local process could use it to read the session
 // through the bridge. Must be set before `ready`.
 if (isElectronViteDev) {
-  app.commandLine.appendSwitch("remote-debugging-port", process.env.OHB_REMOTE_DEBUGGING_PORT ?? "9333");
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.OPENEDBOT_REMOTE_DEBUGGING_PORT ?? "9333");
 }
 
 // The console's copy buttons use navigator.clipboard, which Chromium only

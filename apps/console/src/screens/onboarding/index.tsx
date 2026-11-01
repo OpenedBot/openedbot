@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { api, isApiUnavailable, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { hasCompletedOnboarding } from "../../lib/onboarding-gate";
+import { hasCompletedOnboarding } from "../../lib/session/onboarding-gate";
 import { OnboardingFlow } from "./onboarding-flow";
 
 /**

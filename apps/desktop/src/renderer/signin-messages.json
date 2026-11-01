@@ -52,7 +52,7 @@
     "failed.GOOGLE_REFUSED": "La connexion Google a été refusée ou a expiré. Réessayez.",
     "failed.NETWORK": "La connexion a échoué. Vérifiez votre réseau puis réessayez.",
     "failed.UNKNOWN": "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.",
-    "failed.CONSOLE_UNSUPPORTED": "La console {host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OHB_CONSOLE_URL ou config.json)."
+    "failed.CONSOLE_UNSUPPORTED": "La console {host} ne prend pas encore en charge l’application de bureau : elle ignore la session de l’app. Visez une console à jour (OPENEDBOT_CONSOLE_URL ou config.json)."
   },
   "en": {
     "title": "Welcome back.",
@@ -107,6 +107,6 @@
     "failed.GOOGLE_REFUSED": "The Google sign-in was refused or expired. Try again.",
     "failed.NETWORK": "Sign-in failed. Check your network, then try again.",
     "failed.UNKNOWN": "Sign-in failed. Try again, and tell support if it happens again.",
-    "failed.CONSOLE_UNSUPPORTED": "The console {host} does not support the desktop app yet: it ignores the app session. Point the app at an up-to-date console (OHB_CONSOLE_URL or config.json)."
+    "failed.CONSOLE_UNSUPPORTED": "The console {host} does not support the desktop app yet: it ignores the app session. Point the app at an up-to-date console (OPENEDBOT_CONSOLE_URL or config.json)."
   }
 }

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { EventHub } from "@openedbot/notifications/application/event-hub";
 import type { Db } from "@openedbot/platform-db";
-import { eventRoutes } from "../../src/interfaces/http/event-routes";
+import { eventRoutes } from "../../src/routes/events/event-routes";
 import type { AppVariables } from "../../src/routes/identity/auth";
 import type { StoredRow } from "./run-events-db";
 

@@ -5,7 +5,7 @@ import {
   readThreadFilter,
   serializeCursor,
   SSE_MAX_THREAD_FILTER,
-} from "../src/interfaces/http/event-routes";
+} from "../src/routes/events/event-routes";
 import { HttpError } from "../src/interfaces/http/http-error";
 import { frameReader, sseTestApp, storedRow, streamEvent } from "./fixtures/event-stream";
 import { fakeRunEventsDb } from "./fixtures/run-events-db";

@@ -32,8 +32,8 @@ docker_events="$test_directory/docker-events"
 run_reset() {
   PATH="$fake_bin:/usr/bin:/bin" \
     FAKE_DOCKER_EVENTS="$docker_events" \
-    OHB_POSTGRES_CONTAINER=infra-postgres \
-    OHB_DATABASE_NAME=ohb \
+    OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
     /bin/bash scripts/db.sh --reset "$@"
 }
 
@@ -87,7 +87,7 @@ fi
 # 3. A system or malformed database name is refused before any docker call.
 for bad_name in postgres template0 'ohb"; drop database devhub; --' 'Weird Name'; do
   if PATH="$fake_bin:/usr/bin:/bin" FAKE_DOCKER_EVENTS="$docker_events" \
-      OHB_DATABASE_NAME="$bad_name" \
+      API_DATABASE_URL="postgres://openedbot_api@127.0.0.1:5432/$bad_name" \
       /bin/bash scripts/db.sh --reset --yes --dry-run >/dev/null 2>&1; then
     fail "database name '$bad_name' must be refused."
   fi
@@ -100,8 +100,8 @@ assert_no_docker_call "bad names"
 keep_users_output="$test_directory/keep-users"
 if PATH="$fake_bin:$(dirname "$(command -v bun)"):/usr/bin:/bin" \
     FAKE_DOCKER_EVENTS="$docker_events" \
-    env -u OHB_DEV_RESET_CONFIRM bun apps/api/scripts/dev-reset-data.ts > "$keep_users_output" 2>&1; then
-  fail "dev-reset-data.ts without OHB_DEV_RESET_CONFIRM=yes must exit non-zero."
+    env -u OPENEDBOT_DEV_RESET_CONFIRM bun apps/api/scripts/dev-reset-data.ts > "$keep_users_output" 2>&1; then
+  fail "dev-reset-data.ts without OPENEDBOT_DEV_RESET_CONFIRM=yes must exit non-zero."
 fi
 assert_no_docker_call "keep-users refusal"
 grep -q 'db-reset-keep-users CONFIRM=yes' "$keep_users_output" \

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=lib/env-aliases.sh
+. "$(dirname "$0")/lib/env-aliases.sh" # OHB_* -> OPENEDBOT_* fallback, one release
 
 # Mailpit is the SMTP of DEVELOPMENT, and nothing else: it accepts every
 # message and delivers none. The worker points at it through
@@ -7,13 +9,13 @@ set -euo pipefail
 # read in its web interface on http://127.0.0.1:8025.
 #
 # Same rule as PostgreSQL (scripts/db.sh): the container lives in the shared
-# dev-infra compose project (OHB_MAILPIT_CONTAINER, default infra-mailpit).
+# dev-infra compose project (OPENEDBOT_MAILPIT_CONTAINER, default infra-mailpit).
 # This script starts it when it is stopped and waits for it; it never creates
 # one, and it never touches a production mail transport. On the hosted tiers
 # the transport is Brevo, never this.
 
-container="${OHB_MAILPIT_CONTAINER:-infra-mailpit}"
-ui_url="${OHB_MAILPIT_URL:-http://127.0.0.1:8025}"
+container="${OPENEDBOT_MAILPIT_CONTAINER:-infra-mailpit}"
+ui_url="${E2E_MAILPIT_URL:-http://127.0.0.1:8025}"
 
 if ! command -v docker >/dev/null 2>&1; then
   printf 'Docker is required to reach the Mailpit container %s.\n' "$container" >&2

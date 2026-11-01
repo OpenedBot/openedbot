@@ -4,7 +4,7 @@ import type {
   TimelineModelInput,
   TimelineRun,
   TimelineUserInput,
-} from "../../src/lib/thread-timeline-model";
+} from "../../src/lib/thread/thread-timeline-model";
 
 /**
  * Un fil synthétique qui exerce toutes les branches du modèle : fragments de

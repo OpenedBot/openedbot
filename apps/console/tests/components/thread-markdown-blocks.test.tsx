@@ -6,7 +6,7 @@ import {
   ThreadMarkdownBlock,
 } from "../../src/components/thread-markdown";
 import { I18nProvider } from "../../src/lib/i18n";
-import { splitMarkdownBlocks, stabilizeStreamingMarkdown } from "../../src/lib/streaming-markdown";
+import { splitMarkdownBlocks, stabilizeStreamingMarkdown } from "../../src/lib/stream/streaming-markdown";
 
 const DOCS = {
   answer: `Voici ce que j'ai trouvé.

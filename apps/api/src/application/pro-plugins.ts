@@ -1,7 +1,7 @@
 /**
  * Pro plug-ins in the API.
  *
- * `OHB_PRO_PLUGINS` lists module specifiers; empty or unset is solo mode and
+ * `OPENEDBOT_PLUGINS` lists module specifiers; empty or unset is solo mode and
  * nothing below changes a single route. Each loaded plug-in's API mounts are
  * served under `/api/pro/<id><prefix>`, behind the same `/api/*` middlewares
  * as the core (security headers, compression, rate limiting, then the
@@ -47,7 +47,7 @@ const NOT_FOUND_BODY = { error: { code: "NOT_FOUND", message: "Route introuvable
  * What a mount's `build()` receives. `db` is the API pool, which connects
  * with the application role (row-level security applies: no superuser, no
  * BYPASSRLS, owns no table; see `guardProPlugins`). `config` holds only the
- * plug-in's own variables, `OHB_PRO_<ID>__<KEY>`, keyed by `<KEY>`.
+ * plug-in's own variables, `OPENEDBOT_PLUGIN_<ID>__<KEY>`, keyed by `<KEY>`.
  */
 export type ProPluginContext = {
   readonly pluginId: string;
@@ -57,7 +57,7 @@ export type ProPluginContext = {
   readonly env?: Readonly<Record<string, string>>;
   /**
    * Services the API lends to a plug-in it installs itself (legacy install,
-   * until step 8), keyed by plug-in id. Never set for `OHB_PRO_PLUGINS`
+   * until step 8), keyed by plug-in id. Never set for `OPENEDBOT_PLUGINS`
    * plug-ins other than the ones the API knows.
    */
   readonly host?: Readonly<Record<string, unknown>>;

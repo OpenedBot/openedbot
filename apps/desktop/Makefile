@@ -3,7 +3,8 @@
 
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
-.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check defaults package-win package-win-installer package-mac clean
+include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/env-aliases.mk
+.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 # Defined once, reused by `make help` and by every [make] message below.
@@ -37,7 +38,7 @@ compile: ## Bundle main and preload to dist/ as CommonJS (electron-vite build)
 
 # ─── Run ─────────────────────────────────────────────────────────────────────
 
-# make dev aims production unless OHB_CONSOLE_URL is set: the console on
+# make dev aims production unless OPENEDBOT_CONSOLE_URL is set: the console on
 # https://console.openedbot.app, the API on https://api.openedbot.app (the native
 # clients' host). The operator works on the shell against the real service
 # (2026-10-17).
@@ -48,22 +49,22 @@ PROD_CONSOLE_URL := https://console.openedbot.app
 PROD_API_ORIGIN := https://api.openedbot.app
 LOCAL_CONSOLE_URL := http://localhost:1420
 
-dev: ## Electron with reload (electron-vite dev --watch) on production (console console.openedbot.app, API api.openedbot.app): real account, Google sign-in; OHB_CONSOLE_URL=... aims elsewhere
+dev: ## Electron with reload (electron-vite dev --watch) on production (console console.openedbot.app, API api.openedbot.app): real account, Google sign-in; OPENEDBOT_CONSOLE_URL=... aims elsewhere
 	@command -v bun >/dev/null 2>&1 || { printf "$(C_ERR)[make] bun is not installed (https://bun.sh)$(C_RESET)\n"; exit 1; }
-	@if [ -z "$$OHB_CONSOLE_URL" ]; then printf "$(C_WARN)[make] electron-vite dev on PRODUCTION ($(PROD_CONSOLE_URL), API $(PROD_API_ORIGIN)): real account, real data$(C_RESET)\n"; \
-	else printf "$(C_WARN)[make] electron-vite dev (OHB_CONSOLE_URL=$$OHB_CONSOLE_URL)$(C_RESET)\n"; fi
-	@if [ -z "$$OHB_CONSOLE_URL" ]; then export OHB_CONSOLE_URL="$(PROD_CONSOLE_URL)" OHB_API_ORIGIN="$${OHB_API_ORIGIN:-$(PROD_API_ORIGIN)}"; \
-	else export OHB_API_ORIGIN="$${OHB_API_ORIGIN:-$$OHB_CONSOLE_URL}"; fi; bun run dev
+	@if [ -z "$$OPENEDBOT_CONSOLE_URL" ]; then printf "$(C_WARN)[make] electron-vite dev on PRODUCTION ($(PROD_CONSOLE_URL), API $(PROD_API_ORIGIN)): real account, real data$(C_RESET)\n"; \
+	else printf "$(C_WARN)[make] electron-vite dev (OPENEDBOT_CONSOLE_URL=$$OPENEDBOT_CONSOLE_URL)$(C_RESET)\n"; fi
+	@if [ -z "$$OPENEDBOT_CONSOLE_URL" ]; then export OPENEDBOT_CONSOLE_URL="$(PROD_CONSOLE_URL)" OPENEDBOT_API_ORIGIN="$${OPENEDBOT_API_ORIGIN:-$(PROD_API_ORIGIN)}"; \
+	else export OPENEDBOT_API_ORIGIN="$${OPENEDBOT_API_ORIGIN:-$$OPENEDBOT_CONSOLE_URL}"; fi; bun run dev
 
 dev-local: ## Electron with reload on the local console :1420 (../.. make dev), seeded dev accounts, console HMR
 	@command -v bun >/dev/null 2>&1 || { printf "$(C_ERR)[make] bun is not installed (https://bun.sh)$(C_RESET)\n"; exit 1; }
 	@curl -s -o /dev/null --max-time 2 "$(LOCAL_CONSOLE_URL)" || \
 		printf "$(C_WARN)[make] nothing answers on $(LOCAL_CONSOLE_URL): start the console first (cd ../.. && make db-up && make dev); the window retries every 5 s$(C_RESET)\n"
-	@printf "$(C_WARN)[make] electron-vite dev (OHB_CONSOLE_URL=$(LOCAL_CONSOLE_URL))$(C_RESET)\n"
-	@OHB_CONSOLE_URL="$(LOCAL_CONSOLE_URL)" OHB_API_ORIGIN="$(LOCAL_CONSOLE_URL)" bun run dev
+	@printf "$(C_WARN)[make] electron-vite dev (OPENEDBOT_CONSOLE_URL=$(LOCAL_CONSOLE_URL))$(C_RESET)\n"
+	@OPENEDBOT_CONSOLE_URL="$(LOCAL_CONSOLE_URL)" OPENEDBOT_API_ORIGIN="$(LOCAL_CONSOLE_URL)" bun run dev
 
 start: compile ## Build once, then launch Electron on the configured console (no reload: see make dev)
-	@printf "$(C_WARN)[make] launching Electron (OHB_CONSOLE_URL=$${OHB_CONSOLE_URL:-default})$(C_RESET)\n"
+	@printf "$(C_WARN)[make] launching Electron (OPENEDBOT_CONSOLE_URL=$${OPENEDBOT_CONSOLE_URL:-default})$(C_RESET)\n"
 	@bun run start
 
 # The diagnostics journal (src/main/diagnostics.ts) of one userData: "openedbot
@@ -126,16 +127,26 @@ package-win-installer: defaults ## Unsigned Windows x64 NSIS installer (.exe) in
 	@ls -1 release/*.exe >/dev/null 2>&1 || { printf "$(C_ERR)[make] no .exe produced in release/$(C_RESET)\n"; exit 1; }
 	@for f in release/*.exe; do printf "$(C_OK)[make] %s  (%s, sha256 %s)$(C_RESET)\n" "$$f" "$$(du -h "$$f" | cut -f1)" "$$(sha256sum "$$f" | cut -d' ' -f1)"; done
 
-# The popup bundle electron-builder embeds (mac.extraFiles). Built in its own
-# directory, never copied as source.
-POPUP_APP := ../notch/dist/OHBPopup.app
+# The popup is OpenedBot/openedbot-notch, its own repository: a checkout next
+# to this one by default, NOTCH_DIR=/path/to/openedbot-notch otherwise. Its
+# bundle is built there (make -C $(NOTCH_DIR) bundle), never copied as source,
+# then staged in POPUP_STAGE, the fixed path electron-builder embeds
+# (mac.extraFiles), whatever NOTCH_DIR is.
+NOTCH_DIR ?= ../../../openedbot-notch
+POPUP_APP := $(NOTCH_DIR)/dist/OHBPopup.app
+POPUP_STAGE := popup-bundle/OHBPopup.app
 
-popup-check: ## Check that the popup bundle to embed exists (../notch/dist/OHBPopup.app)
-	@[ -x "$(POPUP_APP)/Contents/MacOS/OHBPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] build it first: make -C ../notch bundle$(C_RESET)\n"; exit 1; }
-	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OHBHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OHBHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C ../notch bundle$(C_RESET)\n"; exit 1; }
+popup-check: ## Check that the popup bundle to embed exists (NOTCH_DIR/dist/OHBPopup.app; NOTCH_DIR defaults to ../../../openedbot-notch)
+	@[ -x "$(POPUP_APP)/Contents/MacOS/OHBPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] clone OpenedBot/openedbot-notch next to this repository (or set NOTCH_DIR), then: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
+	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OHBHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OHBHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
 	@printf "$(C_OK)[make] popup bundle: $(POPUP_APP) (version %s, hosted protocol 1)$(C_RESET)\n" "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null || echo '?')"
 
-package-mac: popup-check defaults ## Unsigned macOS arm64 build (dmg + zip) into release/, popup embedded; run it on a Mac
+popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, where electron-builder embeds it
+	@rm -rf popup-bundle && mkdir -p popup-bundle
+	@ditto "$(POPUP_APP)" "$(POPUP_STAGE)"
+	@printf "$(C_OK)[make] popup staged: $(POPUP_STAGE)$(C_RESET)\n"
+
+package-mac: popup-stage defaults ## Unsigned macOS arm64 build (dmg + zip) into release/, popup embedded; run it on a Mac
 	@[ "$$(uname -s)" = "Darwin" ] || { printf "$(C_ERR)[make] package-mac runs on macOS only (the .dmg is built with hdiutil)$(C_RESET)\n"; exit 1; }
 	@printf "$(C_WARN)[make] building an UNSIGNED, non-notarized macOS app (Gatekeeper blocks the first launch)$(C_RESET)\n"
 	@bun run package:mac
@@ -144,9 +155,9 @@ package-mac: popup-check defaults ## Unsigned macOS arm64 build (dmg + zip) into
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 
-clean: ## Remove dist/ and release/ (node_modules is kept)
-	@rm -rf dist release
-	@printf "$(C_OK)[make] dist/ and release/ removed$(C_RESET)\n"
+clean: ## Remove dist/, release/ and popup-bundle/ (node_modules is kept)
+	@rm -rf dist release popup-bundle
+	@printf "$(C_OK)[make] dist/, release/ and popup-bundle/ removed$(C_RESET)\n"
 
 # ─── Help ────────────────────────────────────────────────────────────────────
 

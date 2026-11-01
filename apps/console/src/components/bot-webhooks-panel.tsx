@@ -8,7 +8,7 @@ import type {
   WebhookEndpointCreatedDto,
   WebhookEndpointDto,
 } from "@openedbot/contracts-api";
-import { isAmbiguousWebhookManagementFailure } from "@/lib/webhook-management";
+import { isAmbiguousWebhookManagementFailure } from "@/lib/bots/webhook-management";
 import { Button, Input, Label, Switch, toast } from "@openedbot/browser-ui-kit";
 import { API_ORIGIN, ApiError, api, queryKeys } from "../lib/api";
 import { randomId } from "../lib/random-id";

@@ -8,9 +8,9 @@ import { InputOtp } from "@openedbot/browser-ui-kit/components/ui/input-otp";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@openedbot/browser-ui-kit/components/ui/tooltip";
 import { isEmailSyntaxValid, normalizeEmail } from "@openedbot/identity/domain/email-address";
 import { ApiError, api, isAlphaClosed, isApiUnavailable, queryKeys } from "../../lib/api";
-import { leaveTo } from "../../lib/open-external";
-import { APP_HOME_HREF } from "../../lib/public-landing-gate";
-import { publicSiteUrl } from "../../lib/public-site";
+import { leaveTo } from "../../lib/platform/open-external";
+import { APP_HOME_HREF } from "../../lib/session/public-landing-gate";
+import { publicSiteUrl } from "../../lib/session/public-site";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
 import { BUTTON } from "../../components/settings/primitives";
@@ -28,7 +28,7 @@ import { BUTTON } from "../../components/settings/primitives";
  * - **Email code**: signup and sign-in share a single-use code. New accounts
  *   continue through the existing organization onboarding.
  * - **Email et mot de passe** : ouvert tant que l'API publie
- *   `password.enabled`. En production (`OHB_DEPLOY_ENV=prod`) ce n'est pas
+ *   `password.enabled`. En production (`OPENEDBOT_ENV=production`) ce n'est pas
  *   le cas : Google et le code email restent disponibles. Dev et preprod le gardent.
  *
  * Style lives in `login.css`: an editorial, technical gate with a brief entry

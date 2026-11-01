@@ -283,7 +283,7 @@ export const settingsProfile = {
   errorTaken: "Un bot s’appelle déjà @{username} : choisissez un autre nom.",
   devToolsTitle: "Outils de développement",
   devToolsDescription:
-    "Visible seulement en développement (OHB_ENV=development). Rejouer l’accueil remet votre parcours à zéro et efface la sortie de l’espace courant : chaque étape se rejoue pour de vrai.",
+    "Visible seulement en développement (OPENEDBOT_ENV=development). Rejouer l’accueil remet votre parcours à zéro et efface la sortie de l’espace courant : chaque étape se rejoue pour de vrai.",
   devResetOnboarding: "Rejouer l’onboarding (dev)",
   devResetOnboardingPending: "Remise à zéro…",
   devResetOnboardingError: "Impossible de rejouer l’onboarding.",
@@ -304,7 +304,7 @@ export const settingsDeveloper = {
     "Les surfaces qui n’existent que sous « make dev » : elles ne sont pas un produit, elles servent à fabriquer le produit. Un build de production ne les monte pas.",
   unavailableTitle: "Rien à montrer ici",
   unavailableDescription:
-    "Le cloud API ne tourne pas en OHB_ENV=development : les outils de développement restent fermés, même sous le serveur Vite.",
+    "Le cloud API ne tourne pas en OPENEDBOT_ENV=development : les outils de développement restent fermés, même sous le serveur Vite.",
 } as const;
 
 export const settingsSecurity = {

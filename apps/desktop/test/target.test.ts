@@ -42,11 +42,11 @@ test("resolveTarget: prod and an API URL", () => {
 test("resolveTarget: absent is null, garbage throws naming the source", () => {
   expect(resolveTarget(undefined, "T")).toBeNull();
   expect(resolveTarget("  ", "T")).toBeNull();
-  expect(() => resolveTarget("staging", "OHB_TARGET")).toThrow("OHB_TARGET must be");
+  expect(() => resolveTarget("staging", "OPENEDBOT_TARGET")).toThrow("OPENEDBOT_TARGET must be");
   // No preset besides prod: a named environment is an error, not a hidden URL.
-  expect(() => resolveTarget("preprod", "OHB_TARGET")).toThrow("OHB_TARGET must be prod or a URL");
-  expect(() => resolveTarget("ftp://example.com", "OHB_TARGET")).toThrow("OHB_TARGET must be");
-  expect(() => resolveTarget(42, "OHB_TARGET")).toThrow("OHB_TARGET must be");
+  expect(() => resolveTarget("preprod", "OPENEDBOT_TARGET")).toThrow("OPENEDBOT_TARGET must be prod or a URL");
+  expect(() => resolveTarget("ftp://example.com", "OPENEDBOT_TARGET")).toThrow("OPENEDBOT_TARGET must be");
+  expect(() => resolveTarget(42, "OPENEDBOT_TARGET")).toThrow("OPENEDBOT_TARGET must be");
 });
 
 test("targetLabel is null on production only", () => {
@@ -69,10 +69,10 @@ test("tokensFileName keeps tokens.bin for production and splits every other API"
 
 test("devUserDataName follows the backend the environment aims at", () => {
   expect(devUserDataName({})).toBe("openedbot (dev)");
-  expect(devUserDataName({ OHB_API_ORIGIN: `${PRODUCTION_API_ORIGIN}/` })).toBe("openedbot (dev prod)");
-  expect(devUserDataName({ OHB_TARGET: "prod" })).toBe("openedbot (dev prod)");
-  expect(devUserDataName({ OHB_TARGET: "preprod" })).toBe("openedbot (dev)");
-  expect(devUserDataName({ OHB_TARGET: "nonsense" })).toBe("openedbot (dev)");
+  expect(devUserDataName({ OPENEDBOT_API_ORIGIN: `${PRODUCTION_API_ORIGIN}/` })).toBe("openedbot (dev prod)");
+  expect(devUserDataName({ OPENEDBOT_TARGET: "prod" })).toBe("openedbot (dev prod)");
+  expect(devUserDataName({ OPENEDBOT_TARGET: "preprod" })).toBe("openedbot (dev)");
+  expect(devUserDataName({ OPENEDBOT_TARGET: "nonsense" })).toBe("openedbot (dev)");
 });
 
 // getConfig() end to end, with electron mocked: precedence between sources.
@@ -81,7 +81,7 @@ const userData = mkdtempSync(path.join(tmpdir(), "ohb-config-"));
 // the mock: bun keeps one electron mock across files, and a missing name (net)
 // fails the link of the next file that imports it.
 mock.module("electron", () => ({ app: { isPackaged: false, getPath: () => userData }, net: {}, shell: {}, ipcMain: { handle() {}, on() {} }, nativeTheme: {}, safeStorage: { isEncryptionAvailable: () => false } }));
-const ENV_NAMES = ["OHB_TARGET", "OHB_CONSOLE_URL", "OHB_API_ORIGIN", "OHB_CLIENT_ID", "OHB_SIGNIN_TEMPLATE", "NODE_ENV_ELECTRON_VITE"];
+const ENV_NAMES = ["OPENEDBOT_TARGET", "OPENEDBOT_CONSOLE_URL", "OPENEDBOT_API_ORIGIN", "OPENEDBOT_SIGNIN_TEMPLATE", "NODE_ENV_ELECTRON_VITE"];
 let imports = 0;
 
 async function configWith(env: Record<string, string>) {
@@ -100,28 +100,28 @@ test("getConfig: no setting is production", async () => {
   expect(await configWith({})).toMatchObject({ consoleUrl: PRODUCTION_CONSOLE_URL, apiOrigin: PRODUCTION_API_ORIGIN });
 });
 
-test("getConfig: OHB_TARGET=<API URL> aims that API and the local console", async () => {
-  expect(await configWith({ OHB_TARGET: "https://api.staging.example.test" })).toMatchObject({ consoleUrl: LOCAL_CONSOLE_URL, apiOrigin: "https://api.staging.example.test" });
+test("getConfig: OPENEDBOT_TARGET=<API URL> aims that API and the local console", async () => {
+  expect(await configWith({ OPENEDBOT_TARGET: "https://api.staging.example.test" })).toMatchObject({ consoleUrl: LOCAL_CONSOLE_URL, apiOrigin: "https://api.staging.example.test" });
 });
 
 test("getConfig: the console is set apart from the API", async () => {
-  const config = await configWith({ OHB_TARGET: "https://api.staging.example.test", OHB_CONSOLE_URL: "http://localhost:5555" });
+  const config = await configWith({ OPENEDBOT_TARGET: "https://api.staging.example.test", OPENEDBOT_CONSOLE_URL: "http://localhost:5555" });
   expect(config).toMatchObject({ consoleUrl: "http://localhost:5555", apiOrigin: "https://api.staging.example.test" });
 });
 
 test("getConfig: an explicit API origin beats the target", async () => {
-  const config = await configWith({ OHB_TARGET: "https://api.staging.example.test", OHB_API_ORIGIN: "http://10.0.0.50:8790" });
+  const config = await configWith({ OPENEDBOT_TARGET: "https://api.staging.example.test", OPENEDBOT_API_ORIGIN: "http://10.0.0.50:8790" });
   expect(config.apiOrigin).toBe("http://10.0.0.50:8790");
 });
 
 test("getConfig: plain http is refused off a lab host, even through a target", async () => {
-  await expect(configWith({ OHB_TARGET: "http://example.com" })).rejects.toThrow("must be https");
+  await expect(configWith({ OPENEDBOT_TARGET: "http://example.com" })).rejects.toThrow("must be https");
 });
 
-test("getConfig: OHB_CONSOLE_URL still overrides the built-in console, the API stays production", async () => {
-  const config = await configWith({ OHB_CONSOLE_URL: "https://openedbot.app/" });
+test("getConfig: OPENEDBOT_CONSOLE_URL still overrides the built-in console, the API stays production", async () => {
+  const config = await configWith({ OPENEDBOT_CONSOLE_URL: "https://openedbot.app/" });
   expect(config).toMatchObject({ consoleUrl: "https://openedbot.app", apiOrigin: PRODUCTION_API_ORIGIN });
-  expect((await configWith({ OHB_CONSOLE_URL: "http://localhost:5555" })).consoleUrl).toBe("http://localhost:5555");
+  expect((await configWith({ OPENEDBOT_CONSOLE_URL: "http://localhost:5555" })).consoleUrl).toBe("http://localhost:5555");
 });
 
 test("parseTrustedExternalUrl: production opens console., the apex and the API, nothing else", async () => {

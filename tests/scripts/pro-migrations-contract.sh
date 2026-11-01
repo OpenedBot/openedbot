@@ -4,7 +4,7 @@ set -euo pipefail
 # Offline contract for the pro plug-in migrations of scripts/db.sh --migrate.
 # docker is faked: every core migration reads as applied, so
 # only plug-in files can be sent to psql.
-#   1. Solo (OHB_PRO_PLUGINS unset or empty): nothing is applied.
+#   1. Solo (OPENEDBOT_PLUGINS unset or empty): nothing is applied.
 #   2. A fixture plug-in: its pending files are applied after the core, in
 #      order, each followed by the insert of `<id>:<file>`, in one
 #      transaction; an already recorded `<id>:<file>` is skipped.
@@ -49,13 +49,13 @@ run_migrate() {
   PATH="$fake_bin:$bun_dir:/usr/bin:/bin" \
     FAKE_ROOT="$root" \
     FAKE_DOCKER_STDIN="$stdin_log" \
-    OHB_POSTGRES_CONTAINER=infra-postgres \
-    OHB_DATABASE_NAME=ohb \
+    OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
     "$@" /bin/bash scripts/db.sh --migrate
 }
 
 # 1. Solo.
-for solo in "env -u OHB_PRO_PLUGINS" "env OHB_PRO_PLUGINS="; do
+for solo in "env -u OPENEDBOT_PLUGINS" "env OPENEDBOT_PLUGINS="; do
   output="$(run_migrate $solo FAKE_APPLIED=)" || fail "solo migrate must succeed ($solo)"
   [ ! -s "$stdin_log" ] || fail "solo mode must apply nothing ($solo); psql got: $(head -3 "$stdin_log")"
   case "$output" in *"pro"*|*":"[0-9][0-9][0-9][0-9]_*) fail "solo mode must not mention plug-in migrations: $output" ;; esac
@@ -74,7 +74,7 @@ export default {
 };
 PLUGIN
 
-output="$(run_migrate env OHB_PRO_PLUGINS="$plugin_dir/index.ts" FAKE_APPLIED="fixture:0001_first")" \
+output="$(run_migrate env OPENEDBOT_PLUGINS="$plugin_dir/index.ts" FAKE_APPLIED="fixture:0001_first")" \
   || fail "pro migrate must succeed"
 printf '%s\n' "$output" | grep -qx 'Migration fixture:0002_second applied to ohb.' \
   || fail "fixture:0002_second must be applied; got: $output"

@@ -91,3 +91,22 @@ describe("log files", () => {
     expect(JSON.parse(line.trim()).channel).toBe("email");
   });
 });
+
+describe("OPENEDBOT_LOG_DIR=off", () => {
+  test("turns the log files off, any other value (or none) keeps them", async () => {
+    const { logFilesEnabled, logsDirectory } = await import("../src/log/files");
+    const previous = process.env.OPENEDBOT_LOG_DIR;
+    try {
+      process.env.OPENEDBOT_LOG_DIR = " OFF ";
+      expect(logFilesEnabled()).toBe(false);
+      expect(logsDirectory()).not.toContain("OFF");
+      process.env.OPENEDBOT_LOG_DIR = "/tmp/openedbot-logs";
+      expect([logFilesEnabled(), logsDirectory()]).toEqual([true, "/tmp/openedbot-logs"]);
+      delete process.env.OPENEDBOT_LOG_DIR;
+      expect(logFilesEnabled()).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.OPENEDBOT_LOG_DIR;
+      else process.env.OPENEDBOT_LOG_DIR = previous;
+    }
+  });
+});

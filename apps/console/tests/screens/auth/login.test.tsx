@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { ThemeProvider } from "@openedbot/browser-ui-kit/theme";
 import { I18nProvider } from "../../../src/lib/i18n";
-import { readCloudSession } from "../../../src/lib/cloud-session";
+import { readCloudSession } from "../../../src/lib/session/cloud-session";
 import { LoginScreen } from "../../../src/screens/auth/login";
 
 const realFetch = globalThis.fetch;

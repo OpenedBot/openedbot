@@ -25,10 +25,10 @@ describe("alertWebhookBody", () => {
 });
 
 describe("deployEnvironment", () => {
-  test("explicit tier wins, production defaults to prod, anything else to dev", () => {
-    expect(deployEnvironment("preprod", "production")).toBe("preprod");
-    expect(deployEnvironment(undefined, "production")).toBe("prod");
-    expect(deployEnvironment("", "development")).toBe("dev");
-    expect(() => deployEnvironment("staging", "production")).toThrow(/dev, preprod or prod/u);
+  test("OPENEDBOT_ENV names the tier: production is prod, preprod is preprod, anything else dev", () => {
+    expect(deployEnvironment("preprod")).toBe("preprod");
+    expect(deployEnvironment("production")).toBe("prod");
+    expect(deployEnvironment("development")).toBe("dev");
+    expect(deployEnvironment(undefined)).toBe("dev");
   });
 });

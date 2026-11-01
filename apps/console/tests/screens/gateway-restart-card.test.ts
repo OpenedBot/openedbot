@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { RuntimeGatewayRestartDto } from "@openedbot/contracts-api";
-import { freshHostJob } from "../../src/screens/settings/installation/connectors-mcp-gateway";
+import { freshHostJob } from "../../src/screens/settings/installation/connectors/connectors-mcp-gateway";
 
 const job = (overrides: Partial<RuntimeGatewayRestartDto> = {}): RuntimeGatewayRestartDto => ({
   jobId: "job-1", status: "ok", step: "done", startedAt: "2026-10-24T18:00:00Z",

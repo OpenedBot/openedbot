@@ -5,8 +5,8 @@ import type { RuntimePublicDto } from "@openedbot/contracts-api";
 import { IconCloud, IconServer, IconServerBolt } from "@tabler/icons-react";
 import { TooltipProvider } from "@openedbot/browser-ui-kit";
 import { I18nProvider } from "../../../src/lib/i18n";
-import { displayedRuntimeHealth } from "../../../src/lib/runtime-health";
-import { useRuntimeHealth, type RuntimeHealthReading } from "../../../src/lib/use-runtime-health";
+import { displayedRuntimeHealth } from "../../../src/lib/runtime/runtime-health";
+import { useRuntimeHealth, type RuntimeHealthReading } from "../../../src/lib/runtime/use-runtime-health";
 import {
   RUNTIME_SETTINGS_PATH,
   RailRuntimeHealth,

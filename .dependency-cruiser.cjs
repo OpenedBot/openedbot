@@ -16,7 +16,7 @@
  * `apps/admin/vite.config.ts` importent `client-env` par chemin relatif, parce
  * qu'esbuild laisse externe un nom de paquet quand il charge une config Vite ;
  * `apps/api/tests/early-fanout-sse.test.ts` éprouve la dédup SSE du client
- * (`apps/console/src/lib/thread-stream-live.ts`) contre le fan-out de l'API.
+ * (`apps/console/src/lib/stream/thread-stream-live.ts`) contre le fan-out de l'API.
  */
 const TESTS = "(\\.test\\.tsx?$|/e2e/|/tests/)";
 
@@ -24,7 +24,7 @@ const TESTS = "(\\.test\\.tsx?$|/e2e/|/tests/)";
  * Les écrans pro de la console (open-core, étape 9) : agence, facturation,
  * règles de permission. Depuis l'étape 11 ils vivent tous dans le dépôt de
  * plug-ins externe (`packages/<plug-in>/console/`) et n'entrent dans un bundle
- * que par leur module console, listé dans `OHB_PRO_CONSOLE`. Les chemins
+ * que par leur module console, listé dans `OPENEDBOT_CONSOLE_PLUGINS`. Les chemins
  * ci-dessous n'existent plus dans le cœur : la règle garde contre leur retour.
  * La plomberie des espaces (sélecteur, onboarding, gardes de route) vit dans
  * `components/workspace/`.
@@ -48,7 +48,7 @@ module.exports = {
       name: "console-sans-ecrans-pro",
       comment:
         "Le code de la console n'importe aucun écran pro (agence, facturation, règles de permission) : ils n'entrent " +
-        "dans un bundle que par le `console/` de leur paquet (dépôt de plug-ins externe), listé dans `OHB_PRO_CONSOLE` (`vite-pro-console.ts`). Un import direct les remettrait dans " +
+        "dans un bundle que par le `console/` de leur paquet (dépôt de plug-ins externe), listé dans `OPENEDBOT_CONSOLE_PLUGINS` (`vite-pro-console.ts`). Un import direct les remettrait dans " +
         "le bundle solo (`make solo-check`). Les types seuls ne comptent pas (`src/pro-console/contract.ts`).",
       severity: "error",
       from: { path: "^apps/console/", pathNot: `${PRO_CONSOLE_SCREENS}|^apps/console/tests/` },
@@ -68,7 +68,7 @@ module.exports = {
       comment:
         "Le cœur n'importe jamais le backoffice ni aucun paquet pro (`@openedbot/pro-*`, plug-ins externes ; " +
         "`@openedbot/staff` avant l'étape 8) : ni ses routes, ni son mode assistance (port `ImpersonationSource` du " +
-        "contrat de plug-in), ni ses tables. L'API le charge par `OHB_PRO_PLUGINS` (`loadProPlugins`, import " +
+        "contrat de plug-in), ni ses tables. L'API le charge par `OPENEDBOT_PLUGINS` (`loadProPlugins`, import " +
         "dynamique), sans import statique. Plus aucune exception depuis le départ de `modules/staff`.",
       severity: "error",
       from: {},
@@ -263,10 +263,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    // apps/desktop and apps/notch are standalone clients imported
-    // into the monorepo with their own dependencies (not Bun workspaces of the
-    // core): their boundaries are not the core's.
-    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/(desktop|notch)/" },
+    // apps/desktop is a standalone client with its own dependencies (not a
+    // Bun workspace of the core): its boundaries are not the core's.
+    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop/" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {

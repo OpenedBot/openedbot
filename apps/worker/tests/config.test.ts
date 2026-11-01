@@ -8,7 +8,7 @@ const encryptionKey = Buffer.alloc(32, 7).toString("base64");
 
 function testEnvironment(overrides: Record<string, string> = {}): Record<string, string> {
   return {
-    OHB_ENV: "test",
+    OPENEDBOT_ENV: "test",
     RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey,
     ...overrides,
   };
@@ -18,7 +18,7 @@ function productionEnvironment(overrides: Record<string, string> = {}): Record<s
   const publicKey = Buffer.alloc(65);
   publicKey[0] = 4;
   return testEnvironment({
-    OHB_ENV: "production",
+    OPENEDBOT_ENV: "production",
     BLOB_DRIVER: "r2",
     R2_BUCKET: "private",
     R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
@@ -134,7 +134,7 @@ describe("transactional email transports", () => {
     const failure = (() => {
       try {
         readWorkerConfig(testEnvironment({
-          OHB_ENV: "production",
+          OPENEDBOT_ENV: "production",
           BLOB_DRIVER: "r2",
           R2_BUCKET: "private",
           R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
@@ -160,7 +160,7 @@ describe("web push VAPID", () => {
 
   test("production sans clés : refus au démarrage", () => {
     expect(() => readWorkerConfig(testEnvironment({
-      OHB_ENV: "production",
+      OPENEDBOT_ENV: "production",
       BLOB_DRIVER: "r2",
       R2_BUCKET: "private",
       R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",

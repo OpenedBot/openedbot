@@ -5,7 +5,7 @@ import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } fr
 import { I18nProvider } from "../../../src/lib/i18n";
 import { ProviderLimitsCard } from "../../../src/components/dashboard/provider-limits-card";
 import { queryKeys } from "../../../src/lib/api";
-import { openSecondaryReads } from "../../../src/lib/after-first-paint";
+import { openSecondaryReads } from "../../../src/lib/shell/after-first-paint";
 
 const realFetch = globalThis.fetch;
 let role = "owner";

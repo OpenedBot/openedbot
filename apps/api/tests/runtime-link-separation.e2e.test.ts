@@ -17,7 +17,7 @@ import { edgeSetupPath } from "../../../tests/edge-setup-dir";
 
 const runtimeId = "5f0f8a3a-1111-4222-8333-444455556666";
 const token = "separation-worker-fixture";
-const enabled = process.env.OHB_LINK_GATEWAY_E2E === "1";
+const enabled = process.env.OPENEDBOT_LINK_GATEWAY_E2E === "1";
 /** A device key as systemd would unseal it for the daemon: the Ed25519 seed, base64, under `$CREDENTIALS_DIRECTORY/device.key`. */
 async function testDeviceKey(): Promise<{ credentials: string; publicKey: string }> {
   const seed = randomBytes(32);
@@ -29,7 +29,7 @@ async function testDeviceKey(): Promise<{ credentials: string; publicKey: string
 
 (enabled ? test : test.skip)("worker HTTP/SSE survive two API process restarts; gateway loss stays ambiguous without replay", async () => {
   const events: string[] = [];
-  const config = readApiConfig({ OHB_ENV: "test", WORKER_INTERNAL_TOKEN: token, RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") });
+  const config = readApiConfig({ OPENEDBOT_ENV: "test", WORKER_INTERNAL_TOKEN: token, RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") });
   const tx = (async (sql: TemplateStringsArray, ...values: unknown[]) => {
     if (sql.join("").includes("from runtimes") && values.includes(hashCredential("continuity-test-token"))) {
       return [{ id: runtimeId, organizationId: "test-org", isCurrent: true }];
@@ -60,7 +60,7 @@ async function testDeviceKey(): Promise<{ credentials: string; publicKey: string
   } });
   const host = Bun.spawn(["go", "test", "-race", "./internal/connector", "-run", "^TestSeparatedGatewayE2EHost$", "-count=1", "-timeout=45s", "-v"], {
     cwd: edgeSetupPath("."),
-    env: { ...process.env, OHB_LINK_E2E_WS_URL: linkURL.replace("http:", "ws:") + RUNTIME_LINK_WS_PATH, OHB_LINK_E2E_CONTROL_URL: `http://127.0.0.1:${control.port}`, CREDENTIALS_DIRECTORY: device.credentials },
+    env: { ...process.env, OPENEDBOT_LINK_E2E_WS_URL: linkURL.replace("http:", "ws:") + RUNTIME_LINK_WS_PATH, OPENEDBOT_LINK_E2E_CONTROL_URL: `http://127.0.0.1:${control.port}`, CREDENTIALS_DIRECTORY: device.credentials },
     stdout: "inherit", stderr: "inherit",
   });
   let api: Bun.Subprocess | null = null;
@@ -71,7 +71,7 @@ async function testDeviceKey(): Promise<{ credentials: string; publicKey: string
   };
   const startApi = async (port = 0) => {
     api = Bun.spawn(["bun", new URL("../../../tests/e2e/runtime-link-api-fixture.ts", import.meta.url).pathname], {
-      env: { ...process.env, OHB_LINK_E2E_GATEWAY_URL: linkURL, OHB_LINK_E2E_API_PORT: String(port) }, stdout: "pipe", stderr: "inherit",
+      env: { ...process.env, OPENEDBOT_LINK_E2E_GATEWAY_URL: linkURL, OPENEDBOT_LINK_E2E_API_PORT: String(port) }, stdout: "pipe", stderr: "inherit",
     });
     const reader = (api.stdout as ReadableStream<Uint8Array>).getReader();
     let line = "";

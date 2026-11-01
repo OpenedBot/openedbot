@@ -6,7 +6,7 @@ import { capabilityView, RUNTIME_SIDE_STORES, type CapabilityToolsetView } from 
 import { runtimeToolsetNameIsContractForbidden } from "@openedbot/runtimes/domain/runtime-contract";
 import { Skeleton, Switch, cn, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, errorMessage, queryKeys } from "../lib/api";
-import { conversationPath } from "../lib/conversation-href";
+import { conversationPath } from "../lib/thread/conversation-href";
 import { useT } from "../lib/i18n";
 import { BUTTON } from "./settings/primitives";
 import { BotMcpCatalogSection, useBotMcpConnect } from "./bot-mcp-catalog";

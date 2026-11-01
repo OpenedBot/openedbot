@@ -11,13 +11,13 @@ import {
 } from "@tanstack/react-router";
 import type { OnboardingStateDto } from "@openedbot/contracts-api";
 import { I18nProvider, LOCALE_STORAGE_KEY } from "../../../src/lib/i18n";
-import { saveCloudSession, clearCloudSession } from "../../../src/lib/cloud-session";
+import { saveCloudSession, clearCloudSession } from "../../../src/lib/session/cloud-session";
 import {
   EMPTY_RUNTIME_DRAFT,
   ONBOARDING_DRAFT_KEY,
   readOnboardingDraft,
   writeOnboardingDraft,
-} from "../../../src/lib/onboarding-draft";
+} from "../../../src/lib/session/onboarding-draft";
 import { OnboardingFlow } from "../../../src/screens/onboarding/onboarding-flow";
 
 const realFetch = globalThis.fetch;

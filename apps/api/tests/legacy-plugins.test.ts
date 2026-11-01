@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { PLUGIN_API_VERSION, type ProPlugin } from "@openedbot/platform-plugins";
 import type { Db } from "@openedbot/platform-db";
 import { LEGACY_PLUGIN_SPECIFIERS, loadLegacyPlugins } from "../src/application/legacy-plugins";
-import { removedApiRoutes } from "../src/interfaces/http/removed-routes";
+import { removedApiRoutes } from "../src/routes/platform/removed-routes";
 import { impersonationSourceOf, proPluginContext, proPublicPathMatcher, proPublicRoutes } from "../src/application/pro-plugins";
 import { HttpError } from "../src/interfaces/http/http-error";
 
@@ -59,12 +59,12 @@ const fakeStaff: ProPlugin<Hono> = {
 };
 
 describe("legacy install", () => {
-  test("empty since step 8: the backoffice comes from an external plug-in through OHB_PRO_PLUGINS", async () => {
+  test("empty since step 8: the backoffice comes from an external plug-in through OPENEDBOT_PLUGINS", async () => {
     expect(LEGACY_PLUGIN_SPECIFIERS).toEqual([]);
     expect(await loadLegacyPlugins([])).toEqual([]);
   });
 
-  test("a plug-in already loaded by OHB_PRO_PLUGINS is not installed twice", async () => {
+  test("a plug-in already loaded by OPENEDBOT_PLUGINS is not installed twice", async () => {
     const loaded: ProPlugin = { manifest: { id: "staff", version: "2.0.0", pluginApi: PLUGIN_API_VERSION, entitlements: [] } };
     const superseded: unknown[] = [];
     const importer = async () => ({ default: fakeStaff });

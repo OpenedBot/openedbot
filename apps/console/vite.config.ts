@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 // paquet externes : Node échoue alors sur l'import sans extension du module
 // partagé. Le relatif embarque toute la chaîne dans la config.
 import { apiProxyTarget, clientPort, loadClientEnv } from "../../platform/config/src/client-env";
-import { DEVELOPMENT_APP_NAME, PRODUCTION_APP_NAME } from "./src/lib/app-name";
+import { DEVELOPMENT_APP_NAME, PRODUCTION_APP_NAME } from "./src/lib/shell/app-name";
 
 // Ni l'origine de l'API ni le port ne sont écrits ici : `API_PORT` et
 // `WEB_APP_URL` les portent déjà, et un littéral ne pourrait que diverger.
@@ -47,10 +47,10 @@ export default defineConfig(({ command, mode, isPreview }) => {
     // Au build : la CSP en tête de index.html (`vite-csp.ts`).
     contentSecurityPolicy(),
     // The pro screens (agency, billing, permission rules): only what
-    // `OHB_PRO_CONSOLE` lists; empty is the solo console (`vite-pro-console.ts`).
-    proConsole(proConsoleEntries(process.env.OHB_PRO_CONSOLE)),
+    // `OPENEDBOT_CONSOLE_PLUGINS` lists; empty is the solo console (`vite-pro-console.ts`).
+    proConsole(proConsoleEntries(process.env.OPENEDBOT_CONSOLE_PLUGINS)),
     // `make solo-check`: which source modules each chunk carries (`vite-module-report.ts`).
-    moduleReport(process.env.OHB_CONSOLE_MODULE_REPORT),
+    moduleReport(process.env.OPENEDBOT_CONSOLE_MODULE_REPORT),
     {
       name: "ohb-dev-app-name",
       transformIndexHtml(html) {

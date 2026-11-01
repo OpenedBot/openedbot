@@ -101,15 +101,15 @@ export type EnvPattern = {
   secret?: boolean;
 };
 
-/** Prefix shared by the plug-in variables; `OHB_PRO_PLUGINS` is the list itself. */
-export const PRO_PLUGIN_ENV_PREFIX = "OHB_PRO_";
+/** Prefix shared by the plug-in variables; `OPENEDBOT_PLUGINS` is the list itself. */
+export const PLUGIN_ENV_PREFIX = "OPENEDBOT_PLUGIN_";
 
 export const ENV_SCHEMA_PATTERNS: readonly EnvPattern[] = [
   // Plug-in variables the core itself documents, before the generic family
   // (first match wins). Still a pattern: a plug-in variable never enters a template.
   {
-    label: "OHB_PRO_AUDIT__RETENTION_DAYS",
-    pattern: /^OHB_PRO_AUDIT__RETENTION_DAYS$/,
+    label: "OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS",
+    pattern: /^OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS$/,
     scope: "worker",
     tier: "default_only",
     doc:
@@ -117,17 +117,17 @@ export const ENV_SCHEMA_PATTERNS: readonly EnvPattern[] = [
       "Unset: every row is archived with no end date, until the legal retention is decided. An invalid value fails the purge.",
   },
   {
-    label: "OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS",
-    pattern: /^OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS$/,
+    label: "OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS",
+    pattern: /^OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS$/,
     scope: "api",
     tier: "default_only",
     doc: "Plug-in `audit`: comma-separated organization ids granted `audit.anchor` (a failed external anchoring blocks their writes). Unset: none.",
   },
   {
-    label: "OHB_PRO_<ID>__<KEY>",
+    label: "OPENEDBOT_PLUGIN_<ID>__<KEY>",
     // <ID>: the plug-in id upper-cased, `-` as `_` (apps/api pluginConfigPrefix);
     // <KEY>: upper-case words joined by single `_`.
-    pattern: /^OHB_PRO_[A-Z][A-Z0-9_]{1,39}__[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
+    pattern: /^OPENEDBOT_PLUGIN_[A-Z][A-Z0-9_]{1,39}__[A-Z0-9]+(?:_[A-Z0-9]+)*$/,
     scope: "api",
     tier: "default_only",
     doc: "Configuration of one loaded plug-in; the plug-in receives <KEY> and nothing else of the environment.",
@@ -146,9 +146,9 @@ export function envSchemaEntry(name: string): EnvVar | undefined {
   return entry;
 }
 
-/** An `OHB_PRO_*` name that is neither the plug-in list nor a well-formed plug-in variable. */
+/** An `OPENEDBOT_PLUGIN_*` name that is neither the plug-in list nor a well-formed plug-in variable. */
 export function isMalformedPluginEnvName(name: string): boolean {
-  return name.startsWith(PRO_PLUGIN_ENV_PREFIX) && !envSchemaEntry(name);
+  return name.startsWith(PLUGIN_ENV_PREFIX) && !envSchemaEntry(name);
 }
 
 /**
@@ -185,8 +185,18 @@ export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
  *   supprimé du dépôt le 2026-10-27 ; aucune source ne les lit plus.
  * - `OHB_AGENCY_ENABLED` : remplacé par les features `agency_workspaces` et
  *   `connector_only_enrollment` dans PostgreSQL.
+ * - `OHB_RUNTIME_MODE` : le mode est toujours `external`
+ *   (platform/config/src/runtime-mode.ts) ; le profil de `make` se déduit de
+ *   DEV_HERMES_URL. Retiré lors du passage au préfixe OPENEDBOT_.
+ * - `OHB_RUNTIME_ADMIN_MODE` : aucun canal d'administration sortant n'existe
+ *   depuis OHB-15 (`runtimeAdminChannels` vaut toujours `{ local: false }`) ;
+ *   retiré, avec son contrôle de production, lors du passage à OPENEDBOT_.
  * - `OHB_MIGRATION_VERSION` : jamais lue par `scripts/db.sh --migrate` ni par
  *   aucune autre source.
+ * - `OHB_DATABASE_NAME`, `OHB_POSTGRES_PORT` (and their short-lived
+ *   `OPENEDBOT_` names) : le nom de la base et le port se lisent dans
+ *   API_DATABASE_URL (scripts/db.sh, dev-reset-data.ts, env-check), qui les
+ *   portait déjà ; une seconde copie ne pouvait que diverger.
  * - `REPLACE` : `make link-dev-up REPLACE=1` used to re-enroll an instance
  *   linked elsewhere. `edge-setup link` has no `--replace` any more and always
  *   replaces the link of the instance it targets (`scripts/lib/link-dev.ts`),
@@ -212,10 +222,16 @@ export const DEPRECATED_ENV_NAMES: readonly string[] = [
   "NEXT_PUBLIC_RUNTIME_DOCS_URL",
   "NEXT_PUBLIC_SITE_URL",
   "OHB_AGENCY_ENABLED",
+  "OHB_DATABASE_NAME",
   "OHB_GOOGLE_ALLOWED_EMAILS",
   "OHB_GOOGLE_CLIENT_ID",
   "OHB_GOOGLE_CLIENT_SECRET",
   "OHB_MIGRATION_VERSION",
+  "OHB_POSTGRES_PORT",
+  "OHB_RUNTIME_ADMIN_MODE",
+  "OHB_RUNTIME_MODE",
+  "OPENEDBOT_DATABASE_NAME",
+  "OPENEDBOT_POSTGRES_PORT",
   "REPLACE",
   "WEB_ORIGINS",
   "WEB_PUBLIC_URL",

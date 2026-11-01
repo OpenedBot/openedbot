@@ -16,8 +16,8 @@ import type {
   RuntimePublicDto,
 } from "@openedbot/contracts-api";
 import { I18nProvider, LOCALE_STORAGE_KEY } from "../../../src/lib/i18n";
-import { saveCloudSession, clearCloudSession } from "../../../src/lib/cloud-session";
-import { writeOnboardingDraft } from "../../../src/lib/onboarding-draft";
+import { saveCloudSession, clearCloudSession } from "../../../src/lib/session/cloud-session";
+import { writeOnboardingDraft } from "../../../src/lib/session/onboarding-draft";
 import { OnboardingFlow } from "../../../src/screens/onboarding/onboarding-flow";
 
 /**

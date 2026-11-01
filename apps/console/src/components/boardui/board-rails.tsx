@@ -10,17 +10,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { useSecondaryReadsReady } from "../../lib/after-first-paint";
-import { useOpenSettings } from "../../lib/settings-overlay";
-import { useSupportDeskAvailable } from "../../lib/support-desk-availability";
-import { useSupportUnread } from "../../lib/support-watch";
-import { useRuntimeHealth } from "../../lib/use-runtime-health";
+import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
+import { useOpenSettings } from "../../lib/shell/settings-overlay";
+import { useSupportDeskAvailable } from "../../lib/support/support-desk-availability";
+import { useSupportUnread } from "../../lib/support/support-watch";
+import { useRuntimeHealth } from "../../lib/runtime/use-runtime-health";
 import { SupportUnreadDot } from "../support/support-unread-dot";
 import { AccountMenu } from "./account-menu";
 import { RailRuntimeHealth } from "./rail-runtime-health";
 
 /**
- * Variante C (`lib/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
+ * Variante C (`lib/shell/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
  * d'OpenBot. Un rail d'icônes posé sur le fond du cadre : Accueil, À traiter
  * en haut ; l'état du runtime, Support, Réglages et le compte en bas.
  */

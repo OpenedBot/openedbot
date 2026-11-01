@@ -156,6 +156,9 @@ machine de développement : **jamais** sur le VPS et jamais devant
 # Voie courte, à la racine du dépôt openedbot-main : tunnel, ticket et lien d'une instance
 # nommée d'après le poste.
 make link-dev-up HOST=hermes-admin@203.0.113.10
+# Ou une fois par poste, dans Makefile.local à la racine du dépôt (jamais
+# versionné) : LINK_DEV_HOST=user@your-vm. `make link-dev-up` seul s'en sert
+# alors ; HOST= sur la ligne de commande l'emporte toujours.
 
 # Voie manuelle. Machine de développement, tunnel SSH inverse :
 ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:8790:127.0.0.1:8790 hermes-admin@203.0.113.10

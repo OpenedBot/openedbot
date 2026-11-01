@@ -9,7 +9,7 @@ import {
 } from "@openedbot/browser-face/artworks";
 import type { BotArtworkSpec } from "@openedbot/browser-face/artworks";
 import { resolveFace } from "@openedbot/browser-face/presets";
-import { useFaceMotion } from "../lib/face-motion";
+import { useFaceMotion } from "../lib/faces/face-motion";
 import { BloubBotFace } from "./bloub-bot";
 
 /**

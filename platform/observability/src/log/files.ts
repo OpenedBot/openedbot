@@ -7,22 +7,23 @@ const CHANNEL_SET = new Set<string>(LOG_CHANNELS);
 
 /**
  * Répertoire Monolog de l'API : `apps/api/var/logs`.
- * Surcharge : `OHB_LOG_DIR` (tests, autre disque).
+ * Surcharge : `OPENEDBOT_LOG_DIR` (tests, autre disque) ; `off` coupe les
+ * fichiers (logFilesEnabled), le journal reste sur stdout.
  *
  * Le chemin part de ce fichier (platform/observability/src/log) et remonte à
  * la racine du dépôt : le dossier par défaut reste celui de l'API, dans le
  * dépôt comme dans l'image, où les deux arbres sont copiés côte à côte.
  */
 export function logsDirectory(): string {
-  const override = process.env.OHB_LOG_DIR?.trim();
-  if (override) return override;
+  const override = process.env.OPENEDBOT_LOG_DIR?.trim();
+  if (override && override.toLowerCase() !== LOG_DIR_OFF) return override;
   return join(import.meta.dir, "../../../../apps/api/var/logs");
 }
 
 /**
  * Nom du fichier d'environnement, comme Symfony `dev.log` / `prod.log`.
  */
-export function logFileStem(env = process.env.OHB_ENV ?? process.env.NODE_ENV ?? "development"): string {
+export function logFileStem(env = process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV ?? "development"): string {
   if (env === "development") return "dev";
   if (env === "production") return "prod";
   const stem = env.replace(/[^a-z0-9_-]/gi, "");
@@ -117,8 +118,9 @@ export function tryCreateLogFileStream(options: LogFileStreamOptions): pino.Dest
   }
 }
 
+/** `OPENEDBOT_LOG_DIR=off`: no log file, stdout only. */
+export const LOG_DIR_OFF = "off";
+
 export function logFilesEnabled(): boolean {
-  if (process.env.OHB_LOG_TO_FILES === "0") return false;
-  if (process.env.OHB_LOG_TO_FILES === "1") return true;
-  return true;
+  return process.env.OPENEDBOT_LOG_DIR?.trim().toLowerCase() !== LOG_DIR_OFF;
 }

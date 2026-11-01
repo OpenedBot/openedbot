@@ -12,7 +12,7 @@ async function capture(command: string[]): Promise<string> {
 
 async function adminUrl(): Promise<URL> {
   if (process.env.INTEGRATION_ADMIN_DATABASE_URL) return new URL(process.env.INTEGRATION_ADMIN_DATABASE_URL);
-  const container = process.env.OHB_POSTGRES_CONTAINER ?? "infra-postgres";
+  const container = process.env.OPENEDBOT_POSTGRES_CONTAINER ?? "infra-postgres";
   const port = (await capture(["docker", "port", container, "5432/tcp"])).split("\n").find((line) => line.startsWith("127.0.0.1:") || line.startsWith("0.0.0.0:"))?.split(":").at(-1);
   if (!port || !/^\d+$/.test(port)) throw new Error("Existing PostgreSQL must expose a loopback port, or supply INTEGRATION_ADMIN_DATABASE_URL.");
   // Credentials are captured in memory only, never printed or passed in argv.

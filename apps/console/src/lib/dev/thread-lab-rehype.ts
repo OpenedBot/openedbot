@@ -4,9 +4,9 @@
  * `rehypeLabWords` ("Streaming Text", Transitions) wraps every word in a span.
  * React keeps the spans already in the DOM, so only a NEW word plays its
  * 350 ms blur-in (`thread-lab.css`). The tail + caret effect the console
- * shipped lives in `lib/stream-tail-rehype.ts`.
+ * shipped lives in `lib/stream/stream-tail-rehype.ts`.
  */
-import { isHastElement, isOpaqueHastElement, type HastNode, type HastRoot } from "../stream-tail-rehype";
+import { isHastElement, isOpaqueHastElement, type HastNode, type HastRoot } from "../stream/stream-tail-rehype";
 
 /** Splits text into words that keep their trailing whitespace: `join("")` gives the text back. */
 export function labWords(text: string): string[] {

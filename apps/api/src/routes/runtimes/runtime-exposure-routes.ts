@@ -330,7 +330,7 @@ async function readOptionalTailscaleCredentials(request: Request): Promise<Tails
  * token n'est produite, le bearer du gateway reste sa seule protection.
  *
  * Fermée par défaut : le parcours existe de bout en bout mais n'est ouvert que
- * si le déploiement pose `OHB_TAILSCALE_FUNNEL_ENABLED`.
+ * si le déploiement pose `OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`.
  */
 async function funnelDraft(body: Record<string, unknown>, config: ApiConfig, tailscale: TailscaleClientFactory): Promise<ExposureDraft> {
   if (!config.tailscaleFunnelEnabled) {

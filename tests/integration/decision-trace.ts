@@ -12,7 +12,7 @@
 import type { SQL } from "bun";
 import type { DecisionDto } from "@openedbot/contracts-api";
 import { appendDecisionTx } from "../../modules/execution/src/application/decision-journal";
-import { listDecisions } from "../../apps/api/src/interfaces/http/misc-routes";
+import { listDecisions } from "../../apps/api/src/routes/overview/misc-routes";
 import { withDisposablePostgres } from "./disposable-postgres";
 
 const id = (n: number) => `a2621100-0000-4000-8000-${String(n).padStart(12, "0")}`;

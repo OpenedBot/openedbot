@@ -1,4 +1,4 @@
-import { activeOrganizationId } from "../cloud-session";
+import { activeOrganizationId } from "../session/cloud-session";
 import type { BotUsageDto, DecisionDto, ModelUsageDto, OverviewDto, UsageDto } from "@openedbot/contracts-api";
 import { API_ORIGIN, request } from "./http";
 

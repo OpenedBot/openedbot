@@ -348,9 +348,10 @@ describe("manifest.env: deployment variables a plug-in declares (step 11.5)", ()
     }
   });
 
-  test("refuses an OHB_* name, a reserved core name and a duplicate", () => {
-    expect(invalidPluginReason(declaring([{ name: "OHB_PRO_PLUGINS" }]))).toBe('manifest.env "OHB_PRO_PLUGINS" is a core variable');
-    expect(invalidPluginReason(declaring([{ name: "OHB_BILLING_KEY" }]))).toBe('manifest.env "OHB_BILLING_KEY" is a core variable');
+  test("refuses an OPENEDBOT_* or legacy OHB_* name, a reserved core name and a duplicate", () => {
+    expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_PLUGINS" }]))).toBe('manifest.env "OPENEDBOT_PLUGINS" is a core variable');
+    expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_BILLING_KEY" }]))).toBe('manifest.env "OPENEDBOT_BILLING_KEY" is a core variable');
+    expect(invalidPluginReason(declaring([{ name: "OHB_BILLING_KEY" }]))).toBe('manifest.env "OHB_BILLING_KEY" is a core variable'); // rename:keep
     const reservedEnv = (name: string) => name === "API_DATABASE_URL";
     expect(invalidPluginReason(declaring([{ name: "API_DATABASE_URL" }]), { reservedEnv })).toBe('manifest.env "API_DATABASE_URL" is a core variable');
     expect(invalidPluginReason(declaring([{ name: "API_DATABASE_URL" }]))).toBeNull();
@@ -376,7 +377,7 @@ describe("manifest.env: deployment variables a plug-in declares (step 11.5)", ()
   });
 
   test("hookContext: env only for a plug-in that declares some", () => {
-    const env = { PAY_KEY: "k", OHB_PRO_BILLING__X: "y", OTHER: "o" };
+    const env = { PAY_KEY: "k", OPENEDBOT_PLUGIN_BILLING__X: "y", OTHER: "o" };
     expect(hookContext(plugin("billing"), env)).toEqual({ config: { X: "y" } });
     expect(hookContext("billing", env)).toEqual({ config: { X: "y" } });
     expect(hookContext(declaring([{ name: "PAY_KEY" }]), env)).toEqual({ config: { X: "y" }, env: { PAY_KEY: "k" } });

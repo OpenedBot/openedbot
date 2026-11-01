@@ -78,7 +78,7 @@ function apiLike(plugins: readonly ProPlugin[], caller: ProCaller | undefined, c
 const CALLER: ProCaller = { organizationId: "org-1", userId: "user-1", role: "owner" };
 
 describe("solo mode", () => {
-  test("an empty or unset OHB_PRO_PLUGINS loads nothing and logs « mode: solo »", async () => {
+  test("an empty or unset OPENEDBOT_PLUGINS loads nothing and logs « mode: solo »", async () => {
     for (const value of [undefined, "", "  ", " , "]) {
       const loaded = await loadApiProPlugins(value, { importer: () => { throw new Error("must not import"); } });
       expect(loaded.plugins).toEqual([]);
@@ -224,27 +224,27 @@ describe("hooks", () => {
 
 describe("plug-in context", () => {
   const ENV = {
-    OHB_PRO_FIXTURE__API_KEY: "k1",
-    OHB_PRO_FIXTURE__WEBHOOK_SECRET: "s1",
-    OHB_PRO_FIXTURE_LEGACY: "no double underscore",
-    OHB_PRO_FIXTURE__BAD__KEY: "nested",
-    OHB_PRO_OTHER__API_KEY: "other plug-in",
-    OHB_PRO_PLUGINS: "@openedbot/pro-fixture",
+    OPENEDBOT_PLUGIN_FIXTURE__API_KEY: "k1",
+    OPENEDBOT_PLUGIN_FIXTURE__WEBHOOK_SECRET: "s1",
+    OPENEDBOT_PLUGIN_FIXTURE_LEGACY: "no double underscore",
+    OPENEDBOT_PLUGIN_FIXTURE__BAD__KEY: "nested",
+    OPENEDBOT_PLUGIN_OTHER__API_KEY: "other plug-in",
+    OPENEDBOT_PLUGINS: "@openedbot/pro-fixture",
     API_DATABASE_URL: "postgres://core-only",
     STRIPE_SECRET_KEY: "core-only",
-    OHB_PRO_FIXTURE__EMPTY: undefined,
+    OPENEDBOT_PLUGIN_FIXTURE__EMPTY: undefined,
   };
 
-  test("config holds only the plug-in's own OHB_PRO_<ID>__<KEY> variables, keyed by <KEY>", () => {
-    expect(pluginConfigPrefix("fixture")).toBe("OHB_PRO_FIXTURE__");
-    expect(pluginConfigPrefix("audit-log")).toBe("OHB_PRO_AUDIT_LOG__");
+  test("config holds only the plug-in's own OPENEDBOT_PLUGIN_<ID>__<KEY> variables, keyed by <KEY>", () => {
+    expect(pluginConfigPrefix("fixture")).toBe("OPENEDBOT_PLUGIN_FIXTURE__");
+    expect(pluginConfigPrefix("audit-log")).toBe("OPENEDBOT_PLUGIN_AUDIT_LOG__");
     expect(pluginConfig("fixture", ENV)).toEqual({ API_KEY: "k1", WEBHOOK_SECRET: "s1" });
     expect(Object.isFrozen(pluginConfig("fixture", ENV))).toBe(true);
     expect(pluginConfig("nothing", ENV)).toEqual({});
   });
 
   test("a plug-in never reads the variables of an id that extends its own", () => {
-    const env = { "OHB_PRO_A__B__TOKEN": "belongs to a--b", OHB_PRO_A__TOKEN: "belongs to a" };
+    const env = { "OPENEDBOT_PLUGIN_A__B__TOKEN": "belongs to a--b", OPENEDBOT_PLUGIN_A__TOKEN: "belongs to a" };
     expect(pluginConfig("a", env)).toEqual({ TOKEN: "belongs to a" });
     expect(pluginConfig("a--b", env)).toEqual({ TOKEN: "belongs to a--b" });
   });
@@ -363,8 +363,8 @@ describe("onOrganizationCreating (step 8d), wired like apps/api/src/index.ts", (
   test("the plug-in billing's hook gets the creation transaction, the event and only its own configuration", async () => {
     const seen: unknown[] = [];
     const hook = organizationCreatingHookOf([fixturePlugin(), billing(async (tx, event, context) => { seen.push([tx, event, context]); })], {
-      OHB_PRO_BILLING__PLAN: "solo",
-      OHB_PRO_FIXTURE__KEY: "nope",
+      OPENEDBOT_PLUGIN_BILLING__PLAN: "solo",
+      OPENEDBOT_PLUGIN_FIXTURE__KEY: "nope",
       STRIPE_SECRET_KEY: "nope",
     });
     const event = { organizationId: "org-1", kind: "personal", billingEnforced: true, environment: "production" } as const;
@@ -422,7 +422,7 @@ describe("plug-in audit (étape 5) : export de preuve sous /api/pro/audit", () =
 
   test("avec l'entitlement (accordé par la config du plug-in, par organisation) : le routeur répond", async () => {
     const plugins = [auditFixture()];
-    const env = { OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS: "org-0, org-1", OHB_PRO_OTHER__ANCHOR_ORGANIZATIONS: "org-2" };
+    const env = { OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS: "org-0, org-1", OPENEDBOT_PLUGIN_OTHER__ANCHOR_ORGANIZATIONS: "org-2" };
     const { app } = apiLike(plugins, CALLER, hookEntitlementCheck(plugins, undefined, env));
     const response = await app.request("/api/pro/audit/proof?runtimeId=rt-1");
     expect(response.status).toBe(200);

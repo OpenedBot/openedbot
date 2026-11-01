@@ -1,6 +1,6 @@
 import { RiListCheck3 } from "@remixicon/react";
 import { Button } from "@openedbot/browser-ui-kit";
-import type { PlanDraft } from "../lib/plan-draft";
+import type { PlanDraft } from "../lib/composer/plan-draft";
 import { useT } from "../lib/i18n";
 
 const actionClass = "min-h-11 min-w-11 flex-[1_1_9rem] px-3 fine:h-8 fine:min-h-8 fine:w-auto fine:min-w-0 fine:flex-none";

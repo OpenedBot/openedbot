@@ -16,7 +16,7 @@ import {
   type ToolGroupStatus,
 } from "@openedbot/conversation/domain/thread-tools";
 import { useT } from "../lib/i18n";
-import { usePrefersReducedMotion } from "../lib/use-reduced-motion";
+import { usePrefersReducedMotion } from "../lib/platform/use-reduced-motion";
 import { ActivityDisclosure } from "./activity-disclosure";
 import { SearchSources } from "./thread-search-sources";
 import { partialFailureLabel } from "./thread-tool-labels";

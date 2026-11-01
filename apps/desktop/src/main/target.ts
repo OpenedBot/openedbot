@@ -3,7 +3,7 @@
 //
 // A target names the API backend (the native sign-in and every API call). It
 // also carries a default console, which each source can still override on its
-// own (OHB_CONSOLE_URL): a non-production API usually serves the API only, so
+// own (OPENEDBOT_CONSOLE_URL): a non-production API usually serves the API only, so
 // its console is the Vite server the developer runs locally.
 
 /**
@@ -14,14 +14,14 @@ export const PRODUCTION_CONSOLE_URL = "https://console.openedbot.app";
 /**
  * The production console before 2026-10-29, still trusted as a console origin
  * alongside the default (trustedConsoleOrigins): a config.json, defaults.json or
- * OHB_CONSOLE_URL may still name it, and the apex keeps serving the console to
+ * OPENEDBOT_CONSOLE_URL may still name it, and the apex keeps serving the console to
  * the desktop shell, then 308s its app paths to `console.`, during the apex
  * transition. Remove it with the site's desktop and app-path redirects.
  */
 export const LEGACY_PRODUCTION_CONSOLE_URL = "https://openedbot.app";
 /**
  * The production API for native clients, the built-in default: /api/* only
- * (../.. `OHB_API_HOSTS`, since 2026-10-17). The console itself keeps /api
+ * (../.. `OPENEDBOT_API_HOSTS`, since 2026-10-17). The console itself keeps /api
  * on its own name, which also stays served for builds that predate this host.
  */
 export const PRODUCTION_API_ORIGIN = "https://api.openedbot.app";
@@ -99,10 +99,10 @@ export function tokensFileName(apiOrigin: string): string {
  * backend gets its own folder, so a dev session never meets another one.
  */
 export function devUserDataName(env: Record<string, string | undefined>): string {
-  let apiOrigin = env.OHB_API_ORIGIN?.trim().replace(/\/+$/, "");
+  let apiOrigin = env.OPENEDBOT_API_ORIGIN?.trim().replace(/\/+$/, "");
   if (!apiOrigin) {
     try {
-      apiOrigin = resolveTarget(env.OHB_TARGET, "OHB_TARGET")?.apiOrigin;
+      apiOrigin = resolveTarget(env.OPENEDBOT_TARGET, "OPENEDBOT_TARGET")?.apiOrigin;
     } catch {
       // getConfig() reports the invalid value with a dialog; here, any name will do.
     }

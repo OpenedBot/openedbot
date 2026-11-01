@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { HermesClientError, type HermesApprovalPolicyState, type HermesHostProfile, type HermesToolset } from "@openedbot/hermes";
 import { prepareReviewProfile, type ReviewProfileDeps } from "../src/application/review-profile";
 import { reviewProfileRetrySeconds } from "../src/sql/review-profiles";
-import { OHB_SERVICE_PROFILES, REVIEW_PROFILE } from "../src/domain/runtime-contract";
+import { OPENEDBOT_SERVICE_PROFILES, REVIEW_PROFILE } from "../src/domain/runtime-contract";
 
 type HostState = {
   exists: boolean;
@@ -159,7 +159,7 @@ describe("PERM2-7a review profile", () => {
   });
 
   test("the review profile is a service profile", () => {
-    expect(OHB_SERVICE_PROFILES.has(REVIEW_PROFILE)).toBe(true);
-    expect(OHB_SERVICE_PROFILES.has("ohb-model-check")).toBe(true);
+    expect(OPENEDBOT_SERVICE_PROFILES.has(REVIEW_PROFILE)).toBe(true);
+    expect(OPENEDBOT_SERVICE_PROFILES.has("ohb-model-check")).toBe(true);
   });
 });

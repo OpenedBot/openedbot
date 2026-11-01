@@ -4,7 +4,7 @@ import { INVITABLE_ROLES, type InvitableRole, type OrganizationMemberInvitationD
 import { Dialog, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import { isEmailSyntaxValid, normalizeEmail } from "@openedbot/identity/domain/email-address";
 import { ApiError, api, errorMessage, queryKeys } from "../../lib/api";
-import { activeOrganizationId } from "../../lib/cloud-session";
+import { activeOrganizationId } from "../../lib/session/cloud-session";
 import { useT } from "../../lib/i18n";
 import { BUTTON, ListRow, ListSection, Note, ToneBadge } from "./primitives";
 

@@ -22,7 +22,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-container="${OHB_POSTGRES_CONTAINER:-infra-postgres}"
+container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
 database="ohb_load"
 tier="${LOAD_SESSIONS:-200}"
 api_port="${LOAD_API_PORT:-18790}"
@@ -105,7 +105,7 @@ FAKE_HERMES_STREAM_INTERVAL_MS=100 \
 pids+=("$!")
 watched="fake-hermes:$!"
 
-OHB_ENV=test API_PORT="$api_port" API_TRUST_PROXY=1 API_IDLE_TIMEOUT="${LOAD_API_IDLE_TIMEOUT:-30}" API_DB_MAX="${LOAD_API_DB_MAX:-16}" \
+OPENEDBOT_ENV=test API_PORT="$api_port" API_TRUST_PROXY=1 API_IDLE_TIMEOUT="${LOAD_API_IDLE_TIMEOUT:-30}" API_DB_MAX="${LOAD_API_DB_MAX:-16}" \
 API_DATABASE_URL="$api_url" RUNTIME_TOKEN_ENCRYPTION_KEY="$encryption_key" \
 WORKER_INTERNAL_TOKEN="$worker_token" METRICS_INTERNAL_TOKEN="$metrics_token" \
 BLOB_DRIVER=file BLOB_FILE_ROOT="$temp_dir/blobs" TEST_HERMES_URL="$fake_url" \
@@ -115,7 +115,7 @@ api_pid="${pids[-1]}"
 watched="$watched,api:$api_pid"
 
 for worker in $(seq 1 "${LOAD_WORKERS:-2}"); do
-  OHB_ENV=test WORKER_ID="load-worker-$worker" WORKER_DATABASE_URL="$worker_url" \
+  OPENEDBOT_ENV=test WORKER_ID="load-worker-$worker" WORKER_DATABASE_URL="$worker_url" \
   RUNTIME_TOKEN_ENCRYPTION_KEY="$encryption_key" WORKER_INTERNAL_TOKEN="$worker_token" \
   API_INTERNAL_URL="http://127.0.0.1:$api_port" BLOB_DRIVER=file BLOB_FILE_ROOT="$temp_dir/blobs" \
   WORKER_DB_MAX="${LOAD_WORKER_DB_MAX:-16}" WORKER_MAX_ACTIVE_RUNS="${LOAD_WORKER_MAX_ACTIVE_RUNS:-}" \

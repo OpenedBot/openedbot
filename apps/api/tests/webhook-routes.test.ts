@@ -10,13 +10,13 @@ import {
   canonicalWebhookRequestHash,
   readWebhookIdempotencyKey,
   webhookIngressRoutes,
-} from "../src/interfaces/http/webhook-ingress-routes";
-import { webhookManagementRoutes } from "../src/interfaces/http/webhook-management-routes";
+} from "../src/routes/webhooks/webhook-ingress-routes";
+import { webhookManagementRoutes } from "../src/routes/webhooks/webhook-management-routes";
 import {
   createWebhookSecret,
   hashWebhookSecret,
   webhookSecretMatches,
-} from "../src/interfaces/http/webhooks/shared";
+} from "../src/routes/webhooks/shared";
 import { tableSubscriptionPort } from "./fixtures/table-subscription-port";
 import { installSubscriptionPort } from "@openedbot/platform-db/subscription-port";
 

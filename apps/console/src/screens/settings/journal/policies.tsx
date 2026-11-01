@@ -15,7 +15,7 @@ import {
 import { InsetGroupedRow, InsetGroupedSection, InsetGroupedStatic } from "../../../components/mobile/inset-grouped";
 import { FleetA2APolicySettings, OrganizationPermissionRulesSettings } from "../../../pro-console/slots";
 import { OrganizationPermissionPolicySettings } from "../../../components/settings/organization-permission-policy";
-import { useSettingsModal } from "../../../lib/settings-modal-context";
+import { useSettingsModal } from "../../../lib/shell/settings-modal-context";
 import { SettingsPane } from "../pane";
 
 /**
@@ -26,7 +26,7 @@ import { SettingsPane } from "../pane";
  * d’agence avec mandat actif et utilisent les opérations nommées de son runtime.
  *
  * Chaque phrase affichée doit rester vraie dans le code : plus de canal SSH
- * sortant depuis OHB-15 (`RuntimeAdminRequest = "disabled" | "local"`), les
+ * sortant depuis OHB-15 (`runtimeAdminChannels` vaut `{ local: false }`), les
  * secrets fournisseurs partent sur le canal HTTPS authentifié, l’API refuse
  * les origines HTTP non déclarées et les autorisations `session` / `always`.
  * Sur mobile, ces phrases se lisent en entier (`multiline`), jamais tronquées.

@@ -5,17 +5,17 @@ import { splitAskUser } from "@openedbot/roster/domain/ask-user";
 import { ROOM_LIMITS } from "@openedbot/roster/domain/bot-mode";
 import { useT, type MessageKey } from "../lib/i18n";
 import { normalizeChoice } from "../lib/format";
-import { markdownToSpeechText } from "../lib/speech-text";
+import { markdownToSpeechText } from "../lib/voice/speech-text";
 import {
   createBrowserVoiceRecognitionAdapter,
   mergeVoiceTranscript,
   type VoiceRecognitionAdapter,
-} from "../lib/web-voice-recognition";
+} from "../lib/voice/web-voice-recognition";
 import {
   createBrowserSpeechSynthesisAdapter,
   readSpeechOutputSettings,
   type SpeechSynthesisAdapter,
-} from "../lib/web-speech-synthesis";
+} from "../lib/voice/web-speech-synthesis";
 import { SpeechOutputSettings } from "./speech-output-settings";
 import { BUTTON } from "./settings/primitives";
 

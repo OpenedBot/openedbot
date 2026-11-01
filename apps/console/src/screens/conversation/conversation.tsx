@@ -1,41 +1,41 @@
 import { isRestoredQueryData } from "../../lib/query-persister";
-import { useWorkspaceTextDraft, useWorkspaceAttachmentDraft } from "../../lib/workspace-draft";
-import { usePublishRunInProgress } from "../../lib/run-in-progress";
+import { useWorkspaceTextDraft, useWorkspaceAttachmentDraft } from "../../lib/workspace/workspace-draft";
+import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { botAccentColor, botBubbleColor, tintTextColor } from "../../lib/bot-tint";
-import { useBotAccentMode } from "../../lib/bot-accent-preference";
+import { botAccentColor, botBubbleColor, tintTextColor } from "../../lib/bots/bot-tint";
+import { useBotAccentMode } from "../../lib/bots/bot-accent-preference";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
 import type { MentionableBot } from "@openedbot/roster/domain/mentions";
 import type { CreateMessageVersionInput, MessageVersionLinkDto } from "@openedbot/contracts-api";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { conversationHref } from "../../lib/conversation-href";
+import { conversationHref } from "../../lib/thread/conversation-href";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconSettings, IconShieldLock, IconX } from "@tabler/icons-react";
 import { Folder } from "lucide-react";
 import { AgentThinking, Button, Dialog, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, userFacingError, runtimesQueryOptions } from "../../lib/api";
-import { applySendAcceptedToCaches } from "../../lib/apply-send-accepted";
-import { useThreadMessageSend } from "../../lib/use-thread-message-send";
+import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
+import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
 import { randomId } from "../../lib/random-id";
-import { displayedRuntimeHealth, runtimeBlocksConversation } from "../../lib/runtime-health";
+import { displayedRuntimeHealth, runtimeBlocksConversation } from "../../lib/runtime/runtime-health";
 import {
   threadContainsOutgoingUserInput,
-} from "../../lib/thread-anchor";
-import { useThreadStream } from "../../lib/use-thread-stream";
-import { useConnectedMcpPlugins } from "../../lib/use-mcp-plugins";
-import { rememberBotThread } from "../../lib/conversation-prefetch";
+} from "../../lib/thread/thread-anchor";
+import { useThreadStream } from "../../lib/stream/use-thread-stream";
+import { useConnectedMcpPlugins } from "../../lib/runtime/use-mcp-plugins";
+import { rememberBotThread } from "../../lib/thread/conversation-prefetch";
 import { BotFace } from "../../components/bot-face";
-import { useBotDialogs } from "../../lib/bot-dialogs";
-import { settledBotModelSaves } from "../../lib/bot-model-saves";
+import { useBotDialogs } from "../../lib/bots/bot-dialogs";
+import { settledBotModelSaves } from "../../lib/bots/bot-model-saves";
 import { Composer } from "../../components/composer";
 import { ConversationAvailability } from "../../components/conversation-availability";
-import { useRunFailureAtOpen } from "../../lib/run-failure-at-open";
+import { useRunFailureAtOpen } from "../../lib/run/run-failure-at-open";
 import { RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
 import { BotProfileRepair, useBotProfileStatus } from "../../components/bot-profile-repair";
 import { ThreadTimeline } from "../../components/thread-timeline";
 import { ThreadTurnRail } from "../../components/thread-turn-rail";
-import { buildThreadRailTurns } from "../../lib/thread-turn-rail";
+import { buildThreadRailTurns } from "../../lib/thread/thread-turn-rail";
 import { WorkflowOverview } from "../../components/workflow-overview";
 import { ThreadContextTab } from "../../components/thread-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
@@ -43,35 +43,35 @@ import { ThreadModelPicker } from "../../components/composer-model-picker";
 import { VoiceDictation } from "../../components/voice-dictation";
 import { assistantVoiceResponses, VoiceCall } from "../../components/voice-call";
 import { SiteHeader } from "../../components/dashboard/site-header";
-import { useOpenSettings } from "../../lib/settings-overlay";
+import { useOpenSettings } from "../../lib/shell/settings-overlay";
 import { ConversationHeader } from "../../components/boardui/conversation-header";
-import { useAgentEditor } from "../../lib/agent-editor";
-import { useThreadGoal, withThreadGoal } from "../../lib/thread-goal";
+import { useAgentEditor } from "../../lib/bots/agent-editor";
+import { useThreadGoal, withThreadGoal } from "../../lib/thread/thread-goal";
 import { PermissionModeBadge } from "../../components/boardui/permission-picker";
 import { GoalDialog } from "../../components/boardui/goal-dialog";
 import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
-import { useDismissedAskUserRuns } from "../../lib/ask-user-dismissals";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import {
   prepareMessageSubmission,
   type IdempotentMessageSubmission,
 } from "@openedbot/conversation/domain/message-submission";
 import { useT } from "../../lib/i18n";
-import { readableRunFailure, runFailureExplainedInThread } from "../../lib/model-unavailable";
-import { runProviderAuthLabel } from "../../lib/provider-auth";
-import { latestRunFallback, sameRunFallback } from "../../lib/run-fallback";
-import { currentThreadRun } from "../../lib/current-thread-run";
-import { useMarkThreadRead } from "../../lib/use-mark-thread-read";
-import { useThreadFind } from "../../lib/use-thread-find";
-import { useSecondaryReadsReady } from "../../lib/after-first-paint";
-import { mergeVoiceTranscript } from "../../lib/web-voice-recognition";
+import { readableRunFailure, runFailureExplainedInThread } from "../../lib/run/model-unavailable";
+import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
+import { latestRunFallback, sameRunFallback } from "../../lib/run/run-fallback";
+import { currentThreadRun } from "../../lib/thread/current-thread-run";
+import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
+import { useThreadFind } from "../../lib/thread/use-thread-find";
+import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
+import { mergeVoiceTranscript } from "../../lib/voice/web-voice-recognition";
 import { ChromeIconButton } from "../../components/mobile/mobile-header";
-import { SHOW_FEATURE_LAB } from "../../lib/dev-approval-probe";
-import { isStandaloneDisplay } from "../../lib/pwa-display";
+import { SHOW_FEATURE_LAB } from "../../lib/thread/dev-approval-probe";
+import { isStandaloneDisplay } from "../../lib/platform/pwa-display";
 import { FeatureLabDialog } from "../../components/feature-lab-dialog";
 import { PendingApprovalDock } from "../../components/gate-card";
-import { liveApprovals } from "../../lib/live-approvals";
+import { liveApprovals } from "../../lib/run/live-approvals";
 import { PendingPlanDock } from "../../components/plan-card";
 import {
   PLAN_PREVIEW_EVENT,
@@ -86,10 +86,10 @@ import {
   usePlanFirst,
   writePlanTurn,
   type PlanTurn,
-} from "../../lib/plan-draft";
+} from "../../lib/composer/plan-draft";
 import { RunActivityDock } from "../../components/run-activity-dock";
 import { DevRenderProfiler } from "../../components/dev/dev-render-profiler";
-import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/use-content-stable";
+import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/hooks/use-content-stable";
 import { BUTTON } from "../../components/settings/primitives";
 
 export function ConversationScreen() {
@@ -181,7 +181,7 @@ export function ConversationScreen() {
   const activeThreadId = requestedTaskId ?? bot?.threadId;
   shownThreadIdRef.current = activeThreadId ?? null;
   // The route loader starts this thread on the next refresh without waiting
-  // for the roster (`lib/conversation-prefetch.ts`).
+  // for the roster (`lib/thread/conversation-prefetch.ts`).
   useEffect(() => {
     if (bot?.id && bot.threadId) rememberBotThread(bot.id, bot.threadId);
   }, [bot?.id, bot?.threadId]);

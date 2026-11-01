@@ -339,7 +339,7 @@ func (p approvalPolicyService) enablePlugin(ctx context.Context, slug string) (s
 	}
 	cmd := p.python("-")
 	cmd.Stdin = append(program, '\n')
-	cmd.Env = append(cmd.Env, "OHB_APPROVAL_PROFILE="+slug, "OHB_APPROVAL_ROOT="+p.runtimeRoot, "OHB_APPROVAL_ENABLE=1", "OHB_APPROVAL_RELOAD=1")
+	cmd.Env = append(cmd.Env, "OPENEDBOT_APPROVAL_PROFILE="+slug, "OPENEDBOT_APPROVAL_ROOT="+p.runtimeRoot, "OPENEDBOT_APPROVAL_ENABLE=1", "OPENEDBOT_APPROVAL_RELOAD=1")
 	result, err := exec.Must(ctx, p.runner, cmd)
 	if err != nil {
 		return "", errors.New("approval policy profile configuration could not be updated")
@@ -430,7 +430,7 @@ func (p approvalPolicyService) pluginEnabled(ctx context.Context, slug string) (
 		return false, errors.New("approval policy profile configuration is unsafe")
 	}
 	cmd.Stdin = append(program, '\n')
-	cmd.Env = append(cmd.Env, "OHB_APPROVAL_PROFILE="+slug, "OHB_APPROVAL_ROOT="+p.runtimeRoot)
+	cmd.Env = append(cmd.Env, "OPENEDBOT_APPROVAL_PROFILE="+slug, "OPENEDBOT_APPROVAL_ROOT="+p.runtimeRoot)
 	result, err := exec.Must(ctx, p.runner, cmd)
 	if err != nil {
 		return false, err

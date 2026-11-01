@@ -9,7 +9,7 @@
 // cross the OS hit test, so a click swallowed by a native drag region
 // (`app-region: drag`) still lands here. Use a real mouse for that class of bug.
 
-const port = process.env.OHB_REMOTE_DEBUGGING_PORT ?? "9333";
+const port = process.env.OPENEDBOT_REMOTE_DEBUGGING_PORT ?? "9333";
 const [command, arg] = process.argv.slice(2);
 
 type Target = { type: string; url: string; webSocketDebuggerUrl: string };

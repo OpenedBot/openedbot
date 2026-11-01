@@ -1,12 +1,12 @@
 /**
- * A plug-in's configuration: only its own `OHB_PRO_<ID>__<KEY>` variables,
+ * A plug-in's configuration: only its own `OPENEDBOT_PLUGIN_<ID>__<KEY>` variables,
  * indexed by KEY. Shared by the API (mount context) and the worker (hooks).
  */
 import type { HookContext, PluginEnvVariable, ProPlugin } from "./contract";
 
-/** `OHB_PRO_<ID>__`: the id upper-cased, `-` as `_`, then a double underscore. */
+/** `OPENEDBOT_PLUGIN_<ID>__`: the id upper-cased, `-` as `_`, then a double underscore. */
 export function pluginConfigPrefix(pluginId: string): string {
-  return `OHB_PRO_${pluginId.toUpperCase().replaceAll("-", "_")}__`;
+  return `OPENEDBOT_PLUGIN_${pluginId.toUpperCase().replaceAll("-", "_")}__`;
 }
 
 const PLUGIN_CONFIG_KEY_RE = /^[A-Z0-9]+(?:_[A-Z0-9]+)*$/;
@@ -44,7 +44,7 @@ export function pluginDeployEnv(
 }
 
 /**
- * The context every hook of a plug-in receives: its `OHB_PRO_<ID>__<KEY>`
+ * The context every hook of a plug-in receives: its `OPENEDBOT_PLUGIN_<ID>__<KEY>`
  * configuration and, when its manifest declares some, its deployment
  * variables. A bare id (no manifest) gets the configuration only.
  */

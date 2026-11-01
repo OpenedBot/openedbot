@@ -5,6 +5,7 @@ package-lock.json
 # Build outputs
 dist/
 release/
+popup-bundle/
 *.tsbuildinfo
 
 # Local secrets and overrides

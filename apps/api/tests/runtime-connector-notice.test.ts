@@ -7,7 +7,7 @@ import { createRuntimeLinkGateway, type LinkSocketData } from "../src/routes/run
 
 const THRESHOLDS = { RUNTIME_CONNECTOR_MIN_VERSION: "v0.5.7", RUNTIME_CONNECTOR_LATEST_VERSION: "v0.5.7" };
 const config = () => readApiConfig({
-  OHB_ENV: "test",
+  OPENEDBOT_ENV: "test",
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   WEB_APP_URL: "https://console.example.test",
   ...THRESHOLDS,

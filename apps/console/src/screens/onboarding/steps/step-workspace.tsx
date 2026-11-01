@@ -13,11 +13,11 @@ import {
   ObInput,
 } from "@openedbot/browser-ui-kit/components/onboarding";
 import { ApiError, api, errorMessage, queryKeys } from "../../../lib/api";
-import { activeOrganizationId, readCloudSession, saveCloudSession } from "../../../lib/cloud-session";
-import { fleetHomeHref } from "../../../lib/workspace-location";
+import { activeOrganizationId, readCloudSession, saveCloudSession } from "../../../lib/session/cloud-session";
+import { fleetHomeHref } from "../../../lib/workspace/workspace-location";
 import { useAccountWorkspaces } from "../../../components/workspace/workspace-navigation";
 import { useT } from "../../../lib/i18n";
-import { writeOnboardingDraft } from "../../../lib/onboarding-draft";
+import { writeOnboardingDraft } from "../../../lib/session/onboarding-draft";
 import { RadioMark } from "../components/option-card";
 import { StepFooter, StepHeading } from "../components/step-shell";
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@openedbot/browser-ui-kit";
 import { useT } from "../lib/i18n";
-import { formatSeconds, type RunTiming } from "../lib/run-timing";
+import { formatSeconds, type RunTiming } from "../lib/run/run-timing";
 
 /**
  * La durée réelle d'une réponse, sous sa bulle, à la place du visage et du nom

@@ -21,11 +21,11 @@ import {
   useIsMobile,
 } from "@openedbot/browser-ui-kit";
 import { ApiError, api, errorMessage, queryKeys } from "../../../lib/api";
-import { activeOrganizationId } from "../../../lib/cloud-session";
+import { activeOrganizationId } from "../../../lib/session/cloud-session";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
-import { isNativeShell } from "../../../lib/native-bridge";
-import { signOut } from "../../../lib/sign-out";
+import { isNativeShell } from "../../../lib/platform/native-bridge";
+import { signOut } from "../../../lib/session/sign-out";
 import {
   ACTIONS,
   BUTTON,

@@ -1,3 +1,4 @@
+import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,9 +16,9 @@ export function generateDevPassword(): string {
   return randomBytes(24).toString("base64url");
 }
 
-/** The env file `make` loaded: OHB_ENV_FILE when set, else the repository's .env.local. */
+/** The env file `make` loaded: ENV_FILE when set, else the repository's .env.local. */
 export function devEnvFilePath(env: Record<string, string | undefined>, repoRoot: string): string {
-  return resolve(repoRoot, env.OHB_ENV_FILE?.trim() || ".env.local");
+  return resolve(repoRoot, env.ENV_FILE?.trim() || ".env.local");
 }
 
 /** Sets NAME=value in an env-file body, replacing an existing (even empty) line. */

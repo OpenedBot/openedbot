@@ -1,7 +1,7 @@
 import { useRef, type ReactNode } from "react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { useScrollFade } from "@openedbot/browser-ui-kit/components/onboarding";
-import type { OnboardingStep } from "@/lib/onboarding";
+import type { OnboardingStep } from "@/lib/session/onboarding";
 import { StepProgressBar, StepSidebar } from "./step-sidebar";
 
 /**

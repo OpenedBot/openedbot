@@ -9,8 +9,8 @@ import {
 } from "@tanstack/react-router";
 import type { BotDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../../src/lib/i18n";
-import { useAgentEditor } from "../../../src/lib/agent-editor";
-import { useBotDialogs, type BotManagePage } from "../../../src/lib/bot-dialogs";
+import { useAgentEditor } from "../../../src/lib/bots/agent-editor";
+import { useBotDialogs, type BotManagePage } from "../../../src/lib/bots/bot-dialogs";
 import { BotDialogsHost } from "../../../src/components/bot-manage/bot-dialogs-host";
 import {
   BotManageDialog,

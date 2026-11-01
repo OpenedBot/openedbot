@@ -10,7 +10,7 @@ import {
   type SpeechOutputSettings as Settings,
   type SpeechSynthesisAdapter,
   type SpeechVoice,
-} from "../lib/web-speech-synthesis";
+} from "../lib/voice/web-speech-synthesis";
 
 /** Radix Select refuses an empty item value: sentinel for "browser default voice". */
 const DEFAULT_VOICE = "__default__";

@@ -24,7 +24,7 @@ import {
  */
 
 const encryptionKey = Buffer.alloc(32, 7).toString("base64");
-const config = readApiConfig({ OHB_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey });
+const config = readApiConfig({ OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey });
 
 const TICKET_SECRET = "connector-ticket-secret";
 const ENROLLMENT_ID = "7a0f8a3a-1111-4222-8333-444455556666";

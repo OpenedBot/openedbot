@@ -23,9 +23,9 @@ import { api, queryKeys } from "../lib/api";
 import { BotGroupsDialog } from "./bot-groups-dialog";
 import { MoveToSectionDialog } from "./move-to-section-dialog";
 import { useT } from "../lib/i18n";
-import { useAgentEditor } from "../lib/agent-editor";
-import { useBotDialogs } from "../lib/bot-dialogs";
-import { useOpenedOnce } from "../lib/use-opened-once";
+import { useAgentEditor } from "../lib/bots/agent-editor";
+import { useBotDialogs } from "../lib/bots/bot-dialogs";
+import { useOpenedOnce } from "../lib/hooks/use-opened-once";
 import { BotFace } from "./bot-face";
 import { BotDeleteDialog, useBotActions } from "./bot-manage/bot-actions";
 import {

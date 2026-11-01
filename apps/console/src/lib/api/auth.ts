@@ -1,4 +1,4 @@
-import { readCloudSession, saveCloudSession } from "../cloud-session";
+import { readCloudSession, saveCloudSession } from "../session/cloud-session";
 import { readInitialLocale } from "@openedbot/browser-i18n";
 import type { AccountWorkspacesDto, AuthClaimDto, AuthProvidersDto, AuthStartDto, AuthUserDto, CreatedOrganizationDto, CreateOrganizationInput, EmailLoginCodeDto, EmailLoginDto, FleetGrantDto, PasswordLoginCodeRequiredDto, WaitlistJoinDto } from "@openedbot/contracts-api";
 import { primeWorkspaceDirectory, request, sharedRead } from "./http";

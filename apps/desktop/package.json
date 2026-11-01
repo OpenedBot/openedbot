@@ -11,7 +11,7 @@
     "test": "bun test test/",
     "compile": "electron-vite build --ignoreConfigWarning",
     "dev": "bun scripts/dev.ts",
-    "dev:prod": "OHB_TARGET=prod bun scripts/dev.ts",
+    "dev:prod": "OPENEDBOT_TARGET=prod bun scripts/dev.ts",
     "start": "electron .",
     "package:win:zip": "electron-builder --win zip",
     "package:win:nsis": "electron-builder --win nsis",

@@ -24,7 +24,11 @@ SIGNED_DIR ?= dist-signed
 # Monorepo OpenedBot/openedbot : la racine (application openedbot, qui porte la
 # moitié TypeScript du contrat du lien) et docs/ (site de documentation, que
 # check-docs compare à docs/ d'ici). Surchargeables, jamais devinés ailleurs.
-OHB_DIR ?= ..
+ifneq ($(origin OHB_DIR),undefined) # rename:keep (one-release fallback)
+$(warning OHB_DIR is deprecated: rename it to OPENEDBOT_MAIN_DIR (old name read for one more release)) # rename:keep
+OPENEDBOT_MAIN_DIR ?= $(strip $(OHB_DIR))# rename:keep
+endif
+OPENEDBOT_MAIN_DIR ?= ..
 DOCS_DIR ?= ../docs
 
 .PHONY: help build build-all release release-assets sign verify-signatures fetch-signed publish publish-check contract-check deploy deploy-host deploy-key-check check check-docs shellcheck fmt vet lint lint-tools test test-release test-update integration integration-vm docs-dev docs-build clean
@@ -235,12 +239,12 @@ test-release: ## Vérifie matrice, alias et checksums, l'ordre et l'immutabilit�
 	bash test/release/notes-check.sh
 	bash test/release/install-identity.sh
 
-contract-check: ## Contrat du lien des deux côtés : la cible de la racine du monorepo (OHB_DIR), sur cet arbre
-	@if [[ ! -f "$(OHB_DIR)/Makefile" ]]; then printf '$(C_ERR)[make]$(C_RESET) dépôt openedbot introuvable : %s (racine du monorepo OpenedBot/openedbot, ou OHB_DIR=...)\n' "$(OHB_DIR)"; exit 2; fi
+contract-check: ## Contrat du lien des deux côtés : la cible de la racine du monorepo (OPENEDBOT_MAIN_DIR), sur cet arbre
+	@if [[ ! -f "$(OPENEDBOT_MAIN_DIR)/Makefile" ]]; then printf '$(C_ERR)[make]$(C_RESET) dépôt openedbot introuvable : %s (racine du monorepo OpenedBot/openedbot, ou OPENEDBOT_MAIN_DIR=...)\n' "$(OPENEDBOT_MAIN_DIR)"; exit 2; fi
 	@# A checkout from before the extraction ignores EDGE_SETUP_DIR and would
 	@# compare its own host/edge-setup copy: a green that proves nothing.
-	@if [[ -e "$(OHB_DIR)/host/edge-setup/go.mod" ]] || ! grep -q '^EDGE_SETUP_DIR ?=' "$(OHB_DIR)/Makefile"; then printf '$(C_ERR)[make]$(C_RESET) %s précède l'"'"'extraction (host/edge-setup présent ou EDGE_SETUP_DIR ignoré) : il ne testerait pas cet arbre\n' "$(OHB_DIR)"; exit 2; fi
-	$(MAKE) -C "$(OHB_DIR)" contract-check EDGE_SETUP_DIR="$(CURDIR)"
+	@if [[ -e "$(OPENEDBOT_MAIN_DIR)/host/edge-setup/go.mod" ]] || ! grep -q '^EDGE_SETUP_DIR ?=' "$(OPENEDBOT_MAIN_DIR)/Makefile"; then printf '$(C_ERR)[make]$(C_RESET) %s précède l'"'"'extraction (host/edge-setup présent ou EDGE_SETUP_DIR ignoré) : il ne testerait pas cet arbre\n' "$(OPENEDBOT_MAIN_DIR)"; exit 2; fi
+	$(MAKE) -C "$(OPENEDBOT_MAIN_DIR)" contract-check EDGE_SETUP_DIR="$(CURDIR)"
 
 test-update: ## Régénère les goldens (à relire dans le diff)
 	go test ./internal/render/ -update

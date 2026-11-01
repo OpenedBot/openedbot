@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
 import { api, queryKeys } from "../lib/api";
-import { browserTitleEntity, browserTitleKey, formatBrowserTitle } from "../lib/browser-title";
+import { browserTitleEntity, browserTitleKey, formatBrowserTitle } from "../lib/shell/browser-title";
 import { useT } from "../lib/i18n";
 
 /**

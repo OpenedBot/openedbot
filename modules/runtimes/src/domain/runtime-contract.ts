@@ -123,7 +123,7 @@ export const REVIEW_PROFILE = "ohb-reviewer";
  * Profiles openedbot creates on the host for its own checks: never a bot's slug,
  * never listed for import, never imported.
  */
-export const OHB_SERVICE_PROFILES: ReadonlySet<string> = new Set(["ohb-model-check", REVIEW_PROFILE]);
+export const OPENEDBOT_SERVICE_PROFILES: ReadonlySet<string> = new Set(["ohb-model-check", REVIEW_PROFILE]);
 /** The link features the review profile needs: create it, cut its tools, set its plugin. */
 export const REVIEW_PROFILE_FEATURES = ["profile_management", "profile_capabilities", APPROVAL_POLICY_FEATURE] as const;
 /** Who answers an organization's gates (PERM2-1, `organizations.permission_pipeline`). */

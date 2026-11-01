@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, Circle, Loader2, ShieldAlert, XCircle } fr
 import type { RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import type { ApprovalRequestDto } from "@openedbot/contracts-api";
-import { buildThreadActivity, type ActivityToolState } from "../lib/thread-activity";
+import { buildThreadActivity, type ActivityToolState } from "../lib/thread/thread-activity";
 import { useT, type MessageKey } from "../lib/i18n";
 
 const RUN_STATUS_KEYS: Record<RunDto["status"], MessageKey> = {

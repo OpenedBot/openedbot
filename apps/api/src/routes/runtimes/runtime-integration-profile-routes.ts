@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { type HermesProfileInventory } from "@openedbot/hermes";
-import { OHB_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
 import type {
   RuntimeHostProfileDto,
   RuntimeProfileDeleteDto,
@@ -71,7 +71,7 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
         return {
           features,
           // openedbot's own check profiles are not agents: never offered for import.
-          profiles: inventory.profiles.filter((profile) => !OHB_SERVICE_PROFILES.has(profile.name)).map((profile) => ({
+          profiles: inventory.profiles.filter((profile) => !OPENEDBOT_SERVICE_PROFILES.has(profile.name)).map((profile) => ({
             name: profile.name, displayName: profile.displayName, title: profile.title,
             description: profile.description, model: profile.model, hasAvatar: profile.hasAvatar,
             routineCount: profile.routines.length, routines: profile.routines,

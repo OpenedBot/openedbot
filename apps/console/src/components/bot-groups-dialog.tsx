@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPlus } from "@tabler/icons-react";
 import type { BotDto, GroupDto } from "@openedbot/contracts-api";
 import { GROUP_MEMBERS_MAX, GROUP_MEMBERS_MIN } from "@openedbot/contracts-api";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { Checkbox, Dialog, Input, Label } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys } from "../lib/api";
 import { GroupFaceStack } from "./group-face-stack";

@@ -10,7 +10,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { IconArrowsSort, IconDeviceLaptop, IconDeviceMobile } from "@tabler/icons-react";
-import { describeUserAgent } from "@/lib/user-agent";
+import { describeUserAgent } from "@/lib/platform/user-agent";
 import type { AccountSessionDto } from "@openedbot/contracts-api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "@openedbot/browser-ui-kit";
 import { BUTTON, ToneBadge } from "../../../components/settings/primitives";

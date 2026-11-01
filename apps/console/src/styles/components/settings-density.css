@@ -25,7 +25,7 @@
 }
 
 /*
-  Taille du texte (Apparence, 10 à 14 px, `lib/text-size.ts`), dans un
+  Taille du texte (Apparence, 10 à 14 px, `lib/shell/text-size.ts`), dans un
   navigateur seulement : l'app de bureau zoome toute sa fenêtre et pose
   `data-native-zoom` sur la racine, et ces règles se taisent (le zoom
   compterait deux fois). Une page ne peut pas zoomer le reste de l'app : les

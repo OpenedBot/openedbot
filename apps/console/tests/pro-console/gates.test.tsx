@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { BotDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../src/lib/i18n";
 import { queryKeys } from "../../src/lib/api";
-import { saveCloudSession } from "../../src/lib/cloud-session";
+import { saveCloudSession } from "../../src/lib/session/cloud-session";
 import { PRO_CONSOLE_ENTITLEMENTS, type ProConsoleModule } from "../../src/pro-console/contract";
 import { proConsole, setProConsoleModulesForTest } from "../../src/pro-console/registry";
 import { BotPermissionRules, hasFleetConsole, OrganizationPermissionRulesSettings } from "../../src/pro-console/slots";
@@ -16,7 +16,7 @@ import { useVisibleSettingsGroups } from "../../src/components/dashboard/setting
  * slot renders and no pro endpoint is called, whatever the session says.
  * Pro: a screen appears only when the session holds its entitlement.
  */
-const pro = Boolean(process.env.OHB_PRO_CONSOLE?.trim());
+const pro = Boolean(process.env.OPENEDBOT_CONSOLE_PLUGINS?.trim());
 const realFetch = globalThis.fetch;
 let calls: string[] = [];
 

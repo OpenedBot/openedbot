@@ -4,14 +4,21 @@
  * prod openedbot at once: a line that does not say where it comes from is a line
  * nobody can act on.
  *
- * Explicit `OHB_DEPLOY_ENV` wins; otherwise `OHB_ENV=production` means prod
- * and anything else means dev. An unknown value fails loudly at startup.
+ * One setting says where a deployment runs: `OPENEDBOT_ENV`. `production`
+ * means prod, `preprod` means preprod (production rules, preprod label),
+ * anything else means dev.
  */
 export type DeployEnvironment = "dev" | "preprod" | "prod";
 
-export function deployEnvironment(explicit: string | undefined, ohbEnv: string | undefined): DeployEnvironment {
-  const value = explicit?.trim().toLowerCase();
-  if (value === "dev" || value === "preprod" || value === "prod") return value;
-  if (value) throw new Error(`OHB_DEPLOY_ENV must be dev, preprod or prod, got ${explicit}.`);
-  return ohbEnv?.trim() === "production" ? "prod" : "dev";
+export function deployEnvironment(openedbotEnv: string | undefined): DeployEnvironment {
+  const value = openedbotEnv?.trim();
+  if (value === "production") return "prod";
+  if (value === "preprod") return "preprod";
+  return "dev";
+}
+
+/** `preprod` runs on production rules: every production guard applies. */
+export function isProductionEnvironment(openedbotEnv: string | undefined): boolean {
+  const value = openedbotEnv?.trim();
+  return value === "production" || value === "preprod";
 }

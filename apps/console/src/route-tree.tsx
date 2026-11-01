@@ -12,19 +12,19 @@ import {
   workspaceInPath,
   workspaceRewriteInput,
   FLEET_ENTRY_PATH,
-} from "./lib/workspace-location";
+} from "./lib/workspace/workspace-location";
 import {
   accountAvailableWorkspaces,
   findWorkspace,
   rememberAccountWorkspaces,
-} from "./lib/workspace-directory";
-import { activeOrganizationId, readCloudSession, saveCloudSession } from "./lib/cloud-session";
+} from "./lib/workspace/workspace-directory";
+import { activeOrganizationId, readCloudSession, saveCloudSession } from "./lib/session/cloud-session";
 import {
   isOwnFleet,
   needsOrganization,
   ONBOARDING_PATH,
   ORGANIZATION_SETUP_PATH,
-} from "./lib/organization-gate";
+} from "./lib/session/organization-gate";
 import type { AccountWorkspacesDto } from "@openedbot/contracts-api";
 import { Suspense, useEffect, useRef } from "react";
 import {
@@ -41,38 +41,38 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { SkeletonRegion, useIsMobile } from "@openedbot/browser-ui-kit";
 import { AppErrorScreen } from "./components/app-error-boundary";
-import { clearAppAccessHint, hasAppAccessHint, markAppAccess } from "./lib/app-access-hint";
+import { clearAppAccessHint, hasAppAccessHint, markAppAccess } from "./lib/session/app-access-hint";
 import { NotFoundScreen } from "./components/app-not-found";
 import { AppFrameSkeleton } from "./components/skeletons/frame-skeletons";
 import { FleetClientLoading } from "./pro-console/slots";
 import { proConsole, proFeatureEntitled } from "./pro-console/registry";
 import { Shell } from "./components/shell";
-import { mobileTransition } from "./lib/mobile-navigation";
-import { consumeMobileLanding, firstRosterBotId, isMobileLandingConsumed } from "./lib/mobile-landing";
+import { mobileTransition } from "./lib/shell/mobile-navigation";
+import { consumeMobileLanding, firstRosterBotId, isMobileLandingConsumed } from "./lib/shell/mobile-landing";
 import { SiteHeader } from "./components/dashboard/site-header";
 import { api, queryKeys } from "./lib/api";
 import { queryClient } from "./lib/query-client";
-import { readSupportDeskAvailable } from "./lib/support-desk-availability";
-import { resolveLegacyConversation } from "./lib/conversation-href";
-import { prefetchConversation, prefetchConversationForPath, prefetchGroupConversation, restoreConversationForPath } from "./lib/conversation-prefetch";
-import { SHOW_DEV_SETTINGS } from "./lib/dev-settings-ui";
-import { needsOnboarding } from "./lib/onboarding-gate";
-import { needsPasswordChange, PASSWORD_CHANGE_PATH } from "./lib/password-change-gate";
-import { APP_HOME_HREF, resolveAppFrameEntry, rootRewriteInput, rootRewriteOutput } from "./lib/public-landing-gate";
-import { ensureAuthStatus, isAppAuthenticated } from "./lib/auth-status";
-import { subscribeCloudSession } from "./lib/cloud-session";
+import { readSupportDeskAvailable } from "./lib/support/support-desk-availability";
+import { resolveLegacyConversation } from "./lib/thread/conversation-href";
+import { prefetchConversation, prefetchConversationForPath, prefetchGroupConversation, restoreConversationForPath } from "./lib/thread/conversation-prefetch";
+import { SHOW_DEV_SETTINGS } from "./lib/shell/dev-settings-ui";
+import { needsOnboarding } from "./lib/session/onboarding-gate";
+import { needsPasswordChange, PASSWORD_CHANGE_PATH } from "./lib/session/password-change-gate";
+import { APP_HOME_HREF, resolveAppFrameEntry, rootRewriteInput, rootRewriteOutput } from "./lib/session/public-landing-gate";
+import { ensureAuthStatus, isAppAuthenticated } from "./lib/session/auth-status";
+import { subscribeCloudSession } from "./lib/session/cloud-session";
 import { useT } from "./lib/i18n";
 import { ConversationScreen } from "./screens/conversation/conversation";
 import { BotCreatingScreen } from "./components/bot-create/bot-creating-screen";
-import { isPendingBotId } from "./lib/pending-bot-creations";
-import { isRuntimeSection, type RuntimeSection } from "./screens/settings/installation/cloud-shared";
+import { isPendingBotId } from "./lib/bots/pending-bot-creations";
+import { isRuntimeSection, type RuntimeSection } from "./screens/settings/installation/cloud/cloud-shared";
 import { SETTINGS_SECTIONS, SettingsBodySkeleton } from "./screens/settings/sections";
 import { SupportLauncher } from "./components/support/support-launcher";
 import { WebWorkflowNotificationBridge } from "./components/web-workflow-notification-bridge";
 import { BrowserTabMetadata } from "./components/browser-tab-metadata";
 import { CompactEmpty } from "./components/compact/compact-frame";
-import { nativeBridge } from "./lib/native-bridge";
-import { COMPACT_PATH, primeNativeSession, readCompactLastBot } from "./lib/compact-shell";
+import { nativeBridge } from "./lib/platform/native-bridge";
+import { COMPACT_PATH, primeNativeSession, readCompactLastBot } from "./lib/shell/compact-shell";
 import {
   CloudSessionGate,
   OrganizationFrame,
@@ -80,7 +80,7 @@ import {
   warmAppAccess,
   requireAuth,
   resolveWorkspaceLocation,
-} from "./lib/route-guards";
+} from "./lib/session/route-guards";
 import { AppFrame } from "./components/frames/app-frame";
 import { CompactFrameEntry } from "./components/frames/compact-frame-entry";
 import { SettingsFrame } from "./components/frames/settings-frame";
@@ -203,7 +203,7 @@ const loginRoute = createRoute({
  *
  * Hors du cadre de l'application et hors de celui des réglages : c'est tout le
  * point. Le garde y envoie quiconque porte encore un mot de passe temporaire
- * (`lib/password-change-gate.ts`), et cet écran n'a qu'une chose à faire.
+ * (`lib/session/password-change-gate.ts`), et cet écran n'a qu'une chose à faire.
  *
  * Deux renvois, et ils tiennent l'écran honnête : sans session on repart vers
  * `/login`, et un compte qui n'a plus rien à changer repart vers
@@ -308,7 +308,7 @@ const appFrameRoute = createRoute({
   id: "_app",
   /**
    * Le même garde que `requireAuth`. La page publique n'est plus dans la
-   * console : elle vit sur le site public (`lib/public-site.ts`).
+   * console : elle vit sur le site public (`lib/session/public-site.ts`).
    */
   beforeLoad: async ({ location, cause }) => {
     // Ouvrir ou fermer la surcouche des réglages ne change que l'état
@@ -325,7 +325,7 @@ const appFrameRoute = createRoute({
     prefetchConversationForPath(location.pathname, location.search);
     // Guards already passed for this user on this browser: open the frame on
     // the cached roster and threads now, check behind it, and redirect only if
-    // a guard fails (`lib/app-access-hint.ts`).
+    // a guard fails (`lib/session/app-access-hint.ts`).
     if (hasAppAccessHint(readCloudSession()?.userId)) {
       guardedAppPath = location.pathname;
       void guardAppFrame(location).catch((error: unknown) => {
@@ -550,7 +550,7 @@ const botConversationRoute = createRoute({
   component: BotConversationEntry,
 });
 
-/** Un bot en cours de création (`lib/pending-bot-creations.ts`) n'a pas encore de fil. */
+/** Un bot en cours de création (`lib/bots/pending-bot-creations.ts`) n'a pas encore de fil. */
 function BotConversationEntry() {
   const { botId } = botConversationRoute.useParams();
   return isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />;
@@ -558,16 +558,16 @@ function BotConversationEntry() {
 
 /**
  * `/dev/thread-lab`: the current thread and composer next to a prototype,
- * on a scripted event stream (`screens/dev/thread-lab.tsx`). Dev server only:
+ * on a scripted event stream (`screens/dev/thread-lab.tsx`). `/dev/math`: the
+ * math + mermaid fixture (`screens/dev/math-lab.tsx`). Dev server only:
  * Vite replaces `import.meta.env.DEV` with `false` in a build, so the route
  * and its chunk are dropped. `=== true` for the reason in `dev-settings-ui.ts`.
  */
 const devRoutes = import.meta.env.DEV === true
-  ? [createRoute({
-      getParentRoute: () => appFrameRoute,
-      path: "/dev/thread-lab",
-      component: lazyRouteComponent(() => import("./screens/dev/thread-lab"), "ThreadLabScreen"),
-    })]
+  ? [
+      createRoute({ getParentRoute: () => appFrameRoute, path: "/dev/thread-lab", component: lazyRouteComponent(() => import("./screens/dev/thread-lab"), "ThreadLabScreen") }),
+      createRoute({ getParentRoute: () => appFrameRoute, path: "/dev/math", component: lazyRouteComponent(() => import("./screens/dev/math-lab"), "MathLabScreen") }),
+    ]
   : [];
 
 /** Ancienne session extra : `/cs/:botId?task=`. Le bot n'a plus qu'un fil. */
@@ -951,7 +951,7 @@ const fleetChooseRoute = createRoute({
 export /**
  * La fenêtre compacte (DEV-139) : `/compact` rouvre le dernier bot,
  * `/compact/:botId` est le fil de ce bot, sans aucun chrome produit. Dans la
- * coque native, l'identité vient du pont (`lib/native-bridge.ts`) et la
+ * coque native, l'identité vient du pont (`lib/platform/native-bridge.ts`) et la
  * session cloud est posée depuis `/api/auth/me` ; dans un navigateur, le même
  * garde que les routes protégées (cookie).
  */

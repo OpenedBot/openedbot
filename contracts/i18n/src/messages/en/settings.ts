@@ -281,7 +281,7 @@ export const settingsProfile = {
   errorTaken: "A bot is already called @{username}: pick another name.",
   devToolsTitle: "Development tools",
   devToolsDescription:
-    "Only visible in development (OHB_ENV=development). Replaying the onboarding resets your own flow and clears the current workspace’s exit: every step plays again for real.",
+    "Only visible in development (OPENEDBOT_ENV=development). Replaying the onboarding resets your own flow and clears the current workspace’s exit: every step plays again for real.",
   devResetOnboarding: "Replay onboarding (dev)",
   devResetOnboardingPending: "Resetting…",
   devResetOnboardingError: "Could not replay the onboarding.",
@@ -302,7 +302,7 @@ export const settingsDeveloper = {
     "The surfaces that only exist under “make dev”: they are not a product, they help build the product. A production build never mounts them.",
   unavailableTitle: "Nothing to show here",
   unavailableDescription:
-    "The cloud API is not running with OHB_ENV=development, so the development tools stay shut even under the Vite server.",
+    "The cloud API is not running with OPENEDBOT_ENV=development, so the development tools stay shut even under the Vite server.",
 } as const;
 
 export const settingsSecurity = {

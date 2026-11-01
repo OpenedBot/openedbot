@@ -16,33 +16,33 @@ import { stripHandlePrefix } from "@openedbot/roster/domain/ask-user";
 import { filterRosterBots, filterRosterGroups, normalizeRosterQuery } from "@openedbot/roster/domain/roster-search";
 import { projectRosterSections, type RosterSectionProjection } from "@openedbot/roster/domain/roster-sections";
 import { cn, toast } from "@openedbot/browser-ui-kit";
-import { partitionThreadVisibility } from "@/lib/thread-visibility";
+import { partitionThreadVisibility } from "@/lib/thread/thread-visibility";
 import { ApiError, api, queryKeys } from "../../lib/api";
-import { registerSpeechRates } from "../../lib/speech-rates";
+import { registerSpeechRates } from "../../lib/voice/speech-rates";
 import { useT } from "../../lib/i18n";
 import { BotContextMenu } from "../bot-context-menu";
 import { BotFace } from "../bot-face";
 import { GroupContextMenu } from "../group-context-menu";
 import { GroupDialog } from "../group-dialog";
 import { GroupFaceStack } from "../group-face-stack";
-import { useBotDialogs } from "../../lib/bot-dialogs";
+import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { ConnectorUpgradeSidebarLink } from "../dashboard/connector-upgrade-badge";
-import { useOperatorIdentity } from "../../lib/operator-identity";
+import { useOperatorIdentity } from "../../lib/session/operator-identity";
 import { useWorkspaceSwitch } from "../workspace/workspace-navigation";
 import { AccountMenu } from "./account-menu";
 import { BUI_PANEL_ITEM, BuiCloseGlyph, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import { COLLAPSE_MOTION, CreateMenu, useBoardChrome } from "./board-chrome";
-import { useOpenedOnce } from "../../lib/use-opened-once";
+import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
 import { useRosterSections } from "../dashboard/use-roster-sections";
 import { PINNED_DROP_ID, RosterDragProvider, rosterRowAttributes, useRosterDrag, type RosterDragRow, type RosterDropSlot } from "../dashboard/roster-drag";
 import { RosterInsertionLine } from "../dashboard/roster-section";
 import { RosterSkeleton } from "../skeletons/frame-skeletons";
-import { useSecondaryReadsReady } from "../../lib/after-first-paint";
-import { rememberBootSidebarShape } from "../../lib/boot-shape";
-import { readBootIdentityLabel, rememberBootIdentity } from "../../lib/boot-identity";
-import { readCloudSession } from "../../lib/cloud-session";
-import { useAccountLayout } from "../../lib/account-layout";
+import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
+import { rememberBootSidebarShape } from "../../lib/session/boot-shape";
+import { readBootIdentityLabel, rememberBootIdentity } from "../../lib/session/boot-identity";
+import { readCloudSession } from "../../lib/session/cloud-session";
+import { useAccountLayout } from "../../lib/shell/account-layout";
 import { BOARD_SIDEBAR_CARD } from "./board-sidebar-card";
 
 type RosterRow = { kind: "bot"; bot: BotDto } | { kind: "group"; group: GroupDto };
@@ -192,7 +192,7 @@ export function BoardSidebar({ className }: { className?: string }) {
   const showSections = !hasQuery && !projection.flat;
 
   // The next refresh draws its loading states with this roster's shape
-  // (`lib/boot-shape.ts`): pinned tiles, section labels and row counts.
+  // (`lib/session/boot-shape.ts`): pinned tiles, section labels and row counts.
   useEffect(() => {
     if (!dense || hasQuery || !roster.isSuccess) return;
     rememberBootSidebarShape({
@@ -524,7 +524,7 @@ export function OrganizationHead({ name: fixedName }: { name?: string } = {}) {
   const userId = readCloudSession()?.userId;
   const known = identity.signedIn ? (identity.personal ? identity.name : identity.organizationName) : "";
   // Until `/api/auth/me` answers the head would be empty: the label recorded
-  // on the last visit stands in (`lib/boot-identity.ts`).
+  // on the last visit stands in (`lib/session/boot-identity.ts`).
   const name = fixedName ?? (known || readBootIdentityLabel(userId) || "");
   useEffect(() => {
     if (!fixedName && known) rememberBootIdentity(userId, known);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { EDGE_SETUP_INSTALL_STEPS } from "../../../../src/screens/settings/installation/cloud-enrollment";
+import { EDGE_SETUP_INSTALL_STEPS } from "../../../../src/screens/settings/installation/cloud/cloud-enrollment";
 
 describe("edge-setup install steps", () => {
   test("install through the signature-checking bootstrap, never the retired GitHub repository", () => {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
 import { I18nProvider } from "../../src/lib/i18n";
 import { AppFrameSkeleton, RosterSkeleton } from "../../src/components/skeletons/frame-skeletons";
-import { DEFAULT_ACCOUNT_LAYOUT, setAccountLayout } from "../../src/lib/account-layout";
+import { DEFAULT_ACCOUNT_LAYOUT, setAccountLayout } from "../../src/lib/shell/account-layout";
 
 beforeEach(() => {
   window.localStorage.setItem("ohb:locale", "fr");

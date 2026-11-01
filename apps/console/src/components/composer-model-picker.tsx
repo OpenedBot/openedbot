@@ -13,7 +13,7 @@ import {
   isHermesReasoningEffort,
   type HermesReasoningEffort,
 } from "@openedbot/contracts-api";
-import { catalogModelView, providerRail, resolveThreadModel, runtimeGlobalModel } from "@/lib/model-catalog";
+import { catalogModelView, providerRail, resolveThreadModel, runtimeGlobalModel } from "@/lib/bots/model-catalog";
 import {
   cn,
   Drawer,
@@ -27,16 +27,16 @@ import {
   TooltipTrigger,
 } from "@openedbot/browser-ui-kit";
 import { ProviderIcon, providerLabel } from "./provider-icon";
-import type { RunFallbackServed } from "../lib/run-fallback";
+import type { RunFallbackServed } from "../lib/run/run-fallback";
 import { BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./boardui/menu";
 import { api, ApiError, queryKeys, runtimesQueryOptions } from "../lib/api";
-import { haptics } from "../lib/haptics";
+import { haptics } from "../lib/platform/haptics";
 import { useT } from "../lib/i18n";
-import { displayedRuntimeHealth } from "../lib/runtime-health";
-import { trackBotModelSave } from "../lib/bot-model-saves";
+import { displayedRuntimeHealth } from "../lib/runtime/runtime-health";
+import { trackBotModelSave } from "../lib/bots/bot-model-saves";
 import { EffortFlame } from "./effort-flame";
 import { BUTTON } from "./settings/primitives";
-import { useOpenSettings } from "../lib/settings-overlay";
+import { useOpenSettings } from "../lib/shell/settings-overlay";
 
 type ModelSelection = {
   model: string | null;

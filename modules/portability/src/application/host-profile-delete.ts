@@ -8,7 +8,7 @@ import { withTenant } from "@openedbot/platform-db";
 import { deleteBotAfterHostProfileDelete } from "@openedbot/roster/sql/bot-import";
 import { workflowSessionKey } from "@openedbot/roster/domain/autonomous-workflow";
 import { personaDraftSessionKey } from "@openedbot/roster/domain/persona-draft";
-import { OHB_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
 import { ProfileDeleteError } from "../domain/errors";
 
 export const PROFILE_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
@@ -37,7 +37,7 @@ export async function deleteHostProfile(
     timeoutMs?: number;
   },
 ): Promise<RuntimeProfileDeleteDto> {
-  if (slug === "default" || !PROFILE_SLUG_PATTERN.test(slug) || OHB_SERVICE_PROFILES.has(slug)) {
+  if (slug === "default" || !PROFILE_SLUG_PATTERN.test(slug) || OPENEDBOT_SERVICE_PROFILES.has(slug)) {
     throw new ProfileDeleteError(400, "PROFILE_INVALID", "Ce slug de profil n’est pas valide.");
   }
   const timeoutMs = deps.timeoutMs ?? PROFILE_INVENTORY_TIMEOUT_MS;

@@ -23,11 +23,11 @@ import {
   CommandSeparator,
   Dialog,
 } from "@openedbot/browser-ui-kit";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { api, queryKeys } from "../lib/api";
 import { useT } from "../lib/i18n";
-import { searchHitMeta } from "../lib/search-hit-meta";
-import { useOpenSettings } from "../lib/settings-overlay";
+import { searchHitMeta } from "../lib/thread/search-hit-meta";
+import { useOpenSettings } from "../lib/shell/settings-overlay";
 
 type CommandIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 

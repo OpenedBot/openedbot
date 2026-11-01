@@ -18,7 +18,7 @@ import { useT } from "../../../lib/i18n";
 import { api, queryKeys } from "../../../lib/api";
 import { InsetGroupedSection, MobileSegmented } from "../../../components/mobile/inset-grouped";
 import { BUTTON } from "../../../components/settings/primitives";
-import { useSettingsModal } from "../../../lib/settings-modal-context";
+import { useSettingsModal } from "../../../lib/shell/settings-modal-context";
 import { SettingsPane } from "../pane";
 import { DecisionTrace } from "./decision-trace";
 

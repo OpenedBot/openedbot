@@ -4,11 +4,11 @@ import { organizationEventEnvelope } from "@openedbot/contracts-events";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import type { Db } from "@openedbot/platform-db";
 import type { ApiConfig } from "../src/infrastructure/config";
-import { eventRoutes, internalEventRoutes } from "../src/interfaces/http/event-routes";
+import { eventRoutes, internalEventRoutes } from "../src/routes/events/event-routes";
 import { HttpError } from "../src/interfaces/http/http-error";
 import type { AppVariables } from "../src/routes/identity/auth";
 import { fakeRunEventsDb, type StoredRow } from "./fixtures/run-events-db";
-import { acceptLiveEvent, advanceStreamCursor, createLiveDedupe } from "../../console/src/lib/thread-stream-live";
+import { acceptLiveEvent, advanceStreamCursor, createLiveDedupe } from "../../console/src/lib/stream/thread-stream-live";
 
 const organizationId = "org-early";
 const occurredAt = new Date("2026-10-03T12:00:00.000Z");

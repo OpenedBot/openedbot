@@ -1,4 +1,4 @@
-import { activeFleetId, activeOrganizationId } from "../cloud-session";
+import { activeFleetId, activeOrganizationId } from "../session/cloud-session";
 import type { ConnectorReleaseResponse, RuntimeConfigurationDto, RuntimeGatewayRestartDto, RuntimeGatewayStatusDto, RuntimeIntegrationInventoryDto, RuntimeIntegrationMcpDto, RuntimeIntegrationMcpServerDto, RuntimeIntegrationToolsetStateDto, RuntimeMcpDisconnectDto, RuntimeMcpOauthDto } from "@openedbot/contracts-api";
 import { request, sharedRead } from "./http";
 

@@ -39,11 +39,11 @@ describe("loadWorkerPro", () => {
   test("the subscription port is the plug-in billing's (step 8d), never another id's", async () => {
     const port = { memberLimit: async () => 3, status: async () => null, read: async () => null, readForUpdate: async () => null, admission: () => null };
     const billing = { webhookPath: "/api/pay/webhook", webhook: async () => new Response(null), subscriptions: port };
-    const withBilling = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true }, silent, {
+    const withBilling = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true }, silent, {
       importer: importerFor({ billing: plugin("billing", { billing }, ["billing.enforced"]) }),
     });
     expect(withBilling.subscriptions as unknown).toBe(port);
-    const without = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true }, silent, {
+    const without = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true }, silent, {
       importer: importerFor({ billing: plugin("billing", {}, ["billing.enforced"]) }),
     });
     expect(without.subscriptions).toBeNull();
@@ -52,7 +52,7 @@ describe("loadWorkerPro", () => {
   test("the plug-in billing provides billing.enforced; BILLING_ENFORCED still decides it", async () => {
     for (const billingEnforced of [false, true]) {
       const queries: string[] = [];
-      const pro = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb(queries), { billingEnforced }, silent, {
+      const pro = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb(queries), { billingEnforced }, silent, {
         importer: importerFor({ billing: plugin("billing", {}, ["billing.enforced"]) }),
       });
       expect(pro.plugins.map((loaded) => loaded.manifest.id)).toEqual(["billing"]);
@@ -64,7 +64,7 @@ describe("loadWorkerPro", () => {
 
   test("a pool role that bypasses row-level security drops every plug-in", async () => {
     const refused: string[] = [];
-    const pro = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb([], { superuser: true }), { billingEnforced: false }, {
+    const pro = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb([], { superuser: true }), { billingEnforced: false }, {
       ...silent,
       refused: (reason) => refused.push(reason),
     }, { importer: importerFor({ billing: plugin("billing", { hooks: { onTenantDeleting: async () => undefined } }, ["billing.enforced"]) }) });
@@ -94,12 +94,12 @@ describe("tenantDeletingHooks", () => {
     expect(calls).toEqual(["agency:org-1", "billing"]);
   });
 
-  test("each hook receives only its own plug-in configuration (OHB_PRO_<ID>__<KEY>)", async () => {
+  test("each hook receives only its own plug-in configuration (OPENEDBOT_PLUGIN_<ID>__<KEY>)", async () => {
     const seen: Array<Readonly<Record<string, string>> | undefined> = [];
     const hooks = tenantDeletingHooks([
       plugin("audit", { hooks: { onTenantDeleting: async (_tx, _event, context) => { seen.push(context?.config); } } }),
       plugin("billing", { hooks: { onTenantDeleting: async (_tx, _event, context) => { seen.push(context?.config); } } }),
-    ], { OHB_PRO_AUDIT__RETENTION_DAYS: "3650", OHB_PRO_BILLING__API_KEY: "x", DATABASE_URL: "postgres://" })!;
+    ], { OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS: "3650", OPENEDBOT_PLUGIN_BILLING__API_KEY: "x", DATABASE_URL: "postgres://" })!;
     await hooks(tx, event);
     expect(seen).toEqual([{ RETENTION_DAYS: "3650" }, { API_KEY: "x" }]);
   });
@@ -118,7 +118,7 @@ describe("proJobs", () => {
       plugin("audit", { jobs: [{ name: "purge-expired", everyMs: 3_600_000, run: async (db, context) => {
         calls.push({ db, config: context.config, aborted: context.signal.aborted });
       } }] }),
-    ], pool, { OHB_PRO_AUDIT__RETENTION_DAYS: "30", OHB_PRO_BILLING__KEY: "other plug-in" });
+    ], pool, { OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS: "30", OPENEDBOT_PLUGIN_BILLING__KEY: "other plug-in" });
     expect(jobs.map((job) => [job.name, job.everyMs])).toEqual([["pro:audit:purge-expired", 3_600_000]]);
     await jobs[0]!.run(new AbortController().signal);
     expect(calls).toEqual([{ db: pool, config: { RETENTION_DAYS: "30" }, aborted: false }]);
@@ -157,7 +157,7 @@ describe("production deployment variables (step 11.5)", () => {
 
   test("billing loaded in production without its variables: the worker refuses to start, before any query", async () => {
     const queries: string[] = [];
-    await expect(loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb(queries), { billingEnforced: true, environment: "production" }, silent, {
+    await expect(loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb(queries), { billingEnforced: true, environment: "production" }, silent, {
       importer: importerFor({ billing: payingBilling() }),
     })).rejects.toThrow(MESSAGE);
     expect(queries).toEqual([]);
@@ -165,12 +165,12 @@ describe("production deployment variables (step 11.5)", () => {
   });
 
   test("with every variable, or outside production, billing loads", async () => {
-    const full = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing", PAY_SECRET: "s", PAY_PRICE: "p" }, roleDb([]), { billingEnforced: true, environment: "production" }, silent, {
+    const full = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing", PAY_SECRET: "s", PAY_PRICE: "p" }, roleDb([]), { billingEnforced: true, environment: "production" }, silent, {
       importer: importerFor({ billing: payingBilling() }),
     });
     expect(full.plugins.map((loaded) => loaded.manifest.id)).toEqual(["billing"]);
     for (const environment of ["development", "test", undefined]) {
-      const dev = await loadWorkerPro({ OHB_PRO_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true, environment }, silent, {
+      const dev = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true, environment }, silent, {
         importer: importerFor({ billing: payingBilling() }),
       });
       expect(dev.plugins.map((loaded) => loaded.manifest.id)).toEqual(["billing"]);
@@ -192,7 +192,7 @@ describe("one owner per deployment variable (step 11.5)", () => {
     };
     for (const environment of ["development", "production"]) {
       const queries: string[] = [];
-      await expect(loadWorkerPro({ OHB_PRO_PLUGINS: "billing,payments", PAY_KEY: "k" }, roleDb(queries), { billingEnforced: false, environment }, silent, {
+      await expect(loadWorkerPro({ OPENEDBOT_PLUGINS: "billing,payments", PAY_KEY: "k" }, roleDb(queries), { billingEnforced: false, environment }, silent, {
         importer: importerFor({ billing: owning("billing"), payments: owning("payments") }),
       })).rejects.toThrow("Deployment variable declared by more than one loaded plug-in: PAY_KEY (billing, payments).");
       expect(queries).toEqual([]);

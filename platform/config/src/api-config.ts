@@ -10,10 +10,10 @@ import type { HermesClientTimeouts } from "@openedbot/hermes";
 import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/hermes/mtls";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
 import { readApiInternalUrl, readApiPort } from "@openedbot/platform-config/api-address";
-import { deployEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
+import { deployEnvironment, isProductionEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
-import { readRuntimeMode } from "@openedbot/platform-config/runtime-mode";
+import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
 import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrations/vapid";
 import { readApnsConfig } from "@openedbot/platform-integrations/apns";
 import { LEGAL_SLUGS, type LegalSlug, type RuntimeMode } from "@openedbot/contracts-api";
@@ -39,9 +39,6 @@ export const DEV_SEED_EMAIL = "dev@ohb.local";
 export const DEV_STAFF_EMAIL = "staff@ohb.dev";
 
 export type ApiEnvironment = "development" | "test" | "production";
-
-/** Ce que `OHB_RUNTIME_ADMIN_MODE` demande. `local` est le défaut de développement. */
-type RuntimeAdminRequest = "disabled" | "local";
 
 /** Les canaux réellement servables par ce déploiement. */
 export type RuntimeAdminChannels = { local: boolean };
@@ -141,7 +138,7 @@ export type ComputerProviderConfig =
 export type ApiConfig = {
   environment: ApiEnvironment;
   /**
-   * Palier de déploiement (`OHB_DEPLOY_ENV`, sinon dérivé de `OHB_ENV`) :
+   * Palier de déploiement, dérivé de `OPENEDBOT_ENV` (`preprod` = règles de production) :
    * nommé dans chaque alerte et poussé aux connecteurs (`link.context`),
    * puisque plusieurs déploiements partagent un canal Discord.
    */
@@ -364,7 +361,7 @@ export type ApiConfig = {
 };
 
 export function readApiConfig(env: Record<string, string | undefined> = process.env): ApiConfig {
-  const environment = readEnvironment(env.OHB_ENV ?? env.NODE_ENV);
+  const environment = readEnvironment(env.OPENEDBOT_ENV ?? env.NODE_ENV);
   // R2 quand il est configuré, sinon le volume du serveur, même en production (`blob-driver.ts`).
   const blobChoice = resolveBlobDriver(env, environment === "production");
   const blobDriver = blobChoice.driver;
@@ -374,7 +371,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     env.RUNTIME_TOKEN_ENCRYPTION_PREVIOUS_KEYS,
     environment,
   );
-  const runtimeMode = readRuntimeMode(env.OHB_RUNTIME_MODE, environment);
+  const runtimeMode = RUNTIME_MODE;
   // HTTP exceptions are always explicit, including the local fake gateway.
   const insecureHermesOrigins = parseInsecureHermesOrigins(env.HERMES_ALLOW_INSECURE_ORIGINS);
   const hermesEndpointPolicy: EndpointPolicy = {
@@ -405,15 +402,13 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     ...webOrigins,
     ...(adminOrigin ? [adminOrigin] : []),
   ]);
-  // `OHB_RUNTIME_ADMIN_MODE` déclare ce que l'hôte autorise, pas ce que
-  // l'organisation a choisi : en développement les deux canaux existent, et
-  // c'est le mode enregistré en base qui décide lequel sert la requête.
-  const runtimeAdminRequest = readRuntimeAdminRequest(env.OHB_RUNTIME_ADMIN_MODE, environment);
-  if (environment === "production" && runtimeAdminRequest === "local") throw new Error("Runtime administration channels are forbidden in production cloud mode.");
+  // Aucun canal d'administration sortant (OHB-15) : plus de shell vers un
+  // runtime client, quel que soit l'environnement. L'ancienne variable qui le
+  // réglait n'est plus lue (env-aliases.ts l'annonce ignorée).
   const runtimeAdminChannels: RuntimeAdminChannels = { local: false };
   const base = {
     environment,
-    deployEnvironment: deployEnvironment(env.OHB_DEPLOY_ENV, env.OHB_ENV),
+    deployEnvironment: deployEnvironment(env.OPENEDBOT_ENV ?? env.NODE_ENV),
     host: env.API_HOST?.trim() || "127.0.0.1",
     port: readApiPort(env.API_PORT),
     databaseUrl:
@@ -474,7 +469,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     trustProxy: /^(1|true)$/i.test(env.API_TRUST_PROXY?.trim() ?? ""),
     billingEnforced: readBooleanDefault(env.BILLING_ENFORCED, environment === "production"),
     managedTunnel: readManagedTunnelConfig(env),
-    tailscaleFunnelEnabled: readBooleanDefault(env.OHB_TAILSCALE_FUNNEL_ENABLED, false),
+    tailscaleFunnelEnabled: readBooleanDefault(env.OPENEDBOT_TAILSCALE_FUNNEL_ENABLED, false),
     google: {
       clientId: optional(env.GOOGLE_CLIENT_ID),
       clientSecret: optional(env.GOOGLE_CLIENT_SECRET),
@@ -529,7 +524,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
 }
 
 export function assertProductionConfig(config: ApiConfig): void {
-  if (config.environment !== "production") throw new Error("OHB_ENV=production is required.");
+  if (config.environment !== "production") throw new Error("OPENEDBOT_ENV=production (or preprod) is required.");
   if (config.devSignIn) throw new Error("Development sign-in credentials must not be published in production.");
   if (config.staffDevSignIn) throw new Error("Development staff sign-in credentials must not be published in production.");
   if (!config.publicUrl.startsWith("https://")) throw new Error("API_PUBLIC_URL must use HTTPS in production.");
@@ -670,48 +665,17 @@ export function assertLegalFile(filePath: string, maxBytes: number, slug = "docu
 
 const LEGAL_PLACEHOLDER_PATTERN = /(?:\b(?:TODO|TBD|FIXME|PLACEHOLDER|LOREM\s+IPSUM|REPLACE[_ -]?ME)\b|\{\{[^}\n]+\}\}|\[(?:YOUR|INSERT|REPLACE|TODO|TBD)[^\]\n]*\]|\bexample\.(?:com|org|net)\b)/i;
 
-/**
- * Ce que l'hôte autorise comme canal d'administration.
- *
- * `local` administre le Hermes que CE déploiement démarre lui-même. Il n'existe
- * plus de canal vers la machine d'un client : OHB-15 a retiré la session SSH
- * sortante, et `ssh` est refusé ici : dans tous les environnements : pour que
- * la frontière tienne par le code plutôt que par une valeur d'environnement.
- *
- * En développement, l'absence de valeur vaut `local` : le poste parle au Hermes
- * du Compose. Ailleurs, elle vaut `disabled`.
- */
-function readRuntimeAdminRequest(
-  value: string | undefined,
-  environment: ApiEnvironment,
-): RuntimeAdminRequest {
-  const requested = value?.trim();
-  const normalized = requested || (environment === "development" ? "local" : "disabled");
-  if (normalized !== "disabled" && normalized !== "local") {
-    throw new Error(
-      "OHB_RUNTIME_ADMIN_MODE must be disabled or local. "
-      + "openedbot no longer opens a shell session toward a customer runtime; "
-      + "a customer poses their own provider credentials with "
-      + "`edge-setup credentials add <provider>` on their host.",
-    );
-  }
-  return normalized;
-}
-
 const BOX_COMPUTER_API = "https://ascii.dev/api/box/v1";
 
 function readComputerProvider(
   env: Record<string, string | undefined>,
   environment: ApiEnvironment,
 ): ComputerProviderConfig {
-  const provider = env.OHB_COMPUTER_PROVIDER?.trim() || "disabled";
-  if (provider === "disabled") return { provider: "disabled" };
-  if (provider !== "box") {
-    throw new Error("OHB_COMPUTER_PROVIDER must be either disabled or box.");
-  }
-  const token = optional(env.OHB_COMPUTER_BOX_TOKEN);
-  if (!token) throw new Error("OHB_COMPUTER_BOX_TOKEN is required when OHB_COMPUTER_PROVIDER=box.");
-  if (token.length > 4_096) throw new Error("OHB_COMPUTER_BOX_TOKEN is too long.");
+  // One provider exists: its token enables it, its absence keeps the
+  // fail-closed default.
+  const token = optional(env.OPENEDBOT_COMPUTER_BOX_TOKEN);
+  if (!token) return { provider: "disabled" };
+  if (token.length > 4_096) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is too long.");
 
   // A configurable provider origin would turn the API into an authenticated
   // SSRF proxy. Only tests may point at a loopback fixture; real deployments
@@ -731,8 +695,8 @@ function readComputerProvider(
 }
 
 function readEnvironment(value: string | undefined): ApiEnvironment {
-  if (value === "production" || value === "test") return value;
-  return "development";
+  // `preprod` is a production deployment with a preprod label (deployEnvironment).
+  return isProductionEnvironment(value) ? "production" : value === "test" ? "test" : "development";
 }
 
 export function readEventsConfig(env: Record<string, string | undefined>): EventsConfig {

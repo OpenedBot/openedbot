@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { RuntimeModelDto, RuntimeModelProviderDto } from "@openedbot/contracts-api";
-import { preferenceForProvider } from "../../../../src/screens/settings/installation/models-preference-panel";
+import { preferenceForProvider } from "../../../../src/screens/settings/installation/models/models-preference-panel";
 
 const model = (id: string, isRuntimeDefault = false): RuntimeModelDto => ({
   id, fast: false, reasoning: true, isRuntimeDefault, freeTier: null,

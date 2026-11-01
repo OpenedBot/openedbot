@@ -6,7 +6,7 @@ import type { BotDto, RuntimeModelProviderDto } from "@openedbot/contracts-api";
 import { toast } from "@openedbot/browser-ui-kit";
 import { I18nProvider } from "../../src/lib/i18n";
 import { ComposerModelPicker, ThreadModelPicker } from "../../src/components/composer-model-picker";
-import { settledBotModelSaves } from "../../src/lib/bot-model-saves";
+import { settledBotModelSaves } from "../../src/lib/bots/bot-model-saves";
 
 const realFetch = globalThis.fetch;
 

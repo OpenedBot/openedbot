@@ -13,7 +13,7 @@
  * skill reads that depend on them live in ./host-operator.ts, fed by the
  * fixtures under ./fixtures/.
  *
- * Nothing here talks to a model. Every run answers `OHB_CANARY_OK <input>`.
+ * Nothing here talks to a model. Every run answers `OPENEDBOT_CANARY_OK <input>`.
  * Its address and bearer come from ./defaults.ts, never from a literal here.
  *
  * Approval gates (PERM2-A, DEV-OHB-250): a run whose input carries
@@ -234,7 +234,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
     }
     if (run.status !== "running") return;
     run.status = "completed";
-    run.output = `OHB_${run.streamed}CANARY_OK ${run.input}`.trim();
+    run.output = `OPENEDBOT_${run.streamed}CANARY_OK ${run.input}`.trim();
     run.usage = { ...RUN_USAGE };
     const session = run.sessionId ? sessions.get(run.sessionId) : undefined;
     if (session) {
@@ -409,7 +409,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
                 controller.close();
                 return;
               }
-              emit({ event: "message.delta", run_id: run.id, timestamp: Date.now() / 1_000, delta: "OHB_" });
+              emit({ event: "message.delta", run_id: run.id, timestamp: Date.now() / 1_000, delta: "OPENEDBOT_" });
               for (let index = 0; index < streamDeltas && run.status === "running"; index += 1) {
                 await Bun.sleep(streamIntervalMs);
                 const delta = `chunk${index} `;

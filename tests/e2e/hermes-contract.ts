@@ -59,7 +59,7 @@ try {
   const sessionId = `ohb-canary-${canaryId}`;
   await client.ensureSession(sessionId, `OHB canary ${canaryId.slice(0, 8)}`);
   const runId = await client.createRun({
-    input: "Réponds exactement OHB_CANARY_OK.",
+    input: "Réponds exactement OPENEDBOT_CANARY_OK.",
     instructions: "Réponds sans outil et sans modifier le système.",
     sessionId,
     provider: provider.slug,
@@ -79,7 +79,7 @@ try {
   } finally {
     clearTimeout(timeout);
   }
-  if (!output.includes("OHB_CANARY_OK")) throw new Error(`Unexpected Hermes result: ${output.slice(0, 200)}`);
+  if (!output.includes("OPENEDBOT_CANARY_OK")) throw new Error(`Unexpected Hermes result: ${output.slice(0, 200)}`);
   console.info(JSON.stringify({
     event: "e2e.hermes_passed", endpoint, profile, models: models.length,
     capabilities: probe.capabilities, provider: provider.slug, model: model.id,

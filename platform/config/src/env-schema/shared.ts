@@ -4,26 +4,24 @@ import type { EnvVar } from "./types";
 export const SHARED_ENV: readonly EnvVar[] = [
   // ---------------------------------------------------------------- both ---
   {
-    name: "OHB_ENV",
+    name: "OPENEDBOT_ENV",
     scope: "shared",
     tier: "local",
-    doc: "Environment: development, test or production. Production enables every startup guard.",
+    doc: "Environment: development, test, production or preprod. production and preprod enable every startup guard; preprod only changes the deployment label (alerts, connectors, sign-in options).",
     example: "development",
     productionExample: "production",
+  },
+  {
+    name: "OPENEDBOT_LOG_DIR",
+    scope: "shared",
+    tier: "default_only",
+    doc: "Directory of the API and worker log files (default apps/api/var/logs); `off` writes no file, stdout only.",
   },
   {
     name: "NODE_ENV",
     scope: "shared",
     tier: "default_only",
-    doc: "Fallback for OHB_ENV when it is absent (API and logger only).",
-  },
-  {
-    name: "OHB_RUNTIME_MODE",
-    scope: "shared",
-    tier: "local",
-    doc: "Deprecated: accepted and ignored with a warning; runtime mode is always external.",
-    example: "external",
-    productionExample: "external",
+    doc: "Fallback for OPENEDBOT_ENV when it is absent (API and logger only).",
   },
   {
     name: "HERMES_ALLOW_INSECURE_ORIGINS",
@@ -272,7 +270,7 @@ export const SHARED_ENV: readonly EnvVar[] = [
     name: "BILLING_ENFORCED",
     scope: "shared",
     tier: "default_only",
-    doc: "Boolean; enforces subscriptions and plan quotas, only with the pro plug-in billing loaded (OHB_PRO_PLUGINS): solo never paywalls. Default true in production, false elsewhere.",
+    doc: "Boolean; enforces subscriptions and plan quotas, only with the pro plug-in billing loaded (OPENEDBOT_PLUGINS): solo never paywalls. Default true in production, false elsewhere.",
   },
   {
     name: "WORKER_RUN_EVENTS_RETENTION_DAYS",

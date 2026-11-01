@@ -4,14 +4,14 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Router
 import type { RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
-import type { SpeechSynthesisAdapter } from "../../src/lib/web-speech-synthesis";
+import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
 import {
   MODEL_UNAVAILABLE,
   modelUnavailableByBot,
   modelUnavailableMessage,
   readableRunFailure,
-} from "../../src/lib/model-unavailable";
+} from "../../src/lib/run/model-unavailable";
 
 /**
  * DEV-329 : un modèle refusé par le fournisseur se lit comme tel dans le fil

@@ -13,10 +13,10 @@ import {
   SectionHeading,
 } from "../../../components/settings/primitives";
 import { api, queryKeys } from "../../../lib/api";
-import { activeOrganizationId } from "../../../lib/cloud-session";
-import { isOwnFleet } from "../../../lib/organization-gate";
+import { activeOrganizationId } from "../../../lib/session/cloud-session";
+import { isOwnFleet } from "../../../lib/session/organization-gate";
 import { useT } from "../../../lib/i18n";
-import { isOverlaySettingsPath, useSettingsOverlay } from "../../../lib/settings-overlay";
+import { isOverlaySettingsPath, useSettingsOverlay } from "../../../lib/shell/settings-overlay";
 import { SettingsPane } from "../pane";
 import { MembersCard } from "./account";
 import { hasFleetConsole } from "../../../pro-console/slots";

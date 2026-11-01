@@ -44,7 +44,7 @@ export type LoadOptions = {
 
 /**
  * Parses a comma-separated list of module specifiers (the value of an env
- * variable such as `OHB_PRO_PLUGINS`). Empty or blank means no plug-in.
+ * variable such as `OPENEDBOT_PLUGINS`). Empty or blank means no plug-in.
  */
 export function parsePluginList(value: string | undefined): string[] {
   if (!value) return [];
@@ -155,6 +155,12 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
   return null;
 }
 
+/**
+ * Prefixes of the core's own variables: `OPENEDBOT_`, and `OHB_`, the prefix
+ * they carried until the OPENEDBOT_ rename (still read for one release).
+ */
+const CORE_ENV_PREFIXES = ["OPENEDBOT_", "OHB_"] as const; // rename:keep
+
 function invalidEnvReason(declared: unknown, reserved: ((name: string) => boolean) | undefined): string | null {
   if (!Array.isArray(declared) || declared.length > PLUGIN_ENV_MAX) return "invalid manifest.env";
   const names = new Set<string>();
@@ -162,7 +168,7 @@ function invalidEnvReason(declared: unknown, reserved: ((name: string) => boolea
     if (!isRecord(variable) || typeof variable.name !== "string" || !PLUGIN_ENV_NAME_RE.test(variable.name)) return "invalid manifest.env entry";
     if (variable.requiredInProduction !== undefined && typeof variable.requiredInProduction !== "boolean") return "invalid manifest.env entry";
     const name = variable.name;
-    if (name.startsWith("OHB_") || reserved?.(name)) return `manifest.env ${JSON.stringify(name)} is a core variable`;
+    if (CORE_ENV_PREFIXES.some((prefix) => name.startsWith(prefix)) || reserved?.(name)) return `manifest.env ${JSON.stringify(name)} is a core variable`;
     if (names.has(name)) return `duplicate manifest.env ${JSON.stringify(name)}`;
     names.add(name);
   }

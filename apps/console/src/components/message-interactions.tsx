@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useThreadEditAvailability } from "../lib/thread-edit-availability";
+import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
 import {
   Check,
   ChevronLeft,
@@ -47,7 +47,7 @@ import {
   DropdownMenuTrigger,
   useCoarsePointer,
 } from "@openedbot/browser-ui-kit";
-import { haptics } from "../lib/haptics";
+import { haptics } from "../lib/platform/haptics";
 import { RiFileCopyLine, RiMoreFill, RiThumbDownLine, RiThumbUpLine } from "@remixicon/react";
 import { BUI_MENU_ITEM, BUI_POPOVER, BuiContextMenu, BuiContextMenuContent, BuiContextMenuItem, BuiContextMenuTrigger } from "./boardui/menu";
 

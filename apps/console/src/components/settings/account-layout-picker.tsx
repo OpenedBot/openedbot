@@ -1,6 +1,6 @@
 import { cn } from "@openedbot/browser-ui-kit";
 import { useT, type MessageKey } from "../../lib/i18n";
-import { ACCOUNT_LAYOUTS, setAccountLayout, useAccountLayout, type AccountLayout } from "../../lib/account-layout";
+import { ACCOUNT_LAYOUTS, setAccountLayout, useAccountLayout, type AccountLayout } from "../../lib/shell/account-layout";
 
 const LAYOUT_COPY: Record<AccountLayout, { name: MessageKey; hint: MessageKey }> = {
   base: { name: "settings.appearance.layouts.base.name", hint: "settings.appearance.layouts.base.hint" },

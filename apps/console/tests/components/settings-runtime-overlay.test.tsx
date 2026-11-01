@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { queryKeys } from "../../src/lib/api";
 import { I18nProvider } from "../../src/lib/i18n";
-import { useOpenSettings } from "../../src/lib/settings-overlay";
-import { setSettingsDisplay } from "../../src/lib/settings-display";
+import { useOpenSettings } from "../../src/lib/shell/settings-overlay";
+import { setSettingsDisplay } from "../../src/lib/shell/settings-display";
 
 // `mock.module` is process-wide in Bun: keep copies of the real modules and put
 // them back after this file, or every later suite renders these fixtures.

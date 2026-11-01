@@ -1,6 +1,6 @@
 import { isRestoredQueryData } from "../../lib/query-persister";
-import { useWorkspaceTextDraft, useWorkspaceAttachmentDraft } from "../../lib/workspace-draft";
-import { usePublishRunInProgress } from "../../lib/run-in-progress";
+import { useWorkspaceTextDraft, useWorkspaceAttachmentDraft } from "../../lib/workspace/workspace-draft";
+import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,19 +8,19 @@ import { Dialog, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
 import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
-import { applySendAcceptedToCaches } from "../../lib/apply-send-accepted";
-import { useThreadMessageSend } from "../../lib/use-thread-message-send";
+import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
+import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
 import { randomId } from "../../lib/random-id";
 import {
   threadContainsOutgoingUserInput,
-} from "../../lib/thread-anchor";
-import { useThreadStream } from "../../lib/use-thread-stream";
-import { useConnectedMcpPlugins } from "../../lib/use-mcp-plugins";
+} from "../../lib/thread/thread-anchor";
+import { useThreadStream } from "../../lib/stream/use-thread-stream";
+import { useConnectedMcpPlugins } from "../../lib/runtime/use-mcp-plugins";
 import { Composer } from "../../components/composer";
 import { GroupFaceStack } from "../../components/group-face-stack";
 import { ThreadTimeline } from "../../components/thread-timeline";
 import { ThreadTurnRail } from "../../components/thread-turn-rail";
-import { buildThreadRailTurns } from "../../lib/thread-turn-rail";
+import { buildThreadRailTurns } from "../../lib/thread/thread-turn-rail";
 import { WorkflowOverview } from "../../components/workflow-overview";
 import { GroupContextTab } from "../../components/group-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
@@ -29,23 +29,23 @@ import { ConversationPending, ThreadSkeleton } from "../../components/thread-ske
 import { VoiceDictation } from "../../components/voice-dictation";
 import { GroupVoiceCall, type GroupVoiceResponse } from "../../components/group-voice-call";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
-import { useDismissedAskUserRuns } from "../../lib/ask-user-dismissals";
+import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import {
   prepareMessageSubmission,
   type IdempotentMessageSubmission,
 } from "@openedbot/conversation/domain/message-submission";
 import { useT } from "../../lib/i18n";
-import { readableRunFailure } from "../../lib/model-unavailable";
-import { runProviderAuthLabel } from "../../lib/provider-auth";
-import { currentThreadRun } from "../../lib/current-thread-run";
-import { useMarkThreadRead } from "../../lib/use-mark-thread-read";
-import { useThreadFind } from "../../lib/use-thread-find";
-import { mergeVoiceTranscript } from "../../lib/web-voice-recognition";
+import { readableRunFailure } from "../../lib/run/model-unavailable";
+import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
+import { currentThreadRun } from "../../lib/thread/current-thread-run";
+import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
+import { useThreadFind } from "../../lib/thread/use-thread-find";
+import { mergeVoiceTranscript } from "../../lib/voice/web-voice-recognition";
 import { PendingApprovalDock } from "../../components/gate-card";
-import { liveApprovals } from "../../lib/live-approvals";
+import { liveApprovals } from "../../lib/run/live-approvals";
 import { RunActivityDock } from "../../components/run-activity-dock";
 import { DevRenderProfiler } from "../../components/dev/dev-render-profiler";
-import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/use-content-stable";
+import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/hooks/use-content-stable";
 import { BUTTON } from "../../components/settings/primitives";
 
 /**

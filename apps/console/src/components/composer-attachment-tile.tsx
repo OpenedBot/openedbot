@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { File as FileGeneric, FileCode, FileJson, FileSpreadsheet, FileText } from "lucide-react";
 import { cn } from "@openedbot/browser-ui-kit";
-import { keepSoftKeyboard } from "../lib/composer-keyboard";
+import { keepSoftKeyboard } from "../lib/composer/composer-keyboard";
 
 /**
  * The 56 px attachment tile of the composer, cloned from the reference's

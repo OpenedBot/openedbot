@@ -12,7 +12,7 @@ import {
   type ToolKind,
 } from "@openedbot/conversation/domain/thread-tools";
 import { useT } from "../lib/i18n";
-import { toolProgressLabel } from "../lib/tool-progress-label";
+import { toolProgressLabel } from "../lib/run/tool-progress-label";
 import { ActivityDisclosure } from "./activity-disclosure";
 import { TurnAuthorHeader } from "./thread-author";
 import { ThreadMarkdown } from "./thread-markdown";

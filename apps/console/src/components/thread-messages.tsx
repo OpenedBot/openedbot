@@ -3,19 +3,19 @@ import { Link } from "@tanstack/react-router";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { segmentMentions } from "@openedbot/roster/domain/mentions";
 import { useT } from "../lib/i18n";
-import { stabilizeStreamingMarkdown } from "../lib/streaming-markdown";
-import { useSmoothText } from "../lib/use-smooth-text";
+import { stabilizeStreamingMarkdown } from "../lib/stream/streaming-markdown";
+import { useSmoothText } from "../lib/stream/use-smooth-text";
 import type { MessageAttachmentChip } from "./attachment-canvas";
 import { BotFace } from "./bot-face";
 import { MessageInteractionShell, type MessageCardHover } from "./message-interactions";
-import { type RunTiming } from "../lib/run-timing";
+import { type RunTiming } from "../lib/run/run-timing";
 import { RunTimingBadge } from "./run-timing";
 import { AttachmentTile } from "./thread-attachment-tile";
 import { ThreadMarkdown } from "./thread-markdown";
-import { modelUnavailableMessage } from "../lib/model-unavailable";
-import { useOpenSettings } from "../lib/settings-overlay";
+import { modelUnavailableMessage } from "../lib/run/model-unavailable";
+import { useOpenSettings } from "../lib/shell/settings-overlay";
 import { providerLabel } from "./provider-icon";
-import { requestProviderReconnect } from "../lib/provider-auth";
+import { requestProviderReconnect } from "../lib/runtime/provider-auth";
 
 /**
  * The failure of a turn whose provider refused the bot's login

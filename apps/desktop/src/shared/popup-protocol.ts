@@ -4,7 +4,8 @@
 //
 // Pure module (no electron import): the main process uses it, `bun test`
 // exercises it, and the future Windows popup (Electron) can reuse both
-// directions. Mirrored in ../notch/Sources/OHBPopup/Host/HostProtocol.swift.
+// directions. Mirrored in OpenedBot/openedbot-notch,
+// Sources/OHBPopup/Host/HostProtocol.swift: change both sides together.
 //
 // Rules: an unknown protocol version ends the session; a malformed line is
 // dropped and logged without its content; the refresh token never crosses this

@@ -21,7 +21,7 @@ const SESSION = "Bearer signed-in";
 /** Never reached: the core route reads nothing, the fixture plug-in does not query. */
 const db = new Proxy({}, { get() { throw new Error("the webhook touched the database"); } }) as unknown as Db;
 const config = { billingPriceEur: 19 } as unknown as ApiConfig;
-const ENV = { OHB_PRO_BILLING__WEBHOOK_SECRET: "plugin-side", PAY_WEBHOOK_SECRET: "core-side" };
+const ENV = { OPENEDBOT_PLUGIN_BILLING__WEBHOOK_SECRET: "plugin-side", PAY_WEBHOOK_SECRET: "core-side" };
 
 /**
  * The order of `apps/api/src/index.ts`: core error handler, 404, the webhook
@@ -111,7 +111,7 @@ describe("the payment webhook at the plug-in's path (step 11.5)", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]!.body).toBe('{"id":"evt_1"}');
     expect(seen[0]!.request.headers.get("Provider-Signature")).toBe("t=1,v1=abc");
-    // Only its own OHB_PRO_BILLING__* variables, never the core's, nor an undeclared deployment name.
+    // Only its own OPENEDBOT_PLUGIN_BILLING__* variables, never the core's, nor an undeclared deployment name.
     expect(seen[0]!.context?.config).toEqual({ WEBHOOK_SECRET: "plugin-side" });
     expect(seen[0]!.context?.env).toBeUndefined();
     // Step 8d: the core lends its database and resolved config, nothing else.

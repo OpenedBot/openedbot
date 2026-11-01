@@ -132,7 +132,7 @@ class RuntimeHomeScopeTests(unittest.TestCase):
             fake_constants.reset_hermes_home_override = reset_home
             environment = os.environ.copy()
             environment["HERMES_HOME"] = str(root / "not-the-active-home")
-            environment["OHB_SCOPE_TEST_SENTINEL"] = "unchanged"
+            environment["OPENEDBOT_SCOPE_TEST_SENTINEL"] = "unchanged"
 
             with patch.dict(os.environ, environment, clear=True), patch.dict(
                 sys.modules, {"hermes_constants": fake_constants}

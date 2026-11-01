@@ -77,45 +77,23 @@ describe("OHB-15 : aucun canal shell vers un hôte client", () => {
   });
 });
 
-describe("OHB-15 : la configuration refuse le canal SSH", () => {
+describe("OHB-15 : la configuration n'ouvre aucun canal SSH", () => {
   const base = {
-    OHB_ENV: "development",
-    OHB_RUNTIME_MODE: "external",
+    OPENEDBOT_ENV: "development",
     RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     WORKER_INTERNAL_TOKEN: "worker-secret",
     METRICS_INTERNAL_TOKEN: "metrics-secret",
   };
 
-  test("`ssh` est refusé, y compris en développement", () => {
+  // La variable qui réglait l'administration est retirée : `ssh`, `local`
+  // ou toute autre valeur est ignorée et aucun canal ne s'ouvre.
+  test("l'ancienne variable d'administration est ignorée, `ssh` compris", () => {
     for (const environment of ["development", "staging"]) {
-      expect(() => readApiConfig({
-        ...base,
-        OHB_ENV: environment,
-        OHB_RUNTIME_ADMIN_MODE: "ssh",
-      })).toThrow(/OHB_RUNTIME_ADMIN_MODE/u);
+      for (const value of ["ssh", "local"]) {
+        const config = readApiConfig({ ...base, OPENEDBOT_ENV: environment, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
+        expect(config.runtimeAdminChannels.local).toBe(false);
+      }
     }
-  });
-
-  test("le message renvoie vers le geste client", () => {
-    let message = "";
-    try {
-      readApiConfig({ ...base, OHB_RUNTIME_ADMIN_MODE: "ssh" });
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error);
-    }
-    expect(message).toMatch(/disabled/u);
-    expect(message).toMatch(/local/u);
-    expect(message).not.toMatch(/,\s*ssh\b|\bssh\s+or\b/u);
-  });
-
-  // OHB-74 : le Hermes intégré est retiré ; `local` reste une valeur acceptée
-  // (compatibilité des .env) mais n'ouvre plus aucun canal d'administration.
-  test("`local` reste accepté mais n'ouvre plus de canal", () => {
-    const config = readApiConfig({
-      ...base,
-      OHB_RUNTIME_ADMIN_MODE: "local",
-    });
-    expect(config.runtimeAdminChannels.local).toBe(false);
   });
 });
 

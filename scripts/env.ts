@@ -23,13 +23,15 @@ import {
   type EnvTemplateEntry,
   type EnvVar,
 } from "../platform/config/src/env-schema";
-import { readRuntimeMode } from "../platform/config/src/runtime-mode";
+import { RUNTIME_MODE } from "../platform/config/src/runtime-mode";
+import { mergedEnvTarget, renamedEnvName } from "../platform/config/src/env-aliases";
 import {
   assertUniqueEnvNames,
   classifyLocalEnvEntry,
   mergeEnvFiles,
   parseEnvLine,
   readEnvFiles,
+  withRenamedEnvValues,
 } from "./lib/env-file";
 
 function usage(): never {
@@ -48,12 +50,14 @@ async function runCheck(): Promise<void> {
   const mode = process.argv.includes("--production") ? "production" : "development";
   // One file for the monorepo (ENV_DIR_OF_SCOPE): validate it, and say
   // which file a missing or wrong value belongs to.
-  const path = basename(process.env.OHB_ENV_FILE?.trim() || ".env.local");
+  const path = basename(process.env.ENV_FILE?.trim() || ".env.local");
   const files = await readEnvFiles(path);
   if (!files.length) {
     throw new Error(`No ${path} found. Run \`make setup\`, or copy each .env.example next to it.`);
   }
-  const { values, sourceOf } = mergeEnvFiles(files);
+  const merged = mergeEnvFiles(files);
+  const values = withRenamedEnvValues(merged.values);
+  const { sourceOf } = merged;
 
   /** Where a variable must be set, for an error message that is actionable. */
   function fileOf(name: string): string {
@@ -62,10 +66,7 @@ async function runCheck(): Promise<void> {
 
   // The runtime mode only matters in development: production is `external`
   // by construction and its required set does not depend on it.
-  const runtimeMode = mode === "development" ? readRuntimeMode(process.env.OHB_RUNTIME_MODE, "development") : undefined;
-  if (mode === "development" && values.OHB_RUNTIME_MODE && values.OHB_RUNTIME_MODE !== runtimeMode) {
-    throw new Error(`OHB_RUNTIME_MODE=${values.OHB_RUNTIME_MODE} in ${fileOf("OHB_RUNTIME_MODE")} conflicts with requested mode ${runtimeMode}.`);
-  }
+  const runtimeMode = mode === "development" ? RUNTIME_MODE : undefined;
   const required = requiredEnvNames(mode, runtimeMode);
 
   for (const name of required) {
@@ -75,20 +76,14 @@ async function runCheck(): Promise<void> {
   // misspelled one would silently never reach its plug-in.
   const malformed = Object.keys(values).filter(isMalformedPluginEnvName);
   if (malformed.length) {
-    throw new Error(`${malformed.join(", ")}: not a plug-in variable; expected OHB_PRO_PLUGINS or OHB_PRO_<ID>__<KEY>.`);
+    throw new Error(`${malformed.join(", ")}: not a plug-in variable; expected OPENEDBOT_PLUGINS or OPENEDBOT_PLUGIN_<ID>__<KEY>.`);
   }
-  // Le nom de la base est écrit trois fois : OHB_DATABASE_NAME pour les scripts
-  // (db-migrate, db-reset), et à l'intérieur des deux DSN pour l'API et le
-  // worker, qui ont chacun leur rôle PostgreSQL. Les trois doivent désigner la
-  // même base : sinon `make db-migrate` migre une base et les apps tournent sur
-  // une autre, sans que rien ne le signale.
+  // Le nom de la base est écrit deux fois, dans les DSN de l'API et du worker,
+  // qui ont chacun leur rôle PostgreSQL ; les scripts (db-migrate, db-reset)
+  // le lisent dans celui de l'API. Les deux doivent désigner la même base :
+  // sinon `make db-migrate` migre une base et le worker tourne sur une autre.
   assertSameDatabase(values);
 
-  // OHB-15 : le canal SSH sortant a été retiré du code. `ssh` n'est plus une
-  // valeur dégradée, c'est une valeur qui n'existe plus.
-  if (values.OHB_RUNTIME_ADMIN_MODE && !new Set(["disabled", "local"]).has(values.OHB_RUNTIME_ADMIN_MODE)) {
-    throw new Error("OHB_RUNTIME_ADMIN_MODE must be disabled or local.");
-  }
   // La PWA appelle `/api` sur sa propre origine en développement et Vite relaie
   // vers l'API : une valeur locale ferait sortir le navigateur du proxy et
   // casserait CORS et les cookies. Ce n'est pas un réglage optionnel.
@@ -180,9 +175,6 @@ async function runCheck(): Promise<void> {
     if (values.DEV_HERMES_URL?.startsWith("http://")) {
       throw new Error("Production configuration must not contain a plaintext Hermes URL.");
     }
-    if ((values.OHB_RUNTIME_ADMIN_MODE ?? "disabled") !== "disabled") {
-      throw new Error("Production requires OHB_RUNTIME_ADMIN_MODE=disabled.");
-    }
     const legalMaxBytes = values.LEGAL_MAX_BYTES ? Number(values.LEGAL_MAX_BYTES) : DEFAULT_LEGAL_MAX_BYTES;
     if (!Number.isSafeInteger(legalMaxBytes) || legalMaxBytes < 1 || legalMaxBytes > MAX_LEGAL_MAX_BYTES) {
       throw new Error(`LEGAL_MAX_BYTES must be an integer between 1 and ${MAX_LEGAL_MAX_BYTES}.`);
@@ -209,15 +201,13 @@ async function runCheck(): Promise<void> {
   }
 
   function assertSameDatabase(values: Record<string, string | undefined>): void {
-    const declared = values.OHB_DATABASE_NAME?.trim() || "ohb";
-    for (const name of ["API_DATABASE_URL", "WORKER_DATABASE_URL"] as const) {
-      const database = databaseOfDsn(values[name]);
-      if (database && database !== declared) {
-        throw new Error(
-          `${name} points at the database "${database}" while OHB_DATABASE_NAME is "${declared}". ` +
-            "Migrations and the applications would use different databases.",
-        );
-      }
+    const declared = databaseOfDsn(values.API_DATABASE_URL) ?? "ohb";
+    const database = databaseOfDsn(values.WORKER_DATABASE_URL);
+    if (database && database !== declared) {
+      throw new Error(
+        `WORKER_DATABASE_URL points at the database "${database}" while API_DATABASE_URL points at "${declared}". ` +
+          "Migrations and the worker would use different databases.",
+      );
     }
   }
 
@@ -239,7 +229,7 @@ async function runAudit(): Promise<void> {
    */
 
   const DEV_TEMPLATE = ".env.example";
-  const localName = basename(process.env.OHB_ENV_FILE?.trim() || ".env.local");
+  const localName = basename(process.env.ENV_FILE?.trim() || ".env.local");
   const apply = process.argv.includes("--apply");
 
   const templates = await readEnvFiles(DEV_TEMPLATE);
@@ -265,33 +255,81 @@ async function runAudit(): Promise<void> {
     console.info(`${localName}: absent; templates are consistent.`);
     process.exit(0);
   }
-  const { values } = mergeEnvFiles(locals);
-  const runtimeMode = readRuntimeMode(
-    process.env.OHB_RUNTIME_MODE?.trim() || values.OHB_RUNTIME_MODE?.trim(),
-    "development",
-  );
+  const values = withRenamedEnvValues(mergeEnvFiles(locals).values);
+  const runtimeMode = RUNTIME_MODE;
 
   const removable: string[] = [];
+  const renamed: string[] = [];
   const kept: string[] = [];
   const misfiled: string[] = [];
+  const presentNames = new Set(locals.flatMap((local) => local.entries.map((entry) => entry.name)));
+  // A merged old name (ENV_MERGES) changes the value of its target: the
+  // target line is rewritten with the converted value (`values` holds it),
+  // or written in place of the first old line when the target is absent.
+  const mergedTargets = new Set([...presentNames].map(mergedEnvTarget).filter((into): into is string => into !== undefined));
+  const presentAfterRename = new Set([...presentNames].map((name) => renamedEnvName(name) ?? name));
+  const writtenTargets = new Set<string>();
+  const beforeMerges = withRenamedEnvValues(mergeEnvFiles(locals).values, { merges: false });
+  const mergedLine = (into: string): string | null => {
+    if (writtenTargets.has(into)) return null;
+    writtenTargets.add(into);
+    if (values[into] !== undefined) return `${into}=${values[into]}`;
+    // Turned off by an old setting: commented out, never deleted, so that a
+    // secret the operator kept is not lost.
+    return beforeMerges[into] === undefined ? null : `# ${into}=${beforeMerges[into]} # off: an old OHB_* setting disabled it (env-audit)`;
+  };
 
   for (const local of locals) {
-    const nextLines = local.text.split(/\r?\n/).filter((line) => {
+    const nextLines: string[] = [];
+    for (const line of local.text.split(/\r?\n/)) {
       const parsed = parseEnvLine(line);
-      if (!parsed) return true;
+      if (!parsed) {
+        nextLines.push(line);
+        continue;
+      }
+      if (mergedTargets.has(parsed.name)) {
+        const rewritten = mergedLine(parsed.name);
+        if (rewritten !== null && rewritten !== line) renamed.push(`${parsed.name}: converted value from the merged old names (${local.path})`);
+        if (rewritten !== null) nextLines.push(rewritten);
+        continue;
+      }
       const decision = classifyLocalEnvEntry(parsed, runtimeMode);
+      const into = mergedEnvTarget(parsed.name);
+      if (decision === "rename" && into) {
+        renamed.push(`${parsed.name} -> folded into ${into} (${local.path})`);
+        if (!presentAfterRename.has(into)) {
+          const rewritten = mergedLine(into);
+          if (rewritten !== null) nextLines.push(rewritten);
+        }
+        continue;
+      }
+      if (decision === "rename") {
+        // The value moves to the new name; never dropped (one-release rename).
+        const next = renamedEnvName(parsed.name)!;
+        if (presentNames.has(next)) {
+          renamed.push(`${parsed.name} -> ${next}, already set: old line removed (${local.path})`);
+        } else if (mergedTargets.has(next)) {
+          renamed.push(`${parsed.name} -> ${next}, value converted from the merged old names (${local.path})`);
+          const rewritten = mergedLine(next);
+          if (rewritten !== null) nextLines.push(rewritten);
+        } else {
+          renamed.push(`${parsed.name} -> ${next} (${local.path})`);
+          nextLines.push(`${next}=${parsed.value}`);
+        }
+        continue;
+      }
       if (decision === "remove") {
         removable.push(`${parsed.name} (${local.path})`);
-        return false;
+        continue;
       }
       if (decision === "preserve") kept.push(parsed.name);
       const declared = envSchemaEntry(parsed.name);
       const owner = declared ? ENV_DIR_OF_SCOPE[declared.scope] : local.dir;
       if (owner !== local.dir) misfiled.push(`${parsed.name}: ${local.path} -> ${envFilePath(owner, localName)}`);
-      return true;
-    });
+      nextLines.push(line);
+    }
 
-    if (apply && nextLines.length !== local.text.split(/\r?\n/).length) {
+    if (apply && nextLines.join("\n") !== local.text.split(/\r?\n/).join("\n")) {
       const temporary = `${local.path}.tmp`;
       await writeFile(temporary, `${nextLines.join("\n").replace(/\n+$/, "")}\n`, { mode: 0o600 });
       await chmod(temporary, 0o600);
@@ -300,6 +338,9 @@ async function runAudit(): Promise<void> {
   }
 
   console.info(`${localName}: removable empty or obsolete variables: ${removable.sort().join(", ") || "none"}.`);
+  if (renamed.length) {
+    console.info(`${localName}: ${apply ? "renamed" : "to rename (OHB_* -> OPENEDBOT_*, values kept or converted; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
+  }
   if (kept.length) console.info(`${localName}: preserved non-empty non-local variables: ${[...new Set(kept)].sort().join(", ")}.`);
   for (const line of misfiled.sort()) {
     console.info(`${localName}: in the wrong file, \`bun scripts/env.ts --template --write-local\` moves it — ${line}`);
@@ -317,7 +358,7 @@ async function runAudit(): Promise<void> {
  *   --print-production  write the production template to stdout. Deployment
  *                       values are secret-manager owned, so the repository
  *                       keeps no production file to drift from the schema.
- *   --write-local       rewrite OHB_ENV_FILE (default .env.local) in schema
+ *   --write-local       rewrite ENV_FILE (default .env.local) in schema
  *                       order, keeping every existing value and applying the
  *                       same removal rules as `env-audit --apply`. Never
  *                       prints a value.
@@ -362,8 +403,8 @@ function banner(title: string): string {
 const GENERATED_FROM = `Generated from ${SCHEMA_PATH} by \`make env-template\`.`;
 
 const ROOT_NOTES = [
-  "`make setup` rewrites OHB_RUNTIME_MODE from its profile: MODE=fake (default)",
-  "and MODE=external -> external. No lab URL is defaulted.",
+  "`make setup` writes DEV_HERMES_URL from its profile: MODE=fake (default) points",
+  "at tests/fake-hermes, MODE=external at your runtime. No lab URL is defaulted.",
 ];
 
 function devHeader(dir: string): string[] {
@@ -405,7 +446,7 @@ async function runTemplate(): Promise<void> {
   } else if (mode === "--print-production") {
     process.stdout.write(productionTemplate());
   } else if (mode === "--write-local") {
-    await writeLocal(basename(process.env.OHB_ENV_FILE?.trim() || ".env.local"));
+    await writeLocal(basename(process.env.ENV_FILE?.trim() || ".env.local"));
   } else {
     console.error("usage: bun scripts/env.ts --template --check | --write | --print-production | --write-local");
     process.exit(2);
@@ -485,11 +526,8 @@ async function write(): Promise<void> {
 async function writeLocal(fileName: string): Promise<void> {
   const files = await readEnvFiles(fileName);
   if (!files.length) throw new Error(`No ${fileName} found in the monorepo; nothing to rewrite.`);
-  const { values: existing } = mergeEnvFiles(files);
-  const runtimeMode = readRuntimeMode(
-    process.env.OHB_RUNTIME_MODE?.trim() || existing.OHB_RUNTIME_MODE?.trim(),
-    "development",
-  );
+  const existing = withRenamedEnvValues(mergeEnvFiles(files).values);
+  const runtimeMode = RUNTIME_MODE;
   const unusedForMode = envUnusedForRuntimeMode(runtimeMode);
 
   const removed: string[] = [];
@@ -527,9 +565,16 @@ async function writeLocal(fileName: string): Promise<void> {
   // Unknown to the schema: kept verbatim in the root file, as env-audit does,
   // so that nothing an operator added on purpose disappears silently.
   const unknown: string[] = [];
+  const renamed: string[] = [];
   for (const file of files) {
     for (const parsed of file.entries) {
       if (envSchemaEntry(parsed.name)) continue;
+      const next = renamedEnvName(parsed.name) ?? mergedEnvTarget(parsed.name);
+      if (next) {
+        // Its value now sits under the new name (withRenamedEnvValues).
+        renamed.push(`${parsed.name} -> ${next}`);
+        continue;
+      }
       if (isDeprecatedEnvName(parsed.name)) {
         removed.push(parsed.name);
         continue;
@@ -543,7 +588,7 @@ async function writeLocal(fileName: string): Promise<void> {
     const entries = byDir.get(dir)!;
     const path = envFilePath(dir, fileName);
     // An application with no variable of its own gets no empty file. The root
-    // one always exists: it carries OHB_RUNTIME_MODE, which the Makefile reads.
+    // one always exists: the Makefile reads DEV_HERMES_URL from it.
     if (!entries.length && dir !== "." && !unknown.length) {
       if (await Bun.file(path).exists()) {
         await unlink(path);
@@ -564,6 +609,7 @@ async function writeLocal(fileName: string): Promise<void> {
 
   console.info(`runtime mode ${runtimeMode}; removed: ${removed.sort().join(", ") || "none"}.`);
   console.info(`added from the template: ${added.sort().join(", ") || "none"}.`);
+  if (renamed.length) console.info(`renamed (values kept): ${renamed.sort().join(", ")}.`);
   for (const line of moved.sort()) console.info(`moved ${line}`);
   if (preserved.length) console.info(`preserved non-empty non-local variables: ${preserved.sort().join(", ")}.`);
   if (unknown.length) console.info(`kept ${unknown.length} variable(s) unknown to the schema in ${fileName}.`);
@@ -592,10 +638,10 @@ function runWhere(): void {
    *   bun scripts/env.ts --where PORT            every name containing PORT
    *   bun scripts/env.ts --where                 every declared variable, one line each
    *
-   *   OHB_ENV_FILE   name of the private file (default .env.local).
+   *   ENV_FILE   name of the private file (default .env.local).
    */
 
-  const fileName = (process.env.OHB_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
+  const fileName = (process.env.ENV_FILE?.trim() || ".env.local").split("/").pop()!;
   const query = process.argv[2]?.trim().toUpperCase();
 
   /** Where the variable would sit if it were set, template or private file. */
@@ -653,10 +699,10 @@ function runFileOf(): void {
    * cannot import the schema, and asking Bun once per variable would pay a
    * process start each time — so the whole map is emitted in one call.
    *
-   *   OHB_ENV_FILE   name of the private file (default .env.local).
+   *   ENV_FILE   name of the private file (default .env.local).
    */
 
-  const fileName = (process.env.OHB_ENV_FILE?.trim() || ".env.local").split("/").pop()!;
+  const fileName = (process.env.ENV_FILE?.trim() || ".env.local").split("/").pop()!;
   const lines = ENV_SCHEMA.map((entry) => `${entry.name}\t${envFilePath(ENV_DIR_OF_SCOPE[entry.scope], fileName)}`);
   process.stdout.write(`${lines.join("\n")}\n`);
 }

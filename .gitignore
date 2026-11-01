@@ -24,6 +24,11 @@ keys-tmp.txt
 apps/*/.env
 apps/*/.env.*
 
+# Réglages make propres au poste (LINK_DEV_HOST...). Le Makefile racine reste
+# suivi : une règle d'ignore ne retire pas un fichier déjà versionné.
+/Makefile
+/Makefile.local
+
 # Checkout des plug-ins externes, cloné ou lié en ./plugins (voir le Makefile,
 # plugins_dir) : jamais versionné ici.
 /plugins

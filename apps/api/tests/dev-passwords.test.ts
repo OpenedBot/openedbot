@@ -38,8 +38,8 @@ describe("dev seed passwords", () => {
     expect(ensureDevPasswords(env, file, () => "never")).toEqual([]);
   });
 
-  test("the env file follows OHB_ENV_FILE, else the repository .env.local", () => {
+  test("the env file follows ENV_FILE, else the repository .env.local", () => {
     expect(devEnvFilePath({}, "/repo")).toBe("/repo/.env.local");
-    expect(devEnvFilePath({ OHB_ENV_FILE: ".env.other" }, "/repo")).toBe("/repo/.env.other");
+    expect(devEnvFilePath({ ENV_FILE: ".env.other" }, "/repo")).toBe("/repo/.env.other");
   });
 });

@@ -5,7 +5,7 @@ import { cn } from "@openedbot/browser-ui-kit";
 import type { HermesBundleImportInput, HermesBundleImportJobDto, HermesProfileImportEntry } from "@openedbot/contracts-api";
 import { collectHermesProfiles, hermesArchiveSlug, HERMES_IMPORT_MAX_JSON_BYTES, parseHermesProfileFiles } from "@openedbot/portability/domain/hermes-profile-bundle";
 import { api, errorMessage, queryKeys } from "../lib/api";
-import { readHermesArchive } from "../lib/hermes-archive";
+import { readHermesArchive } from "../lib/bots/hermes-archive";
 import { useT } from "../lib/i18n";
 import { randomId } from "../lib/random-id";
 import { BUTTON } from "./settings/primitives";

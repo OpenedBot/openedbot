@@ -19,7 +19,7 @@ import {
 import { formatBytes } from "@openedbot/browser-i18n";
 import type { MessageContent } from "@openedbot/contracts-api";
 import { api } from "../lib/api";
-import { releaseComposerKeyboard } from "../lib/composer-keyboard";
+import { releaseComposerKeyboard } from "../lib/composer/composer-keyboard";
 import { useT } from "../lib/i18n";
 import { documentMarkdownComponents } from "./thread-markdown";
 

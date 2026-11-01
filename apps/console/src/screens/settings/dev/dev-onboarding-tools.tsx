@@ -11,7 +11,7 @@ import { useT } from "../../../lib/i18n";
 
 /**
  * Outils de développement : la carte n'existe que si le cloud API a publié
- * `devSignIn` sur `/api/auth/providers`, c'est-à-dire en OHB_ENV=development
+ * `devSignIn` sur `/api/auth/providers`, c'est-à-dire en OPENEDBOT_ENV=development
  * et nulle part ailleurs : le même interrupteur que « Remplir (dev) » de la
  * porte de connexion, et le même que celui qui MONTE `/api/onboarding/reset`
  * côté API. Un build de production ne peut donc ni montrer les boutons ni

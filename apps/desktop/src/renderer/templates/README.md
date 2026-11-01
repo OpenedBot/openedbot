@@ -3,7 +3,7 @@
 The shell's sign-in page (`../signin.html`) has one markup and one behaviour
 (`../../preload/preload.ts`, `../signin-base.css`). A template is **one CSS
 file** in this folder that gives that markup a look. Pick one with
-`OHB_SIGNIN_TEMPLATE=<name>` or `"signinTemplate": "<name>"` in
+`OPENEDBOT_SIGNIN_TEMPLATE=<name>` or `"signinTemplate": "<name>"` in
 `userData/config.json`; an unknown name falls back to `console-split`.
 
 ## Rules

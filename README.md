@@ -18,7 +18,7 @@ gateway on `127.0.0.1` and opens a single outbound WebSocket to the openedbot li
 
 This monorepo holds the open core and its clients. Optional plug-ins (staff back office,
 billing, agency features) and deployment code are not part of it: the core loads plug-ins from
-an external directory at run time (`OHB_PRO_PLUGINS`) and runs fully without them.
+an external directory at run time (`OPENEDBOT_PLUGINS`) and runs fully without them.
 
 ## Layout
 
@@ -30,13 +30,13 @@ edge-setup/     Go installer and connector run on the customer's server (module
                 github.com/OpenedBot/openedbot/edge-setup, tags edge-setup/vX.Y.Z)
 protocol/       versioned connector protocol specification and reference connector
 docs/           documentation site (Astro Starlight), docs.openedbot.app
-apps/desktop/   desktop client (Electron)
-apps/notch/     macOS notch UI prototype (Swift)
+apps/desktop/   desktop client (Electron); on macOS it embeds the notch popup built
+                from OpenedBot/openedbot-notch (NOTCH_DIR, see apps/desktop/README.md)
 ```
 
-`edge-setup/`, `protocol/`, `docs/` and `apps/{desktop,notch}` were imported with their
-full history (`git subtree`) from their former repositories. They keep their own toolchains
-(Go, Swift, Electron, Astro) and are not Bun workspaces of the core.
+`edge-setup/`, `protocol/`, `docs/` and `apps/desktop` keep their own toolchains
+(Go, Electron, Astro) and are not Bun workspaces of the core. The macOS notch UI (Swift)
+lives in its own repository, [OpenedBot/openedbot-notch](https://github.com/OpenedBot/openedbot-notch).
 
 ## Build and test
 
@@ -59,7 +59,8 @@ directory ignored by git: clone or symlink the plug-in checkout there
 `plugins/admin`, and the checkout's `make/*.mk` fragments, if any, are included by the
 Makefile.
 
-> The packages are named `@openedbot/*`; `OHB_*` variables and `X-OHB-*` headers are technical
+> The packages are named `@openedbot/*` and the variables `OPENEDBOT_*` (the legacy `OHB_*`
+> names are still read for one release, with a warning); `X-OHB-*` headers are technical
 > names kept for compatibility.
 
 ## License

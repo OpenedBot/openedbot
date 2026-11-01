@@ -4,7 +4,7 @@
  * runs their `onTenantDeleting` hooks in the purge transaction, and schedules
  * their `jobs` next to the core maintenance jobs.
  *
- * Same rules as the API: an empty or unset `OHB_PRO_PLUGINS` is solo and
+ * Same rules as the API: an empty or unset `OPENEDBOT_PLUGINS` is solo and
  * runs no query; a pool role that could bypass row-level security drops
  * every plug-in; in production, a loaded plug-in missing one of its
  * `requiredInProduction` deployment variables stops the boot (solo requires
@@ -56,7 +56,7 @@ export async function loadWorkerPro(
   log: WorkerProLog,
   options: Pick<LoadOptions, "importer"> = {},
 ): Promise<WorkerPro> {
-  const loaded = await loadProPlugins(parsePluginList(env.OHB_PRO_PLUGINS), { reservedEnv: isCoreEnvName, ...options, warn: log.skipped });
+  const loaded = await loadProPlugins(parsePluginList(env.OPENEDBOT_PLUGINS), { reservedEnv: isCoreEnvName, ...options, warn: log.skipped });
   // Every environment: one owner per deployment variable, as in the API.
   assertDistinctPluginEnv(loaded.plugins);
   if (config.environment === "production") assertWorkerProPluginProductionEnv(loaded.plugins, env);

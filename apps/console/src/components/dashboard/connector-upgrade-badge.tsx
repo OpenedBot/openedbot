@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { RiServerLine } from "@remixicon/react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { runtimeQueryOptions } from "../../lib/api";
-import { connectorUpgradeLevel } from "../../lib/connector-upgrade";
+import { connectorUpgradeLevel } from "../../lib/runtime/connector-upgrade";
 import { useT } from "../../lib/i18n";
 
 /** The warning dot, same token as the runtime health pastille's `warning` tone. */

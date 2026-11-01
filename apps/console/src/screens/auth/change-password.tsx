@@ -4,7 +4,7 @@ import { IconEye, IconEyeOff, IconLock, IconMoon, IconSun } from "@tabler/icons-
 import { passwordChecks, passwordProblem } from "@openedbot/identity/domain/password";
 import { useTheme } from "@openedbot/browser-ui-kit/theme";
 import { ApiError, api, queryKeys } from "../../lib/api";
-import { resetAuthStatus } from "../../lib/auth-status";
+import { resetAuthStatus } from "../../lib/session/auth-status";
 import { useT } from "../../lib/i18n";
 
 /**

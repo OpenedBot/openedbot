@@ -3,11 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { RosterDto } from "@openedbot/contracts-api";
 import type { ThreadSnapshot } from "@openedbot/contracts-api";
-import { activeOrganizationId, cloudSessionRevision, subscribeCloudSession } from "../lib/cloud-session";
+import { activeOrganizationId, cloudSessionRevision, subscribeCloudSession } from "../lib/session/cloud-session";
 import { api, queryKeys, type ThreadView } from "../lib/api";
-import { conversationPath } from "../lib/conversation-href";
-import { readNewestThreadSnapshot } from "../lib/thread-stream-safety";
-import { subscribeToOrganizationEvents } from "../lib/use-thread-stream";
+import { conversationPath } from "../lib/thread/conversation-href";
+import { readNewestThreadSnapshot } from "../lib/stream/thread-stream-safety";
+import { subscribeToOrganizationEvents } from "../lib/stream/use-thread-stream";
 import { useT } from "../lib/i18n";
 import {
   handleWorkflowPageNotification,
@@ -19,7 +19,7 @@ import {
   webNotificationPermissionState,
   webWorkflowNotificationWasSeen,
   WEB_NOTIFICATION_PREFERENCE_EVENT,
-} from "../lib/web-workflow-notifications";
+} from "../lib/run/web-workflow-notifications";
 
 /**
  * Pont global du flux SSE vers l'API Notification du navigateur.

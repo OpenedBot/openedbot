@@ -18,33 +18,33 @@ import {
   MessageInteractionShell,
   type MessageCardHover,
 } from "./message-interactions";
-import { useThreadEditAvailability } from "../lib/thread-edit-availability";
-import { dismissComposerKeyboardFromThread } from "../lib/composer-keyboard";
+import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
+import { dismissComposerKeyboardFromThread } from "../lib/composer/composer-keyboard";
 import {
   nextThreadPin,
   readThreadScrollBox,
   THREAD_ENTRY_GAP_PX,
   THREAD_MESSAGES_CLASS,
   THREAD_SCROLL_ANCHOR_CLASS,
-} from "../lib/thread-anchor";
-import { THREAD_REVEAL_EVENT, type ThreadRevealDetail } from "../lib/thread-turn-rail";
+} from "../lib/thread/thread-anchor";
+import { THREAD_REVEAL_EVENT, type ThreadRevealDetail } from "../lib/thread/thread-turn-rail";
 import {
   countTimelineTurns,
   growTimelineWindow,
   THREAD_FIRST_PAINT_TURN_WINDOW, THREAD_LIVE_TURN_WINDOW,
   THREAD_WINDOW_PAGE,
   windowTimelineEntries,
-} from "../lib/thread-window";
+} from "../lib/thread/thread-window";
 import { useT } from "../lib/i18n";
-import { runTimings } from "../lib/run-timing";
-import { speechRateFor } from "../lib/speech-rates";
-import { markdownToSpeechText } from "../lib/speech-text";
+import { runTimings } from "../lib/run/run-timing";
+import { speechRateFor } from "../lib/voice/speech-rates";
+import { markdownToSpeechText } from "../lib/voice/speech-text";
 import {
   createBrowserSpeechSynthesisAdapter,
   readSpeechOutputSettings,
   SPEECH_SETTINGS_EVENT,
   type SpeechOutputSettings,
-} from "../lib/web-speech-synthesis";
+} from "../lib/voice/web-speech-synthesis";
 import {
   assistantTextParts,
   createTimelineModelBuilder,
@@ -53,22 +53,22 @@ import {
   eventText,
   type Entry,
   type TimelineModelBuilder,
-} from "../lib/thread-timeline-model";
-import { authorRenderKey, entryRunId, entrySignature } from "../lib/thread-timeline-signature";
+} from "../lib/thread/thread-timeline-model";
+import { authorRenderKey, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
 import { AssistantMessage, BotInboundMessage, ModelUnavailableNotice, ProviderAuthNotice, RoomAnswerCard, UserMessage } from "./thread-messages";
-import { isModelUnavailableCode } from "../lib/model-unavailable";
-import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/provider-auth";
+import { isModelUnavailableCode } from "../lib/run/model-unavailable";
+import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/runtime/provider-auth";
 import { ToolActivity } from "./thread-tool-activity";
 import { PendingThinking } from "./thread-thinking-status";
 import { ActivityNarration, ActivityRow, ActivitySearch, TurnActivity } from "./thread-turn-activity";
 import { DateChip, Divider } from "./thread-timeline-chrome";
-import { useThreadRowEnter } from "../lib/thread-motion";
+import { useThreadRowEnter } from "../lib/thread/thread-motion";
 import type { ThreadTimelineProps } from "./thread-timeline-props";
 import { AskUserCard } from "./ask-user-card";
-import { dismissAskUser, useDismissedAskUserRuns } from "../lib/ask-user-dismissals";
-import { openSecondaryReads, THREAD_FIRST_PAINT_MARK } from "../lib/after-first-paint";
-import { isConfirmedLiveAnswer } from "../lib/live-answer";
+import { dismissAskUser, useDismissedAskUserRuns } from "../lib/run/ask-user-dismissals";
+import { openSecondaryReads, THREAD_FIRST_PAINT_MARK } from "../lib/shell/after-first-paint";
+import { isConfirmedLiveAnswer } from "../lib/stream/live-answer";
 
 /** Référence stable : un tableau `[]` recréé à chaque rendu casserait le
  * `memo` des bulles utilisateur (le `Set` de mentions en dépend). */
@@ -446,7 +446,7 @@ function ThreadTimelineView({
     [runs, events, visibleRunIds, timelineModel.eventsByRun, timelineModel.runsById],
   );
   // First messages on screen: the secondary reads of the frame may start
-  // (`lib/after-first-paint.ts`). One frame later, so they follow the paint.
+  // (`lib/shell/after-first-paint.ts`). One frame later, so they follow the paint.
   const hasEntries = windowed.visible.length > 0;
   useEffect(() => {
     if (!hasEntries) return;

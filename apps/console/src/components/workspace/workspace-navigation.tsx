@@ -4,12 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { AccountWorkspace, AccountWorkspacesDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
-import { activeOrganizationId, readCloudSession } from "../../lib/cloud-session";
-import { isOwnFleet, ORGANIZATION_SETUP_PATH, ownWorkspaces } from "../../lib/organization-gate";
-import { personalWorkspaces, rememberAccountWorkspaces, rememberPersonalWorkspaces, rememberWorkspaces } from "../../lib/workspace-directory";
-import { fleetHomeHref, fleetInPath, internalWorkspacePath, operatingFleetId, workspaceFrameInPath, workspaceHref, workspaceInPath } from "../../lib/workspace-location";
-import { isOverlaySettingsPath, useSettingsOverlay } from "../../lib/settings-overlay";
-import { rememberSettingsReturn } from "../../lib/settings-return";
+import { activeOrganizationId, readCloudSession } from "../../lib/session/cloud-session";
+import { isOwnFleet, ORGANIZATION_SETUP_PATH, ownWorkspaces } from "../../lib/session/organization-gate";
+import { personalWorkspaces, rememberAccountWorkspaces, rememberPersonalWorkspaces, rememberWorkspaces } from "../../lib/workspace/workspace-directory";
+import { fleetHomeHref, fleetInPath, internalWorkspacePath, operatingFleetId, workspaceFrameInPath, workspaceHref, workspaceInPath } from "../../lib/workspace/workspace-location";
+import { isOverlaySettingsPath, useSettingsOverlay } from "../../lib/shell/settings-overlay";
+import { rememberSettingsReturn } from "../../lib/shell/settings-return";
 import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
 

@@ -34,13 +34,6 @@ const TS_ENV_READ = /\benv\.([A-Z][A-Z0-9_]+)\b/gu;
 const IMPORT_META_ENV_READ = /\bimport\.meta\.env\.([A-Z][A-Z0-9_]+)\b/gu;
 /** `required("NAME")` / `positiveInteger("NAME", ...)` string-literal reads (apps/api/src/alerting/index.ts). */
 const HELPER_LITERAL_READ = /\b(?:required|positiveInteger)\(\s*"([A-Z][A-Z0-9_]+)"/gu;
-/**
- * A bare `NAME_LIKE_THIS` mention (warning string, error message) shaped like
- * an env var name. Used only for files that name a variable without reading
- * `process.env` themselves (platform/config/src/runtime-mode.ts logs the
- * name of the variable its caller already read).
- */
-const NAME_MENTION = /\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/gu;
 /** `${NAME}` / `$NAME` in shell scripts, filtered through ENV_READ_SKIP below. */
 const SHELL_ENV_READ = /\$\{?([A-Z][A-Z0-9_]*)\}?/gu;
 /** `set_env_value NAME` in scripts/setup.sh. */
@@ -99,7 +92,7 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   { path: "scripts/setup.sh", pattern: SETUP_WRITE, strip: stripShellComments },
   { path: "Makefile", pattern: MAKEFILE_EXPORT, strip: stripShellComments },
   // Élargissement de l'audit A3 : ces lecteurs manquaient à l'appel, ce qui a
-  // laissé HERMES_SESSION_MESSAGES_TIMEOUT_MS, LINK_DEV_*, OHB_POSTGRES_PORT
+  // laissé HERMES_SESSION_MESSAGES_TIMEOUT_MS, LINK_DEV_*, OPENEDBOT_POSTGRES_PORT
   // et les confirmations de reset hors du schéma pendant que MIGRATOR_DATABASE_URL
   // et les NEXT_PUBLIC_* survivaient sans plus aucun lecteur.
   { path: "apps/api/src/alerting/index.ts", pattern: TS_ENV_READ, strip: stripComments },
@@ -111,6 +104,7 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   },
   { path: "apps/api/src/index.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/observability/src/logger.ts", pattern: TS_ENV_READ, strip: stripComments },
+  { path: "platform/observability/src/log/files.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "modules/runtime-link/src/application/config.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "apps/api/scripts/dev-reset-data.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/config/src/hermes-timeouts.ts", pattern: TS_ENV_READ, strip: stripComments },
@@ -118,9 +112,6 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   { path: "platform/integrations/src/managed-tunnel.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/integrations/src/vapid.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/integrations/src/apns.ts", pattern: TS_ENV_READ, strip: stripComments },
-  // Ne lit rien lui-même : il reçoit la valeur déjà lue par son appelant et se
-  // contente de nommer la variable dans son avertissement de dépréciation.
-  { path: "platform/config/src/runtime-mode.ts", pattern: NAME_MENTION, strip: stripComments },
   { path: "scripts/lib/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/db.sh", pattern: SHELL_ENV_READ, strip: stripShellComments },
@@ -242,7 +233,7 @@ describe("ENV_SCHEMA: single source of truth for the environment", () => {
       "AUDIT_WORM_BUCKET", "AUDIT_WORM_ENDPOINT", "AUDIT_WORM_MODE", "AUDIT_WORM_READ_ACCESS_KEY_ID", "AUDIT_WORM_READ_SECRET_ACCESS_KEY",
       "AUDIT_WORM_WRITE_ACCESS_KEY_ID", "AUDIT_WORM_WRITE_SECRET_ACCESS_KEY",
       "BLOB_DRIVER", "FILES_CDN_SIGNING_KEY",
-      "FILES_CDN_URL", "METRICS_INTERNAL_TOKEN", "OHB_RUNTIME_ADMIN_MODE",
+      "FILES_CDN_URL", "METRICS_INTERNAL_TOKEN",
       "PUSH_VAPID_PRIVATE_KEY", "PUSH_VAPID_PUBLIC_KEY", "PUSH_VAPID_SUBJECT",
       "R2_ACCESS_KEY_ID", "R2_BUCKET", "R2_ENDPOINT", "R2_SECRET_ACCESS_KEY", "RUNTIME_TOKEN_ENCRYPTION_KEY",
       "TRANSACTIONAL_EMAIL_FROM", "WEB_APP_URL", "WORKER_DATABASE_URL",
@@ -280,7 +271,7 @@ describe("ENV_SCHEMA: single source of truth for the environment", () => {
 describe("ENV_SCHEMA_PATTERNS: plug-in variables", () => {
   test("isCoreEnvName: a declared, family or retired name is the core's; a plug-in's own deploy name is not (step 11.5)", async () => {
     const { isCoreEnvName } = await import("../src/env-schema");
-    for (const name of ["API_DATABASE_URL", "BILLING_PRICE_EUR", "OHB_PRO_PLUGINS", "OHB_PRO_BILLING__API_KEY", "WEB_ORIGINS"]) {
+    for (const name of ["API_DATABASE_URL", "BILLING_PRICE_EUR", "OPENEDBOT_PLUGINS", "OPENEDBOT_PLUGIN_BILLING__API_KEY", "WEB_ORIGINS"]) {
       expect(isCoreEnvName(name), name).toBe(true);
     }
     for (const name of ["PAY_SECRET_KEY", "PROVIDER_WEBHOOK_SECRET"]) expect(isCoreEnvName(name), name).toBe(false);
@@ -292,23 +283,23 @@ describe("ENV_SCHEMA_PATTERNS: plug-in variables", () => {
     expect(ENV_SCHEMA.filter((entry) => `${entry.name} ${entry.doc}`.toLowerCase().includes(provider)).map((entry) => entry.name)).toEqual([]);
   });
 
-  test("OHB_PRO_<ID>__<KEY> is declared, secret, default_only, owned by the API", async () => {
+  test("OPENEDBOT_PLUGIN_<ID>__<KEY> is declared, secret, default_only, owned by the API", async () => {
     const { envSchemaEntry, envDirOfName } = await import("../src/env-schema");
-    for (const name of ["OHB_PRO_BILLING__API_KEY", "OHB_PRO_AGENCY__MAX_CLIENTS", "OHB_PRO_PLUGIN_REPORTS__X1"]) {
+    for (const name of ["OPENEDBOT_PLUGIN_BILLING__API_KEY", "OPENEDBOT_PLUGIN_AGENCY__MAX_CLIENTS", "OPENEDBOT_PLUGIN_PLUGIN_REPORTS__X1"]) {
       const entry = envSchemaEntry(name);
       expect(entry?.name).toBe(name);
       expect(entry?.tier).toBe("default_only");
       expect(entry?.secret).toBe(true);
-      expect(envDirOfName(name)).toBe(envDirOfName("OHB_PRO_PLUGINS"));
+      expect(envDirOfName(name)).toBe(envDirOfName("OPENEDBOT_PLUGINS"));
     }
   });
 
-  test("the plug-in list stays a named variable; malformed OHB_PRO_* names are flagged", async () => {
+  test("the plug-in list stays a named variable; malformed OPENEDBOT_PLUGIN_* names are flagged", async () => {
     const { envSchemaEntry, isMalformedPluginEnvName } = await import("../src/env-schema");
-    expect(envSchemaEntry("OHB_PRO_PLUGINS")?.tier).toBe("default_only");
-    expect(isMalformedPluginEnvName("OHB_PRO_PLUGINS")).toBe(false);
-    expect(isMalformedPluginEnvName("OHB_PRO_BILLING__API_KEY")).toBe(false);
-    for (const name of ["OHB_PRO_BILLING_API_KEY", "OHB_PRO_BILLING__", "OHB_PRO_BILLING__key", "OHB_PRO_BILLING__A_", "OHB_PRO_X__KEY"]) {
+    expect(envSchemaEntry("OPENEDBOT_PLUGINS")?.tier).toBe("default_only");
+    expect(isMalformedPluginEnvName("OPENEDBOT_PLUGINS")).toBe(false);
+    expect(isMalformedPluginEnvName("OPENEDBOT_PLUGIN_BILLING__API_KEY")).toBe(false);
+    for (const name of ["OPENEDBOT_PLUGIN_BILLING_API_KEY", "OPENEDBOT_PLUGIN_BILLING__", "OPENEDBOT_PLUGIN_BILLING__key", "OPENEDBOT_PLUGIN_BILLING__A_", "OPENEDBOT_PLUGIN_X__KEY"]) {
       expect(isMalformedPluginEnvName(name), name).toBe(true);
     }
     expect(isMalformedPluginEnvName("API_DATABASE_URL")).toBe(false);
@@ -316,20 +307,20 @@ describe("ENV_SCHEMA_PATTERNS: plug-in variables", () => {
 
   test("the audit plug-in variables are documented: retention for the worker, anchoring grants for the API", async () => {
     const { envSchemaEntry, envDirOfName, isMalformedPluginEnvName } = await import("../src/env-schema");
-    const retention = envSchemaEntry("OHB_PRO_AUDIT__RETENTION_DAYS");
+    const retention = envSchemaEntry("OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS");
     expect(retention?.scope).toBe("worker");
     expect(retention?.tier).toBe("default_only");
     expect(retention?.secret).toBeUndefined();
     expect(retention?.doc).toContain("Unset");
-    expect(envDirOfName("OHB_PRO_AUDIT__RETENTION_DAYS")).toBe(".");
-    expect(envSchemaEntry("OHB_PRO_AUDIT__ANCHOR_ORGANIZATIONS")?.scope).toBe("api");
-    expect(isMalformedPluginEnvName("OHB_PRO_AUDIT__RETENTION_DAYS")).toBe(false);
+    expect(envDirOfName("OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS")).toBe(".");
+    expect(envSchemaEntry("OPENEDBOT_PLUGIN_AUDIT__ANCHOR_ORGANIZATIONS")?.scope).toBe("api");
+    expect(isMalformedPluginEnvName("OPENEDBOT_PLUGIN_AUDIT__RETENTION_DAYS")).toBe(false);
     // Any other audit key still falls in the generic, secret family.
-    expect(envSchemaEntry("OHB_PRO_AUDIT__OTHER")?.secret).toBe(true);
+    expect(envSchemaEntry("OPENEDBOT_PLUGIN_AUDIT__OTHER")?.secret).toBe(true);
   });
 
   test("a plug-in variable never enters a template", () => {
     const names = ENV_SCHEMA.map((entry) => entry.name);
-    expect(names.some((name) => /^OHB_PRO_.+__/.test(name))).toBe(false);
+    expect(names.some((name) => /^OPENEDBOT_PLUGIN_.+__/.test(name))).toBe(false);
   });
 });

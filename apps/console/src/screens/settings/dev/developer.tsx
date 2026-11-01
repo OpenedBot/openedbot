@@ -11,7 +11,7 @@ import { SettingsPane } from "../pane";
  * L'entrée de nav n'existe que sous `make dev` (`SHOW_DEV_SETTINGS`), et
  * chaque carte garde en plus SA propre condition côté serveur : la remise à
  * zéro de l'accueil ne s'affiche que si le cloud API a publié `devSignIn`,
- * c'est-à-dire en `OHB_ENV=development`. Le serveur Vite ne suffit donc pas à
+ * c'est-à-dire en `OPENEDBOT_ENV=development`. Le serveur Vite ne suffit donc pas à
  * ouvrir une action ; il ne fait qu'ouvrir la page.
  */
 export function DeveloperSettings() {

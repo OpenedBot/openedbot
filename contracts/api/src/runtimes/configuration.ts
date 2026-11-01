@@ -122,12 +122,12 @@ export type RuntimeConfigurationDto = {
   devDefaults: RuntimeDevDefaultsDto | null;
   /**
    * OHB-75 : openedbot peut publier un gateway sur son propre compte Cloudflare
-   * (`OHB_CF_*` renseignés). Absent sur les serveurs antérieurs.
+   * (`OPENEDBOT_MANAGED_TUNNEL_URL` renseignée). Absent sur les serveurs antérieurs.
    */
   managedTunnelAvailable?: boolean;
   /**
    * OHB-75 : la publication Tailscale Funnel assistée est ouverte
-   * (`OHB_TAILSCALE_FUNNEL_ENABLED`). Fausse ou absente, la carte reste
+   * (`OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`). Fausse ou absente, la carte reste
    * affichée mais désactivée.
    */
   tailscaleFunnelAvailable?: boolean;

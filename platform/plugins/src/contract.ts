@@ -98,13 +98,13 @@ export type ProPluginManifest = {
 
 /**
  * A deployment variable a plug-in reads under its own deployed name instead
- * of `OHB_PRO_<ID>__<KEY>`: for a name that is already a deploy contract
+ * of `OPENEDBOT_PLUGIN_<ID>__<KEY>`: for a name that is already a deploy contract
  * (secret manager, a provider's dashboard), so that moving code into a
  * plug-in renames nothing on the deploy side. The core never reads it: it
  * hands the plug-in the declared names that are set (`HookContext.env`),
  * and the API refuses to start in production while a loaded plug-in misses
  * one marked `requiredInProduction`. A name the core itself declares (its
- * environment schema), an `OHB_*` name or a duplicate is refused by the
+ * environment schema), an `OPENEDBOT_*` name (or a legacy `OHB_*` one) or a duplicate is refused by the
  * loader: a plug-in never reads the core's variables this way.
  */
 export type PluginEnvVariable = {
@@ -137,7 +137,7 @@ export type MigrationSet = {
 
 /**
  * What the core hands every hook as its last argument: the plug-in's own
- * configuration (`OHB_PRO_<ID>__<KEY>`, indexed by KEY), never the whole
+ * configuration (`OPENEDBOT_PLUGIN_<ID>__<KEY>`, indexed by KEY), never the whole
  * environment. Optional so that hooks written before it keep their shape.
  */
 export type HookContext = {

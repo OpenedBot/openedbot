@@ -1,5 +1,5 @@
 /*
-  Pas d'anneau de focus sur un bouton cliqué (voir `lib/pointer-focus.ts`).
+  Pas d'anneau de focus sur un bouton cliqué (voir `lib/shell/pointer-focus.ts`).
 
   `data-pointer-focus` reste sur `<html>` du dernier clic jusqu'à ce que le
   clavier déplace le focus : un Échap ou une lettre tapée ensuite ne fait plus

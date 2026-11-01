@@ -21,7 +21,7 @@ export type AuthProvidersDto = {
   google: { enabled: true } | { enabled: false; reason: AuthProviderDisabledReason };
   /**
    * Email and password sign-in. `enabled: false` in production
-   * (`OHB_DEPLOY_ENV=prod`). Google and e-mail codes remain available.
+   * (`OPENEDBOT_ENV=production`). Google and e-mail codes remain available.
    * Dev and preprod keep password sign-in.
    */
   password: { enabled: true } | { enabled: false };

@@ -3,15 +3,15 @@ import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useIsMobile } from "@openedbot/browser-ui-kit";
 import { BoardFrame } from "../boardui/board-frame";
 import { SettingsModal } from "../boardui/settings-modal";
-import { FaceMotionProvider } from "../../lib/face-motion";
+import { FaceMotionProvider } from "../../lib/faces/face-motion";
 import { SETTINGS_SECTIONS } from "../../screens/settings/sections";
 import {
   SETTINGS_OVERLAY_STATE_KEY,
   SettingsOverlayContext,
   settingsOverlayPath,
   type SettingsOverlay,
-} from "../../lib/settings-overlay";
-import { takeQueuedSettingsOverlay, useSettingsDisplay } from "../../lib/settings-display";
+} from "../../lib/shell/settings-overlay";
+import { takeQueuedSettingsOverlay, useSettingsDisplay } from "../../lib/shell/settings-display";
 import { MobileFrame } from "./mobile-frame";
 import { ConnectorUpdateAnnouncement } from "../connector-update-dialog";
 import { useFleetFrameContext } from "../../pro-console/slots";
@@ -29,7 +29,7 @@ export function AppFrame() {
 /**
  * Au bureau, les réglages s'ouvrent au-dessus de l'écran courant : l'URL
  * affichée est celle de la rubrique (masque TanStack), l'emplacement réel
- * reste l'écran d'origine, qui ne se démonte pas. Voir `lib/settings-overlay.ts`.
+ * reste l'écran d'origine, qui ne se démonte pas. Voir `lib/shell/settings-overlay.ts`.
  */
 export function DesktopAppFrame() {
   // Élément stable : ouvrir ou fermer la surcouche ne re-rend ni le cadre ni

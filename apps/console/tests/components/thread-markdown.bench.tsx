@@ -13,7 +13,7 @@ const { flushSync } = await import("react-dom");
 const { createRoot } = await import("react-dom/client");
 const { I18nProvider } = await import("../../src/lib/i18n");
 const { ThreadMarkdown, ThreadMarkdownBlock } = await import("../../src/components/thread-markdown");
-const { stabilizeStreamingMarkdown } = await import("../../src/lib/streaming-markdown");
+const { stabilizeStreamingMarkdown } = await import("../../src/lib/stream/streaming-markdown");
 
 const SECTION = (index: number) => `## Partie ${index}
 

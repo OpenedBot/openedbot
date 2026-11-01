@@ -12,7 +12,7 @@ const SCREENSHOT_COMMAND = [
   "export DISPLAY=${DISPLAY:-:0}",
   `f=${SCREENSHOT_PATH}`,
   'scrot -o -q 70 "$f" 2>/dev/null || import -window root -quality 70 "$f" 2>/dev/null || ffmpeg -y -f x11grab -i "$DISPLAY" -frames:v 1 -q:v 7 "$f" >/dev/null 2>&1',
-  'test -s "$f" && echo OHB_CAPTURED',
+  'test -s "$f" && echo OPENEDBOT_CAPTURED',
 ].join("; ");
 
 export type ComputerMachineState = "off" | "provisioning" | "ready" | "error";
@@ -188,7 +188,7 @@ export class BoxComputerProvider implements ComputerProvider {
       body: JSON.stringify({ command: SCREENSHOT_COMMAND }),
     }, 65_000);
     const result = asRecord(command);
-    if (result?.exitCode !== 0 || typeof result.stdout !== "string" || !result.stdout.includes("OHB_CAPTURED")) {
+    if (result?.exitCode !== 0 || typeof result.stdout !== "string" || !result.stdout.includes("OPENEDBOT_CAPTURED")) {
       throw new ComputerProviderError(502, "COMPUTER_CAPTURE_FAILED", "La capture du bureau a échoué.");
     }
 

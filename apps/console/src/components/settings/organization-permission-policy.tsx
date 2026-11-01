@@ -9,7 +9,7 @@ import {
   type PermissionRulesMode,
 } from "@openedbot/contracts-api";
 import { api, userFacingError } from "../../lib/api";
-import { activeFleetId, activeOrganizationId } from "../../lib/cloud-session";
+import { activeFleetId, activeOrganizationId } from "../../lib/session/cloud-session";
 import { useT } from "../../lib/i18n";
 import { ACTIONS, BUTTON, CardHeading, FIELD, Note, SettingsCard, StatusList, StatusRow } from "./primitives";
 

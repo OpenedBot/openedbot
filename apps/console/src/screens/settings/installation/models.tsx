@@ -8,7 +8,7 @@ import type {
   RuntimeModelSelectionStateDto,
   RuntimePublicDto,
 } from "@openedbot/contracts-api";
-import { visibleRosterItems } from "@/lib/thread-visibility";
+import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { ApiError, api, queryKeys } from "../../../lib/api";
 import { useT } from "../../../lib/i18n";
 import {
@@ -20,13 +20,13 @@ import {
   ToneBadge,
 } from "../../../components/settings/primitives";
 import { SettingsPane } from "../pane";
-import { runtimeReadiness } from "./models-readiness";
+import { runtimeReadiness } from "./models/models-readiness";
 import {
   activeProviderIncident,
   ProviderIncidentDialog,
   ProviderIncidentsContext,
 } from "../../../components/provider-incident-banner";
-import { displayedRuntimeHealth, runtimeHealthLabel } from "../../../lib/runtime-health";
+import { displayedRuntimeHealth, runtimeHealthLabel } from "../../../lib/runtime/runtime-health";
 import {
   NONE,
   RUNTIME_POLL_MS,
@@ -34,23 +34,23 @@ import {
   type AssignmentMode,
   type Preference,
   type RuntimeOffline,
-} from "./models-shared";
-import { CatalogSkeleton } from "./models-catalog-parts";
-import { RuntimeNotReady, RuntimeOfflineVeil } from "./models-offline";
-import { ModelsMobile } from "./models-mobile";
-import { BotModelsCard, DefaultModelCard, preferenceForProvider } from "./models-preference-panel";
-import { ConnectedProviders, ProviderCatalogDialog } from "./models-provider-directory";
-import { ProviderConfigDialog } from "./models-provider-dialog";
+} from "./models/models-shared";
+import { CatalogSkeleton } from "./models/models-catalog-parts";
+import { RuntimeNotReady, RuntimeOfflineVeil } from "./models/models-offline";
+import { ModelsMobile } from "./models/models-mobile";
+import { BotModelsCard, DefaultModelCard, preferenceForProvider } from "./models/models-preference-panel";
+import { ConnectedProviders, ProviderCatalogDialog } from "./models/models-provider-directory";
+import { ProviderConfigDialog } from "./models/models-provider-dialog";
 import {
   clearProviderReconnect,
   holdProviderReconnect,
   freshProviderReconnect,
   releaseProviderReconnect,
   useProviderReconnectRequest,
-} from "../../../lib/provider-auth";
+} from "../../../lib/runtime/provider-auth";
 
-export { ProviderConfigDialog } from "./models-provider-dialog";
-export { ProviderPreferenceCombobox } from "./models-provider-combobox";
+export { ProviderConfigDialog } from "./models/models-provider-dialog";
+export { ProviderPreferenceCombobox } from "./models/models-provider-combobox";
 
 /** La valeur « aucun fournisseur » que rend `ProviderPreferenceCombobox`. */
 export const PROVIDER_PREFERENCE_NONE = NONE;

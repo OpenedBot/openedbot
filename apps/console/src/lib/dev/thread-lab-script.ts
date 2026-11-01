@@ -12,7 +12,7 @@
  */
 import type { ProductRunStatus } from "@openedbot/contracts-api";
 import type { ProductEventType, StoredProductEvent } from "@openedbot/contracts-events";
-import { isConfirmedLiveAnswer } from "../live-answer";
+import { isConfirmedLiveAnswer } from "../stream/live-answer";
 
 export type LabStep =
   /** Text streamed as `agent.message` fragments. Before a tool it reads as narration. */

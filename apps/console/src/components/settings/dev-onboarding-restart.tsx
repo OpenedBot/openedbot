@@ -5,7 +5,7 @@ import { Dialog } from "@openedbot/browser-ui-kit";
 import { BUTTON } from "./primitives";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { clearOnboardingDraft } from "../../lib/onboarding-draft";
+import { clearOnboardingDraft } from "../../lib/session/onboarding-draft";
 
 /**
  * « Repartir de zéro » : le geste de développement qui vide les données
@@ -22,7 +22,7 @@ import { clearOnboardingDraft } from "../../lib/onboarding-draft";
 
 /**
  * L'interrupteur, et le seul : le cloud API publie `devSignIn` sur
- * `/api/auth/providers` en `OHB_ENV=development` et nulle part ailleurs.
+ * `/api/auth/providers` en `OPENEDBOT_ENV=development` et nulle part ailleurs.
  * C'est le même qui MONTE la route ; un build de production ne peut donc ni
  * montrer le geste ni l'atteindre. Le champ porte les identifiants du compte
  * de dev : sa PRÉSENCE est le booléen, jamais sa valeur.

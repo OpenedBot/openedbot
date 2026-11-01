@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { TRANSACTIONAL_EMAIL_KINDS, TRANSACTIONAL_EMAIL_LOCALES } from "@openedbot/contracts-api";
 import { TRANSACTIONAL_EMAIL_SAMPLE_DATA } from "../src/domain/email/samples";
-import { OHB_SUPPORT_DISCORD_URL, renderTransactionalEmail } from "../src/domain/email/templates";
+import { OPENEDBOT_SUPPORT_DISCORD_URL, renderTransactionalEmail } from "../src/domain/email/templates";
 
 /**
  * Un genre déclaré sans gabarit ne part pas en message vide : il part en échec
@@ -132,8 +132,8 @@ describe("ouverture d’accès", () => {
   test("porte le lien du Discord de support, HTML et texte, dans les deux langues", () => {
     for (const locale of TRANSACTIONAL_EMAIL_LOCALES) {
       const rendered = renderTransactionalEmail({ kind: "waitlist_access_granted", locale, data });
-      expect(rendered.html).toContain(OHB_SUPPORT_DISCORD_URL);
-      expect(rendered.text).toContain(OHB_SUPPORT_DISCORD_URL);
+      expect(rendered.html).toContain(OPENEDBOT_SUPPORT_DISCORD_URL);
+      expect(rendered.text).toContain(OPENEDBOT_SUPPORT_DISCORD_URL);
     }
   });
 
@@ -143,8 +143,8 @@ describe("ouverture d’accès", () => {
       locale: "fr",
       data: { webAppUrl: data.webAppUrl },
     });
-    expect(rendered.html).toContain(OHB_SUPPORT_DISCORD_URL);
-    expect(rendered.text).toContain(OHB_SUPPORT_DISCORD_URL);
+    expect(rendered.html).toContain(OPENEDBOT_SUPPORT_DISCORD_URL);
+    expect(rendered.text).toContain(OPENEDBOT_SUPPORT_DISCORD_URL);
   });
 });
 

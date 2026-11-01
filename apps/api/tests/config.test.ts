@@ -25,7 +25,7 @@ const vapidPublic = (() => {
 const vapidPrivate = Buffer.alloc(32, 9).toString("base64url");
 
 const production = {
-  OHB_ENV: "production",
+  OPENEDBOT_ENV: "production",
   API_PUBLIC_URL: "https://api.ohb.example",
   WEB_APP_URL: "https://app.ohb.example",
   API_DATABASE_URL: "postgres://api:secret@db/ohb",
@@ -59,8 +59,7 @@ const production = {
 };
 
 const development = {
-  OHB_ENV: "development",
-  OHB_RUNTIME_MODE: "external",
+  OPENEDBOT_ENV: "development",
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
 };
 
@@ -149,24 +148,21 @@ describe("production configuration", () => {
     expect(() => assertProductionConfig(readApiConfig(production))).toThrow(/LEGAL_MENTIONS_FILE/);
   });
 
-  // OHB-15 : le canal SSH sortant n'est plus interdit en production, il
-  // n'existe plus du tout. La configuration le refuse avant même d'arriver au
-  // garde de production.
-  test("refuses the removed SSH administration channel outright", () => {
-    expect(() => readApiConfig({
-      ...production,
-      OHB_RUNTIME_ADMIN_MODE: "ssh",
-    })).toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
+  // OHB-15 : le canal SSH sortant n'existe plus du tout, et la variable qui
+  // réglait l'administration est retirée : en production comme ailleurs, sa
+  // valeur est ignorée et aucun canal ne s'ouvre.
+  test("OPENEDBOT_ENV=preprod runs on production rules with the preprod label", () => {
+    const config = readApiConfig({ ...production, OPENEDBOT_ENV: "preprod" });
+    expect([config.environment, config.deployEnvironment]).toEqual(["production", "preprod"]);
+    expect(readApiConfig(production).deployEnvironment).toBe("prod");
   });
 
-  test("forbids the local administration channel in production cloud mode", () => {
-    expect(() => assertProductionConfig(readApiConfig({
-      ...production,
-      OHB_RUNTIME_MODE: "external",
-      OHB_RUNTIME_ADMIN_MODE: "local",
-      DEV_HERMES_DASHBOARD_USERNAME: "dashboard",
-      DEV_HERMES_DASHBOARD_PASSWORD: "dashboard-secret",
-    }))).toThrow(/Runtime administration channels are forbidden/i);
+  test("ignores the retired administration variable in production, whatever its value", () => {
+    for (const value of ["ssh", "local", "disabled"]) {
+      const config = readApiConfig({ ...production, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
+      expect(config.runtimeAdminChannels).toEqual({ local: false });
+      expect(() => assertProductionConfig(config)).not.toThrow(/administration|ADMIN_MODE/i);
+    }
   });
 
   test("requires an HTTPS web URL: the payment provider returns the browser there", () => {
@@ -249,33 +245,17 @@ describe("canaux d’administration du déploiement", () => {
     expect(readApiConfig(development).runtimeAdminChannels).toEqual({ local: false });
   });
 
-  test("une demande explicite n’ouvre que le canal demandé", () => {
-    expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "local" })
-      .runtimeAdminChannels).toEqual({ local: false });
-  });
-
-  // Y compris en développement : une frontière que le poste local peut
-  // contourner n'est pas une frontière.
-  test("`ssh` est refusé jusque dans l’environnement de développement", () => {
-    expect(() => readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "ssh" }))
-      .toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
-  });
-
-  // Une valeur inconnue valait auparavant « les deux canaux » en
-  // développement. Elle échoue désormais partout : un mode d'administration
-  // deviné est exactement ce que cette US retire.
-  test("rejects an unknown administration override, development included", () => {
-    expect(() => readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "auto" }))
-      .toThrow(/OHB_RUNTIME_ADMIN_MODE must be disabled or local/i);
-  });
-
-  test("honors disabled administration on an external development runtime", () => {
-    expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: "disabled" })
-      .runtimeAdminChannels).toEqual({ local: false });
+  // L'ancienne variable d'administration est retirée : aucune valeur, même
+  // `ssh` ou `local`, n'ouvre de canal, développement compris.
+  test("la variable d’administration retirée n’ouvre aucun canal", () => {
+    for (const value of ["local", "ssh", "auto", "disabled"]) {
+      expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: value }) // rename:keep
+        .runtimeAdminChannels).toEqual({ local: false });
+    }
   });
 
   test("requires a strong runtime token encryption key in development", () => {
-    expect(() => readApiConfig({ OHB_ENV: "development" })).toThrow(/RUNTIME_TOKEN_ENCRYPTION_KEY/);
+    expect(() => readApiConfig({ OPENEDBOT_ENV: "development" })).toThrow(/RUNTIME_TOKEN_ENCRYPTION_KEY/);
   });
 
   test("does not keep a hardcoded former development encryption key", () => {
@@ -319,7 +299,7 @@ describe("staff development sign-in", () => {
       email: DEV_STAFF_EMAIL,
       password: "generated-staff",
     });
-    expect(readApiConfig({ ...development, DEV_STAFF_PASSWORD: "generated-staff", OHB_ENV: "test" }).staffDevSignIn).toBeNull();
+    expect(readApiConfig({ ...development, DEV_STAFF_PASSWORD: "generated-staff", OPENEDBOT_ENV: "test" }).staffDevSignIn).toBeNull();
   });
 
   test("never falls back to a versioned password: without one, nothing is published", () => {
@@ -338,13 +318,11 @@ describe("Computer provider configuration", () => {
     expect(readApiConfig(development).computer).toEqual({ provider: "disabled" });
   });
 
-  test("requires an environment-owned Box token", () => {
-    expect(() => readApiConfig({ ...development, OHB_COMPUTER_PROVIDER: "box" }))
-      .toThrow(/OHB_COMPUTER_BOX_TOKEN/);
+  test("the environment-owned Box token alone enables the provider", () => {
+    expect(readApiConfig({ ...development, OPENEDBOT_COMPUTER_BOX_TOKEN: " " }).computer).toEqual({ provider: "disabled" });
     expect(readApiConfig({
       ...development,
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
     }).computer).toEqual({
       provider: "box",
       apiUrl: "https://ascii.dev/api/box/v1",
@@ -355,17 +333,15 @@ describe("Computer provider configuration", () => {
   test("only lets tests override Box with a loopback fixture", () => {
     const configured = readApiConfig({
       ...development,
-      OHB_ENV: "test",
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_ENV: "test",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "http://127.0.0.1:18799/provider/",
     });
     expect(configured.computer).toMatchObject({ apiUrl: "http://127.0.0.1:18799/provider" });
     expect(() => readApiConfig({
       ...development,
-      OHB_ENV: "test",
-      OHB_COMPUTER_PROVIDER: "box",
-      OHB_COMPUTER_BOX_TOKEN: "box_secret",
+      OPENEDBOT_ENV: "test",
+      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "https://attacker.example/provider",
     })).toThrow(/loopback/);
   });
@@ -374,8 +350,7 @@ describe("Computer provider configuration", () => {
 describe("development web origins", () => {
   test("defaults the browser and OAuth callback to localhost", () => {
     const config = readApiConfig({
-      OHB_ENV: "development",
-      OHB_RUNTIME_MODE: "external",
+      OPENEDBOT_ENV: "development",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     });
 
@@ -388,8 +363,7 @@ describe("development web origins", () => {
 
   test("auto-includes ADMIN_PUBLIC_URL in CORS without listing it in CORS_ALLOWED_ORIGINS", () => {
     const config = readApiConfig({
-      OHB_ENV: "development",
-      OHB_RUNTIME_MODE: "external",
+      OPENEDBOT_ENV: "development",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
       ADMIN_PUBLIC_URL: "http://admin.local:1421",
     });
@@ -443,7 +417,7 @@ describe("Hermes endpoint configuration", () => {
 
   test("keeps a fake HTTP endpoint scoped to test", () => {
     expect(readApiConfig({
-      OHB_ENV: "test",
+      OPENEDBOT_ENV: "test",
       RUNTIME_TOKEN_ENCRYPTION_KEY: development.RUNTIME_TOKEN_ENCRYPTION_KEY,
       TEST_HERMES_URL: "http://127.0.0.1:18642",
     }).testHermesUrl).toBe(

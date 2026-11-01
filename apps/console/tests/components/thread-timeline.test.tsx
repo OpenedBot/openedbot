@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { ApprovalRequestDto, RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
-import type { SpeechSynthesisAdapter } from "../../src/lib/web-speech-synthesis";
+import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
 
 const speechAdapter: SpeechSynthesisAdapter = {

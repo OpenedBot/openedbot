@@ -1,8 +1,8 @@
-import type { AuthStatus } from "../auth-status";
-import { clearCloudSession, readWebCsrfToken, syncCloudSession } from "../cloud-session";
-import { NATIVE_SESSION_MARK, nativeBridge } from "../native-bridge";
-import { clearOnboardingDraft } from "../onboarding-draft";
-import { workspaceInPath } from "../workspace-location";
+import type { AuthStatus } from "../session/auth-status";
+import { clearCloudSession, readWebCsrfToken, syncCloudSession } from "../session/cloud-session";
+import { NATIVE_SESSION_MARK, nativeBridge } from "../platform/native-bridge";
+import { clearOnboardingDraft } from "../session/onboarding-draft";
+import { workspaceInPath } from "../workspace/workspace-location";
 import type { AccountSecurityDto, AuthMeDto, AuthStartDto, ChangePasswordDto, ChangePasswordInput, GoogleLinkClaimDto, GoogleUnlinkDto, MemberRoleChangedDto, OrganizationMemberDto, OrganizationPermissionPolicyInput, OrganizationPermissionPolicyView, RevokeSessionsDto } from "@openedbot/contracts-api";
 import { isUnauthorized, request } from "./http";
 import type { MobileConnectTicketDto } from "./types";
@@ -41,7 +41,7 @@ export const accountApi = {
     };
   },
   /**
-   * Les deux lectures du garde de route (`lib/auth-status.ts`) en une : le SSO
+   * Les deux lectures du garde de route (`lib/session/auth-status.ts`) en une : le SSO
    * est-il offert, et par quoi cette fenêtre est-elle authentifiée.
    *
    * L'ordre a changé avec le déménagement : c'est l'ÉMETTEUR qui dit qui on

@@ -2,7 +2,7 @@
  * `virtual:ohb-pro-console`: the pro console modules of this build
  * (open-core step 9, `src/pro-console/contract.ts`).
  *
- * `OHB_PRO_CONSOLE` lists them, comma-separated, like `OHB_PRO_PLUGINS` for
+ * `OPENEDBOT_CONSOLE_PLUGINS` lists them, comma-separated, like `OPENEDBOT_PLUGINS` for
  * the API: absolute paths (a plug-in package's `console/index.ts`) or
  * resolvable specifiers. Empty or unset is solo: the module is
  * an empty list and no pro screen, chunk or style enters the bundle.

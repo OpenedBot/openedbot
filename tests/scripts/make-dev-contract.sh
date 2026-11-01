@@ -157,66 +157,56 @@ assert_command_count dev-admin "$admin_plan" "$console_command" 0
 assert_command_count dev-admin "$admin_plan" "$worker_command" 0
 assert_no_preparation dev-admin "$admin_plan"
 
-# dev, dev-api and dev-worker validate the env file first (env-check), with
-# the same runtime mode as the apps: a file that would crash an app at boot
-# stops make before anything starts. Hence two OHB_RUNTIME_MODE per dev plan.
+# dev, dev-api and dev-worker validate the env file first (env-check): a file
+# that would crash an app at boot stops make before anything starts. The
+# runtime mode is no longer passed: the apps always run in external mode.
 for target in dev dev-api dev-worker; do
   assert_literal_count "$target" "$(dry_run "$target")" "scripts/env.ts --check" 1
+  assert_not_contains "$target" "$(dry_run "$target")" 'OHB_RUNTIME_MODE' # rename:keep
 done
 
-# Profiles. The default profile is `fake`: the apps run in external runtime
-# mode against tests/fake-hermes, and nothing pulls the Hermes image.
-assert_literal_count dev "$dev_plan" 'OHB_RUNTIME_MODE="external"' 2
-fake_plan="$(dry_run MODE=fake dev)"
-assert_literal_count "dev MODE=fake" "$fake_plan" 'OHB_RUNTIME_MODE="external"' 2
-bundled_plan="$(dry_run MODE=bundled dev)"
-assert_literal_count "dev MODE=bundled" "$bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
-external_plan="$(dry_run MODE=external dev)"
-assert_literal_count "dev MODE=external" "$external_plan" 'OHB_RUNTIME_MODE="external"' 2
+# Profiles. The default profile is `fake`: the apps run against
+# tests/fake-hermes, and nothing pulls the Hermes image.
+assert_literal_count "db-seed" "$(dry_run db-seed)" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+for profile in fake bundled external; do
+  assert_literal_count "db-seed MODE=$profile" "$(dry_run MODE=$profile db-seed)" "OPENEDBOT_DEV_PROFILE=\"$profile\"" 1
+done
 
-# Without MODE=, the profile follows OHB_RUNTIME_MODE in the env file: an
-# existing bundled workstation must not be re-run as external (env-check would
-# refuse the conflicting mode), and a fake workstation (external mode pointed
-# at the fake gateway by setup.sh) must keep seeding its fake runtime row.
-bundled_env='OHB_RUNTIME_MODE=bundled'
-external_env='OHB_RUNTIME_MODE=external'
-fake_env=$'OHB_RUNTIME_MODE=external\nDEV_HERMES_URL=http://127.0.0.1:18642'
-derived_bundled_plan="$(dry_run_with_env "$bundled_env" dev)"
-assert_literal_count "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
-assert_not_contains "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="external"'
-derived_bundled_seed_plan="$(dry_run_with_env "$bundled_env" db-seed)"
-assert_literal_count "db-seed (env bundled)" "$derived_bundled_seed_plan" 'OHB_DEV_PROFILE="bundled"' 1
-derived_external_plan="$(dry_run_with_env "$external_env" dev)"
-assert_literal_count "dev (env external)" "$derived_external_plan" 'OHB_RUNTIME_MODE="external"' 2
+# Without MODE=, the profile follows DEV_HERMES_URL in the env file (the fake
+# gateway or nothing: fake; any other runtime: external), and a legacy
+# bundled workstation keeps its profile for one release.
+legacy_bundled_env='OHB_RUNTIME_MODE=bundled' # rename:keep
+external_env='DEV_HERMES_URL=https://runtime.example.test'
+fake_env='DEV_HERMES_URL=http://127.0.0.1:18642'
+derived_bundled_seed_plan="$(dry_run_with_env "$legacy_bundled_env" db-seed)"
+assert_literal_count "db-seed (legacy env bundled)" "$derived_bundled_seed_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 derived_external_seed_plan="$(dry_run_with_env "$external_env" db-seed)"
-assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OHB_DEV_PROFILE="external"' 1
+assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OPENEDBOT_DEV_PROFILE="external"' 1
 derived_fake_seed_plan="$(dry_run_with_env "$fake_env" db-seed)"
-assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OHB_DEV_PROFILE="fake"' 1
-assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OHB_RUNTIME_MODE="external"' 1
-derived_empty_seed_plan="$(dry_run_with_env 'OHB_RUNTIME_MODE=' db-seed)"
-assert_literal_count "db-seed (env empty mode)" "$derived_empty_seed_plan" 'OHB_DEV_PROFILE="fake"' 1
+assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+derived_empty_seed_plan="$(dry_run_with_env 'DEV_HERMES_URL=' db-seed)"
+assert_literal_count "db-seed (env empty URL)" "$derived_empty_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
 # An explicit MODE= keeps priority over the env file.
-explicit_fake_plan="$(dry_run_with_env "$bundled_env" dev MODE=fake)"
-assert_literal_count "dev MODE=fake (env bundled)" "$explicit_fake_plan" 'OHB_RUNTIME_MODE="external"' 2
-explicit_bundled_plan="$(dry_run_with_env "$external_env" dev MODE=bundled)"
-assert_literal_count "dev MODE=bundled (env external)" "$explicit_bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
+explicit_fake_plan="$(dry_run_with_env "$external_env" db-seed MODE=fake)"
+assert_literal_count "db-seed MODE=fake (env external)" "$explicit_fake_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+explicit_bundled_plan="$(dry_run_with_env "$external_env" db-seed MODE=bundled)"
+assert_literal_count "db-seed MODE=bundled (env external)" "$explicit_bundled_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 
 setup_plan="$(dry_run setup)"
 assert_not_contains setup "$setup_plan" "hermes-image-tag.ts"
-assert_literal_count setup "$setup_plan" 'OHB_DEV_PROFILE="fake"' 1
-assert_literal_count setup "$setup_plan" 'OHB_RUNTIME_MODE="external"' 1
+assert_literal_count setup "$setup_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+assert_not_contains setup "$setup_plan" 'OHB_RUNTIME_MODE' # rename:keep
 assert_literal_count setup "$setup_plan" "scripts/setup.sh" 1
 
 bundled_setup_plan="$(dry_run setup MODE=bundled)"
 assert_not_contains "setup MODE=bundled" "$bundled_setup_plan" "hermes-image-tag.ts"
-assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OHB_DEV_PROFILE="bundled"' 1
-assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OHB_RUNTIME_MODE="bundled"' 1
+assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 
 # infra-up only proves PostgreSQL now: the bundled Hermes container tooling
 # was removed with deprecated/infra.
 infra_plan="$(dry_run infra-up)"
 assert_literal_count infra-up "$infra_plan" "scripts/db.sh --up" 1
-assert_not_contains infra-up "$infra_plan" "OHB_DEV_PROFILE"
+assert_not_contains infra-up "$infra_plan" "OPENEDBOT_DEV_PROFILE"
 assert_not_contains infra-up "$infra_plan" "scripts/hermes.sh"
 bundled_infra_plan="$(dry_run infra-up MODE=bundled)"
 assert_literal_count "infra-up MODE=bundled" "$bundled_infra_plan" "scripts/db.sh --up" 1
@@ -283,9 +273,74 @@ case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract HOST
   *'HOST="user@runtime-host"'*) ;;
   *) fail "make -n link-dev-up must pass HOST from the command line." ;;
 esac
-case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract link-dev-up)" in
+# LINK_DEV_HOST= on the command line: a workstation Makefile.local may set it.
+case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST= link-dev-up)" in
   *'HOST=""'*) ;;
   *) fail "without HOST, make -n link-dev-up must name no host." ;;
 esac
+# Without HOST, link-dev-up and link-mode fall back to LINK_DEV_HOST (set in
+# Makefile.local, here on the command line); HOST still wins. Dry run, no ssh.
+for target in link-dev-up link-mode; do
+  case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST=user@your-vm "$target")" in
+    *'HOST="user@your-vm"'*) ;;
+    *) fail "without HOST, make -n $target must use LINK_DEV_HOST." ;;
+  esac
+  case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST=user@your-vm HOST=user@runtime-host "$target")" in
+    *'HOST="user@runtime-host"'*) ;;
+    *) fail "make -n $target must prefer HOST over LINK_DEV_HOST." ;;
+  esac
+done
+
+# The dev targets load the env file and must never print it. A bare `export`
+# (or `env`, `set`, `export -p`, xtrace...) in a recipe dumps every value in
+# clear: encryption keys, push credentials, tokens. Run dev, dev-api and
+# dev-worker for real with a stubbed launcher (the app commands are no-ops,
+# env-check is skipped, only scripts/dev-accounts.ts runs) and fail if a
+# sentinel secret or seed password from the env file reaches stdout or stderr. The sentinel itself is never printed.
+sentinel_dir="$contract_tmpdir/sentinel"
+mkdir -p "$sentinel_dir/bin"
+# The stub runs scripts/dev-accounts.ts with the real bun (the `make dev`
+# step that lists the seed accounts) and nothing else.
+real_bun="$(command -v bun)" || fail "bun is required to run scripts/dev-accounts.ts."
+printf '#!/bin/sh\nif [ "$1" = scripts/dev-accounts.ts ]; then exec "%s" "$@"; fi\nexit 0\n' "$real_bun" > "$sentinel_dir/bin/bun"
+chmod +x "$sentinel_dir/bin/bun"
+sentinel_value="sentinel-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+sentinel_env="$sentinel_dir/env"
+{
+  printf 'OPENEDBOT_TEST_SENTINEL_SECRET=%s\n' "$sentinel_value"
+  printf 'API_ENCRYPTION_KEY=%s\n' "$sentinel_value"
+  # The seed passwords: dev-accounts names where they live, never the value.
+  printf 'E2E_PASSWORD=%s-e2e\n' "$sentinel_value"
+  printf 'DEV_STAFF_PASSWORD=%s-staff\n' "$sentinel_value"
+} > "$sentinel_env"
+for target in dev dev-api dev-worker; do
+  sentinel_output="$sentinel_dir/$target.out"
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND=true DEV_API_COMMAND=true DEV_WORKER_COMMAND=true \
+    "$target" >"$sentinel_output" 2>&1 </dev/null; then
+    fail "make $target with a stubbed launcher exited non-zero (output withheld: it may hold env values)."
+  fi
+  if grep -qF -- "$sentinel_value" "$sentinel_output"; then
+    fail "make $target printed a value from the env file (environment dump); value withheld."
+  fi
+done
+# The dev-accounts step really ran, and says where each password lives.
+dev_accounts_output="$sentinel_dir/dev.out"
+grep -qF "E2E_PASSWORD in $sentinel_env" "$dev_accounts_output" ||
+  fail "make dev must say where E2E_PASSWORD lives (scripts/dev-accounts.ts)."
+grep -qF "DEV_STAFF_PASSWORD in $sentinel_env" "$dev_accounts_output" ||
+  fail "make dev must say where DEV_STAFF_PASSWORD lives (scripts/dev-accounts.ts)."
+# Without the dump, the env file still reaches the apps (LOAD_ENV exports it
+# with set -a): the stubbed launcher fails when the sentinel is not set.
+printf '#!/bin/sh\n[ -n "${OPENEDBOT_TEST_SENTINEL_SECRET:-}" ]\n' > "$sentinel_dir/bin/require-env"
+chmod +x "$sentinel_dir/bin/require-env"
+require_env="$sentinel_dir/bin/require-env"
+for target in dev dev-api dev-worker; do
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND="$require_env" DEV_API_COMMAND="$require_env" \
+    DEV_WORKER_COMMAND="$require_env" "$target" >/dev/null 2>&1 </dev/null; then
+    fail "make $target must export the env file to the app it starts."
+  fi
+done
 
 printf 'make dev dry-run contract passed.\n'

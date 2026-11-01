@@ -11,7 +11,7 @@
     haut droit (`titleBarOverlay`, 46 px de haut, aux couleurs du cadre).
 
   Tout vit sous `:root[data-native-titlebar]` (`"mac"` ou `"windows"`), posé
-  avant le premier rendu par `lib/native-titlebar.ts` : navigateur et PWA ne
+  avant le premier rendu par `lib/platform/native-titlebar.ts` : navigateur et PWA ne
   voient aucune de ces règles. Les règles communes aux deux coques prennent
   l'attribut seul, les autres sa valeur.
 
@@ -38,7 +38,7 @@
 
 :root[data-native-titlebar="mac"] {
   /* Où les feux finissent, en pixels de la page. Ils ne zooment pas avec la
-     taille du texte (`lib/text-size.ts`) : la coque zoome la page et pose
+     taille du texte (`lib/shell/text-size.ts`) : la coque zoome la page et pose
      `--ohb-native-zoom`, et leurs 76 px d'écran valent 76 / zoom pixels de
      page. La coque recentre aussi les feux sur la barre du haut zoomée. */
   --ohb-traffic-lights-end: calc(76px / var(--ohb-native-zoom, 1));

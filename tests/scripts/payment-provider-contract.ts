@@ -9,7 +9,8 @@
 // platform, contracts and browser packages, and the core scripts. Not
 // scanned, as dated debt (db/ownership.json, `until` 2026-12-31): the
 // `subscriptions` and `stripe_events` tables and their migrations (db/), and
-// the native clients (Swift, the notch demo), which stay out of this step.
+// the native clients (Swift: the iOS app and openedbot-notch, in their own
+// repositories), which stay out of this step.
 // Tests, docs and fixtures may name the provider: they check its absence.
 // `ROOT` lets the mutation check point it at another tree.
 import { Glob } from "bun";
