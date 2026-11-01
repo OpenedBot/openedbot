@@ -148,14 +148,6 @@ type YoloFrame struct {
 	Tail      string
 }
 
-func isYoloFrameType(t string) bool {
-	switch t {
-	case TYoloLease, TYoloRevoke, TYoloState, TYoloAudit, TYoloAuditAck:
-		return true
-	}
-	return false
-}
-
 type yoloObject map[string]json.RawMessage
 
 func yoloObjectOf(raw json.RawMessage, name string) (yoloObject, error) {
