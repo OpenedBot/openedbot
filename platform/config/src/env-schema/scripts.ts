@@ -7,13 +7,7 @@ export const SCRIPTS_ENV: readonly EnvVar[] = [
     name: "ENV_FILE",
     scope: "scripts",
     tier: "default_only",
-    doc: "Environment file loaded by the Makefile and scripts/setup.sh (default .env.local).",
-  },
-  {
-    name: "OPENEDBOT_ENV_FILE",
-    scope: "scripts",
-    tier: "default_only",
-    doc: "Environment file read by env-check, env-audit and env-template (default .env.local).",
+    doc: "Environment file loaded by the Makefile and scripts/setup.sh, and read by env-check, env-audit and env-template (default .env.local).",
   },
   {
     name: "OPENEDBOT_DEV_PROFILE",

@@ -120,19 +120,19 @@ setup: ## Prépare entièrement le développement local (env, dépendances, Post
 	ENV_FILE="$(ENV_FILE)" OPENEDBOT_DEV_PROFILE="$(MODE)" bash scripts/setup.sh
 
 env-check: ## Valide strictement .env.local.
-	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --check
+	ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --check
 
 env-audit: ## Vérifie les templates et affiche uniquement les noms superflus de .env.local.
-	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit
+	ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit
 
 env-prune: ## Retire de .env.local les variables hors-dev uniquement lorsqu'elles sont vides.
-	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit --apply
+	ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit --apply
 
 env-template: ## Régénère .env.example depuis platform/config/src/env-schema.ts.
 	bun scripts/env.ts --template --write
 
 env-where: ## Où une variable est déclarée et quel fichier doit la porter (NAME=API_PORT ; sans NAME, tout le schéma).
-	@OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --where $(NAME)
+	@ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --where $(NAME)
 
 env-prod-list: ## Imprime le modèle de production (aucun fichier de prod n'est versionné ; valeurs au gestionnaire de secrets).
 	@bun scripts/env.ts --template --print-production
@@ -159,7 +159,7 @@ db-migrate: ## [DB] Applique les migrations; exige une infrastructure déjà dé
 	$(LOAD_ENV_OPT) bash scripts/db.sh --migrate
 
 db-seed: db-migrate env-check ## Crée le compte, l’organisation, l’abonnement et Hermes de dev.
-	$(LOAD_ENV) OPENEDBOT_ENV_FILE="$(abspath $(ENV_FILE))" OPENEDBOT_DEV_PROFILE="$(MODE)" bun run --filter api seed
+	$(LOAD_ENV) ENV_FILE="$(abspath $(ENV_FILE))" OPENEDBOT_DEV_PROFILE="$(MODE)" bun run --filter api seed
 
 # env-check runs before the database is dropped: an invalid .env.local must
 # fail while the data is still there. The reset is a drop/create of the single

@@ -38,8 +38,10 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
   });
 
   test("every new name of the table is new-style, and no old name is still declared", () => {
+    // A few names leave the prefix for the plain name the tools already use.
+    const unprefixed = new Set(["ENV_FILE", "E2E_MAILPIT_URL"]);
     for (const [old, next] of Object.entries(ENV_RENAMES)) {
-      expect([old, next.startsWith("OPENEDBOT_")]).toEqual([old, true]);
+      expect([old, next.startsWith("OPENEDBOT_") || unprefixed.has(next)]).toEqual([old, true]);
       expect([old, envSchemaEntry(old)]).toEqual([old, undefined]);
     }
   });

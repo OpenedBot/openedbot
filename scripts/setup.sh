@@ -52,7 +52,7 @@ bun install --frozen-lockfile
 declare -A env_file_of=()
 while IFS=$'\t' read -r mapped_name mapped_path; do
   [ -n "$mapped_name" ] && env_file_of["$mapped_name"]="$mapped_path"
-done < <(OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --file-of)
+done < <(ENV_FILE="$env_file" bun scripts/env.ts --file-of)
 
 # The private file a variable belongs to; the root one for anything the schema
 # does not know, which is where env-audit also keeps unknown names.
@@ -190,8 +190,8 @@ elif [ "$profile" = "external" ]; then
   fi
 fi
 
-OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --audit --apply
-OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --check
+ENV_FILE="$env_file" bun scripts/env.ts --audit --apply
+ENV_FILE="$env_file" bun scripts/env.ts --check
 
 # The seed probes DEV_HERMES_URL (health, capabilities, toolsets, model
 # options). With the fake profile that gateway is this repository's own

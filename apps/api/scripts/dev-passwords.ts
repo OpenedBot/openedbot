@@ -16,9 +16,9 @@ export function generateDevPassword(): string {
   return randomBytes(24).toString("base64url");
 }
 
-/** The env file `make` loaded: OPENEDBOT_ENV_FILE when set, else the repository's .env.local. */
+/** The env file `make` loaded: ENV_FILE when set, else the repository's .env.local. */
 export function devEnvFilePath(env: Record<string, string | undefined>, repoRoot: string): string {
-  return resolve(repoRoot, env.OPENEDBOT_ENV_FILE?.trim() || ".env.local");
+  return resolve(repoRoot, env.ENV_FILE?.trim() || ".env.local");
 }
 
 /** Sets NAME=value in an env-file body, replacing an existing (even empty) line. */

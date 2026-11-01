@@ -38,3 +38,4 @@ $(eval $(call openedbot_legacy_flag,OHB_CONSOLE_SOLO,OPENEDBOT_CONSOLE_MODE,1,so
 $(eval $(call openedbot_legacy_var,OHB_PUBLIC_URL,OPENEDBOT_PUBLIC_URL))
 $(eval $(call openedbot_legacy_var,OHB_CONSOLE_URL,OPENEDBOT_CONSOLE_URL))
 $(eval $(call openedbot_legacy_var,OHB_CORE_DIR,OPENEDBOT_MAIN_DIR))
+$(eval $(call openedbot_legacy_var,OHB_ENV_FILE,ENV_FILE))
