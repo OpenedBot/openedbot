@@ -69,6 +69,9 @@ cd ../.. && make dev   # API :8790, console :1420
 cd ../desktop && make dev-local
 ```
 
+From the repository root, `make desktop` does the same in one step (it installs the
+dependencies and the Electron binary first when needed), and `make stop` also stops it.
+
 | Command | What it does |
 |---|---|
 | `make dev` | Electron with reload (electron-vite) against production |
