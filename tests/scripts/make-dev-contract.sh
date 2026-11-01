@@ -281,18 +281,24 @@ esac
 # The dev targets load the env file and must never print it. A bare `export`
 # (or `env`, `set`, `export -p`, xtrace...) in a recipe dumps every value in
 # clear: encryption keys, push credentials, tokens. Run dev, dev-api and
-# dev-worker for real with a stubbed launcher (`bun` and the commands are
-# no-ops, env-check is skipped) and fail if a sentinel secret from the env
-# file reaches stdout or stderr. The sentinel itself is never printed.
+# dev-worker for real with a stubbed launcher (the app commands are no-ops,
+# env-check is skipped, only scripts/dev-accounts.ts runs) and fail if a
+# sentinel secret or seed password from the env file reaches stdout or stderr. The sentinel itself is never printed.
 sentinel_dir="$contract_tmpdir/sentinel"
 mkdir -p "$sentinel_dir/bin"
-printf '#!/bin/sh\nexit 0\n' > "$sentinel_dir/bin/bun"
+# The stub runs scripts/dev-accounts.ts with the real bun (the `make dev`
+# step that lists the seed accounts) and nothing else.
+real_bun="$(command -v bun)" || fail "bun is required to run scripts/dev-accounts.ts."
+printf '#!/bin/sh\nif [ "$1" = scripts/dev-accounts.ts ]; then exec "%s" "$@"; fi\nexit 0\n' "$real_bun" > "$sentinel_dir/bin/bun"
 chmod +x "$sentinel_dir/bin/bun"
 sentinel_value="sentinel-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
 sentinel_env="$sentinel_dir/env"
 {
   printf 'OPENEDBOT_TEST_SENTINEL_SECRET=%s\n' "$sentinel_value"
   printf 'API_ENCRYPTION_KEY=%s\n' "$sentinel_value"
+  # The seed passwords: dev-accounts names where they live, never the value.
+  printf 'E2E_PASSWORD=%s-e2e\n' "$sentinel_value"
+  printf 'DEV_STAFF_PASSWORD=%s-staff\n' "$sentinel_value"
 } > "$sentinel_env"
 for target in dev dev-api dev-worker; do
   sentinel_output="$sentinel_dir/$target.out"
@@ -305,6 +311,12 @@ for target in dev dev-api dev-worker; do
     fail "make $target printed a value from the env file (environment dump); value withheld."
   fi
 done
+# The dev-accounts step really ran, and says where each password lives.
+dev_accounts_output="$sentinel_dir/dev.out"
+grep -qF "E2E_PASSWORD in $sentinel_env" "$dev_accounts_output" ||
+  fail "make dev must say where E2E_PASSWORD lives (scripts/dev-accounts.ts)."
+grep -qF "DEV_STAFF_PASSWORD in $sentinel_env" "$dev_accounts_output" ||
+  fail "make dev must say where DEV_STAFF_PASSWORD lives (scripts/dev-accounts.ts)."
 # Without the dump, the env file still reaches the apps (LOAD_ENV exports it
 # with set -a): the stubbed launcher fails when the sentinel is not set.
 printf '#!/bin/sh\n[ -n "${OPENEDBOT_TEST_SENTINEL_SECRET:-}" ]\n' > "$sentinel_dir/bin/require-env"

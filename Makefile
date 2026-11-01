@@ -211,7 +211,7 @@ dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les troi
 			fi; \
 		done; \
 	}; \
-	bun scripts/dev-accounts.ts; \
+	ENV_FILE="$(ENV_FILE)" bun scripts/dev-accounts.ts; \
 	$(DEV_COMMAND) 2>&1 | format_dev_logs
 
 dev-api: env-check ## [API] Lance uniquement l’API; infrastructure déjà prête.
