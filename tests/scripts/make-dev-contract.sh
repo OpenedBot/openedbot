@@ -278,4 +278,44 @@ case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract link
   *) fail "without HOST, make -n link-dev-up must name no host." ;;
 esac
 
+# The dev targets load the env file and must never print it. A bare `export`
+# (or `env`, `set`, `export -p`, xtrace...) in a recipe dumps every value in
+# clear: encryption keys, push credentials, tokens. Run dev, dev-api and
+# dev-worker for real with a stubbed launcher (`bun` and the commands are
+# no-ops, env-check is skipped) and fail if a sentinel secret from the env
+# file reaches stdout or stderr. The sentinel itself is never printed.
+sentinel_dir="$contract_tmpdir/sentinel"
+mkdir -p "$sentinel_dir/bin"
+printf '#!/bin/sh\nexit 0\n' > "$sentinel_dir/bin/bun"
+chmod +x "$sentinel_dir/bin/bun"
+sentinel_value="sentinel-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+sentinel_env="$sentinel_dir/env"
+{
+  printf 'OPENEDBOT_TEST_SENTINEL_SECRET=%s\n' "$sentinel_value"
+  printf 'API_ENCRYPTION_KEY=%s\n' "$sentinel_value"
+} > "$sentinel_env"
+for target in dev dev-api dev-worker; do
+  sentinel_output="$sentinel_dir/$target.out"
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND=true DEV_API_COMMAND=true DEV_WORKER_COMMAND=true \
+    "$target" >"$sentinel_output" 2>&1 </dev/null; then
+    fail "make $target with a stubbed launcher exited non-zero (output withheld: it may hold env values)."
+  fi
+  if grep -qF -- "$sentinel_value" "$sentinel_output"; then
+    fail "make $target printed a value from the env file (environment dump); value withheld."
+  fi
+done
+# Without the dump, the env file still reaches the apps (LOAD_ENV exports it
+# with set -a): the stubbed launcher fails when the sentinel is not set.
+printf '#!/bin/sh\n[ -n "${OPENEDBOT_TEST_SENTINEL_SECRET:-}" ]\n' > "$sentinel_dir/bin/require-env"
+chmod +x "$sentinel_dir/bin/require-env"
+require_env="$sentinel_dir/bin/require-env"
+for target in dev dev-api dev-worker; do
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND="$require_env" DEV_API_COMMAND="$require_env" \
+    DEV_WORKER_COMMAND="$require_env" "$target" >/dev/null 2>&1 </dev/null; then
+    fail "make $target must export the env file to the app it starts."
+  fi
+done
+
 printf 'make dev dry-run contract passed.\n'

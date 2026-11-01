@@ -194,7 +194,7 @@ runtime-token-rotate: db-migrate env-check ## Ré-encrypte atomiquement les toke
 # ─── Mode dev : lancer les apps et le lien ───────────────────────────────────
 
 dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les trois apps; ni infra, ni migration. MODE=fake|bundled|external force le profil.
-	@set -eo pipefail; $(LOAD_ENV) export; \
+	@set -eo pipefail; $(LOAD_ENV) \
 	format_dev_logs() { \
 		local line label color payload; \
 		while IFS= read -r line || [[ -n "$$line" ]]; do \
@@ -215,7 +215,7 @@ dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les troi
 	$(DEV_COMMAND) 2>&1 | format_dev_logs
 
 dev-api: env-check ## [API] Lance uniquement l’API; infrastructure déjà prête.
-	$(LOAD_ENV) export; $(DEV_API_COMMAND)
+	$(LOAD_ENV) $(DEV_API_COMMAND)
 
 dev-console: ## [CONSOLE] Lance uniquement Vite sur :1420.
 	$(LOAD_ENV_OPT) $(DEV_CONSOLE_COMMAND)
@@ -225,7 +225,7 @@ dev-admin: ## [ADMIN] Lance le backoffice staff (ADMIN_DIR, plugins/admin, plug-
 	$(LOAD_ENV_OPT) $(DEV_ADMIN_COMMAND)
 
 dev-worker: env-check ## [WORKER] Traite les runs/workflows; API et infrastructure à part.
-	$(LOAD_ENV) export; $(DEV_WORKER_COMMAND)
+	$(LOAD_ENV) $(DEV_WORKER_COMMAND)
 
 # `make stop` arrête l'environnement de dev local en entier : API, worker,
 # console et backoffice. Le port ne suffisait pas. Le worker n'écoute rien, il
