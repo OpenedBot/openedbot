@@ -5,6 +5,8 @@
  * (migration 0142): this module only produces the canonical form.
  */
 
+import type { EffectiveYolo } from "./yolo";
+
 export const PERMISSION_CEILINGS = ["manual", "auto", "bypass"] as const;
 
 export type PermissionCeiling = (typeof PERMISSION_CEILINGS)[number];
@@ -85,12 +87,27 @@ export type PermissionContextDto = {
   reviewProven: boolean;
 };
 
-export type EffectivePermissionReason = "ceiling" | "enforce_review" | "review_unproven";
+export const EFFECTIVE_PERMISSION_REASONS = ["ceiling", "enforce_review", "review_unproven"] as const;
 
-export type EffectivePermission = { mode: BotPermissionMode; reason: EffectivePermissionReason | null };
+export type EffectivePermissionReason = (typeof EFFECTIVE_PERMISSION_REASONS)[number];
 
-/** The mode a bot really runs in, and why it differs from its stored one (`null`: it does not). */
-export function effectiveBotPermission(stored: BotPermissionMode | null | undefined, context: PermissionContextDto | null | undefined): EffectivePermission {
+/**
+ * `reason`: why `mode` differs from the stored one (`null`: it does not).
+ * `yolo`: the active YOLO lease that covers the bot, if any (`null`: none).
+ */
+export type EffectivePermission = { mode: BotPermissionMode; reason: EffectivePermissionReason | null; yolo: EffectiveYolo | null };
+
+/** The mode a bot really runs in, why it differs from its stored one, and the YOLO lease that covers it. */
+export function effectiveBotPermission(
+  stored: BotPermissionMode | null | undefined,
+  context: PermissionContextDto | null | undefined,
+  yolo: EffectiveYolo | null = null,
+): EffectivePermission {
+  const { mode, reason } = effectiveStoredMode(stored, context);
+  return { mode, reason, yolo };
+}
+
+function effectiveStoredMode(stored: BotPermissionMode | null | undefined, context: PermissionContextDto | null | undefined): Omit<EffectivePermission, "yolo"> {
   const mode: BotPermissionMode = stored === "plan" || stored === "auto" || stored === "bypass" ? stored : "manual";
   if (!context || context.pipeline !== "v2" || mode === "plan") return { mode, reason: null };
   let effective: PermissionCeiling = mode;
@@ -109,6 +126,19 @@ export function effectiveBotPermission(stored: BotPermissionMode | null | undefi
   }
   return effective === mode ? { mode, reason: null } : { mode: effective, reason };
 }
+
+/**
+ * A YOLO lease is allowed only where `bypass` would be: no ceiling or a
+ * `bypass` one, and no enforced review. The refusal is explicit
+ * (`YOLO_BLOCKED_BY_POLICY` with this reason), never a silent downgrade.
+ */
+export function yoloPolicyBlock(policy: { maxMode: PermissionCeiling | null; enforceReview: boolean }): YoloPolicyBlockReason | null {
+  if (policy.maxMode !== null && policy.maxMode !== "bypass") return "ceiling";
+  if (policy.enforceReview) return "enforce_review";
+  return null;
+}
+
+export type YoloPolicyBlockReason = "ceiling" | "enforce_review";
 
 export type CommandBlocklistIssue = "too_many" | "not_text" | "empty" | "too_long" | "characters" | "command_name";
 
@@ -146,7 +176,7 @@ export function normalizeCommandBlocklist(input: unknown): CommandBlocklistResul
 
 /** PERM2-11: the stages of the permission pipeline, in pipeline order. */
 export const PERMISSION_DECISION_STAGES = [
-  "forbidden", "floor", "opaque", "deletion", "tool_policy", "grant", "review", "full", "human", "unattended",
+  "forbidden", "yolo", "floor", "opaque", "deletion", "tool_policy", "grant", "review", "full", "human", "unattended",
 ] as const;
 
 export type PermissionDecisionStage = (typeof PERMISSION_DECISION_STAGES)[number];
@@ -174,6 +204,7 @@ export const DECISION_TRACE_REASONS = [
   "plan_mode", "manual_mode", "opaque_operation", "deletion", "tool_ask", "tool_always",
   "grant", "terminal_switch", "full_access", "never_wait",
   "review_approve", "review_deny", "review_escalated", "review_timeout", "review_circuit_open", "review_failed",
+  "yolo_lease", "yolo_hardline", "yolo_denied", "yolo_protected",
 ] as const;
 
 export type DecisionTraceReason = (typeof DECISION_TRACE_REASONS)[number];

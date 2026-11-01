@@ -135,6 +135,7 @@ function decideV2(row: GateState, gate: GateIdentity, choices: readonly unknown[
     detail: {
       reason: decision.reason,
       effectiveMode: decision.effectiveMode,
+      ...(decision.yoloLeaseId ? { yoloLeaseId: decision.yoloLeaseId } : {}),
       ...(decision.heldBy ? { heldStage: decision.heldBy.stage, heldReason: decision.heldBy.reason } : {}),
       // PERM2-11: the journal names the grant that answered, and its author.
       ...(decision.stage === "grant" && decision.reason === "grant" && row.rules.grants.grantId

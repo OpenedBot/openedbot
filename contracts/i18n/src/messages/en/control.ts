@@ -144,6 +144,7 @@ export const decisions = {
     heldBy: "Nobody answers this routine; it would have waited: {reason}",
     stage: {
       forbidden: "forbidden",
+      yolo: "YOLO lease",
       floor: "floor",
       opaque: "opaque operation",
       deletion: "deletion",
@@ -181,6 +182,10 @@ export const decisions = {
       review_timeout: "the automatic review did not answer in time",
       review_circuit_open: "review paused after three denials in a row",
       review_failed: "the automatic review could not complete",
+      yolo_lease: "auto-approved (YOLO)",
+      yolo_hardline: "hardline action, never auto-approved",
+      yolo_denied: "action on the organization’s deny-list",
+      yolo_protected: "protected path (.ssh, .env, keychain…)",
     },
   },
 } as const;

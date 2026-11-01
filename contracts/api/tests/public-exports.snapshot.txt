@@ -119,6 +119,7 @@ type DecisionTraceReason
 type DecisionTraceStage
 type EffectivePermission
 type EffectivePermissionReason
+type EffectiveYolo
 type EmailLoginCodeDto
 type EmailLoginDto
 type ExpressionId
@@ -316,6 +317,12 @@ type WorkflowHistoryPageDto
 type WorkflowStatus
 type WorkspaceBusinessMetrics
 type WorkspaceRole
+type YoloErrorCode
+type YoloLease
+type YoloLeaseDto
+type YoloLeaseHostState
+type YoloPolicyBlockReason
+type YoloScope
 value ACCESS_TIERS
 value BOT_PERMISSION_MODES
 value BOT_REPLY_LANGUAGES
@@ -332,6 +339,7 @@ value COMMAND_BLOCKLIST_MAX_LENGTH
 value DECISION_TRACE_REASONS
 value DECISION_TRACE_STAGES
 value DEFAULT_REASONING_EFFORT
+value EFFECTIVE_PERMISSION_REASONS
 value EXPRESSIONS
 value GROUP_MEMBERS_MAX
 value GROUP_MEMBERS_MIN
@@ -355,6 +363,16 @@ value SHAPES
 value SUPPORT_MESSAGE_MAX_CHARS
 value TRANSACTIONAL_EMAIL_KINDS
 value TRANSACTIONAL_EMAIL_LOCALES
+value YOLO_ACK_REQUIRED_CODE
+value YOLO_BLOCKED_BY_POLICY_CODE
+value YOLO_ERROR_CODES
+value YOLO_ERROR_STATUS
+value YOLO_HOST_UNSUPPORTED_CODE
+value YOLO_HUMAN_REQUIRED_CODE
+value YOLO_MAX_SECONDS
+value YOLO_SCOPES
+value YOLO_SIGNING_UNAVAILABLE_CODE
+value YOLO_THREAD_DEFAULT_SECONDS
 value accessUnlocks
 value canManageWorkspaceMembers
 value canOperateWorkspace
@@ -370,3 +388,4 @@ value permissionModeRaiseRefused
 value permissionModeUnderCeiling
 value pickBySeed
 value transactionalEmailLocale
+value yoloPolicyBlock

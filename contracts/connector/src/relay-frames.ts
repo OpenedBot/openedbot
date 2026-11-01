@@ -8,6 +8,8 @@
  */
 
 import { isUuid } from "@openedbot/contracts-primitives";
+import { RelayFrameError } from "./relay-frame-error";
+import { decodeYoloFrame, isYoloFrameType, type RelayYoloFrame } from "./relay-frames-yolo";
 
 /** Version du protocole annoncée dans `hello`. */
 export const RELAY_PROTOCOL = 1 as const;
@@ -217,16 +219,12 @@ export type RelayTextFrame =
   | RelayCancelFrame
   | RelayErrFrame
   | RelayPingFrame
-  | RelayPongFrame;
+  | RelayPongFrame
+  | RelayYoloFrame;
 
 export type RelayFrameType = RelayTextFrame["t"];
 
-export class RelayFrameError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
-    this.name = "RelayFrameError";
-  }
-}
+export { RelayFrameError };
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -408,6 +406,7 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
     case "pong":
       return { t };
     default:
+      if (isYoloFrameType(t)) return decodeYoloFrame(t, frame);
       throw new RelayFrameError(`unknown frame type "${t}"`);
   }
 }

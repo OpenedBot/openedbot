@@ -144,6 +144,7 @@ export const decisions = {
     heldBy: "Personne ne répond à cette routine ; elle aurait attendu : {reason}",
     stage: {
       forbidden: "interdit",
+      yolo: "bail YOLO",
       floor: "plancher",
       opaque: "opération opaque",
       deletion: "suppression",
@@ -181,6 +182,10 @@ export const decisions = {
       review_timeout: "la revue automatique n’a pas répondu à temps",
       review_circuit_open: "revue suspendue après trois refus de suite",
       review_failed: "la revue automatique n’a pas pu aboutir",
+      yolo_lease: "auto-approuvée (YOLO)",
+      yolo_hardline: "action de la liste hardline, jamais auto-approuvée",
+      yolo_denied: "action de la deny-list de l’organisation",
+      yolo_protected: "chemin protégé (.ssh, .env, trousseau…)",
     },
   },
 } as const;

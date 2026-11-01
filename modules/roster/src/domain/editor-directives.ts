@@ -117,7 +117,8 @@ export function autoApprovesPermission(mode: BotPermissionMode | string | null |
  * - every mode, including `bypass`, holds a circuit breaker: deleting `/`,
  *   the home directory itself, the process cwd (`.`, the stand-in for a
  *   workspace root the gate does not name), or touching `.git/config`,
- *   `.git/hooks`, `.ssh`, `.env`, `id_rsa`, `credentials`.
+ *   `.git/hooks`, `.ssh`, `.env`, `id_rsa`, `credentials`, the macOS keychain
+ *   (`PROTECTED_PATH_PATTERNS`).
  *
  * An interpreter that deletes (`python -c`, `find -exec`) is not classified
  * here. The gate text is the shell Hermes asked about, not a semantic model.
@@ -238,13 +239,28 @@ function isWorkspaceDot(path: string): boolean {
   return path === "." || path === "./" || path === "./*";
 }
 
+/**
+ * The paths no policy ever lets a bot touch, by protection id. The circuit
+ * breaker and the floor read them in every mode; a YOLO lease names the ids
+ * it keeps (`protect`), and the shared fixture `yolo-hardline.json` holds the
+ * same patterns for the host. The macOS keychain joined the original six.
+ */
+export const PROTECTED_PATH_PATTERNS = {
+  git_config: /(?:^|\/)\.git\/config$/,
+  git_hooks: /(?:^|\/)\.git\/hooks(?:\/|$)/,
+  ssh: /(?:^|\/)\.ssh(?:\/|$)/,
+  env: /(?:^|\/)\.env$/,
+  id_rsa: /(?:^|\/)id_rsa$/,
+  credentials: /(?:^|\/)credentials(?:\.json)?$/,
+  keychain: /(?:^|\/)Library\/Keychains(?:\/|$)/,
+} as const satisfies Record<string, RegExp>;
+
+export type ProtectedPathId = keyof typeof PROTECTED_PATH_PATTERNS;
+
+const PROTECTED_PATHS: readonly RegExp[] = Object.values(PROTECTED_PATH_PATTERNS);
+
 function isProtectedPath(path: string): boolean {
-  return /(?:^|\/)\.git\/config$/.test(path)
-    || /(?:^|\/)\.git\/hooks(?:\/|$)/.test(path)
-    || /(?:^|\/)\.ssh(?:\/|$)/.test(path)
-    || /(?:^|\/)\.env$/.test(path)
-    || /(?:^|\/)id_rsa$/.test(path)
-    || /(?:^|\/)credentials(?:\.json)?$/.test(path);
+  return PROTECTED_PATHS.some((pattern) => pattern.test(path));
 }
 
 function redirectsToProtected(raw: string): boolean {
