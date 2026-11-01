@@ -7,7 +7,7 @@ import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
 
 /**
- * What can be done TO a bot (OpenBot `manage.tsx`): pin, hide, archive,
+ * What can be done TO a bot: pin, hide, archive,
  * delete. One hook for the sidebar context menu and the bot page, so both
  * entry points run the same mutation, the same guards and the same
  * navigation away from a bot that leaves the roster.

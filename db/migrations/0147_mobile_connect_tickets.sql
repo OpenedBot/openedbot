@@ -1,6 +1,6 @@
 begin;
 
--- Connexion d'un téléphone par QR (« Mobile Connect »), comme OpenBot et Grok Bot :
+-- Connexion d'un téléphone par QR (« Mobile Connect »), comme Grok Bot :
 -- un membre déjà authentifié dans la console demande un ticket ; la console
 -- l'affiche en QR (`ohb://join?api=…&ticket=<id>.<secret>`) ; l'app le scanne et
 -- l'échange, une seule fois et avant son expiration, contre un code natif PKCE

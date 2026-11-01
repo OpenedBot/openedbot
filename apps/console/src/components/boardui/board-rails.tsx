@@ -21,7 +21,7 @@ import { RailRuntimeHealth } from "./rail-runtime-health";
 
 /**
  * Variante C (`lib/shell/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
- * d'OpenBot. Un rail d'icônes posé sur le fond du cadre : Accueil, À traiter
+ * en rail. Un rail d'icônes posé sur le fond du cadre : Accueil, À traiter
  * en haut ; l'état du runtime, Support, Réglages et le compte en bas.
  */
 

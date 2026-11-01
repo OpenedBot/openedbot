@@ -510,8 +510,7 @@ export async function prepareGroupTurn(
   const { before, unread } = partition;
   // Le message auquel on répond est servi entier. L'historique derrière ne
   // l'est que tant que le budget d'un envoi (3 Mio) tient : au-delà, une note
-  // dit que le fichier n'est pas dans ce tour. Même règle qu'OpenBot
-  // (`inlineAttachments`) : ne jamais répondre comme si la pièce n'existait pas.
+  // dit que le fichier n'est pas dans ce tour. La règle : ne jamais répondre comme si la pièce n'existait pas.
   const files = await loadRoomAttachments(db, context.organizationId, unread, before, blob);
   const state = groupSendState(context);
   if (state?.phase === "route") {

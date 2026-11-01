@@ -423,7 +423,7 @@ export function mentionedMembers<T extends { id: string; slug: string }>(
 
 /**
  * Mentions qui ouvrent le message (`@neo @scout hello`). Une mention plus loin
- * (`hello @neo`) n'adresse personne : seul un `@` en tête réveille (OpenBot).
+ * (`hello @neo`) n'adresse personne : seul un `@` en tête réveille.
  * L'ordre rendu est celui du roster.
  */
 export function leadingMentions<T extends { id: string; slug: string }>(
@@ -483,8 +483,8 @@ export function buildGroupInstructions(input: {
   maxRounds: number;
   /**
    * Premier tour d'un envoi : le membre fait partie des répondants que
-   * l'opérateur vient d'adresser, il répond donc toujours (comme OpenBot,
-   * « Answer only your own part ») ; `(pass)` ne vaut qu'aux tours suivants.
+   * l'opérateur vient d'adresser, il répond donc toujours (et seulement
+   * pour sa part) ; `(pass)` ne vaut qu'aux tours suivants.
    */
   addressed?: boolean;
   /** Le toolset `web` du profil est actif dans cette session. */

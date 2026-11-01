@@ -439,8 +439,7 @@ export function StatusTile({
  * chaque ligne est un réglage (libellé et phrase à gauche, valeur ou commande
  * à droite), séparées par des filets.
  *
- * C'est la géométrie des réglages d'un système (et d'OpenBot, le benchmark de
- * la console) : l'œil descend une seule colonne de libellés et une seule
+ * C'est la géométrie des réglages d'un système : l'œil descend une seule colonne de libellés et une seule
  * colonne de valeurs, au lieu de sauter d'une tuile à l'autre dans une grille
  * de cartes. Sur téléphone c'est le même groupe iOS que `SettingsCard` : titre
  * au-dessus, phrase sous le bloc.

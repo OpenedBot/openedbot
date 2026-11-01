@@ -357,7 +357,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
             aria-invalid={draft.name.length > 0 && !trimmedName ? true : undefined}
             onChange={(event) => update({ name: event.target.value })}
             onKeyDown={(event) => {
-              // Entrée crée (OpenBot), sauf pendant une composition IME.
+              // Entrée crée, sauf pendant une composition IME.
               if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
               event.preventDefault();
               submit();

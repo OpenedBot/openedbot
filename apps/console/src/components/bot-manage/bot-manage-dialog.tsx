@@ -65,7 +65,7 @@ const PAGES: Record<BotManagePage, PageEntry> = {
   webhooks: { id: "webhooks", icon: IconWebhook, labelKey: "botManage.page.webhooks", disabled: true },
 };
 
-/** The rows of the bot page, grouped as OpenBot's `settings-rows` (each row says its current answer). */
+/** The rows of the bot page, grouped in settings rows (each row says its current answer). */
 export const BOT_MANAGE_GROUPS: ReadonlyArray<{ labelKey: MessageKey; pages: BotManagePage[] }> = [
   { labelKey: "botManage.group.who", pages: ["persona", "model"] },
   { labelKey: "botManage.group.how", pages: ["approvals", "skills", "mcp", "credentials", "coordination"] },
@@ -91,8 +91,7 @@ function personaSummary(instructions: string): string | null {
 }
 
 /**
- * La page d'un bot, à l'iso d'OpenBot (`bot-profile/profile.tsx` +
- * `settings-rows.tsx` + `manage.tsx`) : une liste de rangées qui disent
+ * La page d'un bot : une liste de rangées qui disent
  * chacune leur réponse actuelle et ouvrent leur page, puis ce qu'on peut faire
  * au bot (épingler, masquer, dupliquer, archiver, supprimer).
  *

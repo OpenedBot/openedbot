@@ -52,7 +52,7 @@ export type CreationOptionsValue = {
 };
 
 /**
- * « Options avancées », folded by default (touri, OpenBot): the defaults are
+ * « Options avancées », folded by default (touri): the defaults are
  * the safe ones (ask before acting, introduce itself), so a bot is created
  * with a name and a persona; everything here can change later on its page.
  * The closed disclosure still names the current choices, so nothing is

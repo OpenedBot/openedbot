@@ -47,7 +47,7 @@ export type GroupSendState = {
   nudged?: string[];
   /**
    * `route` : session sans outils qui nomme UN propriétaire avant tout appel
-   * de travail (OpenBot : never select all members). `contribution` : un
+   * de travail (jamais tous les membres). `contribution` : un
    * membre délégué écrit pour le répondant, sans bulle. `synthesis` : le
    * répondant publie l'unique réponse.
    */
@@ -99,7 +99,7 @@ function isContributionList(value: unknown): value is Array<{ botId: string; tex
 /**
  * Mentions en tête du message opérateur, et seulement celles-là.
  * `@scout @neo hello` réveille les deux. `hello @scout` n'en réveille aucun :
- * une mention plus loin est une référence, pas une adresse (OpenBot).
+ * une mention plus loin est une référence, pas une adresse.
  * L'ordre rendu est celui du roster, pas celui du texte.
  */
 function leadingAddressedMembers<T extends { id: string; slug: string }>(
@@ -526,8 +526,7 @@ export function advanceGroupSend(
   }
 
   // Fin de tour : seuls les membres qu'une sortie du tour a nommés (`@slug`)
-  // reprennent la parole, dans l'ordre où ils ont été nommés (OpenBot
-  // `relay`, server/src/channels/group.ts). Personne de nommé : le salon se
+  // reprennent la parole, dans l'ordre où ils ont été nommés. Personne de nommé : le salon se
   // calme. Relancer tout le roster faisait réfléchir chaque bot une seconde
   // fois après chaque envoi, pour passer.
   if (!spoke.length) return { kind: "settled" };

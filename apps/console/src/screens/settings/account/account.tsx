@@ -68,7 +68,7 @@ function controlHeight(isMobile: boolean): string {
  * commande à droite) plutôt qu'en grille de cartes et de tuiles : chaque
  * tuile répétait son libellé en capitales et son icône pour un seul mot de
  * valeur, et l'œil zigzaguait entre deux colonnes de cartes de hauteurs
- * différentes. La liste se lit d'un trait, comme les réglages d'OpenBot.
+ * différentes. La liste se lit d'un trait.
  *
  * Tout ce que la page dit vient de l'API : `GET /api/auth/me` (adresse,
  * espace, rôle), `GET /api/account/security` (lien Google, existence d'un mot
@@ -98,7 +98,7 @@ function AccountPage({ team }: { team: boolean }) {
   const [mobileMemberInvitationAction, setMobileMemberInvitationAction] = useState<ReactNode>(null);
 
   // Les sections sont enfants directs du panneau : elles prennent toute sa
-  // largeur (comme les réglages d'OpenBot) et son espacement, au bureau comme
+  // largeur et son espacement, au bureau comme
   // sur téléphone. Une colonne plafonnée laissait un vide à droite de la modale.
   return (
     <SettingsPane footer={isMobile ? mobileMemberInvitationAction : undefined}>

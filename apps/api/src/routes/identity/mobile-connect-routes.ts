@@ -9,7 +9,7 @@ import type { AppVariables } from "./auth";
 
 /**
  * « Mobile Connect » : connecter un téléphone en scannant un QR affiché par la
- * console, sans retaper de mot de passe (OpenBot, Grok Bot).
+ * console, sans retaper de mot de passe (comme Grok Bot).
  *
  * 1. `POST /api/auth/mobile-connect/tickets` (session requise) crée un ticket
  *    jetable de dix minutes et renvoie le lien à encoder en QR.

@@ -80,7 +80,7 @@ export function ModelPage({ bot }: { bot: BotDto }) {
   );
 }
 
-/** Approval rules: a choice written on click (OpenBot `setup.tsx`), no draft. */
+/** Approval rules: a choice written on click, no draft. */
 export function ApprovalsPage({ bot }: { bot: BotDto }) {
   const { t } = useT();
   const queryClient = useQueryClient();

@@ -100,7 +100,7 @@ export function ConversationScreen() {
   const navigate = useNavigate();
   const openSettings = useOpenSettings();
   const queryClient = useQueryClient();
-  // La page de CE bot (rangées OpenBot), montée une fois par le cadre.
+  // La page de CE bot (en rangées), montée une fois par le cadre.
   const openManage = useBotDialogs((state) => state.openManage);
   // The page reads the thread shown here (a `?task=` branch included), held
   // in a ref so these callbacks stay referentially stable for the timeline.

@@ -32,10 +32,10 @@ export const waitlist = {
     console: "The console: browser and phone",
     bot: "The bot: on your server",
   },
-  // What openedbot does, after openbot.run's grid: the room large, then what
-  // the chapters don't cover.
+  // What the bot does day to day: the room large, then what the chapters
+  // don't cover.
   does: {
-    title: "What openedbot does",
+    title: "Day to day",
     lede: "Bots that remember, come back on time and ask before they act.",
     salon: {
       title: "Several bots, one room.",
@@ -48,16 +48,16 @@ export const waitlist = {
       pass: "Sillage isn't mentioned: it passes its turn.",
     },
     provider: {
-      title: "The AI plan you already have",
-      body: "Connect your Anthropic, OpenAI Codex or OpenRouter account from the console. Your bots run on what you already pay for.",
+      title: "The AI provider you choose",
+      body: "From the console, link an account or an API key: Anthropic, OpenAI, Google Gemini, xAI or OpenRouter.",
     },
     model: {
-      title: "Change the model, keep the bot",
-      body: "Each bot has its own model. Change it in its settings: its character and memory stay.",
+      title: "One model per bot",
+      body: "Pick each bot's model in its settings. If you switch later, it keeps its character and its memory.",
     },
     approval: {
       title: "It asks before writing",
-      body: "Before writing on your server or running a risky command, the bot stops and waits for your approval, right in the conversation.",
+      body: "Before writing on your server or running a risky command, the bot stops and waits for your approval, right in the conversation. Your answer is logged in the journal.",
     },
     connectors: {
       title: "Plug in your tools",
@@ -68,13 +68,13 @@ export const waitlist = {
       body: "A voice call, one to one or in a room: it answers you out loud.",
     },
   },
-  // The landing, on openbot.run's grammar (dark, sans-serif, bento): its
-  // hero, the console window and its menus.
+  // The landing (dark, sans-serif, bento): its hero, the console window and
+  // its menus.
   open: {
     nav: { features: "Features", how: "Install", faq: "Questions" },
-    meet: "Meet",
+    meet: "Hello, this is",
     name: "openedbot",
-    lede: "Persistent AI teammates on your own server. Run {codex}, {claude}, {gemini} and {grok} with the plans you already pay for, or another provider.",
+    lede: "A bot that works on your server, not ours. It asks before it acts and keeps a record of every decision. Customer support, calendar, news watch or servers: you give it its job.",
     preview: {
       room: "Launch",
       roomLast: "Brume: Reviewed. The demo date…",
@@ -245,7 +245,7 @@ export const waitlist = {
     },
     provider: {
       q: "Which AI provider do I need?",
-      a: "The one you already have. Connect Anthropic, OpenAI Codex or OpenRouter from the console, then pick each bot's model.",
+      a: "The one you prefer. From the console, you link an account or an API key (Anthropic, OpenAI, Google Gemini, xAI or OpenRouter, among others), then pick each bot's model.",
     },
     off: {
       q: "What if my server goes down?",
@@ -264,8 +264,7 @@ export const waitlist = {
       a: "No. Your machine opens the connection to openedbot itself. Nothing to open, no domain to buy.",
     },
   },
-  // The sections taken from Grok Bot (x.ai/bot), blended into the
-  // openbot.run grid: the launch pill, the statement card, the four
+  // The following sections: the launch pill, the statement card, the four
   // scenes, the jobs and the closing call.
   teammates: {
     launch: {
@@ -280,7 +279,7 @@ export const waitlist = {
     },
     many: {
       title: "Many bots, each on its own work",
-      lede: "Create a bot, give it a task, add another when the work grows. They run on your server and hand work to each other in a room.",
+      lede: "Create a bot, give it a task, then a second one for another topic. They run on your server and answer each other in a room.",
       memoryUpdated: "Updated memory for",
       routineName: "Monday update",
       routineWhen: "Every Monday at 9:00 am",
@@ -333,12 +332,12 @@ export const waitlist = {
       },
     },
     home: {
-      title: "On your server, with your subscription",
-      lede: "The bot lives at your place and runs on the AI provider you already pay for.",
+      title: "On your server, with your AI provider",
+      lede: "The bot lives at your place. You pick the AI provider and each bot's model.",
     },
     final: {
       title: "Meet your first bot",
-      body: "A teammate that lives on your server and asks before it writes.",
+      body: "It lives on your server, asks before it acts and logs every decision in the journal.",
     },
   },
   footer: {
@@ -353,7 +352,7 @@ export const waitlist = {
     copy: "© 2026 openedbot. The bot stays with you.",
   },
   pw: {
-    modelsCaption: "On the models of the AI subscription you already pay for",
+    modelsCaption: "With the models of the provider you choose",
     visualsTitle: "The console, as it is",
     visualsLede: "Real screens, captured on iPhone and on desktop, with real bots.",
     salonTitle: "The same room, everywhere",

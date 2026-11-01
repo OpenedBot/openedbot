@@ -32,7 +32,7 @@ const BRIDGE_PROBE_MS = 10_000;
 // The console's frame surface (BoardUI `--bui-background-full`: light #ffffff,
 // dark #121212), the colour of its top bar, around the grey cards of BoardUI's
 // "Chat Starter" template (sidebar and main card). Painted before the first frame so a launch never flashes white in dark
-// mode (OpenBot does the same), and behind the Windows caption buttons so they
+// mode, and behind the Windows caption buttons so they
 // melt into the console's top bar.
 const FRAME_RGB = { light: [255, 255, 255], dark: [18, 18, 18] } as const;
 // The caption glyphs: the console's primary text on that surface.

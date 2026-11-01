@@ -14,7 +14,7 @@ import { DeployEnvironmentBadge } from "../deploy-environment-badge";
 import { BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 
 /**
- * La barre du haut du cadre de bureau, à la manière de Codex ou d'OpenBot :
+ * La barre du haut du cadre de bureau, à la manière de Codex :
  * une seule rangée de 46 px sur toute la largeur, au-dessus de la barre
  * latérale et de la carte principale, sur le fond du cadre.
  *

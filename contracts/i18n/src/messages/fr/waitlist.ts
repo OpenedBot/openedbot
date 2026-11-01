@@ -38,10 +38,10 @@ export const waitlist = {
   // et son chapô sur la page, puis sa preuve dans une bande de nuit : une
   // capture réelle de la console, jamais une maquette. Même lexique que
   // l'accueil : machine, fournisseur d'IA, connexion sécurisée.
-  // Ce que fait openedbot, d'après la grille d'openbot.run : le salon en grand,
-  // puis ce que les chapitres ne couvrent pas.
+  // Ce que fait le bot au quotidien : le salon en grand, puis ce que les
+  // chapitres ne couvrent pas.
   does: {
-    title: "Ce que fait openedbot",
+    title: "Au quotidien",
     lede: "Des bots qui se souviennent, reviennent à l’heure et vous demandent avant d’agir.",
     salon: {
       title: "Plusieurs bots, un salon.",
@@ -54,16 +54,16 @@ export const waitlist = {
       pass: "Sillage n’est pas cité\u00a0: il passe son tour.",
     },
     provider: {
-      title: "L’abonnement d’IA que vous avez déjà",
-      body: "Branchez votre compte Anthropic, OpenAI Codex ou OpenRouter depuis la console. Vos bots tournent sur ce que vous payez déjà.",
+      title: "Le fournisseur d’IA de votre choix",
+      body: "Depuis la console, reliez un compte ou une clé d’API\u00a0: Anthropic, OpenAI, Google Gemini, xAI ou OpenRouter.",
     },
     model: {
-      title: "Changez de modèle, gardez le bot",
-      body: "Chaque bot a son modèle. Changez-le dans ses réglages\u00a0: son caractère et sa mémoire restent.",
+      title: "Un modèle par bot",
+      body: "Choisissez le modèle de chaque bot dans ses réglages. Si vous en changez plus tard, il garde son caractère et sa mémoire.",
     },
     approval: {
       title: "Il demande avant d’écrire",
-      body: "Avant d’écrire sur votre serveur ou de lancer une commande à risque, le bot s’arrête et attend votre accord, dans la conversation.",
+      body: "Avant d’écrire sur votre serveur ou de lancer une commande à risque, le bot s’arrête et attend votre accord, dans la conversation. Votre réponse est inscrite au journal.",
     },
     connectors: {
       title: "Branchez vos outils",
@@ -74,13 +74,13 @@ export const waitlist = {
       body: "Un appel vocal, seul à seul ou dans un salon\u00a0: il vous répond à voix haute.",
     },
   },
-  // La landing, sur la grammaire d'openbot.run (sombre, sans-serif,
-  // bento) : son héros, la fenêtre de la console et ses menus.
+  // La landing (sombre, sans-serif, bento) : son héros, la fenêtre de la
+  // console et ses menus.
   open: {
     nav: { features: "Fonctions", how: "Installation", faq: "Questions" },
-    meet: "Voici",
+    meet: "Bonjour, ici",
     name: "openedbot",
-    lede: "Des coéquipiers IA permanents, sur votre propre serveur. Faites tourner {codex}, {claude}, {gemini} et {grok} avec les abonnements que vous payez déjà, ou un autre fournisseur.",
+    lede: "Un bot qui travaille sur votre serveur, pas sur le nôtre. Il vous demande avant d’agir et garde la trace de chaque décision. Support client, agenda, veille ou serveurs\u00a0: c’est vous qui lui donnez son métier.",
     preview: {
       room: "Lancement",
       roomLast: "Brume\u00a0: Relu. Il manque la date…",
@@ -251,7 +251,7 @@ export const waitlist = {
     },
     provider: {
       q: "Quel fournisseur d’IA faut-il\u00a0?",
-      a: "Celui que vous avez déjà. Vous branchez Anthropic, OpenAI Codex ou OpenRouter depuis la console, puis vous choisissez le modèle de chaque bot.",
+      a: "Celui que vous préférez. Depuis la console, vous reliez un compte ou une clé d’API (Anthropic, OpenAI, Google Gemini, xAI ou OpenRouter, entre autres), puis vous choisissez le modèle de chaque bot.",
     },
     off: {
       q: "Et si mon serveur s’éteint ?",
@@ -274,9 +274,8 @@ export const waitlist = {
   // colonnes de liens, une barre de bas de page, puis le nom en très grand,
   // coupé par le bord. Aucun lien inventé : chaque colonne ne liste que ce
   // qui existe sur ce déploiement.
-  // Les sections reprises de Grok Bot (x.ai/bot), fondues dans la grille
-  // d'openbot.run : la pastille d'annonce, la carte de présentation, les
-  // quatre scènes, les métiers et l'appel final.
+  // Les sections suivantes : la pastille d'annonce, la carte de
+  // présentation, les quatre scènes, les métiers et l'appel final.
   teammates: {
     launch: {
       open: "La console est ouverte",
@@ -290,7 +289,7 @@ export const waitlist = {
     },
     many: {
       title: "Plusieurs bots, chacun sur son sujet",
-      lede: "Créez un bot, confiez-lui une tâche, ajoutez-en un autre quand le travail grandit. Ils tournent sur votre serveur et se passent la main dans un salon.",
+      lede: "Créez un bot, confiez-lui une tâche, puis un deuxième pour un autre sujet. Ils tournent sur votre serveur et se répondent dans un salon.",
       memoryUpdated: "Mémoire mise à jour pour",
       routineName: "Point du lundi",
       routineWhen: "Chaque lundi à 09:00",
@@ -343,12 +342,12 @@ export const waitlist = {
       },
     },
     home: {
-      title: "Sur votre serveur, avec votre abonnement",
-      lede: "Le bot vit chez vous et tourne sur le fournisseur d’IA que vous payez déjà.",
+      title: "Sur votre serveur, avec votre fournisseur d’IA",
+      lede: "Le bot vit chez vous. Vous choisissez le fournisseur d’IA et le modèle de chaque bot.",
     },
     final: {
       title: "Rencontrez votre premier bot",
-      body: "Un coéquipier qui vit sur votre serveur et vous demande avant d’écrire.",
+      body: "Il vit sur votre serveur, vous demande avant d’agir et note chaque décision au journal.",
     },
   },
   footer: {
@@ -366,7 +365,7 @@ export const waitlist = {
   // bande des modèles, les captures, la grille
   // des raisons et la bande des bots.
   pw: {
-    modelsCaption: "Avec les modèles de l’abonnement d’IA que vous payez déjà",
+    modelsCaption: "Avec les modèles du fournisseur que vous choisissez",
     visualsTitle: "La console, telle quelle",
     visualsLede: "Des écrans réels, pris sur iPhone et sur ordinateur, avec de vrais bots.",
     salonTitle: "Le même salon, partout",

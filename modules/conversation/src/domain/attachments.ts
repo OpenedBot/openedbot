@@ -269,7 +269,7 @@ export type LoadedAttachment = {
  * Ce qu'un tour de salon fait d'une pièce qu'il n'a pas pu relire, ou qu'il
  * laisse derrière lui.
  *
- * Même distinction qu'OpenBot (`attachment-parts.ts`) : le message auquel on
+ * La distinction : le message auquel on
  * répond échoue en le disant (`missing`), un message plus ancien dit seulement
  * qu'il n'est pas dans CE tour (`skipped`). Les deux empêchent le modèle de
  * répondre comme s'il avait vu le fichier.

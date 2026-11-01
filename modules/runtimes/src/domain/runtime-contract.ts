@@ -74,7 +74,7 @@ export const FORBIDDEN_TOOLSETS: ReadonlySet<string> = new Set([
  * like a Grok Bot bot (operator, 2026-10-25: "le bot doit être opérationnel
  * comme dans grokbot"). Every one is on by default at a competitor
  * (hermes-agent's own `hermes-api-server` composite, OpenClaw `coding`,
- * touri, OpenMausBot, OpenBot; study of 2026-10-25). A profile clones the
+ * touri, OpenMausBot; study of 2026-10-25). A profile clones the
  * runtime root, whose list drifts: the worker's capability baseline
  * (`modules/roster/src/domain/capability-baseline.ts`) applies this set to
  * each new bot's profile.
