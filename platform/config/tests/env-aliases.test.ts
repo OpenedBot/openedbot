@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyEnvAliases, ENV_RENAMES, renamedEnvName, resetEnvAliasWarnings } from "../src/env-aliases";
+import { applyEnvAliases, ENV_MERGES, ENV_RENAMES, mergedEnvTarget, renamedEnvName, resetEnvAliasWarnings } from "../src/env-aliases";
 import { envSchemaEntry } from "../src/env-schema";
 
 const root = join(import.meta.dir, "..", "..", "..");
@@ -49,5 +49,28 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
     const block = sh.split("<<'TABLE'\n")[1]?.split("\nTABLE")[0] ?? "";
     const pairs = Object.fromEntries(block.trim().split("\n").map((line) => line.trim().split(/\s+/) as [string, string]));
     expect(pairs).toEqual({ ...ENV_RENAMES });
+  });
+
+  test("merged names: converted into their target, then removed, one warning naming no value", () => {
+    const warnings: string[] = [];
+    const preprod: Record<string, string | undefined> = { OHB_ENV: "production", OHB_DEPLOY_ENV: "preprod" }; // rename:keep
+    applyEnvAliases(preprod, (message) => warnings.push(message));
+    expect(preprod).toEqual({ OHB_ENV: "production", OPENEDBOT_ENV: "preprod" }); // rename:keep
+    expect(warnings.some((message) => message.includes("folded into OPENEDBOT_ENV"))).toBe(true);
+    expect(warnings.join("\n")).not.toContain("preprod");
+    resetEnvAliasWarnings();
+    const prod: Record<string, string | undefined> = { OPENEDBOT_ENV: "production", OHB_DEPLOY_ENV: "prod" }; // rename:keep
+    applyEnvAliases(prod, () => {});
+    expect(prod).toEqual({ OPENEDBOT_ENV: "production" });
+  });
+
+  test("every merged name is an old name, and its target is declared", () => {
+    for (const merge of ENV_MERGES) {
+      for (const name of merge.from) {
+        expect([name, name.startsWith("OHB_"), renamedEnvName(name)]).toEqual([name, true, undefined]);
+        expect(mergedEnvTarget(name)).toBe(merge.into);
+      }
+      expect([merge.into, envSchemaEntry(merge.into)?.name]).toEqual([merge.into, merge.into]);
+    }
   });
 });

@@ -151,6 +151,12 @@ describe("production configuration", () => {
   // OHB-15 : le canal SSH sortant n'existe plus du tout, et la variable qui
   // réglait l'administration est retirée : en production comme ailleurs, sa
   // valeur est ignorée et aucun canal ne s'ouvre.
+  test("OPENEDBOT_ENV=preprod runs on production rules with the preprod label", () => {
+    const config = readApiConfig({ ...production, OPENEDBOT_ENV: "preprod" });
+    expect([config.environment, config.deployEnvironment]).toEqual(["production", "preprod"]);
+    expect(readApiConfig(production).deployEnvironment).toBe("prod");
+  });
+
   test("ignores the retired administration variable in production, whatever its value", () => {
     for (const value of ["ssh", "local", "disabled"]) {
       const config = readApiConfig({ ...production, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep

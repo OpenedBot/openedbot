@@ -62,7 +62,7 @@ export async function readSigninContext(config: DesktopConfig): Promise<SigninCo
     getJson(config, "/api/legal").catch(() => null),
     getJson(config, "/api/health").catch(() => null),
   ]);
-  // The API's own word wins (../.. OPENEDBOT_DEPLOY_ENV): a LAN host may well be a
+  // The API's own word wins (../.. OPENEDBOT_ENV): a LAN host may well be a
   // preprod. Without it, the origin decides (target.ts).
   const said = record(health).environment;
   const environment: DeployEnvironment =

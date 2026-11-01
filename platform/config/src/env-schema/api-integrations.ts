@@ -185,14 +185,6 @@ export const API_INTEGRATIONS_ENV: readonly EnvVar[] = [
     example: "",
   },
   {
-    name: "OPENEDBOT_DEPLOY_ENV",
-    scope: "shared",
-    tier: "production",
-    doc: "Deployment tier named in every alert and shown to connectors: dev, preprod or prod. Defaults to prod under OPENEDBOT_ENV=production, dev otherwise.",
-    example: "",
-    productionExample: "prod",
-  },
-  {
     name: "ALERT_WEBHOOK_URL",
     scope: "api",
     tier: "production",

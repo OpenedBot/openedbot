@@ -5,7 +5,7 @@ import {
   envUnusedForRuntimeMode,
   isDeprecatedEnvName,
 } from "../../platform/config/src/env-schema";
-import { renamedEnvName } from "../../platform/config/src/env-aliases";
+import { foldEnvMerges, mergedEnvTarget, renamedEnvName } from "../../platform/config/src/env-aliases";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 
 /** Helpers shared by env-audit and env-template. Values are never printed. */
@@ -43,7 +43,7 @@ export function assertUniqueEnvNames(path: string, names: readonly string[]): vo
 export type LocalEnvDecision = "keep" | "preserve" | "remove" | "rename";
 
 export function classifyLocalEnvEntry(entry: EnvEntry, runtimeMode: RuntimeMode): LocalEnvDecision {
-  if (renamedEnvName(entry.name)) return "rename";
+  if (renamedEnvName(entry.name) || mergedEnvTarget(entry.name)) return "rename";
   if (isDeprecatedEnvName(entry.name) || envUnusedForRuntimeMode(runtimeMode).has(entry.name)) return "remove";
   const tier = envSchemaEntry(entry.name)?.tier;
   if (tier !== "production" && tier !== "default_only") return "keep";
@@ -95,7 +95,8 @@ export function mergeEnvFiles(files: readonly EnvFile[]): {
 
 /**
  * The values with every old OHB_* name folded into its OPENEDBOT_* name
- * (when that one is absent), as the apps read them for one more release.
+ * (when that one is absent), then the merged names converted (ENV_MERGES),
+ * as the apps read them for one more release.
  */
 export function withRenamedEnvValues(values: Readonly<Record<string, string>>): Record<string, string> {
   const folded: Record<string, string> = { ...values };
@@ -105,5 +106,7 @@ export function withRenamedEnvValues(values: Readonly<Record<string, string>>): 
     if (!(next in values)) folded[next] = value;
     delete folded[name];
   }
-  return folded;
+  const merged: Record<string, string | undefined> = folded;
+  foldEnvMerges(merged);
+  return merged as Record<string, string>;
 }

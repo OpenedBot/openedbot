@@ -7,7 +7,7 @@ export const SHARED_ENV: readonly EnvVar[] = [
     name: "OPENEDBOT_ENV",
     scope: "shared",
     tier: "local",
-    doc: "Environment: development, test or production. Production enables every startup guard.",
+    doc: "Environment: development, test, production or preprod. production and preprod enable every startup guard; preprod only changes the deployment label (alerts, connectors, sign-in options).",
     example: "development",
     productionExample: "production",
   },

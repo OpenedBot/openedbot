@@ -266,7 +266,7 @@ export function authRoutes(
   const routes = new Hono<{ Variables: AppVariables }>();
   const google = createGoogleAuth(config, createPostgresOAuthAttemptStore(db, config.tokenEncryption));
   // Prod n'ouvre que Google. Le mot de passe reste la porte de dev et de
-  // preprod (`OPENEDBOT_DEPLOY_ENV`). Un appel direct est refusé, pas seulement caché.
+  // preprod (`OPENEDBOT_ENV=preprod`). Un appel direct est refusé, pas seulement caché.
   const passwordOpen = config.deployEnvironment !== "prod";
 
   // Les réponses d'auth contiennent des identifiants de tentative, des codes

@@ -75,7 +75,7 @@ in `tokens-<host>.bin` and a dev run in its own folder (`openedbot (dev prod)`,
 folder. A shell that is not on production says so in the window title and the
 tray tooltip, and logs a warning.
 
-Sign-in: an API that runs with `OPENEDBOT_DEPLOY_ENV=preprod` offers the e-mail and
+Sign-in: an API that runs with `OPENEDBOT_ENV=preprod` offers the e-mail and
 password form next to Google, and the sign-in page shows "API préprod". Such an
 API never publishes credentials, so a dev run aimed at it reads the development
 accounts from the development API (`OPENEDBOT_DEV_ACCOUNTS_API`, default

@@ -13,7 +13,6 @@
 /** Old name -> new name. Mirrored by scripts/lib/env-aliases.sh (tested). */
 export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_ENV: "OPENEDBOT_ENV",
-  OHB_DEPLOY_ENV: "OPENEDBOT_DEPLOY_ENV",
   OHB_PRO_PLUGINS: "OPENEDBOT_PLUGINS",
   OHB_PRO_CONSOLE: "OPENEDBOT_CONSOLE_PLUGINS",
   OHB_CF_ACCOUNT_ID: "OPENEDBOT_CF_ACCOUNT_ID",
@@ -64,10 +63,59 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
 /** Plug-in family `OHB_PRO_<ID>__<KEY>` -> `OPENEDBOT_PLUGIN_<ID>__<KEY>` (after the exact names). */
 export const ENV_RENAMED_PREFIXES: readonly (readonly [string, string])[] = [["OHB_PRO_", "OPENEDBOT_PLUGIN_"]];
 
+/**
+ * Old names folded into another variable with a value change (decision
+ * "merge"). `convert` sees the environment after the plain renames and
+ * returns the new value of `into`: a string sets it, `null` unsets it,
+ * `undefined` leaves it as it is (the old value carried no information the
+ * new form does not already give). The old names are then removed.
+ */
+export interface EnvMerge {
+  readonly from: readonly string[];
+  readonly into: string;
+  readonly convert: (env: Readonly<Record<string, string | undefined>>) => string | null | undefined;
+}
+
+export const ENV_MERGES: readonly EnvMerge[] = [
+  {
+    // dev/prod were derived from OPENEDBOT_ENV already; only `preprod`, on
+    // production rules, says something more: OPENEDBOT_ENV=preprod.
+    from: ["OHB_DEPLOY_ENV"],
+    into: "OPENEDBOT_ENV",
+    convert: (env) => (env.OHB_DEPLOY_ENV?.trim().toLowerCase() === "preprod" && env.OPENEDBOT_ENV?.trim() === "production" ? "preprod" : undefined),
+  },
+];
+
+/** The variable an old merged name now folds into, or undefined. */
+export function mergedEnvTarget(name: string): string | undefined {
+  return ENV_MERGES.find((merge) => merge.from.includes(name))?.into;
+}
+
+/**
+ * Applies every merge whose old names are set in `env`, in place, and
+ * returns the old names consumed with their target. Never reads a value
+ * back to the caller.
+ */
+export function foldEnvMerges(env: Record<string, string | undefined>): { name: string; into: string }[] {
+  const folded: { name: string; into: string }[] = [];
+  for (const merge of ENV_MERGES) {
+    const present = merge.from.filter((name) => env[name] !== undefined);
+    if (!present.length) continue;
+    const next = merge.convert(env);
+    if (next === null) delete env[merge.into];
+    else if (next !== undefined) env[merge.into] = next;
+    for (const name of present) {
+      delete env[name];
+      folded.push({ name, into: merge.into });
+    }
+  }
+  return folded;
+}
+
 /** Old names that are no longer read at all: warned about, then ignored. */
 export const ENV_DROPPED: readonly string[] = ["OHB_RUNTIME_MODE", "OHB_RUNTIME_ADMIN_MODE"];
 
-/** The new name of a renamed variable, or undefined. */
+/** The new name of a renamed variable (plain rename, no value change), or undefined. */
 export function renamedEnvName(name: string): string | undefined {
   if (Object.hasOwn(ENV_RENAMES, name)) return ENV_RENAMES[name];
   for (const [from, to] of ENV_RENAMED_PREFIXES) {
@@ -117,6 +165,9 @@ export function applyEnvAliases(
     } else {
       emit(name, `${name} is deprecated: remove it, ${next} is already set.`);
     }
+  }
+  for (const { name, into } of foldEnvMerges(env)) {
+    emit(name, `${name} is deprecated: it is folded into ${into} (converted for one more release); set ${into} instead.`);
   }
   return emitted;
 }

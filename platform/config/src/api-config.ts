@@ -10,7 +10,7 @@ import type { HermesClientTimeouts } from "@openedbot/hermes";
 import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/hermes/mtls";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
 import { readApiInternalUrl, readApiPort } from "@openedbot/platform-config/api-address";
-import { deployEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
+import { deployEnvironment, isProductionEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
@@ -138,7 +138,7 @@ export type ComputerProviderConfig =
 export type ApiConfig = {
   environment: ApiEnvironment;
   /**
-   * Palier de déploiement (`OPENEDBOT_DEPLOY_ENV`, sinon dérivé de `OPENEDBOT_ENV`) :
+   * Palier de déploiement, dérivé de `OPENEDBOT_ENV` (`preprod` = règles de production) :
    * nommé dans chaque alerte et poussé aux connecteurs (`link.context`),
    * puisque plusieurs déploiements partagent un canal Discord.
    */
@@ -408,7 +408,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
   const runtimeAdminChannels: RuntimeAdminChannels = { local: false };
   const base = {
     environment,
-    deployEnvironment: deployEnvironment(env.OPENEDBOT_DEPLOY_ENV, env.OPENEDBOT_ENV),
+    deployEnvironment: deployEnvironment(env.OPENEDBOT_ENV ?? env.NODE_ENV),
     host: env.API_HOST?.trim() || "127.0.0.1",
     port: readApiPort(env.API_PORT),
     databaseUrl:
@@ -524,7 +524,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
 }
 
 export function assertProductionConfig(config: ApiConfig): void {
-  if (config.environment !== "production") throw new Error("OPENEDBOT_ENV=production is required.");
+  if (config.environment !== "production") throw new Error("OPENEDBOT_ENV=production (or preprod) is required.");
   if (config.devSignIn) throw new Error("Development sign-in credentials must not be published in production.");
   if (config.staffDevSignIn) throw new Error("Development staff sign-in credentials must not be published in production.");
   if (!config.publicUrl.startsWith("https://")) throw new Error("API_PUBLIC_URL must use HTTPS in production.");
@@ -698,8 +698,8 @@ function readComputerProvider(
 }
 
 function readEnvironment(value: string | undefined): ApiEnvironment {
-  if (value === "production" || value === "test") return value;
-  return "development";
+  // `preprod` is a production deployment with a preprod label (deployEnvironment).
+  return isProductionEnvironment(value) ? "production" : value === "test" ? "test" : "development";
 }
 
 export function readEventsConfig(env: Record<string, string | undefined>): EventsConfig {

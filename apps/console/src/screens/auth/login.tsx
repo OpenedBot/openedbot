@@ -28,7 +28,7 @@ import { BUTTON } from "../../components/settings/primitives";
  * - **Email code**: signup and sign-in share a single-use code. New accounts
  *   continue through the existing organization onboarding.
  * - **Email et mot de passe** : ouvert tant que l'API publie
- *   `password.enabled`. En production (`OPENEDBOT_DEPLOY_ENV=prod`) ce n'est pas
+ *   `password.enabled`. En production (`OPENEDBOT_ENV=production`) ce n'est pas
  *   le cas : Google et le code email restent disponibles. Dev et preprod le gardent.
  *
  * Style lives in `login.css`: an editorial, technical gate with a brief entry

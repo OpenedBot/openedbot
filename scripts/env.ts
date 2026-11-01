@@ -24,7 +24,7 @@ import {
   type EnvVar,
 } from "../platform/config/src/env-schema";
 import { RUNTIME_MODE } from "../platform/config/src/runtime-mode";
-import { renamedEnvName } from "../platform/config/src/env-aliases";
+import { mergedEnvTarget, renamedEnvName } from "../platform/config/src/env-aliases";
 import {
   assertUniqueEnvNames,
   classifyLocalEnvEntry,
@@ -266,6 +266,17 @@ async function runAudit(): Promise<void> {
   const kept: string[] = [];
   const misfiled: string[] = [];
   const presentNames = new Set(locals.flatMap((local) => local.entries.map((entry) => entry.name)));
+  // A merged old name (ENV_MERGES) changes the value of its target: the
+  // target line is rewritten with the converted value (`values` holds it),
+  // or written in place of the first old line when the target is absent.
+  const mergedTargets = new Set([...presentNames].map(mergedEnvTarget).filter((into): into is string => into !== undefined));
+  const presentAfterRename = new Set([...presentNames].map((name) => renamedEnvName(name) ?? name));
+  const writtenTargets = new Set<string>();
+  const mergedLine = (into: string): string | null => {
+    if (writtenTargets.has(into)) return null;
+    writtenTargets.add(into);
+    return values[into] === undefined ? null : `${into}=${values[into]}`;
+  };
 
   for (const local of locals) {
     const nextLines: string[] = [];
@@ -275,12 +286,31 @@ async function runAudit(): Promise<void> {
         nextLines.push(line);
         continue;
       }
+      if (mergedTargets.has(parsed.name)) {
+        const rewritten = mergedLine(parsed.name);
+        if (rewritten !== null && rewritten !== line) renamed.push(`${parsed.name}: converted value from the merged old names (${local.path})`);
+        if (rewritten !== null) nextLines.push(rewritten);
+        continue;
+      }
       const decision = classifyLocalEnvEntry(parsed, runtimeMode);
+      const into = mergedEnvTarget(parsed.name);
+      if (decision === "rename" && into) {
+        renamed.push(`${parsed.name} -> folded into ${into} (${local.path})`);
+        if (!presentAfterRename.has(into)) {
+          const rewritten = mergedLine(into);
+          if (rewritten !== null) nextLines.push(rewritten);
+        }
+        continue;
+      }
       if (decision === "rename") {
         // The value moves to the new name; never dropped (one-release rename).
         const next = renamedEnvName(parsed.name)!;
         if (presentNames.has(next)) {
           renamed.push(`${parsed.name} -> ${next}, already set: old line removed (${local.path})`);
+        } else if (mergedTargets.has(next)) {
+          renamed.push(`${parsed.name} -> ${next}, value converted from the merged old names (${local.path})`);
+          const rewritten = mergedLine(next);
+          if (rewritten !== null) nextLines.push(rewritten);
         } else {
           renamed.push(`${parsed.name} -> ${next} (${local.path})`);
           nextLines.push(`${next}=${parsed.value}`);
@@ -308,7 +338,7 @@ async function runAudit(): Promise<void> {
 
   console.info(`${localName}: removable empty or obsolete variables: ${removable.sort().join(", ") || "none"}.`);
   if (renamed.length) {
-    console.info(`${localName}: ${apply ? "renamed" : "to rename (OHB_* -> OPENEDBOT_*, values kept; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
+    console.info(`${localName}: ${apply ? "renamed" : "to rename (OHB_* -> OPENEDBOT_*, values kept or converted; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
   }
   if (kept.length) console.info(`${localName}: preserved non-empty non-local variables: ${[...new Set(kept)].sort().join(", ")}.`);
   for (const line of misfiled.sort()) {
@@ -538,7 +568,7 @@ async function writeLocal(fileName: string): Promise<void> {
   for (const file of files) {
     for (const parsed of file.entries) {
       if (envSchemaEntry(parsed.name)) continue;
-      const next = renamedEnvName(parsed.name);
+      const next = renamedEnvName(parsed.name) ?? mergedEnvTarget(parsed.name);
       if (next) {
         // Its value now sits under the new name (withRenamedEnvValues).
         renamed.push(`${parsed.name} -> ${next}`);

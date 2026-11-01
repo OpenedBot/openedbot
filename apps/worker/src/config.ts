@@ -10,7 +10,7 @@ import { readApiInternalUrl } from "@openedbot/platform-config/api-address";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
-import { deployEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
+import { deployEnvironment, isProductionEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { fileBlobRoot, resolveBlobDriver } from "@openedbot/platform-config/blob-driver";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
@@ -90,7 +90,7 @@ export type WorkerConfig = {
   transactionalEmail: TransactionalEmailConfig;
   /** Origine de la PWA, pour les liens des e-mails transactionnels. */
   webAppUrl: string;
-  /** Palier de déploiement (`OPENEDBOT_DEPLOY_ENV`), nommé dans les alertes Discord. */
+  /** Palier de déploiement (dérivé de `OPENEDBOT_ENV`), nommé dans les alertes Discord. */
   deployEnvironment: DeployEnvironment;
   blob:
     | { driver: "file"; root: string; fallbackReason?: string | null }
@@ -113,7 +113,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
   if (linkMode === "separate" && !env.RUNTIME_LINK_INTERNAL_URL?.trim()) {
     throw new Error("RUNTIME_LINK_INTERNAL_URL is required when RUNTIME_LINK_MODE=separate.");
   }
-  const environment = env.OPENEDBOT_ENV === "production" ? "production" : env.OPENEDBOT_ENV === "test" ? "test" : "development";
+  const environment = isProductionEnvironment(env.OPENEDBOT_ENV) ? "production" : env.OPENEDBOT_ENV === "test" ? "test" : "development";
   // La même règle que l'API : R2 s'il est configuré, sinon le volume partagé avec elle.
   const blobChoice = resolveBlobDriver(env, environment === "production");
   const blobDriver = blobChoice.driver;
@@ -250,7 +250,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
       maxAttempts: boundedInteger(env.TRANSACTIONAL_EMAIL_MAX_ATTEMPTS, 5, 1, 10, "TRANSACTIONAL_EMAIL_MAX_ATTEMPTS"),
     },
     webAppUrl: (env.WEB_APP_URL?.trim() || "http://localhost:1420").replace(/\/+$/, ""),
-    deployEnvironment: deployEnvironment(env.OPENEDBOT_DEPLOY_ENV, env.OPENEDBOT_ENV),
+    deployEnvironment: deployEnvironment(env.OPENEDBOT_ENV),
     vapid: readVapidConfig(env, environment === "production"),
     apns: readApnsConfig(env, environment === "production"),
   } satisfies Omit<WorkerConfig, "blob">;
