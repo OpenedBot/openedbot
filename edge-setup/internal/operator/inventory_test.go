@@ -787,6 +787,14 @@ func (p *countingProbe) count(verb string) int {
 
 func cachedServer(t *testing.T, recorder *countingProbe, clock *time.Time) *httptest.Server {
 	t.Helper()
+	srv, _ := cachedServerAndOperator(t, recorder, clock)
+	return srv
+}
+
+// cachedServerAndOperator is cachedServer that also hands back the Server, for
+// tests that must wait for a read it refreshes in the background.
+func cachedServerAndOperator(t *testing.T, recorder *countingProbe, clock *time.Time) (*httptest.Server, *Server) {
+	t.Helper()
 	fake := exectest.NewFake()
 	fake.OnPrefix("/usr/sbin/runuser -u hermes -- /usr/bin/env", exec.Result{})
 	s := &Server{
@@ -799,7 +807,21 @@ func cachedServer(t *testing.T, recorder *countingProbe, clock *time.Time) *http
 	}
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
-	return srv
+	return srv, s
+}
+
+// awaitBackgroundRead blocks until the read of verb the server has in flight,
+// if any, has finished. readCached registers that flight under s.mu before it
+// answers, so once the request that triggered it has returned, the flight is
+// either still listed here or already done; waiting on its channel needs no
+// sleep and no timeout.
+func awaitBackgroundRead(s *Server, verb string) {
+	s.mu.Lock()
+	flight := s.probeFlights[verb]
+	s.mu.Unlock()
+	if flight != nil {
+		<-flight.done
+	}
 }
 
 func TestReadsAreCachedBecauseEachOneStartsAColdInterpreter(t *testing.T) {
@@ -808,7 +830,7 @@ func TestReadsAreCachedBecauseEachOneStartsAColdInterpreter(t *testing.T) {
 		"toolsets":      settableWebBrowser,
 		"mcp-inventory": `{"platform":"api_server","servers":[],"catalog":[]}`,
 	}}
-	srv := cachedServer(t, recorder, &clock)
+	srv, s := cachedServerAndOperator(t, recorder, &clock)
 
 	for range 3 {
 		if status, _ := call(t, srv, "GET", "/toolsets", ""); status != 200 {
@@ -826,6 +848,10 @@ func TestReadsAreCachedBecauseEachOneStartsAColdInterpreter(t *testing.T) {
 	// does not freeze the answer.
 	clock = clock.Add(ReadCacheTTL + time.Second)
 	call(t, srv, "GET", "/toolsets", "")
+	// Within StaleReadLimit the expired document is answered at once and the
+	// host is asked again in the background (stale-while-revalidate): wait for
+	// that read instead of racing it.
+	awaitBackgroundRead(s, "toolsets")
 	if recorder.count("toolsets") != 2 {
 		t.Fatalf("an expired document must be refetched: %v", recorder.calls)
 	}
