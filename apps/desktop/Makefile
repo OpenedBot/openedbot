@@ -17,9 +17,14 @@ C_RESET   := \033[0m
 
 # ─── Install / Setup ─────────────────────────────────────────────────────────
 
-install: ## Install dependencies with Bun (lockfile: bun.lock)
+# Since Electron 44 the package has no postinstall: the binary is fetched on
+# first require(), but electron-vite looks for it (path.txt) without requiring
+# electron and stops on "Electron uninstall". install-electron fetches it now;
+# it is a no-op when the right version is already in node_modules/electron/dist.
+install: ## Install dependencies with Bun (lockfile: bun.lock), then the Electron binary
 	@command -v bun >/dev/null 2>&1 || { printf "$(C_ERR)[make] bun is not installed (https://bun.sh)$(C_RESET)\n"; exit 1; }
 	@bun install
+	@bun x install-electron
 	@printf "$(C_OK)[make] dependencies installed$(C_RESET)\n"
 
 # ─── Build / Check ───────────────────────────────────────────────────────────
