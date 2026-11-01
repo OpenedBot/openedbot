@@ -763,7 +763,7 @@ func runOperatorDaemon(env cli.Env, ctx context.Context) int {
 	srv := operator.Host(runner, token, func(f string, a ...any) { printf(env.Stderr, f, a...) })
 	h := srv.Handler()
 	printf(env.Stderr, "operator listening on %s (connector only)", layout.OperatorSocket)
-	if err := operator.Listen(ctx, layout.OperatorSocket, h); err != nil {
+	if err := operator.Listen(ctx, layout.OperatorSocket, h, func(f string, a ...any) { printf(env.Stderr, f, a...) }); err != nil {
 		return fail(env, cli.ExitFailure, "operator: %v", err)
 	}
 	return cli.ExitOK

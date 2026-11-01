@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 )
 
 // MCPServer is the public view of one configured MCP server.
@@ -99,6 +102,29 @@ func (s *Server) mcpAdd(w http.ResponseWriter, r *http.Request) {
 	if body.Auth == "" {
 		body.Auth = "none"
 	}
+	// The probe checks all of this again; refusing here keeps hostile input
+	// from ever reaching a process running as the service user.
+	if !mcpNameRe.MatchString(body.Name) {
+		writeError(w, http.StatusBadRequest, "NAME_INVALID", "the server name must be 1-64 characters of [A-Za-z0-9_-]")
+		return
+	}
+	if !validHTTPSURL(body.URL) {
+		writeError(w, http.StatusBadRequest, "URL_INVALID", "the endpoint URL must be an https:// URL of at most 2048 characters")
+		return
+	}
+	switch body.Auth {
+	case "none", "oauth":
+		// Only auth header uses a token; any other is never forwarded.
+		body.Token = ""
+	case "header":
+		if !validSecretValue(body.Token) {
+			writeError(w, http.StatusBadRequest, "SECRET_INVALID", "the bearer token is missing, too long or contains control characters")
+			return
+		}
+	default:
+		writeError(w, http.StatusBadRequest, "AUTH_INVALID", "auth must be none, header or oauth")
+		return
+	}
 	// The token travels in the JSON body to the probe's stdin, never in argv,
 	// never in a log line, and never back out in any response.
 	if !s.mcpBusy.TryLock() {
@@ -127,6 +153,24 @@ func (s *Server) mcpInstall(w http.ResponseWriter, r *http.Request) {
 	var body mcpInstallBody
 	if !readBody(w, r, &body) {
 		return
+	}
+	// The entry is the one the route names. A body that names another one
+	// is refused, never silently preferred.
+	name := r.PathValue("name")
+	if !mcpNameRe.MatchString(name) || (body.Name != "" && body.Name != name) {
+		writeError(w, http.StatusBadRequest, "NAME_INVALID", "the catalogue entry name is invalid")
+		return
+	}
+	body.Name = name
+	if len(body.Env) > maxCatalogEnv {
+		writeError(w, http.StatusBadRequest, "ENV_INVALID", "too many environment values")
+		return
+	}
+	for key, value := range body.Env {
+		if !envKeyRe.MatchString(key) || !validSecretValue(value) {
+			writeError(w, http.StatusBadRequest, "ENV_INVALID", "environment names are [A-Z0-9_] and values 1-4096 printable characters")
+			return
+		}
 	}
 	if !s.mcpBusy.TryLock() {
 		writeError(w, http.StatusConflict, "MCP_IN_PROGRESS", "an MCP change is already running; retry once it completes")
@@ -180,6 +224,26 @@ type MCPServerRemoval struct {
 	Name string `json:"name"`
 	// TokensRemoved is false when an OAuth token file of the root survived.
 	TokensRemoved bool `json:"tokensRemoved"`
+}
+
+const (
+	maxMCPURL     = 2048
+	maxSecret     = 4096
+	maxCatalogEnv = 16
+)
+
+var envKeyRe = regexp.MustCompile(`^[A-Z0-9_]{1,64}$`)
+
+func validHTTPSURL(raw string) bool {
+	if len(raw) > maxMCPURL || !strings.HasPrefix(raw, "https://") || hasControl(raw) {
+		return false
+	}
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil
+}
+
+func validSecretValue(raw string) bool {
+	return raw != "" && len(raw) <= maxSecret && !hasControl(raw)
 }
 
 func readBody(w http.ResponseWriter, r *http.Request, into any) bool {

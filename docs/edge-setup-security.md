@@ -31,7 +31,7 @@ connection. It has two parts:
 |---|---|
 | A network attacker between the host and the release origin, a CDN, or a mirror | every binary is verified against a `SHA256SUMS` signed keyless by the release workflow (Sigstore); HTTPS only; any failure installs nothing |
 | An attacker who controls `releases.openedbot.app` | cannot produce a valid signature; can withhold releases or point `LATEST` at an older or the same signed one, which `upgrade` refuses without `--allow-downgrade` and `auto-upgrade` always refuses |
-| An agent workload running in the gateway (prompt injection, malicious tool) | runs as the unprivileged `hermes` account, no shell, no sudo; the gateway unit hides the connector's credentials, the operator socket and the rest of the system (`ProtectSystem=strict`, `ProtectHome=tmpfs`, no capability); cloud metadata endpoints are denied |
+| An agent workload running in the gateway (prompt injection, malicious tool) | runs as the unprivileged `hermes` account, no shell, no sudo; the gateway unit hides the connector's credentials, the operator socket and the rest of the system (`ProtectSystem=strict`, `ProtectHome=tmpfs`, no capability); the operator also refuses any peer that is not root or the connector's own system unit, so a `hermes` process outside the gateway (rootless Docker, the user manager) cannot drive it either; cloud metadata endpoints are denied |
 | An unprivileged local user | the gateway listens on `127.0.0.1:8642` only and requires the bearer; with `--firewall`, an owner-match rule refuses loopback connections from any uid but `hermes` and root; every secret file is 0600 |
 | Someone who steals the link token | cannot reconnect without the device key (proof of possession at every connection); the token rotates over the link |
 | Someone who reads a log or a shell history | the ticket is refused on the command line and is read from a no-echo prompt, stdin or a 0600 file; the journal masks anything shaped like a secret |
@@ -152,6 +152,19 @@ systemd 257):
 | `hermes-setup-upgrade` (opt-in timer) | root | 7.0 | it replaces the binary and restarts units |
 | `hermes-loopback-guard` (with `--firewall`) | root | 1.8 | — (writes iptables rules: NET_ADMIN and NET_RAW only, no IP traffic, no device) |
 | `hermes-hardening-rollback` (with `--ssh-hardening`) | root | 8.8 | restores SSH access if a hardening is not confirmed in 10 minutes |
+
+**The operator socket.** `hermes-operator` serves a fixed list of named
+verbs; an unknown route gets `404 ROUTE_UNKNOWN`, and no verb takes a command,
+a path or a free argument. Before routing it refuses dot segments, empty
+segments and encoded slashes; every route parameter is checked against its
+grammar before its handler runs, and MCP bodies are checked before any
+process starts. Each connection is then checked with `SO_PEERCRED`: root is
+accepted, the `hermes` account only from the connector's own system unit
+(its cgroup under `/system.slice`, which only PID 1 can place a process in);
+the gateway, the rootless Docker daemon and the `hermes` user manager share
+that uid and are refused. Its unit adds `RestrictNamespaces=true`,
+`MemoryDenyWriteExecute=` and `ProtectProc=invisible`, which brings its
+exposure from 3.1 to 2.5.
 
 Host policies are opt-in, each by its own flag, and apply inside a
 transaction that rolls back by itself if access is not confirmed:

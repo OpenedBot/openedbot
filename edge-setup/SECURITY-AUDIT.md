@@ -77,7 +77,7 @@ Aucun fichier modifiable par tous n'a été trouvé dans les écrits du binaire.
 |---|---|---|---|
 | `hermes-gateway.service` | hermes | runtime Hermes (Python), API sur `127.0.0.1:8642` | NoNewPrivileges, PrivateTmp, `ProtectSystem=full`, `ProtectHome=tmpfs`, ProtectKernel*, RestrictSUIDSGID, RestrictAddressFamilies, IPAddressDeny métadonnées ; **pas** de CapabilityBoundingSet, SystemCallFilter, RestrictNamespaces, MemoryDenyWriteExecute, PrivateDevices |
 | `hermes-connector.service` (+ `@<nom>`) | hermes | lien WebSocket sortant vers la console | `ProtectSystem=strict`, PrivatePIDs, MemoryDenyWriteExecute, InaccessiblePaths données ; **pas** de CapabilityBoundingSet vide, SystemCallFilter, PrivateDevices, RestrictNamespaces, ProtectKernelLogs |
-| `hermes-operator.service` | **root** (voulu) | exécute `hermes auth add` en tant que `hermes` pour les verbes nommés de la console, via socket Unix | CapabilityBoundingSet réduit à SETUID/SETGID/CHOWN/FOWNER/DAC_OVERRIDE, SystemCallFilter=@system-service, `ProtectSystem=strict`, ReadWritePaths=/srv/hermes/data |
+| `hermes-operator.service` | **root** (voulu) | exécute `hermes auth add` en tant que `hermes` pour les verbes nommés de la console, via socket Unix | CapabilityBoundingSet réduit à SETUID/SETGID/CHOWN/FOWNER/DAC_OVERRIDE, SystemCallFilter=@system-service, `ProtectSystem=strict`, ReadWritePaths=/srv/hermes/data, RestrictNamespaces=true, MemoryDenyWriteExecute, `ProtectProc=invisible` (exposition 2.5) ; socket : pair vérifié à chaque connexion (SO_PEERCRED : root, ou `hermes` depuis l'unité système du connecteur seulement), chemins et paramètres de route validés avant tout traitement |
 | `hermes-setup-upgrade.service/.timer` | root | mise à jour automatique (opt-in) | PrivateTmp seulement |
 | `hermes-loopback-guard.service` | root | règles iptables owner-match sur lo:8642 (avec `--firewall`) | CapabilityBoundingSet NET_ADMIN/NET_RAW |
 | `hermes-hardening-rollback.service/.timer` | root | retour arrière d'accès SSH | minimal |
@@ -85,7 +85,8 @@ Aucun fichier modifiable par tous n'a été trouvé dans les écrits du binaire.
 ## 5. Ports
 
 - **Aucun port entrant ouvert par défaut.** Gateway : `127.0.0.1:8642`
-  (loopback). Opérateur : socket Unix. Connecteur : client seulement.
+  (loopback). Opérateur : socket Unix `0660 root:hermes`, chaque pair vérifié
+  (SO_PEERCRED et cgroup de l'unité du connecteur). Connecteur : client seulement.
 - `--firewall --allow-inbound PORT/proto` ouvre explicitement des ports choisis
   par l'opérateur ; SSH 22 reste celui de l'hôte.
 - L'ancienne exposition directe (Caddy) est retirée par `migrateLegacyDirect`.
@@ -189,6 +190,7 @@ Relevé à la fin de la branche `fix/opened-bot-release` ; le détail est dans
 | 2 | sudoers | aucune règle sans `--ssh-hardening` ; `hermes-admin NOPASSWD: ALL` conservé en option documentée |
 | 3 | systemd ≤ 2.0 | connecteur 1.3 ; garde loopback 1.8 (réinstallé par `upgrade` si l'unité diffère) ; opérateur (root, voulu) 3.1 ; gateway 4.1 (charges d'agent) ; upgrade 7.0 ; rollback d'accès 8.8 inchangé (filet anti-verrouillage : il doit pouvoir réécrire sshd, UFW et sudoers) |
 | 4 | Réseau, appairage | aucun port entrant ; ticket 5 min, usage unique, jamais en argv ni en en-tête autre qu'`Authorization` (tests) |
+| 4 | Socket de l'opérateur | verbes nommés seulement (route inconnue : 404 `ROUTE_UNKNOWN`) ; segments `.`/`..`, vides ou `%2F` refusés avant le routage ; chaque paramètre de route validé par sa grammaire avant le handler ; corps MCP validés avant tout processus ; pair vérifié (SO_PEERCRED + cgroup `/system.slice/…hermes-connector…`) : le gateway, Docker rootless et le gestionnaire utilisateur, même uid, sont refusés ; unité de l'opérateur 3.1 → 2.5 (prouvé sur l'hôte de lab) |
 | 5 | `--dry-run` | `up`, `upgrade`, `uninstall`, `reset`, amorçage |
 | 5 | Désinstallation et révocation | `uninstall` et `unlink` demandent la révocation (`link.retire`, preuve par la clé d'appareil) ; échec signalé, non bloquant |
 | 5 | Mise à jour atomique avec retour arrière | manuelle et automatique, y compris finalisée en ligne ; prouvé sur l'hôte de lab |
