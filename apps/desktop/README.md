@@ -50,8 +50,10 @@ auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on fir
 - [Bun](https://bun.sh) for dependencies and scripts (no npm / yarn / pnpm)
 - No Node install needed to run the app: Electron ships its own
 - An openedbot console to target (see [Configuration](#configuration))
-- For `make package-mac`: a Mac and the popup bundle built in `../notch`
-  (`make -C ../notch bundle`)
+- For `make package-mac`: a Mac and the popup bundle built in an
+  [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) checkout, next to this
+  repository by default (`make -C ../openedbot-notch bundle` from the repository root;
+  `NOTCH_DIR=/path/to/openedbot-notch` otherwise)
 
 ## Quick start
 

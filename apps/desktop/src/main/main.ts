@@ -274,7 +274,7 @@ function popupGiveUpMessage(reason: PopupGiveUpReason): string {
       return `La popup s’est arrêtée ${reason.failures} fois de suite. openedbot repasse en mode Fenêtre.`;
     case "protocol":
       return reason.version === 0
-        ? "Cette version d’openedbot notch est antérieure au mode popup d’openedbot : reconstruisez-la (make -C ../notch bundle). openedbot repasse en mode Fenêtre."
+        ? "Cette version d’openedbot notch est antérieure au mode popup d’openedbot : reconstruisez-la (make bundle dans openedbot-notch). openedbot repasse en mode Fenêtre."
         : `Cette popup parle une autre version du protocole (${reason.version}). openedbot repasse en mode Fenêtre.`;
     case "fatal":
       return reason.code === "STANDALONE_RUNNING"

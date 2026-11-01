@@ -66,10 +66,11 @@ mac:
     - name: openedbot
       schemes:
         - ohb
-  # The popup (openedbot Notch) is built in ../notch and embedded as is, never
-  # as source: `make -C ../notch bundle`, then `make package-mac` checks it
-  # exists. src/main/popup-host.ts runs Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup
+  # The popup (openedbot Notch) is built in its own repository,
+  # OpenedBot/openedbot-notch (`make -C $NOTCH_DIR bundle`), and embedded as
+  # is, never as source: `make package-mac` checks it and stages it in
+  # popup-bundle/. src/main/popup-host.ts runs Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup
   # with --hosted. extraFiles is relative to Contents/ on macOS.
   extraFiles:
-    - from: ../notch/dist/OHBPopup.app
+    - from: popup-bundle/OHBPopup.app
       to: Helpers/OHBPopup.app

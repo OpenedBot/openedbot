@@ -4,7 +4,7 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
 include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/env-aliases.mk
-.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check defaults package-win package-win-installer package-mac clean
+.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 # Defined once, reused by `make help` and by every [make] message below.
@@ -127,16 +127,26 @@ package-win-installer: defaults ## Unsigned Windows x64 NSIS installer (.exe) in
 	@ls -1 release/*.exe >/dev/null 2>&1 || { printf "$(C_ERR)[make] no .exe produced in release/$(C_RESET)\n"; exit 1; }
 	@for f in release/*.exe; do printf "$(C_OK)[make] %s  (%s, sha256 %s)$(C_RESET)\n" "$$f" "$$(du -h "$$f" | cut -f1)" "$$(sha256sum "$$f" | cut -d' ' -f1)"; done
 
-# The popup bundle electron-builder embeds (mac.extraFiles). Built in its own
-# directory, never copied as source.
-POPUP_APP := ../notch/dist/OHBPopup.app
+# The popup is OpenedBot/openedbot-notch, its own repository: a checkout next
+# to this one by default, NOTCH_DIR=/path/to/openedbot-notch otherwise. Its
+# bundle is built there (make -C $(NOTCH_DIR) bundle), never copied as source,
+# then staged in POPUP_STAGE, the fixed path electron-builder embeds
+# (mac.extraFiles), whatever NOTCH_DIR is.
+NOTCH_DIR ?= ../../../openedbot-notch
+POPUP_APP := $(NOTCH_DIR)/dist/OHBPopup.app
+POPUP_STAGE := popup-bundle/OHBPopup.app
 
-popup-check: ## Check that the popup bundle to embed exists (../notch/dist/OHBPopup.app)
-	@[ -x "$(POPUP_APP)/Contents/MacOS/OHBPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] build it first: make -C ../notch bundle$(C_RESET)\n"; exit 1; }
-	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OHBHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OHBHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C ../notch bundle$(C_RESET)\n"; exit 1; }
+popup-check: ## Check that the popup bundle to embed exists (NOTCH_DIR/dist/OHBPopup.app; NOTCH_DIR defaults to ../../../openedbot-notch)
+	@[ -x "$(POPUP_APP)/Contents/MacOS/OHBPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] clone OpenedBot/openedbot-notch next to this repository (or set NOTCH_DIR), then: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
+	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OHBHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OHBHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
 	@printf "$(C_OK)[make] popup bundle: $(POPUP_APP) (version %s, hosted protocol 1)$(C_RESET)\n" "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null || echo '?')"
 
-package-mac: popup-check defaults ## Unsigned macOS arm64 build (dmg + zip) into release/, popup embedded; run it on a Mac
+popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, where electron-builder embeds it
+	@rm -rf popup-bundle && mkdir -p popup-bundle
+	@ditto "$(POPUP_APP)" "$(POPUP_STAGE)"
+	@printf "$(C_OK)[make] popup staged: $(POPUP_STAGE)$(C_RESET)\n"
+
+package-mac: popup-stage defaults ## Unsigned macOS arm64 build (dmg + zip) into release/, popup embedded; run it on a Mac
 	@[ "$$(uname -s)" = "Darwin" ] || { printf "$(C_ERR)[make] package-mac runs on macOS only (the .dmg is built with hdiutil)$(C_RESET)\n"; exit 1; }
 	@printf "$(C_WARN)[make] building an UNSIGNED, non-notarized macOS app (Gatekeeper blocks the first launch)$(C_RESET)\n"
 	@bun run package:mac
@@ -145,9 +155,9 @@ package-mac: popup-check defaults ## Unsigned macOS arm64 build (dmg + zip) into
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 
-clean: ## Remove dist/ and release/ (node_modules is kept)
-	@rm -rf dist release
-	@printf "$(C_OK)[make] dist/ and release/ removed$(C_RESET)\n"
+clean: ## Remove dist/, release/ and popup-bundle/ (node_modules is kept)
+	@rm -rf dist release popup-bundle
+	@printf "$(C_OK)[make] dist/, release/ and popup-bundle/ removed$(C_RESET)\n"
 
 # ─── Help ────────────────────────────────────────────────────────────────────
 
