@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { checkBeforeForwardTx, resolveGateTx } from "../src/application/runner/permission-gate";
 import type { GateIdentity } from "../src/domain/gate-identity";
+import { YOLO_DEFAULT_PROTECT } from "../src/domain/yolo-hardline";
 
 const CONTEXT = { organizationId: "org-1", botId: "bot-1", neverWait: false };
 const UNATTENDED = { ...CONTEXT, neverWait: true };
@@ -13,6 +14,7 @@ type OrgPolicyState = { ceiling: string | null; enforceReview: boolean; commandB
 function fakeTx(state: {
   pipeline: string | null; mode?: string; revision?: number; reviewProven?: boolean;
   orgPolicy?: OrgPolicyState; toolPolicies?: Record<string, string>; grant?: boolean; terminalAlways?: boolean;
+  yolo?: { id: string; payload: unknown };
 }) {
   const queries: string[] = [];
   const values: unknown[][] = [];
@@ -29,6 +31,7 @@ function fakeTx(state: {
       return Promise.resolve(policy && tenant.at(-1) === parameters[0] ? [{ policy }] : []);
     }
     if (text.includes("from runtime_review_profiles")) return Promise.resolve([{ proven: state.reviewProven === true }]);
+    if (text.includes("from permission_yolo_leases")) return Promise.resolve(state.yolo && tenant.at(-1) === parameters[0] ? [state.yolo] : []);
     if (text.includes("from organization_permission_policies")) return Promise.resolve(state.orgPolicy ? [state.orgPolicy] : []);
     if (text.includes("from bot_permission_grants")) return Promise.resolve(state.grant === true && tenant.at(-1) === parameters[0] ? [{ id: GRANT_ID }] : []);
     if (text.includes("from runtime_permission_settings")) return Promise.resolve([{ switched: state.terminalAlways === true && tenant.at(-1) === parameters[0] }]);
@@ -360,5 +363,53 @@ describe("a plan-only turn (0155)", () => {
 
   test("a legacy organization is left to persist, which never auto-approves a plan turn", async () => {
     expect(await resolveGateTx(fakeTx({ pipeline: "legacy" }).tx, PLAN_TURN, WRITE, CHOICES)).toEqual({ pipeline: "legacy" });
+  });
+});
+
+describe("resolveGateTx under a YOLO lease (0158)", () => {
+  const LEASE_ID = "7a000000-0000-4000-8000-000000000001";
+  const RUN = { ...CONTEXT, runtimeId: "7a000000-0000-4000-8000-0000000000aa", threadId: "7a000000-0000-4000-8000-0000000000bb" };
+  const payload = (deny: string[] = []) => ({
+    v: 1, leaseId: LEASE_ID, organizationId: "7a000000-0000-4000-8000-0000000000cc", runtimeId: RUN.runtimeId,
+    scope: "runtime", profile: null, sessionKey: null, issuedAt: 1_800_000_000, notBefore: 1_800_000_000, expiresAt: 1_800_014_400,
+    grantedBy: "7a000000-0000-4000-8000-0000000000dd", deny: { commands: deny, tools: [], paths: [] }, protect: [...YOLO_DEFAULT_PROTECT],
+  });
+  const leased = (mode: string, deny: string[] = []) => fakeTx({ pipeline: "v2", mode, yolo: { id: LEASE_ID, payload: payload(deny) } });
+
+  test("a covered manual bot is answered once by the lease, named in the detail", async () => {
+    const { tx, values, tenant } = leased("manual");
+    const resolution = await resolveGateTx(tx, RUN, TERMINAL, CHOICES);
+    expect(resolution).toMatchObject({ choice: "once", decision: { stage: "yolo", reason: "yolo_lease" }, detail: { yoloLeaseId: LEASE_ID } });
+    // Read under the run's tenant, then the previous setting is put back.
+    expect(tenant.slice(-2)).toEqual(["org-1", ""]);
+    expect(values.find((parameters) => parameters.includes(RUN.runtimeId))).toContain(RUN.threadId);
+  });
+
+  test("the lease's deny-list and protections still refuse", async () => {
+    expect(await resolveGateTx(leased("manual", ["git push"]).tx, RUN, TERMINAL, CHOICES))
+      .toMatchObject({ choice: "deny", decision: { stage: "yolo", reason: "yolo_denied" } });
+    const ssh: GateIdentity = { ...WRITE, gateArgs: { ...WRITE.gateArgs, args: { path: "/home/u/.ssh/id_rsa", size: 4 } } };
+    expect(await resolveGateTx(leased("manual").tx, RUN, ssh, CHOICES)).toMatchObject({ choice: "deny", decision: { stage: "yolo" } });
+  });
+
+  test("a ceiling below bypass ignores the lease and names the downgrade", async () => {
+    const resolution = await resolveGateTx(fakeTx({
+      pipeline: "v2", mode: "bypass", orgPolicy: { ceiling: "manual", enforceReview: false, commandBlocklist: [] }, yolo: { id: LEASE_ID, payload: payload() },
+    }).tx, RUN, WRITE, CHOICES);
+    expect(resolution).toMatchObject({ choice: null, decision: { outcome: "human" }, detail: { effectiveMode: "manual", effectiveReason: "ceiling" } });
+    expect((resolution as { detail: object }).detail).not.toHaveProperty("yoloLeaseId");
+  });
+
+  test("an unreadable stored payload is no lease, and a run without a runtime reads none", async () => {
+    expect(await resolveGateTx(fakeTx({ pipeline: "v2", mode: "manual", yolo: { id: LEASE_ID, payload: { v: 2 } } }).tx, RUN, TERMINAL, CHOICES))
+      .toMatchObject({ choice: null, decision: { outcome: "human" } });
+    const { tx, queries } = leased("manual");
+    expect(await resolveGateTx(tx, CONTEXT, TERMINAL, CHOICES)).toMatchObject({ choice: null });
+    expect(queries.some((query) => query.includes("permission_yolo_leases"))).toBe(false);
+  });
+
+  test("a mode left as stored carries no downgrade reason", async () => {
+    const resolution = await resolveGateTx(fakeTx({ pipeline: "v2", mode: "bypass" }).tx, RUN, WRITE, CHOICES);
+    expect((resolution as { detail: object }).detail).not.toHaveProperty("effectiveReason");
   });
 });

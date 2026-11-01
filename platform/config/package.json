@@ -22,7 +22,8 @@
     "./http-body": "./src/http-body.ts",
     "./rate-limit": "./src/rate-limit.ts",
     "./runtime-mode": "./src/runtime-mode.ts",
-    "./sse-heartbeat": "./src/sse-heartbeat.ts"
+    "./sse-heartbeat": "./src/sse-heartbeat.ts",
+    "./yolo-lease-signing": "./src/yolo-lease-signing.ts"
   },
   "scripts": {
     "test": "bun test tests",

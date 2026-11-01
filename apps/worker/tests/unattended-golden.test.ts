@@ -110,6 +110,8 @@ function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes
       return Promise.resolve(state.grantFor === parameters[2] && visible() ? [{ id: "71000000-0000-4000-8000-000000000001" }] : []);
     }
     if (text.includes("from runtime_review_profiles")) return Promise.resolve([{ proven: state.reviewProven === true }]);
+    // No YOLO lease in these states (0158): the pipeline without YOLO.
+    if (text.includes("from permission_yolo_leases")) return Promise.resolve([]);
     if (text.includes("from runtime_permission_settings")) return Promise.resolve([{ switched: state.terminalAlways === true && visible() }]);
     if (text.includes("from organization_permission_policies")) return Promise.resolve(state.orgPolicy ? [state.orgPolicy] : []);
     if (text.includes("from organizations")) return Promise.resolve(state.pipeline === null ? [] : [{ pipeline: state.pipeline }]);

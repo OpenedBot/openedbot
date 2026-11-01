@@ -18,6 +18,7 @@ import { readSectionName, readSectionOrder, readSectionPatch } from "@openedbot/
 import { readSectionId } from "@openedbot/roster/domain/section-id";
 import { readToolErrorCursor, readToolErrorLimit } from "@openedbot/roster/domain/tool-errors";
 import { createBot, deleteBot, listRoster, resolveBotDeps, updateBot, type BotRouteDeps } from "@openedbot/roster/application/bots";
+import { withEffectivePermissions } from "@openedbot/roster/application/bot-effective-permission";
 import {
   createBotProfile,
   readBotCapabilitiesView,
@@ -68,7 +69,8 @@ export function botRoutes(db: Db, config: ApiConfig, routeDeps: BotRouteDeps = {
     // Le roster normal exclut les préférences masquées. Seule la vue de
     // récupération explicite demande les lignes avec leur marqueur `hidden`.
     const includeHidden = context.req.query("includeHidden") === "true";
-    return context.json(await listRoster(db, auth.organizationId, auth.userId, includeHidden));
+    const roster = await listRoster(db, auth.organizationId, auth.userId, includeHidden);
+    return context.json({ ...roster, bots: await withEffectivePermissions(db, auth.organizationId, roster.bots) });
   });
 
   routes.post("/", async (context) => {

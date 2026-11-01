@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  BOT_SETTINGS_TOOL_INPUT_SCHEMA,
   BotSettingsToolInputError,
   readBotSettingsToolArgs,
   withBotSettingsRunKey,
@@ -39,6 +40,15 @@ describe("bot settings proposal tool", () => {
       .toThrow(BotSettingsToolInputError);
     expect(() => readBotSettingsToolArgs({ run_key: "k", reason: "r", permission_mode: "bypass" }))
       .toThrow(BotSettingsToolInputError);
+  });
+
+  test("never offers a bot a YOLO lease: no field of the tool names one", () => {
+    // A bot never grants itself a lease (mode YOLO): only an owner or an admin, in a human session.
+    expect(Object.keys(BOT_SETTINGS_TOOL_INPUT_SCHEMA.properties).filter((key) => /yolo|lease|permission|bypass/i.test(key))).toEqual([]);
+    expect(BOT_SETTINGS_TOOL_INPUT_SCHEMA.additionalProperties).toBe(false);
+    for (const key of ["yolo", "yolo_lease", "yolo_scope", "lease_minutes"]) {
+      expect(() => readBotSettingsToolArgs({ run_key: "k", reason: "r", instructions: "x", [key]: true })).toThrow(BotSettingsToolInputError);
+    }
   });
 
   test("rejects values outside the editor setting classes", () => {

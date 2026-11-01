@@ -317,10 +317,16 @@ type WorkflowHistoryPageDto
 type WorkflowStatus
 type WorkspaceBusinessMetrics
 type WorkspaceRole
+type YoloAuditEntryDto
+type YoloAuditPageDto
+type YoloConsentDto
 type YoloErrorCode
+type YoloGrantRequest
+type YoloKillResultDto
 type YoloLease
 type YoloLeaseDto
 type YoloLeaseHostState
+type YoloLeaseKeyDto
 type YoloPolicyBlockReason
 type YoloScope
 value ACCESS_TIERS

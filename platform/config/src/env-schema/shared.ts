@@ -81,6 +81,22 @@ export const SHARED_ENV: readonly EnvVar[] = [
     secret: true,
   },
   {
+    name: "OPENEDBOT_YOLO_LEASE_SIGNING_KEY",
+    scope: "api",
+    tier: "local",
+    doc: "Ed25519 seed (32 bytes, base64) signing YOLO leases, verified offline by the host against the pinned public key. Optional: absent, the API starts but refuses every grant (503 YOLO_SIGNING_UNAVAILABLE), never an unsigned lease. Never commit a real value.",
+    example: "",
+    secret: true,
+  },
+  {
+    name: "OPENEDBOT_YOLO_LEASE_PREVIOUS_KEYS",
+    scope: "api",
+    tier: "production",
+    doc: "Comma-separated retired YOLO lease seeds: only their public keys are published, so hosts still verify the leases they signed (24 h at most) during a rotation.",
+    example: "",
+    secret: true,
+  },
+  {
     name: "AUDIT_WORM_MODE",
     scope: "api",
     tier: "local",

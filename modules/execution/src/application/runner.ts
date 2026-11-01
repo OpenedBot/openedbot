@@ -320,7 +320,7 @@ export async function executeRun(
         organizationId: activeContext.organizationId,
         botId: activeContext.botId,
         neverWait,
-        planOnly: activeContext.planOnly === true,
+        planOnly: activeContext.planOnly === true, runtimeId: activeContext.runtimeId, threadId: activeContext.threadId,
       }, {
         choice: candidate.choice,
         decidedByKind: candidate.decidedByKind,

@@ -71,3 +71,44 @@ export type YoloLeaseDto = {
 
 /** Ce que l'état effectif d'un bot dit d'un bail actif sur lui (`EffectivePermission.yolo`). */
 export type EffectiveYolo = { leaseId: string; scope: YoloScope; expiresAt: string };
+
+/** Le corps de `POST /api/organization/yolo/leases`. `runtimeId` absent : le runtime actif. */
+export type YoloGrantRequest = {
+  scope: YoloScope;
+  runtimeId?: string;
+  botId?: string;
+  threadId?: string;
+  /** 1 à 1440 ; absent : 4 h (`YOLO_THREAD_DEFAULT_SECONDS`). */
+  durationMinutes?: number;
+  /** La confirmation de la première fois ; exigée tant qu'aucune n'est enregistrée (428). */
+  acknowledged?: boolean;
+};
+
+/**
+ * Une clé publique de signature des baux, que l'hôte épingle : `keyId` (16
+ * premiers octets hex de sha256(clé)) et la clé brute de 32 octets en base64.
+ * `current` : celle qui signe les nouveaux baux ; les autres vérifient
+ * encore les baux qu'elles ont signés.
+ */
+export type YoloLeaseKeyDto = { keyId: string; publicKey: string; current: boolean };
+
+export type YoloConsentDto = { acknowledgedAt: string | null; soloDefault: boolean };
+
+/** Une auto-approbation remontée par l'hôte : le hash des arguments seulement. */
+export type YoloAuditEntryDto = {
+  id: string;
+  runtimeId: string;
+  leaseId: string;
+  writeSeq: number;
+  occurredAt: string;
+  profile: string;
+  gateKind: string;
+  toolKey: string | null;
+  argsHash: string;
+  entryHash: string;
+};
+
+export type YoloAuditPageDto = { entries: YoloAuditEntryDto[]; nextCursor: string | null };
+
+/** « Couper YOLO partout » : les baux révoqués à l'instant, et les runtimes prévenus. */
+export type YoloKillResultDto = { revoked: number; runtimes: number };

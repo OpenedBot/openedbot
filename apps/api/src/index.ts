@@ -66,6 +66,8 @@ import { miscRoutes } from "./routes/overview/misc-routes";
 import { groupRoutes } from "./routes/roster/group-routes";
 import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
+import { yoloRoutes } from "./routes/identity/yolo-routes";
+import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
 import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
 import { unhandledErrorBody } from "./interfaces/http/unhandled-error";
@@ -428,6 +430,8 @@ app.route("/api/alert-channels", alertChannelRoutes(db, config));
 // ici : le plug-in pro `permissions` les sert sous `/api/pro/permissions`
 // (étape 8b) ; en solo, la route n'existe pas (404).
 app.route("/api/organization/permissions", permissionPolicyRoutes(db));
+// Mode YOLO : sans clé de signature, l'API démarre et refuse l'octroi (503).
+app.route("/api/organization/yolo", yoloRoutes(db, { signing: readYoloLeaseSigningConfig(process.env) }));
 app.route("/api/organization", memberRoutes(db, config));
 // Montages `session` des plug-ins pro, sous `/api/pro/<id>` : derrière la
 // session ; sans l'entitlement déclaré par le montage, la route n'existe pas (404).
