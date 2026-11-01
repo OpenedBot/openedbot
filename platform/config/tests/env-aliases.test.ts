@@ -77,7 +77,7 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
   });
 
   test("the four Cloudflare names fold into one managed tunnel URL that reads back", async () => {
-    const { readManagedTunnelConfig } = await import("../../integrations/src/managed-tunnel");
+    const { readManagedTunnelConfig } = await import("@openedbot/platform-integrations/managed-tunnel");
     const env: Record<string, string | undefined> = { OHB_CF_ACCOUNT_ID: "acc", OHB_CF_API_TOKEN: "t/k", OHB_CF_ZONE_ID: "zone", OHB_MANAGED_TUNNEL_SUFFIX: "example.test" }; // rename:keep
     const warnings: string[] = [];
     applyEnvAliases(env, (message) => warnings.push(message));
