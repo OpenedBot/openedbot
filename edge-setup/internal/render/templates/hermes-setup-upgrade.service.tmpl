@@ -1,0 +1,33 @@
+[Unit]
+Description=edge-setup automatic upgrade (newer releases only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0022
+# The pass installs a release only when its SHA256SUMS carries the Sigstore
+# signature of the release workflow on that tag, its binary matches it, the
+# version is a newer vX.Y.Z, and no transaction or run is in progress. It proves the link on the new binary and puts the previous
+# one back otherwise.
+ExecStart={{ .ToolPath }} upgrade --auto --yes
+TimeoutStartSec=20min
+PrivateTmp=true
+# A root pass that replaces the tool, re-renders units and restarts them: it
+# keeps the file system and the privileges that needs (an upgrade must never
+# lose what a later release requires to install itself), and drops only what
+# none of that uses. No NoNewPrivileges=: with User=root written out, systemd
+# 257 then drops CAP_SETUID, and `runuser -u hermes` of the finish step fails.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK

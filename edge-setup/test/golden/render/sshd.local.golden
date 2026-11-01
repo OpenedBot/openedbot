@@ -1,0 +1,15 @@
+[DEFAULT]
+banaction = ufw
+bantime = 1h
+findtime = 10m
+maxretry = 5
+bantime.increment = true
+bantime.maxtime = 1d
+usedns = no
+ignoreip = 127.0.0.1/8 ::1 203.0.113.7
+
+[sshd]
+enabled = true
+port = 22
+backend = systemd
+mode = normal

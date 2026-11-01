@@ -1,0 +1,17 @@
+[
+  {
+    "name": "arxiv",
+    "description": "Search and summarize arXiv papers.",
+    "category": "research"
+  },
+  {
+    "name": "plan",
+    "description": "Write a step-by-step plan before acting.",
+    "category": "software-development"
+  },
+  {
+    "name": "excalidraw",
+    "description": "Draw diagrams as Excalidraw scenes.",
+    "category": "creative"
+  }
+]

@@ -1,0 +1,34 @@
+# Swift / Xcode
+.build/
+.swiftpm/
+*.xcodeproj
+xcuserdata/
+DerivedData/
+Package.resolved
+
+# Build output
+dist/
+build/
+*.app
+*.dmg
+*.zip
+
+# Node / Bun (helper scripts)
+node_modules/
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.p12
+*.keychain-db
+session.json
+
+# Tooling scratch
+.playwright-mcp/
+*.log
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

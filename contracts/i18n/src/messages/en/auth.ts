@@ -1,0 +1,177 @@
+/** English strings, one file per domain: `messages.en.ts` assembles them. */
+
+export const memberInvitation = {
+  title: "{organizationName} invites you as {role}",
+  email: "Invited email",
+  role: "Role",
+  expires: "Invitation valid until {date}.",
+  details: "{role} · expires {date}",
+  pendingTitle: "Pending invitations",
+  pending: "Pending",
+  expired: "Expired",
+  loading: "Loading invitations",
+  empty: "No pending invitations.",
+  send: "Send invitation",
+  resend: "Resend",
+  cancel: "Cancel",
+  signup: "Create my account",
+  password: "Password",
+  passwordHelp: "At least 12 characters, one uppercase letter and one special character.",
+  login: "Sign in to continue",
+  accept: "Accept",
+  decline: "Decline",
+  declined: "You declined this invitation. You did not join the organization.",
+  invalid: "This invitation is no longer available. Ask an administrator for a new invitation.",
+  wrongEmail: "Your session uses a different address. Sign in with {email} to respond.",
+  switchAccount: "Switch account",
+  consent: "Accept this invitation to join {organizationName}.",
+  browser: "Continue in browser",
+  error: "Unable to respond to this invitation. Please try again.",
+  errorForbidden: "You are not allowed to use this invitation.",
+  errorPending: "This address already has a pending invitation.",
+  errorUnavailable: "This invitation is no longer available.",
+  errorEmailMismatch: "This invitation belongs to another email address.",
+  errorLoginRequired: "Sign in before responding to this invitation.",
+  errorAlready: "This address is already a member or invited.",
+  errorLimit: "The workspace member limit has been reached.",
+  invalidEmail: "Enter a valid email address, for example camille@example.com.",
+  errorDisposable: "Disposable addresses are not accepted: use an address the person actually reads.",
+  errorDomainUnknown: "This domain receives no mail: check the address (for example gmail.co instead of gmail.com).",
+  toastSent: "Invitation sent to {email}.",
+  toastResent: "Invitation resent to {email}.",
+  toastCanceled: "Invitation for {email} canceled.",
+} as const;
+
+export const legal = {
+  mentions: "Legal notice",
+  privacy: "Privacy policy",
+  terms: "Terms of service",
+  description: "Documents published by this deployment.",
+  navigationLabel: "Legal documents",
+  backToApp: "Back to openedbot",
+  loading: "Loading this document…",
+  unavailable: "Document unavailable",
+  unavailableDescription: "This legal document is not available on this deployment.",
+  unavailableShort: "unavailable",
+  notFound: "Document not found",
+  notFoundDescription: "This legal document does not exist.",
+} as const;
+
+export const login = {
+  emailCodeTitle: "Sign up or sign in by email",
+  emailCodeSent: "A code was sent to {email}. It expires in 10 minutes.",
+  emailCodeLabel: "6-digit code",
+  emailCodeVerify: "Verify and continue",
+  emailCodeResend: "Send another code",
+  continue: "Continue",
+  signingInAs: "Signing in as {email}",
+  changeEmail: "Change",
+  emailCodeInstead: "Email me a code instead",
+  passwordInstead: "Use my password",
+  emailCodeResendIn: "Send another code in {seconds} s",
+  emailCodeResent: "A new code was sent to {email}. It replaces the previous one and expires in 10 minutes.",
+  waitlistLink: "Join the waitlist",
+
+  title: "Welcome back.",
+  intro: "Sign in to get back to your bots and your conversations.",
+  sessionExpired: "Your session has expired : sign in again.",
+  sessionRevoked: "This session was revoked (Settings → Security) : sign in again.",
+  alphaClosed: {
+    title: "Sign in",
+    body: "If the session does not open here, leave your address on the home page.",
+    action: "Back to home",
+  },
+  google: "Continue with Google",
+  googleStarting: "Opening…",
+  googleWaiting: "Waiting for the sign-in in the browser : this page updates by itself.",
+  googleCancel: "Cancel",
+  passwordEmail: "E-mail address",
+  passwordPassword: "Password",
+  passwordShow: "Show password",
+  passwordHide: "Hide password",
+  passwordSubmit: "Sign in",
+  passwordSubmitting: "Signing in…",
+  googleDisabledNotConfigured:
+    "Google SSO is not configured in this environment. Use your cloud account e-mail and password.",
+  googleDisabledOriginUnsupported:
+    "Google SSO cannot complete over this local-network address: Google refuses a private IP as a redirect URI, and the session would land on the API host instead. Sign in with your e-mail and password.",
+  failed: {
+    EMAIL_LOGIN_CODE_INVALID: "Invalid or expired code. Request a new code.",
+    EMAIL_LOGIN_CODE_UNSENT: "The code could not be sent. Please try again.",
+    EMAIL_LOGIN_CODE_COOLDOWN: "Wait a minute before requesting another code.",
+
+    AUTH_DENIED: "Sign-in cancelled in Google.",
+    AUTH_STATE_INVALID: "The attempt no longer matches this window : start again.",
+    AUTH_EXCHANGE_FAILED:
+      "Google did not confirm the sign-in (exchange refused or network down) : check the OAuth client and its redirect URI, then start again.",
+    AUTH_TOKEN_INVALID: "The token Google returned is not the expected one : start again.",
+    AUTH_EMAIL_NOT_VERIFIED: "Google does not certify this e-mail : use an account with a verified address.",
+    AUTH_EMAIL_NOT_ALLOWED:
+      "This address is not open on openedbot yet : join the waitlist, we will write to you when your access is approved.",
+    AUTH_NOT_A_MEMBER:
+      "This account is recognised, but it does not belong to this organization : ask an administrator for an invitation.",
+    AUTH_SIGNUP_FAILED:
+      "The account could not be created after Google : start again, and contact support if it happens twice.",
+    MEMBER_QUOTA_REACHED:
+      "The organization that invited you has reached its member limit : its owner must upgrade the plan.",
+    AUTH_GOOGLE_UNLINKED:
+      "Google was unlinked from this account : sign in with your password, then connect Google again from “My account”.",
+    GOOGLE_EMAIL_MISMATCH: "This Google account does not have your openedbot address.",
+    GOOGLE_ALREADY_LINKED: "This Google account is already linked to another openedbot account.",
+    AUTH_ENROLLMENT_INVALID:
+      "The cloud authentication configuration is invalid : contact an administrator.",
+    AUTH_CREDENTIALS_INVALID: "Wrong e-mail or password.",
+    CREDENTIALS_INVALID: "Wrong e-mail or password.",
+    MEMBERSHIP_REQUIRED:
+      "This account is recognised, but it belongs to no active organisation: ask an administrator for an invitation.",
+    VALIDATION_ERROR: "The e-mail address and the password are both required.",
+    AUTH_CLIENT_FAILED: "Sign-in could not start on this device : close and reopen the app.",
+    NOT_A_MEMBER:
+      "This account does not belong to this organization : ask an administrator for an invitation.",
+    ENROLLMENT_UNKNOWN: "The cloud authentication configuration is missing.",
+    ENROLLMENT_REVOKED: "The cloud authentication configuration was revoked.",
+    AUTH_ATTEMPT_UNKNOWN: "The attempt expired (ten minutes) : start again.",
+    AUTH_RETURN_ORIGIN_UNTRUSTED:
+      "This address is not allowed for Google sign-in. Add its origin to CORS_ALLOWED_ORIGINS.",
+    AUTH_PROVIDER_DISABLED: "Google SSO is disabled in this environment.",
+    AUTH_PASSWORD_DISABLED: "Password sign-in is not open in this environment.",
+    AUTH_GOOGLE_ORIGIN_UNSUPPORTED:
+      "Google SSO cannot complete over this local-network address : sign in with your e-mail and password.",
+    RATE_LIMITED: "Too many attempts : wait a minute.",
+    IDENTITY_STORAGE_FAILED:
+      "The secure store could not save the session : unlock the device and try again.",
+    NOT_ENROLLED: "Cloud authentication is not configured.",
+    UNAUTHORIZED: "This session is no longer valid : sign in again.",
+    SERVICE_UNAVAILABLE: "The sign-in service is temporarily unavailable. Please try again in a moment.",
+    UNKNOWN: "Sign-in failed. Try again, and tell support if it happens again.",
+  },
+  unavailableTitle: "Sign-in temporarily unavailable",
+  unreachable: "We cannot load the sign-in options right now. Please try again in a moment.",
+  ledgerFootnote: "Your bots run on your machine. openedbot keeps your conversations and your settings.",
+} as const;
+
+export const changePassword = {
+  title: "Choose your password",
+  intro:
+    "The password you received by email is temporary. Choose another one to open openedbot: that is the only thing to do, and you will not come back here.",
+  currentLabel: "Temporary password",
+  newLabel: "New password",
+  confirmLabel: "Confirm the new password",
+  ruleLength: "At least 12 characters",
+  ruleUppercase: "At least one capital letter",
+  ruleSymbol: "At least one special character",
+  mismatch: "The two new passwords do not match.",
+  submit: "Save and come in",
+  submitting: "Saving…",
+  signOut: "Sign out",
+  signingOut: "Signing out…",
+  footnote:
+    "The temporary password stops working as soon as it is replaced, and your other sessions are closed.",
+  errorCurrentInvalid:
+    "That temporary password was refused. Copy it again from the email you received, with no surrounding spaces.",
+  errorTooWeak: "This password does not meet the three rules above.",
+  errorUnchanged: "The new password must differ from the temporary one.",
+  errorNotSet: "This account signs in with Google only: it has no password to change.",
+  errorGeneric:
+    "The password could not be saved. Try again, and tell support if it happens again.",
+} as const;

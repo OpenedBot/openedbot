@@ -1,0 +1,15 @@
+# Managed by Hermes host hardening. OpenSSH uses the first value found;
+# the 00 prefix must precede cloud-init's 50-cloud-init.conf.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+PermitRootLogin no
+PermitEmptyPasswords no
+AllowUsers hermes-admin
+MaxAuthTries 3
+LoginGraceTime 30
+X11Forwarding no
+LogLevel VERBOSE
+UsePAM yes

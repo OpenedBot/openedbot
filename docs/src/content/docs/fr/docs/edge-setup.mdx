@@ -1,0 +1,215 @@
+---
+title: edge-setup
+description: Ce que l’outil installe sur votre machine, ce qu’il n’installe pas, et comment le vérifier.
+icon: Wrench
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`edge-setup` est un binaire unique, exécuté **sur votre machine** (VPS ou homelab, Debian 12 ou plus, ou Ubuntu 24.04 ou plus, `amd64` ou `arm64`, systemd). Il installe une version épinglée d’Hermes, le logiciel qui fait travailler vos bots, et relie la machine à openedbot. Le durcissement du système est entièrement optionnel.
+
+Cette page est la référence de l’outil. Le parcours console reste [Relier une machine](/fr/docs/machine). Ce qui vous est garanti est dans [Sécurité](/fr/docs/confiance).
+
+<Aside type="caution" title="Une machine dédiée">
+Réservez à `edge-setup` une machine qui n’héberge pas d’autres services. Le profil renforcé prend la main sur SSH (un seul compte d’administration autorisé), sur le pare-feu UFW (tout refusé par défaut, aucune ouverture implicite) et sur Docker (rootless, paquets épinglés). Posé sur un serveur qui sert déjà autre chose, il peut couper votre accès ou casser ces services.
+</Aside>
+
+<Aside type="caution" title="up seul ne durcit rien">
+`sudo edge-setup up --yes` installe Hermes et prépare la machine à être reliée, sans rien publier sur Internet. Il ne configure ni SSH, ni UFW, ni fail2ban, ni PAM, ni journald, ni les mises à jour automatiques. Une machine sur Internet qui s’arrête là n’a **pas** reçu de durcissement.
+</Aside>
+
+## Ce que l’outil fait
+
+- Installe Hermes à une version épinglée et vérifiée, sous un compte système dédié, sans sudo.
+- Relie la machine à votre espace openedbot (`link`) avec un ticket à usage unique.
+- Peut poser, **si vous le demandez**, sandbox rootless, UFW, fail2ban, durcissement SSH, journal persistant, unattended-upgrades, politique de mot de passe, journal sudo, coupure LLMNR.
+- Met à jour le binaire (`upgrade`) après avoir vérifié la signature de la release, puis le SHA-256 du binaire contre `SHA256SUMS`.
+
+## Ce que l’outil ne fait pas
+
+- Il n’est pas un durcisseur générique pour un VPS qui héberge autre chose qu’Hermes.
+- Il n’ouvre aucun port entrant. SSH n’est ouvert que si vous déclarez `--allow-inbound 22/tcp` avec `--firewall`.
+- Il ne chiffre pas le disque. Un instantané fournisseur est une copie en clair de tout ce que contient la machine, clés comprises.
+- Il ne filtre pas la sortie Internet du bot, hors les adresses de métadonnées du fournisseur cloud.
+- Il n’isole pas deux espaces openedbot reliés à la même machine : ils voient les mêmes données.
+
+Chaque modification exige `--yes`. Une option qui peut fermer l’accès exige aussi `--console-confirmed`. Aucun flag n’accepte un secret : stdin ou fichier `0600`.
+
+## Installer et vérifier l’intégrité
+
+Le plus simple est le script d’installation. Il installe la version avec laquelle il a été publié, vérifie la signature de la release puis l’empreinte SHA-256 du binaire, et n’installe rien si l’un des contrôles échoue. Jouez ces commandes sur la machine :
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh
+sudo edge-setup up --yes
+```
+
+Le script accepte deux options :
+
+```bash
+# tout vérifier et afficher l’étape d’installation, sans rien écrire
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh -s -- --dry-run
+# une autre version que celle du script (ou --version latest, explicitement)
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh -s -- --version vX.Y.Z
+```
+
+À la main, avec [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installé, les mêmes contrôles dans le même ordre :
+
+```bash
+V=vX.Y.Z   # la version à installer ; https://releases.openedbot.app/edge-setup/LATEST nomme la plus récente
+U=https://releases.openedbot.app/edge-setup/$V
+A=edge-setup_linux_$(dpkg --print-architecture)
+curl --proto '=https' --tlsv1.2 -fsSL -O "$U/$A" -O "$U/SHA256SUMS" -O "$U/SHA256SUMS.sigstore.json"
+cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/OpenedBot/openedbot/.github/workflows/edge-setup-release.yml@refs/tags/edge-setup/$V" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+sudo install -m 0755 "$A" /usr/local/sbin/edge-setup
+sudo edge-setup up --yes
+```
+
+1. `V` est la version à installer, `A` le binaire adapté à la machine (`amd64` ou `arm64`).
+2. Télécharge depuis `releases.openedbot.app` le binaire, ses empreintes (`SHA256SUMS`) et leur signature (`SHA256SUMS.sigstore.json`).
+3. Vérifie la signature : elle doit venir du workflow de release d’openedbot, exécuté sur le tag de cette version. La commande doit afficher `Verified OK` ; sinon, n’allez pas plus loin.
+4. Vérifie l’empreinte SHA-256 du binaire. La commande doit afficher `OK` ; sinon, n’allez pas plus loin.
+5. Installe le binaire sous `/usr/local/sbin/edge-setup`.
+6. Installe Hermes sous un compte non privilégié, le garde joignable depuis la machine seule (aucun port entrant) et pose la connexion sortante chiffrée vers openedbot.
+
+Ensuite, ouvrez le ticket dans la console (il est valable cinq minutes) et reliez la machine :
+
+```bash
+edge-setup link --ohb https://link.openedbot.app --yes
+```
+
+`https://link.openedbot.app` est l’origine par défaut : `edge-setup link --yes` fait la même chose. `edge-setup` demande le ticket sans l’afficher : collez-le à l’invite. Il ne figure ni dans la ligne de commande ni dans l’historique du shell, et ne sert qu’une fois.
+
+Contrôles à la demande, avant ou après `up` :
+
+```bash
+edge-setup self-verify
+sudo edge-setup detect
+sudo edge-setup plan
+```
+
+`self-verify` n’est exécuté implicitement par aucune autre commande. Si les releases ne répondent pas ou ne servent pas une version vérifiable, `upgrade` et `self-verify` échouent sans rien changer.
+
+Les releases sont **signées** : la signature, faite par le workflow de release d’openedbot sur GitHub pour le tag de cette version et inscrite dans le journal de transparence public de Sigstore, prouve d’où viennent les empreintes ; la somme SHA-256 relie ensuite le binaire à ces empreintes. Une compromission de nos sites de publication ne suffit pas à faire accepter un autre binaire. Une release sans signature (jusqu’à v0.0.2) est refusée. Voir [Sécurité](/fr/docs/confiance).
+
+## Options de durcissement
+
+Les protections déjà posées restent actives lors d’un `up` ultérieur : omettre un flag ne les éteint pas. Les options qui touchent l’accès exigent Debian 13. `--sandbox` exige cgroup v2.
+
+| Option | Effet |
+|---|---|
+| *(aucune)* | Hermes et de quoi relier la machine. Rien d’autre. |
+| `--sandbox` | Docker rootless, outils des bots dans la sandbox, images et paquets Docker épinglés (`apt-mark hold`). |
+| `--persistent-journal` | journald sur disque. |
+| `--unattended-upgrades` | Mises à jour de sécurité automatiques du système. |
+| `--sudo-logging` | Journal sudo root-only et rotation. |
+| `--password-policy` | PAM / pwquality. |
+| `--disable-llmnr` | Coupe LLMNR via systemd-resolved. |
+| `--firewall` | Gère UFW sans reset. Refuse une règle entrante non déclarée. Aucune ouverture SSH implicite. |
+| `--allow-inbound PORT/tcp\|udp` | Ouverture UFW déclarée ; uniquement avec `--firewall`. |
+| `--fail2ban` | Jail SSH. |
+| `--ssh-hardening` | Crée un compte d’administration dédié, seul autorisé en SSH, avec votre clé ; sshd durci (`PermitRootLogin no`). Exige `--admin-key`. |
+| `--quarantine-cloud-user` | Quarantaine du compte cloud-init `debian`. Exige le durcissement SSH. |
+| `--auto-upgrade` | Après un `up` réussi, active la mise à jour automatique (toutes les 6 h). Équivalent à `auto-upgrade enable --yes`. |
+| `--detach` | Rend la main après l’armement du retour en arrière au lieu d’attendre `verify-access`. |
+
+Une option qui ferme l’accès arme un retour en arrière de 600 s. Depuis **une autre** session SSH, avec le compte d’administration :
+
+```bash
+ssh hermes-admin@203.0.113.10
+edge-setup verify-access
+```
+
+Sans cette confirmation, SSH, UFW, fail2ban ou le compte cloud-init concernés sont restaurés. Remplacez `203.0.113.10` par l’adresse réelle.
+
+### Lecture seule après coup
+
+```bash
+edge-setup status
+edge-setup doctor
+edge-setup audit --strict
+```
+
+`doctor` vérifie qu’Hermes fonctionne et n’est joignable que depuis la machine. Il avertit si le pare-feu attendu manque, si un lien est inactif, si la mise à jour automatique est éteinte. `audit --strict` écrit un rapport lisible par root seul ; un `SKIP` sur une protection non sélectionnée n’est pas un échec.
+
+## Profil recommandé (serveur Internet)
+
+Debian 13, cgroup v2, et une puce TPM2 si le fournisseur en offre une : un instantané du disque ne suffit alors pas à faire passer une copie de la machine pour la vôtre.
+
+```bash
+sudo edge-setup up \
+  --sandbox --persistent-journal --unattended-upgrades \
+  --sudo-logging --password-policy --disable-llmnr \
+  --firewall --allow-inbound 22/tcp --fail2ban \
+  --ssh-hardening --quarantine-cloud-user \
+  --auto-upgrade \
+  --admin-key /root/admin.pub --console-confirmed --yes
+```
+
+Puis, dans les 600 s, `verify-access` depuis une nouvelle session. Ensuite :
+
+```bash
+edge-setup link --ohb https://link.openedbot.app --yes
+edge-setup doctor
+edge-setup audit --strict
+```
+
+Sur un réseau isolé, `sudo edge-setup up --yes` suffit pour relier la machine. Ce n’est pas un durcissement.
+
+Le compte d’administration a tous les droits root sans mot de passe : une clé SSH volée donne root. Limitez les clés autorisées et protégez-les.
+
+## Mettre à jour et revenir en arrière
+
+```bash
+edge-setup upgrade --yes
+edge-setup self-verify
+edge-setup auto-upgrade enable --yes
+edge-setup auto-upgrade status
+```
+
+`upgrade` télécharge la nouvelle version en HTTPS, vérifie la signature de la release puis, **une fois**, le binaire contre `SHA256SUMS`, et la met en place. Si Hermes doit redémarrer, il ne le fait que lorsque vos bots ne travaillent pas, et l’ancienne version revient s’il ne répond plus ensuite ; sinon le redémarrage reste en attente.
+
+`auto-upgrade` (toutes les 6 h) n’installe qu’une version `vX.Y.Z` plus récente, jamais pendant que vos bots travaillent, puis **vérifie** en moins de 2 min que la machine est toujours reliée. Sinon l’ancienne version est remise. Désactivé par défaut : rien ne l’allume sans `auto-upgrade enable` ou `up --auto-upgrade`.
+
+openedbot ne met jamais votre machine à jour à votre place. Une version trop ancienne est signalée dans la console ; la mise à jour reste votre geste.
+
+## Désinstaller
+
+Voir d’abord ce qui serait retiré, sans rien toucher :
+
+```bash
+sudo edge-setup uninstall --plan
+```
+
+Puis désinstaller, en gardant les données ou en les détruisant :
+
+```bash
+sudo edge-setup uninstall --yes --keep-data
+sudo edge-setup uninstall --yes --purge-data --i-understand-data-loss
+```
+
+`uninstall` retire Hermes, ses services et `edge-setup` lui-même : il ne reste ni service `hermes-*`, ni commande `edge-setup`. Les données d’Hermes (son jeton d’accès, les identifiants de vos fournisseurs d’IA, les espaces de travail des bots) restent en place avec `--keep-data` : un `edge-setup up` ultérieur les retrouve telles quelles. `--purge-data` les détruit sans retour possible et exige `--i-understand-data-loss`.
+
+Sans l’une de ces deux options, `uninstall` pose la question dans le terminal : Entrée garde les données, les détruire demande de taper `purge`. Hors d’un terminal, il refuse et ne change rien. Le compte d’administration créé par `--ssh-hardening` reste en place.
+
+## Dépannage court
+
+| Symptôme | Geste |
+|---|---|
+| `verify-access` refuse | Nouvelle session SSH avec la clé admin, pas celle qui a lancé `up`. La fenêtre de 600 s court toujours. |
+| Verrouillé avant `verify-access` | Attendre le retour en arrière (≤ 600 s). `status` montre `rolled_back=true`. |
+| `doctor` signale une installation d’Hermes à mettre à jour | `sudo edge-setup upgrade --yes` ou `sudo edge-setup up --yes`. |
+| `cosign` n’affiche pas `Verified OK` | Ne pas installer le binaire. Vérifier que `V` désigne une version signée (v0.0.3 ou plus) ; ne jamais assouplir l’identité attendue. |
+| `sha256sum` n’affiche pas `OK` | Refaire le téléchargement ; ne pas installer le binaire. |
+| « must run as root » | Relancer la commande avec `sudo`. |
+| Machine qui héberge déjà d’autres services | Arrêter. Prendre une machine dédiée. |
+
+Ticket refusé ou expiré, machine introuvable ou retirée dans la console : voir [Résoudre un problème](/fr/docs/depannage).
+
+Ce qui vous est garanti : [Sécurité](/fr/docs/confiance). Les questions
+courtes : [FAQ](/fr/docs/faq). Le parcours console :
+[Relier une machine](/fr/docs/machine).

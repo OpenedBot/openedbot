@@ -1,0 +1,128 @@
+---
+title: Reset
+description: reset and uninstall (--plan, --yes, --purge-data, --legacy, --remove-admin). Restores access, never closes it.
+---
+
+The tool re-executes itself through `sudo` (see [Operations](/docs/operations)):
+do not prefix `edge-setup` with `sudo`.
+
+```bash
+edge-setup reset --plan                       # liste, n'agit pas (alias --dry-run)
+edge-setup reset --yes                        # retire runtime, unités, état, accès posés
+edge-setup reset --yes --purge-data --i-understand-data-loss   # + /srv/hermes/data, /home/hermes
+edge-setup reset --yes --purge-packages       # + docker-ce, containerd.io
+edge-setup reset --yes --legacy               # + namespace openhermesbot-*
+edge-setup reset --yes --legacy --purge-tailscale   # + tailscale (souvent votre accès)
+```
+
+## `uninstall`: uninstall edge-setup
+
+```bash
+edge-setup uninstall --plan                   # liste, n'agit pas (alias --dry-run)
+edge-setup uninstall --yes                    # demande : garder ou purger les données
+edge-setup uninstall --yes --keep-data        # sans question, données gardées
+edge-setup uninstall --yes --purge-data --i-understand-data-loss   # sans question, tout purgé
+```
+
+`uninstall` performs exactly the removal of `reset` and accepts the same
+options (`--purge-packages`, `--legacy`, `--remove-admin`…). In a terminal, it
+asks what happens to the runtime data (bearer, credentials,
+workspaces): Enter keeps it, `2` purges it after you type `purge`. A
+missing or different answer cancels everything, nothing is changed. Outside a terminal
+(script, `ssh hote edge-setup uninstall`), the choice must come from
+`--keep-data` or from `--purge-data --i-understand-data-loss`, otherwise the command
+refuses.
+
+Before removing anything, `uninstall` stops each linked connector and asks
+openedbot to revoke its runtime (`link.retire` frame), over a session proved
+by the device key like any reconnection: once the links are erased, the host
+could no longer prove which runtime it was. openedbot revokes the runtime of
+the current token, records it in the link journal (`host_retired`) and
+confirms it (`link.retired`). Without a confirmation within 20 s (openedbot
+unreachable, or older than this tool), `uninstall` says so, tells where to
+revoke by hand (Settings → Installation → Edge) and goes on: removing the host
+never depends on the network. `--plan` (alias `--dry-run`) lists the runtimes
+that would be revoked. `unlink` makes the same request for its one instance,
+after proving the connector stopped and before erasing the link. `reset`
+revokes nothing: it returns the host to zero, the identity stays in
+openedbot.
+
+Both `reset` and `uninstall` also remove the `edge-setup` and
+`hermes-setup` names (link or copy) from `/usr/local/bin`, `/usr/local/sbin` and
+`/usr/sbin`. A file installed by the `.deb` package stays in place and is removed
+with `apt remove edge-setup`.
+
+Refused while the hardening transaction
+(`/var/lib/hermes-host-hardening/active`) is in progress.
+
+## Order, and why it never opens or closes access
+
+1. Units `hermes-connector`, `hermes-operator`, `hermes-gateway`,
+   `hermes-loopback-guard` and the access rollback timer:
+   stop, disable, files removed. The guard's iptables `OUTPUT` rules
+   (ports 8642 and 9119) are deleted: this reopens those ports on loopback,
+   without ever closing SSH.
+2. Rootless Docker of `hermes`: `systemctl --user disable --now docker`,
+   linger, `delegate.conf`, `/etc/modules-load.d/hermes-docker.conf`, the
+   `hermes:` lines of `/etc/subuid`/`/etc/subgid`.
+3. Access: **restore, never close**, only for components
+   carrying an HVS ownership marker: sshd drop-in removed or replaced
+   by its backup (`sshd -t` before reload); fail2ban jail; UFW restored
+   from the four backed-up files, otherwise `--force disable` and
+   deletion of only the `Hermes-managed` rules; resolved drop-ins,
+   pwquality, logging sudoers (`81-hermes-logging`), logrotate,
+   apt; then `visudo -cf`. A customer policy without a marker is left intact.
+   The `hermes-admin` account **and** its file
+   `/etc/sudoers.d/80-hermes-admin` are kept: without them, the session that
+   runs the reset has no way back to root. The file is removed only
+   by `--remove-admin`, together with the account (account deleted, then
+   file, then `visudo -cf`), or if it is orphaned (account already gone).
+   `--remove-admin` is refused from the `hermes-admin` session, before
+   any change. `--restore-cloud-user` replays the restore of the
+   cloud-init account from `/var/backups/hermes-access/`.
+4. Runtime files: `/usr/local/lib/hermes-*`,
+   `/usr/local/share/hermes-python`, `/var/cache/hermes`, archives under
+   `/var/tmp`, and `/run/hermes-operator` (the operator socket and the gateway's
+   "restart pending" marker). The `hermes-operator` unit keeps this
+   directory across restarts (`RuntimeDirectoryPreserve=yes`):
+   systemd no longer empties it when the reset stops the unit, so the reset
+   removes it itself; otherwise it would survive `reset` and `uninstall` until
+   the next machine reboot.
+5. State: `/var/lib/hermes-*`, `/var/backups/hermes-access`, `/etc/hermes`.
+6. `--purge-data`: `/srv/hermes/data` and `/home/hermes` (bearer, provider
+   keys, workspaces). Requires `--i-understand-data-loss`.
+7. `--purge-packages`: Docker packages (`hold` released first), APT repository and key; the rootful units
+   are unmasked. `ufw`, `fail2ban`, `unattended-upgrades` stay
+   (standard Debian packages).
+8. Old `hermes-connector` account, if it comes from a previous version;
+   the single current account `hermes` is removed only with `--purge-data`. The
+   `/usr/local/lib/hermes-setup/` copy is removed last, then the
+   `edge-setup` / `hermes-setup` names on the PATH that do not belong to the package.
+9. `--legacy`: `openhermesbot-*` drop-ins and units, `/var/lib/openhermesbot*`,
+   `/var/backups/openhermesbot-access`, `/var/cache/openhermesbot`,
+   `/usr/local/lib/openhermesbot-*`, `/etc/openhermesbot`, the
+   `openhermesbot-hermes` container, `/root/hermes-rename-*`, `tailscaled` + package +
+   UFW rules `41641/udp` and `in on tailscale0`.
+
+At the end, `reset` lists any leftover (`systemctl list-unit-files 'hermes-*'`,
+paths still present) and exits with an error if any remain.
+
+## Rebuild from scratch
+
+On a VPS provisioned by the old tool, prefer reinstalling from
+a clean image at the provider: the IP and the host fingerprint change, and
+it is the only way to be sure nothing is left behind. `reset --legacy`
+exists for cases where rebuilding is not possible.
+
+On a host the old tool has already provisioned, `up` refuses two states
+it cannot audit:
+
+- a pre-existing `hermes-admin`: "the admin account pre-exists and was not
+  created by this tool". From a **root** session (the operation is refused
+  from the `hermes-admin` session), run
+  `edge-setup reset --yes --remove-admin`, then `edge-setup up` recreates the
+  account and its sudoers;
+- a cloud-init `debian` account already neutralized, without `authorized_keys`:
+  "debian exists without authorized_keys; refusing to quarantine an unaudited
+  state". If that account is no longer used, remove it by hand
+  (`userdel -r debian`) before running `up` again.

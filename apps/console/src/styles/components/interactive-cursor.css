@@ -1,0 +1,66 @@
+/*
+  Curseur des contrôles, partout (navigateur, PWA, coque de bureau) :
+  décision de l'opérateur du 2026-10-25.
+
+  - Ce qui se clique prend la main : boutons, liens, onglets, entrées de
+    menu et de liste, interrupteurs, cases, sélecteurs, et le libellé d'une
+    case ou d'un interrupteur (un clic dessus coche).
+  - Ce qui est désactivé prend le curseur « interdit ».
+
+  La main est posée dans `@layer base`, en `:where` (spécificité nulle) : une
+  classe utilitaire (`cursor-text`, `cursor-e-resize`, la flèche d'une pastille
+  qui n'ouvre qu'une infobulle) garde le dernier mot. « Interdit » est hors
+  couche, donc au-dessus des utilitaires : un contrôle désactivé ne garde
+  jamais la main d'une classe `cursor-pointer`.
+
+  Un contrôle natif désactivé en `pointer-events: none` ne montrait aucun
+  curseur (celui de dessous) : il reçoit de nouveau la souris. Le navigateur
+  ne déclenche aucun clic sur un contrôle `:disabled`, rien ne s'active.
+*/
+@layer base {
+  :where(
+    button,
+    a[href],
+    summary,
+    select,
+    [role="button"],
+    [role="link"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="menuitemcheckbox"],
+    [role="menuitemradio"],
+    [role="option"],
+    [role="switch"],
+    [role="checkbox"],
+    [role="radio"],
+    [role="combobox"]:not(input),
+    input:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"]),
+    label:has(input:is([type="checkbox"], [type="radio"]), [role="switch"], [role="checkbox"], [role="radio"])
+  ) {
+    cursor: pointer;
+  }
+}
+
+:is(
+  button,
+  select,
+  input,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="combobox"]
+):is(:disabled, [aria-disabled="true"], [data-disabled]:not([data-disabled="false"])),
+label:has(:is(input, [role="switch"], [role="checkbox"], [role="radio"]):is(:disabled, [aria-disabled="true"])) {
+  cursor: not-allowed;
+}
+
+:is(button, select, input):disabled {
+  pointer-events: auto;
+}

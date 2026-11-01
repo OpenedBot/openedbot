@@ -1,0 +1,55 @@
+---
+title: Sécurité
+description: Ce qui reste sur votre machine, ce qu’openedbot ne fait jamais, et les risques qui restent les vôtres.
+icon: Shield
+---
+
+openedbot orchestre vos bots. Il n’administre pas votre serveur. Cette page dit ce qui vous est garanti, et ce qui ne l’est pas. Les commandes de l’outil sont dans [edge-setup](/fr/docs/edge-setup).
+
+## Ce qui reste chez vous
+
+- Le logiciel qui fait travailler vos bots (Hermes).
+- Les secrets propres à votre machine : ils ne la quittent jamais.
+- Les clés de vos services d’intelligence artificielle. Celles que vous saisissez dans la console sont transmises à votre machine sans être conservées ni journalisées par openedbot.
+- Les fichiers, la mémoire et l’historique de travail de vos bots sur la machine.
+
+Vous n’ouvrez aucun port sur votre routeur et vous n’exposez aucune adresse de votre machine.
+
+## Ce qu’openedbot ne fait jamais
+
+- Il n’ouvre jamais de session sur votre machine : ni SSH, ni terminal.
+- Il n’exécute aucune commande libre et ne lit pas le contenu de votre disque.
+- Il ne met pas votre machine à jour à votre place.
+- Il ne redémarre Hermes que lorsque vous le demandez dans la console.
+
+Il ne fait que ce dont la console a besoin : faire travailler vos bots, afficher leur état et régler leurs services et leurs fonctions.
+
+## Relier et retirer une machine
+
+- Le ticket ne sert qu’une fois et expire après cinq minutes.
+- Une machine reliée peut être retirée à tout moment depuis la console : elle n’a alors plus accès à votre espace.
+- Les échanges entre votre machine et openedbot sont chiffrés pendant le transport.
+
+## Ce que cette page ne garantit pas
+
+| Risque | Qui le tient |
+|---|---|
+| Quelqu’un a root sur votre machine | Vous. Root voit tout ce que la machine contient, clés comprises. |
+| Instantané ou console du fournisseur de VPS | Le fournisseur. Le disque n’est pas chiffré par `edge-setup`. |
+| Une page ou un fichier lu par le bot (injection) | Les approbations dans la console. Le bot peut joindre Internet librement. |
+| Le fournisseur de modèle (Anthropic, etc.) | Il reçoit les messages que le bot lui envoie. |
+| `up` sans options de durcissement | Aucun pare-feu, aucun SSH durci, aucun fail2ban. Voir [edge-setup](/fr/docs/edge-setup). |
+
+## Signaler une faille
+
+Ne publiez pas une faille exploitable ; écrivez au support depuis la
+console (**Contacter le support**), avec la version (`edge-setup version`)
+et l’impact. N’envoyez jamais un ticket, un mot de passe ou une clé.
+
+Chaque release d’`edge-setup` est signée par le workflow de release
+d’openedbot sur GitHub, pour le tag de sa version, et la signature est inscrite
+dans le journal de transparence public de Sigstore. L’installation et les mises
+à jour vérifient cette signature, puis la somme SHA-256 du binaire, avant
+d’installer quoi que ce soit : rien n’est installé si l’un des contrôles
+échoue, et une release non signée est refusée. Voir
+[edge-setup](/fr/docs/edge-setup).

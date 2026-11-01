@@ -1,0 +1,145 @@
+---
+/**
+ * The motion of the landing, the same vocabulary as the console's public page
+ * (`apps/console/src/screens/public/landing-motion.tsx`), played with the Web
+ * Animations API instead of the `motion` package:
+ *
+ * - `[data-reveal]`: rises 60 px, sharpens from a 16 px blur, in 0.6 s, once,
+ *   when its top passes 90 % of the window (`data-reveal-delay` in seconds);
+ * - `[data-lines]`: each line of a heading slides out of its mask, 80 ms apart;
+ * - `[data-type]`: the commands of the dark panel type themselves, in order,
+ *   then their note fades in;
+ * - `.pill`: on hover or focus the orange disc crosses the button.
+ *
+ * `Landing.astro` sets `data-motion="on"` before the first paint only when the
+ * browser can animate and the reader accepts motion; it drops the flag if this
+ * script has not started after 2.5 s, so a failed load never hides the page.
+ */
+---
+
+<script>
+  const root = document.documentElement;
+
+  const EASE_OUT = 'cubic-bezier(0.33, 1, 0.68, 1)';
+  const EASE_LINES = 'cubic-bezier(0.25, 1, 0.5, 1)';
+  /** What is already above the fold reveals too: infinite top margin. */
+  const MARGIN = '100000px 0px -10% 0px';
+  const FONTS_TIMEOUT_MS = 1500;
+
+  function whenInView(element: Element, run: () => void) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        run();
+      },
+      { rootMargin: MARGIN },
+    );
+    observer.observe(element);
+  }
+
+  function delayOf(element: HTMLElement): number {
+    return Number(element.dataset.revealDelay ?? 0) * 1000;
+  }
+
+  /** The CSS gate hides until `data-revealed`; `fill: backwards` holds the first frame through the delay. */
+  function reveal(element: HTMLElement) {
+    element.dataset.revealed = '';
+    element.animate(
+      [
+        { opacity: 0, filter: 'blur(16px)', transform: 'translateY(60px)' },
+        { opacity: 1, filter: 'blur(0px)', transform: 'none' },
+      ],
+      { duration: 600, delay: delayOf(element), easing: EASE_OUT, fill: 'backwards' },
+    );
+  }
+
+  async function lines(heading: HTMLElement) {
+    await Promise.race([document.fonts?.ready, new Promise((resolve) => setTimeout(resolve, FONTS_TIMEOUT_MS))]);
+    const words = Array.from(heading.querySelectorAll<HTMLElement>('.lp-word'));
+    const rows: HTMLElement[][] = [];
+    let lastTop: number | null = null;
+    for (const word of words) {
+      const top = Math.round(word.offsetTop);
+      if (top !== lastTop) rows.push([]);
+      rows[rows.length - 1]!.push(word.firstElementChild as HTMLElement);
+      lastTop = top;
+    }
+    whenInView(heading, () => {
+      heading.dataset.revealed = '';
+      rows.forEach((row, index) => {
+        for (const inner of row) {
+          inner.animate(
+            [
+              { opacity: 0, transform: 'translateY(110%)' },
+              { opacity: 1, transform: 'none' },
+            ],
+            { duration: 800, delay: delayOf(heading) + index * 80, easing: EASE_LINES, fill: 'backwards' },
+          );
+        }
+      });
+    });
+  }
+
+  /** Types each command left to right, one after the other, then shows its note. */
+  function typeCommands(panel: HTMLElement) {
+    // Starts once the panel itself has risen in.
+    let at = delayOf(panel) + 400;
+    for (const line of panel.querySelectorAll<HTMLElement>('[data-type]')) {
+      const code = line.querySelector('code');
+      const note = line.querySelector<HTMLElement>('.note');
+      if (!code) continue;
+      const chars = Math.max(1, code.textContent?.trim().length ?? 1);
+      // Five commands must finish in about three seconds.
+      const duration = Math.min(600, chars * 10);
+      // A wrapped command reveals line by line; a one-line command types left to right.
+      const rows = Math.max(1, Math.round(code.offsetHeight / parseFloat(getComputedStyle(code).lineHeight)));
+      line.dataset.revealed = '';
+      code.animate(
+        rows > 1
+          ? [{ clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0 0)' }]
+          : [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }],
+        { duration, delay: at, easing: `steps(${rows > 1 ? rows : chars}, end)`, fill: 'backwards' },
+      );
+      note?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, delay: at + duration, easing: EASE_OUT, fill: 'backwards' });
+      at += duration + 120;
+    }
+    panel.style.setProperty('--lp-caret-delay', `${at}ms`);
+    panel.dataset.typed = '';
+  }
+
+  /** The disc slides to the end of the button and the label takes its place, measured on the gesture. */
+  function slide(pill: HTMLElement) {
+    const disc = pill.querySelector<HTMLElement>('.pill-disc');
+    const label = pill.querySelector<HTMLElement>('.pill-label');
+    if (!disc || !label) return;
+    const enter = () => {
+      const padding = parseFloat(getComputedStyle(pill).paddingLeft) * 2;
+      const width = disc.offsetWidth;
+      disc.style.transform = `translateX(${Math.ceil(pill.clientWidth - padding) - width}px)`;
+      label.style.transform = `translateX(-${width}px)`;
+    };
+    const leave = () => {
+      disc.style.transform = '';
+      label.style.transform = '';
+    };
+    pill.addEventListener('mouseenter', enter);
+    pill.addEventListener('mouseleave', leave);
+    pill.addEventListener('focus', enter);
+    pill.addEventListener('blur', leave);
+  }
+
+  if (root.dataset.motion === 'on') {
+    root.dataset.motionReady = '';
+    for (const element of document.querySelectorAll<HTMLElement>('[data-reveal]')) {
+      whenInView(element, () => reveal(element));
+    }
+    for (const heading of document.querySelectorAll<HTMLElement>('[data-lines]')) void lines(heading);
+    for (const panel of document.querySelectorAll<HTMLElement>('[data-typing]')) {
+      whenInView(panel, () => typeCommands(panel));
+    }
+    if (matchMedia('(hover: hover)').matches) {
+      for (const pill of document.querySelectorAll<HTMLElement>('.pill')) slide(pill);
+    }
+  }
+</script>

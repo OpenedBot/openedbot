@@ -1,0 +1,23 @@
+---
+/**
+ * A heading whose lines slide out of their mask, one line every 80 ms
+ * (`RevealLines` of the console's `landing-motion.tsx`). Split into words at
+ * build time; `Motion.astro` groups the words of one line after the fonts load.
+ */
+type Props = { as?: 'h1' | 'h2'; id?: string; text: string };
+const { as: Tag = 'h1', id, text } = Astro.props;
+const words = text.split(/\s+/).filter(Boolean);
+---
+
+<Tag id={id} data-lines>
+  {
+    words.map((word, index) => (
+      <>
+        {index > 0 ? ' ' : null}
+        <span class="lp-word">
+          <span class="lp-word-inner">{word}</span>
+        </span>
+      </>
+    ))
+  }
+</Tag>

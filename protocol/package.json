@@ -1,0 +1,19 @@
+{
+  "name": "openedbot-protocol",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Wire contract between openedbot and edge-setup: relay frames, gateway route allowlist, A2A types.",
+  "workspaces": ["connector"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p connector/tsconfig.json",
+    "test": "bun test connector/tests",
+    "check": "bun run typecheck && bun run test",
+    "sync": "bash scripts/sync-from-siblings.sh"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.3"
+  }
+}

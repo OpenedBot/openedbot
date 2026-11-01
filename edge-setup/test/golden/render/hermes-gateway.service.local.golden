@@ -1,0 +1,91 @@
+[Unit]
+Description=Hermes Agent gateway for hermes
+After=network-online.target
+Wants=network-online.target
+# Restart=on-failure with RestartSec=3 restarts forever by default: a gateway
+# that cannot read its own configuration would burn a small VPS at twenty
+# restarts a minute and bury the cause in the journal. Ten attempts over ten
+# minutes absorb a transient failure; beyond that the unit stops and says so,
+# and `up` or `upgrade` starts it again once the cause is fixed.
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/srv/hermes/data/workspace
+Environment=HOME=/srv/hermes/data/home
+Environment=HERMES_HOME=/srv/hermes/data
+Environment=PATH=/usr/local/lib/hermes-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/srv/hermes/data/runtime.env
+# It is the gateway that serves the HTTP API: `api_server` is one of its
+# channels, configured by the API_SERVER_* variables above. `hermes serve` is
+# something else: the JSON-RPC backend of the upstream desktop app, on 9119.
+ExecStart=/usr/local/lib/hermes-agent/venv/bin/hermes gateway run --replace
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+# Read-only everywhere but the runtime data: the venv, Node and the tool stay
+# root-owned and unwritable, /tmp and /var/tmp are private.
+ProtectSystem=strict
+ReadWritePaths=/srv/hermes/data
+ProtectHome=tmpfs
+# A compromised gateway must not read connector state or call the privileged
+# operator merely because both services use the hermes uid.
+InaccessiblePaths=-/etc/hermes/connector -/var/lib/hermes-connector -/run/hermes-operator
+# systemd hands a unit's credentials to its uid alone, and the connector shares
+# the hermes uid: its unsealed device key and link token sit readable in
+# /run/credentials/hermes-connector*.service. This unit loads no credential of
+# its own (it reads runtime.env through EnvironmentFile=), so hide the tree.
+InaccessiblePaths=-/run/credentials
+# /run/credentials may not exist yet when this unit starts: systemd creates it
+# for the first unit that holds a credential, which can be the connector,
+# ordered after this one. The leading - above skips a missing path, so create
+# it first (the + runs this one command as root, outside the sandbox).
+ExecStartPre=+/bin/mkdir -p -m 0755 /run/credentials
+# No PrivatePIDs= here: Hermes 0.22 proves its live gateway from the host's
+# process view, and a private PID namespace makes the gateway record PID 1, so
+# host-side profile commands (delete, create, rename) miss the multiplexer.
+# The connector keeps its own PrivatePIDs= and marks itself non-dumpable.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Agent-driven code runs in this process tree (the `local` backend, the Node
+# bridges), so only what no workload legitimately needs is removed here:
+# capabilities (the unit runs unprivileged), the clock, the kernel log, the
+# hostname, foreign ABIs. MemoryDenyWriteExecute= would break Node's JIT, and
+# SystemCallFilter=, PrivateDevices= and RestrictNamespaces= would break tools
+# an operator runs on purpose: they are not set.
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectHostname=true
+SystemCallArchitectures=native
+# cgroup-scoped BPF address filter: it covers this unit and every process it
+# spawns, which is what makes it the system-wide layer. With the `local`
+# terminal backend there is no container at all: agent-driven code runs in this
+# very process tree, so this is the only boundary left between it and the cloud
+# metadata endpoint. Independent of UFW and of Docker: it still holds if the
+# firewall is flushed.
+# Per systemd.resource-control(5) the two lists are applied in turn: an address
+# that matches IPAddressAllow= is granted, otherwise one that matches
+# IPAddressDeny= is refused, otherwise it is granted. There is no
+# IPAddressAllow= line here on purpose: `any` would match every address first
+# and leave both ranges reachable. With the allow list empty the ranges below
+# are refused and every other address (model providers, loopback) falls to the
+# last rule and passes.
+# Never deny 127.0.0.0/8 here: the filter is applied to ingress as well, and
+# the connector's authenticated loopback calls to 127.0.0.1:8642
+# would die with it.
+IPAddressDeny=169.254.0.0/16
+IPAddressDeny=fd00:ec2::/64
+
+[Install]
+WantedBy=multi-user.target

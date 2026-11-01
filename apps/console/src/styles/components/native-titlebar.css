@@ -1,0 +1,223 @@
+/*
+  La coque native (`openedbot-desktop`) n'a pas de barre de titre, ni sous macOS ni
+  sous Windows : la console monte jusqu'au bord haut de la fenêtre et la
+  barre du haut du cadre (`board-chrome.tsx`, 46 px) devient celle de la
+  fenêtre, à la manière de Codex, de ChatGPT ou de T3 Code. La rangée du haut
+  de l'app (haut de la barre latérale, barre du haut, en-tête de l'éditeur
+  d'agent) devient la poignée de la fenêtre.
+
+  - macOS : les feux tricolores flottent dans le coin haut gauche.
+  - Windows : la coque dessine réduire, agrandir et fermer par-dessus le coin
+    haut droit (`titleBarOverlay`, 46 px de haut, aux couleurs du cadre).
+
+  Tout vit sous `:root[data-native-titlebar]` (`"mac"` ou `"windows"`), posé
+  avant le premier rendu par `lib/native-titlebar.ts` : navigateur et PWA ne
+  voient aucune de ces règles. Les règles communes aux deux coques prennent
+  l'attribut seul, les autres sa valeur.
+
+  Géométrie liée à `openedbot-desktop/src/main/window.ts` :
+  - macOS, `trafficLightPosition: { x: 16, y: 16 }` (boutons de 14 pt espacés
+    de 23 : x 16 à 76, y 16 à 30, centre y 23). Ce centre est celui de la
+    barre du haut du cadre (46 / 2), barre latérale ouverte ou repliée.
+  - Windows, `titleBarOverlay.height: 46` : les boutons font la hauteur de la
+    barre. Leur largeur vient des variables de la Window Controls Overlay
+    (`env(titlebar-area-*)`), qu'Electron expose avec `titleBarOverlay`.
+  Changer l'un sans l'autre décale les boutons.
+
+  Régions de déplacement : Chromium les applique dans l'ordre, une région
+  `no-drag` venue après découpe la région `drag` qu'elle recouvre. Une zone
+  `drag` avale tous les clics au niveau du système : chaque contrôle d'une
+  rangée déplaçable doit donc être `no-drag`, sinon il ne répond plus.
+*/
+
+:root[data-native-titlebar] {
+  /* La hauteur de la barre du haut, donc celle de la bande des boutons du
+     système. */
+  --ohb-titlebar-height: 46px;
+}
+
+:root[data-native-titlebar="mac"] {
+  /* Où les feux finissent, en pixels de la page. Ils ne zooment pas avec la
+     taille du texte (`lib/text-size.ts`) : la coque zoome la page et pose
+     `--ohb-native-zoom`, et leurs 76 px d'écran valent 76 / zoom pixels de
+     page. La coque recentre aussi les feux sur la barre du haut zoomée. */
+  --ohb-traffic-lights-end: calc(76px / var(--ohb-native-zoom, 1));
+  /* Depuis le début de la rangée (x 12, barre latérale ou barre du haut
+     repliée) : les feux finissent à 76, puis 8 px avant le premier contrôle
+     (72 px sans zoom). */
+  --ohb-traffic-lights-width: calc(var(--ohb-traffic-lights-end) - 4px);
+}
+
+:root[data-native-titlebar="windows"] {
+  /* La largeur des boutons du système, mesurée depuis le bord droit de la
+     fenêtre : ce que la zone de titre libre laisse à droite. Sans les
+     variables (une coque sans `titleBarOverlay`), les trois boutons de
+     Windows 11 à 46 px, arrondis. */
+  --ohb-caption-buttons-width: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))
+  );
+}
+
+/* La place des feux dans la rangée du haut de la barre latérale. Windows
+   n'en a pas : ses boutons sont à droite. */
+[data-titlebar-lights] {
+  display: none;
+}
+
+:root[data-native-titlebar="mac"] [data-titlebar-lights] {
+  display: block;
+  flex: none;
+  width: var(--ohb-traffic-lights-width);
+}
+
+/* La barre du haut touche le bord droit de la fenêtre : ses actions
+   s'arrêtent avant les boutons du système, avec le même retrait que son bord
+   droit sans eux (12 px). */
+:root[data-native-titlebar="windows"] [data-board-topbar] {
+  padding-inline-end: calc(var(--ohb-caption-buttons-width) + 12px);
+}
+
+/* Le haut de la fenêtre au-dessus des cartes (marge du cadre et haut de la
+   carte latérale) : sur tous les écrans, y compris ceux sans en-tête. Rien
+   d'interactif n'y vit. Derrière tout (z-index -1) et transparente aux clics
+   web : seule la région native compte. */
+[data-native-titlebar-band] {
+  display: none;
+}
+
+:root[data-native-titlebar] [data-native-titlebar-band] {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 20px;
+  pointer-events: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+:root[data-native-titlebar] [data-titlebar-drag] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+:root[data-native-titlebar] [data-titlebar-drag] :is(
+  a,
+  button,
+  input,
+  label,
+  select,
+  summary,
+  textarea,
+  [contenteditable="true"],
+  [role="button"],
+  [role="combobox"],
+  [role="link"],
+  [role="menuitem"],
+  [role="switch"],
+  [role="tab"],
+  [tabindex]:not([tabindex="-1"])
+) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Ce qui s'ouvre par-dessus une rangée déplaçable (menus, popovers,
+   modales) reste cliquable : monté en portail à la fin de `<body>`, il vient
+   après et découpe la région. */
+:root[data-native-titlebar] :is(
+  [data-radix-popper-content-wrapper],
+  [role="alertdialog"],
+  [role="dialog"],
+  [role="listbox"],
+  [role="menu"]
+) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/*
+  La modale des réglages (`settings-modal.tsx`) ne passe jamais sous les
+  boutons du système (feux à gauche, réduire / fermer à droite) : elle
+  commence sous la barre du haut (46 px) au lieu de 16, et sa hauteur
+  maximale suit. Au-dessus, une bande pleine largeur sert de poignée de la
+  fenêtre (le fond assombri n'en est pas une : un clic dessus ferme la
+  modale).
+*/
+[data-settings-drag-strip] {
+  display: none;
+}
+
+:root[data-native-titlebar] [data-settings-drag-strip] {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  height: var(--ohb-titlebar-height);
+}
+
+:root[data-native-titlebar] [data-settings-modal-frame] {
+  padding-top: var(--ohb-titlebar-height);
+}
+
+:root[data-native-titlebar] [data-settings-modal] {
+  max-height: calc(100dvh - var(--ohb-titlebar-height) - 16px);
+}
+
+/* Rail d'icônes du cadre personnel, macOS : les feux (x 16 à 76) recouvrent
+   la rangée du logo du rail (56 px de large). Le logo est masqué, sans copie
+   dans la barre du haut (choix de l'opérateur, 2026-10-26), et la rangée vide
+   reste une poignée de la fenêtre. La barre du haut commence après le rail :
+   elle ne réserve aux feux que ce qui en dépasse (76 - (56 + 12) + 8, 16 px
+   sans zoom). */
+:root[data-native-titlebar="mac"] [data-board-icon-rail] [data-titlebar-rail-logo] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+:root[data-native-titlebar="mac"] [data-board-icon-rail] [data-titlebar-rail-logo] > img {
+  visibility: hidden;
+}
+
+:root[data-native-titlebar="mac"] [data-board-icon-rail] ~ * [data-titlebar-lights] {
+  width: calc(var(--ohb-traffic-lights-end) - 60px);
+}
+
+/*
+  Fenêtre étroite (la coque mobile de `useIsMobile`, sous 768 px) : pas de
+  carte latérale où loger les feux. Les boutons du système prennent la bande
+  de la barre d'état, comme une encoche : la coque mobile la réserve déjà par
+  `--ohb-safe-top`. La fenêtre de la coque ne descend pas sous 800 px ; ce
+  cas reste pour un zoom ou un minimum abaissé.
+*/
+@media (max-width: 767px) {
+  :root[data-native-titlebar] {
+    --ohb-safe-top: var(--ohb-titlebar-height);
+  }
+
+  :root[data-native-titlebar] [data-native-titlebar-band] {
+    height: var(--ohb-titlebar-height);
+  }
+
+  :root[data-native-titlebar="mac"] [data-titlebar-lights] {
+    display: none;
+  }
+}
+
+/* L'accueil (`onboarding/components/step-shell.tsx`) n'a pas la barre du haut
+   du cadre : sans elle, les feux de macOS mordaient le coin de la carte du
+   rail. Une rangée vide de la hauteur de la barre les accueille et sert de
+   poignée ; la carte du rail perd sa marge haute, la rangée la remplace. */
+[data-onboarding-titlebar] {
+  display: none;
+}
+
+:root[data-native-titlebar] [data-onboarding-titlebar] {
+  display: block;
+  flex: none;
+  height: var(--ohb-titlebar-height);
+}
+
+:root[data-native-titlebar] [data-onboarding-rail] {
+  padding-top: 0;
+}

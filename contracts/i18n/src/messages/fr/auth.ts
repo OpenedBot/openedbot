@@ -1,0 +1,178 @@
+/** Chaînes françaises, un fichier par domaine : `messages.fr.ts` les assemble. */
+
+export const memberInvitation = {
+  title: "{organizationName} vous invite comme {role}",
+  email: "Adresse invitée",
+  role: "Rôle",
+  expires: "Invitation valable jusqu’au {date}.",
+  details: "{role} · expire le {date}",
+  pendingTitle: "Invitations en attente",
+  pending: "En attente",
+  expired: "Expirée",
+  loading: "Chargement des invitations",
+  empty: "Aucune invitation en attente.",
+  send: "Envoyer l’invitation",
+  resend: "Renvoyer",
+  cancel: "Annuler",
+  signup: "Créer mon compte",
+  password: "Mot de passe",
+  passwordHelp: "Au moins 12 caractères, une majuscule et un caractère spécial.",
+  login: "Se connecter pour continuer",
+  accept: "Accepter",
+  decline: "Refuser",
+  declined: "Vous avez refusé cette invitation. Vous n’avez pas rejoint l’organisation.",
+  invalid: "Cette invitation n’est plus disponible. Demandez une nouvelle invitation à un administrateur.",
+  wrongEmail: "Votre session utilise une autre adresse. Connectez-vous avec {email} pour répondre.",
+  switchAccount: "Changer de compte",
+  consent: "Acceptez cette invitation pour rejoindre {organizationName}.",
+  browser: "Continuer dans le navigateur",
+  error: "Impossible de répondre à cette invitation. Réessayez.",
+  errorForbidden: "Vous n’êtes pas autorisé à utiliser cette invitation.",
+  errorPending: "Cette adresse a déjà une invitation en attente.",
+  errorUnavailable: "Cette invitation n’est plus disponible.",
+  errorEmailMismatch: "Cette invitation appartient à une autre adresse email.",
+  errorLoginRequired: "Connectez-vous avant de répondre à cette invitation.",
+  errorAlready: "Cette adresse est déjà membre ou invitée.",
+  errorLimit: "La limite de membres de l’espace est atteinte.",
+  invalidEmail: "Saisissez une adresse email valide, par exemple camille@example.com.",
+  errorDisposable: "Les adresses jetables ne sont pas acceptées : utilisez une adresse que la personne relève.",
+  errorDomainUnknown: "Ce domaine ne reçoit pas de courrier : vérifiez l’adresse (par exemple gmail.co au lieu de gmail.com).",
+  toastSent: "Invitation envoyée à {email}.",
+  toastResent: "Invitation renvoyée à {email}.",
+  toastCanceled: "Invitation de {email} annulée.",
+} as const;
+
+export const legal = {
+  mentions: "Mentions légales",
+  privacy: "Politique de confidentialité",
+  terms: "Conditions d’utilisation",
+  description: "Documents publiés par ce déploiement.",
+  navigationLabel: "Documents légaux",
+  backToApp: "Retour à openedbot",
+  loading: "Chargement du document…",
+  unavailable: "Document indisponible",
+  unavailableDescription: "Ce document légal n’est pas disponible sur ce déploiement.",
+  unavailableShort: "indisponible",
+  notFound: "Document introuvable",
+  notFoundDescription: "Ce document légal n’existe pas.",
+} as const;
+
+export const login = {
+  emailCodeTitle: "Inscription ou connexion par email",
+  emailCodeSent: "Un code a été envoyé à {email}. Il expire dans 10 minutes.",
+  emailCodeLabel: "Code à 6 chiffres",
+  emailCodeVerify: "Vérifier et continuer",
+  emailCodeResend: "Renvoyer un code",
+  continue: "Continuer",
+  signingInAs: "Connexion avec {email}",
+  changeEmail: "Modifier",
+  emailCodeInstead: "Recevoir un code par email",
+  passwordInstead: "Utiliser mon mot de passe",
+  emailCodeResendIn: "Renvoyer un code dans {seconds} s",
+  emailCodeResent: "Un nouveau code a été envoyé à {email}. Il remplace le précédent et expire dans 10 minutes.",
+  waitlistLink: "Rejoindre la liste d’attente",
+
+  title: "Bon retour.",
+  intro: "Connectez-vous pour retrouver vos bots et vos conversations.",
+  sessionExpired: "Votre session a expiré : reconnectez-vous.",
+  sessionRevoked: "Cette session a été révoquée (Réglages → Sécurité) : reconnectez-vous.",
+  alphaClosed: {
+    title: "Connexion",
+    body: "Si la session ne s’ouvre pas ici, laissez votre adresse sur la page d’accueil.",
+    action: "Retour à l’accueil",
+  },
+  google: "Continuer avec Google",
+  googleStarting: "Ouverture…",
+  googleWaiting: "En attente de la connexion dans le navigateur : cette page se met à jour toute seule.",
+  googleCancel: "Annuler",
+  passwordEmail: "Adresse e-mail",
+  passwordPassword: "Mot de passe",
+  passwordShow: "Afficher le mot de passe",
+  passwordHide: "Masquer le mot de passe",
+  passwordSubmit: "Se connecter",
+  passwordSubmitting: "Connexion…",
+  googleDisabledNotConfigured:
+    "Le SSO Google n’est pas configuré sur cet environnement. Utilisez l’adresse e-mail et le mot de passe de votre compte cloud.",
+  googleDisabledOriginUnsupported:
+    "Le SSO Google n’aboutit pas depuis cet accès réseau local : Google n’accepte pas une adresse IP privée comme URI de redirection, et la session reviendrait sur l’hôte de l’API. Connectez-vous avec l’adresse e-mail et le mot de passe.",
+  failed: {
+    EMAIL_LOGIN_CODE_INVALID: "Code invalide ou expiré. Demandez un nouveau code.",
+    EMAIL_LOGIN_CODE_UNSENT: "Le code n’a pas pu être envoyé. Réessayez.",
+    EMAIL_LOGIN_CODE_COOLDOWN: "Patientez une minute avant de demander un nouveau code.",
+
+    AUTH_DENIED: "Connexion annulée dans Google.",
+    AUTH_STATE_INVALID: "La tentative ne correspond plus à cette fenêtre : recommencez.",
+    AUTH_EXCHANGE_FAILED:
+      "Google n’a pas confirmé la connexion (échange refusé ou réseau coupé) : vérifiez le client OAuth et son URI de redirection, puis recommencez.",
+    AUTH_TOKEN_INVALID: "Le jeton renvoyé par Google n’est pas celui attendu : recommencez.",
+    AUTH_EMAIL_NOT_VERIFIED: "Google ne certifie pas cet e-mail : utilisez un compte dont l’adresse est vérifiée.",
+    AUTH_EMAIL_NOT_ALLOWED:
+      "Cette adresse n’est pas encore ouverte sur openedbot : inscrivez-vous à la liste d’attente, nous vous écrirons dès que votre accès sera validé.",
+    AUTH_NOT_A_MEMBER:
+      "Ce compte est reconnu, mais il n’appartient pas à cette organisation : demandez une invitation à un administrateur.",
+    AUTH_SIGNUP_FAILED:
+      "La création du compte n’a pas abouti après Google : recommencez, et prévenez le support si cela se reproduit.",
+    MEMBER_QUOTA_REACHED:
+      "L’organisation qui vous a invité a atteint sa limite de membres : son propriétaire doit passer à une offre supérieure.",
+    AUTH_GOOGLE_UNLINKED:
+      "Google a été délié de ce compte : connectez-vous avec votre mot de passe, puis reconnectez Google depuis « Mon compte ».",
+    GOOGLE_EMAIL_MISMATCH: "Ce compte Google n’a pas l’adresse de votre compte openedbot.",
+    GOOGLE_ALREADY_LINKED: "Ce compte Google est déjà lié à un autre compte openedbot.",
+    AUTH_ENROLLMENT_INVALID:
+      "La configuration d’authentification cloud est invalide : contactez un administrateur.",
+    AUTH_CREDENTIALS_INVALID: "Adresse ou mot de passe incorrect.",
+    CREDENTIALS_INVALID: "Adresse ou mot de passe incorrect.",
+    MEMBERSHIP_REQUIRED:
+      "Ce compte est reconnu, mais il n’appartient à aucune organisation active : demandez une invitation à un administrateur.",
+    VALIDATION_ERROR: "L’adresse e-mail et le mot de passe sont requis.",
+    AUTH_CLIENT_FAILED: "La connexion n’a pas pu démarrer sur cet appareil : fermez puis relancez l’application.",
+    NOT_A_MEMBER:
+      "Ce compte n’appartient pas à cette organisation : demandez une invitation à un administrateur.",
+    ENROLLMENT_UNKNOWN: "La configuration d’authentification cloud est introuvable.",
+    ENROLLMENT_REVOKED: "La configuration d’authentification cloud a été révoquée.",
+    AUTH_ATTEMPT_UNKNOWN: "La tentative a expiré (dix minutes) : recommencez.",
+    AUTH_RETURN_ORIGIN_UNTRUSTED:
+      "Cette adresse n’est pas autorisée pour la connexion Google. Ajoutez son origine à CORS_ALLOWED_ORIGINS.",
+    AUTH_PROVIDER_DISABLED: "Le SSO Google est désactivé sur cet environnement.",
+    AUTH_PASSWORD_DISABLED: "La connexion par mot de passe n’est pas ouverte sur cet environnement.",
+    AUTH_GOOGLE_ORIGIN_UNSUPPORTED:
+      "Le SSO Google n’aboutit pas depuis cet accès réseau local : connectez-vous avec l’adresse e-mail et le mot de passe.",
+    RATE_LIMITED: "Trop de tentatives : patientez une minute.",
+    IDENTITY_STORAGE_FAILED:
+      "Le trousseau sécurisé n’a pas pu enregistrer la session : déverrouillez l’appareil puis réessayez.",
+    NOT_ENROLLED: "L’authentification cloud n’est pas configurée.",
+    UNAUTHORIZED: "Cette session n’est plus valide : reconnectez-vous.",
+    SERVICE_UNAVAILABLE: "Le service de connexion est temporairement indisponible. Réessayez dans quelques instants.",
+    UNKNOWN: "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.",
+  },
+  unavailableTitle: "Connexion temporairement indisponible",
+  unreachable: "Nous ne pouvons pas charger les moyens de connexion pour le moment. Réessayez dans quelques instants.",
+  ledgerFootnote: "Vos bots tournent sur votre machine. openedbot garde vos conversations et vos réglages.",
+} as const;
+
+export const changePassword = {
+  title: "Choisissez votre mot de passe",
+  intro:
+    "Le mot de passe reçu par e-mail est temporaire. Choisissez-en un autre pour ouvrir openedbot : c’est la seule chose à faire, et vous n’aurez plus à y revenir.",
+  currentLabel: "Mot de passe temporaire",
+  newLabel: "Nouveau mot de passe",
+  confirmLabel: "Confirmez le nouveau mot de passe",
+  ruleLength: "Au moins 12 caractères",
+  ruleUppercase: "Au moins une majuscule",
+  ruleSymbol: "Au moins un caractère spécial",
+  mismatch: "Les deux nouveaux mots de passe ne sont pas identiques.",
+  submit: "Enregistrer et entrer",
+  submitting: "Enregistrement…",
+  signOut: "Se déconnecter",
+  signingOut: "Déconnexion…",
+  footnote:
+    "Le mot de passe temporaire cesse de fonctionner dès qu’il est remplacé, et vos autres sessions sont fermées.",
+  errorCurrentInvalid:
+    "Ce mot de passe temporaire est refusé. Recopiez-le depuis l’e-mail reçu, sans espace autour.",
+  errorTooWeak: "Ce mot de passe ne remplit pas les trois règles ci-dessus.",
+  errorUnchanged: "Le nouveau mot de passe doit différer du mot de passe temporaire.",
+  errorNotSet:
+    "Ce compte se connecte uniquement par Google : il n’a pas de mot de passe à changer.",
+  errorGeneric:
+    "Le mot de passe n’a pas pu être enregistré. Réessayez, et prévenez le support si cela se reproduit.",
+} as const;

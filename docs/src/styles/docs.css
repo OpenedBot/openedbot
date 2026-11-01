@@ -1,0 +1,315 @@
+/*
+ * Documentation pages (Starlight), dressed like the BoardUI docs
+ * (boardui.com/components): a floating, rounded sidebar card that carries the
+ * brand and the search, a quiet tree with small section labels, the current
+ * page on a grey pill, and the language and theme controls at the top right
+ * of the content. Inter, as in the console. The orange of the console
+ * (#ff7800) only marks; text accents use a darker orange that keeps AA
+ * contrast (#c2410c on white).
+ *
+ * Unlayered on purpose: these rules win over Starlight's `starlight.core`
+ * layer without `!important`. Mobile (< 50rem) keeps Starlight's top bar and
+ * menu; only the colors and the tree apply there.
+ */
+
+/* A denser scale, like BoardUI's: every Starlight size is in rem, so a 14 px
+   root takes the body to 14 px and the small chrome (section labels, table of
+   contents, code) to 10.5-12 px. The landing has its own stylesheet. */
+html {
+  font-size: 14px;
+}
+
+:root {
+  --sl-font: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --bui-gap: 0.75rem;
+  --bui-radius: 1.5rem;
+  --bui-head-h: 6.75rem;
+
+  /* Dark (Starlight's default theme). */
+  --bui-side-bg: #161618;
+  --bui-hair: #27272a;
+  --bui-active: #26262a;
+  --bui-label: #8b8b94;
+  --bui-item: #c4c4cc;
+
+  --sl-color-accent-low: #3b1d06;
+  --sl-color-accent: #ff9a3d;
+  --sl-color-accent-high: #ffd8b0;
+  --sl-color-bg: #0f0f11;
+  --sl-color-bg-nav: var(--bui-side-bg);
+  --sl-color-bg-sidebar: var(--bui-side-bg);
+  --sl-color-hairline-light: var(--bui-hair);
+  --sl-color-hairline-shade: var(--bui-hair);
+}
+
+:root[data-theme='light'] {
+  --bui-side-bg: #f7f7f8;
+  --bui-hair: #e7e7ea;
+  --bui-active: #ebebee;
+  --bui-label: #8a8a93;
+  --bui-item: #3f3f46;
+
+  --sl-color-accent-low: #fff1e6;
+  --sl-color-accent: #c2410c;
+  --sl-color-accent-high: #7c2d12;
+  --sl-color-white: #171717;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: var(--bui-side-bg);
+  --sl-color-bg-sidebar: var(--bui-side-bg);
+  --sl-color-hairline-light: var(--bui-hair);
+  --sl-color-hairline-shade: var(--bui-hair);
+}
+
+/* ---- Tree ---------------------------------------------------------------- */
+
+/* Section labels: small, grey, with the chevron at the end. */
+.sidebar-content summary .large {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bui-label);
+}
+
+.sidebar-content summary {
+  padding-block: 0.35rem;
+}
+
+.sidebar-content summary .caret {
+  width: 1rem;
+  height: 1rem;
+  color: var(--bui-label);
+}
+
+.sidebar-content .top-level > li + li {
+  margin-top: 0.85rem;
+}
+
+/* The guide line hangs from the section, items sit to its right. */
+.sidebar-content ul ul {
+  margin-top: 0.15rem;
+}
+
+.sidebar-content ul ul li {
+  margin-inline-start: 0.85rem;
+  /* Block padding, not margin: two highlighted items never touch, and the
+     guide line stays continuous. */
+  padding-block: 2px;
+  padding-inline-start: 0.5rem;
+  border-inline-start: 1px solid var(--bui-hair);
+}
+
+.sidebar-content a {
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  color: var(--bui-item);
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus-visible {
+  background: var(--bui-active);
+  color: var(--sl-color-white);
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background: var(--bui-active);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+
+/* ---- Search -------------------------------------------------------------- */
+
+site-search > button {
+  border-radius: 999px;
+  border-color: var(--bui-hair);
+  background: var(--sl-color-bg);
+}
+
+/* ---- Desktop: the floating card ------------------------------------------ */
+
+@media (min-width: 50rem) {
+  :root[data-has-sidebar] {
+    --sl-sidebar-width: 17rem;
+    --sl-content-inline-start: calc(var(--sl-sidebar-width) + 2 * var(--bui-gap));
+  }
+
+  /* Starlight's top bar becomes the head of the card: brand, then search. */
+  :root[data-has-sidebar] .page > .header {
+    inset-block-start: var(--bui-gap);
+    inset-inline-start: var(--bui-gap);
+    width: var(--sl-sidebar-width);
+    height: var(--bui-head-h);
+    padding: 1rem 0.9rem 0.5rem;
+    border: 1px solid var(--bui-hair);
+    border-bottom: 0;
+    border-radius: var(--bui-radius) var(--bui-radius) 0 0;
+    background: var(--bui-side-bg);
+  }
+
+  :root[data-has-sidebar] .page > .header > .header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  :root[data-has-sidebar] .page > .header site-search,
+  :root[data-has-sidebar] .page > .header site-search > button {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Language and theme: top right of the content, as on BoardUI. */
+  :root[data-has-sidebar] .page > .header .right-group {
+    position: fixed;
+    inset-block-start: 1.1rem;
+    inset-inline-end: 1.5rem;
+  }
+
+  :root[data-has-sidebar] .page > .header .right-group select,
+  :root[data-has-sidebar] .page > .header .right-group starlight-theme-select,
+  :root[data-has-sidebar] .page > .header .right-group starlight-lang-select {
+    border-radius: 0.75rem;
+  }
+
+  :root[data-has-sidebar] .sidebar-pane {
+    inset-block: calc(var(--bui-gap) + var(--bui-head-h)) var(--bui-gap);
+    inset-inline-start: var(--bui-gap);
+    border: 1px solid var(--bui-hair);
+    border-top: 0;
+    border-radius: 0 0 var(--bui-radius) var(--bui-radius);
+    background: var(--bui-side-bg);
+  }
+
+  :root[data-has-sidebar] .sidebar-content {
+    padding: 0.25rem 0.75rem 1rem;
+  }
+
+  /* No full-width bar any more: the content starts near the top. */
+  :root[data-has-sidebar] .main-frame {
+    padding-top: 3.5rem;
+  }
+
+  :root[data-has-sidebar] .right-sidebar {
+    inset-block-start: 3.5rem;
+    border-inline-start: 0;
+  }
+
+
+  /* The page title reads like BoardUI's: regular weight, tight. */
+  :root[data-has-sidebar] h1#_top {
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ---- Brand, headings, chrome -------------------------------------------- */
+
+.site-title {
+  gap: 0.6rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+
+.site-title img {
+  height: 1.75rem;
+  width: auto;
+}
+
+/* The site has no social links: no divider before the theme select. */
+.right-group .social-icons {
+  display: none;
+}
+
+/* The EN | FR switch (`components/LangSwitch.astro`), in both themes. */
+:root {
+  --ls-track: #26262a;
+  --ls-thumb: #3f3f46;
+  --ls-ink: #fafafa;
+  --ls-muted: #a1a1aa;
+  --ls-focus: #0a84ff;
+}
+
+:root[data-theme='light'] {
+  --ls-track: #ebebee;
+  --ls-thumb: #ffffff;
+  --ls-ink: #171717;
+  --ls-muted: #71717a;
+  --ls-focus: #007aff;
+}
+
+/* Scrollbar only while the pointer is over the tree. */
+.sidebar-pane {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-pane:hover {
+  scrollbar-color: var(--bui-hair) transparent;
+}
+
+.sl-markdown-content :is(h2, h3) {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.sl-markdown-content h2 {
+  font-size: 1.5rem;
+}
+
+.sl-markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+@media (min-width: 50rem) {
+  :root[data-has-sidebar] .content-panel + .content-panel {
+    border-top: 0;
+  }
+}
+
+/* ---- Previous / next ----------------------------------------------------- */
+
+/* Quiet, like BoardUI's: a small label, the title at body size, no shadow. */
+.pagination-links {
+  gap: 0.75rem;
+}
+
+.pagination-links a {
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-color: var(--bui-hair);
+  border-radius: 1rem;
+  box-shadow: none;
+  color: var(--bui-label);
+  font-size: 0.8125rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pagination-links a:hover {
+  border-color: var(--bui-hair);
+  background: var(--bui-active);
+}
+
+.pagination-links .link-title {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--sl-color-white);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.pagination-links svg {
+  width: 1rem;
+  height: 1rem;
+}

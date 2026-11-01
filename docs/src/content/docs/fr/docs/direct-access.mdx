@@ -1,0 +1,180 @@
+---
+title: Accès direct
+description: Le second mode d'attache d'un runtime. Le gateway est publié en HTTPS par un tunnel Cloudflare géré par openedbot ou par Tailscale Funnel, et openedbot reçoit l'URL et le bearer. Ce que ça coûte, et pourquoi le lien reste recommandé.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="En cours de développement">
+Cette voie n’est pas encore ouverte à tous. Cette page n’est publiée que dans
+la documentation de développement ; la voie prise en charge est
+[edge-setup](/fr/docs/machine).
+</Aside>
+
+Il existe deux façons de joindre un runtime depuis openedbot. Cette page
+décrit la seconde, pour que le choix soit fait en connaissance de cause. Les
+parcours pas à pas :
+[par Cloudflare](/fr/docs/machine-cloudflare) et
+[par Tailscale](/fr/docs/machine-tailscale). Dans la console, ils partent de
+*Réglages › Installation › Edge › Ajouter un runtime*.
+
+| | **Lien openedbot** (recommandé) | **Accès direct** (avancé) |
+|---|---|---|
+| Qui ouvre la connexion | l'hôte, en sortant | openedbot, en entrant |
+| Domaine, certificat | aucun | aucun : un sous-domaine d'openedbot (tunnel géré) ou une adresse `ts.net` (Funnel) |
+| Bearer du gateway | ne quitte jamais l'hôte | confié à openedbot |
+| Surface publiée | aucune | toute la surface du gateway, derrière Access (Cloudflare) ou derrière le seul bearer (Funnel) |
+| Profils Hermes | un profil par bot, quand l'hôte annonce cette capacité | le profil par défaut, partagé par tous les bots |
+| Capacités depuis la console | oui (fournisseurs, toolsets, MCP, profils) | non : tout se fait sur l'hôte |
+| Rejeu d'un flux d'événements coupé | oui | non |
+| Outil | `edge-setup` | `cloudflared` ou Tailscale, installé par vous avec la commande que la console affiche |
+
+<Aside type="note" title="Cet outil ne fait pas l'accès direct">
+`edge-setup` n'installe pas de tunnel et ne publie pas de hostname. openedbot
+crée la publication chez Cloudflare ou sur votre tailnet, affiche la commande
+à coller sur l'hôte et vérifie le résultat ; il ne l'exécute pas. Sur un hôte
+installé par `edge-setup`, `doctor` reste la façon de confirmer que le
+gateway répond bien sur `127.0.0.1:8642` avant de le publier.
+</Aside>
+
+## Ce que le mode coûte vraiment
+
+- **Le bord protège moins que le lien.** Le hostname publie *toute* la
+  surface du gateway. Le tunnel géré place une application Cloudflare Access
+  devant, avec un service token qu'openedbot envoie à chaque requête
+  (`CF-Access-Client-Id` / `CF-Access-Client-Secret`). Funnel n'a pas
+  d'équivalent : le bearer du gateway est sa seule garde.
+- **openedbot détient le bearer.** Il est chiffré à l'enregistrement, et
+  « Modifier les accès » remplace la valeur enregistrée. La rotation elle-même
+  se fait sur l'hôte, en changeant `API_SERVER_KEY`, puis en reportant la
+  nouvelle valeur dans openedbot. Il n'est plus vrai que le secret du gateway ne
+  quitte pas l'hôte : c'est la différence de fond avec le lien.
+- **Un seul profil.** L'amont exige une clé propre à chaque profil nommé servi
+  sous `/p/<slug>` : avec un seul bearer et sans opérateur, tous les bots du
+  runtime partagent le profil par défaut. Un bot n'a donc plus ses toolsets,
+  son modèle ni ses serveurs MCP à lui.
+- **Aucune administration des capacités.** Les gestes que le lien porte se font
+  sur l'hôte : `edge-setup credentials add <fournisseur>`,
+  `edge-setup toolsets`, `edge-setup mcp` si l'outil est installé, sinon la
+  CLI amont (`hermes setup`, `hermes tools disable <toolset> --platform
+  api_server`).
+
+## Le parcours, en bref
+
+1. sur l'hôte, un gateway Hermes sur `127.0.0.1:8642`, avec
+   `API_SERVER_ENABLED=true`, un `API_SERVER_KEY` fort, et les toolsets
+   `cronjob`, `delegation`, `memory` et `session_search` désactivés
+   (voir [Préparer Hermes sur la machine](#préparer-hermes-sur-la-machine)) ;
+2. dans openedbot, **Publier** : un tunnel géré (rien à saisir) ou Funnel
+   (un nom de machine et un client OAuth du tailnet) ;
+3. sur l'hôte, la commande affichée une seule fois :
+   `cloudflared service install <jeton>`, ou `tailscale up` puis
+   `tailscale funnel --bg 8642` ;
+4. dans openedbot, quand le hostname répond : nom, bearer, puis **Tester**.
+   Trois preuves séparées (bord joignable, authentification valide, contrat
+   toolsets) avant que **Ajouter** ne s'active. Sans runtime qui sert, le nouveau
+   sert aussitôt ; sinon, confirmez avec **Remplacer maintenant**.
+
+```bash
+# Sur l'hôte, une fois le hostname publié : le gateway doit répondre lui-même.
+curl -si https://ohb-xxxxxxxx.rt.openedbot.app/health | head -1
+```
+
+Avec le tunnel géré, une redirection ou un `403` d'Access sans service token
+est normal : c'est le bord qui filtre. Un `530` ou une page HTML signée
+`cloudflare` signale un tunnel déconnecté, pas le gateway.
+
+<Aside type="caution" title="Les tunnels montés par le client ne sont plus proposés">
+La console ne propose plus de déclarer un tunnel Cloudflare créé à la main
+dans votre propre Zero Trust. Une publication de ce type encore enregistrée
+n'est révoquée que chez openedbot : ce qu'elle a créé chez Cloudflare reste à
+retirer à la main. Les Quick Tunnels `*.trycloudflare.com` restent refusés :
+Cloudflare écrit qu'ils ne prennent pas en charge les Server-Sent Events, et
+un run Hermes *est* un flux SSE.
+</Aside>
+
+Les limites de Funnel (ports, débit) restent à valider sur un flux SSE
+soutenu.
+
+## Préparer Hermes sur la machine
+
+Sans `edge-setup`, c'est à vous d'installer Hermes et de le lancer, quelle
+que soit la voie de publication.
+Toutes ces commandes se tapent sur la machine, avec votre utilisateur
+habituel.
+
+1. Installez Hermes, puis rechargez le shell :
+
+   ```bash
+   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+   source ~/.bashrc
+   ```
+
+2. Choisissez un fournisseur de modèle (clé d'API ou connexion) :
+
+   ```bash
+   hermes setup
+   ```
+
+3. Activez l'API d'Hermes avec une clé longue et aléatoire :
+
+   ```bash
+   printf 'API_SERVER_ENABLED=true\nAPI_SERVER_KEY=%s\n' "$(openssl rand -hex 32)" >> ~/.hermes/.env
+   chmod 600 ~/.hermes/.env
+   ```
+
+   Cette clé vous sera demandée en déclarant le runtime (**Bearer
+   API_SERVER_KEY**). Pour la relire :
+   `grep API_SERVER_KEY ~/.hermes/.env`.
+
+4. Désactivez les quatre fonctions qu'openedbot n'autorise pas sur cette
+   voie :
+
+   ```bash
+   for t in cronjob delegation memory session_search; do
+     hermes tools disable "$t" --platform api_server
+   done
+   ```
+
+5. Installez Hermes comme service système, qui démarre avec la machine :
+
+   ```bash
+   sudo "$(command -v hermes)" gateway install --system --run-as-user "$USER"
+   sudo "$(command -v hermes)" gateway start --system
+   ```
+
+6. Vérifiez qu'il répond, en local :
+
+   ```bash
+   curl -s http://127.0.0.1:8642/health
+   ```
+
+   Ce que vous devez voir : une réponse JSON. Un `Connection refused` veut
+   dire qu'Hermes ne tourne pas : `hermes gateway status --system`.
+
+## Ouvrir les voies sur un déploiement
+
+Les deux cartes restent visibles dans la console, mais désactivées tant que
+le déploiement ne les ouvre pas :
+
+- **Tunnel géré par openedbot** : `OHB_CF_ACCOUNT_ID`, `OHB_CF_API_TOKEN` et
+  `OHB_CF_ZONE_ID` renseignés côté API et worker ; `OHB_MANAGED_TUNNEL_SUFFIX`
+  vaut `rt.openedbot.app` par défaut ;
+- **Tailscale Funnel** : `OHB_TAILSCALE_FUNNEL_ENABLED`.
+
+Sinon, l'API répond `MANAGED_TUNNEL_UNAVAILABLE` ou
+`TAILSCALE_FUNNEL_UNAVAILABLE`.
+
+Une carte cliquable ne suffit pas. Le réglage produit
+`connector_only_enrollment` est actif par défaut : tant qu'il l'est, la
+publication et le test se font, mais **Ajouter** est refusé, parce que les
+nouveaux runtimes doivent passer par le lien. Ce réglage est lu au démarrage de
+l'API et ne se change pas depuis le backoffice.
+
+## Revenir au lien
+
+Rien n'est irréversible : installer `edge-setup`, faire `up`, puis `link`
+crée une seconde ligne de runtime, qui ne sert les runs qu'une fois **Remplacer** confirmé. Supprimer
+ensuite le runtime direct retire le tunnel géré du compte openedbot ; une
+publication Funnel se retire sur l'hôte et dans l'admin Tailscale. Voir
+[Démarrer](/fr/docs/getting-started).

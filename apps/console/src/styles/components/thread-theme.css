@@ -1,0 +1,272 @@
+/*
+ * Le thème du fil d'un bot, celui de Grok Bot 0.78.1 en clair et en sombre
+ * (styles calculés relevés le 30-10 sur deux fils réels, `reports/grok-bot/
+ * 2026_10_30/thread-theme.json`). Portée : la colonne du fil
+ * (`data-thread-column`, conversation.tsx) : en-tête, messages, composer.
+ *
+ * Les utilitaires BoardUI lisent leurs jetons en direct (`@theme inline`,
+ * boardui.css) : les redéfinir ici repeint la colonne sans toucher au reste
+ * de l'application. Les valeurs `--ohb-*` vivent sur la racine : une bulle
+ * hors de la colonne (salon) garde le même rendu.
+ */
+:root {
+  --ohb-thread-page: #fcfcfc;
+  --ohb-thread-ink: #1c1c1c;
+  --ohb-thread-muted: rgb(28 28 28 / 0.68);
+  --ohb-thread-marker: rgb(28 28 28 / 0.56);
+  --ohb-thread-icon: rgb(28 28 28 / 0.56);
+  --ohb-thread-placeholder: rgb(28 28 28 / 0.4);
+  --ohb-thread-wash: rgb(28 28 28 / 0.06);
+  --ohb-thread-wash-hover: rgb(28 28 28 / 0.1);
+  --ohb-bubble-agent: rgb(28 28 28 / 0.06);
+  --ohb-bubble-edge:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.16), inset 0 -0.5px 0 rgb(255 255 255 / 0.16),
+    inset 0 0 0 0.5px rgb(28 28 28 / 0.06);
+  /* La bulle de l'opérateur et le bouton d'envoi : la couleur du bot,
+     assombrie de 12 % pour la bulle (le bouton garde l'aplat). */
+  --ohb-bubble-user-mix: 88%;
+  --ohb-send-mix: 100%;
+  --ohb-composer-edge: rgb(28 28 28 / 0.24);
+  /* Un bot sans couleur (gris chez Grok) : bulle et envoi à l'encre. */
+  --ohb-bubble-user-neutral: #1c1c1c;
+  --ohb-bubble-user-neutral-text: #fff;
+  --ohb-send-neutral: #1c1c1c;
+  --ohb-send-neutral-ink: #fcfcfc;
+  --ohb-code-bg: #fff;
+  --ohb-code-edge: rgb(28 28 28 / 0.12);
+}
+
+.dark {
+  --ohb-thread-page: #121212;
+  --ohb-thread-ink: #f5f5f5;
+  --ohb-thread-muted: rgb(245 245 245 / 0.66);
+  --ohb-thread-marker: rgb(245 245 245 / 0.54);
+  --ohb-thread-icon: rgb(245 245 245 / 0.56);
+  --ohb-thread-placeholder: rgb(245 245 245 / 0.4);
+  --ohb-thread-wash: rgb(245 245 245 / 0.06);
+  --ohb-thread-wash-hover: rgb(245 245 245 / 0.1);
+  --ohb-bubble-agent: rgb(245 245 245 / 0.04);
+  --ohb-bubble-edge:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.03), inset 0 -0.5px 0 rgb(255 255 255 / 0.03),
+    inset 0 0 0 0.5px rgb(245 245 245 / 0.04);
+  /* En sombre, bulle et bouton partagent le même aplat, assombri de 8 %. */
+  --ohb-bubble-user-mix: 92%;
+  --ohb-send-mix: 92%;
+  --ohb-composer-edge: rgb(245 245 245 / 0.22);
+  --ohb-bubble-user-neutral: rgb(245 245 245 / 0.18);
+  --ohb-bubble-user-neutral-text: #f5f5f5;
+  --ohb-send-neutral: #f5f5f5;
+  --ohb-send-neutral-ink: #121212;
+  --ohb-code-bg: #161616;
+  --ohb-code-edge: rgb(245 245 245 / 0.1);
+}
+
+[data-thread-column] {
+  color: var(--ohb-thread-ink);
+  --bui-text-primary: var(--ohb-thread-ink);
+  --bui-background-primary-default: #fff;
+  --bui-composer-add: var(--ohb-thread-wash);
+  --bui-composer-add-hover: var(--ohb-thread-wash-hover);
+  --bui-composer-edge: var(--ohb-composer-edge);
+  --bui-composer-edge-hover: var(--ohb-composer-edge);
+}
+
+.dark [data-thread-column] {
+  --bui-background-primary-default: #1f1f1f;
+}
+
+/* Le fond du fil est la page de Grok. Au bureau seulement : la scène mobile
+   garde sa carte grise (`boardui.css`). */
+[data-thread-column]:not([data-mobile-scene] *) {
+  background-color: var(--ohb-thread-page);
+  --agent-glyph-mask: var(--ohb-thread-page);
+}
+
+/* ── Bulles ─────────────────────────────────────────────────────────────── */
+
+/* 0,15 px en dur : un `em` se calculerait sur la bulle, pas sur sa prose. */
+[data-assistant-layout="bubble"],
+[data-user-bubble] {
+  letter-spacing: 0.15px;
+  box-shadow: var(--ohb-bubble-edge);
+}
+
+[data-assistant-layout="bubble"] {
+  background-color: var(--ohb-bubble-agent);
+}
+
+/* La bulle de l'opérateur d'un bot sans couleur : l'encre (#1c1c1c) en
+   clair, un voile blanc à 18 % en sombre (bot « UX/UI Designer », mesuré). */
+[data-user-bubble] {
+  background-color: var(--ohb-bubble-user-neutral);
+  color: var(--ohb-bubble-user-neutral-text);
+}
+
+/*
+ * Encart neutre dans une réponse : `bg-muted/40` se confond avec le voile de
+ * la bulle. La surface des cartes l'en détache.
+ */
+[data-assistant-layout="bubble"] [data-callout="NOTE"],
+[data-assistant-layout="bubble"] [data-callout="TIP"] {
+  background-color: var(--bui-background-primary-default);
+}
+
+[data-assistant-layout="bubble"] li::marker {
+  color: var(--ohb-thread-marker);
+}
+
+[data-assistant-layout="bubble"] :is(ul, ol) {
+  padding-inline-start: 20px;
+}
+
+/* Les blocs d'une réponse sont à 10 px ; les titres gardent leur marge. */
+[data-assistant-layout="bubble"] .prose > * + :is(p, ul, ol, blockquote) {
+  margin-top: 10px;
+}
+
+/*
+ * La bulle de l'utilisateur est un aplat de la couleur du bot du fil
+ * (`--bot-tint`, posée par l'écran de conversation : absente en salon et
+ * pour un avatar robot, la bulle reste alors à l'encre, ci-dessus). Le texte est
+ * blanc, ou l'encre sur un aplat clair (`--bot-tint-text`, `tintTextColor`),
+ * à 96 % en sombre (#f5f5f5 chez Grok). Une mention garde la couleur du
+ * texte : l'accent de l'interface sur un aplat de couleur est illisible.
+ */
+[data-bot-tint] [data-user-bubble] {
+  background-color: color-mix(in srgb, var(--bot-tint) var(--ohb-bubble-user-mix), black);
+  color: var(--bot-tint-text, #fff);
+}
+
+.dark [data-bot-tint] [data-user-bubble] {
+  color: color-mix(in srgb, var(--bot-tint-text, #fff) 96%, black);
+}
+
+[data-user-bubble] [data-mention] {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/*
+ * Bulles groupées : deux rangées de bulles du même côté, d'affilée (deux
+ * envois avant la réponse, deux réponses sans message entre elles), sont à
+ * 4 px au lieu des 12 du fil, et leurs coins joints passent à 6 px, à
+ * gauche pour le bot, à droite pour l'opérateur. Un bloc d'activité ou une
+ * date entre elles les sépare. Les rangées sont les coques d'interactions
+ * (`data-message-align`, message-interactions.tsx).
+ */
+[data-thread-messages] > [data-message-align="start"]:has([data-assistant-layout]) + [data-message-align="start"]:has([data-assistant-layout]),
+[data-thread-messages] > [data-message-align="end"]:has([data-user-bubble]) + [data-message-align="end"]:has([data-user-bubble]) {
+  margin-top: -8px;
+}
+
+[data-thread-messages] > [data-message-align="start"]:has([data-assistant-layout]) + [data-message-align="start"] [data-assistant-layout="bubble"] {
+  border-top-left-radius: 6px;
+}
+
+[data-thread-messages] > [data-message-align="start"]:has(+ [data-message-align="start"] [data-assistant-layout]) [data-assistant-layout="bubble"] {
+  border-bottom-left-radius: 6px;
+}
+
+[data-thread-messages] > [data-message-align="end"]:has([data-user-bubble]) + [data-message-align="end"] [data-user-bubble] {
+  border-top-right-radius: 6px;
+}
+
+[data-thread-messages] > [data-message-align="end"]:has(+ [data-message-align="end"] [data-user-bubble]) [data-user-bubble] {
+  border-bottom-right-radius: 6px;
+}
+
+/* ── Séparateur de date ─────────────────────────────────────────────────── */
+
+/* Chez Grok, une ligne de texte centrée, sans pastille. */
+[data-thread-date] {
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+[data-thread-date] .bui-date-chip {
+  border-radius: 0;
+  background: none;
+  padding: 6px 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--ohb-thread-muted);
+}
+
+/* ── Composer ───────────────────────────────────────────────────────────── */
+
+/* Carte blanche (#1f1f1f en sombre), liseré d'un demi-pixel, ombre de Grok :
+   la même au repos et au focus. */
+[data-thread-column] [data-composer-shell] {
+  border-width: 0.5px;
+  box-shadow:
+    0 2px 8px -1px rgb(0 0 0 / 0.05),
+    0 1px 2px 0 rgb(0 0 0 / 0.03),
+    0 0 0 1px rgb(228 228 228 / 0.04);
+}
+
+[data-thread-column] [data-composer-shell] textarea::placeholder {
+  color: var(--ohb-thread-placeholder);
+}
+
+/* Joindre et micro : deux pastilles de 28 px sur le même lavis, icône à 56 %. */
+@media (min-width: 40rem) {
+  [data-thread-column] [data-composer-attachment] {
+    color: var(--ohb-thread-icon);
+  }
+
+  [data-thread-column] [data-composer-voice]:not([data-listening]) {
+    background-color: var(--ohb-thread-wash);
+    color: var(--ohb-thread-icon);
+  }
+
+  [data-thread-column] [data-composer-voice]:not([data-listening]):hover:not(:disabled) {
+    background-color: var(--ohb-thread-wash-hover);
+  }
+}
+
+/* Avec la couleur du bot, l'envoi est un aplat (assombri en sombre), pas le
+   dégradé de l'accent de l'application. */
+[data-thread-column][data-bot-accent] {
+  --ohb-send: color-mix(in srgb, var(--bot-tint) var(--ohb-send-mix), black);
+  --bui-gradient-primary: linear-gradient(var(--ohb-send), var(--ohb-send));
+}
+
+/* Sans couleur de bot, l'envoi (et tout bouton primaire du fil) est à
+   l'encre, comme le bot gris de Grok : #1c1c1c en clair, #f5f5f5 en sombre. */
+[data-thread-column]:not([data-bot-accent]) {
+  --bui-gradient-primary: linear-gradient(var(--ohb-send-neutral), var(--ohb-send-neutral));
+  --bui-gradient-primary-hover: linear-gradient(
+    color-mix(in srgb, var(--ohb-send-neutral) 86%, var(--ohb-thread-page)),
+    color-mix(in srgb, var(--ohb-send-neutral) 86%, var(--ohb-thread-page))
+  );
+}
+
+[data-thread-column]:not([data-bot-accent]) .bg-button-primary {
+  color: var(--ohb-send-neutral-ink);
+}
+
+/* ── Blocs de code ──────────────────────────────────────────────────────── */
+
+/* Une carte posée dans la bulle, sans entête : blanche (#161616 en
+   sombre), liseré à 12 % (10 %), rayon 14, mono 12/18, lignes à 10 px du
+   bord. Les couleurs du markdown sont dans le thème Shiki
+   (`withGrokMarkdown`, thread-markdown.tsx). */
+[data-code-block] {
+  border-radius: 14px;
+  border-color: var(--ohb-code-edge);
+  background-color: var(--ohb-code-bg);
+}
+
+/* Copier flotte en haut à droite, une pastille de la même carte. */
+[data-code-block] > [data-code-copy] {
+  border-color: var(--ohb-code-edge);
+  background-color: var(--ohb-code-bg);
+}
+
+[data-code-block] > :is(.ohb-code, pre) {
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 18px;
+}

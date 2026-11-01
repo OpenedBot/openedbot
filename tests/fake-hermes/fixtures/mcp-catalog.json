@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "name": "context7",
+      "description": "Up-to-date library documentation for the model.",
+      "source": "https://github.com/upstash/context7",
+      "authType": "none",
+      "authProvider": null,
+      "transport": "http",
+      "requiresInstall": false,
+      "envSpecs": [],
+      "endpoint": "https://mcp.context7.com/mcp",
+      "command": null,
+      "tools": ["resolve-library-id", "get-library-docs"]
+    },
+    {
+      "name": "github",
+      "description": "GitHub repositories, issues and pull requests.",
+      "source": "https://github.com/github/github-mcp-server",
+      "authType": "api_key",
+      "authProvider": null,
+      "transport": "http",
+      "requiresInstall": false,
+      "envSpecs": [
+        {
+          "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+          "description": "A fine-grained personal access token.",
+          "required": true,
+          "secret": true
+        },
+        {
+          "name": "GITHUB_TOOLSETS",
+          "description": "Comma-separated GitHub toolsets to expose.",
+          "required": false,
+          "secret": false
+        }
+      ],
+      "endpoint": "https://api.githubcopilot.com/mcp/",
+      "command": null,
+      "tools": ["get_issue", "list_pull_requests", "search_repositories"]
+    },
+    {
+      "name": "linear",
+      "description": "Linear issues and projects.",
+      "source": "https://linear.app/docs/mcp",
+      "authType": "oauth",
+      "authProvider": "linear",
+      "transport": "http",
+      "requiresInstall": false,
+      "envSpecs": [],
+      "endpoint": "https://mcp.linear.app/mcp",
+      "command": null,
+      "tools": ["list_issues", "create_issue", "get_project"]
+    },
+    {
+      "name": "time",
+      "description": "Current time and timezone conversions.",
+      "source": "https://github.com/modelcontextprotocol/servers",
+      "authType": "none",
+      "authProvider": null,
+      "transport": "stdio",
+      "requiresInstall": false,
+      "envSpecs": [],
+      "endpoint": null,
+      "command": "uvx",
+      "tools": ["get_current_time", "convert_time"]
+    }
+  ],
+  "customServerTools": ["search", "fetch"]
+}

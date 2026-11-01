@@ -1,0 +1,42 @@
+{
+  "name": "ohb",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "bun@1.4.4",
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "apps/api",
+    "apps/console",
+    "apps/link-gateway",
+    "apps/worker",
+    "contracts/*",
+    "browser/*",
+    "platform/*",
+    "modules/*"
+  ],
+  "scripts": {
+    "dev": "make dev",
+    "dev:api": "make dev-api",
+    "dev:worker": "make dev-worker",
+    "dev:console": "make dev-console",
+    "dev:admin": "make dev-admin",
+    "build": "make build",
+    "typecheck": "make typecheck",
+    "test": "make test"
+  },
+  "devDependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
+    "@openedbot/contracts-events": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/notifications": "workspace:*",
+    "@openedbot/platform-db": "workspace:*",
+    "@openedbot/roster": "workspace:*",
+    "@types/bun": "1.4.0",
+    "dependency-cruiser": "^18.2.0",
+    "hono": "^4.10.4",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@openedbot/portability",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./application/*": "./src/application/*.ts",
+    "./domain/*": "./src/domain/*.ts",
+    "./domain/archive/*": "./src/domain/archive/*.ts",
+    "./sql/*": "./src/sql/*.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-errors": "workspace:*",
+    "@openedbot/contracts-primitives": "workspace:*",
+    "@openedbot/conversation": "workspace:*",
+    "@openedbot/execution": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/platform-db": "workspace:*",
+    "@openedbot/roster": "workspace:*",
+    "@openedbot/runtimes": "workspace:*",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

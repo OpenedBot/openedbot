@@ -1,0 +1,39 @@
+{
+  "name": "@openedbot/platform-config",
+  "version": "1.0.0",
+  "private": true,
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "//publishConfig": "TODO(scope): GitHub Packages only accepts a scope equal to the owning org, so publishing needs @openedbot/* (org OpenedBot) instead of @openedbot/*, and private: false. Until that rename (and its import paths) is decided, this package publishes nothing.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./api-address": "./src/api-address.ts",
+    "./api-config": "./src/api-config.ts",
+    "./blob-driver": "./src/blob-driver.ts",
+    "./client-env": "./src/client-env.ts",
+    "./connector-version": "./src/connector-version.ts",
+    "./deploy-environment": "./src/deploy-environment.ts",
+    "./env-schema": "./src/env-schema.ts",
+    "./hermes-timeouts": "./src/hermes-timeouts.ts",
+    "./http-body": "./src/http-body.ts",
+    "./rate-limit": "./src/rate-limit.ts",
+    "./runtime-mode": "./src/runtime-mode.ts",
+    "./sse-heartbeat": "./src/sse-heartbeat.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-errors": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/platform-integrations": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

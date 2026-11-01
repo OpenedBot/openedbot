@@ -1,0 +1,159 @@
+# Contrôles d'edge-setup dans le monorepo OpenedBot/openedbot. edge-setup/,
+# docs/ (site de documentation, miroir de edge-setup/docs) et le cœur (moitié
+# TypeScript du contrat du lien) sont dans le même dépôt : un seul checkout,
+# plus de clé de déploiement. Actions épinglées par SHA ; Go épinglé par go.mod.
+name: edge-setup-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "edge-setup/**"
+      - "docs/**"
+      - "platform/hermes/**"
+      - "modules/runtimes/**"
+      - "contracts/**"
+      - "Makefile"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/edge-setup-ci.yml"
+  pull_request:
+    paths:
+      - "edge-setup/**"
+      - "docs/**"
+      - "platform/hermes/**"
+      - "modules/runtimes/**"
+      - "contracts/**"
+      - "Makefile"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/edge-setup-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-setup-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: edge-setup
+
+jobs:
+  static:
+    name: Static (gofmt, vet, staticcheck, govulncheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - name: Install staticcheck and govulncheck (pinned versions and h1 sums)
+        # Versions and module sums live in edge-setup/Makefile
+        # (STATICCHECK_VERSION/SUM, GOVULNCHECK_VERSION/SUM); lint-tools
+        # installs them and checks the sum recorded in each binary.
+        run: make lint-tools
+      - run: make lint LINT_STRICT=1
+      - name: Integration tests compile
+        run: go vet -tags integration ./test/integration/...
+
+  test:
+    name: Tests (unit, docs mirror, release assets and publication)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The binary version comes from `git describe --tags --match 'edge-setup/v*'`.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - run: make test
+      - run: make test-release
+
+  contract:
+    name: Connector contract (Go and TypeScript halves)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install the locked OpenedBot workspace
+        working-directory: .
+        run: bun install --frozen-lockfile
+      - run: make contract-check
+
+  build:
+    name: Build (build-all)
+    needs: [static, test, contract]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - run: make build-all
+
+  scripts:
+    name: Scripts (shellcheck, install bootstrap)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install shellcheck v0.11.0 (pinned by SHA-256)
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -fsSLo shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf shellcheck.tar.xz
+          echo "$PWD/shellcheck-v0.11.0" >> "$GITHUB_PATH"
+      - run: make shellcheck
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install bootstrap (valid, invalid and missing signature, dry-run, pinned version)
+        working-directory: docs
+        run: bun test tests/install.test.ts
+
+  e2e:
+    # A privileged systemd container per distribution: read-only commands,
+    # up, the previews, uninstall (data kept, revocation attempted against an
+    # unreachable origin) and reset. Docker rootless and cgroup limits need a
+    # VM: make integration-vm.
+    name: E2E (${{ matrix.base }})
+    needs: [static, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ["ubuntu:24.04", "ubuntu:26.04", "debian:trixie"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - run: make build
+      - name: Integration scenarios
+        env:
+          EDGE_SETUP_IT_BASE: ${{ matrix.base }}
+        run: go test -tags integration -count=1 -timeout 70m -run 'TestReadOnlyCommandsOnFreshHost|TestUpConnectorNoSSHHardening' -v ./test/integration/

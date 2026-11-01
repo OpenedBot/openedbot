@@ -1,0 +1,51 @@
+Connexion de test openedbot / Hermes
+================================
+
+Ce fichier ne contient aucun mot de passe ni aucune clé privée.
+Utiliser une clé SSH locale chargée dans ssh-agent.
+
+Hôte de test
+------------
+
+  hermes-admin@203.0.113.10
+
+Configuration recommandée dans ~/.ssh/config
+---------------------------------------------
+
+  Host ohb-hermes-test
+      HostName 203.0.113.10
+      User hermes-admin
+      IdentityFile ~/.ssh/id_ed25519
+      IdentitiesOnly yes
+
+Tester la connexion
+-------------------
+
+  ssh ohb-hermes-test
+
+Déployer le connecteur openedbot depuis ce dépôt
+-------------------------------------------
+
+  cd edge-setup               # ce dépôt, à côté du dépôt openedbot
+  make deploy HOST=hermes-admin@203.0.113.10
+
+Le déploiement reconstruit et installe edge-setup sur le VPS. Il ne
+modifie pas le runtime Hermes upstream.
+
+Tunnel SSH utilisé par openedbot en développement
+--------------------------------------------
+
+  make link-dev-up HOST=hermes-admin@203.0.113.10    # à la racine du dépôt openedbot
+
+Le lien reste ouvert en arrière-plan pendant le test : `make link-dev-status`
+le dit, `make link-dev-down` le ferme. Le tunnel relie le port API openedbot local
+au VPS via SSH, sans exposer le port sur Internet.
+
+Validation réelle
+------------------
+
+  1. Vérifier avec `make link-dev-status` que le lien est ouvert.
+  2. Ouvrir openedbot et envoyer une vraie demande à un bot relié à ce runtime.
+  3. Vérifier dans les logs API un GET 200 sur :
+     `/internal/runtime-links/<runtime-id>/proxy/api/sessions/<session-id>/messages`.
+  4. Le plan réel doit apparaître dans le fil après la fin du run.

@@ -1,0 +1,40 @@
+---
+title: Relier une machine
+description: Choisissez un serveur Debian ou Ubuntu et suivez les étapes affichées dans la console.
+icon: Server
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Une machine reliée permet à vos bots de répondre. Elle doit rester allumée quand vous voulez les utiliser. Une seule machine sert tous les bots de votre espace. Dans la console, elle s’appelle aussi « runtime ».
+
+<Aside type="caution" title="Une machine dédiée, et une installation qui ne durcit rien">
+Réservez à vos bots une machine qui n’héberge pas d’autres services : les options de durcissement de `edge-setup` prennent la main sur SSH, le pare-feu et Docker.
+
+Les commandes affichées dans la console installent Hermes et relient la machine. Elles ne configurent ni le pare-feu, ni SSH, ni fail2ban, sauf si vous ajoutez ces options. Le détail et le profil recommandé pour un serveur Internet sont dans [edge-setup](/fr/docs/edge-setup).
+</Aside>
+
+## Choisir une machine
+
+Il vous faut un serveur Debian 12 ou plus, ou Ubuntu 24.04 ou plus, loué ou chez vous, en `amd64` ou `arm64`. Les autres systèmes ne sont pas pris en charge.
+
+Vous n’avez pas besoin d’acheter un nom de domaine ni d’ouvrir un port sur votre routeur.
+
+## Relier la machine
+
+1. Dans la console, ouvrez **Réglages > Edge** et choisissez **Ajouter un runtime**. Pendant le parcours de bienvenue, la même fenêtre s’ouvre depuis l’étape **Configuration**.
+2. Gardez l’option **Lien openedbot (recommandé)** et donnez un nom à la machine.
+3. Ouvrez un terminal sur la machine. Copiez les commandes affichées, une à la fois et dans l’ordre. Elles téléchargent `edge-setup`, vérifient son empreinte, l’installent, puis préparent la machine. Si la vérification de l’empreinte n’affiche pas OK, n’allez pas plus loin.
+4. Choisissez **Appairer depuis le serveur**. La console affiche une commande `edge-setup link` et un ticket, avec le temps qui reste.
+5. Lancez la commande `edge-setup link` sur la machine. Quand elle demande le ticket, collez-le à l’invite masquée : il ne s’affiche pas. Le ticket est valable cinq minutes et ne fonctionne qu’une fois. Ne l’ajoutez jamais à une commande et ne le partagez pas.
+6. La console confirme quand la machine est connectée. Vous pouvez alors créer un bot et lui parler.
+
+Si les commandes de l’étape 3 ont déjà été jouées sur cette machine, passez directement à l’appairage. Si le ticket expire, voir [Résoudre un problème](/fr/docs/depannage#mon-ticket-a-expiré).
+
+## Remplacer la machine
+
+Votre espace a une seule machine. Pour en changer :
+
+1. Dans **Réglages > Edge**, choisissez **Remplacer le runtime**, puis suivez les mêmes étapes sur la nouvelle machine. Elle attend sans servir vos bots.
+2. Confirmez le remplacement avec **Remplacer**. La nouvelle machine prend le relais, l’ancienne est retirée et ses tâches en cours s’arrêtent.
+3. Vos bots n’existent pas encore sur la nouvelle machine : importez-les avec **Réglages > Importer des agents**.

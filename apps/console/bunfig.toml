@@ -1,0 +1,4 @@
+[test]
+# Un DOM avant l'import de React : sinon `react-dom/client` se lie à un
+# environnement sans `document` et aucun test de rendu ne peut monter.
+preload = ["./test-setup.ts"]

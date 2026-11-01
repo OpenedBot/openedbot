@@ -1,0 +1,351 @@
+/*
+  Accueil de mode : `/bot` et `/cs`.
+
+  Pas une page de présentation : l'index du mode. Il vit DANS la coque de
+  l'application, donc il en prend les tokens (`--background`, `--foreground`,
+  `--border`, `--accent-600`) et suit le thème clair/sombre au lieu d'imposer
+  son propre monde sombre. La couleur ne sert qu'à une chose : l'action.
+
+  La signature est le filet entre deux lignes. Plein sur `/bot` : un registre
+  qui court, un contact ne se détache pas. Pointillé sur `/cs` : la
+  perforation d'un carnet à souches : une session s'arrache et s'archive.
+*/
+
+.ohb-mode {
+  --mode-gutter: clamp(1.25rem, 5vw, 3rem);
+  --mode-rule: color-mix(in oklab, var(--border) 90%, transparent);
+  --mode-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.ohb-mode-guide {
+  width: min(100%, 46rem);
+  margin-inline: auto;
+  padding: clamp(2rem, 6vw, 4.5rem) var(--mode-gutter) clamp(3rem, 8vw, 6rem);
+}
+
+/* Le lanceur porte un champ, des pastilles et un bouton sur la même ligne. */
+.ohb-mode-guide[data-kind="chat"] {
+  width: min(100%, 52rem);
+}
+
+.ohb-mode-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ohb-mode-eyebrow {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/*
+  Une seule affordance colorée sur la page. Elle est en `--accent-600` parce
+  que c'est l'accent que l'opérateur a choisi dans ses réglages : la page ne
+  ramène pas un vert à elle.
+*/
+.ohb-mode-cta {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-600);
+  color: var(--accent-contrast);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms var(--mode-ease);
+}
+
+.ohb-mode-cta:hover {
+  background: var(--accent-700);
+}
+
+.ohb-mode-cta:focus-visible,
+.ohb-mode-row-target:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/*
+  L'affirmation. Deux phrases : la première pose le fait, la seconde : en
+  italique de la même fonte : dit ce qu'il en coûte. L'italique porte la
+  distinction entre les deux modes ; aucun surligneur ne s'en charge.
+*/
+.ohb-mode-title {
+  margin: 1.5rem 0 0;
+  max-width: 16ch;
+  font-family: var(--font-serif);
+  font-size: clamp(34px, 5.2vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.ohb-mode-title em {
+  display: block;
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.ohb-mode-lead {
+  margin: 1.15rem 0 0;
+  max-width: 46ch;
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.ohb-mode-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin: 1.25rem 0 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ohb-mode-facts span + span::before {
+  content: "·";
+  margin-right: 1.1rem;
+  opacity: 0.55;
+}
+
+.ohb-mode-index {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  border-top: 1px solid var(--mode-rule);
+}
+
+.ohb-mode-index-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 1rem 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ohb-mode-index-title span {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
+.ohb-mode-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+  Le filet. `/bot` : plein : le registre est continu. `/cs` : pointillé : la
+  ligne est une souche détachable. C'est le seul endroit où les deux pages
+  divergent visuellement, et il dit exactement ce qui les sépare.
+*/
+.ohb-mode-row + .ohb-mode-row {
+  border-top: 1px solid var(--mode-rule);
+}
+
+[data-kind="chat"] .ohb-mode-row + .ohb-mode-row {
+  border-top-style: dashed;
+}
+
+.ohb-mode-row-target {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 140ms var(--mode-ease);
+}
+
+.ohb-mode-row-target:hover {
+  background: var(--surface-hover);
+}
+
+.ohb-mode-row-target:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.ohb-mode-row-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.ohb-mode-row-text strong {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ohb-mode-row-text > span {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ohb-mode-row-meta {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ohb-mode-row-go {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 140ms var(--mode-ease),
+    transform 140ms var(--mode-ease);
+}
+
+.ohb-mode-row-target:hover .ohb-mode-row-go,
+.ohb-mode-row-target:focus-visible .ohb-mode-row-go {
+  opacity: 1;
+  transform: none;
+}
+
+.ohb-mode-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  padding: 1.75rem 0.5rem 0.5rem;
+}
+
+.ohb-mode-empty p {
+  margin: 0;
+  max-width: 42ch;
+}
+
+.ohb-mode-empty p:first-child {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.ohb-mode-empty p + p {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.ohb-mode-empty .ohb-mode-cta {
+  margin-top: 0.75rem;
+}
+
+/* Apparition au montage : les lignes se posent, décalées par leur rang. */
+.ohb-mode-row {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.ohb-mode-guide.in .ohb-mode-row {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 420ms var(--mode-ease),
+    transform 420ms var(--mode-ease);
+  transition-delay: calc(min(var(--i, 0), 8) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-mode-row {
+    opacity: 1;
+    transform: none;
+  }
+
+  .ohb-mode-guide.in .ohb-mode-row,
+  .ohb-mode-cta,
+  .ohb-mode-row-target,
+  .ohb-mode-row-go {
+    transition-duration: 0.01ms;
+    transition-delay: 0ms;
+  }
+
+  .ohb-mode-row-go {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Au doigt, aucun survol ne révèle la flèche : elle reste posée. */
+@media (pointer: coarse) {
+  .ohb-mode-row-go {
+    opacity: 1;
+    transform: none;
+  }
+
+  .ohb-mode-row-target:hover {
+    background: none;
+  }
+}
+
+.ohb-mode-cta:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.ohb-mode-cta:disabled:hover {
+  background: var(--accent-600);
+}
+
+/* Au doigt : 44 pt sur ce qui se tape (HIG / WCAG 2.5.8), aucun survol ne porte d'information. */
+@media (pointer: coarse) {
+  .ohb-mode-cta {
+    min-height: 44px;
+  }
+
+  .ohb-mode-cta:hover {
+    background: var(--accent-600);
+  }
+}

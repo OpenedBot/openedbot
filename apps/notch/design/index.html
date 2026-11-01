@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openedbot notch — vos bots openedbot dans l'encoche</title>
+<link rel="stylesheet" href="design.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Design produit · v0.1 · 11 octobre 2026</div>
+    <h1>openedbot notch — vos bots openedbot dans l'encoche du Mac</h1>
+    <p class="lead">Une petite encoche noire soudée à un bord de l'écran, un anneau par bot avec son avatar. D'un coup d'œil : qui travaille et où il en est, qui attend votre accord, quel runtime est tombé. Au survol, le détail ; d'un clic, la fenêtre de l'agent : on lit, on autorise, on refuse, on lui parle. Sans ouvrir la console.</p>
+    <nav class="toc">
+      <a href="#maquette">Maquette</a><a href="#lecture">Comment lire l'encoche</a><a href="#dix">Dix bots, sections</a><a href="#flows">Flux</a><a href="#menubar">Barre de menus</a><a href="#settings">Réglages</a><a href="#archi">Architecture</a><a href="#mapping">Correspondance openedbot</a>
+    </nav>
+  </div>
+</header>
+
+<section id="maquette">
+  <div class="wrap">
+    <h2>Maquette interactive</h2>
+    <p class="sub">Survolez la pastille sur le bord pour déplier l'encoche, puis un anneau pour sa carte. <b>Cliquez un anneau : la fenêtre de dialogue de l'agent s'ouvre</b> (fil, appels d'outils, approbation en ligne, saisie). Les boutons rejouent les situations clés.</p>
+    <div class="desk-wrap">
+      <div class="desk" id="desk">
+        <div class="menubar">
+          <div><b></b> openedbot &nbsp; Fichier &nbsp; Édition &nbsp; Présentation</div>
+          <div class="right"><span id="mb-readings"></span><span>⌥</span><span>◔</span><span>Sam. 11 oct. 13:42</span></div>
+        </div>
+        <div class="window">
+~/openedbot <span style="color:#7fd0ff">$</span> make dev<br>
+<span style="color:#9ad">api</span>     listening on :8787<br>
+<span style="color:#9ad">worker</span>  runs: 2 running · 1 awaiting_approval<br>
+<span style="color:#9ad">console</span> http://localhost:5173<br>
+<span style="color:#6c6">✓</span> runtime vps-paris connected (generation 7, connector 1.5.0)<br>
+<span style="color:#6c6">✓</span> runtime homelab-01 connected (generation 3, connector 1.5.0)<br>
+<span style="color:#f66">!</span> runtime gpu-box link_down since 13:38<br>
+<br>
+<span style="color:#888">events  approval.requested  bot=support  run=run_8Qz…</span><br>
+<span style="color:#888">events  run.completed       bot=ops      run=run_7Hb…</span>
+        </div>
+        <div class="dock"><i></i><i></i><i></i><i></i></div>
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="lbl">Scénario</span>
+      <button data-scn="rest">Au repos</button>
+      <button data-scn="working">Support travaille</button>
+      <button data-scn="approval">Approbation en attente</button>
+      <button data-scn="done">Run terminé</button>
+      <button data-scn="offline">Runtime hors ligne</button>
+    </div>
+    <div class="controls">
+      <span class="lbl">Bord</span>
+      <button data-edge="right" class="on">Droite</button>
+      <button data-edge="left">Gauche</button>
+      <button data-edge="top">Haut</button>
+      <button data-edge="bottom">Bas</button>
+      <span class="lbl" style="margin-left:14px">Barre de menus</span>
+      <button id="mb-toggle">Lectures on/off</button>
+    </div>
+    <div class="controls">
+      <span class="lbl">Roster</span>
+      <button data-roster="3" class="on">3 bots</button>
+      <button data-roster="10">10 bots · 3 sections</button>
+      <span class="lbl" style="margin-left:14px">Affichage</span>
+      <button data-view="sections" class="on">Par section</button>
+      <button data-view="active">Actifs seulement</button>
+      <button data-view="all">Tous les anneaux</button>
+    </div>
+    <p class="note">Notch layout metrics (anneau 44 pt, carte 226 pt, courbes inverses de 39 pt). Le POC Swift de ce dépôt dessine déjà cette encoche en vrai sur macOS, avec des données mock.</p>
+  </div>
+</section>
+
+<section id="lecture">
+  <div class="wrap">
+    <h2>Comment lire l'encoche</h2>
+    <p class="sub">Chaque élément répond à une question précise, et une seule. Rien dans l'encoche ne ressemble à un anneau sans en être un.</p>
+    <div class="grid three">
+      <div class="card-doc"><h3>L'anneau : « où en est-il ? »</h3><p>Un anneau par bot, son avatar au centre, son nom dessous. L'arc est l'avancement du run en cours (<code>usedSteps / maxSteps</code> du workflow), dans la couleur de l'état : blanc en <code>running</code>, ambre en <code>awaiting_approval</code>, vert plein au <code>completed</code>, rouge pointillé si le runtime est tombé. Sans run, la piste seule. Aucun quota de fournisseur : ce n'est pas le sujet de cette encoche.</p></div>
+      <div class="card-doc"><h3>L'arc intérieur : « il fait quoi, là ? »</h3><p>Plus fin, d'un autre rayon, neutre. Il tourne tant qu'un run du bot est en <code>running</code> ; devient un anneau ambre qui pulse en <code>awaiting_approval</code> ; se fige en vert au <code>completed</code> ; pointillé rouge si le lien du runtime est tombé (<code>link_down</code>). Rien quand tout est calme.</p></div>
+      <div class="card-doc"><h3>Le badge : « on m'attend ? »</h3><p>Le nombre d'éléments d'inbox du bot (<code>InboxCountsDto</code> : approbation, à relire, à vous). Ambre, en haut à droite de l'anneau. C'est la seule chose de l'encoche qui vous demande quelque chose.</p></div>
+      <div class="card-doc"><h3>L'anneau atténué : « je ne sais plus »</h3><p>Runtime injoignable (<code>RuntimeLinkDto.connected = false</code>) ou fournisseur en incident : l'anneau passe à 45 % d'opacité, l'arc devient rouge pointillé. On ne dessine jamais un état inventé.</p></div>
+      <div class="card-doc"><h3>La carte : le détail au survol</h3><p>Titre : le bot, son runtime, son modèle et son mode de permission. Puis l'état du lien (« connecté · vu il y a 3 s » ou « hors ligne depuis 4 min »), la routine et son prochain passage, et sous un filet les runs : DM, groupe ou routine, état, étape, depuis quand. Enfin, s'il y en a une, l'approbation à traiter et un champ pour parler au bot.</p></div>
+      <div class="card-doc"><h3>Le clic : la fenêtre de l'agent</h3><p>Un clic sur l'anneau ouvre une fenêtre de dialogue flottante à côté de l'encoche, pour <em>cet</em> agent : son fil (<code>GET /api/threads/:id/history</code>), ses appels d'outils, l'approbation à traiter en ligne, et un champ pour lui écrire (<code>POST …/messages</code>). Elle reste ouverte tant qu'on y est, Échap la ferme. C'est le <code>/compact/:botId</code> de la console, sans la console.</p></div>
+      <div class="card-doc"><h3>L'orbe : les réglages</h3><p>Sous l'encoche, un arc au repos, un engrenage au survol. Un clic ouvre les réglages. Le clic droit sur l'encoche propose « Garder ouverte », « Actualiser », le bord et « Ouvrir la console ».</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="dix">
+  <div class="wrap">
+    <h2>Dix bots, trois sections</h2>
+    <p class="sub">Une colonne de dix anneaux ne se lit plus et ne tient plus sur un écran. Trois règles, dans cet ordre, et l'encoche garde sa taille quel que soit le roster. Les sections sont celles d'openedbot (<code>RosterDto.sections</code>), dans l'ordre de la console.</p>
+    <div class="grid three">
+      <div class="card-doc"><h3>1 · Les alertes sortent du rang</h3><p>Un bot qui attend une approbation (ou a un élément d'inbox) est toujours promu en anneau propre, en tête de l'encoche, quelle que soit sa section. On ne doit jamais ouvrir une pile pour découvrir qu'on vous attend.</p></div>
+      <div class="card-doc"><h3>2 · Une pile par section</h3><p>Au-delà de six bots, chaque section devient un seul anneau : les avatars empilés, l'avancement le plus haut de ses runs, l'activité la plus pressante, le badge cumulé et le nombre de bots. Le survol déploie la pile à côté de l'encoche : une ligne par bot, clic → sa fenêtre.</p></div>
+      <div class="card-doc"><h3>3 · Actifs seulement</h3><p>Réglage « Afficher : actifs seulement » : seuls les bots qui travaillent, attendent, viennent de finir ou sont tombés ont un anneau. Les autres sont derrière un « +N » qui se déploie de la même façon. C'est le mode de quelqu'un qui a vingt bots dont trois vivent.</p></div>
+      <div class="card-doc"><h3>Tous les anneaux, si on y tient</h3><p>Mode « Tous » : une colonne complète, les sections séparées par un filet et leur nom en petites capitales. Sur un bord vertical, dix anneaux de 32 px font 480 px : ça tient sur un écran de portable, pas sur une moitié d'écran partagé. L'encoche le dit dans les réglages plutôt que de déborder.</p></div>
+      <div class="card-doc"><h3>Ordre et choix</h3><p>L'ordre est celui du roster openedbot ; dans les réglages on peut masquer un bot ou une section de l'encoche (sans rien changer dans openedbot), et choisir au plus deux bots pour la barre de menus. Le total « N à valider » y apparaît toujours, quel que soit le choix.</p></div>
+      <div class="card-doc"><h3>Groupes</h3><p>Un salon de bots (<code>GroupDto</code>, 2 à 6 bots) n'a pas d'anneau : il apparaît comme une session « Groupe · Newsletter » dans la carte de chacun de ses membres, et dans leur fenêtre. L'anneau reste un bot, un seul, avec son runtime.</p></div>
+    </div>
+    <p class="note">Essayez dans la maquette : Roster « 10 bots · 3 sections », puis Affichage « Par section », « Actifs seulement », « Tous les anneaux ». Avec le scénario « Approbation en attente », Support est promu hors de sa pile.</p>
+  </div>
+</section>
+
+<section id="flows">
+  <div class="wrap">
+    <h2>Les quatre flux qui comptent</h2>
+    <p class="sub">Ce que l'app doit rendre plus court que « ouvrir la console ». Chaque flux part d'un événement SSE réel d'openedbot.</p>
+
+    <h3 style="margin:18px 0 10px;font-size:16px">1 · Approuver sans quitter son travail</h3>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><b>approval.requested</b>Le bot Support demande <code>shell</code> pour un remboursement. L'arc passe ambre, le badge « 1 » s'allume, l'encoche s'ouvre 5 s, son « Funk ».</div>
+      <div class="step"><span class="n">2</span><b>La carte s'épingle</b>L'encoche reste ouverte tant que l'approbation est en attente. Carte : outil, commande en mono, le run concerné, « expire dans 9 min » (<code>expires_at</code>).</div>
+      <div class="step"><span class="n">3</span><b>Autoriser · Refuser</b><code>POST /api/approvals/:id/respond</code> avec <code>choice: once | deny</code>. Pas de « toujours » : openedbot ne l'offre pas, l'encoche n'invente pas. Raccourcis ↩ et ⌘⌫.</div>
+      <div class="step"><span class="n">4</span><b>approval.responded</b>L'arc redevient blanc tournant (ou vert si refusé et terminé). 409 <code>APPROVAL_NOT_PENDING</code> : « déjà traitée depuis la console », la carte se ferme sans erreur.</div>
+    </div>
+
+    <h3 style="margin:26px 0 10px;font-size:16px">2 · Savoir qu'un run a fini, et revenir dessus</h3>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><b>run.completed</b>Seul le passage hors de <code>running</code> compte. Un run déjà fini au lancement n'est pas annoncé. <code>notifyOnFinish</code> du bot est respecté.</div>
+      <div class="step"><span class="n">2</span><b>Annonce 5 s</b>L'encoche s'ouvre, l'arc du bot passe vert, son « Glass ». Pas de contenu du fil : comme le Web Push d'openedbot, seul le nom du bot et le titre du run sortent.</div>
+      <div class="step"><span class="n">3</span><b>Clic sur la session</b>Ouvre <code>/compact/:botId</code> dans la coque bureau si elle tourne, sinon la console web. Le dernier saut reste une touche.</div>
+      <div class="step"><span class="n">4</span><b>run.error</b>Même annonce, arc rouge, ligne « échec · étape 5/8 ». Un run <code>needs_review</code> alimente le badge.</div>
+    </div>
+
+    <h3 style="margin:26px 0 10px;font-size:16px">3 · Voir qu'un runtime est tombé</h3>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><b>link disconnected</b>Le connecteur a cessé de répondre aux pings (15 s). <code>RuntimeLinkDto.connected = false</code>.</div>
+      <div class="step"><span class="n">2</span><b>Anneau atténué, arc rouge pointillé</b>Pour chaque bot de ce runtime. La carte dit « hors ligne depuis 4 min », la version du connecteur et si une mise à jour existe.</div>
+      <div class="step"><span class="n">3</span><b>Alerte durable</b>Après <code>downAfterMinutes</code>, openedbot ouvre une alerte <code>link_down</code> : notification système, une fois.</div>
+      <div class="step"><span class="n">4</span><b>Retour</b>Au <code>connected</code> suivant, l'anneau se rallume avec une relecture des runs et de l'inbox.</div>
+    </div>
+
+    <h3 style="margin:26px 0 10px;font-size:16px">4 · Dialoguer avec un agent depuis l'encoche</h3>
+    <div class="flow">
+      <div class="step"><span class="n">1</span><b>Clic sur l'anneau</b>La fenêtre de l'agent s'ouvre à côté de l'encoche, déjà au bon endroit du fil (<code>/history</code> puis les événements SSE <code>agent.message</code>, <code>tool.call</code>, <code>tool.result</code>).</div>
+      <div class="step"><span class="n">2</span><b>Écrire</b><code>POST /threads/:threadId/messages</code> → 202 <code>SendMessageAccepted</code>. Le message apparaît tout de suite, l'arc de l'anneau se met à tourner.</div>
+      <div class="step"><span class="n">3</span><b>Lire, approuver</b>Les réponses arrivent dans la fenêtre. Une approbation demandée s'affiche en ligne, avec Autoriser une fois · Refuser, au même endroit que le fil.</div>
+      <div class="step"><span class="n">4</span><b>Fermer</b>Échap ou ×. La fenêtre ne vole jamais le focus tant qu'on n'y clique pas ; le reste (pièces jointes, groupes, routines) reste dans la console.</div>
+    </div>
+  </div>
+</section>
+
+<section id="menubar">
+  <div class="wrap">
+    <h2>Barre de menus</h2>
+    <p class="sub">Par défaut une icône. Avec le réglage « Afficher l'activité », la barre dit ce qui tourne et ce qui vous attend : la seule ligne de l'app qui tient dans la barre.</p>
+    <pre class="ascii">  ◐ Support · attend │ ⚙ Ops · travaille 3/8 │ 2 en cours │ 1 à valider          ⌥ ◔ Sam. 11 oct. 13:42
+
+  menu (clic) :  Support · attend ton accord · DM Léa      Ops · travaille 3/8      Growth · hors ligne
+                 ─────────────────────────────────
+                 Garder ouverte        Bord ▸       Ouvrir la console       Réglages…       Quitter</pre>
+  </div>
+</section>
+
+<section id="settings">
+  <div class="wrap">
+    <h2>Réglages</h2>
+    <p class="sub">Une fenêtre, cinq groupes. Tout ce qui touche à ce que l'app lit se décide dans openedbot ; ici on ne règle que ce qu'elle montre.</p>
+    <div class="grid two">
+      <div class="settings">
+        <h4>Compte</h4>
+        <div class="opt"><span>operateur@acme.test · Acme (agency)</span><span class="seg"><span class="on">Acme</span><span>Perso</span></span></div>
+        <h4 style="margin-top:14px">Apparence</h4>
+        <div class="opt"><span>Bord</span><span class="seg"><span class="on">Droite</span><span>Gauche</span><span>Haut</span><span>Bas</span></span></div>
+        <div class="opt"><span>Taille</span><span class="seg"><span>Petite</span><span class="on">Moyenne</span><span>Grande</span></span></div>
+        <div class="opt"><span>Toujours afficher</span><span class="sw off"></span></div>
+        <div class="opt"><span>Recentrer sur ce bord</span><span class="tag">Bouton</span></div>
+      </div>
+      <div class="settings">
+        <h4>Bots</h4>
+        <div class="opt"><span>◐ Support · vps-paris</span><span><span class="tag ok">anneau</span><span class="tag ok">barre</span></span></div>
+        <div class="opt"><span>⚙ Ops · homelab-01</span><span><span class="tag ok">anneau</span><span class="tag ok">barre</span></span></div>
+        <div class="opt"><span>▥ Growth · gpu-box</span><span><span class="tag ok">anneau</span><span class="tag">barre</span></span></div>
+        <h4 style="margin-top:14px">Annonces</h4>
+        <div class="opt"><span>Ouvrir l'encoche à la fin d'un run / à une approbation</span><span class="sw"></span></div>
+        <div class="opt"><span>Son (fin · approbation)</span><span class="seg"><span class="on">Glass</span><span class="on">Funk</span></span></div>
+        <div class="opt"><span>Notifications système (approbation, fin, erreur, lien)</span><span class="sw"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="archi">
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <p class="sub">Le POC Swift existe (encoche, anneaux, carte, machine à états, mock). Ce qui change : la source de données devient l'API d'openedbot, derrière le même protocole <code>BotFeed</code>.</p>
+    <pre class="ascii">
+   openedbot API                                          openedbot notch (macOS, Swift)
+   ┌──────────────────────────────────┐                 ┌───────────────────────────────────┐
+   │ POST /api/auth/native/authorize  │ ◀── PKCE ────── │ OHBotAuth  (callback 127.0.0.1:47813) │
+   │ POST /api/auth/native/token      │ ──▶ bearer ───▶ │ access 15 min · refresh 30 j, Keychain│
+   │                                  │                 │                                   │
+   │ GET  /api/bots      (RosterDto)  │ ──────────────▶ │ OHBotFeed : BotFeed               │
+   │ GET  /api/inbox     (counts)     │ ──────────────▶ │   bots → Bot (anneau, carte)      │
+   │ GET  /api/runtime/list           │ ──────────────▶ │   runs → BotRun (étape, état)     │
+   │ GET  /api/events    (SSE, cursor)│ ═══ flux ═════▶ │   inbox → badge, carte            │
+   │        approval.requested         │                 │   link events → atténuation       │
+   │        run.completed / run.error  │                 │                                   │
+   │ POST /api/approvals/:id/respond  │ ◀────────────── │ Autoriser / Refuser               │
+   │ POST /api/threads/:id/messages   │ ◀────────────── │ Composer                          │
+   └──────────────────────────────────┘                 │                                   │
+                                                        │ NotchModel → NotchRootView        │
+   Runtime du client (edge-setup, Hermes)               │ NotchWindowController (4 bords)   │
+   ┌──────────────────────────────────┐                 │ StatusItemController (barre)      │
+   │ connecteur WSS sortant, ping 15 s│ ──▶ openedbot ──▶   │ Annonces · Notifications          │
+   │ hello: generation, connecteur    │                 └───────────────────────────────────┘
+   └──────────────────────────────────┘
+</pre>
+    <div class="grid three">
+      <div class="card-doc"><h3>Lecture</h3><ul><li>Au lancement : bots, inbox, runtimes et runs, en une rafale.</li><li>Ensuite : SSE <code>/api/events</code> avec reprise par <code>Last-Event-ID</code> ; <code>stream.gap</code> → relecture complète.</li><li>Runs et inbox relus à chaque reconnexion ; entre deux, seul le flux SSE fait bouger l'encoche.</li></ul></div>
+      <div class="card-doc"><h3>Écriture</h3><ul><li>Deux actions seulement : répondre à une approbation, envoyer un message.</li><li>Rôle opérateur requis pour répondre ; sinon les boutons sont absents, pas grisés.</li><li>Idempotence : un double clic ne renvoie pas deux fois (409 absorbé).</li></ul></div>
+      <div class="card-doc"><h3>Ce que l'app ne fait pas</h3><ul><li>Pas de fil de conversation, pas de pièces jointes : c'est la console (<code>/compact</code>).</li><li>Pas de création de bot, de routine, de runtime.</li><li>Jamais de texte de fil dans une notification ou une annonce.</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="mapping">
+  <div class="wrap">
+    <h2>Correspondance openedbot → encoche</h2>
+    <table class="spec">
+      <tr><th>openedbot</th><th>Dans l'encoche</th><th>Source</th></tr>
+      <tr><td>Bot (<code>BotDto</code>)</td><td>Un anneau, son glyphe = la face « bloub » du bot (ou l'initiale) ; clic → sa fenêtre de dialogue</td><td><code>GET /api/bots</code></td></tr>
+      <tr><td>Fil du bot (<code>ThreadSnapshot</code>, messages, <code>tool.call</code> / <code>tool.result</code>)</td><td>La fenêtre de dialogue : bulles, lignes d'outils en mono, approbation en ligne, saisie</td><td><code>GET /api/threads/:id/history</code>, SSE <code>?threadId=</code>, <code>POST …/messages</code></td></tr>
+      <tr><td>Run <code>running</code> / <code>awaiting_approval</code> / <code>completed</code> / <code>failed</code></td><td>Arc de l'anneau : avancement <code>usedSteps/maxSteps</code>, blanc / ambre pulsé / vert / rouge ; arc intérieur qui tourne pendant le travail</td><td>SSE <code>run.*</code>, <code>approval.*</code>, <code>GET /api/workflows</code></td></tr>
+      <tr><td>Workflow <code>dm</code> / <code>group</code> / <code>routine</code></td><td>Une ligne de session dans la carte, préfixée du kind, avec étape <code>usedSteps/maxSteps</code></td><td><code>GET /api/workflows?status=</code></td></tr>
+      <tr><td>Inbox (approbation, à relire, à vous)</td><td>Badge ambre sur l'anneau ; carte épinglée tant qu'une approbation est en attente</td><td><code>GET /api/inbox</code></td></tr>
+      <tr><td>Approbation <code>pending</code></td><td>Bloc outil + commande + « expire dans » ; boutons Autoriser (once) · Refuser</td><td><code>POST /api/approvals/:id/respond</code></td></tr>
+      <tr><td>Lien runtime (<code>connected</code>, <code>lastSeenAt</code>, connecteur périmé)</td><td>Anneau atténué + arc rouge pointillé ; ligne « hors ligne depuis » ; notice de mise à jour</td><td><code>GET /api/runtime/list</code>, <code>link/events</code></td></tr>
+      <tr><td>Incident fournisseur <code>quota</code> / <code>auth</code></td><td>Anneau atténué, ligne « fournisseur en incident jusqu'à 16:13 » dans la carte</td><td>API runtime</td></tr>
+      <tr><td>Routine (<code>nextRunAt</code>, <code>missedCount</code>)</td><td>Ligne « Routine · Veille infra · prochain passage dans 2 h 18 »</td><td><code>GET /api/bots/:id/routines</code></td></tr>
+      <tr><td>Préférence <code>notifyOnFinish</code></td><td>Décide si la fin d'un run est annoncée pour ce bot</td><td><code>BotDto</code></td></tr>
+      <tr><td>Organisation (<code>X-OHB-Organization</code>)</td><td>Sélecteur dans les réglages ; une encoche par organisation active</td><td>Auth native</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer><div class="wrap">openedbot notch · maquette HTML statique, sans dépendance. Ouvrir <code>design/index.html</code> dans un navigateur. Le POC macOS est à la racine du dépôt (<code>make dev</code>).</div></footer>
+
+<script src="data.js"></script>
+<script src="design.js"></script>
+</body>
+</html>

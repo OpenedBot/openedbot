@@ -1,0 +1,101 @@
+/*
+ * Le motion du fil et du composer, relevé sur Grok Bot 0.78.1 (capture
+ * image par image d'un envoi réel, le 30-10). Durées et courbes sont les
+ * siennes ; `lib/thread-motion.ts` porte celles que le JS joue (entrée des
+ * rangées, ressort du composer).
+ */
+
+/*
+ * L'indicateur d'un bot au travail (`PendingThinking`) : il entre en
+ * échelle 0,92 et fondu (180 ms), ses points rebondissent de 0,6 à 1
+ * (340 ms, courbe qui dépasse), le libellé monte 220 ms plus tard.
+ */
+@keyframes ohb-typing-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.ohb-typing-enter {
+  transform-origin: left center;
+  animation: ohb-typing-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ohb-typing-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.ohb-typing-enter .ohb-thinking-dots {
+  animation: ohb-typing-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/*
+ * Un libellé de statut qui en remplace un autre monte de 4 px (180 ms). Le
+ * premier ne bouge pas, sauf sous la marque qui entre (`data-enter`) : il
+ * arrive alors 220 ms après elle. Le reflet (`agent-activity.css`) tourne
+ * en même temps : les deux animations sont déclarées ensemble.
+ */
+@keyframes ohb-status-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.ohb-status-swap:not([data-first]),
+.ohb-status-swap[data-first][data-enter] {
+  animation: ohb-status-swap 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ohb-status-swap[data-first][data-enter] {
+  animation-delay: 220ms;
+}
+.ohb-thinking-shimmer.ohb-status-swap:not([data-first]),
+.ohb-thinking-shimmer.ohb-status-swap[data-first][data-enter] {
+  animation:
+    ohb-status-swap 180ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    ohb-thinking-shimmer 2.2s steps(60, end) infinite;
+}
+.ohb-thinking-shimmer.ohb-status-swap[data-first][data-enter] {
+  animation-delay: 220ms, 0s;
+}
+
+/* « Aller en bas » arrive de 6 px plus bas (150 ms). */
+@keyframes ohb-scroll-bottom-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.ohb-scroll-bottom-enter {
+  animation: ohb-scroll-bottom-enter 150ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/*
+ * Le bouton principal du composer change d'icône (envoyer, arrêter,
+ * micro) : la nouvelle passe de 0,5 à 1 en 200 ms. Posée seulement sur une
+ * icône montée après le premier rendu (`useState` du composer) : la page qui
+ * s'ouvre ne fait rien bouger.
+ */
+@keyframes ohb-icon-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+.ohb-icon-swap {
+  animation: ohb-icon-swap 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-typing-enter,
+  .ohb-typing-enter .ohb-thinking-dots,
+  .ohb-status-swap:not([data-first]),
+  .ohb-status-swap[data-first][data-enter],
+  .ohb-thinking-shimmer.ohb-status-swap:not([data-first]),
+  .ohb-thinking-shimmer.ohb-status-swap[data-first][data-enter],
+  .ohb-scroll-bottom-enter,
+  .ohb-icon-swap {
+    animation: none;
+  }
+}

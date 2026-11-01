@@ -1,0 +1,18 @@
+{
+  "name": "@openedbot/support",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Dated debt (open-core step 11.3, until 2026-12-31): the help desk itself moved to the staff plug-in; only the retention of its tables, run by the core worker, stays here while the worker does not load that plug-in.",
+  "type": "module",
+  "exports": {
+    "./sql/*": "./src/sql/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

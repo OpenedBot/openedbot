@@ -1,0 +1,3 @@
+# Managed by Hermes host hardening.
+[Resolve]
+LLMNR=no

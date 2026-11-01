@@ -1,0 +1,140 @@
+---
+title: Commands
+description: Table of edge-setup verbs, provider credentials and named instances. Every mutation requires --yes. No flag accepts a secret.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every mutation requires `--yes`. A new protection affecting access requires `--console-confirmed`.
+No flag accepts a secret.
+
+<Aside type="caution" title="Options come before the name">
+Argument parsing stops at the first word that is not an option.
+On verbs that take a name (`credentials`, `toolsets`, `mcp`), writing
+`credentials add anthropic --yes` leaves `--yes` unread and the command is
+refused for extra arguments. The order that works is
+`credentials add --yes anthropic`.
+</Aside>
+
+After the first `up`, stop prefixing with `sudo`
+(see [Getting started](/docs/getting-started)). `version`, `help` and `self-verify`
+never require root.
+
+| Command | Read-only | Effect |
+|---|---|---|
+| `audit [--strict]` | yes | Security inventory: mandatory checks and selected options; the others are `SKIP` (root-only report). |
+| `credentials list\|add\|login\|remove` | `list` | Provider key through stdin or a 0600 file, or OAuth through a device code (`login`), proven through `/api/model/options`. See [Provider credentials](#provider-credentials). |
+| `deploy-key set\|status` | | Sets (on stdin) or describes the host's deployment key, the one that tags a binary for `upgrade --from --tag`. Internal path, never needed by a customer. |
+| `detect` | yes | Host facts, recommended mode, preflight. |
+| `doctor` | yes | Checks the runtime end to end (loopback gateway, anonymous refusal, catalog); reports an inactive link instance. |
+| `export [--json\|--md]` | yes | Non-secret coordinates for openedbot; the bearer never appears in them. |
+| `help` | yes | Lists the commands (`-h` and `--help` too). No root. |
+| `link --ohb URL` | | Connector link handshake, token persisted 0600, device key sealed, daemon started. See the flags below. |
+| `mcp list\|add\|remove` | `list` | CLI equivalent of the MCP actions the console runs over the link: `add --url https://… --yes <name>`, `remove --yes <name>`. The token goes through a 0600 file (`--auth header --token-file F`). |
+| `plan` | yes | What `up` would do, without writing anything. |
+| `reset --yes …` | | Removes what the tool installed, then fails if any residue remains. `--plan` lists what would be removed without touching anything (no `--yes`). `--purge-data --i-understand-data-loss` also removes the runtime data (bearer, credentials, workspaces). `--purge-packages` also purges `docker-ce` and `containerd.io`. `--remove-admin` removes the `hermes-admin` account and its sudoers file (refused from its own session). `--restore-cloud-user` restores the quarantined cloud-init account from its backups. `--legacy` purges the old `openhermesbot-*` namespace; with it, tailscale is removed only with `--purge-tailscale` (it is often your access). See [Reset](/docs/reset). |
+| `self-verify [--release-url]` | yes | Manual diagnostic: verifies the signature of the release's `SHA256SUMS`, then checks that the current binary is listed in it. Never run implicitly on each command. No root. |
+| `status` | yes | Phases, mode, transaction markers, installed versions, and one line per link instance (origin, runtime, unit, device key, tier and owner; JSON `connectors[]`). |
+| `toolsets list\|enable\|disable` | `list` | CLI equivalent of the toolset actions the console runs over the link: `enable --yes <name>`, `disable --yes <name>`, re-read from the runtime inventory. A toolset from the forbidden list is refused. |
+| `uninstall --yes` | | `reset` under the name people look for, plus the data choice: removes `edge-setup`, the runtime and its services. On a terminal, it asks whether to keep the runtime data (Enter keeps it; destroying it requires typing `purge`). Off a terminal, the choice comes from `--keep-data` or from `--purge-data --i-understand-data-loss`. Accepts the other `reset` options, `--plan` included. |
+| `unlink [--name <instance>] --yes` | | Stops and disables the connector of one instance (the default one without `--name`), then removes its local link (`link.json`, token, link context and origin). Keeps its device key and the Hermes data. The runtime stays in openedbot, offline, to be removed there if needed. |
+| `up` | | Installs the minimal runtime under `hermes`, the loopback gateway and the connector. The global protections are all opt-in, through positive options. See [`up` options](#up-options). |
+| `update` | | On its own: code 69 (not implemented). `update --self [--yes]` is the alias of `upgrade` (release only). |
+| `upgrade --yes [--release-url URL]` | | Downloads the new release over HTTPS, verifies the Sigstore signature of its `SHA256SUMS` then, once, its SHA-256 against that manifest (an unsigned release is refused), replaces the installed binary and restarts its units; also rewrites `hermes-gateway.service` when it differs from the one the binary renders, and restarts the gateway only if the host is idle. `--from FILE --tag HEX` (HMAC-SHA256 under the key set by `deploy-key set`) remains an internal path for `make deploy` over SSH. |
+| `auto-upgrade enable\|disable --yes`, `auto-upgrade status` | | Sets or removes the automatic upgrade timer (every 6 h): only a newer `vX.Y.Z` release that is signed and matches its `SHA256SUMS` is installed, the link is proven on the new binary, and the old one is put back otherwise. Disabled by default. |
+| `verify-access` | | From a **new** SSH session: proves the new access and disarms an SSH/UFW/fail2ban/quarantine rollback. |
+| `version` | yes | Prints the binary version (`--version` too). No root. |
+
+## `link` flags
+
+| Flag | Effect |
+|---|---|
+| `--ohb URL` | openedbot origin, `https://` required. |
+| `--ticket-file F` | `0600` file holding the ticket; by default stdin, or a prompt without echo. |
+| `--insecure-ohb` | Also accepts an `http://` origin **on the loopback** (development, behind a reverse SSH tunnel); any other `http://` origin is still refused. |
+| `--name <name>` | Named instance (`^[a-z][a-z0-9-]{0,31}$`): its own link, its own device key and its `hermes-connector@<name>.service` unit, next to the default link. This is what lets one host serve a prod and a dev at the same time. See [Named instances](#named-instances). |
+| `--rekey` | Regenerates the device key of an already linked runtime, without a ticket; the new public key is presented on a session. |
+
+## `up` options
+
+| Option | Effect |
+|---|---|
+| `--admin-key F` | File holding the single `ssh-ed25519` public key of the admin account. Required by `--ssh-hardening`. |
+| `--console-confirmed` | Confirms that an out-of-band console exists; required by any new option that affects access. |
+| `--detach` | Returns after arming the rollback instead of waiting for `verify-access`. |
+| `--auto-upgrade` | Also enables the automatic upgrade timer, like `auto-upgrade enable --yes`. |
+
+The protections (`--sandbox`, `--persistent-journal`,
+`--unattended-upgrades`, `--sudo-logging`, `--password-policy`,
+`--disable-llmnr`, `--firewall`, `--allow-inbound`, `--fail2ban`,
+`--ssh-hardening`, `--quarantine-cloud-user`) are detailed in
+[Operations](/docs/operations). The old negative options are refused.
+
+## Provider credentials
+
+Four verbs, no others: `list`, `add`, `login`, `remove`.
+
+```bash
+edge-setup credentials list
+umask 077; printf '%s' 'sk-…' > /root/anthropic.key
+edge-setup credentials add --api-key-file /root/anthropic.key --yes anthropic
+# or: printf '%s\n' 'sk-…' | edge-setup credentials add --yes anthropic
+edge-setup credentials remove --label operator-20260901 --yes anthropic
+edge-setup credentials login --yes openai-codex
+```
+
+The key goes through stdin or a `0600` file, never as an argument. The
+provider name comes **last**. `--label` names the credential (by default
+`operator-<date>` for `add`, required for `remove`).
+
+`add` is validated only after re-reading `/api/model/options` on the loopback:
+"the CLI said yes" is not enough.
+
+`login` runs `hermes auth add <provider> --no-browser` as the service
+user, shows the URL and the device code, waits, then proves the access
+against the catalog.
+
+### From openedbot
+
+In link mode, the same actions can be done from the interface (Settings ›
+Models › provider) without touching the VPS. In direct access, the console
+does not administer capabilities: everything is done on the host.
+
+The operator (`hermes-operator.service`) is the only process that runs
+`hermes auth add` as the service user. The connector announces this
+capability to openedbot; the key travels to the stdin of `hermes auth add`,
+never into argv or a log. An older host without an operator stays in manual
+mode on the openedbot side.
+
+A credential can also be set **per profile**, without changing the host's
+default provider: this gives a bot with its own Hermes profile its own
+provider credentials. The action stays the same: the operator runs it, then
+re-reads before answering.
+
+No shell, no free-form command and no file path go through the link.
+
+## Named instances
+
+A `hermes-connector` is **one** link: one `link.json`, one device key, one
+unit, one state directory. `link --name <name>` (`default`, `runs`,
+`diagnostics` and `creation-audit` are reserved) creates a **named instance**
+next to the default link, for example a production and a development link on
+the same host:
+
+| | default instance (no `--name`) | instance `<name>` |
+|---|---|---|
+| link | `/etc/hermes/connector/link.json` | `/etc/hermes/connector/<name>/link.json` |
+| sealed device key | `/etc/hermes/connector/device.key.cred` | `/etc/hermes/connector/<name>/device.key.cred` |
+| unit | `hermes-connector.service` | `hermes-connector@<name>.service` |
+| state | `/var/lib/hermes-connector` | `/var/lib/hermes-connector/<name>` |
+
+Two instances are two distinct runtimes on the openedbot side. What stays
+shared is the host itself: the gateway bearer, the profiles, the sessions
+and the operator socket.
+
+`link` writes the link of the targeted instance, whatever the previous one
+was: it does not refuse another origin. Before reading the ticket, it reports
+the origin it is leaving and the runtime that openedbot keeps although the
+host will no longer call it back. To keep both links, create the second one
+with `--name dev`. `status` lists every instance; `link --rekey` and `unlink`
+take the same `--name`.

@@ -1,0 +1,16 @@
+/*
+  Pas d'anneau de focus sur un bouton cliqué (voir `lib/pointer-focus.ts`).
+
+  `data-pointer-focus` reste sur `<html>` du dernier clic jusqu'à ce que le
+  clavier déplace le focus : un Échap ou une lettre tapée ensuite ne fait plus
+  apparaître l'anneau sur le bouton cliqué. Tab le rend aussitôt.
+
+  Les champs de saisie gardent leur anneau : il sert de bordure pendant la
+  frappe. Couvre `focus-visible:ring-*` (Tailwind) et `outline` ; les styles
+  écrits en `box-shadow` direct (`bot-create.css`) ne sont pas concernés.
+*/
+:root[data-pointer-focus] :focus-visible:not(input, textarea, [contenteditable="true"]) {
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}

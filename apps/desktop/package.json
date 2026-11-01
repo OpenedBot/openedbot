@@ -1,0 +1,31 @@
+{
+  "name": "openedbot-desktop",
+  "productName": "openedbot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "openedbot desktop shell: a compact native window around the openedbot web console",
+  "license": "Apache-2.0",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test test/",
+    "compile": "electron-vite build --ignoreConfigWarning",
+    "dev": "bun scripts/dev.ts",
+    "dev:prod": "OHB_TARGET=prod bun scripts/dev.ts",
+    "start": "electron .",
+    "package:win:zip": "electron-builder --win zip",
+    "package:win:nsis": "electron-builder --win nsis",
+    "package:mac": "electron-builder --mac"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7"
+  }
+}

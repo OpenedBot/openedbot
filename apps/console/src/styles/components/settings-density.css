@@ -1,0 +1,73 @@
+/*
+  Modale des réglages (bureau) : des tableaux denses, pour que les colonnes
+  tiennent dans la carte sans défilement horizontal (appareils, agents,
+  fournisseurs, politiques). Texte à 13 px, 8 px de marge par cellule, en-tête
+  de 36 px. Les boutons de tri de l'en-tête compensent la marge de la cellule
+  (`-ml-3` dans les tableaux) : ils suivent la nouvelle marge, et le texte de
+  l'en-tête reste aligné sur celui des cellules. La feuille mobile garde ses
+  listes (`ohb-status-list`), sans tableau.
+*/
+[data-settings-modal] [data-slot="table"] {
+  font-size: 13px;
+}
+
+[data-settings-modal] :is([data-slot="table-head"], [data-slot="table-cell"]) {
+  padding-inline: 8px;
+}
+
+[data-settings-modal] [data-slot="table-head"] {
+  height: 36px;
+}
+
+[data-settings-modal] [data-slot="table-head"] > button:first-child {
+  margin-inline-start: -8px;
+  font-size: inherit;
+}
+
+/*
+  Taille du texte (Apparence, 10 à 14 px, `lib/text-size.ts`), dans un
+  navigateur seulement : l'app de bureau zoome toute sa fenêtre et pose
+  `data-native-zoom` sur la racine, et ces règles se taisent (le zoom
+  compterait deux fois). Une page ne peut pas zoomer le reste de l'app : les
+  deux colonnes de la modale (navigation et rubrique) sont zoomées, pas la
+  boîte, qui garde sa taille à l'écran. Sans la variable, rien ne change.
+
+  Ce qui s'ouvre depuis la modale vit en portail sous `body` : sélecteurs,
+  menus, infobulles, la liste des fournisseurs, les fenêtres (catalogue,
+  connexion d'un fournisseur, confirmations). Tant que la modale est ouverte,
+  ils prennent le même zoom, sinon ils sortaient à 14 px au-dessus d'un
+  texte à 11. Le zoom porte sur le CONTENU, jamais sur l'élément que Radix
+  ou la liste des fournisseurs positionne en `px` (sa position serait
+  zoomée aussi) : l'enfant du conteneur Radix et l'intérieur de
+  `[data-portal-panel]`. Une fenêtre est centrée par son voile : elle se
+  zoome entière.
+*/
+:root:not([data-native-zoom]) [data-settings-modal] > *,
+:root:not([data-native-zoom]):has([data-settings-modal]) :is(
+  [data-slot="dialog-content"],
+  [data-radix-popper-content-wrapper] > *,
+  [data-portal-panel] > *
+) {
+  zoom: var(--ohb-settings-zoom, 1);
+}
+
+/*
+  Un sélecteur prend la largeur de son déclencheur et la hauteur libre de
+  l'écran, mesurées en pixels d'écran par Radix : sous le zoom, ces longueurs
+  rapetisseraient d'autant. Elles sont divisées par le zoom pour retomber
+  sur la même taille à l'écran. (Zoomer l'intérieur seulement faussait le
+  défilement vers l'élément choisi, coupé par la flèche du bas.) Seulement
+  en mode `popper` : un sélecteur `item-aligned` ne passe pas par le
+  conteneur Radix et n'est pas zoomé.
+*/
+:root:not([data-native-zoom]):has([data-settings-modal]) [data-radix-popper-content-wrapper] > [data-slot="select-content"] {
+  width: calc(var(--radix-select-trigger-width) / var(--ohb-settings-zoom, 1));
+}
+
+:root:not([data-native-zoom]):has([data-settings-modal]) [data-radix-popper-content-wrapper] > [data-slot="select-content"]:not([style*="--ohb-select-rows"]) {
+  max-height: calc(var(--radix-select-content-available-height) / var(--ohb-settings-zoom, 1));
+}
+
+:root:not([data-native-zoom]):has([data-settings-modal]) [data-radix-popper-content-wrapper] > [data-slot="select-content"] [data-radix-select-viewport] {
+  min-width: calc(var(--radix-select-trigger-width) / var(--ohb-settings-zoom, 1));
+}

@@ -1,0 +1,38 @@
+.legal-markdown h1,
+.legal-markdown h2,
+.legal-markdown h3 {
+  margin-top: 2rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.legal-markdown h1 { font-size: 1.5rem; }
+.legal-markdown h2 { font-size: 1.25rem; }
+.legal-markdown h3 { font-size: 1.05rem; }
+.legal-markdown p,
+.legal-markdown ul,
+.legal-markdown ol,
+.legal-markdown blockquote,
+.legal-markdown table { margin-top: 1rem; }
+.legal-markdown ul { list-style: disc; padding-left: 1.5rem; }
+.legal-markdown ol { list-style: decimal; padding-left: 1.5rem; }
+.legal-markdown a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.legal-markdown blockquote { border-left: 2px solid var(--border); padding-left: 1rem; color: var(--muted-foreground); }
+.legal-markdown table { width: 100%; border-collapse: collapse; }
+.legal-markdown pre {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--surface-sunken);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.legal-markdown :not(pre) > code {
+  border-radius: 0.25rem;
+  background: var(--surface-sunken);
+  padding: 0.1rem 0.35rem;
+  font-size: 0.8125rem;
+}
+.legal-markdown th,
+.legal-markdown td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }

@@ -1,0 +1,4 @@
+# Managed by edge-setup: rootless Docker needs these controllers delegated
+# to the service user's manager so --cpus/--memory/--pids are honoured.
+[Service]
+Delegate=cpu cpuset io memory pids

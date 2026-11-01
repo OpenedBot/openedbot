@@ -1,0 +1,55 @@
+/*
+  Coque native (`openedbot-desktop`) : l'interface se comporte comme une app de
+  bureau, pas comme une page. Navigateur et PWA ne voient aucune de ces
+  règles (`:root[data-native-titlebar]`, posé par `lib/native-titlebar.ts`).
+
+  - Les contrôles et le cadre (rail, barre du haut, barre latérale, menus)
+    ne se sélectionnent pas : un double-clic sur un bouton ne surligne pas
+    son libellé. Le contenu (messages, code, champs, réglages) reste
+    sélectionnable : un champ l'est toujours, même sous `user-select: none`.
+  - Le curseur des contrôles (la main, « interdit » s'ils sont désactivés)
+    vit dans `interactive-cursor.css`, partout et pas seulement ici.
+  - Les images et les liens du cadre ne se laissent pas glisser hors de la
+    fenêtre (le logo, un avatar, une conversation de la barre latérale).
+  - macOS : texte lissé en niveaux de gris, l'épaisseur des apps natives
+    (Chromium le rend plus gras par défaut).
+*/
+
+:root[data-native-titlebar] :is(
+  [data-board-icon-rail],
+  [data-board-topbar],
+  #ohb-board-sidebar,
+  button,
+  [role="button"],
+  [role="menu"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="tab"],
+  [role="switch"],
+  [role="tooltip"]
+) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Un champ dans le cadre (la recherche) se sélectionne toujours. */
+:root[data-native-titlebar] :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+:root[data-native-titlebar] :is(
+  [data-board-icon-rail],
+  [data-board-topbar],
+  #ohb-board-sidebar,
+  button
+) :is(img, a) {
+  -webkit-user-drag: none;
+}
+
+:root[data-native-titlebar="mac"] body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

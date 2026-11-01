@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    openedbot app icon, drawn after the macOS app icon grid (824 px tile, 100 px
+    margin) in the manner of the Grok Bot icon: one oversized, shaded mascot
+    head sliding in from the lower left and cropped by the tile. The mascot is
+    the openedbot one (ears, crest, dark visor, blue eyes, speech-bubble tail).
+    Rendered to PNG / ICNS by hand, see CLAUDE.md "Icons".
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14254d"/>
+      <stop offset="1" stop-color="#01102c"/>
+    </linearGradient>
+    <radialGradient id="shell" cx="0.36" cy="0.30" r="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#eef3fb"/>
+      <stop offset="0.8" stop-color="#c3cfe3"/>
+      <stop offset="1" stop-color="#93a3c1"/>
+    </radialGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1838"/>
+      <stop offset="1" stop-color="#020a1f"/>
+    </linearGradient>
+    <linearGradient id="eye" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f9ff"/>
+      <stop offset="1" stop-color="#8fc0ff"/>
+    </linearGradient>
+    <filter id="glow" x="-1" y="-1" width="3" height="3">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="drop" x="-0.2" y="-0.2" width="1.4" height="1.4">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feOffset dy="10" result="blur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#drop)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  </g>
+
+  <g clip-path="url(#tileClip)">
+    <!-- The head, its own origin at the face centre, tilted like Grok Bot's. -->
+    <g transform="translate(470 650) rotate(-16) scale(1.12)">
+      <!-- ears -->
+      <path d="M-250 -110 C-290 -240 -320 -360 -340 -480 C-240 -420 -140 -350 -60 -270 Z" fill="url(#shell)"/>
+      <path d="M250 -110 C290 -240 320 -360 340 -480 C240 -420 140 -350 60 -270 Z" fill="url(#shell)"/>
+      <!-- head and its speech-bubble tail -->
+      <path d="M0 -300 C210 -300 330 -170 330 10 C330 200 190 320 0 320 C-60 320 -110 310 -150 292 C-190 330 -240 350 -290 352 C-250 322 -232 286 -228 250 C-296 192 -330 105 -330 10 C-330 -170 -210 -300 0 -300 Z" fill="url(#shell)"/>
+      <!-- crest -->
+      <path d="M0 -372 L50 -294 L0 -216 L-50 -294 Z" fill="url(#shell)" stroke="#a9b8d3" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M-62 -232 L0 -180 L62 -232" fill="none" stroke="#0b1838" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- visor -->
+      <path d="M-255 -40 C-255 -130 -170 -170 -80 -150 C-40 -142 -20 -120 0 -120 C20 -120 40 -142 80 -150 C170 -170 255 -130 255 -40 C255 80 170 130 0 130 C-170 130 -255 80 -255 -40 Z" fill="url(#visor)"/>
+      <!-- eyes, with their glow -->
+      <g filter="url(#glow)" opacity="0.85">
+        <rect x="-150" y="-80" width="70" height="120" rx="35" fill="#6fb0ff"/>
+        <rect x="80" y="-80" width="70" height="120" rx="35" fill="#6fb0ff"/>
+      </g>
+      <rect x="-150" y="-80" width="70" height="120" rx="35" fill="url(#eye)"/>
+      <rect x="80" y="-80" width="70" height="120" rx="35" fill="url(#eye)"/>
+    </g>
+    <!-- a soft top sheen, as on the macOS tiles -->
+    <rect x="100" y="100" width="824" height="412" fill="#ffffff" opacity="0.04"/>
+  </g>
+</svg>

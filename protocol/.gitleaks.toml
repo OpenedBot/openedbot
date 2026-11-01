@@ -1,0 +1,8 @@
+# Reviewed 2026-10-28: the relay-frame test vectors carry synthetic link tokens
+# (fixtures shared with edge-setup test/golden), not credentials.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic test vectors"
+paths = ['''^connector/fixtures/relay-frames\.vectors\.json$''']

@@ -1,0 +1,857 @@
+/*
+  console-split (default): form column on the left and a rounded panel on
+  the right (a band above the form in narrow windows), with the painted crew
+  in the panel. The surfaces and controls of BoardUI's "Chat Starter"
+  template, the look of the console it opens (../.. boardui.css), measured
+  on boardui.com/templates/chat-starter/login: white frame, grey card at
+  24 px radius with no border, filled inputs, the blue gradient button.
+*/
+html[data-theme="dark"] {
+  --bg: #121212;
+  --panel: lab(7.78201% 0 0);
+  --text: lab(98.26% 0 0);
+  --muted: lab(48.496% 0 0);
+  --faint: lab(34.924% 0 0);
+  --card: lab(15.204% 0 0);
+  --field: lab(15.204% 0 0);
+  --field-hover: lab(27.036% 0 0);
+  --border: lab(27.036% 0 0);
+  --separator: lab(15.204% 0 0);
+  --primary: lab(54.1736% 13.3369 -74.6839);
+  --primary-strong: lab(44.0605% 29.0279 -86.0352);
+  --link: lab(54.1736% 13.3369 -74.6839);
+  --primary-text: #ffffff;
+  --danger: #ff6467;
+  --warning: #f6c76a;
+  --art: url("../assets/signin-galaxy.webp");
+  --art-bg: #050812;
+}
+
+html[data-theme="light"] {
+  --bg: #ffffff;
+  --panel: #f7f7f7;
+  --text: lab(2.75381% 0 0);
+  --muted: lab(48.496% 0 0);
+  --faint: lab(66.128% 0 0);
+  --card: #ffffff;
+  --field: #ebebeb;
+  --field-hover: lab(84.92% 0 0);
+  --border: #ebebeb;
+  --separator: #ebebeb;
+  --primary: lab(54.1736% 13.3369 -74.6839);
+  --primary-strong: lab(44.0605% 29.0279 -86.0352);
+  --link: lab(44.0605% 29.0279 -86.0352);
+  --primary-text: #ffffff;
+  --danger: #d4151f;
+  --warning: #8a5a00;
+  --art: url("../assets/signin-galaxy-light.webp");
+  --art-bg: #dce8fb;
+}
+
+html {
+  --gradient-primary: linear-gradient(180deg, var(--primary) 0%, var(--primary-strong) 100%);
+  --gradient-primary-hover: linear-gradient(180deg, #3392ff 0%, var(--primary) 100%);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+/* The page itself never scrolls: a page scrollbar would run under the
+   Windows caption buttons and push the art under them. The form column
+   scrolls on its own when it is taller than the window (dev accounts, an
+   error, a short window), the art stays put. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.shell {
+  display: grid;
+  grid-template-areas: "main art";
+  grid-template-columns: minmax(380px, 1fr) minmax(0, 1.15fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+}
+
+.main {
+  grid-area: main;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 36px 40px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* No visible scrollbar (operator's call): the layout is sized to fit, and
+     in the rare window too small for it the wheel and keyboard still scroll. */
+  scrollbar-width: none;
+}
+
+/* Flex children would otherwise shrink to fit instead of overflowing, and
+   the column would squash the form rather than scroll it. */
+.main > * {
+  flex-shrink: 0;
+}
+
+/* A card of the console's frame: 12 px from the window edges, 24 px radius,
+   no border. */
+.art {
+  position: relative;
+  grid-area: art;
+  margin: 12px 12px 12px 0;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--art-bg);
+}
+
+/* The crew sits in the middle of the art, the planet below: `cover` keeps
+   it in view for any panel shape. A very slow drift is the page's only
+   unprompted motion. */
+.art-image {
+  position: absolute;
+  inset: -3%;
+  background: var(--art) 50% 42% / cover no-repeat;
+  animation: drift 40s ease-in-out infinite alternate;
+}
+
+.deco,
+.art-mascot {
+  display: none;
+}
+
+@keyframes drift {
+  to {
+    transform: scale(1.04) translate(-0.6%, 0.4%);
+  }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+}
+
+.content {
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 30px;
+  letter-spacing: -0.01em;
+}
+
+.lead {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.note {
+  margin-top: 24px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+/* BoardUI buttons: 36 px, 10 px radius, a 2 % press instead of a lift. */
+.btn {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 150ms, 150ms, 150ms, 220ms;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-google {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--panel);
+}
+
+html[data-theme="dark"] .btn-google:hover:not(:disabled) {
+  background: var(--field-hover);
+}
+
+/* The vertical gradient of BoardUI's primary button; its hover gradient
+   fades in from a pseudo-element, a gradient cannot be transitioned. */
+.btn-primary {
+  isolation: isolate;
+  position: relative;
+  border: 0;
+  background: var(--gradient-primary);
+  color: var(--primary-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+
+.btn-primary::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  content: "";
+  background: var(--gradient-primary-hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.btn-primary:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--field);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--separator);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--text);
+}
+
+/* BoardUI's filled field: no border, a 2 px inset ring that turns blue on
+   focus. */
+.control input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 32px;
+  border: 0;
+  border-radius: 10px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  box-shadow: inset 0 0 0 2px transparent;
+  transition: box-shadow 150ms ease;
+}
+
+.control input::placeholder {
+  color: var(--faint);
+}
+
+.control-secret input {
+  padding-right: 40px;
+}
+
+.control input:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.eye {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pending .matrix {
+  color: var(--primary);
+}
+
+/* Base hint first: the tone rules below share its specificity and must win. */
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.note[data-tone="warning"],
+.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  color: var(--danger);
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 8px 12px;
+  border: 1px solid;
+  border-radius: 10px;
+}
+
+/* Seeded accounts, development only: visibly apart from the real path. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+.dev-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--separator);
+}
+
+.dev-role {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Two short lines per account: the role across the row, then the e-mail with
+   "Fill" and "Sign in" beside it, instead of pushing the column into a
+   scrollbar. */
+.dev-choice {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "role role"
+    "account actions";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 0;
+  padding-top: 8px;
+}
+
+.dev-role {
+  grid-area: role;
+}
+
+.dev-account {
+  grid-area: account;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-actions {
+  grid-area: actions;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.dev-fill {
+  flex: none;
+  padding: 6px;
+  font-size: 13px;
+}
+
+.btn.dev-submit {
+  flex: none;
+  width: auto;
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--separator);
+}
+
+.footnote {
+  max-width: 19rem;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--link);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Which API the page signs in against (the preload hides it on production):
+   the same tones as the console's Edge badge, amber for dev, blue for
+   preprod, so the two never pass for production at a glance. */
+.env-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.env-badge[data-environment="dev"] {
+  color: var(--warning);
+}
+
+.env-badge[data-environment="preprod"] {
+  color: var(--link);
+}
+
+/* BoardUI's segmented control: a grey track, the pressed option on a
+   lifted white chip. */
+.locale {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+html[data-theme="dark"] .locale {
+  background: var(--field);
+}
+
+.locale-option {
+  min-width: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.locale-option[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+html[data-theme="dark"] .locale-option[aria-pressed="true"] {
+  background: var(--field-hover);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+html[data-theme="dark"] .theme-toggle {
+  background: var(--field);
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ─── Narrow and short windows ──────────────────────────────────────────── */
+
+/* Below 1000 px the art becomes a band above the form, framed on the crew. */
+@media (max-width: 999px) {
+  .shell {
+    grid-template-areas:
+      "art"
+      "main";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: clamp(170px, 32vh, 320px) minmax(0, 1fr);
+  }
+
+  .art {
+    margin: 12px 12px 0;
+  }
+
+  .art-image {
+    background-position: 50% 40%;
+  }
+
+  .main {
+    padding: 24px 24px 20px;
+  }
+
+  .brand {
+    display: none;
+  }
+}
+
+/* Short windows: a tighter rhythm so the whole form fits without scrolling. */
+@media (max-height: 700px) {
+  .main {
+    gap: 20px;
+    padding-top: 24px;
+    padding-bottom: 16px;
+  }
+
+  .title {
+    font-size: 22px;
+    line-height: 28px;
+  }
+
+  .actions,
+  .password {
+    gap: 12px;
+  }
+
+  .actions {
+    margin-top: 20px;
+  }
+}
+
+/* Short windows: whatever the form shows (a Google hint, an error, the dev
+   accounts), the language and theme switches must stay on screen, so they
+   move up to the brand line, top right, and the footnote is what can go. */
+@media (max-height: 700px) {
+  .main {
+    position: relative;
+  }
+
+  .controls {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+  }
+
+  .footer {
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+
+@media (max-height: 640px) {
+  .footnote {
+    display: none;
+  }
+
+  .main {
+    gap: 16px;
+  }
+}
+
+/* Narrow AND short: a band under 150 px would slice through the crew, so
+   the art steps aside and the form keeps the whole window. */
+@media (max-width: 999px) and (max-height: 640px) {
+  .shell {
+    grid-template-areas: "main";
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .art {
+    display: none;
+  }
+
+  .brand {
+    display: inline-flex;
+  }
+
+  .footnote {
+    display: none;
+  }
+}
+
+/* Development API: the seeded accounts add a block under the form. The
+   short-window rhythm applies at any height so everything still fits
+   without scrolling: switches up on the brand line, no footnote. */
+body:has(#dev-accounts:not([hidden])) .main {
+  position: relative;
+  gap: 20px;
+  padding-top: 24px;
+  padding-bottom: 16px;
+}
+
+body:has(#dev-accounts:not([hidden])) .actions,
+body:has(#dev-accounts:not([hidden])) .password {
+  gap: 12px;
+}
+
+body:has(#dev-accounts:not([hidden])) .actions {
+  margin-top: 20px;
+}
+
+body:has(#dev-accounts:not([hidden])) .controls {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+}
+
+body:has(#dev-accounts:not([hidden])) .footer {
+  padding-top: 0;
+  border-top: 0;
+}
+
+body:has(#dev-accounts:not([hidden])) .footnote {
+  display: none;
+}
+
+/* Short windows: the hint only restates the roles listed under it. */
+@media (max-height: 700px) {
+  .dev-hint {
+    display: none;
+  }
+}
+
+/* Narrow windows with the dev block: a slimmer art band leaves it room. */
+@media (max-width: 999px) and (min-height: 641px) {
+  body:has(#dev-accounts:not([hidden])) .shell {
+    grid-template-rows: clamp(120px, 20vh, 200px) minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-image {
+    animation: none;
+  }
+
+  .btn,
+  .btn-primary::before,
+  .control input {
+    transition: none;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-inline-start: 65px;
+}
+
+/* Windows: minimize, maximize and close float over the top right corner,
+   46 px high (signin-base.css). The art card starts under that strip, so
+   the buttons sit on the frame colour their glyphs are made for, as in the
+   console. */
+html[data-platform="win32"] .art {
+  margin-top: 46px;
+}
+
+/* Narrow and short, the art is gone and the language and theme switches,
+   top right, would land under the buttons: they step left of them. */
+@media (max-width: 999px) and (max-height: 640px) {
+  html[data-platform="win32"] .controls,
+  html[data-platform="win32"] body:has(#dev-accounts:not([hidden])) .controls {
+    right: calc(var(--caption-buttons-width) + 12px);
+  }
+}

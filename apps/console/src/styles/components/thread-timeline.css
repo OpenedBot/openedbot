@@ -1,0 +1,281 @@
+/**
+ * Tours réglés du fil (thread-timeline.tsx) : ni parmi les derniers, ni le
+ * tour en direct, ni la bulle sortante. `content-visibility: auto` laisse le
+ * navigateur sauter la mise en page et la peinture de ce qui est hors écran,
+ * c'est ce qui rend bon marché la lecture de `scrollHeight` (envoi, SSE)
+ * sur un fil de plusieurs milliers de nœuds. `contain-intrinsic-size` pose
+ * une taille de repli : sans elle, un bloc pas encore mesuré vaudrait 0 et
+ * le scroll sauterait à chaque tour qui entre ou sort du viewport.
+ */
+.ohb-turn-contain {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/**
+ * Le conteneur défilant du fil (`role="log"`, thread-timeline.tsx). Une
+ * mutation à l'intérieur (bulle sortante, tour en direct qui grandit) ne doit
+ * pas faire recalculer la mise en page du composer ou de la coque au-dessus :
+ * `contain: layout style` déclare la frontière explicitement plutôt que de
+ * laisser le navigateur la déduire de `overflow-y: auto` seul.
+ */
+.ohb-thread-scroll-contain {
+  contain: layout style;
+}
+
+/**
+ * Le rail des tours (`thread-turn-rail.tsx`) occupe la marge gauche du fil
+ * d'un bot, au bureau. Le fil reste pleine largeur : seule sa gouttière
+ * gauche s'élargit pour que les traits ne touchent plus le texte.
+ */
+[data-turn-rail] [role="log"] {
+  padding-left: 3.5rem;
+}
+
+/**
+ * Carte d'équipe d'un salon (`RoomAnswerCard`, thread-timeline.tsx).
+ *
+ * Le gris reste sur CHAQUE bulle, pas sur la carte. La rangée d'actions est
+ * le frère d'après la bulle : si la carte était le gris, les icônes tombaient
+ * dedans. Là elles se posent dessous, calées au bord droit, comme une réponse
+ * seule.
+ */
+[data-room-answer] article {
+  max-width: 100%;
+}
+
+[data-room-answer] [data-message-actions-row] {
+  justify-content: flex-end;
+  padding-inline: 2px;
+}
+
+[data-room-answer] article + article {
+  margin-top: 0.75rem;
+}
+
+[data-room-answer] [data-assistant-author] {
+  margin-bottom: 0;
+}
+
+/* La signature de la contribution est AU-DESSUS de sa bulle : sans cette
+   marge, le nom colle la carte. */
+[data-room-contribution] > [data-assistant-author] {
+  margin-bottom: 0.5rem;
+}
+
+/* La synthèse est la réponse de la carte : le bot est déjà dans l'en-tête.
+   « Réflexion… » pendant l'écriture reste. */
+[data-room-synthesis] [data-assistant-author]:not([data-thinking]) {
+  display: none;
+}
+
+/* Une signature au-dessus de chaque contribution. Celle de la bulle,
+   quand le tour en avait déjà une, ne se rajoute pas. */
+[data-room-contribution] article [data-assistant-author] {
+  display: none;
+}
+
+[data-room-contribution] + [data-room-contribution] {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--bui-border-button-default);
+}
+
+/* Mode équipe : les contributions, ouvertes sous la réponse finale. */
+[data-room-answer] [data-room-contributions] {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--bui-border-button-default);
+}
+
+/**
+ * Colonne de lecture du fil d'un bot (`data-thread-column`, conversation.tsx).
+ *
+ * Le fil, les docks et le composer se centrent (`mx-auto`) dans une même
+ * largeur au lieu de s'étirer sur tout l'écran : 60rem (960 px), le
+ * `maxContentWidthPx` de Grok Bot. La prose ne s'y étale pas : chaque
+ * réponse est une bulle de 560 px au plus (`thread-messages.tsx`). La rangée défilante reste pleine largeur, pour que
+ * la barre de défilement et la molette valent sur toute la fenêtre. En dessous
+ * de la colonne (téléphone, fenêtre étroite), rien ne change.
+ *
+ * Chaque rangée garde sa gouttière : la largeur maximale l'y ajoute, pour que
+ * le CONTENU de chaque rangée tombe sur les mêmes bords que les messages.
+ */
+[data-thread-column] {
+  --ohb-thread-column: 60rem;
+}
+
+[data-thread-column] [data-thread-messages] {
+  width: 100%;
+  max-width: var(--ohb-thread-column);
+  margin-inline: auto;
+}
+
+/* Rangées en `px-4 sm:px-6` : recherche, erreurs, approbation, plan, activité. */
+[data-thread-column] :is(
+  [data-thread-lane],
+  [data-approval-dock],
+  [data-plan-dock],
+  [data-run-activity]
+) {
+  width: 100%;
+  max-width: calc(var(--ohb-thread-column) + 3rem);
+  margin-inline: auto;
+}
+
+/*
+ * « Aller en bas » à droite, au bord droit de la colonne (donc du composer),
+ * comme Grok Bot iPhone ; centré, il couvrait le texte du fil. Hors colonne,
+ * le repli garde 0.75rem du bord.
+ */
+[data-thread-scroll-bottom] {
+  right: max(0.75rem, calc((100% - var(--ohb-thread-column, 100%)) / 2));
+}
+
+/* Composer en `sm:p-1`, et le voile qui le bloque quand il est désactivé. */
+[data-thread-column] :is([data-thread-composer], [data-composer-disabled-surface]) {
+  width: 100%;
+  max-width: calc(var(--ohb-thread-column) + 0.5rem);
+  margin-inline: auto;
+}
+
+/*
+ * Avec le rail des tours, le fil a 3.5rem de gouttière gauche. La droite
+ * grandit jusqu'à 3.5rem dès que la place le permet, sinon la colonne serait
+ * centrée sur la zone à droite du rail et décalée des docks et du composer,
+ * qui eux se centrent sur la fenêtre.
+ */
+[data-thread-column] [data-turn-rail] [role="log"] {
+  padding-right: clamp(0.75rem, 100% - var(--ohb-thread-column) - 3.5rem, 3.5rem);
+}
+
+/* L'activité suit le rail (`pl-14`) : sa largeur compte cette gouttière des deux côtés. */
+[data-thread-column]:has([data-turn-rail]) [data-run-activity] {
+  max-width: calc(var(--ohb-thread-column) + 7rem);
+}
+
+/*
+ * La gouttière de Grok Bot (`ui-scroll-area__viewport` : `padding: 0 84px`) :
+ * au bureau, le fil, les docks et le composer gardent 84 px de chaque côté
+ * de la colonne, 12 % d'une colonne étroite (au moins 1 rem). Le pourcentage
+ * se rapporte à la colonne, le parent de chacun : messages et composer
+ * tombent sur les mêmes bords. Le rail des tours vit dans la gouttière
+ * gauche, qui ne descend pas sous ses 3.5rem.
+ */
+@media (min-width: 40rem) {
+  [data-thread-column] {
+    --ohb-thread-gutter: clamp(1rem, 12%, 84px);
+  }
+
+  [data-thread-column] [role="log"] {
+    padding-inline: var(--ohb-thread-gutter);
+  }
+
+  [data-thread-column] [data-turn-rail] [role="log"],
+  [data-thread-column]:has([data-turn-rail]) [data-run-activity] {
+    padding-left: max(3.5rem, var(--ohb-thread-gutter));
+    padding-right: var(--ohb-thread-gutter);
+  }
+
+  [data-thread-column] :is([data-thread-lane], [data-approval-dock], [data-plan-dock], [data-run-activity]),
+  [data-thread-column] [data-thread-composer] {
+    padding-inline: var(--ohb-thread-gutter);
+    max-width: calc(var(--ohb-thread-column) + 2 * var(--ohb-thread-gutter));
+  }
+
+  [data-thread-column]:has([data-turn-rail]) [data-run-activity] {
+    max-width: calc(var(--ohb-thread-column) + max(3.5rem, var(--ohb-thread-gutter)) + var(--ohb-thread-gutter));
+  }
+
+  [data-thread-column] [data-composer-disabled-surface] {
+    max-width: none;
+  }
+}
+
+/*
+ * « Stream Text » (streaming-ui.pulseview.app, Chat collection): while an
+ * answer streams, its newest characters sit in a blurred, masked tail and a
+ * solid caret follows them (`stream-tail-rehype.ts`, last block only). A
+ * finished answer carries neither. Under reduced motion the tail is plain
+ * text; the caret stays, it does not move on its own.
+ */
+.ohb-stream-tail {
+  filter: blur(1.6px);
+  -webkit-mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
+  mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
+}
+
+.ohb-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1.5px;
+  border-radius: 1px;
+  background: var(--bui-text-primary);
+  vertical-align: text-bottom;
+  translate: 0 -0.5px;
+}
+
+/*
+  Caret blink (streaming-ui.pulseview.app `.sui-caret`: 1 s, steps(2)). Two
+  identical keyframes under two names: the stream tail flips `data-tick` on
+  every text update (`rehypeStreamTail`), which swaps the name and restarts
+  the blink, so the caret stays solid while tokens arrive.
+*/
+@keyframes ohb-caret-blink-a {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes ohb-caret-blink-b {
+  50% {
+    opacity: 0;
+  }
+}
+.ohb-stream-caret {
+  animation: ohb-caret-blink-a 1s steps(2, start) 0.45s infinite;
+}
+.ohb-stream-caret[data-tick="1"] {
+  animation-name: ohb-caret-blink-b;
+}
+
+/*
+  Block reveal (`tpl-reveal` of the reference): a paragraph or list item born
+  while the answer streams blurs in. Opacity, filter and transform only: no
+  layout shift, nothing the scroll pin has to chase.
+*/
+@keyframes ohb-reveal {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(4px);
+  }
+}
+.ohb-reveal {
+  animation: ohb-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The action row of a finished answer rises in (`chat-fade-up`). */
+@keyframes ohb-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.ohb-fade-up {
+  animation: ohb-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-stream-tail {
+    filter: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .ohb-stream-caret {
+    animation: none;
+  }
+  .ohb-reveal,
+  .ohb-fade-up {
+    animation: none;
+  }
+}

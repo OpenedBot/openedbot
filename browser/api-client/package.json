@@ -1,0 +1,23 @@
+{
+  "name": "@openedbot/browser-api-client",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/api-client.ts",
+    "./support-stream": "./src/support-stream.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-events": "workspace:*",
+    "@openedbot/contracts-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,15 @@
+[DEFAULT]
+banaction = ufw
+bantime = 1h
+findtime = 10m
+maxretry = 5
+bantime.increment = true
+bantime.maxtime = 1d
+usedns = no
+ignoreip = {{ .IgnoreIP }}
+
+[sshd]
+enabled = true
+port = {{ .SSHPort }}
+backend = systemd
+mode = normal

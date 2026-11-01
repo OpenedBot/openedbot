@@ -1,0 +1,44 @@
+{
+ "shapes": [
+  "cercle",
+  "galet",
+  "squircle",
+  "capsule",
+  "triangle",
+  "hexagone",
+  "nuage",
+  "goutte"
+ ],
+ "expressions": [
+  "neutre",
+  "attentif",
+  "surpris",
+  "excite",
+  "heureux",
+  "hilare",
+  "colere",
+  "triste",
+  "effraye",
+  "mefiant",
+  "confus",
+  "curieux",
+  "fier",
+  "timide",
+  "blase",
+  "somnolent"
+ ],
+ "colors": [
+  "encre",
+  "brun",
+  "rouge",
+  "orange",
+  "ambre",
+  "vert",
+  "turquoise",
+  "bleu",
+  "violet",
+  "rose",
+  "gris",
+  "creme"
+ ]
+}

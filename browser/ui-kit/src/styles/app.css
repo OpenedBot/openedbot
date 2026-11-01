@@ -1,0 +1,1651 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+  Scrollbars: one API over the two competing standards (`scrollbar-width` /
+  `scrollbar-color` for Firefox and recent Chromium, `::-webkit-scrollbar` for
+  the rest). `nocompatible` is what unlocks `scrollbar-*-rounded-*` and
+  `scrollbar-w/h-*`, without it the plugin only ships sizes and colors.
+  See `scrollbar-subtle` at the bottom of this file for the house treatment.
+*/
+@plugin "tailwind-scrollbar" {
+  nocompatible: true;
+}
+
+/*
+  Les réponses des bots sont du markdown : sans ce plugin, les classes `prose`
+  du fil sont inertes et titres, listes et blocs de code se rendent tous
+  identiques.
+*/
+@plugin "@tailwindcss/typography";
+
+/* Les composants du design system, sous browser/ui-kit/src. La console
+   déclare ses propres sources dans apps/console/src/globals.css. */
+@source "..";
+
+/*
+  Self-hosted fonts, no third-party request.
+
+  They used to come from fonts.googleapis.com with `display=swap`, so any
+  privacy extension or slow link left the page rendering in the system stack
+  (SF Pro on macOS), which is measurably wider and taller than Inter: the whole
+  UI looked ~10% bigger until the webfont landed, if it ever did.
+
+  The `* Fallback` faces below carry the metric overrides boardui.com ships
+  (via next/font), so the pre-swap paint matches the final one.
+*/
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+/* Source Serif 4, the onboarding hero's display face (`font-serif`), and the
+   only place in the app that asks for a serif. Self-hosted like the other two,
+   for the same reason. */
+@import "@fontsource-variable/source-serif-4";
+
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+  size-adjust: 107.12%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  src: local("Arial");
+  ascent-override: 75.79%;
+  descent-override: 22.29%;
+  line-gap-override: 0%;
+  size-adjust: 134.59%;
+}
+
+@custom-variant dark (&:is(.dark *));
+/* touch devices: no hover, so hover-revealed affordances must be shown outright */
+@custom-variant coarse (@media (pointer: coarse));
+/*
+  `sm:` / `md:` are viewport WIDTH queries, never pointer queries: a tablet, or
+  a large phone in landscape, clears `md:` and would inherit desktop geometry
+  under a thumb. Anything that SHRINKS a hit target for the mouse must be gated
+  on the pointer, not on the breakpoint (HIG / WCAG 2.5.8).
+*/
+@custom-variant fine (@media (pointer: fine));
+
+/*
+  Largeurs du cadre, en @theme NON inline : l'utilitaire doit compiler vers
+  `max-width: var(--container-…)` pour que la valeur reste surchargeable au
+  runtime.
+
+  `--container-content` est la largeur des pages de tableau de bord.
+  `--sidebar-width` est le rail déployé ; il est réécrit plus haut dans la
+  chaîne par `components/shell.tsx`, qui est la source de vérité.
+*/
+@theme {
+  --container-content: 1600px;
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 72px;
+}
+
+/*
+  Multica's type scale, the onboarding surface's, and only its.
+
+  The steps are named for the role the text plays rather than for a t-shirt
+  size, and each carries its own line-height so leading can't fragment the way
+  size does. They are ADDED next to the BoardUI scale below, not merged into
+  it: the ported screens reference these names verbatim (`text-body`,
+  `text-title-lg`, `text-caption`…), and rewriting each one into the nearest
+  boardui step is exactly the pixel drift the port exists to avoid. The two
+  scales don't collide, boardui's names all carry a weight suffix
+  (`text-body-medium`), these never do.
+
+  Registered as font-size in `lib/utils.ts` too: tailwind-merge files unknown
+  `text-*` under text-color, so an unregistered `text-body` would be dropped by
+  a following `text-muted-foreground` and the element would fall back to 16px.
+*/
+@theme {
+  /* counters, badges, timestamps, overline labels */
+  --text-micro: 11px;
+  --text-micro--line-height: 15px;
+  /* secondary and helper text */
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  /* dense labels: table headers, metadata rows */
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  /* UI body, the workhorse */
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  /* roomier body: dialog copy, onboarding prose */
+  --text-body-lg: 15px;
+  --text-body-lg--line-height: 22px;
+  /* small headings */
+  --text-title-sm: 16px;
+  --text-title-sm--line-height: 24px;
+  /* section headings */
+  --text-title: 18px;
+  --text-title--line-height: 28px;
+  /* card and dialog titles */
+  --text-title-lg: 20px;
+  --text-title-lg--line-height: 28px;
+}
+
+/*
+  BoardUI type scale, measured on boardui.com/components/typography.
+  12 families × 4 weights; each utility carries size, line-height and weight,
+  so `text-body-medium` replaces `text-sm font-medium leading-5`.
+*/
+@theme {
+  --text-display-1-regular: 56px;
+  --text-display-1-regular--line-height: 72px;
+  --text-display-1-regular--font-weight: 400;
+  --text-display-1-medium: 56px;
+  --text-display-1-medium--line-height: 72px;
+  --text-display-1-medium--font-weight: 500;
+  --text-display-1-semibold: 56px;
+  --text-display-1-semibold--line-height: 72px;
+  --text-display-1-semibold--font-weight: 600;
+  --text-display-1-bold: 56px;
+  --text-display-1-bold--line-height: 72px;
+  --text-display-1-bold--font-weight: 700;
+
+  --text-display-2-regular: 48px;
+  --text-display-2-regular--line-height: 64px;
+  --text-display-2-regular--font-weight: 400;
+  --text-display-2-medium: 48px;
+  --text-display-2-medium--line-height: 64px;
+  --text-display-2-medium--font-weight: 500;
+  --text-display-2-semibold: 48px;
+  --text-display-2-semibold--line-height: 64px;
+  --text-display-2-semibold--font-weight: 600;
+  --text-display-2-bold: 48px;
+  --text-display-2-bold--line-height: 64px;
+  --text-display-2-bold--font-weight: 700;
+
+  --text-display-3-regular: 40px;
+  --text-display-3-regular--line-height: 54px;
+  --text-display-3-regular--font-weight: 400;
+  --text-display-3-medium: 40px;
+  --text-display-3-medium--line-height: 54px;
+  --text-display-3-medium--font-weight: 500;
+  --text-display-3-semibold: 40px;
+  --text-display-3-semibold--line-height: 54px;
+  --text-display-3-semibold--font-weight: 600;
+  --text-display-3-bold: 40px;
+  --text-display-3-bold--line-height: 54px;
+  --text-display-3-bold--font-weight: 700;
+
+  --text-display-4-regular: 32px;
+  --text-display-4-regular--line-height: 44px;
+  --text-display-4-regular--font-weight: 400;
+  --text-display-4-medium: 32px;
+  --text-display-4-medium--line-height: 44px;
+  --text-display-4-medium--font-weight: 500;
+  --text-display-4-semibold: 32px;
+  --text-display-4-semibold--line-height: 44px;
+  --text-display-4-semibold--font-weight: 600;
+  --text-display-4-bold: 32px;
+  --text-display-4-bold--line-height: 44px;
+  --text-display-4-bold--font-weight: 700;
+
+  --text-title-1-regular: 24px;
+  --text-title-1-regular--line-height: 34px;
+  --text-title-1-regular--font-weight: 400;
+  --text-title-1-medium: 24px;
+  --text-title-1-medium--line-height: 34px;
+  --text-title-1-medium--font-weight: 500;
+  --text-title-1-semibold: 24px;
+  --text-title-1-semibold--line-height: 34px;
+  --text-title-1-semibold--font-weight: 600;
+  --text-title-1-bold: 24px;
+  --text-title-1-bold--line-height: 34px;
+  --text-title-1-bold--font-weight: 700;
+
+  --text-title-2-regular: 20px;
+  --text-title-2-regular--line-height: 26px;
+  --text-title-2-regular--font-weight: 400;
+  --text-title-2-medium: 20px;
+  --text-title-2-medium--line-height: 26px;
+  --text-title-2-medium--font-weight: 500;
+  --text-title-2-semibold: 20px;
+  --text-title-2-semibold--line-height: 26px;
+  --text-title-2-semibold--font-weight: 600;
+  --text-title-2-bold: 20px;
+  --text-title-2-bold--line-height: 26px;
+  --text-title-2-bold--font-weight: 700;
+
+  --text-title-3-regular: 18px;
+  --text-title-3-regular--line-height: 26px;
+  --text-title-3-regular--font-weight: 400;
+  --text-title-3-medium: 18px;
+  --text-title-3-medium--line-height: 26px;
+  --text-title-3-medium--font-weight: 500;
+  --text-title-3-semibold: 18px;
+  --text-title-3-semibold--line-height: 26px;
+  --text-title-3-semibold--font-weight: 600;
+  --text-title-3-bold: 18px;
+  --text-title-3-bold--line-height: 26px;
+  --text-title-3-bold--font-weight: 700;
+
+  --text-headline-regular: 16px;
+  --text-headline-regular--line-height: 22px;
+  --text-headline-regular--font-weight: 400;
+  --text-headline-medium: 16px;
+  --text-headline-medium--line-height: 22px;
+  --text-headline-medium--font-weight: 500;
+  --text-headline-semibold: 16px;
+  --text-headline-semibold--line-height: 22px;
+  --text-headline-semibold--font-weight: 600;
+  --text-headline-bold: 16px;
+  --text-headline-bold--line-height: 22px;
+  --text-headline-bold--font-weight: 700;
+
+  --text-body-regular: 14px;
+  --text-body-regular--line-height: 20px;
+  --text-body-regular--font-weight: 400;
+  --text-body-medium: 14px;
+  --text-body-medium--line-height: 20px;
+  --text-body-medium--font-weight: 500;
+  --text-body-semibold: 14px;
+  --text-body-semibold--line-height: 20px;
+  --text-body-semibold--font-weight: 600;
+  --text-body-bold: 14px;
+  --text-body-bold--line-height: 20px;
+  --text-body-bold--font-weight: 700;
+
+  --text-body-2-regular: 13px;
+  --text-body-2-regular--line-height: 18px;
+  --text-body-2-regular--font-weight: 400;
+  --text-body-2-medium: 13px;
+  --text-body-2-medium--line-height: 18px;
+  --text-body-2-medium--font-weight: 500;
+  --text-body-2-semibold: 13px;
+  --text-body-2-semibold--line-height: 18px;
+  --text-body-2-semibold--font-weight: 600;
+  --text-body-2-bold: 13px;
+  --text-body-2-bold--line-height: 18px;
+  --text-body-2-bold--font-weight: 700;
+
+  --text-caption-1-regular: 12px;
+  --text-caption-1-regular--line-height: 16px;
+  --text-caption-1-regular--font-weight: 400;
+  --text-caption-1-regular--letter-spacing: 0.15px;
+  --text-caption-1-medium: 12px;
+  --text-caption-1-medium--line-height: 16px;
+  --text-caption-1-medium--font-weight: 500;
+  --text-caption-1-medium--letter-spacing: 0.15px;
+  --text-caption-1-semibold: 12px;
+  --text-caption-1-semibold--line-height: 16px;
+  --text-caption-1-semibold--font-weight: 600;
+  --text-caption-1-semibold--letter-spacing: 0.15px;
+  --text-caption-1-bold: 12px;
+  --text-caption-1-bold--line-height: 16px;
+  --text-caption-1-bold--font-weight: 700;
+  --text-caption-1-bold--letter-spacing: 0.15px;
+
+  --text-caption-2-regular: 11px;
+  --text-caption-2-regular--line-height: 15px;
+  --text-caption-2-regular--font-weight: 400;
+  --text-caption-2-regular--letter-spacing: 0.2px;
+  --text-caption-2-medium: 11px;
+  --text-caption-2-medium--line-height: 15px;
+  --text-caption-2-medium--font-weight: 500;
+  --text-caption-2-medium--letter-spacing: 0.2px;
+  --text-caption-2-semibold: 11px;
+  --text-caption-2-semibold--line-height: 15px;
+  --text-caption-2-semibold--font-weight: 600;
+  --text-caption-2-semibold--letter-spacing: 0.2px;
+  --text-caption-2-bold: 11px;
+  --text-caption-2-bold--line-height: 15px;
+  --text-caption-2-bold--font-weight: 700;
+  --text-caption-2-bold--letter-spacing: 0.2px;
+}
+
+/*
+  BoardUI design tokens (extracted from boardui.com production CSS)
+  Fonts: Inter / JetBrains Mono · Accent: blue · Neutrals: zinc-like
+  Signature: vertical-gradient primary button (180deg blue-500 -> blue-600)
+*/
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-inter), "Inter Fallback", ui-sans-serif, system-ui,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: var(--font-jetbrains), "JetBrains Mono Fallback", ui-monospace,
+    "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-heading: var(--font-inter);
+  /* Only the onboarding hero asks for it, see the @import at the top. */
+  --font-serif: var(--font-source-serif), ui-serif, Georgia, Cambria,
+    "Times New Roman", Times, serif;
+
+  /* Multica's accent, used by the onboarding hero's emphasis and its @mentions.
+     Distinct from the `brand-100…700` ramp above, which aliases the user's
+     chosen accent: this one is a fixed pair that flips with the theme (see the
+     `--brand` values in the `:root` / `.dark` blocks). */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  /* BoardUI brand scale, primary buttons + active nav.
+     Aliases the live accent scale, so `bg-brand-600` follows the user's
+     accent choice (see the [data-accent] blocks below). */
+  --color-brand-100: var(--accent-100);
+  --color-brand-200: var(--accent-200);
+  --color-brand-300: var(--accent-300);
+  --color-brand-400: var(--accent-400);
+  --color-brand-500: var(--accent-500);
+  --color-brand-600: var(--accent-600);
+  --color-brand-700: var(--accent-700);
+  --color-brand-contrast: var(--accent-contrast);
+
+  /* the gray card surface, neutral-100 in light, neutral-800 in dark */
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  /* the frame the inset layout floats its content on, one step further back */
+  --color-surface-sunken: var(--surface-sunken);
+  --color-control: var(--control);
+  --color-control-active: var(--control-active);
+
+  /* named colors so tailwind-scrollbar's `scrollbar-thumb-*` can reach the
+     theme tokens instead of an arbitrary `[var(--…)]` value */
+  --color-scroll-thumb: var(--ai-chat-scrollbar-thumb);
+  --color-scroll-thumb-hover: var(--ai-chat-scrollbar-thumb-hover);
+
+  /* Segments des blocs agent (BoardUI `--color-chart-1..9`, relevés sur
+     boardui.com). Une rampe à part de `--chart-*`, qui suit l'accent de
+     l'opérateur : ici les teintes doivent rester distinctes entre elles,
+     pas s'accorder à un thème. Identiques en clair et en sombre, comme en
+     amont : seule la piste change. */
+  --color-agent-seg-1: var(--agent-seg-1);
+  --color-agent-seg-2: var(--agent-seg-2);
+  --color-agent-seg-3: var(--agent-seg-3);
+  --color-agent-seg-4: var(--agent-seg-4);
+  --color-agent-seg-5: var(--agent-seg-5);
+  --color-agent-seg-6: var(--agent-seg-6);
+  --color-agent-seg-7: var(--agent-seg-7);
+  --color-agent-seg-8: var(--agent-seg-8);
+  --color-agent-seg-9: var(--agent-seg-9);
+  --color-agent-track: var(--agent-track);
+  --color-agent-separator: var(--ai-chat-separator);
+
+  /* BoardUI data-viz (Tailwind lime): the signature chart accent */
+  --color-viz-200: #d9f99d; /* lime-200 */
+  --color-viz-400: #a3e635; /* lime-400: bars + area */
+  --color-viz-500: #84cc16; /* lime-500: revenue line */
+  --color-viz-600: #65a30d; /* lime-600 */
+  /* BoardUI `--color-chart-2` / `bg-chart-2` (admin theme.css). Named
+     lime-400 here: console `--color-chart-2` follows the operator accent
+     and must stay that way for the dashboard series. */
+  --color-lime-400: #a3e635;
+
+  /*
+    Semantic status. `-100` is the chip fill, `-700` the text/icon on it and
+    `-soft` the quieter panel fill used by alerts. All three flip with the
+    scheme (see the --state-* declarations below), so a success chip reads as
+    dark-lime-on-black instead of a glowing pastel block in dark mode.
+  */
+  --color-pos-100: var(--state-pos);
+  --color-pos-700: var(--state-pos-fg);
+  --color-pos-soft: var(--state-pos-soft);
+  --color-warn-100: var(--state-warn);
+  --color-warn-700: var(--state-warn-fg);
+  --color-warn-soft: var(--state-warn-soft);
+  --color-neg-100: var(--state-neg);
+  --color-neg-700: var(--state-neg-fg);
+  --color-neg-soft: var(--state-neg-soft);
+  --color-info-100: var(--state-info);
+  --color-info-700: var(--state-info-fg);
+  --color-info-soft: var(--state-info-soft);
+
+  /*
+    Contribution heatmap (Tailwind violet). The whole ramp is themed, not just
+    the empty cell: reused as-is on a dark canvas the light end would read
+    brighter than the busiest days and invert the scale.
+  */
+  --color-heat-0: var(--heat-0);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-text: var(--destructive-text);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* radius: BoardUI 2lg = 10px is the dominant container radius */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* BoardUI elevation tokens */
+  --shadow-xs: 0 1px 2px 0 #0000000d;
+  --shadow-card: 0 1px 1px 0 #0000000a, 0 4px 4px 0 #00000005;
+  --shadow-elevated: 0 1px 0 0 #00000005, 0 1px 12px 0 #0000000f,
+    0 0 1px 0 #00000052;
+  --shadow-sidebar: 0 1px 0 0 #00000005, 0 1px 12px 0 #0000000f,
+    0 0 1px 0 #00000052;
+}
+
+/*
+  Accent scales, the user-selectable button/link hue, persisted in the
+  `boardui_accent` cookie and applied as `data-accent` on <html> (see
+  features/dashboard/theme). Blue is the BoardUI default and lives in :root;
+  the [data-accent] blocks below only restate the seven stops, so every
+  derived token (--primary, --ring, the gradients…) follows automatically.
+
+  `--accent-contrast` is the text colour that sits on top of the 500/600
+  stops, white everywhere except the two light hues.
+*/
+:root[data-accent="teal"] {
+  --accent-100: #cbfbf1;
+  --accent-200: #96f7e4;
+  --accent-300: #46ecd5;
+  --accent-400: #00d5be;
+  --accent-500: #00bba7;
+  --accent-600: #009689;
+  --accent-700: #00786f;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="lime"] {
+  --accent-100: #ecfcca;
+  --accent-200: #d8f999;
+  --accent-300: #bbf451;
+  --accent-400: #9ae600;
+  --accent-500: #7ccf00;
+  --accent-600: #5ea500;
+  --accent-700: #497d00;
+  --accent-contrast: #1a2e05;
+}
+:root[data-accent="pink"] {
+  --accent-100: #fce7f3;
+  --accent-200: #fccee8;
+  --accent-300: #fda5d5;
+  --accent-400: #fb64b6;
+  --accent-500: #f6339a;
+  --accent-600: #e60076;
+  --accent-700: #c6005c;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="sky"] {
+  --accent-100: #dff2fe;
+  --accent-200: #b8e6fe;
+  --accent-300: #74d4ff;
+  --accent-400: #00bcff;
+  --accent-500: #00a6f4;
+  --accent-600: #0084d1;
+  --accent-700: #0069a8;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="purple"] {
+  --accent-100: #f3e8ff;
+  --accent-200: #e9d4ff;
+  --accent-300: #dab2ff;
+  --accent-400: #c27aff;
+  --accent-500: #ad46ff;
+  --accent-600: #9810fa;
+  --accent-700: #8200db;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="emerald"] {
+  --accent-100: #d0fae5;
+  --accent-200: #a4f4cf;
+  --accent-300: #5ee9b5;
+  --accent-400: #00d492;
+  --accent-500: #00bc7d;
+  --accent-600: #009966;
+  --accent-700: #007a55;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="yellow"] {
+  --accent-100: #fef9c2;
+  --accent-200: #fff085;
+  --accent-300: #ffdf20;
+  --accent-400: #fdc700;
+  --accent-500: #efb100;
+  --accent-600: #d08700;
+  --accent-700: #a65f00;
+  --accent-contrast: #422006;
+}
+:root[data-accent="orange"] {
+  --accent-100: #ffedd4;
+  --accent-200: #ffd6a8;
+  --accent-300: #ffb86a;
+  --accent-400: #ff8904;
+  --accent-500: #ff6900;
+  --accent-600: #f54900;
+  --accent-700: #ca3500;
+  --accent-contrast: #ffffff;
+}
+:root[data-accent="rose"] {
+  --accent-100: #ffe4e6;
+  --accent-200: #ffccd3;
+  --accent-300: #ffa1ad;
+  --accent-400: #ff637e;
+  --accent-500: #ff2056;
+  --accent-600: #ec003f;
+  --accent-700: #c70036;
+  --accent-contrast: #ffffff;
+}
+
+:root {
+  --radius: 0.625rem; /* 10px, BoardUI 2lg */
+
+  /* Self-hosted @fontsource-variable faces (see the @imports at the top of this
+     file); the plain names cover a system install of the same family. */
+  --font-inter: "Inter Variable", "Inter";
+  --font-jetbrains: "JetBrains Mono Variable", "JetBrains Mono";
+  --font-source-serif: "Source Serif 4 Variable", "Source Serif 4";
+
+  /* Onboarding accent (Multica's `--brand`), light scheme. */
+  --brand: oklch(0.55 0.16 255);
+  --brand-foreground: oklch(0.985 0 0);
+
+  /* default accent, BoardUI blue */
+  --accent-100: #dbeafe;
+  --accent-200: #bedbff;
+  --accent-300: #90c5ff;
+  --accent-400: #3392ff;
+  --accent-500: #3080ff;
+  --accent-600: #155dfc;
+  --accent-700: #1447e6;
+  --accent-contrast: #ffffff;
+
+  color-scheme: light;
+
+  --background: #ffffff;
+  --foreground: #0a0a0a; /* neutral-950 */
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+
+  /* the gray card/rail surface the white content floats on */
+  --panel: #ffffff; /* the content panel, white, like the cards it holds */
+  --surface: #f7f7f7; /* neutral-100 */
+  --surface-hover: #ebebeb; /* neutral-200 */
+  --surface-sunken: #ededee; /* inset-layout frame */
+
+  --control: #f7f7f7; /* segmented-control track */
+  --control-active: #ffffff; /* …and its selected pill */
+
+  --state-pos: #d0fae5; /* emerald-100 */
+  --state-pos-fg: #007a55; /* emerald-700, 4,72:1 sur la chip, 5,36:1 sur blanc */
+  --state-pos-soft: #ecfdf5; /* emerald-50 */
+  --state-warn: #fff085; /* yellow-200 */
+  --state-warn-fg: #894b00;
+  --state-warn-soft: #fefce8;
+  --state-neg: #ffccd3; /* rose-200 */
+  --state-neg-fg: #a50036;
+  --state-neg-soft: #fff1f2;
+  --state-info: #dbeafe; /* blue-100 */
+  --state-info-fg: #1447e6;
+  --state-info-soft: #eff6ff;
+
+  --primary: var(--accent-600);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: #f7f7f7; /* neutral-100 */
+  --secondary-foreground: #262626; /* neutral-800 */
+  --muted: #f7f7f7;
+  --muted-foreground: #737373; /* neutral-500 */
+  --accent: #f7f7f7;
+  --accent-foreground: #171717;
+  --destructive: #fb2c36; /* red-500 */
+  /*
+   * Le rouge des BORDURES et des FONDS ci-dessus ne tient pas comme TEXTE : en
+   * clair, #fb2c36 donne 3,81:1 sur blanc et 3,53:1 sur le fond teinté
+   * `bg-destructive/5`, sous les 4,5:1 exigés par WCAG AA en dessous de 18 pt
+   * (mesuré à l'axe le 26-08 sur le panneau des capacités). Un second jeton
+   * plutôt qu'un `--destructive` assombri : celui-ci sert aussi de fond aux
+   * boutons destructifs, où le rouge vif est juste.
+   */
+  --destructive-text: #c10007; /* red-700, 6,5:1 sur blanc, 6,2:1 sur le fond teinté */
+
+  --border: oklch(0.922 0 0); /* shadcn neutral, neutral-200 (#e5e5e5) */
+  --input: oklch(0.922 0 0);
+  --ring: var(--accent-500);
+
+  --chart-1: var(--accent-500);
+  --chart-2: var(--accent-300);
+  --chart-3: var(--accent-700);
+  --chart-4: #a1a1a1; /* neutral-400 */
+  --chart-5: #d4d4d4; /* neutral-300 */
+
+  --heat-0: #d4d4d4; /* neutral-300, empty cell */
+  --heat-1: #ddd6ff; /* violet-200 */
+  --heat-2: #a684ff; /* violet-400 */
+  --heat-3: #8e51ff; /* violet-500 */
+  --heat-4: #7f22fe; /* violet-600 */
+  --heat-5: #7008e7; /* violet-700 */
+
+  /* inset frame: gray sidebar area, white floating content */
+  --sidebar: #f7f7f7; /* neutral-100 */
+  --sidebar-foreground: #0a0a0a;
+  --sidebar-primary: var(--accent-600);
+  --sidebar-primary-foreground: var(--accent-contrast);
+  --sidebar-accent: #ebebeb; /* neutral-200 hover */
+  /* Le texte secondaire de la barre latérale ne vit PAS sur le fond de la page :
+     il vit sur `--sidebar` (#f7f7f7) et, sur la ligne survolée ou active, sur
+     `--sidebar-accent` (#ebebeb). `--muted-foreground` (#737373) y tombe à
+     4,43 et 3,98, sous le seuil AA de 4,5 (mesuré à l'axe). Ce jeton nomme
+     donc la contrainte : lisible sur les DEUX surfaces (5,36 et 4,82). */
+  --sidebar-muted-foreground: #666666;
+  --sidebar-accent-foreground: #0a0a0a;
+  --sidebar-border: oklch(0.922 0 0); /* shadcn neutral */
+  --sidebar-ring: #a1a1a1; /* neutral-400, focus visible sans couleur d'accent */
+
+  /* signature primary-button gradients */
+  --gradient-primary: linear-gradient(
+    180deg,
+    var(--accent-500) 0%,
+    var(--accent-600) 100%
+  );
+  --gradient-primary-hover: linear-gradient(
+    180deg,
+    var(--accent-400) 0%,
+    var(--accent-500) 100%
+  );
+  --gradient-primary-active: linear-gradient(
+    180deg,
+    var(--accent-600) 0%,
+    var(--accent-700) 100%
+  );
+  --gradient-primary-disabled: linear-gradient(180deg, #ebebeb 0%, #d4d4d4 100%);
+  --shadow-btn-primary: inset 0 1px 0 0 #ffffff40, 0 0 0 1px var(--accent-600),
+    0 1px 2px 0 #0000001a;
+
+  /* BoardUI ghost button, soft accent wash + accent label */
+  --button-ghost: var(--accent-100);
+  --button-ghost-fg: var(--accent-700);
+  --button-ghost-hover: var(--accent-200);
+  --button-ghost-active: var(--accent-300);
+  --button-ghost-disabled: color-mix(in srgb, var(--accent-100) 55%, white);
+  --button-ghost-disabled-fg: var(--accent-300);
+
+  /* BoardUI danger, vertical red gradient */
+  --gradient-danger: linear-gradient(180deg, #ff6467 0%, #e7000b 100%);
+  --gradient-danger-hover: linear-gradient(180deg, #ff8a8c 0%, #ff6467 100%);
+  --gradient-danger-active: linear-gradient(180deg, #e7000b 0%, #c10007 100%);
+  --gradient-danger-disabled: linear-gradient(180deg, #ffe4e6 0%, #fecdd3 100%);
+
+  /* AI Chat template, boardui.com/templates/ai-chat (measured tokens) */
+  /* segments des blocs agent, relevés sur boardui.com */
+  --agent-seg-1: lab(76.0109% -53.3483 -2.27906);
+  --agent-seg-2: lab(83.7876% -45.0447 88.4738);
+  --agent-seg-3: lab(64.5597% 64.3615 -12.7988);
+  --agent-seg-4: lab(70.687% -23.6078 -45.9483);
+  --agent-seg-5: lab(63.6946% 47.6127 -59.2066);
+  --agent-seg-6: #3392ff;
+  --agent-seg-7: lab(75.0771% -60.7313 19.4147);
+  --agent-seg-8: lab(83.2664% 8.65132 106.895);
+  --agent-seg-9: lab(59.866% 22.4834 -64.4485);
+  --agent-track: #ebebeb;
+
+  --ai-chat-scrollbar-thumb: #d4d4d4;
+  --ai-chat-scrollbar-thumb-hover: #a3a3a3;
+
+  --ai-chat-bg-full: #ffffff;
+  --ai-chat-bg-secondary: #f7f7f7;
+  --ai-chat-bg-tertiary: #ebebeb;
+  /* one step darker than tertiary: the agent-plan glyphs (step dots, ring track,
+     the minimize square) sit *on* a bg-primary card, which tertiary matches in dark */
+  --ai-chat-bg-quaternary: #d4d4d4;
+  --ai-chat-bg-primary: #ffffff;
+  --ai-chat-border-panel: #ffffff;
+  --ai-chat-border: #ffffff;
+  --ai-chat-separator: #ebebeb;
+  --ai-chat-composer-add-bg: #f7f7f7;
+  --ai-chat-composer-add-hover-bg: #ebebeb;
+  --ai-chat-agent-ring: #454545;
+  --ai-chat-tsx-bg: #f5f3ff;
+  --ai-chat-tsx-fg: #7c3aed;
+  --ai-chat-tsx-border: #ede9fe;
+  --ai-chat-code-keyword: #7ccf00;
+  --ai-chat-code-ident: #00bc7d;
+  --ai-chat-code-text: #525252;
+  --ai-chat-code-ln: #a3a3a3;
+  --ai-chat-kbd-bg: #d4d4d4;
+  --ai-chat-avatar-bg: #d4d4d4;
+  --ai-chat-icon-secondary: #737373;
+  --ai-chat-icon-tertiary: #a3a3a3;
+  --ai-chat-icon-quaternary: #d4d4d4;
+  /* the workspace avatar keeps the same blue in both themes, like the target */
+  --ai-chat-team-avatar-bg: #8ec5ff;
+  --ai-chat-team-avatar-fg: #1c398e;
+  --ai-chat-pill-tab-selected: #e8f1ff;
+  --ai-chat-pill-tab-hover: #f7f7f7;
+  --ai-chat-switch-chip-start: #ffffff;
+  --ai-chat-switch-chip-end: #f7f7f7;
+}
+
+/*
+  Dark scheme, transcribed from boardui.com's own dark tokens.
+
+  Values transcribed from boardui.com's own dark render, measured by painted
+  area, the real hierarchy is much flatter than token names suggest:
+    #121212  the dominant field (frame AND content panel, one nappe)
+    #171717  cards, widgets, sidebar rail, the second surface
+    #262626  buttons, inputs, chips only, small raised controls
+  So most of the screen is #121212/#171717; #262626 is reserved for the bits
+  you click. Surfaces separate by lightness, not outlines, the separator
+  border is the same neutral as the card, so borders read as seams. Only
+  buttons/inputs get a visible edge at 15% white (`--input`).
+*/
+.dark {
+  color-scheme: dark;
+
+  /* Onboarding accent, one notch lighter so it survives the near-black field. */
+  --brand: oklch(0.65 0.16 255);
+  --brand-foreground: oklch(0.985 0 0);
+
+  --background: #121212; /* background-full, the dominant field */
+  --foreground: #fafafa;
+  --card: #262626; /* buttons, inputs, popovers, the raised controls */
+  --card-foreground: #fafafa;
+  --popover: #262626;
+  --popover-foreground: #fafafa;
+
+  /*
+    `--panel` is the content column. In dark it is the SAME as the frame
+    (#121212), so the two merge into one continuous field, that is what keeps
+    boardui.com flat instead of showing a lighter block on the right. Cards
+    then sit one subtle step up at #171717.
+  */
+  --panel: #121212; /* == --background: content merges into the frame */
+  --surface: #171717; /* cards, widgets, background-secondary */
+  --surface-hover: #262626;
+  /*
+    Inset chrome (layout 02): the rail the transparent-or-sidebar panel sits on.
+    Must stay background-secondary (neutral-900), NOT background-full, otherwise
+    the sidebar collapses into the dark canvas. Light analogue is #ededee.
+  */
+  --surface-sunken: #171717; /* neutral-900, background-secondary-default */
+
+  --control: #262626; /* visible segmented track above the page */
+  --control-active: #404040; /* selected pill above the track */
+
+  /* status: <hue>-950 at 60% behind a bright <hue>-400 label */
+  --state-pos: #002c2299;
+  --state-pos-fg: #00d492; /* emerald-400 */
+  --state-pos-soft: #002c2266;
+  --state-warn: #43200499;
+  --state-warn-fg: #fdc700; /* yellow-400 */
+  --state-warn-soft: #43200466;
+  --state-neg: #4d021899;
+  --state-neg-fg: #ff637e; /* rose-400 */
+  --state-neg-soft: #4d021866;
+  --state-info: #16245699;
+  --state-info-fg: #8ec5ff; /* blue-300 */
+  --state-info-soft: #16245666;
+
+  --primary: var(--accent-500);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626; /* small chip / badge fills, raised on the #171717 cards */
+  --muted-foreground: #a1a1a1;
+  --accent: #404040; /* background-tertiary-hover, hover fill on buttons/rows */
+  --accent-foreground: #fafafa;
+  --destructive: #ff6467;
+  /* En sombre le rouge vif tient déjà : 6,1:1 sur #171717. */
+  --destructive-text: #ff6467;
+
+  --border: oklch(1 0 0 / 10%); /* shadcn neutral, white seam, reads on any surface */
+  --input: oklch(1 0 0 / 15%); /* the one visible edge, buttons, inputs */
+  --ring: var(--accent-500);
+
+  --chart-1: var(--accent-500);
+  --chart-2: var(--accent-300);
+  --chart-3: var(--accent-700);
+  --chart-4: #737373;
+  --chart-5: #404040;
+
+  /* ramp runs dark -> bright so the busiest days still stand out */
+  --heat-0: #262626; /* neutral-800, empty cell */
+  --heat-1: #3c1c73; /* violet-950 */
+  --heat-2: #5c26b3; /* violet-800 */
+  --heat-3: #7f22fe; /* violet-600 */
+  --heat-4: #a684ff; /* violet-400 */
+  --heat-5: #ddd6ff; /* violet-200 */
+
+  --sidebar: #171717; /* neutral-900, background-secondary-default */
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: var(--accent-500);
+  --sidebar-primary-foreground: var(--accent-contrast);
+  --sidebar-accent: #404040;
+  /* Même contrainte en sombre : #a1a1a1 tombe à 4,01 sur la ligne active
+     (#404040). #b3b3b3 tient les deux surfaces (8,55 et 4,95). */
+  --sidebar-muted-foreground: #b3b3b3;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: oklch(1 0 0 / 10%); /* shadcn neutral */
+  --sidebar-ring: #737373; /* neutral-500, focus visible sans couleur d'accent */
+
+  --gradient-primary: linear-gradient(
+    180deg,
+    var(--accent-400) 0%,
+    var(--accent-600) 100%
+  );
+  --gradient-primary-hover: linear-gradient(
+    180deg,
+    var(--accent-400) 0%,
+    var(--accent-500) 100%
+  );
+  --gradient-primary-active: linear-gradient(
+    180deg,
+    var(--accent-600) 0%,
+    var(--accent-700) 100%
+  );
+  --gradient-primary-disabled: linear-gradient(180deg, #404040 0%, #262626 100%);
+  --shadow-btn-primary: inset 0 1px 0 0 #ffffff33, 0 0 0 1px var(--accent-600),
+    0 1px 2px 0 #00000040;
+
+  --button-ghost: color-mix(in srgb, var(--accent-500) 18%, #171717);
+  --button-ghost-fg: var(--accent-300);
+  --button-ghost-hover: color-mix(in srgb, var(--accent-500) 28%, #171717);
+  --button-ghost-active: color-mix(in srgb, var(--accent-500) 38%, #171717);
+  --button-ghost-disabled: #262626;
+  --button-ghost-disabled-fg: #737373;
+
+  --gradient-danger: linear-gradient(180deg, #ff6467 0%, #e7000b 100%);
+  --gradient-danger-hover: linear-gradient(180deg, #ff8a8c 0%, #ff6467 100%);
+  --gradient-danger-active: linear-gradient(180deg, #e7000b 0%, #c10007 100%);
+  --gradient-danger-disabled: linear-gradient(180deg, #4d0218 0%, #3b0214 100%);
+
+  /* la rampe de segments ne bouge pas en sombre, seule la piste recule */
+  --agent-track: #262626;
+
+  --ai-chat-scrollbar-thumb: #404040;
+  --ai-chat-scrollbar-thumb-hover: #525252;
+
+  --ai-chat-bg-full: #121212;
+  --ai-chat-bg-secondary: #171717;
+  --ai-chat-bg-tertiary: #262626;
+  --ai-chat-bg-quaternary: #404040;
+  --ai-chat-bg-primary: #262626;
+  --ai-chat-border-panel: #262626;
+  --ai-chat-border: #262626;
+  --ai-chat-separator: #404040;
+  --ai-chat-composer-add-bg: #262626;
+  --ai-chat-composer-add-hover-bg: #404040;
+  /* the filled part of a progress ring: it has to read *against* the #404040 track */
+  --ai-chat-agent-ring: rgba(255, 255, 255, 0.5);
+  --ai-chat-tsx-bg: #2e1065;
+  --ai-chat-tsx-fg: #c4b5fd;
+  --ai-chat-tsx-border: #4c1d95;
+  --ai-chat-code-keyword: #a3e635;
+  --ai-chat-code-ident: #2dd4bf;
+  --ai-chat-code-text: #d4d4d4;
+  --ai-chat-code-ln: #737373;
+  --ai-chat-kbd-bg: #404040;
+  --ai-chat-avatar-bg: #404040;
+  --ai-chat-icon-secondary: #a1a1a1;
+  --ai-chat-icon-tertiary: #525252;
+  --ai-chat-icon-quaternary: #525252;
+  /* deliberately NOT flipped in dark mode, the target keeps blue-300/blue-900 */
+  --ai-chat-team-avatar-bg: #8ec5ff;
+  --ai-chat-team-avatar-fg: #1c398e;
+  --ai-chat-pill-tab-selected: #172554;
+  --ai-chat-pill-tab-hover: #262626;
+  --ai-chat-switch-chip-start: #262626;
+  --ai-chat-switch-chip-end: #262626;
+}
+
+@layer base {
+  /* The base baseline stays below utility overrides and unlayered mobile rules. */
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scroll-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-scroll-thumb);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-scroll-thumb-hover);
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  /*
+    WebKit / Chromium paint :disabled <button> / <input> with a light-scheme
+    -webkit-text-fill-color and ignore `color`. In dark mode that fill is
+    near-black, the two disabled run-preference selects on /settings/models
+    were unreadable on --surface. Bind the fill to the authored color.
+  */
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/*
+  Touch targets, the desktop scale ships 36px (h-9) and 40px (h-10) controls, both
+  under the 44px minimum of WCAG 2.5.8. Bump them on coarse pointers only, so the
+  dense mouse-driven layout is untouched. Unlayered, so it wins over `@layer utilities`.
+  Scoped to real controls: `size-9` is also used for avatars, which stay 36px.
+*/
+@media (pointer: coarse) {
+  .h-9,
+  .h-10 {
+    height: 2.75rem;
+  }
+  button.size-9,
+  a.size-9,
+  [role="button"].size-9 {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/*
+  List and menu rows switch their highlight at once. With a 120-150 ms colour
+  fade, a pointer sweeping a list left every row it crossed fading in then out:
+  a grey flash trailing the cursor. Native menus (and Grok Bot) never fade a
+  row. Covers every ARIA row and anything tagged `.ohb-row`; the press feedback
+  (scale, opacity) keeps its timing. Unlayered, so it wins over
+  `transition-colors`; the `.ohb-press` line outranks that class's own fade.
+*/
+:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .ohb-row),
+:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .ohb-row).ohb-press {
+  transition-property: transform, translate, scale, opacity;
+}
+
+/*
+  App shell scale, renders the AI-chat shell at 90% of its authored size to
+  match the density of boardui.com/templates/ai-chat.
+
+  `zoom` is used rather than `font-size: 90%` because the template mixes rem
+  utilities with hard-coded px (`w-[260px]`, `rounded-[24px]`); only `zoom`
+  scales both. `transform: scale()` would break the sticky/fixed sidebar.
+
+  `dvh` resolves against the real viewport and is then scaled down, so the
+  shell height must be divided by the factor or it stops filling the screen.
+
+  Trade-off: media queries still evaluate against the unscaled viewport, so
+  breakpoints fire with ~11% more layout width available than authored.
+*/
+[data-app-zoom] {
+  --app-zoom: 0.9;
+  zoom: var(--app-zoom);
+  height: calc(100dvh / var(--app-zoom));
+  max-height: calc(100dvh / var(--app-zoom));
+}
+
+/*
+  Theme flip, soft crossfade instead of a hard snap.
+
+  Chromium / Safari 18+: `document.startViewTransition` (see theme/context.tsx)
+  paints both schemes into VT pseudo-elements; we only tune duration/easing.
+
+  Firefox / older: temporary `.theme-transitioning` on <html> eases the token
+  colours for ~340ms, then the class is removed so hovers stay snappy.
+*/
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    fill 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 340ms cubic-bezier(0.4, 0, 0.2, 1),
+    outline-color 340ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: none !important;
+  }
+}
+
+/* Effort level name in the model picker: blur-fades in on every level change. */
+@theme {
+  --animate-effort-label: ai-chat-effort-label 0.35s ease-out;
+}
+@keyframes ai-chat-effort-label {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+/*
+  Agent plan card (`agent-progress.tsx`). Every entrance in the template lands the
+  same way, a short blur-and-lift, so they share one curve; only the distance and
+  the delay change. `both` so a staggered row is already hidden before its turn.
+*/
+@theme {
+  --animate-agent-card-in: ai-chat-agent-card-in 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-agent-strike: ai-chat-agent-strike 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  /* the running step's ring creeps forward: nothing measures how long a step takes,
+     so it eases towards, and stops short of, a full turn until the model says done */
+  --animate-agent-step-ring: ai-chat-agent-step-ring 45s ease-out both;
+}
+@keyframes ai-chat-agent-card-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+/*
+  Réponse IA : chaque nouveau bloc Markdown se pose une seule fois avec le
+  même adoucissement que le chat BoardUI de référence. Le sélecteur vise les
+  enfants directs pour ne pas réanimer chaque ligne d'une liste ou d'un code.
+*/
+@keyframes ai-chat-response-block-in {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+.ai-response-reveal > :where(p, h1, h2, h3, h4, ul, ol, pre, blockquote, table, hr, div, aside) {
+  animation: ai-chat-response-block-in 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes ai-chat-agent-strike {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes ai-chat-agent-step-ring {
+  from {
+    stroke-dasharray: 0 1;
+  }
+  to {
+    stroke-dasharray: 0.85 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-response-reveal > :where(p, h1, h2, h3, h4, ul, ol, pre, blockquote, table, hr, div, aside),
+  .animate-agent-card-in,
+  .animate-agent-strike {
+    animation: none;
+  }
+  /* the ring still has to show the step is running, so it holds a fixed arc */
+  .animate-agent-step-ring {
+    animation: none;
+    stroke-dasharray: 0.25 1;
+  }
+}
+
+/*
+  Blocs agent portés de BoardUI (agent-thinking, agent-progress, task-list,
+  web-search). Les keyframes viennent du `globals.css` du registre public,
+  leurs commentaires sont réécrits ici.
+
+  Le libellé qui travaille : un reflet traverse le texte. Base et pointe
+  dérivent toutes deux de la teinte posée par le composant sur
+  `--ohb-agent-tone`, pour que chaque ton scintille pareil.
+*/
+@keyframes ohb-agent-shimmer {
+  from {
+    background-position: 200% center;
+  }
+  to {
+    background-position: -100% center;
+  }
+}
+.ohb-agent-label {
+  /* Les deux teintes du reflet vivent dans leurs propres variables. Un
+     `color-mix()` écrit directement parmi les arrêts du dégradé se fait
+     aplatir par le minifieur en production : les trois arrêts retombent sur
+     la même couleur et le reflet disparaît. Dans une propriété custom, la
+     valeur est transportée telle quelle. */
+  --ohb-agent-tone: var(--color-muted-foreground);
+  --ohb-agent-tone-soft: color-mix(in oklab, var(--ohb-agent-tone) 55%, transparent);
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    var(--ohb-agent-tone-soft) 30%,
+    var(--ohb-agent-tone) 50%,
+    var(--ohb-agent-tone-soft) 70%
+  );
+  background-position: 200% center;
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: ohb-agent-shimmer 2.6s linear infinite;
+  will-change: background-position;
+  /* `background-position` sur `background-clip: text` repeint à chaque
+     frame (une propriété de fond ne se compose jamais sur le GPU comme le
+     ferait `transform`/`opacity`) : mesuré à ~140 ms par frame, sans script
+     ni mise en page, pendant qu'un run est en direct (un ou deux libellés
+     `TaskList`/`WebSearch` « en cours » à la fois). `contain: paint` borne
+     le repeint à cette étiquette : il ne peut jamais déborder sa boîte, donc
+     ça ne change rien à l'affichage, mais ça évite qu'il invalide la peinture
+     d'un voisin. Ça ne supprime pas le coût du repeint lui-même : le libellé
+     d'`AgentThinking` (`RollText`) passe par `ShineText` / `.ohb-shine`
+     (`transform` seul); cette classe reste pour les libellés qui peuvent
+     passer à la ligne (`TaskList` étapes, `WebSearch`, `ShimmerLabel`). */
+  contain: paint;
+}
+
+/*
+  Le même reflet sans repeindre (`ShineText`, shine-text.tsx) : le texte de
+  base reste fixe en teinte douce; une bande large de la moitié du libellé,
+  masquée en fondu sur ses bords, le traverse en `translate3d`, et la copie
+  du texte qu'elle porte (teinte pleine, largeur double de la bande, donc
+  celle du libellé) reçoit la translation inverse pour que ses glyphes
+  restent sur ceux de la base. Deux animations `transform` : composited, ni
+  peinture ni mise en page par frame. Bande : de -100 % de sa largeur
+  (-0,5 L) à 200 % (+1 L). Copie : de +50 % de sa largeur (+0,5 L) à -100 %
+  (-1 L), l'exact opposé. Même durée et même courbe, sinon les glyphes
+  glissent.
+*/
+@keyframes ohb-shine-band {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(200%, 0, 0);
+  }
+}
+@keyframes ohb-shine-text {
+  from {
+    transform: translate3d(50%, 0, 0);
+  }
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+.ohb-shine {
+  /* Mêmes variables que `.ohb-agent-label` (voir la note sur `color-mix()`). */
+  --ohb-agent-tone: var(--color-muted-foreground);
+  --ohb-agent-tone-soft: color-mix(in oklab, var(--ohb-agent-tone) 55%, transparent);
+  position: relative;
+  color: var(--ohb-agent-tone-soft);
+}
+.ohb-shine-band {
+  position: absolute;
+  inset-block: -0.2em;
+  left: 0;
+  width: 50%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 50%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 50%, transparent);
+  animation: ohb-shine-band 2.6s linear infinite;
+  will-change: transform;
+}
+.ohb-shine-text {
+  flex: none;
+  width: 200%;
+  white-space: nowrap;
+  color: var(--ohb-agent-tone);
+  animation: ohb-shine-text 2.6s linear infinite;
+  will-change: transform;
+}
+
+/* Étoile qui scintille : elle grandit, se pose, disparaît. La durée et le
+   décalage de chaque étoile arrivent en style inline. */
+@keyframes ohb-agent-star {
+  0%,
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+}
+.ohb-agent-star {
+  transform: scale(0);
+  animation-name: ohb-agent-star;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* Comète d'infini : le segment de tiret fait un tour du huit normalisé
+   (`pathLength=100`) par durée d'animation. */
+@keyframes ohb-agent-dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.ohb-agent-comet {
+  animation-name: ohb-agent-dash;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Les glyphes d'étoile pèsent un peu plus que les grilles de points sur fond
+   clair : on les adoucit, elles seules, jamais le libellé. */
+.ohb-agent-stars {
+  color: color-mix(in oklab, currentColor 75%, transparent);
+}
+.dark .ohb-agent-stars {
+  color: inherit;
+}
+
+/* La coche d'une étape franchie se dessine comme si on la cochait à la main.
+   Le tracé pose `pathLength=1`, le calcul de tirets est donc indépendant de
+   la résolution. */
+@keyframes ohb-agent-check {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ohb-agent-check {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ohb-agent-check 200ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-agent-label {
+    color: var(--ohb-agent-tone);
+    background-image: none;
+    animation: none;
+  }
+  .ohb-shine {
+    color: var(--ohb-agent-tone);
+  }
+  .ohb-shine-band {
+    display: none;
+  }
+  /* Les étoiles se posent visibles plutôt que figées à `scale(0)`. */
+  .ohb-agent-star {
+    animation: none;
+    transform: none;
+    opacity: 0.7;
+  }
+  .ohb-agent-comet {
+    animation: none;
+  }
+  .ohb-agent-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+  `RollText` (roll-text.tsx): a text slot whose value rolls, as `rollSlot()`
+  in the Stream collection of streaming-ui.pulseview.app. Both lines share
+  one grid cell; the slot clips them vertically only, so a long label still
+  truncates on the side.
+*/
+.ohb-roll {
+  position: relative;
+  display: inline-grid;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  vertical-align: bottom;
+  margin-block: -0.08em;
+  padding-block: 0.08em;
+  clip-path: inset(0 -999px);
+}
+.ohb-roll-line {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes ohb-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(90%);
+    filter: blur(3px);
+  }
+}
+@keyframes ohb-roll-out {
+  to {
+    opacity: 0;
+    transform: translateY(-90%);
+    filter: blur(3px);
+  }
+}
+.ohb-roll-in {
+  animation: ohb-roll-in 0.32s cubic-bezier(0.34, 1.32, 0.64, 1) both;
+}
+.ohb-roll-out {
+  animation: ohb-roll-out 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ohb-roll-in {
+    animation: none;
+  }
+  .ohb-roll-out {
+    display: none;
+  }
+}
+
+/*
+  Onboarding step entry. Pure opacity, no transform and no height: the steps
+  render inside scrolling panes, and anything that moves the box produces a
+  scrollbar flash on every step entry.
+*/
+@keyframes onboarding-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+.animate-onboarding-enter {
+  animation: onboarding-enter 0.4s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-onboarding-enter {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 scrollbars                                 */
+/* -------------------------------------------------------------------------- */
+
+/*
+  Two treatments, picked by what the scroller is:
+  - `no-scrollbar` (from shadcn/tailwind.css) for chrome that scrolls incidentally
+    sidebar nav, breadcrumb overflow: a bar there is noise.
+  - `scrollbar-subtle` below for real content (thread, code, diffs, long lists),
+    the bar has to be findable, so it stays visible but thin, trackless and
+    rounded, and only gains contrast on hover.
+  The base layer supplies the app-wide baseline, while utility and unlayered
+  mobile rules keep their intentional overrides.
+
+  `scrollbar-subtle` is the one name the app uses; it is a thin wrapper over
+  tailwind-scrollbar so the treatment stays in one place. The plugin's own
+  utilities (`scrollbar-thin`, `scrollbar-thumb-*`, `scrollbar-w-*`, the
+  `scrollbar-hover:` variant) remain available for one-off scrollers.
+*/
+@utility scrollbar-subtle {
+  @apply scrollbar-thin scrollbar-track-transparent scrollbar-corner-transparent;
+  @apply scrollbar-thumb-scroll-thumb scrollbar-thumb-rounded-full;
+  @apply scrollbar-hover:scrollbar-thumb-scroll-thumb-hover;
+}
+
+/*
+  Défileur vertical qui ne rogne pas les anneaux de focus.
+
+  `overflow-y: auto` seul rend le clip effectif sur LES DEUX axes (une valeur
+  `visible` en face d'une valeur qui ne l'est pas est calculée en `auto`), et
+  le clip tombe au bord de la padding box. Un champ en `w-full` dans un
+  défileur sans gouttière horizontale perd donc les 3 px d'anneau
+  (`focus-visible:ring-3`) à gauche et à droite : la boîte de dialogue a l'air
+  d'entourer le champ à moitié.
+
+  La gouttière de 6 px couvre l'anneau le plus large de la maison
+  (`ring-2 + ring-offset-2`) et la marge négative l'annule visuellement : le
+  contenu reste aligné, seule la barre de défilement se décale d'autant.
+
+  À utiliser pour TOUT défileur imbriqué dans un corps de dialogue, qui n'a par
+  construction pas le `px-5` du corps lui-même.
+*/
+@utility scroll-y-ring-safe {
+  overflow-y: auto;
+  margin-inline: -0.375rem;
+  padding-inline: 0.375rem;
+}
+
+/*
+  Clignement des artworks de bot : la paupière couleur visor recouvre la
+  capsule un instant, puis se retire, les yeux restent peints dans le WEBP,
+  rien n'est redessiné ouvert. Cadence portée de `face-blink` (mobile) :
+  fermeture ~70 ms, réouverture ~110 ms sur un cycle ~4,4 s ; chaque avatar
+  reçoit une durée et un départ propres en style inline, sinon toute la barre
+  latérale cligne d'un seul homme.
+*/
+@keyframes bot-artwork-blink {
+  0%,
+  95.9% {
+    transform: scaleY(0.06);
+    opacity: 0;
+  }
+  96.2% {
+    opacity: 1;
+  }
+  97.5% {
+    transform: scaleY(1);
+  }
+  99.5% {
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(0.06);
+    opacity: 0;
+  }
+}
+.bot-artwork-lid {
+  animation: bot-artwork-blink 4400ms linear infinite;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-artwork-lid {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* La respiration d'un artwork, le `bob` de grokbot, dont l'avatar penche et
+   monte en permanence. Entre deux clignements espacés de quatre secondes, une
+   tête parfaitement immobile est une icône ; deux pour cent de translation
+   suffisent à en refaire quelqu'un.
+
+   Amplitude et période sont volontairement hors phase avec le clignement, et
+   le retard vient de la même graine (`blinkRhythmFor`) : deux bots d'une même
+   liste ne respirent jamais ensemble. Pas de `will-change`, trente pastilles
+   feraient trente couches de compositeur pour une animation que le navigateur
+   promeut déjà seul le temps qu'elle joue. */
+@keyframes bot-artwork-idle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2.2%) rotate(-0.7deg);
+  }
+  50% {
+    transform: translateY(-0.5%) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-2.6%) rotate(0.7deg);
+  }
+}
+.bot-artwork-idle {
+  animation: bot-artwork-idle 5200ms ease-in-out infinite;
+  transform-origin: 50% 88%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-artwork-idle {
+    animation: none;
+  }
+}
+
+/* Foyer `/` : tokens et motion vivent dans `screens/overview.css`. */
+
+/*
+  Composer, surbrillance arc-en-ciel des plugins MCP.
+
+  Colorer LES LETTRES, et pas seulement leur fond, oblige à effacer le texte du
+  `textarea` et à laisser le calque miroir le peindre à sa place. Trois choses
+  cassent si on s'arrête à `color: transparent` :
+
+  - WebKit peint le texte d'un champ par `-webkit-text-fill-color` et ignore
+    `color` (voir le bloc `:disabled` plus haut) : il faut effacer les deux ;
+  - le curseur suit `caret-color`, dont la valeur initiale est `currentColor`,
+    devenu transparent, le curseur disparaît. On le rattache à la couleur du
+    texte ;
+  - une sélection ne montrerait qu'un bloc vide. `::selection` REPEINT le texte
+    sélectionné : sélectionner pour copier redevient lisible.
+
+  L'état ne dure que le temps d'un nom de plugin écrit dans le champ, et jamais
+  pendant une pré-édition IME (le calque, lui, ne connaît que la valeur
+  validée, voir `composer.tsx`).
+*/
+/*
+  Composer du fil : les valeurs relevées au navigateur sur
+  boardui.com/components/composer-attachments (Composer Panel + Composer
+  Attachments), le 09-09-2026.
+
+  Elles vivent ici et non en classes utilitaires parce que les deux sont des
+  valeurs composées, ombre à deux couches et dégradé, que le JIT ne génère pas
+  de façon fiable depuis une valeur arbitraire à virgules.
+*/
+/* Card shadow: `shadow-xs` at rest, `shadow-sm` on focus-within (composer
+   Mention of streaming-ui.pulseview.app, measured 2026-10-25). */
+[data-composer-shell] {
+  box-shadow: var(--shadow-xs);
+}
+[data-composer-shell]:focus-within {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+[data-composer-send-action] {
+  background-image: linear-gradient(#2b7fff, #155dfc);
+}
+
+[data-composer][data-composer-text="mirrored"] {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--foreground);
+}
+[data-composer][data-composer-text="mirrored"]::selection {
+  color: var(--foreground);
+  -webkit-text-fill-color: var(--foreground);
+}
+
+/*
+  Une lettre de l'arc-en-ciel. La teinte vient du composant (`--ohb-mcp-hue`,
+  répartie sur le mot) ; la clarté et le chroma sont fixés ici en `oklch`, qui
+  garde la MÊME clarté perçue d'une teinte à l'autre, en `hsl`, le jaune
+  sortait délavé et le bleu presque noir sur le même mot.
+*/
+.ohb-mcp-letter {
+  color: oklch(0.58 0.19 var(--ohb-mcp-hue));
+}
+.dark .ohb-mcp-letter {
+  color: oklch(0.78 0.17 var(--ohb-mcp-hue));
+}
+
+/* Une ligne du roster en cours de glissement (`roster-drag.tsx`) : la souris
+   tient une carte, pas du texte, rien ne se sélectionne, et le curseur le dit. */
+body.ohb-roster-dragging,
+body.ohb-roster-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/*
+  La carte du guichet sur la page publique (`components/support/support-panel.tsx`,
+  variante `card`) : les couleurs de la démo message-scroller de shadcn,
+  relevées en styles calculés le 2026-09-12, thème par thème. Elles ne suivent
+  pas les jetons de l'app : la carte est un objet shadcn posé sur la page.
+*/
+.ohb-support-card {
+  --sc-card: #ffffff;
+  --sc-fg: #0a0a0a;
+  --sc-muted-fg: #737373;
+  --sc-tile: #f5f5f5;
+  --sc-line: #e5e5e5;
+  --sc-box: rgba(229, 229, 229, 0.5);
+  --sc-plus-bg: #ffffff;
+  --sc-send: #004de5;
+  --sc-send-fg: #eef6ff;
+  --sc-ring: 0 0 0 1px rgba(10, 10, 10, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.dark .ohb-support-card {
+  --sc-card: #171717;
+  --sc-fg: #fafafa;
+  --sc-muted-fg: #a1a1a1;
+  --sc-tile: #262626;
+  --sc-line: rgba(255, 255, 255, 0.1);
+  --sc-box: rgba(255, 255, 255, 0.075);
+  --sc-plus-bg: transparent;
+  --sc-send: #0040b8;
+  --sc-send-fg: #eef6ff;
+  --sc-ring: 0 0 0 1px rgba(250, 250, 250, 0.1), 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
