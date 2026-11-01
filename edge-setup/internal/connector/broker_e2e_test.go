@@ -30,14 +30,14 @@ func TestBrokerE2ELateCapabilitiesPreserveInflightRequest(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	// The TypeScript broker lives in OpenedBot/openedbot, checked out next to
-	// this repository unless OPENEDBOT_DIR says otherwise.
-	repo := os.Getenv("OPENEDBOT_DIR")
+	// this repository unless OPENEDBOT_MAIN_DIR says otherwise.
+	repo := os.Getenv("OPENEDBOT_MAIN_DIR")
 	if repo == "" {
 		_, file, _, _ := runtime.Caller(0)
 		repo = filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
 	}
 	if _, err := os.Stat(filepath.Join(repo, "tests/e2e/connector-broker-fixture.ts")); err != nil {
-		t.Fatalf("openedbot repository not found at %s: expected the root of the OpenedBot/openedbot monorepo, or set OPENEDBOT_DIR", repo)
+		t.Fatalf("openedbot repository not found at %s: expected the root of the OpenedBot/openedbot monorepo, or set OPENEDBOT_MAIN_DIR", repo)
 	}
 	cmd := exec.CommandContext(ctx, bun, "tests/e2e/connector-broker-fixture.ts")
 	cmd.Dir = repo

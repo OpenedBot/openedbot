@@ -380,7 +380,7 @@ deploy: ## Refuse : le déploiement n'est pas dans ce dépôt ; make build const
 # build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_MODE=solo pour une console solo
 # assumée. Contrat : tests/scripts/console-build-guard-contract.sh.
 prod-console-guard:
-	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_MODE)" != "solo" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_MODE=solo.\n' >&2; exit 2; fi
+	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_MODE)" != "solo" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_MODE=solo.\n' >&2; exit 2; fi
 
 # L'origine de production, celle que la console affiche dans sa commande
 # d'appairage. `link-prod` en est le pendant `make` : la bascule inverse de
@@ -466,7 +466,7 @@ test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et
 # Solo et avec plug-ins, mêmes tests : `test-unit` une fois sans plug-in, puis
 # avec les plug-ins du répertoire plugins/ (voir plugins_dir) chargés par
 # OPENEDBOT_PLUGINS (chemins absolus). Ce répertoire est relié à CE checkout du cœur avant
-# (`make link-core OPENEDBOT_CORE_DIR=…`), pour que cœur et plug-ins partagent une
+# (`make link-core OPENEDBOT_MAIN_DIR=…`), pour que cœur et plug-ins partagent une
 # seule copie de chaque module. Les tests d'or des permissions jouent dans
 # les deux modes ; `apps/api/tests/pro-mode.test.ts` ne joue qu'en pro.
 # Sans plugins/, le cœur ne nomme aucun chemin de plug-in et le solo n'en
@@ -489,7 +489,7 @@ test-dual: ## Tests unitaires deux fois : solo (sans plug-in), puis avec les plu
 	@echo "== test-dual : solo (OPENEDBOT_PLUGINS et OPENEDBOT_CONSOLE_PLUGINS vides)"
 	OPENEDBOT_PLUGINS= OPENEDBOT_CONSOLE_PLUGINS= $(MAKE) test-unit
 	@test -f "plugins/packages/pro-staff/src/plugin.ts" || { echo "test-dual : pas de plug-ins dans ./plugins (clonez ou liez le checkout des plug-ins en ./plugins)"; exit 2; }
-	$(MAKE) -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)
+	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR) OHB_CORE_DIR=$(CURDIR) # rename:keep (plug-in checkout older than the rename)
 	@echo "== test-dual : pro (OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
 	OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) $(MAKE) test-unit
 
@@ -511,7 +511,7 @@ solo-check: ## Console solo sans aucun écran pro (bundle et routes), contrôle 
 	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/solo.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/solo" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts solo "$(SOLO_CHECK_DIR)/solo.json"
 	bun apps/console/scripts/solo-bundle-strings.ts solo "$(SOLO_CHECK_DIR)/solo" $(SOLO_CHECK_MESSAGES)
-	$(MAKE) -C plugins link-core OPENEDBOT_CORE_DIR=$(CURDIR)
+	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR) OHB_CORE_DIR=$(CURDIR) # rename:keep (plug-in checkout older than the rename)
 	@echo "== solo-check : build pro (OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
 	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/pro.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/pro" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts pro "$(SOLO_CHECK_DIR)/pro.json"
