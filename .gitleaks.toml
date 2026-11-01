@@ -72,3 +72,13 @@ description = "Password generator alphabet constant (no secret: the alphabet its
 condition = "AND"
 paths = ['''^edge-setup/internal/commands/admin_password\.go$''']
 regexes = ['''^ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789$''']
+
+[[rules.allowlists]]
+description = "YOLO lease golden vectors: sessionKey is sha256 of a fixed sample session id, not a credential"
+condition = "AND"
+paths = [
+  '''^edge-setup/test/golden/yolo-lease/lease-v1\.json$''',
+  '''^modules/execution/tests/fixtures/yolo-lease/lease-v1\.json$''',
+  '''^platform/hermes/tests/fixtures/relay-frames-yolo\.vectors\.json$''',
+]
+regexes = ['''^08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279$''']
