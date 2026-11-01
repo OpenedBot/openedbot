@@ -318,12 +318,10 @@ describe("Computer provider configuration", () => {
     expect(readApiConfig(development).computer).toEqual({ provider: "disabled" });
   });
 
-  test("requires an environment-owned Box token", () => {
-    expect(() => readApiConfig({ ...development, OPENEDBOT_COMPUTER_PROVIDER: "box" }))
-      .toThrow(/OPENEDBOT_COMPUTER_BOX_TOKEN/);
+  test("the environment-owned Box token alone enables the provider", () => {
+    expect(readApiConfig({ ...development, OPENEDBOT_COMPUTER_BOX_TOKEN: " " }).computer).toEqual({ provider: "disabled" });
     expect(readApiConfig({
       ...development,
-      OPENEDBOT_COMPUTER_PROVIDER: "box",
       OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
     }).computer).toEqual({
       provider: "box",
@@ -336,7 +334,6 @@ describe("Computer provider configuration", () => {
     const configured = readApiConfig({
       ...development,
       OPENEDBOT_ENV: "test",
-      OPENEDBOT_COMPUTER_PROVIDER: "box",
       OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "http://127.0.0.1:18799/provider/",
     });
@@ -344,7 +341,6 @@ describe("Computer provider configuration", () => {
     expect(() => readApiConfig({
       ...development,
       OPENEDBOT_ENV: "test",
-      OPENEDBOT_COMPUTER_PROVIDER: "box",
       OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
       TEST_COMPUTER_BOX_API: "https://attacker.example/provider",
     })).toThrow(/loopback/);

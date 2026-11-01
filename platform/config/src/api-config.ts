@@ -671,13 +671,10 @@ function readComputerProvider(
   env: Record<string, string | undefined>,
   environment: ApiEnvironment,
 ): ComputerProviderConfig {
-  const provider = env.OPENEDBOT_COMPUTER_PROVIDER?.trim() || "disabled";
-  if (provider === "disabled") return { provider: "disabled" };
-  if (provider !== "box") {
-    throw new Error("OPENEDBOT_COMPUTER_PROVIDER must be either disabled or box.");
-  }
+  // One provider exists: its token enables it, its absence keeps the
+  // fail-closed default.
   const token = optional(env.OPENEDBOT_COMPUTER_BOX_TOKEN);
-  if (!token) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is required when OPENEDBOT_COMPUTER_PROVIDER=box.");
+  if (!token) return { provider: "disabled" };
   if (token.length > 4_096) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is too long.");
 
   // A configurable provider origin would turn the API into an authenticated

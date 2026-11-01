@@ -98,7 +98,7 @@ export function mergeEnvFiles(files: readonly EnvFile[]): {
  * (when that one is absent), then the merged names converted (ENV_MERGES),
  * as the apps read them for one more release.
  */
-export function withRenamedEnvValues(values: Readonly<Record<string, string>>): Record<string, string> {
+export function withRenamedEnvValues(values: Readonly<Record<string, string>>, options: { merges?: boolean } = {}): Record<string, string> {
   const folded: Record<string, string> = { ...values };
   for (const [name, value] of Object.entries(values)) {
     const next = renamedEnvName(name);
@@ -107,6 +107,6 @@ export function withRenamedEnvValues(values: Readonly<Record<string, string>>): 
     delete folded[name];
   }
   const merged: Record<string, string | undefined> = folded;
-  foldEnvMerges(merged);
+  if (options.merges !== false) foldEnvMerges(merged);
   return merged as Record<string, string>;
 }

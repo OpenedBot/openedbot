@@ -88,4 +88,14 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
     applyEnvAliases(partial, () => {});
     expect(partial).toEqual({});
   });
+
+  test("the Computer provider: box keeps the token, an explicit disabled unsets it", () => {
+    const box: Record<string, string | undefined> = { OHB_COMPUTER_PROVIDER: "box", OHB_COMPUTER_BOX_TOKEN: "tok" }; // rename:keep
+    applyEnvAliases(box, () => {});
+    expect(box).toEqual({ OHB_COMPUTER_BOX_TOKEN: "tok", OPENEDBOT_COMPUTER_BOX_TOKEN: "tok" }); // rename:keep
+    resetEnvAliasWarnings();
+    const off: Record<string, string | undefined> = { OHB_COMPUTER_PROVIDER: "disabled", OPENEDBOT_COMPUTER_BOX_TOKEN: "tok" }; // rename:keep
+    applyEnvAliases(off, () => {});
+    expect(off).toEqual({});
+  });
 });

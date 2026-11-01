@@ -105,17 +105,10 @@ export const API_INTEGRATIONS_ENV: readonly EnvVar[] = [
     example: "",
   },
   {
-    name: "OPENEDBOT_COMPUTER_PROVIDER",
-    scope: "api",
-    tier: "production",
-    doc: "`disabled` (fail-closed default) or `box`; the provider origin is never configurable.",
-    example: "disabled",
-  },
-  {
     name: "OPENEDBOT_COMPUTER_BOX_TOKEN",
     scope: "api",
     tier: "production",
-    doc: "Box API token, required when OPENEDBOT_COMPUTER_PROVIDER=box; injected from the secret manager.",
+    doc: "Box API token: set, it enables the Computer provider (Box, the only one); empty keeps it disabled (fail-closed). The provider origin is never configurable. Injected from the secret manager.",
     example: "",
     secret: true,
   },

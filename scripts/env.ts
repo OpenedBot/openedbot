@@ -272,10 +272,14 @@ async function runAudit(): Promise<void> {
   const mergedTargets = new Set([...presentNames].map(mergedEnvTarget).filter((into): into is string => into !== undefined));
   const presentAfterRename = new Set([...presentNames].map((name) => renamedEnvName(name) ?? name));
   const writtenTargets = new Set<string>();
+  const beforeMerges = withRenamedEnvValues(mergeEnvFiles(locals).values, { merges: false });
   const mergedLine = (into: string): string | null => {
     if (writtenTargets.has(into)) return null;
     writtenTargets.add(into);
-    return values[into] === undefined ? null : `${into}=${values[into]}`;
+    if (values[into] !== undefined) return `${into}=${values[into]}`;
+    // Turned off by an old setting: commented out, never deleted, so that a
+    // secret the operator kept is not lost.
+    return beforeMerges[into] === undefined ? null : `# ${into}=${beforeMerges[into]} # off: an old OHB_* setting disabled it (env-audit)`;
   };
 
   for (const local of locals) {

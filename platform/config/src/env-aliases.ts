@@ -16,7 +16,6 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_PRO_PLUGINS: "OPENEDBOT_PLUGINS",
   OHB_PRO_CONSOLE: "OPENEDBOT_CONSOLE_PLUGINS",
   OHB_TAILSCALE_FUNNEL_ENABLED: "OPENEDBOT_TAILSCALE_FUNNEL_ENABLED",
-  OHB_COMPUTER_PROVIDER: "OPENEDBOT_COMPUTER_PROVIDER",
   OHB_COMPUTER_BOX_TOKEN: "OPENEDBOT_COMPUTER_BOX_TOKEN",
   OHB_LOG_DIR: "OPENEDBOT_LOG_DIR",
   OHB_LOG_TO_FILES: "OPENEDBOT_LOG_TO_FILES",
@@ -93,6 +92,13 @@ export const ENV_MERGES: readonly EnvMerge[] = [
       const query = suffix && suffix !== "rt.openedbot.app" ? `?suffix=${encodeURIComponent(suffix)}` : "";
       return `cloudflare://${encodeURIComponent(apiToken)}@${accountId}/${zoneId}${query}`;
     },
+  },
+  {
+    // The token alone now enables the provider. An explicit `disabled` next
+    // to a token kept it off: the token is then unset, for the same result.
+    from: ["OHB_COMPUTER_PROVIDER"],
+    into: "OPENEDBOT_COMPUTER_BOX_TOKEN",
+    convert: (env) => (env.OHB_COMPUTER_PROVIDER?.trim() === "box" ? undefined : env.OPENEDBOT_COMPUTER_BOX_TOKEN === undefined ? undefined : null),
   },
 ];
 
