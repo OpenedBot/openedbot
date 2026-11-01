@@ -5,6 +5,7 @@ import {
   envUnusedForRuntimeMode,
   isDeprecatedEnvName,
 } from "../../platform/config/src/env-schema";
+import { renamedEnvName } from "../../platform/config/src/env-aliases";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 
 /** Helpers shared by env-audit and env-template. Values are never printed. */
@@ -32,15 +33,18 @@ export function assertUniqueEnvNames(path: string, names: readonly string[]): vo
 /**
  * What `env-audit --apply` does with one `.env.local` entry.
  *
+ *   - `rename`: an old OHB_* name of the OPENEDBOT_* rename, rewritten under
+ *     its new name with its value (removed when the new name is already set);
  *   - `remove`: deprecated, unused in this runtime mode, an admin mode other
  *     than `disabled`, or an empty non-local variable;
  *   - `preserve`: a non-empty production / default-only variable, reported
  *     by name but kept;
  *   - `keep`: a local variable, or one unknown to the schema.
  */
-export type LocalEnvDecision = "keep" | "preserve" | "remove";
+export type LocalEnvDecision = "keep" | "preserve" | "remove" | "rename";
 
 export function classifyLocalEnvEntry(entry: EnvEntry, runtimeMode: RuntimeMode): LocalEnvDecision {
+  if (renamedEnvName(entry.name)) return "rename";
   if (isDeprecatedEnvName(entry.name) || envUnusedForRuntimeMode(runtimeMode).has(entry.name)) return "remove";
   if (entry.name === "OHB_RUNTIME_ADMIN_MODE" && entry.value.trim() !== "disabled") return "remove";
   const tier = envSchemaEntry(entry.name)?.tier;
@@ -89,4 +93,19 @@ export function mergeEnvFiles(files: readonly EnvFile[]): {
     }
   }
   return { values, sourceOf };
+}
+
+/**
+ * The values with every old OHB_* name folded into its OPENEDBOT_* name
+ * (when that one is absent), as the apps read them for one more release.
+ */
+export function withRenamedEnvValues(values: Readonly<Record<string, string>>): Record<string, string> {
+  const folded: Record<string, string> = { ...values };
+  for (const [name, value] of Object.entries(values)) {
+    const next = renamedEnvName(name);
+    if (!next) continue;
+    if (!(next in values)) folded[next] = value;
+    delete folded[name];
+  }
+  return folded;
 }

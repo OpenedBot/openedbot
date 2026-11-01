@@ -24,12 +24,14 @@ import {
   type EnvVar,
 } from "../platform/config/src/env-schema";
 import { readRuntimeMode } from "../platform/config/src/runtime-mode";
+import { renamedEnvName } from "../platform/config/src/env-aliases";
 import {
   assertUniqueEnvNames,
   classifyLocalEnvEntry,
   mergeEnvFiles,
   parseEnvLine,
   readEnvFiles,
+  withRenamedEnvValues,
 } from "./lib/env-file";
 
 function usage(): never {
@@ -53,7 +55,9 @@ async function runCheck(): Promise<void> {
   if (!files.length) {
     throw new Error(`No ${path} found. Run \`make setup\`, or copy each .env.example next to it.`);
   }
-  const { values, sourceOf } = mergeEnvFiles(files);
+  const merged = mergeEnvFiles(files);
+  const values = withRenamedEnvValues(merged.values);
+  const { sourceOf } = merged;
 
   /** Where a variable must be set, for an error message that is actionable. */
   function fileOf(name: string): string {
@@ -265,33 +269,50 @@ async function runAudit(): Promise<void> {
     console.info(`${localName}: absent; templates are consistent.`);
     process.exit(0);
   }
-  const { values } = mergeEnvFiles(locals);
+  const values = withRenamedEnvValues(mergeEnvFiles(locals).values);
   const runtimeMode = readRuntimeMode(
     process.env.OHB_RUNTIME_MODE?.trim() || values.OHB_RUNTIME_MODE?.trim(),
     "development",
   );
 
   const removable: string[] = [];
+  const renamed: string[] = [];
   const kept: string[] = [];
   const misfiled: string[] = [];
+  const presentNames = new Set(locals.flatMap((local) => local.entries.map((entry) => entry.name)));
 
   for (const local of locals) {
-    const nextLines = local.text.split(/\r?\n/).filter((line) => {
+    const nextLines: string[] = [];
+    for (const line of local.text.split(/\r?\n/)) {
       const parsed = parseEnvLine(line);
-      if (!parsed) return true;
+      if (!parsed) {
+        nextLines.push(line);
+        continue;
+      }
       const decision = classifyLocalEnvEntry(parsed, runtimeMode);
+      if (decision === "rename") {
+        // The value moves to the new name; never dropped (one-release rename).
+        const next = renamedEnvName(parsed.name)!;
+        if (presentNames.has(next)) {
+          renamed.push(`${parsed.name} -> ${next}, already set: old line removed (${local.path})`);
+        } else {
+          renamed.push(`${parsed.name} -> ${next} (${local.path})`);
+          nextLines.push(`${next}=${parsed.value}`);
+        }
+        continue;
+      }
       if (decision === "remove") {
         removable.push(`${parsed.name} (${local.path})`);
-        return false;
+        continue;
       }
       if (decision === "preserve") kept.push(parsed.name);
       const declared = envSchemaEntry(parsed.name);
       const owner = declared ? ENV_DIR_OF_SCOPE[declared.scope] : local.dir;
       if (owner !== local.dir) misfiled.push(`${parsed.name}: ${local.path} -> ${envFilePath(owner, localName)}`);
-      return true;
-    });
+      nextLines.push(line);
+    }
 
-    if (apply && nextLines.length !== local.text.split(/\r?\n/).length) {
+    if (apply && nextLines.join("\n") !== local.text.split(/\r?\n/).join("\n")) {
       const temporary = `${local.path}.tmp`;
       await writeFile(temporary, `${nextLines.join("\n").replace(/\n+$/, "")}\n`, { mode: 0o600 });
       await chmod(temporary, 0o600);
@@ -300,6 +321,9 @@ async function runAudit(): Promise<void> {
   }
 
   console.info(`${localName}: removable empty or obsolete variables: ${removable.sort().join(", ") || "none"}.`);
+  if (renamed.length) {
+    console.info(`${localName}: ${apply ? "renamed" : "to rename (OHB_* -> OPENEDBOT_*, values kept; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
+  }
   if (kept.length) console.info(`${localName}: preserved non-empty non-local variables: ${[...new Set(kept)].sort().join(", ")}.`);
   for (const line of misfiled.sort()) {
     console.info(`${localName}: in the wrong file, \`bun scripts/env.ts --template --write-local\` moves it — ${line}`);
@@ -485,7 +509,7 @@ async function write(): Promise<void> {
 async function writeLocal(fileName: string): Promise<void> {
   const files = await readEnvFiles(fileName);
   if (!files.length) throw new Error(`No ${fileName} found in the monorepo; nothing to rewrite.`);
-  const { values: existing } = mergeEnvFiles(files);
+  const existing = withRenamedEnvValues(mergeEnvFiles(files).values);
   const runtimeMode = readRuntimeMode(
     process.env.OHB_RUNTIME_MODE?.trim() || existing.OHB_RUNTIME_MODE?.trim(),
     "development",
@@ -527,9 +551,16 @@ async function writeLocal(fileName: string): Promise<void> {
   // Unknown to the schema: kept verbatim in the root file, as env-audit does,
   // so that nothing an operator added on purpose disappears silently.
   const unknown: string[] = [];
+  const renamed: string[] = [];
   for (const file of files) {
     for (const parsed of file.entries) {
       if (envSchemaEntry(parsed.name)) continue;
+      const next = renamedEnvName(parsed.name);
+      if (next) {
+        // Its value now sits under the new name (withRenamedEnvValues).
+        renamed.push(`${parsed.name} -> ${next}`);
+        continue;
+      }
       if (isDeprecatedEnvName(parsed.name)) {
         removed.push(parsed.name);
         continue;
@@ -564,6 +595,7 @@ async function writeLocal(fileName: string): Promise<void> {
 
   console.info(`runtime mode ${runtimeMode}; removed: ${removed.sort().join(", ") || "none"}.`);
   console.info(`added from the template: ${added.sort().join(", ") || "none"}.`);
+  if (renamed.length) console.info(`renamed (values kept): ${renamed.sort().join(", ")}.`);
   for (const line of moved.sort()) console.info(`moved ${line}`);
   if (preserved.length) console.info(`preserved non-empty non-local variables: ${preserved.sort().join(", ")}.`);
   if (unknown.length) console.info(`kept ${unknown.length} variable(s) unknown to the schema in ${fileName}.`);
