@@ -595,7 +595,14 @@ func (a *Auditor) sudoers(context.Context) Result {
 		return Result{"sudoers", Fail, layout.SudoersAdmin + " exists but --ssh-hardening was not selected"}
 	}
 	if sshHardening {
-		return Result{"sudoers", Pass, "no sudo rule for " + layout.ServiceUser + "; " + layout.AdminUser + " has the administrator rule of --ssh-hardening"}
+		mode := a.State.AdminSudo
+		if mode == "" {
+			mode = layout.AdminSudoNoPasswd // hardened before --admin-sudo existed
+		}
+		if mode == layout.AdminSudoPassword && strings.Contains(a.read(layout.SudoersAdmin), "NOPASSWD") {
+			return Result{"sudoers", Fail, layout.SudoersAdmin + " grants NOPASSWD but --admin-sudo=" + layout.AdminSudoPassword + " was chosen"}
+		}
+		return Result{"sudoers", Pass, "no sudo rule for " + layout.ServiceUser + "; " + layout.AdminUser + " has the administrator rule of --ssh-hardening (" + mode + ")"}
 	}
 	return Result{"sudoers", Pass, "no sudo rule for " + layout.ServiceUser + " and none written by this tool"}
 }

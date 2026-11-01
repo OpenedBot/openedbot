@@ -57,17 +57,51 @@ LockPersonality=true
 RestrictRealtime=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # Agent-driven code runs in this process tree (the `local` backend, the Node
-# bridges), so only what no workload legitimately needs is removed here:
-# capabilities (the unit runs unprivileged), the clock, the kernel log, the
-# hostname, foreign ABIs. MemoryDenyWriteExecute= would break Node's JIT, and
-# SystemCallFilter=, PrivateDevices= and RestrictNamespaces= would break tools
-# an operator runs on purpose: they are not set.
+# bridges, the docker CLI of the sandbox backend), so each option below was
+# proved on a Debian 13 host (systemd 257) with real agent tools: the terminal
+# tool in a rootless Docker sandbox through the API, and, in a copy of this
+# unit, Python (multiprocessing, ctypes callbacks, SQLite WAL, setrlimit),
+# Node.js (JIT, WebAssembly, fetch, child processes), npx, git, tar, curl,
+# PTYs, /dev/shm and `docker run` with a workspace volume.
+# Two options were tried and left out because they break that workload:
+# - MemoryDenyWriteExecute= kills Node.js at its first JIT tier-up
+#   (SIGTRAP in Runtime_BytecodeBudgetInterrupt), npx included;
+# - ProcSubset=pid hides /proc/meminfo, /proc/cpuinfo and /proc/loadavg:
+#   os.cpus() in Node returns an empty list and psutil-style probes fail.
+# UMask= is left at 0022 on purpose: the workspaces are bind-mounted into the
+# sandboxes, where a non-root image user maps to a subordinate uid; 0027
+# would hide every file the agent writes from it.
+# RestrictNamespaces= refuses unshare(2) and setns(2): an agent cannot build
+# its own container or user namespace (unshare, bwrap, a sandboxed Chromium)
+# inside this unit. Sandboxes belong to the rootless dockerd, which runs in the
+# service user's manager outside this unit; the browser runs there too.
 CapabilityBoundingSet=
 AmbientCapabilities=
 ProtectClock=true
 ProtectKernelLogs=true
 ProtectHostname=true
 SystemCallArchitectures=native
+# @system-service as is: nothing in it broke the workload above. @privileged
+# and @resources are not removed from it: fchown(2) on the service user's own
+# files and setrlimit(2) are ordinary tool calls (tar, pip, shells, Python). Everything @system-service leaves
+# out (mount, module, reboot, swap, raw I/O, clock, debug/ptrace, obsolete
+# ABIs) fails with EPERM instead of killing the caller.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RestrictNamespaces=true
+# A private /dev (null, zero, random, tty, pts, shm): no disk, no hardware.
+PrivateDevices=true
+# Only the processes of the service user are visible in /proc (its own
+# gateway, the connector, the rootless dockerd and its sandboxes).
+ProtectProc=invisible
+# A user namespace that maps only root (without capabilities) and the service
+# user: every other account and group shows as nobody, and a process that
+# escapes the other options holds no other uid.
+PrivateUsers=true
+# SysV and POSIX IPC objects of the service user are removed when the
+# gateway stops; sandboxes keep their own IPC namespace in the rootless
+# dockerd and are not affected.
+RemoveIPC=true
 # cgroup-scoped BPF address filter: it covers this unit and every process it
 # spawns, which is what makes it the system-wide layer. With the `local`
 # terminal backend there is no container at all: agent-driven code runs in this

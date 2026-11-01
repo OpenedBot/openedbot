@@ -41,22 +41,30 @@ ssh_opts=(-i id_ed25519 -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownH
 for _ in $(seq 1 90); do ssh "${ssh_opts[@]}" debian@127.0.0.1 true 2>/dev/null && break; sleep 2; done
 ssh "${ssh_opts[@]}" debian@127.0.0.1 true || { echo "VM did not come up (see $work/serial.log)" >&2; exit 1; }
 
-scp -q "${ssh_opts[@]}" "$root/dist/edge-setup" admin_ed25519.pub debian@127.0.0.1:/tmp/
+# hermes-admin's sudo password (the default --admin-sudo=password); the VM has
+# no terminal for the prompt, so it comes from a 0600 file.
+admin_password="vm-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+(umask 077; printf '%s\n' "$admin_password" > admin.password)
+scp -q "${ssh_opts[@]}" "$root/dist/edge-setup" admin_ed25519.pub admin.password debian@127.0.0.1:/tmp/
 # The command line is built here, on purpose, and run by the VM's shell.
 # shellcheck disable=SC2029
 vm() { ssh "${ssh_opts[@]}" debian@127.0.0.1 "sudo -n $*"; }
 vm install -m 0755 /tmp/edge-setup /usr/local/sbin/edge-setup
 vm install -m 0600 /tmp/admin_ed25519.pub /root/admin.pub
+vm install -m 0600 /tmp/admin.password /root/admin.password
+vm rm -f /tmp/admin.password
 vm edge-setup detect
 vm edge-setup up --sandbox --persistent-journal --unattended-upgrades \
   --sudo-logging --password-policy --disable-llmnr \
   --firewall --allow-inbound 22/tcp --fail2ban \
   --ssh-hardening --quarantine-cloud-user \
-  --admin-key /root/admin.pub --console-confirmed --detach --yes
-# The new session: the admin key over the forwarded port.
-ssh -i admin_ed25519 -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR \
-  hermes-admin@127.0.0.1 sudo -n edge-setup verify-access
-admin() { ssh -i admin_ed25519 -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR hermes-admin@127.0.0.1 "sudo -n $*"; }
+  --admin-key /root/admin.pub --admin-password-file /root/admin.password \
+  --console-confirmed --detach --yes
+# The new session: the admin key over the forwarded port; sudo reads the
+# password on stdin.
+admin() { ssh -i admin_ed25519 -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR hermes-admin@127.0.0.1 "sudo -S -p '' $*" < admin.password; }
+admin edge-setup verify-access
+admin rm -f /root/admin.password
 admin edge-setup doctor
 admin edge-setup audit --strict
 admin edge-setup status

@@ -31,7 +31,7 @@ connection. It has two parts:
 |---|---|
 | A network attacker between the host and the release origin, a CDN, or a mirror | every binary is verified against a `SHA256SUMS` signed keyless by the release workflow (Sigstore); HTTPS only; any failure installs nothing |
 | An attacker who controls `releases.openedbot.app` | cannot produce a valid signature; can withhold releases or point `LATEST` at an older or the same signed one, which `upgrade` refuses without `--allow-downgrade` and `auto-upgrade` always refuses |
-| An agent workload running in the gateway (prompt injection, malicious tool) | runs as the unprivileged `hermes` account, no shell, no sudo; the gateway unit hides the connector's credentials, the operator socket and the rest of the system (`ProtectSystem=strict`, `ProtectHome=tmpfs`, no capability); cloud metadata endpoints are denied |
+| An agent workload running in the gateway (prompt injection, malicious tool) | runs as the unprivileged `hermes` account, no shell, no sudo; the gateway unit hides the connector's credentials, the operator socket and the rest of the system (`ProtectSystem=strict`, `ProtectHome=tmpfs`, no capability); the operator also refuses any peer that is not root or the connector's own system unit, so a `hermes` process outside the gateway (rootless Docker, the user manager) cannot drive it either; cloud metadata endpoints are denied |
 | An unprivileged local user | the gateway listens on `127.0.0.1:8642` only and requires the bearer; with `--firewall`, an owner-match rule refuses loopback connections from any uid but `hermes` and root; every secret file is 0600 |
 | Someone who steals the link token | cannot reconnect without the device key (proof of possession at every connection); the token rotates over the link |
 | Someone who reads a log or a shell history | the ticket is refused on the command line and is read from a no-echo prompt, stdin or a 0600 file; the journal masks anything shaped like a secret |
@@ -147,11 +147,24 @@ systemd 257):
 | Unit | User | Exposure | Why not lower |
 |---|---|---|---|
 | `hermes-connector` | hermes | 1.3 | — |
-| `hermes-operator` | root | 3.1 | it must switch to `hermes` (`runuser`) to run the provider sign-in commands openedbot asks for; capabilities limited to SETUID, SETGID, CHOWN, FOWNER, DAC_OVERRIDE |
-| `hermes-gateway` | hermes | 4.1 | runs arbitrary agent tools (Node.js JIT, Python, optional rootless Docker): no `MemoryDenyWriteExecute`, no system call filter. Two `ExecStartPre=+` lines run as root before it starts: one creates `/run/credentials`, one waits up to 60 s for the rootless Docker socket |
+| `hermes-operator` | root | 2.5 | it must switch to `hermes` (`runuser`) to run the provider sign-in commands openedbot asks for; capabilities limited to SETUID, SETGID, CHOWN, FOWNER, DAC_OVERRIDE |
+| `hermes-gateway` | hermes | 1.3 | runs arbitrary agent tools (Node.js JIT, Python, optional rootless Docker). It has the `@system-service` system call filter, `RestrictNamespaces`, `PrivateDevices`, `PrivateUsers`, `ProtectProc=invisible`, `RemoveIPC` and no capability; `MemoryDenyWriteExecute` (kills the Node.js JIT), `ProcSubset=pid` (hides `/proc/meminfo` and `/proc/cpuinfo`) and `UMask=0027` (hides agent files from non-root sandbox users) were measured and left out. Two `ExecStartPre=+` lines run as root before it starts: one creates `/run/credentials`, one waits up to 60 s for the rootless Docker socket |
 | `hermes-setup-upgrade` (opt-in timer) | root | 7.0 | it replaces the binary and restarts units |
 | `hermes-loopback-guard` (with `--firewall`) | root | 1.8 | — (writes iptables rules: NET_ADMIN and NET_RAW only, no IP traffic, no device) |
 | `hermes-hardening-rollback` (with `--ssh-hardening`) | root | 8.8 | restores SSH access if a hardening is not confirmed in 10 minutes |
+
+**The operator socket.** `hermes-operator` serves a fixed list of named
+verbs; an unknown route gets `404 ROUTE_UNKNOWN`, and no verb takes a command,
+a path or a free argument. Before routing it refuses dot segments, empty
+segments and encoded slashes; every route parameter is checked against its
+grammar before its handler runs, and MCP bodies are checked before any
+process starts. Each connection is then checked with `SO_PEERCRED`: root is
+accepted, the `hermes` account only from the connector's own system unit
+(its cgroup under `/system.slice`, which only PID 1 can place a process in);
+the gateway, the rootless Docker daemon and the `hermes` user manager share
+that uid and are refused. Its unit adds `RestrictNamespaces=true`,
+`MemoryDenyWriteExecute=` and `ProtectProc=invisible`, which brings its
+exposure from 3.1 to 2.5.
 
 Host policies are opt-in, each by its own flag, and apply inside a
 transaction that rolls back by itself if access is not confirmed:
@@ -160,10 +173,21 @@ unattended upgrades, persistent journal, sudo logging, cloud-init account
 quarantine.
 
 **`--ssh-hardening` creates an administrator.** It creates `hermes-admin`,
-key-only SSH login, with `NOPASSWD: ALL` in `/etc/sudoers.d/80-hermes-admin`,
-to replace the cloud-init account it quarantines. Without that flag, no
-sudoers file is written. `audit` fails if a file of `/etc/sudoers.d` grants a
-rule to `hermes`, or if the administrator rule exists without `--ssh-hardening`.
+key-only SSH login, to replace the cloud-init account it quarantines. Its rule
+in `/etc/sudoers.d/80-hermes-admin` asks its own password for every `sudo`
+(`--admin-sudo=password`, the default): a stolen SSH key alone does not give
+root. `up` asks that password twice on the terminal, without echo, or
+generates one, shows it once on the terminal and waits for the operator to
+confirm it is stored; without a terminal it reads `--admin-password-file`
+(a 0600 file owned by the caller). The password is never printed on stdout or
+stderr, never written to the journal or the state file, and is set with
+`chpasswd` on stdin only after the reloaded sshd is proved to refuse passwords.
+It must be at least as long as the password policy's minimum (14).
+`--admin-sudo=nopasswd` keeps the former `NOPASSWD: ALL` rule, and hosts
+hardened before this option keep theirs. Without `--ssh-hardening`, no sudoers
+file is written. `audit` fails if a file of `/etc/sudoers.d` grants a rule to
+`hermes`, if the administrator rule exists without `--ssh-hardening`, or if it
+grants `NOPASSWD` where a password was chosen.
 
 Network destinations of the binary:
 

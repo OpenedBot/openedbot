@@ -10,6 +10,22 @@ La numérotation repart de v0.0.1 avec le dépôt autonome et la nouvelle origin
 de téléchargement. Les versions v0.2.0 à v1.4.0, publiées depuis l'ancien
 dépôt, restent listées plus bas pour l'historique.
 
+## Unreleased
+
+### Sécurité
+
+- Avec `--ssh-hardening`, le compte d'administration `hermes-admin` doit désormais taper son propre mot de passe pour chaque `sudo` : une clé SSH volée ne suffit plus à devenir root. `edge-setup up` demande ce mot de passe deux fois sans l'afficher, ou en génère un, l'affiche une seule fois et attend que vous confirmiez l'avoir rangé, avant de rien changer. Il doit compter au moins 14 caractères. Il n'est jamais écrit dans un journal ni affiché ailleurs que sur votre terminal, et il n'est posé qu'une fois prouvé que SSH refuse les mots de passe.
+- `--admin-sudo=nopasswd` garde l'ancienne règle, sans mot de passe. Une machine déjà durcie garde la sienne. `edge-setup audit` signale une règle sans mot de passe là où un mot de passe a été choisi.
+
+### Ajouté
+
+- `--admin-sudo password|nopasswd` choisit la règle sudo de `hermes-admin` (`password` par défaut).
+- `--admin-password-file` lit ce mot de passe dans un fichier réservé à son propriétaire, pour une installation sans terminal.
+
+### Corrigé
+
+- Avec `--password-policy`, un changement de mot de passe pouvait échouer faute du dictionnaire de mots de passe : edge-setup installe désormais `cracklib-runtime` avec la politique.
+
 ## v0.0.4 - 2026-11-01
 
 ### Sécurité

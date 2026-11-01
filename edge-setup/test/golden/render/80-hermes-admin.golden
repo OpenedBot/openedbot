@@ -1,1 +1,1 @@
-hermes-admin ALL=(ALL:ALL) NOPASSWD: ALL
+hermes-admin ALL=(ALL:ALL) ALL
