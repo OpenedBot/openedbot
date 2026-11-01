@@ -122,7 +122,7 @@ export type RuntimeConfigurationDto = {
   devDefaults: RuntimeDevDefaultsDto | null;
   /**
    * OHB-75 : openedbot peut publier un gateway sur son propre compte Cloudflare
-   * (`OPENEDBOT_CF_*` renseignés). Absent sur les serveurs antérieurs.
+   * (`OPENEDBOT_MANAGED_TUNNEL_URL` renseignée). Absent sur les serveurs antérieurs.
    */
   managedTunnelAvailable?: boolean;
   /**

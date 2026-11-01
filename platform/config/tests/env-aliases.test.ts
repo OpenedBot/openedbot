@@ -73,4 +73,19 @@ describe("OHB_* -> OPENEDBOT_* one-release fallback", () => {
       expect([merge.into, envSchemaEntry(merge.into)?.name]).toEqual([merge.into, merge.into]);
     }
   });
+
+  test("the four Cloudflare names fold into one managed tunnel URL that reads back", async () => {
+    const { readManagedTunnelConfig } = await import("../../integrations/src/managed-tunnel");
+    const env: Record<string, string | undefined> = { OHB_CF_ACCOUNT_ID: "acc", OHB_CF_API_TOKEN: "t/k", OHB_CF_ZONE_ID: "zone", OHB_MANAGED_TUNNEL_SUFFIX: "example.test" }; // rename:keep
+    const warnings: string[] = [];
+    applyEnvAliases(env, (message) => warnings.push(message));
+    expect(Object.keys(env)).toEqual(["OPENEDBOT_MANAGED_TUNNEL_URL"]);
+    expect(readManagedTunnelConfig(env)).toEqual({ accountId: "acc", apiToken: "t/k", zoneId: "zone", hostSuffix: "example.test" });
+    expect(warnings).toHaveLength(4);
+    expect(warnings.join("\n")).not.toContain("t/k");
+    resetEnvAliasWarnings();
+    const partial: Record<string, string | undefined> = { OHB_CF_ACCOUNT_ID: "acc" }; // rename:keep
+    applyEnvAliases(partial, () => {});
+    expect(partial).toEqual({});
+  });
 });

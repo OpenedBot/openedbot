@@ -15,10 +15,6 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_ENV: "OPENEDBOT_ENV",
   OHB_PRO_PLUGINS: "OPENEDBOT_PLUGINS",
   OHB_PRO_CONSOLE: "OPENEDBOT_CONSOLE_PLUGINS",
-  OHB_CF_ACCOUNT_ID: "OPENEDBOT_CF_ACCOUNT_ID",
-  OHB_CF_API_TOKEN: "OPENEDBOT_CF_API_TOKEN",
-  OHB_CF_ZONE_ID: "OPENEDBOT_CF_ZONE_ID",
-  OHB_MANAGED_TUNNEL_SUFFIX: "OPENEDBOT_MANAGED_TUNNEL_SUFFIX",
   OHB_TAILSCALE_FUNNEL_ENABLED: "OPENEDBOT_TAILSCALE_FUNNEL_ENABLED",
   OHB_COMPUTER_PROVIDER: "OPENEDBOT_COMPUTER_PROVIDER",
   OHB_COMPUTER_BOX_TOKEN: "OPENEDBOT_COMPUTER_BOX_TOKEN",
@@ -83,6 +79,20 @@ export const ENV_MERGES: readonly EnvMerge[] = [
     from: ["OHB_DEPLOY_ENV"],
     into: "OPENEDBOT_ENV",
     convert: (env) => (env.OHB_DEPLOY_ENV?.trim().toLowerCase() === "preprod" && env.OPENEDBOT_ENV?.trim() === "production" ? "preprod" : undefined),
+  },
+  {
+    // Four values that only make sense together become one URL, the token
+    // percent-encoded in its user part (still a secret, never logged).
+    from: ["OHB_CF_ACCOUNT_ID", "OHB_CF_API_TOKEN", "OHB_CF_ZONE_ID", "OHB_MANAGED_TUNNEL_SUFFIX"],
+    into: "OPENEDBOT_MANAGED_TUNNEL_URL",
+    convert: (env) => {
+      if (env.OPENEDBOT_MANAGED_TUNNEL_URL?.trim()) return undefined;
+      const [accountId, apiToken, zoneId] = [env.OHB_CF_ACCOUNT_ID, env.OHB_CF_API_TOKEN, env.OHB_CF_ZONE_ID].map((value) => value?.trim() ?? "");
+      if (!accountId || !apiToken || !zoneId) return undefined;
+      const suffix = env.OHB_MANAGED_TUNNEL_SUFFIX?.trim().toLowerCase().replace(/^\.+|\.+$/g, "");
+      const query = suffix && suffix !== "rt.openedbot.app" ? `?suffix=${encodeURIComponent(suffix)}` : "";
+      return `cloudflare://${encodeURIComponent(apiToken)}@${accountId}/${zoneId}${query}`;
+    },
   },
 ];
 

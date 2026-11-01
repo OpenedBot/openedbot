@@ -157,9 +157,9 @@ habituel.
 Les deux cartes restent visibles dans la console, mais désactivées tant que
 le déploiement ne les ouvre pas :
 
-- **Tunnel géré par openedbot** : `OPENEDBOT_CF_ACCOUNT_ID`, `OPENEDBOT_CF_API_TOKEN` et
-  `OPENEDBOT_CF_ZONE_ID` renseignés côté API et worker ; `OPENEDBOT_MANAGED_TUNNEL_SUFFIX`
-  vaut `rt.openedbot.app` par défaut ;
+- **Tunnel géré par openedbot** : `OPENEDBOT_MANAGED_TUNNEL_URL`
+  (`cloudflare://<jeton-api>@<id-compte>/<id-zone>`) renseignée côté API et worker ;
+  un `?suffix=` facultatif change le suffixe des noms d'hôte, `rt.openedbot.app` par défaut ;
 - **Tailscale Funnel** : `OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`.
 
 Sinon, l'API répond `MANAGED_TUNNEL_UNAVAILABLE` ou
