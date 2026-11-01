@@ -5,6 +5,8 @@ include scripts/lib/env-aliases.mk
 # s'il existe, peut poser par exemple LINK_DEV_HOST=user@your-vm.
 -include $(CURDIR)/Makefile.local
 
+# ─── Configuration ───────────────────────────────────────────────────────────
+
 ENV_FILE ?= .env.local
 # Development profile: fake (default, tests/fake-hermes), bundled (Docker Hermes)
 # or external (operator-provided runtime). The apps always run in the external
@@ -30,6 +32,7 @@ MODE ?= fake
 else
 MODE ?= external
 endif
+
 # Une variable, un fichier, et ce fichier est celui de la racine : API,
 # worker, console, backoffice, Makefile et scripts y puisent tous
 # (platform/config/src/env-schema.ts, ENV_DIR_OF_SCOPE, toutes portées
@@ -42,10 +45,15 @@ LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]
 LOAD_ENV = if [ ! -f "$(ENV_FILE)" ]; then printf '%s is missing. Run make setup.\n' "$(ENV_FILE)" >&2; exit 1; fi; $(LOAD_ENV_FILES)
 LOAD_ENV_OPT = $(LOAD_ENV_FILES)
 
+# Les cibles e2e qui parlent à l'API locale vérifient d'abord qu'elle répond.
+REQUIRE_API = $(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
+	|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+
 DEV_COMMAND ?= bun run --filter api --filter console --filter worker --parallel --no-orphans --elide-lines=0 dev
 DEV_API_COMMAND ?= bun run --cwd apps/api --silent dev
 DEV_CONSOLE_COMMAND ?= bun run --cwd apps/console --silent dev
 DEV_WORKER_COMMAND ?= bun run --cwd apps/worker --silent dev
+
 # Plug-ins externes : par convention le répertoire plugins/ à la racine de ce
 # checkout, ignoré par git (clone ou lien symbolique du checkout des plug-ins :
 # `ln -s <checkout des plug-ins> plugins`). Détecté s'il existe ; absent, le
@@ -54,22 +62,15 @@ plugins_dir := $(if $(wildcard $(CURDIR)/plugins/.),$(CURDIR)/plugins)
 # Le backoffice staff est un plug-in externe : plugins/admin, ou ADMIN_DIR directement.
 ADMIN_DIR ?= $(if $(plugins_dir),$(plugins_dir)/admin)
 DEV_ADMIN_COMMAND ?= bun run --cwd $(ADMIN_DIR) --silent dev
-UNIT_CONSOLE_BATCH_SIZE ?= 1
+REQUIRE_ADMIN = if [ ! -f "$(ADMIN_DIR)/package.json" ]; then printf '$(C_ERR)[make]$(C_RESET) backoffice introuvable : %s (checkout des plug-ins en ./plugins, ou ADMIN_DIR=...).\n' "$(ADMIN_DIR)" >&2; exit 2; fi
 
-
-.PHONY: help help-all
-.PHONY: setup env-check env-audit env-prune env-template env-prod-list env-where
-.PHONY: db-up infra-up mailpit-up fake-hermes fake-apns db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
-.PHONY: link-dev-up link-dev-down link-dev-status link-mode
-.PHONY: link-gateway-install link-prod link-dev-verify
-.PHONY: dev dev-api dev-console dev-worker dev-admin preview-console stop
-.PHONY: typecheck deps-check test-unit test-dual solo-check test-integration test check license-check
-.PHONY: contract-check
-.PHONY: e2e-api e2e-bot e2e-bot-keep e2e-bot-bench e2e-fresh-setup e2e-onboarding e2e-support-ui e2e-hermes e2e-support e2e-link e2e-link-load e2e-link-separation e2e-link-continuity e2e-push email-preview e2e-email load
-.PHONY: build-api build-alerting build-cloud
-.PHONY: build build-console build-admin prod-console-guard deploy
-.PHONY: wt-new wt-ls wt-merge wt-rm wt-sync
-.PHONY: clean
+# L'app desktop (coque Electron autour de la console) vit hors des workspaces
+# bun de la racine : son propre bun.lock, ses propres node_modules, son propre
+# Makefile (packaging, journal, design lab : `make -C apps/desktop help`).
+DESKTOP_DIR := apps/desktop
+DESKTOP_DEPS := $(DESKTOP_DIR)/node_modules/.make-installed
+# La console que vise `make desktop` : celle de `make dev` (WEB_APP_URL).
+DESKTOP_CONSOLE_URL ?= $(or $(call env_file_value,WEB_APP_URL),http://localhost:1420)
 
 # ─── Couleurs ────────────────────────────────────────────────────────────────
 # Définies une fois, réutilisées par les recettes qui parlent à l'utilisateur.
@@ -100,9 +101,10 @@ C_DEV_OTHER   :=
 endif
 
 # ─── Aide ────────────────────────────────────────────────────────────────────
+.PHONY: help help-all
 
 # Les cibles du quotidien, par mode ; toutes les autres restent dans help-all.
-HELP_DEV     := setup dev stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
+HELP_DEV     := setup dev desktop stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
 # Les fragments privés (plugins/make/*.mk, en fin de fichier) y ajoutent leurs cibles.
 HELP_PREPROD :=
 HELP_PROD    := link-prod
@@ -117,7 +119,8 @@ help: ## Les commandes du quotidien, par mode.
 help-all: ## Toutes les commandes documentées, par section.
 	@$(HELP_AWK) -v all=1 $(MAKEFILE_LIST)
 
-# ─── Mode dev : installation du poste ────────────────────────────────────────
+# ─── Dev : installation du poste ─────────────────────────────────────────────
+.PHONY: setup env-check env-audit env-prune env-template env-where env-prod-list
 
 setup: ## Prépare entièrement le développement local (env, dépendances, PostgreSQL et données).
 	ENV_FILE="$(ENV_FILE)" OPENEDBOT_DEV_PROFILE="$(MODE)" bash scripts/setup.sh
@@ -140,7 +143,8 @@ env-where: ## Où une variable est déclarée et quel fichier doit la porter (NA
 env-prod-list: ## Imprime le modèle de production (aucun fichier de prod n'est versionné ; valeurs au gestionnaire de secrets).
 	@bun scripts/env.ts --template --print-production
 
-# ─── Mode dev : base et services partagés ────────────────────────────────────
+# ─── Dev : base et services partagés ─────────────────────────────────────────
+.PHONY: db-up infra-up mailpit-up fake-hermes fake-apns db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
 
 db-up: ## [DB] Vérifie le PostgreSQL partagé (dev-infra, redémarré s’il est arrêté, jamais créé ici) ; jamais Hermes.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --up
@@ -194,7 +198,8 @@ endif
 runtime-token-rotate: db-migrate env-check ## Ré-encrypte atomiquement les tokens avec la clé courante.
 	$(LOAD_ENV) bun apps/api/scripts/rotate-runtime-token-key.ts
 
-# ─── Mode dev : lancer les apps et le lien ───────────────────────────────────
+# ─── Dev : lancer les apps ───────────────────────────────────────────────────
+.PHONY: dev dev-api dev-console dev-worker dev-admin desktop preview-console stop
 
 dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les trois apps; ni infra, ni migration. MODE=fake|bundled|external force le profil.
 	@set -eo pipefail; $(LOAD_ENV) \
@@ -223,27 +228,45 @@ dev-api: env-check ## [API] Lance uniquement l’API; infrastructure déjà prê
 dev-console: ## [CONSOLE] Lance uniquement Vite sur :1420.
 	$(LOAD_ENV_OPT) $(DEV_CONSOLE_COMMAND)
 
-dev-admin: ## [ADMIN] Lance le backoffice staff (ADMIN_DIR, plugins/admin, plug-in externe) sur :1421.
-	@if [ ! -f "$(ADMIN_DIR)/package.json" ]; then printf '$(C_ERR)[make]$(C_RESET) backoffice introuvable : %s (checkout des plug-ins en ./plugins, ou ADMIN_DIR=...).\n' "$(ADMIN_DIR)" >&2; exit 2; fi
-	$(LOAD_ENV_OPT) $(DEV_ADMIN_COMMAND)
-
 dev-worker: env-check ## [WORKER] Traite les runs/workflows; API et infrastructure à part.
 	$(LOAD_ENV) $(DEV_WORKER_COMMAND)
 
+dev-admin: ## [ADMIN] Lance le backoffice staff (ADMIN_DIR, plugins/admin, plug-in externe) sur :1421.
+	@$(REQUIRE_ADMIN)
+	$(LOAD_ENV_OPT) $(DEV_ADMIN_COMMAND)
+
+# Les dépendances de l'app desktop, réinstallées dès que son package.json ou
+# son bun.lock bouge (le témoin est dans node_modules : un rm -rf le relance).
+$(DESKTOP_DEPS): $(DESKTOP_DIR)/package.json $(DESKTOP_DIR)/bun.lock
+	@$(MAKE) --no-print-directory -C $(DESKTOP_DIR) install
+	@touch $@
+
+# Rechargement à chaud : le main et le preload sont recompilés et Electron
+# relancé à chaque sauvegarde ; l'UI vient de la console de `make dev` (HMR de
+# Vite). Pour viser la production : `make -C apps/desktop dev`.
+desktop: $(DESKTOP_DEPS) ## [DESKTOP] Lance l'app desktop en dev (Electron rechargé à chaud) sur la console locale de make dev.
+	@$(MAKE) --no-print-directory -C $(DESKTOP_DIR) dev-local LOCAL_CONSOLE_URL="$(DESKTOP_CONSOLE_URL)"
+
+preview-console: build-console ## Sert le dist de la console sur :1420 (même origine que make dev). Incompatible avec vite.
+	$(LOAD_ENV_OPT) bun run --filter console preview
+
 # `make stop` arrête l'environnement de dev local en entier : API, worker,
-# console et backoffice. Le port ne suffisait pas. Le worker n'écoute rien, il
-# survivait donc à chaque arrêt, et deux `make dev` empilés finissaient par
-# poser deux workers sur la même file : un run pouvait rester en file sans
-# que personne ne le prenne.
+# console, backoffice et app desktop. Le port ne suffisait pas. Le worker
+# n'écoute rien, il survivait donc à chaque arrêt, et deux `make dev` empilés
+# finissaient par poser deux workers sur la même file : un run pouvait rester
+# en file sans que personne ne le prenne.
 #
 # Les processus sont reconnus à leur répertoire de travail sous `apps/`, pas
 # à un motif de ligne de commande : `bun --watch src/index.ts` est le même
 # texte pour l'API, le worker et n'importe quel autre dépôt ouvert à côté.
+# L'app desktop compte deux choses : son lanceur bun (cwd apps/desktop) et
+# Electron lui-même, reconnu au chemin de son exécutable : electron-vite ne le
+# ferme pas quand il reçoit SIGTERM, Electron survivrait sinon à `make stop`.
 # Ce qui a sa propre cible n'est pas touché : ni le faux Hermes, ni le lien
 # connecteur (`make link-dev-down`).
 #
 # PORT=<n> garde l'ancien usage : libérer ce seul port, et rien d'autre.
-stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice). PORT=<n> pour ne libérer qu'un port.
+stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice, app desktop). PORT=<n> pour ne libérer qu'un port.
 	@set -eo pipefail; $(LOAD_ENV_OPT) \
 	if ! command -v lsof >/dev/null 2>&1; then \
 		printf '$(C_ERR)[make]$(C_RESET) lsof est requis pour trouver les processus à arrêter.\n' >&2; exit 1; \
@@ -288,13 +311,16 @@ stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice).
 		cwd="$$(lsof -a -p "$$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"; \
 		[ -n "$$cwd" ] || continue; \
 		case "$$cwd" in \
-			"$$root"/apps/api|"$$root"/apps/worker|"$$root"/apps/console|"$(ADMIN_DIR)") \
+			"$$root"/apps/api|"$$root"/apps/worker|"$$root"/apps/console|"$$root"/$(DESKTOP_DIR)|"$(ADMIN_DIR)") \
 				targets="$$targets $$pid" ;; \
 			"$$root") \
 				case "$$(ps -o command= -p "$$pid" 2>/dev/null)" in \
 					*--filter*dev*) targets="$$targets $$pid" ;; \
 				esac ;; \
 		esac; \
+	done; \
+	for pid in $$(pgrep -f "^$$root/$(DESKTOP_DIR)/node_modules/electron/dist/" 2>/dev/null || true); do \
+		targets="$$targets $$pid"; \
 	done; \
 	if [ -n "$$targets" ]; then \
 		printf '$(C_WARN)[make]$(C_RESET) Arrêt des apps de ce dépôt :%s\n' "$$targets"; \
@@ -316,6 +342,9 @@ stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice).
 	free_port "$${API_PORT:-8790}" "API" || status=$$?; \
 	exit $$status
 
+# ─── Dev : lien vers un runtime distant ──────────────────────────────────────
+.PHONY: link-dev-up link-dev-down link-dev-status link-mode link-dev-verify link-gateway-install
+
 # TICKET=ask : le ticket est ouvert dans la console (Réglages, Installation,
 # fenêtre d'appairage) puis collé sans écho, au lieu de la connexion du compte
 # dev. Le runtime arrive alors dans l'espace de celui qui l'a ouvert, un compte
@@ -336,84 +365,14 @@ link-dev-status: ## [DEV] Ce qui tourne du lien dev : API, passerelle, tunnel, d
 link-mode: ## [DEV] Ce que chaque lien du VPS vise, dev ou production, et comment basculer (HOST=user@vps, sinon LINK_DEV_HOST de Makefile.local).
 	@ENV_FILE="$(ENV_FILE)" HOST="$(link_dev_host)" bash scripts/link-dev-pass.sh modes
 
-# ─── Mode dev : runtime distant ───────────────────────────────────────────────
+link-dev-verify: ## [DEV] Passe navigateur de /settings/runtime dans un Chrome jetable (ouvre un ticket local de 5 min ; ne joint aucun hôte).
+	@ENV_FILE="$(ENV_FILE)" bash scripts/link-dev-pass.sh verify
 
 link-gateway-install: ## [HERMES] Installe le service utilisateur systemd sans le lancer ni l’activer au démarrage.
 	@bun scripts/runtime-link-service.ts --install
 
-link-dev-verify: ## [DEV] Passe navigateur de /settings/runtime dans un Chrome jetable (ouvre un ticket local de 5 min ; ne joint aucun hôte).
-	@ENV_FILE="$(ENV_FILE)" bash scripts/link-dev-pass.sh verify
-
-preview-console: build-console ## Sert le dist de la console sur :1420 (même origine que make dev). Incompatible avec vite.
-	$(LOAD_ENV_OPT) bun run --filter console preview
-
-# ─── Déploiement : artefacts locaux et prod ─────────────────────────────────
-# Les artefacts sont construits SUR LE POSTE (make build-*). La preuve locale
-# combine typecheck, tests unitaires, contrats et, pour les changements de
-# runtime, l'application locale reliée à un runtime distant (make link-dev-up).
-# Le déploiement lui-même n'est pas dans ce dépôt.
-DEPLOY_APPS_ACTIVE ?= console
-DEPLOY_APPS := $(if $(APP),$(APP),$(DEPLOY_APPS_ACTIVE))
-comma := ,
-DEPLOY_APP_LIST := $(subst $(comma), ,$(DEPLOY_APPS))
-
-# URL interne de l'API figée dans le backoffice à la construction. Le build de
-# production refuse une origine loopback ; le service `api` est le relais
-# interne du stack de production.
-DEPLOY_API_INTERNAL_URL ?= http://api:8790
-
-build-console: ## [deploy] Construit la console web (apps/console/dist), sans rien déployer.
-	$(LOAD_ENV_OPT) bun run --filter console build
-
-build-admin: ## [deploy] Construit le backoffice staff (plug-in externe, ADMIN_DIR), sans rien déployer.
-	@if [ ! -f "$(ADMIN_DIR)/package.json" ]; then printf '$(C_ERR)[make]$(C_RESET) backoffice introuvable : %s (checkout des plug-ins en ./plugins, ou ADMIN_DIR=...).\n' "$(ADMIN_DIR)" >&2; exit 2; fi
-	$(LOAD_ENV_OPT) API_INTERNAL_URL="$(DEPLOY_API_INTERNAL_URL)" bun run --cwd $(ADMIN_DIR) build
-
-# `make build` livre les artefacts du rôle alpha : même garde qu'un déploiement
-# dès que la console en fait partie (une console solo par oubli de
-# OPENEDBOT_CONSOLE_PLUGINS est refusée, OPENEDBOT_CONSOLE_MODE=solo l'assume). La garde passe
-# AVANT tout build, y compris en -j : les builds sont relancés après elle.
-build: $(if $(filter console,$(DEPLOY_APP_LIST)),prod-console-guard) ## [deploy] Construit les artefacts des applications actives (ou APP=console,admin).
-	@$(MAKE) --no-print-directory $(addprefix build-,$(DEPLOY_APP_LIST))
-
-deploy: ## Refuse : le déploiement n'est pas dans ce dépôt ; make build construit les artefacts.
-	@printf '$(C_ERR)[make]$(C_RESET) Le déploiement n'"'"'est pas dans ce dépôt : make build construit les artefacts.\n' >&2; exit 2
-
-# ─── Mode prod : garde de build et lien de production ─────────────────────────
-
-# La console hébergée porte les écrans des plug-ins (étape 9) : sans OPENEDBOT_CONSOLE_PLUGINS,
-# `build-console` sortirait une console solo, sans agence, facturation ni
-# règles de permission. Refus avant tout déploiement et avant tout
-# build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_MODE=solo pour une console solo
-# assumée. Contrat : tests/scripts/console-build-guard-contract.sh.
-prod-console-guard:
-	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_MODE)" != "solo" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_MODE=solo.\n' >&2; exit 2; fi
-
-# L'origine de production, celle que la console affiche dans sa commande
-# d'appairage. `link-prod` en est le pendant `make` : la bascule inverse de
-# `link-dev-up`, en une commande entière plutôt qu'un copier-coller vers le VPS.
-# Le ticket n'est ni ici ni dans argv : `edge-setup` le demande à son invite
-# masquée sur le VPS, d'où le `ssh -t`.
-# Origine du lien de la prod (RUNTIME_LINK_PUBLIC_URL du VPS) : un nouveau lien
-# vise toujours celle-ci ; openedbot.app (API_PUBLIC_URL) reste acceptée.
-OPENEDBOT_PUBLIC_URL ?= https://link.openedbot.app
-# La console où l'opérateur ouvre le ticket (API_PUBLIC_URL du VPS).
-OPENEDBOT_CONSOLE_URL ?= https://openedbot.app
-
-link-prod: ## [OPS] Bascule le VPS sur la production ; le ticket est demandé à l’invite masquée du VPS (HOST=user@vps).
-	@set -eo pipefail; \
-	if [ -z "$(HOST)" ]; then \
-		printf '$(C_ERR)[make]$(C_RESET) HOST est requis : make link-prod HOST=user@vps.\n' >&2; exit 2; \
-	fi; \
-	case "$(OPENEDBOT_PUBLIC_URL)" in \
-		https://*) ;; \
-		*) printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_PUBLIC_URL doit être une origine https.\n' >&2; exit 2 ;; \
-	esac; \
-	printf '$(C_OK)[make]$(C_RESET) Ouvrez un ticket dans %s, onglet Runtimes, « Ajouter un runtime ».\n' "$(OPENEDBOT_CONSOLE_URL)"; \
-	printf '$(C_OK)[make]$(C_RESET) Collez-le à l’invite masquée ci-dessous ; il ne passe ni par argv ni par l’historique.\n'; \
-	ssh -t "$(HOST)" sudo edge-setup link --ohb "$(OPENEDBOT_PUBLIC_URL)" --yes
-
 # ─── Qualité ─────────────────────────────────────────────────────────────────
+.PHONY: typecheck deps-check license-check test-unit test-dual solo-check test-integration test check
 
 typecheck: ## Typechecke tous les workspaces actifs, puis tests/, scripts/ et apps/console/scripts (tsconfig.json racine).
 	bun run --filter api --filter worker --filter link-gateway --filter console --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter '@openedbot/browser-*' --filter './modules/*' typecheck
@@ -434,6 +393,8 @@ deps-check: ## Frontières entre applications, paquets et couches (.dependency-c
 
 license-check: ## Licences des paquets tiers de bun.lock (transitifs compris) : aucun GPL ni AGPL ; LGPL et MPL listés.
 	bun scripts/license-scan.ts
+
+UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et scripts, sans réseau ni PostgreSQL.
 	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
@@ -584,6 +545,7 @@ check: env-audit typecheck deps-check test build-cloud ## Garde complète: envir
 # création, manifeste de l'allowlist. Cette cible est la seule porte qui voit
 # les deux moitiés à la fois ; les déploiements et la release sur tag la
 # jouent avant de livrer quoi que ce soit.
+.PHONY: contract-check
 
 # edge-setup vit dans edge-setup/ de ce dépôt (monorepo), plus à côté de
 # celui-ci (EDGE_SETUP_DIR pour un autre chemin). Absent, le contrat échoue :
@@ -616,27 +578,25 @@ contract-check: ## [contrat] Copies identiques des fixtures du fil, puis tests G
 	@printf '$(C_OK)[make]$(C_RESET) Contrat connecteur tenu des deux côtés.\n'
 
 # ─── E2E et charge ───────────────────────────────────────────────────────────
+.PHONY: e2e-api e2e-bot e2e-bot-keep e2e-bot-bench e2e-fresh-setup e2e-onboarding e2e-support-ui e2e-hermes e2e-support
+.PHONY: e2e-link e2e-link-load e2e-link-separation e2e-link-continuity e2e-push email-preview e2e-email load
 
 e2e-api: ## Parcours HTTP cloud; exige la stack locale déjà lancée (make dev).
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/api-cloud.ts
 
 e2e-bot: ## Bots e2e sur le runtime lié (SCENARIOS=lifecycle|greeting|fast-path|coordination|model-reset|permissions|all, ARGS=...); rapport HTML dans tmp/e2e-bot/; exige make dev.
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : bots jetables, purgés et nettoyage hôte vérifié avant la fin.\n'
 	$(LOAD_ENV_OPT) E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts $(or $(SCENARIOS),lifecycle) $(ARGS)
 
 e2e-bot-keep: ## Idem en scénario lifecycle, mais LAISSE le bot vivant pour inspection dans la console (à purger soi-même).
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	@printf '$(C_WARN)[make]$(C_RESET) le bot créé NE sera PAS purgé : la base ne sera pas rendue telle quelle.\n'
 	$(LOAD_ENV_OPT) E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts lifecycle --keep $(ARGS)
 
 e2e-bot-bench: ## Bench bots : création vers première question (SAMPLES=3) et tours d'un bot prêt (MESSAGES=5), p50/p95/max dans le rapport HTML.
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : bots jetables, purgés et nettoyage hôte vérifié avant la fin.\n'
 	$(LOAD_ENV_OPT) E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts greeting fast-path --samples $(or $(SAMPLES),3) --messages $(or $(MESSAGES),5) --label bench $(ARGS)
 
@@ -647,8 +607,7 @@ e2e-onboarding: ## Vérifie l’ordre shadcn fournisseur/modèle et les gates d�
 	cd apps/console && bun test tests/e2e/onboarding-runtime.e2e.test.tsx
 
 e2e-support-ui: ## Guichet de support AU NAVIGATEUR : markdown rendu, capture affichée, compteurs, infobulle du rail (exige make dev).
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	@curl -fsS "http://localhost:1421/" >/dev/null 2>&1 \
 		|| { echo "Backoffice indisponible sur :1421 : lancer « make dev-admin » (backoffice, plug-in externe)." >&2; exit 1; }
 	@# Résolu depuis apps/console, comme le script : playwright y est déclaré, et
@@ -661,13 +620,11 @@ e2e-hermes: ## Canari live non destructif contre DEV_HERMES_URL (HTTPS, ou origi
 	$(LOAD_ENV) bun tests/e2e/hermes-contract.ts
 
 e2e-support: ## Guichet de support en HTTP pur : un visiteur écrit, le staff voit la trame arriver et répond; aucun modèle appelé.
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/support-desk.ts
 
 e2e-link: ## Enrôle un runtime par le lien connecteur contre l'API locale (make dev) et un faux Hermes en processus.
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/link-connector.ts
 
 e2e-link-load: ## k6 E2E du lien réel API → VPS : santé, charge bornée, journal et rapport; aucun modèle sollicité.
@@ -683,8 +640,7 @@ e2e-link-continuity: ## Recette réelle opt-in : fournisseur explicite, cycle bo
 	@$(LOAD_ENV_OPT) bun tests/e2e/runtime-link-live-continuity.ts
 
 e2e-push: ## Web Push contre un serveur simulé (jamais FCM/Mozilla); exige la stack locale déjà lancée et PUSH_VAPID_*.
-	@$(LOAD_ENV_OPT) curl -fsS "http://127.0.0.1:$${API_PORT:-8790}/api/health" >/dev/null 2>&1 \
-		|| { echo "API cloud locale indisponible: lancer « make dev » dans un autre terminal." >&2; exit 1; }
+	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/push.ts
 
 email-preview: ## Rend chaque gabarit d'e-mail dans tmp/email-preview/ (HTML + texte, fr et en) ; n'envoie rien.
@@ -698,6 +654,35 @@ load: ## Banc de charge local (SSE, conversations en boucle, faux Hermes en stre
 	bash tests/load/run.sh
 
 # ─── Build ───────────────────────────────────────────────────────────────────
+# Les artefacts sont construits SUR LE POSTE (make build-*). La preuve locale
+# combine typecheck, tests unitaires, contrats et, pour les changements de
+# runtime, l'application locale reliée à un runtime distant (make link-dev-up).
+# Le déploiement lui-même n'est pas dans ce dépôt.
+.PHONY: build build-console build-admin build-api build-alerting build-cloud deploy
+
+DEPLOY_APPS_ACTIVE ?= console
+DEPLOY_APPS := $(if $(APP),$(APP),$(DEPLOY_APPS_ACTIVE))
+comma := ,
+DEPLOY_APP_LIST := $(subst $(comma), ,$(DEPLOY_APPS))
+
+# URL interne de l'API figée dans le backoffice à la construction. Le build de
+# production refuse une origine loopback ; le service `api` est le relais
+# interne du stack de production.
+DEPLOY_API_INTERNAL_URL ?= http://api:8790
+
+# `make build` livre les artefacts du rôle alpha : même garde qu'un déploiement
+# dès que la console en fait partie (une console solo par oubli de
+# OPENEDBOT_CONSOLE_PLUGINS est refusée, OPENEDBOT_CONSOLE_MODE=solo l'assume). La garde passe
+# AVANT tout build, y compris en -j : les builds sont relancés après elle.
+build: $(if $(filter console,$(DEPLOY_APP_LIST)),prod-console-guard) ## [deploy] Construit les artefacts des applications actives (ou APP=console,admin).
+	@$(MAKE) --no-print-directory $(addprefix build-,$(DEPLOY_APP_LIST))
+
+build-console: ## [deploy] Construit la console web (apps/console/dist), sans rien déployer.
+	$(LOAD_ENV_OPT) bun run --filter console build
+
+build-admin: ## [deploy] Construit le backoffice staff (plug-in externe, ADMIN_DIR), sans rien déployer.
+	@$(REQUIRE_ADMIN)
+	$(LOAD_ENV_OPT) API_INTERNAL_URL="$(DEPLOY_API_INTERNAL_URL)" bun run --cwd $(ADMIN_DIR) build
 
 build-api: ## Construit API et worker.
 	mkdir -p dist/bin
@@ -708,9 +693,45 @@ build-alerting: ## Construit la sonde d'alerting interne.
 	mkdir -p dist/bin
 	bun build apps/api/src/alerting/index.ts --target=bun --outfile=dist/bin/ohb-alerting
 
-# La SPA se construit par `build-console` (section Déploiement), et `make build`
-# y garde son sens de livraison : les artefacts des applications actives.
 build-cloud: build-api build-alerting build-console ## Construit les services et la SPA déployables.
+
+deploy: ## Refuse : le déploiement n'est pas dans ce dépôt ; make build construit les artefacts.
+	@printf '$(C_ERR)[make]$(C_RESET) Le déploiement n'"'"'est pas dans ce dépôt : make build construit les artefacts.\n' >&2; exit 2
+
+# ─── Prod : garde de build et lien de production ─────────────────────────────
+.PHONY: prod-console-guard link-prod
+
+# La console hébergée porte les écrans des plug-ins (étape 9) : sans OPENEDBOT_CONSOLE_PLUGINS,
+# `build-console` sortirait une console solo, sans agence, facturation ni
+# règles de permission. Refus avant tout déploiement et avant tout
+# build (`make build`, rôle alpha) ; OPENEDBOT_CONSOLE_MODE=solo pour une console solo
+# assumée. Contrat : tests/scripts/console-build-guard-contract.sh.
+prod-console-guard:
+	@if [ -z "$(OPENEDBOT_CONSOLE_PLUGINS)" ] && [ "$(OPENEDBOT_CONSOLE_MODE)" != "solo" ]; then printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_CONSOLE_PLUGINS vide : la console hébergée serait solo. make $(or $(MAKECMDGOALS),build) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) (plug-ins reliés : make -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)), ou OPENEDBOT_CONSOLE_MODE=solo.\n' >&2; exit 2; fi
+
+# L'origine de production, celle que la console affiche dans sa commande
+# d'appairage. `link-prod` en est le pendant `make` : la bascule inverse de
+# `link-dev-up`, en une commande entière plutôt qu'un copier-coller vers le VPS.
+# Le ticket n'est ni ici ni dans argv : `edge-setup` le demande à son invite
+# masquée sur le VPS, d'où le `ssh -t`.
+# Origine du lien de la prod (RUNTIME_LINK_PUBLIC_URL du VPS) : un nouveau lien
+# vise toujours celle-ci ; openedbot.app (API_PUBLIC_URL) reste acceptée.
+OPENEDBOT_PUBLIC_URL ?= https://link.openedbot.app
+# La console où l'opérateur ouvre le ticket (API_PUBLIC_URL du VPS).
+OPENEDBOT_CONSOLE_URL ?= https://openedbot.app
+
+link-prod: ## [OPS] Bascule le VPS sur la production ; le ticket est demandé à l’invite masquée du VPS (HOST=user@vps).
+	@set -eo pipefail; \
+	if [ -z "$(HOST)" ]; then \
+		printf '$(C_ERR)[make]$(C_RESET) HOST est requis : make link-prod HOST=user@vps.\n' >&2; exit 2; \
+	fi; \
+	case "$(OPENEDBOT_PUBLIC_URL)" in \
+		https://*) ;; \
+		*) printf '$(C_ERR)[make]$(C_RESET) OPENEDBOT_PUBLIC_URL doit être une origine https.\n' >&2; exit 2 ;; \
+	esac; \
+	printf '$(C_OK)[make]$(C_RESET) Ouvrez un ticket dans %s, onglet Runtimes, « Ajouter un runtime ».\n' "$(OPENEDBOT_CONSOLE_URL)"; \
+	printf '$(C_OK)[make]$(C_RESET) Collez-le à l’invite masquée ci-dessous ; il ne passe ni par argv ni par l’historique.\n'; \
+	ssh -t "$(HOST)" sudo edge-setup link --ohb "$(OPENEDBOT_PUBLIC_URL)" --yes
 
 # ─── Worktrees ───────────────────────────────────────────────────────────────
 # Un chantier = une branche = un worktree `.worktrees/<NAME>` dans ce dépôt
@@ -718,18 +739,20 @@ build-cloud: build-api build-alerting build-console ## Construit les services et
 # `develop` (branche de travail quotidienne). Retour : `make wt-merge` depuis le
 # checkout qui reçoit, puis `make wt-rm`. Après une fusion de `develop` dans
 # `main`, `make wt-sync` réaligne `develop` sur `main` et pousse les deux.
+.PHONY: wt-new wt-ls wt-merge wt-rm wt-sync
 
 WT_BASE ?= develop
 WT_ROOT ?= $(CURDIR)/.worktrees
 WT_DIR   = $(WT_ROOT)/$(NAME)
-WT_ENV_FILES = .env.local apps/api/.env.local apps/worker/.env.local apps/console/.env.local
+# Les réglages non versionnés du poste : le fichier d'env unique et Makefile.local.
+WT_LOCAL_FILES = .env.local Makefile.local
 
 define wt_need_name
 	@if [ -z "$(NAME)" ]; then printf '$(C_ERR)[make]$(C_RESET) NAME est requis (ex. NAME=ohb-71).\n' >&2; exit 2; fi; \
 	case "$(NAME)" in *[!A-Za-z0-9._/-]*|-*|*/) printf '$(C_ERR)[make]$(C_RESET) NAME invalide : %s\n' "$(NAME)" >&2; exit 2 ;; esac
 endef
 
-wt-new: ## Crée le worktree .worktrees/NAME sur la branche NAME (créée depuis WT_BASE=develop si absente) et y copie les .env.local.
+wt-new: ## Crée le worktree .worktrees/NAME sur la branche NAME (créée depuis WT_BASE=develop si absente) et y copie .env.local et Makefile.local.
 	$(wt_need_name)
 	@if [ -e "$(WT_DIR)" ]; then printf '$(C_WARN)[make]$(C_RESET) %s existe déjà.\n' "$(WT_DIR)"; exit 0; fi; \
 	git fetch -q origin; mkdir -p "$(WT_ROOT)"; \
@@ -740,10 +763,10 @@ wt-new: ## Crée le worktree .worktrees/NAME sur la branche NAME (créée depuis
 	else \
 		git worktree add -b "$(NAME)" "$(WT_DIR)" "$(WT_BASE)"; \
 	fi; \
-	copied=0; for f in $(WT_ENV_FILES); do \
-		if [ -f "$$f" ] && [ ! -e "$(WT_DIR)/$$f" ]; then mkdir -p "$(WT_DIR)/$$(dirname "$$f")"; cp "$$f" "$(WT_DIR)/$$f"; copied=$$((copied+1)); fi; \
+	copied=0; for f in $(WT_LOCAL_FILES); do \
+		if [ -f "$$f" ] && [ ! -e "$(WT_DIR)/$$f" ]; then cp "$$f" "$(WT_DIR)/$$f"; copied=$$((copied+1)); fi; \
 	done; \
-	printf '$(C_OK)[make]$(C_RESET) Worktree %s sur %s (%s .env.local copiés). Ensuite : cd %s && bun install\n' "$(WT_DIR)" "$(NAME)" "$$copied" "$(WT_DIR)"
+	printf '$(C_OK)[make]$(C_RESET) Worktree %s sur %s (%s fichiers locaux copiés). Ensuite : cd %s && bun install\n' "$(WT_DIR)" "$(NAME)" "$$copied" "$(WT_DIR)"
 
 wt-ls: ## Liste les worktrees et dit si leur branche est déjà fusionnée dans HEAD.
 	@git worktree list --porcelain | awk '/^worktree /{p=$$2} /^branch /{sub("refs/heads/","",$$2); print p"\t"$$2}' | while IFS="$$(printf '\t')" read -r path branch; do \
@@ -773,6 +796,7 @@ wt-sync: ## Après une fusion de develop dans main : réaligne develop sur main 
 	git branch -f develop main && git push origin main develop && printf '$(C_OK)[make]$(C_RESET) main et develop alignées sur %s et poussées.\n' "$$(git rev-parse --short main)"
 
 # ─── Nettoyage ───────────────────────────────────────────────────────────────
+.PHONY: clean
 
 clean: ## Supprime uniquement les artefacts générés; jamais .data ni PostgreSQL.
 	rm -rf dist apps/api/dist apps/console/dist

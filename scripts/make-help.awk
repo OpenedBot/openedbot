@@ -14,7 +14,7 @@
 
 BEGIN {
   FS = ":.*## "
-  if (all) printf "%sOHB : toutes les commandes documentées%s\n", S, R
+  if (all) printf "%sopenedbot : toutes les commandes documentées%s\n", S, R
 }
 
 /^# ─── / {
@@ -52,11 +52,12 @@ END {
     printf "\n"
     exit
   }
-  printf "%sOHB : les commandes du quotidien, par mode%s\n", S, R
+  printf "%sopenedbot : les commandes du quotidien, par mode%s\n", S, R
   mode("DEV", "ce poste : .env.local, PostgreSQL partagé, runtime distant (ou faux Hermes)", dev)
   mode("PREPROD", "environnement de préproduction : l'API et son worker avant la production", preprod)
   mode("PROD", "production : les vrais clients", prod)
   mode("AVANT DE POUSSER", "aucun mode : code, tests, contrats", check)
   printf "\n  Premier lancement   make setup, puis make dev, puis make link-dev-up HOST=user@hôte (autre terminal)\n"
-  printf "  Tout le reste       make help-all (e2e, build, veille amont, worktrees)\n\n"
+  printf "  App desktop         make desktop (autre terminal, une fois make dev lancé)\n"
+  printf "  Tout le reste       make help-all (e2e, build, worktrees, fragments privés)\n\n"
 }
