@@ -273,10 +273,23 @@ case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract HOST
   *'HOST="user@runtime-host"'*) ;;
   *) fail "make -n link-dev-up must pass HOST from the command line." ;;
 esac
-case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract link-dev-up)" in
+# LINK_DEV_HOST= on the command line: a workstation Makefile.local may set it.
+case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST= link-dev-up)" in
   *'HOST=""'*) ;;
   *) fail "without HOST, make -n link-dev-up must name no host." ;;
 esac
+# Without HOST, link-dev-up and link-mode fall back to LINK_DEV_HOST (set in
+# Makefile.local, here on the command line); HOST still wins. Dry run, no ssh.
+for target in link-dev-up link-mode; do
+  case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST=user@your-vm "$target")" in
+    *'HOST="user@your-vm"'*) ;;
+    *) fail "without HOST, make -n $target must use LINK_DEV_HOST." ;;
+  esac
+  case "$(make --no-print-directory --dry-run ENV_FILE=.env.make-dev-contract LINK_DEV_HOST=user@your-vm HOST=user@runtime-host "$target")" in
+    *'HOST="user@runtime-host"'*) ;;
+    *) fail "make -n $target must prefer HOST over LINK_DEV_HOST." ;;
+  esac
+done
 
 # The dev targets load the env file and must never print it. A bare `export`
 # (or `env`, `set`, `export -p`, xtrace...) in a recipe dumps every value in

@@ -1,6 +1,9 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 include scripts/lib/env-aliases.mk
+# Réglages propres au poste, jamais versionnés (.gitignore) : Makefile.local,
+# s'il existe, peut poser par exemple LINK_DEV_HOST=user@your-vm.
+-include $(CURDIR)/Makefile.local
 
 ENV_FILE ?= .env.local
 # Development profile: fake (default, tests/fake-hermes), bundled (Docker Hermes)
@@ -317,8 +320,12 @@ stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice).
 # fenêtre d'appairage) puis collé sans écho, au lieu de la connexion du compte
 # dev. Le runtime arrive alors dans l'espace de celui qui l'a ouvert, un compte
 # Google compris, et l'instance est reprise même déjà liée.
-link-dev-up: ## [DEV] Relie un runtime distant à ce poste : passerelle, tunnel, enrôlement, en arrière-plan (HOST=user@hôte ; TICKET=ask : ticket collé depuis la console).
-	@ENV_FILE="$(ENV_FILE)" HOST="$(HOST)" LINK_DEV_TICKET="$(TICKET)" bash scripts/link-dev-pass.sh up
+# HOST= sur la ligne de commande l'emporte ; sinon LINK_DEV_HOST (Makefile.local).
+LINK_DEV_HOST ?=
+link_dev_host = $(or $(HOST),$(LINK_DEV_HOST))
+
+link-dev-up: ## [DEV] Relie un runtime distant à ce poste : passerelle, tunnel, enrôlement, en arrière-plan (HOST=user@hôte, sinon LINK_DEV_HOST de Makefile.local ; TICKET=ask : ticket collé depuis la console).
+	@ENV_FILE="$(ENV_FILE)" HOST="$(link_dev_host)" LINK_DEV_TICKET="$(TICKET)" bash scripts/link-dev-pass.sh up
 
 link-dev-down: ## [DEV] Arrête ce que `link-dev-up` a démarré, et rien d'autre.
 	@ENV_FILE="$(ENV_FILE)" bash scripts/link-dev-pass.sh down
@@ -326,8 +333,8 @@ link-dev-down: ## [DEV] Arrête ce que `link-dev-up` a démarré, et rien d'autr
 link-dev-status: ## [DEV] Ce qui tourne du lien dev : API, passerelle, tunnel, dernière ligne de journal.
 	@ENV_FILE="$(ENV_FILE)" bash scripts/link-dev-pass.sh status
 
-link-mode: ## [DEV] Ce que chaque lien du VPS vise, dev ou production, et comment basculer (HOST=user@vps).
-	@ENV_FILE="$(ENV_FILE)" HOST="$(HOST)" bash scripts/link-dev-pass.sh modes
+link-mode: ## [DEV] Ce que chaque lien du VPS vise, dev ou production, et comment basculer (HOST=user@vps, sinon LINK_DEV_HOST de Makefile.local).
+	@ENV_FILE="$(ENV_FILE)" HOST="$(link_dev_host)" bash scripts/link-dev-pass.sh modes
 
 # ─── Mode dev : runtime distant ───────────────────────────────────────────────
 

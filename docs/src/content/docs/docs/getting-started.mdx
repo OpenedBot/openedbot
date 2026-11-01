@@ -154,6 +154,9 @@ runs on the development machine: **never** on the VPS and never in front of
 # Short path, at the root of the openedbot-main repository: tunnel, ticket and link for an
 # instance named after the workstation.
 make link-dev-up HOST=hermes-admin@203.0.113.10
+# Or once per workstation, in Makefile.local at the repository root (never
+# committed): LINK_DEV_HOST=user@your-vm. Then `make link-dev-up` alone uses it;
+# HOST= on the command line still wins.
 
 # Manual path. Development machine, reverse SSH tunnel:
 ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:8790:127.0.0.1:8790 hermes-admin@203.0.113.10

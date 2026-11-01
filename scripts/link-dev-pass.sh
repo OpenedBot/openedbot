@@ -144,8 +144,8 @@ cmd_up() {
   require bun
   require ssh
 
-  local host="${HOST:-}"
-  [[ -n "$host" ]] || die "Aucun hôte : lancez make link-dev-up HOST=user@hôte (hôte ssh de votre runtime)." 2
+  local host="${HOST:-${LINK_DEV_HOST:-}}"
+  [[ -n "$host" ]] || die "Aucun hôte : lancez make link-dev-up HOST=user@hôte (hôte ssh de votre runtime), ou posez LINK_DEV_HOST=user@hôte dans Makefile.local." 2
 
   # TICKET=ask : ticket ouvert dans la console (Réglages, Installation,
   # fenêtre d'appairage) au lieu du compte dev, pour que le runtime arrive
@@ -384,8 +384,8 @@ cmd_status() {
 cmd_modes() {
   load_env
   require ssh
-  local host="${HOST:-}"
-  [[ -n "$host" ]] || die "Aucun hôte : lancez make link-mode HOST=user@hôte." 2
+  local host="${HOST:-${LINK_DEV_HOST:-}}"
+  [[ -n "$host" ]] || die "Aucun hôte : lancez make link-mode HOST=user@hôte, ou posez LINK_DEV_HOST=user@hôte dans Makefile.local." 2
 
   printf 'côté poste\n'
   cmd_status
