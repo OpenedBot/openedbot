@@ -18,14 +18,6 @@ export const SHARED_ENV: readonly EnvVar[] = [
     doc: "Fallback for OPENEDBOT_ENV when it is absent (API and logger only).",
   },
   {
-    name: "OHB_RUNTIME_MODE",
-    scope: "shared",
-    tier: "local",
-    doc: "Deprecated: accepted and ignored with a warning; runtime mode is always external.",
-    example: "external",
-    productionExample: "external",
-  },
-  {
     name: "HERMES_ALLOW_INSECURE_ORIGINS",
     scope: "shared",
     tier: "local",

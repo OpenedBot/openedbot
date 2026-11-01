@@ -1,13 +1,15 @@
 import type { RuntimeMode } from "@openedbot/contracts-api";
 
-/** Compatibility parser: runtime selection now belongs to each runtime. */
+/**
+ * Runtime selection belongs to each runtime: the apps always run in the
+ * `external` mode. The former OHB_RUNTIME_MODE variable is no longer read
+ * (env-aliases.ts warns that it is ignored, env-audit removes it).
+ */
+/** The deployment environments the configuration distinguishes. */
 export type RuntimeEnvironment = "development" | "test" | "production";
+
+export const RUNTIME_MODE: RuntimeMode = "external";
 
 export function isRuntimeMode(value: unknown): value is RuntimeMode {
   return value === "external";
-}
-
-export function readRuntimeMode(value: string | undefined, _environment: RuntimeEnvironment): RuntimeMode {
-  if (value !== undefined) console.warn("OHB_RUNTIME_MODE is retired and ignored; runtime mode is external.");
-  return "external";
 }

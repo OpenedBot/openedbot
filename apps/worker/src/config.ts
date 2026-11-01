@@ -9,7 +9,7 @@ import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/herm
 import { readApiInternalUrl } from "@openedbot/platform-config/api-address";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
-import { readRuntimeMode } from "@openedbot/platform-config/runtime-mode";
+import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
 import { deployEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { fileBlobRoot, resolveBlobDriver } from "@openedbot/platform-config/blob-driver";
 import type { RuntimeMode } from "@openedbot/contracts-api";
@@ -122,7 +122,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     env.RUNTIME_TOKEN_ENCRYPTION_PREVIOUS_KEYS,
     environment,
   );
-  const runtimeMode = readRuntimeMode(env.OHB_RUNTIME_MODE, environment);
+  const runtimeMode = RUNTIME_MODE;
   const declaredInsecureOrigins = parseInsecureHermesOrigins(env.HERMES_ALLOW_INSECURE_ORIGINS);
   const hermesEndpointPolicy: EndpointPolicy = {
     environment,

@@ -157,60 +157,50 @@ assert_command_count dev-admin "$admin_plan" "$console_command" 0
 assert_command_count dev-admin "$admin_plan" "$worker_command" 0
 assert_no_preparation dev-admin "$admin_plan"
 
-# dev, dev-api and dev-worker validate the env file first (env-check), with
-# the same runtime mode as the apps: a file that would crash an app at boot
-# stops make before anything starts. Hence two OHB_RUNTIME_MODE per dev plan.
+# dev, dev-api and dev-worker validate the env file first (env-check): a file
+# that would crash an app at boot stops make before anything starts. The
+# runtime mode is no longer passed: the apps always run in external mode.
 for target in dev dev-api dev-worker; do
   assert_literal_count "$target" "$(dry_run "$target")" "scripts/env.ts --check" 1
+  assert_not_contains "$target" "$(dry_run "$target")" 'OHB_RUNTIME_MODE' # rename:keep
 done
 
-# Profiles. The default profile is `fake`: the apps run in external runtime
-# mode against tests/fake-hermes, and nothing pulls the Hermes image.
-assert_literal_count dev "$dev_plan" 'OHB_RUNTIME_MODE="external"' 2
-fake_plan="$(dry_run MODE=fake dev)"
-assert_literal_count "dev MODE=fake" "$fake_plan" 'OHB_RUNTIME_MODE="external"' 2
-bundled_plan="$(dry_run MODE=bundled dev)"
-assert_literal_count "dev MODE=bundled" "$bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
-external_plan="$(dry_run MODE=external dev)"
-assert_literal_count "dev MODE=external" "$external_plan" 'OHB_RUNTIME_MODE="external"' 2
+# Profiles. The default profile is `fake`: the apps run against
+# tests/fake-hermes, and nothing pulls the Hermes image.
+assert_literal_count "db-seed" "$(dry_run db-seed)" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+for profile in fake bundled external; do
+  assert_literal_count "db-seed MODE=$profile" "$(dry_run MODE=$profile db-seed)" "OPENEDBOT_DEV_PROFILE=\"$profile\"" 1
+done
 
-# Without MODE=, the profile follows OHB_RUNTIME_MODE in the env file: an
-# existing bundled workstation must not be re-run as external (env-check would
-# refuse the conflicting mode), and a fake workstation (external mode pointed
-# at the fake gateway by setup.sh) must keep seeding its fake runtime row.
-bundled_env='OHB_RUNTIME_MODE=bundled'
-external_env='OHB_RUNTIME_MODE=external'
-fake_env=$'OHB_RUNTIME_MODE=external\nDEV_HERMES_URL=http://127.0.0.1:18642'
-derived_bundled_plan="$(dry_run_with_env "$bundled_env" dev)"
-assert_literal_count "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
-assert_not_contains "dev (env bundled)" "$derived_bundled_plan" 'OHB_RUNTIME_MODE="external"'
-derived_bundled_seed_plan="$(dry_run_with_env "$bundled_env" db-seed)"
-assert_literal_count "db-seed (env bundled)" "$derived_bundled_seed_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
-derived_external_plan="$(dry_run_with_env "$external_env" dev)"
-assert_literal_count "dev (env external)" "$derived_external_plan" 'OHB_RUNTIME_MODE="external"' 2
+# Without MODE=, the profile follows DEV_HERMES_URL in the env file (the fake
+# gateway or nothing: fake; any other runtime: external), and a legacy
+# bundled workstation keeps its profile for one release.
+legacy_bundled_env='OHB_RUNTIME_MODE=bundled' # rename:keep
+external_env='DEV_HERMES_URL=https://runtime.example.test'
+fake_env='DEV_HERMES_URL=http://127.0.0.1:18642'
+derived_bundled_seed_plan="$(dry_run_with_env "$legacy_bundled_env" db-seed)"
+assert_literal_count "db-seed (legacy env bundled)" "$derived_bundled_seed_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 derived_external_seed_plan="$(dry_run_with_env "$external_env" db-seed)"
 assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OPENEDBOT_DEV_PROFILE="external"' 1
 derived_fake_seed_plan="$(dry_run_with_env "$fake_env" db-seed)"
 assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
-assert_literal_count "db-seed (env fake)" "$derived_fake_seed_plan" 'OHB_RUNTIME_MODE="external"' 1
-derived_empty_seed_plan="$(dry_run_with_env 'OHB_RUNTIME_MODE=' db-seed)"
-assert_literal_count "db-seed (env empty mode)" "$derived_empty_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+derived_empty_seed_plan="$(dry_run_with_env 'DEV_HERMES_URL=' db-seed)"
+assert_literal_count "db-seed (env empty URL)" "$derived_empty_seed_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
 # An explicit MODE= keeps priority over the env file.
-explicit_fake_plan="$(dry_run_with_env "$bundled_env" dev MODE=fake)"
-assert_literal_count "dev MODE=fake (env bundled)" "$explicit_fake_plan" 'OHB_RUNTIME_MODE="external"' 2
-explicit_bundled_plan="$(dry_run_with_env "$external_env" dev MODE=bundled)"
-assert_literal_count "dev MODE=bundled (env external)" "$explicit_bundled_plan" 'OHB_RUNTIME_MODE="bundled"' 2
+explicit_fake_plan="$(dry_run_with_env "$external_env" db-seed MODE=fake)"
+assert_literal_count "db-seed MODE=fake (env external)" "$explicit_fake_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
+explicit_bundled_plan="$(dry_run_with_env "$external_env" db-seed MODE=bundled)"
+assert_literal_count "db-seed MODE=bundled (env external)" "$explicit_bundled_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 
 setup_plan="$(dry_run setup)"
 assert_not_contains setup "$setup_plan" "hermes-image-tag.ts"
 assert_literal_count setup "$setup_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
-assert_literal_count setup "$setup_plan" 'OHB_RUNTIME_MODE="external"' 1
+assert_not_contains setup "$setup_plan" 'OHB_RUNTIME_MODE' # rename:keep
 assert_literal_count setup "$setup_plan" "scripts/setup.sh" 1
 
 bundled_setup_plan="$(dry_run setup MODE=bundled)"
 assert_not_contains "setup MODE=bundled" "$bundled_setup_plan" "hermes-image-tag.ts"
 assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
-assert_literal_count "setup MODE=bundled" "$bundled_setup_plan" 'OHB_RUNTIME_MODE="bundled"' 1
 
 # infra-up only proves PostgreSQL now: the bundled Hermes container tooling
 # was removed with deprecated/infra.

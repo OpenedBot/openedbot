@@ -162,7 +162,7 @@ export const API_ENV: readonly EnvVar[] = [
     example: "disabled",
   },
   // DEV_HERMES_URL / DEV_HERMES_TOKEN are read by apps/api/scripts/seed.ts
-  // only under the fake profile, which itself runs in OHB_RUNTIME_MODE=external
+  // only under the fake profile, which itself runs in the external runtime mode
   // and writes both values through scripts/setup.sh. The fake and external
   // profiles are therefore indistinguishable by runtime mode, and a real
   // external host registers its runtime through the application: neither

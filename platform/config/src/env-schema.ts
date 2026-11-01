@@ -185,6 +185,9 @@ export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
  *   supprimé du dépôt le 2026-10-27 ; aucune source ne les lit plus.
  * - `OHB_AGENCY_ENABLED` : remplacé par les features `agency_workspaces` et
  *   `connector_only_enrollment` dans PostgreSQL.
+ * - `OHB_RUNTIME_MODE` : le mode est toujours `external`
+ *   (platform/config/src/runtime-mode.ts) ; le profil de `make` se déduit de
+ *   DEV_HERMES_URL. Retiré lors du passage au préfixe OPENEDBOT_.
  * - `OHB_MIGRATION_VERSION` : jamais lue par `scripts/db.sh --migrate` ni par
  *   aucune autre source.
  * - `REPLACE` : `make link-dev-up REPLACE=1` used to re-enroll an instance
@@ -216,6 +219,7 @@ export const DEPRECATED_ENV_NAMES: readonly string[] = [
   "OHB_GOOGLE_CLIENT_ID",
   "OHB_GOOGLE_CLIENT_SECRET",
   "OHB_MIGRATION_VERSION",
+  "OHB_RUNTIME_MODE",
   "REPLACE",
   "WEB_ORIGINS",
   "WEB_PUBLIC_URL",

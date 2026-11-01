@@ -8,30 +8,14 @@ cd "$root"
 
 env_file="${ENV_FILE:-.env.local}"
 
-# Three development profiles, one runtime mode each:
-#   fake     -> OHB_RUNTIME_MODE=external, pointed at tests/fake-hermes (default)
-#   bundled  -> OHB_RUNTIME_MODE=bundled, operator-provided Hermes + dashboard credentials
-#   external -> OHB_RUNTIME_MODE=external, operator-provided DEV_HERMES_URL/TOKEN
-# `make` always passes OPENEDBOT_DEV_PROFILE; a direct call falls back to the runtime
-# mode it was given, and only then to the fake profile.
-profile="${OPENEDBOT_DEV_PROFILE:-}"
-if [ -z "$profile" ]; then
-  case "${OHB_RUNTIME_MODE:-}" in
-    bundled) profile="bundled" ;;
-    external) profile="external" ;;
-    "") profile="fake" ;;
-    *)
-      # Same rule as platform/config/src/runtime-mode.ts, which a shell
-      # script cannot import: only the two profile-backed modes exist.
-      printf 'OHB_RUNTIME_MODE=%s is not a runtime mode; use bundled or external.\n' "$OHB_RUNTIME_MODE" >&2
-      exit 1
-      ;;
-  esac
-fi
+# Three development profiles; the apps always run in the external runtime mode:
+#   fake     -> pointed at tests/fake-hermes (default)
+#   bundled  -> operator-provided Hermes + dashboard credentials
+#   external -> operator-provided DEV_HERMES_URL/TOKEN
+# `make` always passes OPENEDBOT_DEV_PROFILE; a direct call defaults to fake.
+profile="${OPENEDBOT_DEV_PROFILE:-fake}"
 case "$profile" in
-  fake) runtime_mode="external" ;;
-  bundled) runtime_mode="bundled" ;;
-  external) runtime_mode="external" ;;
+  fake | bundled | external) ;;
   *)
     printf 'OPENEDBOT_DEV_PROFILE must be fake, bundled or external, not %s.\n' "$profile" >&2
     exit 1
@@ -163,7 +147,6 @@ for password_name in E2E_PASSWORD DEV_STAFF_PASSWORD; do
 done
 unset password_name
 
-set_env_value OHB_RUNTIME_MODE "$runtime_mode"
 if [ "$profile" = "bundled" ]; then
   # No Docker automation here: the operator runs their own Hermes gateway and
   # native Dashboard, and provides the matching credentials up front.
@@ -207,8 +190,8 @@ elif [ "$profile" = "external" ]; then
   fi
 fi
 
-OPENEDBOT_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --audit --apply
-OPENEDBOT_ENV_FILE="$env_file" OHB_RUNTIME_MODE="$runtime_mode" bun scripts/env.ts --check
+OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --audit --apply
+OPENEDBOT_ENV_FILE="$env_file" bun scripts/env.ts --check
 
 # The seed probes DEV_HERMES_URL (health, capabilities, toolsets, model
 # options). With the fake profile that gateway is this repository's own

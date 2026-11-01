@@ -4,34 +4,28 @@ include scripts/lib/env-aliases.mk
 
 ENV_FILE ?= .env.local
 # Development profile: fake (default, tests/fake-hermes), bundled (Docker Hermes)
-# or external (operator-provided runtime). The fake profile runs the apps in
-# OHB_RUNTIME_MODE=external against the fake gateway.
-# An explicit MODE=<profile> always wins. Otherwise the profile follows the
-# runtime mode already written in $(ENV_FILE), so that an existing workstation
-# keeps its profile without repeating MODE= on every command:
-#   OHB_RUNTIME_MODE=bundled                                    -> bundled
-#   OHB_RUNTIME_MODE=external + DEV_HERMES_URL=<fake gateway>   -> fake
-#   OHB_RUNTIME_MODE=external otherwise                         -> external
-#   OHB_RUNTIME_MODE absent or empty (no env file yet)          -> fake
+# or external (operator-provided runtime). The apps always run in the external
+# runtime mode; the profile only decides which runtime setup.sh points them at.
+# An explicit MODE=<profile> always wins. Otherwise the profile follows
+# DEV_HERMES_URL in $(ENV_FILE), so that an existing workstation keeps its
+# profile without repeating MODE= on every command:
+#   DEV_HERMES_URL absent, empty or the fake gateway   -> fake
+#   DEV_HERMES_URL=<any other runtime>                 -> external
+#   legacy OHB_RUNTIME_MODE=bundled (one release)      -> bundled (rename:keep)
 # The fake gateway URL is the one scripts/setup.sh writes for the fake profile.
 FAKE_HERMES_URL := http://127.0.0.1:18642
 env_file_value = $(strip $(lastword $(shell sed -n 's/^$(1)=//p' "$(ENV_FILE)" 2>/dev/null)))
-ENV_FILE_RUNTIME_MODE := $(call env_file_value,OHB_RUNTIME_MODE)
+ENV_FILE_LEGACY_RUNTIME_MODE := $(call env_file_value,OHB_RUNTIME_MODE)# rename:keep (dropped variable, read one release)
 ENV_FILE_HERMES_URL := $(call env_file_value,DEV_HERMES_URL)
 
-ifeq ($(ENV_FILE_RUNTIME_MODE),bundled)
+ifeq ($(ENV_FILE_LEGACY_RUNTIME_MODE),bundled)
 MODE ?= bundled
-else ifeq ($(ENV_FILE_RUNTIME_MODE)|$(ENV_FILE_HERMES_URL),external|$(FAKE_HERMES_URL))
+else ifeq ($(ENV_FILE_HERMES_URL),)
 MODE ?= fake
-else ifeq ($(ENV_FILE_RUNTIME_MODE),external)
+else ifeq ($(ENV_FILE_HERMES_URL),$(FAKE_HERMES_URL))
+MODE ?= fake
+else
 MODE ?= external
-else
-MODE ?= fake
-endif
-ifeq ($(MODE),fake)
-RUNTIME_MODE := external
-else
-RUNTIME_MODE := $(MODE)
 endif
 # Une variable, un fichier, et ce fichier est celui de la racine : API,
 # worker, console, backoffice, Makefile et scripts y puisent tous
@@ -123,10 +117,10 @@ help-all: ## Toutes les commandes documentées, par section.
 # ─── Mode dev : installation du poste ────────────────────────────────────────
 
 setup: ## Prépare entièrement le développement local (env, dépendances, PostgreSQL et données).
-	ENV_FILE="$(ENV_FILE)" OPENEDBOT_DEV_PROFILE="$(MODE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bash scripts/setup.sh
+	ENV_FILE="$(ENV_FILE)" OPENEDBOT_DEV_PROFILE="$(MODE)" bash scripts/setup.sh
 
 env-check: ## Valide strictement .env.local.
-	OPENEDBOT_ENV_FILE="$(ENV_FILE)" OHB_RUNTIME_MODE="$(RUNTIME_MODE)" bun scripts/env.ts --check
+	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --check
 
 env-audit: ## Vérifie les templates et affiche uniquement les noms superflus de .env.local.
 	OPENEDBOT_ENV_FILE="$(ENV_FILE)" bun scripts/env.ts --audit
@@ -200,7 +194,7 @@ runtime-token-rotate: db-migrate env-check ## Ré-encrypte atomiquement les toke
 # ─── Mode dev : lancer les apps et le lien ───────────────────────────────────
 
 dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les trois apps; ni infra, ni migration. MODE=fake|bundled|external force le profil.
-	@set -eo pipefail; $(LOAD_ENV) export OHB_RUNTIME_MODE="$(RUNTIME_MODE)"; \
+	@set -eo pipefail; $(LOAD_ENV) export; \
 	format_dev_logs() { \
 		local line label color payload; \
 		while IFS= read -r line || [[ -n "$$line" ]]; do \
@@ -221,7 +215,7 @@ dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les troi
 	$(DEV_COMMAND) 2>&1 | format_dev_logs
 
 dev-api: env-check ## [API] Lance uniquement l’API; infrastructure déjà prête.
-	$(LOAD_ENV) export OHB_RUNTIME_MODE="$(RUNTIME_MODE)"; $(DEV_API_COMMAND)
+	$(LOAD_ENV) export; $(DEV_API_COMMAND)
 
 dev-console: ## [CONSOLE] Lance uniquement Vite sur :1420.
 	$(LOAD_ENV_OPT) $(DEV_CONSOLE_COMMAND)
@@ -231,7 +225,7 @@ dev-admin: ## [ADMIN] Lance le backoffice staff (ADMIN_DIR, plugins/admin, plug-
 	$(LOAD_ENV_OPT) $(DEV_ADMIN_COMMAND)
 
 dev-worker: env-check ## [WORKER] Traite les runs/workflows; API et infrastructure à part.
-	$(LOAD_ENV) export OHB_RUNTIME_MODE="$(RUNTIME_MODE)"; $(DEV_WORKER_COMMAND)
+	$(LOAD_ENV) export; $(DEV_WORKER_COMMAND)
 
 # `make stop` arrête l'environnement de dev local en entier : API, worker,
 # console et backoffice. Le port ne suffisait pas. Le worker n'écoute rien, il

@@ -23,7 +23,7 @@ import {
   type EnvTemplateEntry,
   type EnvVar,
 } from "../platform/config/src/env-schema";
-import { readRuntimeMode } from "../platform/config/src/runtime-mode";
+import { RUNTIME_MODE } from "../platform/config/src/runtime-mode";
 import { renamedEnvName } from "../platform/config/src/env-aliases";
 import {
   assertUniqueEnvNames,
@@ -66,10 +66,7 @@ async function runCheck(): Promise<void> {
 
   // The runtime mode only matters in development: production is `external`
   // by construction and its required set does not depend on it.
-  const runtimeMode = mode === "development" ? readRuntimeMode(process.env.OHB_RUNTIME_MODE, "development") : undefined;
-  if (mode === "development" && values.OHB_RUNTIME_MODE && values.OHB_RUNTIME_MODE !== runtimeMode) {
-    throw new Error(`OHB_RUNTIME_MODE=${values.OHB_RUNTIME_MODE} in ${fileOf("OHB_RUNTIME_MODE")} conflicts with requested mode ${runtimeMode}.`);
-  }
+  const runtimeMode = mode === "development" ? RUNTIME_MODE : undefined;
   const required = requiredEnvNames(mode, runtimeMode);
 
   for (const name of required) {
@@ -270,10 +267,7 @@ async function runAudit(): Promise<void> {
     process.exit(0);
   }
   const values = withRenamedEnvValues(mergeEnvFiles(locals).values);
-  const runtimeMode = readRuntimeMode(
-    process.env.OHB_RUNTIME_MODE?.trim() || values.OHB_RUNTIME_MODE?.trim(),
-    "development",
-  );
+  const runtimeMode = RUNTIME_MODE;
 
   const removable: string[] = [];
   const renamed: string[] = [];
@@ -386,8 +380,8 @@ function banner(title: string): string {
 const GENERATED_FROM = `Generated from ${SCHEMA_PATH} by \`make env-template\`.`;
 
 const ROOT_NOTES = [
-  "`make setup` rewrites OHB_RUNTIME_MODE from its profile: MODE=fake (default)",
-  "and MODE=external -> external. No lab URL is defaulted.",
+  "`make setup` writes DEV_HERMES_URL from its profile: MODE=fake (default) points",
+  "at tests/fake-hermes, MODE=external at your runtime. No lab URL is defaulted.",
 ];
 
 function devHeader(dir: string): string[] {
@@ -510,10 +504,7 @@ async function writeLocal(fileName: string): Promise<void> {
   const files = await readEnvFiles(fileName);
   if (!files.length) throw new Error(`No ${fileName} found in the monorepo; nothing to rewrite.`);
   const existing = withRenamedEnvValues(mergeEnvFiles(files).values);
-  const runtimeMode = readRuntimeMode(
-    process.env.OHB_RUNTIME_MODE?.trim() || existing.OHB_RUNTIME_MODE?.trim(),
-    "development",
-  );
+  const runtimeMode = RUNTIME_MODE;
   const unusedForMode = envUnusedForRuntimeMode(runtimeMode);
 
   const removed: string[] = [];
@@ -574,7 +565,7 @@ async function writeLocal(fileName: string): Promise<void> {
     const entries = byDir.get(dir)!;
     const path = envFilePath(dir, fileName);
     // An application with no variable of its own gets no empty file. The root
-    // one always exists: it carries OHB_RUNTIME_MODE, which the Makefile reads.
+    // one always exists: the Makefile reads DEV_HERMES_URL from it.
     if (!entries.length && dir !== "." && !unknown.length) {
       if (await Bun.file(path).exists()) {
         await unlink(path);

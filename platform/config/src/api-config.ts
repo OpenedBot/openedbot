@@ -13,7 +13,7 @@ import { readApiInternalUrl, readApiPort } from "@openedbot/platform-config/api-
 import { deployEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
-import { readRuntimeMode } from "@openedbot/platform-config/runtime-mode";
+import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
 import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrations/vapid";
 import { readApnsConfig } from "@openedbot/platform-integrations/apns";
 import { LEGAL_SLUGS, type LegalSlug, type RuntimeMode } from "@openedbot/contracts-api";
@@ -374,7 +374,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     env.RUNTIME_TOKEN_ENCRYPTION_PREVIOUS_KEYS,
     environment,
   );
-  const runtimeMode = readRuntimeMode(env.OHB_RUNTIME_MODE, environment);
+  const runtimeMode = RUNTIME_MODE;
   // HTTP exceptions are always explicit, including the local fake gateway.
   const insecureHermesOrigins = parseInsecureHermesOrigins(env.HERMES_ALLOW_INSECURE_ORIGINS);
   const hermesEndpointPolicy: EndpointPolicy = {

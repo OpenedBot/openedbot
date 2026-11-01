@@ -80,7 +80,6 @@ describe("OHB-15 : aucun canal shell vers un hôte client", () => {
 describe("OHB-15 : la configuration refuse le canal SSH", () => {
   const base = {
     OPENEDBOT_ENV: "development",
-    OHB_RUNTIME_MODE: "external",
     RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     WORKER_INTERNAL_TOKEN: "worker-secret",
     METRICS_INTERNAL_TOKEN: "metrics-secret",

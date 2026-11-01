@@ -60,7 +60,6 @@ const production = {
 
 const development = {
   OPENEDBOT_ENV: "development",
-  OHB_RUNTIME_MODE: "external",
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
 };
 
@@ -162,7 +161,6 @@ describe("production configuration", () => {
   test("forbids the local administration channel in production cloud mode", () => {
     expect(() => assertProductionConfig(readApiConfig({
       ...production,
-      OHB_RUNTIME_MODE: "external",
       OHB_RUNTIME_ADMIN_MODE: "local",
       DEV_HERMES_DASHBOARD_USERNAME: "dashboard",
       DEV_HERMES_DASHBOARD_PASSWORD: "dashboard-secret",
@@ -375,7 +373,6 @@ describe("development web origins", () => {
   test("defaults the browser and OAuth callback to localhost", () => {
     const config = readApiConfig({
       OPENEDBOT_ENV: "development",
-      OHB_RUNTIME_MODE: "external",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
     });
 
@@ -389,7 +386,6 @@ describe("development web origins", () => {
   test("auto-includes ADMIN_PUBLIC_URL in CORS without listing it in CORS_ALLOWED_ORIGINS", () => {
     const config = readApiConfig({
       OPENEDBOT_ENV: "development",
-      OHB_RUNTIME_MODE: "external",
       RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
       ADMIN_PUBLIC_URL: "http://admin.local:1421",
     });

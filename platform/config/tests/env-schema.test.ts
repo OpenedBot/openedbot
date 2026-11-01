@@ -34,13 +34,6 @@ const TS_ENV_READ = /\benv\.([A-Z][A-Z0-9_]+)\b/gu;
 const IMPORT_META_ENV_READ = /\bimport\.meta\.env\.([A-Z][A-Z0-9_]+)\b/gu;
 /** `required("NAME")` / `positiveInteger("NAME", ...)` string-literal reads (apps/api/src/alerting/index.ts). */
 const HELPER_LITERAL_READ = /\b(?:required|positiveInteger)\(\s*"([A-Z][A-Z0-9_]+)"/gu;
-/**
- * A bare `NAME_LIKE_THIS` mention (warning string, error message) shaped like
- * an env var name. Used only for files that name a variable without reading
- * `process.env` themselves (platform/config/src/runtime-mode.ts logs the
- * name of the variable its caller already read).
- */
-const NAME_MENTION = /\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/gu;
 /** `${NAME}` / `$NAME` in shell scripts, filtered through ENV_READ_SKIP below. */
 const SHELL_ENV_READ = /\$\{?([A-Z][A-Z0-9_]*)\}?/gu;
 /** `set_env_value NAME` in scripts/setup.sh. */
@@ -118,9 +111,6 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   { path: "platform/integrations/src/managed-tunnel.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/integrations/src/vapid.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/integrations/src/apns.ts", pattern: TS_ENV_READ, strip: stripComments },
-  // Ne lit rien lui-même : il reçoit la valeur déjà lue par son appelant et se
-  // contente de nommer la variable dans son avertissement de dépréciation.
-  { path: "platform/config/src/runtime-mode.ts", pattern: NAME_MENTION, strip: stripComments },
   { path: "scripts/lib/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/db.sh", pattern: SHELL_ENV_READ, strip: stripShellComments },

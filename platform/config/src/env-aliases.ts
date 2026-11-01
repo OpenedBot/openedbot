@@ -65,7 +65,7 @@ export const ENV_RENAMES: Readonly<Record<string, string>> = {
 export const ENV_RENAMED_PREFIXES: readonly (readonly [string, string])[] = [["OHB_PRO_", "OPENEDBOT_PLUGIN_"]];
 
 /** Old names that are no longer read at all: warned about, then ignored. */
-export const ENV_DROPPED: readonly string[] = [];
+export const ENV_DROPPED: readonly string[] = ["OHB_RUNTIME_MODE"];
 
 /** The new name of a renamed variable, or undefined. */
 export function renamedEnvName(name: string): string | undefined {
