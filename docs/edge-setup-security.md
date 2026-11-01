@@ -148,7 +148,7 @@ systemd 257):
 |---|---|---|---|
 | `hermes-connector` | hermes | 1.3 | — |
 | `hermes-operator` | root | 3.1 | it must switch to `hermes` (`runuser`) to run the provider sign-in commands openedbot asks for; capabilities limited to SETUID, SETGID, CHOWN, FOWNER, DAC_OVERRIDE |
-| `hermes-gateway` | hermes | 4.1 | runs arbitrary agent tools (Node.js JIT, Python, optional rootless Docker): no `MemoryDenyWriteExecute`, no system call filter. Two `ExecStartPre=+` lines run as root before it starts: one creates `/run/credentials`, one waits up to 60 s for the rootless Docker socket |
+| `hermes-gateway` | hermes | 1.3 | runs arbitrary agent tools (Node.js JIT, Python, optional rootless Docker). It has the `@system-service` system call filter, `RestrictNamespaces`, `PrivateDevices`, `PrivateUsers`, `ProtectProc=invisible`, `RemoveIPC` and no capability; `MemoryDenyWriteExecute` (kills the Node.js JIT), `ProcSubset=pid` (hides `/proc/meminfo` and `/proc/cpuinfo`) and `UMask=0027` (hides agent files from non-root sandbox users) were measured and left out. Two `ExecStartPre=+` lines run as root before it starts: one creates `/run/credentials`, one waits up to 60 s for the rootless Docker socket |
 | `hermes-setup-upgrade` (opt-in timer) | root | 7.0 | it replaces the binary and restarts units |
 | `hermes-loopback-guard` (with `--firewall`) | root | 1.8 | — (writes iptables rules: NET_ADMIN and NET_RAW only, no IP traffic, no device) |
 | `hermes-hardening-rollback` (with `--ssh-hardening`) | root | 8.8 | restores SSH access if a hardening is not confirmed in 10 minutes |
