@@ -5,29 +5,12 @@
 name: edge-setup-ci
 
 on:
+  # No trigger-level `paths`: a filtered-out workflow reports no check at all,
+  # which leaves a required check pending forever. The `changes` job below
+  # applies the same path list per job, and `ci-ok` is the one check to require.
   push:
     branches: [main]
-    paths:
-      - "edge-setup/**"
-      - "docs/**"
-      - "platform/hermes/**"
-      - "modules/runtimes/**"
-      - "contracts/**"
-      - "Makefile"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/edge-setup-ci.yml"
   pull_request:
-    paths:
-      - "edge-setup/**"
-      - "docs/**"
-      - "platform/hermes/**"
-      - "modules/runtimes/**"
-      - "contracts/**"
-      - "Makefile"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/edge-setup-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -42,8 +25,53 @@ defaults:
     working-directory: edge-setup
 
 jobs:
+  changes:
+    # Same path list as the former trigger filter. Anything that cannot be
+    # diffed (manual run, new branch, missing base) counts as relevant.
+    name: Changes (path filter)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: filter
+        working-directory: .
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          range=""
+          if [ "$EVENT" = pull_request ]; then
+            range="$BASE...$HEAD"
+          elif [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            range="$BEFORE..$AFTER"
+          fi
+          if [ -z "$range" ]; then
+            echo "no diffable range ($EVENT): every job runs"
+            relevant=true
+          else
+            files=$(git diff --name-only "$range")
+            printf '%s\n' "$files"
+            # Here-string, not a pipe: under pipefail, grep -q closing early
+            # could fail the producer and turn a match into "not relevant".
+            if grep -qE '^(edge-setup/|docs/|platform/hermes/|modules/runtimes/|contracts/)|^(Makefile|package\.json|bun\.lock|\.github/workflows/edge-setup-ci\.yml)$' <<<"$files"; then
+              relevant=true
+            else
+              relevant=false
+            fi
+          fi
+          echo "relevant=$relevant" | tee -a "$GITHUB_OUTPUT"
+
   static:
     name: Static (gofmt, vet, staticcheck, govulncheck)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -63,6 +91,8 @@ jobs:
 
   test:
     name: Tests (unit, docs mirror, release assets and publication)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -79,6 +109,8 @@ jobs:
 
   contract:
     name: Connector contract (Go and TypeScript halves)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -97,7 +129,8 @@ jobs:
 
   build:
     name: Build (build-all)
-    needs: [static, test, contract]
+    needs: [changes, static, test, contract]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -112,6 +145,8 @@ jobs:
 
   scripts:
     name: Scripts (shellcheck, install bootstrap)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -137,7 +172,8 @@ jobs:
     # unreachable origin) and reset. Docker rootless and cgroup limits need a
     # VM: make integration-vm.
     name: E2E (${{ matrix.base }})
-    needs: [static, test]
+    needs: [changes, static, test]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
@@ -157,3 +193,28 @@ jobs:
         env:
           EDGE_SETUP_IT_BASE: ${{ matrix.base }}
         run: go test -tags integration -count=1 -timeout 70m -run 'TestReadOnlyCommandsOnFreshHost|TestUpConnectorNoSSHHardening' -v ./test/integration/
+
+  ci-ok:
+    # The single required check. It always runs and passes only when the path
+    # filter succeeded and every job either succeeded or was skipped because
+    # nothing relevant changed. A failed or cancelled job fails it, and so
+    # does a skipped job when the change was relevant.
+    name: edge-setup-ci ok
+    if: always()
+    needs: [changes, static, test, contract, build, scripts, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check every job result
+        working-directory: .
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e '
+            (.changes.result == "success") and
+            (.changes.outputs.relevant == "true" or .changes.outputs.relevant == "false") and
+            ( if .changes.outputs.relevant == "true"
+              then ([del(.changes)[] | .result] | all(. == "success"))
+              else ([del(.changes)[] | .result] | all(. == "success" or . == "skipped"))
+              end )' > /dev/null
