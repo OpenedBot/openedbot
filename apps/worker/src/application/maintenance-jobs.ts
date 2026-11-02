@@ -113,12 +113,13 @@ export function maintenanceJobs(
       run: (signal) => guardedPass("worker.approval_policy_reconcile_failed", () => reconcileHostApprovalPolicies(db, config, signal)),
     },
     {
-      // Mode YOLO : baux échus marqués, baux non livrés et révocations non confirmées repoussés au lien.
+      // Mode YOLO : baux échus marqués, baux non livrés et révocations non confirmées repoussés au lien,
+      // YOLO par défaut du mode solo local renouvelé ou coupé par l'API.
       name: "yolo-lease-sync",
       everyMs: config.routineTickMs,
       run: (signal) => guardedPass("worker.yolo_lease_sync_failed", async () => {
         const sync = await syncYoloLeases(db, config, signal);
-        if (sync.expired + sync.pushed + sync.failed > 0) console.info(JSON.stringify({ event: "worker.yolo_lease_sync", ...sync }));
+        if (sync.expired + sync.pushed + sync.failed + sync.solo > 0) console.info(JSON.stringify({ event: "worker.yolo_lease_sync", ...sync }));
       }),
     },
     {

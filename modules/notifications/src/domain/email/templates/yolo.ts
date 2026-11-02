@@ -102,4 +102,59 @@ export const YOLO_TEMPLATES = {
       };
     },
   },
+  /**
+   * Le YOLO par défaut du mode solo local vient d'être coupé : l'organisation
+   * compte désormais plus d'un membre (`reconcileYoloSoloDefault`,
+   * `modules/execution/src/application/yolo-leases.ts`). Ses baux solo sont
+   * révoqués et le consentement remis à false ; l'owner le rallumera s'il
+   * revient seul, ou octroiera des baux à la main.
+   */
+  yolo_solo_default_ended: {
+    fr: (data) => {
+      const organizationName = text(data.organizationName) || "votre organisation";
+      const settingsUrl = text(data.settingsUrl);
+      return {
+        subject: `YOLO par défaut coupé pour ${organizationName}`,
+        preheader: "Un deuxième membre a rejoint l’organisation : chaque action sensible demande de nouveau une approbation.",
+        blocks: [
+          { kind: "heading", text: "Le YOLO par défaut est coupé" },
+          {
+            kind: "paragraph",
+            text: `${organizationName} compte désormais plus d’un membre. Le YOLO par défaut est réservé à une organisation où vous êtes seul : openedbot a révoqué ses baux et l’a désactivé.`,
+          },
+          {
+            kind: "paragraph",
+            text: "Vos bots demandent de nouveau une approbation pour chaque action sensible. Un owner ou un admin peut encore activer le mode YOLO pour une conversation, un bot ou un runtime, pour une durée limitée.",
+          },
+          ...(settingsUrl
+            ? ([{ kind: "button", label: "Ouvrir les réglages du runtime", url: settingsUrl }] as EmailBlock[])
+            : []),
+        ],
+        footerReason: "Vous recevez ce message parce que vous êtes propriétaire de cette organisation openedbot.",
+      };
+    },
+    en: (data) => {
+      const organizationName = text(data.organizationName) || "your organization";
+      const settingsUrl = text(data.settingsUrl);
+      return {
+        subject: `Default YOLO turned off for ${organizationName}`,
+        preheader: "A second member joined the organization: every sensitive action asks for approval again.",
+        blocks: [
+          { kind: "heading", text: "Default YOLO is off" },
+          {
+            kind: "paragraph",
+            text: `${organizationName} now has more than one member. Default YOLO is only for an organization where you are alone: openedbot revoked its leases and turned it off.`,
+          },
+          {
+            kind: "paragraph",
+            text: "Your bots ask for approval again for every sensitive action. An owner or an admin can still turn YOLO mode on for a conversation, a bot or a runtime, for a limited time.",
+          },
+          ...(settingsUrl
+            ? ([{ kind: "button", label: "Open runtime settings", url: settingsUrl }] as EmailBlock[])
+            : []),
+        ],
+        footerReason: "You are getting this message because you own this openedbot organization.",
+      };
+    },
+  },
 } satisfies TemplateFamily;

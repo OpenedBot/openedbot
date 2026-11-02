@@ -365,6 +365,13 @@ qui tourne coupe tout en moins de 2 s et le signale à openedbot au prochain
 lien. Tout bail émis avant ce moment reste refusé, même après `on`, qui ne lève
 que le refus local des baux suivants. Sans `--yes`, rien n'est changé.
 
+En mode solo local (un espace dont le propriétaire est le seul membre, et qui
+a activé « YOLO par défaut (solo) »), openedbot renouvelle pour lui un bail de
+runtime de 24 h. `.ssh`, `.env` (et `.env.*`) et le trousseau restent toujours
+protégés. Ce renouvellement s'arrête dès qu'un deuxième membre rejoint
+l'espace, et `off` le coupe aussi : openedbot remet le réglage à faux en
+l'apprenant, et ne renouvelle plus rien tant qu'on ne l'a pas rallumé.
+
 ## Sauvegarde, destruction
 
 Ce qui vaut la peine d'être sauvegardé tient dans `/srv/hermes/data`

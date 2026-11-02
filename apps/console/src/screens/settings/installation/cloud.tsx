@@ -29,6 +29,7 @@ import { ConnectorReleaseNotesButton } from "../../../components/connector-updat
 import { linkHealthErrorText } from "../../../lib/runtime/link-health-error";
 import { RuntimeRemoval, RuntimeReplacement } from "./cloud/cloud-registry";
 import { RuntimeTerminalSwitch } from "./cloud/cloud-terminal-switch";
+import { RuntimeYoloSoloSwitch } from "./cloud/cloud-yolo-solo-switch";
 import { RuntimeAlertsSection } from "./cloud/cloud-alerts";
 
 export { isRuntimeSection, type RuntimeSection } from "./cloud/cloud-shared";
@@ -269,6 +270,8 @@ function RuntimeConnectionForm({
         </SettingsCard>
       ) : null}
       {runtime?.id ? <RuntimeTerminalSwitch runtimeId={runtime.id} /> : null}
+      {/* Mode solo local : seulement pour l'owner seul de son espace (l'API le dit). */}
+      {runtime?.id ? <RuntimeYoloSoloSwitch /> : null}
       <ProviderIncidentDialog incidents={runtime?.providerIncidents} />
     </>
   );

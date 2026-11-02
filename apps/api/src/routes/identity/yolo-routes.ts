@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { isUuid } from "@openedbot/contracts-primitives";
+import { constantTimeEqual } from "@openedbot/platform-db/credential";
 import type { Db } from "@openedbot/platform-db";
 import type { YoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
 import { readOrganizationPermissionPolicy } from "@openedbot/identity/sql/permission-policy";
@@ -12,6 +13,7 @@ import {
   readYoloAudit,
   readYoloConsent,
   readYoloGrantInput,
+  reconcileYoloSoloDefault,
   revokeYoloLease,
   saveYoloConsent,
   yoloLeaseKeys,
@@ -26,7 +28,19 @@ export type YoloRouteDeps = {
   /** La poussée vers l'hôte ; branchée sur le lien en PR 4, sans effet d'ici là. */
   publisher?: YoloLeasePublisher;
   now?: () => number;
+  /** Origine de la PWA, pour le lien de l'e-mail de fin du YOLO solo. */
+  webAppUrl?: string;
 };
+
+function yoloLeaseDeps(routeDeps: YoloRouteDeps): YoloLeaseDeps {
+  return {
+    signer: createYoloLeaseSigner(routeDeps.signing),
+    publisher: routeDeps.publisher ?? NO_YOLO_PUBLISHER,
+    readPolicy: (tx, organizationId) => readOrganizationPermissionPolicy(tx, organizationId),
+    now: routeDeps.now,
+    webAppUrl: routeDeps.webAppUrl,
+  };
+}
 
 function optionalQueryUuid(value: string | undefined, field: string): string | undefined {
   if (value === undefined || value === "") return undefined;
@@ -43,12 +57,7 @@ function optionalQueryUuid(value: string | undefined, field: string): string | u
  */
 export function yoloRoutes(db: Db, routeDeps: YoloRouteDeps): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
-  const deps: YoloLeaseDeps = {
-    signer: createYoloLeaseSigner(routeDeps.signing),
-    publisher: routeDeps.publisher ?? NO_YOLO_PUBLISHER,
-    readPolicy: (tx, organizationId) => readOrganizationPermissionPolicy(tx, organizationId),
-    now: routeDeps.now,
-  };
+  const deps = yoloLeaseDeps(routeDeps);
 
   routes.get("/keys", (context) => context.json(yoloLeaseKeys(deps.signer)));
 
@@ -83,8 +92,27 @@ export function yoloRoutes(db: Db, routeDeps: YoloRouteDeps): Hono<{ Variables: 
 
   routes.put("/consent", async (context) => {
     const body = await jsonBody(context.req.raw);
-    return context.json(await saveYoloConsent(db, context.get("auth"), body));
+    return context.json(await saveYoloConsent(db, deps, context.get("auth"), body));
   });
 
+  return routes;
+}
+
+/**
+ * Mode solo local : `/internal/yolo`, hors session, pour le worker seulement
+ * (bearer interne). Le renouvellement signe ici, où vit la clé : le worker ne
+ * la tient jamais, il demande la passe d'une organisation qu'il voit due.
+ */
+export function yoloInternalRoutes(db: Db, workerInternalToken: string, routeDeps: YoloRouteDeps): Hono {
+  const routes = new Hono();
+  const deps = yoloLeaseDeps(routeDeps);
+  routes.post("/solo-default/:organizationId/reconcile", async (context) => {
+    if (!workerInternalToken || !constantTimeEqual(context.req.header("Authorization") ?? "", `Bearer ${workerInternalToken}`)) {
+      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
+    }
+    const organizationId = context.req.param("organizationId");
+    if (!isUuid(organizationId)) throw new HttpError(400, "YOLO_LEASE_INVALID", "Identifiant invalide.", {}, { field: "organizationId" });
+    return context.json(await reconcileYoloSoloDefault(db, deps, organizationId));
+  });
   return routes;
 }

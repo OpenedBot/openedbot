@@ -21,6 +21,7 @@ import {
   YOLO_MAX_SECONDS,
   YOLO_SCOPES,
   YOLO_SIGNING_UNAVAILABLE_CODE,
+  YOLO_SOLO_NOT_ELIGIBLE_CODE,
   YOLO_THREAD_DEFAULT_SECONDS,
   yoloPolicyBlock,
   type PermissionCeiling,
@@ -37,15 +38,21 @@ import { parseYoloLease, type RelayYoloLeaseFrame, type RelayYoloRevokeFrame } f
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { logger } from "@openedbot/platform-observability";
+import { enqueueTransactionalEmail } from "@openedbot/notifications/application/transactional-email";
 import { signYoloLease, validateYoloLeaseShape, yoloSigningKeyFromSeed, type YoloSigningKey } from "../domain/yolo-lease";
 import { YOLO_DEFAULT_PROTECT } from "../domain/yolo-hardline";
 import {
+  endYoloSoloDefaultTx,
   grantYoloLeaseTx,
+  grantYoloSoloLeaseTx,
+  isYoloSoloTx,
   readLiveRuntimeIdsTx,
   readLiveYoloLeasesTx,
   readYoloAuditTx,
   readYoloConsentTx,
   readYoloLeaseTx,
+  readYoloSoloRecipientsTx,
+  readYoloSoloStateTx,
   readYoloTargetTx,
   revokeYoloLeasesTx,
   writeYoloConsentTx,
@@ -90,6 +97,8 @@ export type YoloLeaseDeps = {
   readPolicy: YoloPolicyRead;
   /** Millisecondes epoch ; injectable pour les tests. */
   now?: () => number;
+  /** Origine de la PWA, pour le lien de l'e-mail de fin du YOLO solo ; vide : pas de bouton. */
+  webAppUrl?: string;
 };
 
 export type YoloGrantInput = {
@@ -183,6 +192,7 @@ function leaseDto(row: YoloLeaseRow): YoloLeaseDto {
     revokedAt: row.revokedAt ? isoInstant(row.revokedAt) : null,
     hostState: row.hostState,
     deliveredAt: row.deliveredAt ? isoInstant(row.deliveredAt) : null,
+    soloDefault: row.soloDefault,
   };
 }
 
@@ -307,7 +317,11 @@ export async function revokeYoloLease(db: Db, deps: YoloLeaseDeps, actor: YoloAc
       throw new HttpError(404, "YOLO_LEASE_NOT_FOUND", "Bail introuvable.");
     }
     const revoked = await revokeYoloLeasesTx(tx, { organizationId: actor.organizationId, actorUserId: actor.userId, leaseId, reason: "manual" });
-    return { row: (await readYoloLeaseTx(tx, actor.organizationId, leaseId))!, revoked };
+    const row = (await readYoloLeaseTx(tx, actor.organizationId, leaseId))!;
+    // Révoquer le bail solo, c'est couper le YOLO par défaut : sinon le
+    // renouvellement le rendrait à la passe suivante.
+    if (row.soloDefault) revoked.push(...(await endYoloSoloDefaultTx(tx, { organizationId: actor.organizationId, actorUserId: actor.userId })).revoked);
+    return { row, revoked };
   });
   for (const lease of revoked) {
     await publish("revoke", () => deps.publisher.pushRevoke({
@@ -338,27 +352,199 @@ export async function killYoloLeases(db: Db, deps: YoloLeaseDeps, actor: YoloAct
   return { revoked: revoked.length, runtimes: runtimes.length };
 }
 
+/** Le YOLO par défaut s'active par l'owner d'une organisation à un seul membre, lui-même. */
+async function soloEligibleTx(tx: TransactionDb, actor: YoloActor): Promise<boolean> {
+  return actor.role === "owner" && isYoloSoloTx(tx, actor.organizationId, actor.userId);
+}
+
 export async function readYoloConsent(db: Db, actor: YoloActor): Promise<YoloConsentDto> {
-  const row = await withTenant(db, actor.organizationId, (tx) => readYoloConsentTx(tx, actor.organizationId, actor.userId));
-  return { acknowledgedAt: row ? isoInstant(row.acknowledgedAt) : null, soloDefault: row?.soloDefault ?? false };
+  const { row, soloEligible } = await withTenant(db, actor.organizationId, async (tx) => ({
+    row: await readYoloConsentTx(tx, actor.organizationId, actor.userId),
+    soloEligible: await soloEligibleTx(tx, actor),
+  }));
+  return { acknowledgedAt: row ? isoInstant(row.acknowledgedAt) : null, soloDefault: row?.soloDefault ?? false, soloEligible };
 }
 
 /**
  * La confirmation de la première fois, par la personne elle-même. Le YOLO
- * solo par défaut (`soloDefault`, PR 7) équivaut à un octroi : owner ou
- * admin seulement.
+ * par défaut du mode solo local (`soloDefault`) équivaut à un octroi de 24 h
+ * renouvelé : l'activer est réservé à l'owner d'une organisation à un seul
+ * membre (409 `YOLO_SOLO_NOT_ELIGIBLE` sinon), et le premier bail part tout
+ * de suite. Le couper (owner ou admin) révoque aussi les baux solo.
  */
-export async function saveYoloConsent(db: Db, actor: YoloActor, body: Record<string, unknown>): Promise<YoloConsentDto> {
+export async function saveYoloConsent(db: Db, deps: YoloLeaseDeps, actor: YoloActor, body: Record<string, unknown>): Promise<YoloConsentDto> {
   requireHumanSession(actor);
   if (body.acknowledged !== true) throw invalid("acknowledged", "La confirmation doit être donnée explicitement.");
   if (body.soloDefault !== undefined && typeof body.soloDefault !== "boolean") throw invalid("soloDefault", "Le choix doit être vrai ou faux.");
-  if (body.soloDefault !== undefined) requireManager(actor);
-  const row = await withTenant(db, actor.organizationId, (tx) => writeYoloConsentTx(tx, {
-    organizationId: actor.organizationId,
-    userId: actor.userId,
-    soloDefault: typeof body.soloDefault === "boolean" ? body.soloDefault : null,
-  }));
-  return { acknowledgedAt: isoInstant(row.acknowledgedAt), soloDefault: row.soloDefault };
+  const soloDefault = typeof body.soloDefault === "boolean" ? body.soloDefault : null;
+  if (soloDefault !== null) requireManager(actor);
+  if (soloDefault === true) {
+    if (actor.role !== "owner") throw new HttpError(403, "ROLE_REQUIRED", "Seul le propriétaire active le YOLO par défaut.");
+    if (!deps.signer.current) {
+      throw new HttpError(503, YOLO_SIGNING_UNAVAILABLE_CODE, "Le mode YOLO n'est pas disponible sur ce serveur : aucune clé de signature n'est configurée.");
+    }
+  }
+  const { row, soloEligible, ended } = await withTenant(db, actor.organizationId, async (tx) => {
+    const eligible = await soloEligibleTx(tx, actor);
+    if (soloDefault === true && !eligible) {
+      throw new HttpError(409, YOLO_SOLO_NOT_ELIGIBLE_CODE, "Le YOLO par défaut est réservé à une organisation dont vous êtes le seul membre.", {}, { reason: "members" });
+    }
+    const ended = soloDefault === false ? await endYoloSoloDefaultTx(tx, { organizationId: actor.organizationId, actorUserId: actor.userId }) : null;
+    const row = await writeYoloConsentTx(tx, { organizationId: actor.organizationId, userId: actor.userId, soloDefault });
+    return { row, soloEligible: eligible, ended };
+  });
+  await publishRevokes(deps, actor.organizationId, ended?.revoked ?? []);
+  if (soloDefault === true) {
+    try {
+      await reconcileYoloSoloDefault(db, deps, actor.organizationId);
+    } catch (error) {
+      // Le consentement est enregistré : le réconciliateur du worker réessaie.
+      logger.warn({ event: "yolo.solo_default_first_grant_failed", organizationId: actor.organizationId, error: error instanceof Error ? error.name : "unknown" }, "solo YOLO first grant failed; the worker retries");
+    }
+  }
+  return { acknowledgedAt: isoInstant(row.acknowledgedAt), soloDefault: row.soloDefault, soloEligible };
+}
+
+async function publishRevokes(deps: YoloLeaseDeps, organizationId: string, revoked: ReadonlyArray<{ leaseId: string; runtimeId: string }>): Promise<void> {
+  const revokedAt = Math.floor((deps.now?.() ?? Date.now()) / 1000);
+  for (const lease of revoked) {
+    await publish("revoke", () => deps.publisher.pushRevoke({
+      organizationId, runtimeId: lease.runtimeId, frame: { t: "yolo.revoke", leaseId: lease.leaseId, revokedAt },
+    }), { organizationId, runtimeId: lease.runtimeId, leaseId: lease.leaseId });
+  }
+}
+
+/** Mode solo local : un bail runtime de 24 h, renouvelé quand il lui reste moins de 6 h. */
+export const YOLO_SOLO_LEASE_SECONDS = YOLO_MAX_SECONDS;
+export const YOLO_SOLO_RENEW_BEFORE_SECONDS = 6 * 3600;
+/** Les protections qu'un bail solo porte toujours, quoi que dise le catalogue. */
+export const YOLO_SOLO_REQUIRED_PROTECT = ["ssh", "env", "keychain"] as const;
+
+/**
+ * Le bail solo d'un runtime : portée runtime, 24 h, pour le compte de l'owner
+ * (`grantedBy`), la deny-list de commandes de l'organisation, toutes les
+ * protections par défaut. Le système l'émet, jamais un bot.
+ */
+export function buildYoloSoloLease(input: {
+  organizationId: string;
+  runtimeId: string;
+  ownerUserId: string;
+  commandBlocklist: readonly string[];
+  now: number;
+}): YoloLease {
+  const protect = [...new Set([...YOLO_DEFAULT_PROTECT, ...YOLO_SOLO_REQUIRED_PROTECT])];
+  const lease: YoloLease = parseYoloLease({
+    v: 1,
+    leaseId: crypto.randomUUID(),
+    organizationId: input.organizationId,
+    runtimeId: input.runtimeId,
+    scope: "runtime",
+    profile: null,
+    sessionKey: null,
+    issuedAt: input.now,
+    notBefore: input.now,
+    expiresAt: input.now + YOLO_SOLO_LEASE_SECONDS,
+    grantedBy: input.ownerUserId,
+    deny: { commands: [...input.commandBlocklist], tools: [], paths: [] },
+    protect,
+  });
+  const shape = validateYoloLeaseShape(lease);
+  if (!shape.ok) throw new Error(`a solo YOLO lease built here is invalid: ${shape.issue}`);
+  return lease;
+}
+
+export type YoloSoloPass = {
+  /** Baux solo émis (renouvelés) à l'instant. */
+  renewed: number;
+  /** Le YOLO par défaut vient d'être coupé : l'organisation n'est plus solo. */
+  ended: boolean;
+  /** Ce qui empêche un renouvellement, nommé (politique, hôte, clé absente). */
+  skipped: Array<{ runtimeId: string | null; status: string }>;
+};
+
+/**
+ * Le renouvellement solo d'une organisation, par le système (le worker via
+ * la route interne, et l'API juste après le consentement). Idempotent : un
+ * runtime dont le bail runtime vivant dure encore plus que la marge n'en
+ * reçoit pas d'autre. Une organisation qui n'est plus solo voit son YOLO par
+ * défaut coupé (baux solo révoqués, `superseded`) et ses owners prévenus par
+ * e-mail. Un kill a déjà remis le consentement à false : rien n'est renouvelé.
+ */
+export async function reconcileYoloSoloDefault(db: Db, deps: YoloLeaseDeps, organizationId: string): Promise<YoloSoloPass> {
+  const now = Math.floor((deps.now?.() ?? Date.now()) / 1000);
+  const key = deps.signer.current;
+  const pass: YoloSoloPass = { renewed: 0, ended: false, skipped: [] };
+  const outcome = await withTenant(db, organizationId, async (tx) => {
+    const state = await readYoloSoloStateTx(tx, organizationId, YOLO_SOLO_RENEW_BEFORE_SECONDS);
+    if (state.consentUserIds.length === 0) return { revoked: [], granted: [] };
+    const owner = state.soloOwnerId;
+    if (owner === null) {
+      const ended = await endYoloSoloDefaultTx(tx, { organizationId, actorUserId: null });
+      if (ended.status === "ended") {
+        pass.ended = true;
+        await enqueueYoloSoloEndedEmails(tx, organizationId, deps.webAppUrl ?? "", now);
+      }
+      return { revoked: ended.revoked, granted: [] };
+    }
+    if (!state.consentUserIds.includes(owner) || state.dueRuntimeIds.length === 0) return { revoked: [], granted: [] };
+    if (!key) {
+      pass.skipped.push({ runtimeId: null, status: "signing_unavailable" });
+      return { revoked: [], granted: [] };
+    }
+    const policy = await deps.readPolicy(tx, organizationId);
+    const block = yoloPolicyBlock({ maxMode: policy?.maxMode ?? null, enforceReview: policy?.enforceReview ?? false });
+    if (block) {
+      pass.skipped.push({ runtimeId: null, status: `blocked_${block}` });
+      return { revoked: [], granted: [] };
+    }
+    const granted: Array<{ lease: YoloLease; keyId: string; signature: string; superseded: string[] }> = [];
+    for (const runtimeId of state.dueRuntimeIds) {
+      const lease = buildYoloSoloLease({ organizationId, runtimeId, ownerUserId: owner, commandBlocklist: policy?.commandBlocklist ?? [], now });
+      const signed = signYoloLease(lease, key);
+      const result = await grantYoloSoloLeaseTx(tx, {
+        organizationId, ownerUserId: owner, keyId: signed.keyId, signature: signed.signature, lease, renewBeforeSeconds: YOLO_SOLO_RENEW_BEFORE_SECONDS,
+      });
+      if (result.status === "granted") granted.push({ lease, keyId: signed.keyId, signature: signed.signature, superseded: result.superseded });
+      else if (result.status !== "not_due") pass.skipped.push({ runtimeId, status: result.status });
+    }
+    return { revoked: [], granted };
+  });
+  await publishRevokes(deps, organizationId, outcome.revoked);
+  for (const { lease, keyId, signature, superseded } of outcome.granted) {
+    await publishRevokes(deps, organizationId, superseded.map((leaseId) => ({ leaseId, runtimeId: lease.runtimeId })));
+    await publish("lease", () => deps.publisher.pushLease({
+      organizationId, runtimeId: lease.runtimeId, frame: { t: "yolo.lease", lease, keyId, signature },
+    }), { organizationId, runtimeId: lease.runtimeId, leaseId: lease.leaseId });
+  }
+  pass.renewed = outcome.granted.length;
+  if (pass.renewed > 0 || pass.ended || pass.skipped.length > 0) {
+    logger.info({ event: "yolo.solo_default_reconciled", organizationId, renewed: pass.renewed, ended: pass.ended, skipped: pass.skipped }, "solo YOLO default reconciled");
+  }
+  return pass;
+}
+
+const YOLO_SOLO_ENDED_EMAIL_KIND = "yolo_solo_default_ended" as const;
+
+/**
+ * Un deuxième membre a rejoint l'organisation : ses owners apprennent que le
+ * YOLO par défaut est coupé, dans la transaction même qui le coupe. Le rôle
+ * de l'API dépose sans relire la file (`on conflict do nothing`).
+ */
+async function enqueueYoloSoloEndedEmails(tx: TransactionDb, organizationId: string, webAppUrl: string, now: number): Promise<void> {
+  const origin = webAppUrl.replace(/\/+$/, "");
+  for (const recipient of await readYoloSoloRecipientsTx(tx, organizationId)) {
+    await enqueueTransactionalEmail(tx, {
+      kind: YOLO_SOLO_ENDED_EMAIL_KIND,
+      dedupeKey: `${YOLO_SOLO_ENDED_EMAIL_KIND}:${organizationId}:${recipient.userId}:${now}`,
+      recipientEmail: recipient.email,
+      locale: "fr",
+      payload: {
+        organizationName: recipient.organizationName,
+        reason: "members",
+        ...(origin ? { settingsUrl: `${origin}/o/${encodeURIComponent(recipient.organizationSlug)}/settings/runtime`, webAppUrl: origin } : {}),
+      },
+    });
+  }
 }
 
 const AUDIT_PAGE = 100;

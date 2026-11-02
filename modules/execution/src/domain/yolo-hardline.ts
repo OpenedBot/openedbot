@@ -63,7 +63,7 @@ export const YOLO_PROTECTIONS: Readonly<Record<ProtectedPathId, { paths: readonl
   git_config: { paths: [String.raw`(?:^|/)\.git/config$`], commands: [mentions(String.raw`\.git/config`)] },
   git_hooks: { paths: [String.raw`(?:^|/)\.git/hooks(?:/|$)`], commands: [mentions(String.raw`\.git/hooks`)] },
   ssh: { paths: [String.raw`(?:^|/)\.ssh(?:/|$)`], commands: [mentions(String.raw`\.ssh`)] },
-  env: { paths: [String.raw`(?:^|/)\.env$`], commands: [mentions(String.raw`\.env`)] },
+  env: { paths: [String.raw`(?:^|/)\.env(?:\.[A-Za-z0-9_.-]+)?$`], commands: [mentions(String.raw`\.env(?:\.[A-Za-z0-9_.-]+)?`)] },
   id_rsa: { paths: [String.raw`(?:^|/)id_rsa$`], commands: [mentions("id_rsa")] },
   credentials: { paths: [String.raw`(?:^|/)credentials(?:\.json)?$`], commands: [mentions(String.raw`credentials(?:\.json)?`)] },
   keychain: {

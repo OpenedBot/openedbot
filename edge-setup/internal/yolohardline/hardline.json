@@ -85,10 +85,10 @@
     },
     "env": {
       "paths": [
-        "(?:^|/)\\.env$"
+        "(?:^|/)\\.env(?:\\.[A-Za-z0-9_.-]+)?$"
       ],
       "commands": [
-        "(?:^|[\\s'\"=:<>/])\\.env(?:[\\s'\"/;&|<>)]|$)"
+        "(?:^|[\\s'\"=:<>/])\\.env(?:\\.[A-Za-z0-9_.-]+)?(?:[\\s'\"/;&|<>)]|$)"
       ]
     },
     "id_rsa": {
@@ -265,6 +265,16 @@
     {
       "kind": "command",
       "input": "cat .env.example",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "command",
+      "input": "source .env.production.local",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "command",
+      "input": "cat .envrc",
       "expect": "allowed"
     },
     {
@@ -310,6 +320,16 @@
     {
       "kind": "path",
       "input": "app/.env.local",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "path",
+      "input": "/srv/app/.env.staging",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "path",
+      "input": "app/.environment.md",
       "expect": "allowed"
     },
     {

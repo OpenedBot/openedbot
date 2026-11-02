@@ -249,7 +249,8 @@ export const PROTECTED_PATH_PATTERNS = {
   git_config: /(?:^|\/)\.git\/config$/,
   git_hooks: /(?:^|\/)\.git\/hooks(?:\/|$)/,
   ssh: /(?:^|\/)\.ssh(?:\/|$)/,
-  env: /(?:^|\/)\.env$/,
+  // `.env` and its variants (`.env.local`, `.env.production`...), never `.envrc`.
+  env: /(?:^|\/)\.env(?:\.[A-Za-z0-9_.-]+)?$/,
   id_rsa: /(?:^|\/)id_rsa$/,
   credentials: /(?:^|\/)credentials(?:\.json)?$/,
   keychain: /(?:^|\/)Library\/Keychains(?:\/|$)/,

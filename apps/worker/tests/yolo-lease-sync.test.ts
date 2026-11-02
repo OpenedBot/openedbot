@@ -19,7 +19,9 @@ const lease = (n: number, revokedAt: Date | null = null): Due => ({
   id: id(200 + n), runtimeId: RUNTIME, payload: payload(id(200 + n)), keyId: "e".repeat(32), signature: `${"A".repeat(86)}==`, revokedAt,
 });
 
-function fakeDb(input: { organizations?: string[]; due?: Due[]; expired?: number }) {
+type Solo = { consented: boolean; ownerConsented: boolean; members: number; due: boolean };
+
+function fakeDb(input: { organizations?: string[]; due?: Due[]; expired?: number; solo?: Solo }) {
   const statements: Array<{ sql: string; values: unknown[] }> = [];
   let organizationsServed = false;
   const run = async (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -32,6 +34,7 @@ function fakeDb(input: { organizations?: string[]; due?: Due[]; expired?: number
       return (input.organizations ?? [ORG]).map((organizationId) => ({ organizationId }));
     }
     if (sql.includes("set host_state = 'expired'")) return Array.from({ length: input.expired ?? 0 }, (_, index) => ({ id: id(300 + index) }));
+    if (sql.includes("as consented")) return input.solo ? [input.solo] : [];
     if (sql.includes("from permission_yolo_leases l")) return input.due ?? [];
     return [];
   };
@@ -64,7 +67,7 @@ describe("yolo-lease-sync", () => {
   test("marque les baux échus, sous le tenant de chaque organisation", async () => {
     const { db, statements } = fakeDb({ expired: 2 });
     const { fetchImpl, calls } = fakeFetch();
-    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 2, pushed: 0, failed: 0 });
+    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 2, pushed: 0, failed: 0, solo: 0 });
     const tenant = statements.findIndex(({ sql }) => sql.includes("app.organization_id"));
     expect(statements[tenant]!.values[0]).toBe(ORG);
     const expire = statements.find(({ sql }) => sql.includes("set host_state = 'expired'"))!;
@@ -78,7 +81,7 @@ describe("yolo-lease-sync", () => {
     const revokedAt = new Date("2026-11-02T09:30:00Z");
     const { db, statements } = fakeDb({ due: [lease(1), lease(2, revokedAt)] });
     const { fetchImpl, calls } = fakeFetch();
-    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 2, failed: 0 });
+    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 2, failed: 0, solo: 0 });
     expect(calls.map((call) => call.url)).toEqual([
       `http://link:8792/internal/runtime-links/${RUNTIME}/control`,
       `http://link:8792/internal/runtime-links/${RUNTIME}/control`,
@@ -98,13 +101,13 @@ describe("yolo-lease-sync", () => {
     const now = new Date("2026-11-02T10:00:00Z");
     const first = fakeDb({ due: [lease(1)] });
     const failing = fakeFetch(false);
-    expect(await syncYoloLeases(first.db, options(failing.fetchImpl, now))).toEqual({ expired: 0, pushed: 0, failed: 1 });
+    expect(await syncYoloLeases(first.db, options(failing.fetchImpl, now))).toEqual({ expired: 0, pushed: 0, failed: 1, solo: 0 });
     const again = fakeDb({ due: [lease(1)] });
-    expect(await syncYoloLeases(again.db, options(failing.fetchImpl, new Date(now.getTime() + 30_000)))).toEqual({ expired: 0, pushed: 0, failed: 0 });
+    expect(await syncYoloLeases(again.db, options(failing.fetchImpl, new Date(now.getTime() + 30_000)))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 0 });
     expect(failing.calls).toHaveLength(1);
     const later = fakeDb({ due: [lease(1)] });
     const working = fakeFetch(true);
-    expect(await syncYoloLeases(later.db, options(working.fetchImpl, new Date(now.getTime() + 61_000)))).toEqual({ expired: 0, pushed: 1, failed: 0 });
+    expect(await syncYoloLeases(later.db, options(working.fetchImpl, new Date(now.getTime() + 61_000)))).toEqual({ expired: 0, pushed: 1, failed: 0, solo: 0 });
   });
 
   test("une charge stockée illisible n'est jamais poussée", async () => {
@@ -112,13 +115,68 @@ describe("yolo-lease-sync", () => {
     expect(yoloSyncFrame(broken)).toBeNull();
     const { db } = fakeDb({ due: [broken] });
     const { fetchImpl, calls } = fakeFetch();
-    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0 });
+    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 0 });
     expect(calls).toEqual([]);
+  });
+
+  describe("mode solo local", () => {
+    const soloUrl = `http://api:8790/internal/yolo/solo-default/${ORG}/reconcile`;
+    const apiFetch = (status = 200) => {
+      const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+      const fetchImpl = async (url: string, init?: RequestInit) => {
+        calls.push({ url, headers: init?.headers as Record<string, string> });
+        return Response.json({ renewed: 1, ended: false, skipped: [] }, { status });
+      };
+      return { calls, fetchImpl };
+    };
+
+    test("un runtime sans bail runtime au-delà de la marge : l'API, qui signe, renouvelle", async () => {
+      const { db, statements } = fakeDb({ solo: { consented: true, ownerConsented: true, members: 1, due: true } });
+      const { fetchImpl, calls } = apiFetch();
+      expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 1 });
+      // Jamais le gateway du lien : la clé de signature ne vit que dans l'API.
+      expect(calls.map((call) => call.url)).toEqual([soloUrl]);
+      expect(calls[0]!.headers.Authorization).toBe("Bearer internal-token");
+      const probe = statements.find(({ sql }) => sql.includes("as consented"))!;
+      expect(probe.sql).toContain("make_interval(secs => ?)");
+      expect(probe.values).toContain(6 * 3600);
+      expect(statements.indexOf(probe)).toBeGreaterThan(statements.findIndex(({ sql }) => sql.includes("app.organization_id")));
+    });
+
+    test("un deuxième membre : l'API coupe le YOLO par défaut, même sans renouvellement dû", async () => {
+      const { db } = fakeDb({ solo: { consented: true, ownerConsented: true, members: 2, due: false } });
+      const { fetchImpl, calls } = apiFetch();
+      expect((await syncYoloLeases(db, options(fetchImpl))).solo).toBe(1);
+      expect(calls.map((call) => call.url)).toEqual([soloUrl]);
+    });
+
+    test("rien à faire : bail encore long, aucun consentement, ou consentement d'un autre que l'owner unique", async () => {
+      for (const solo of [
+        { consented: true, ownerConsented: true, members: 1, due: false },
+        { consented: false, ownerConsented: false, members: 1, due: true },
+        { consented: true, ownerConsented: false, members: 1, due: true },
+      ]) {
+        resetYoloLeaseSync();
+        const { db } = fakeDb({ solo });
+        const { fetchImpl, calls } = apiFetch();
+        expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 0 });
+        expect(calls).toEqual([]);
+      }
+    });
+
+    test("une API qui ne répond pas recule, comme une poussée", async () => {
+      const now = new Date("2026-11-02T10:00:00Z");
+      const solo = { consented: true, ownerConsented: true, members: 1, due: true };
+      const failing = apiFetch(503);
+      expect(await syncYoloLeases(fakeDb({ solo }).db, options(failing.fetchImpl, now))).toEqual({ expired: 0, pushed: 0, failed: 1, solo: 0 });
+      expect(await syncYoloLeases(fakeDb({ solo }).db, options(failing.fetchImpl, new Date(now.getTime() + 30_000)))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 0 });
+      expect(failing.calls).toHaveLength(1);
+    });
   });
 
   test("sans organisation à visiter, le curseur repart du début", async () => {
     const { db } = fakeDb({ organizations: [] });
     const { fetchImpl } = fakeFetch();
-    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0 });
+    expect(await syncYoloLeases(db, options(fetchImpl))).toEqual({ expired: 0, pushed: 0, failed: 0, solo: 0 });
   });
 });
