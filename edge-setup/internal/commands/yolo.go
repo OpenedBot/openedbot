@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/cli"
@@ -37,13 +38,23 @@ func runYolo(env cli.Env, args []string) int {
 	fs := newFlagSet("yolo", env)
 	jsonOut := fs.Bool("json", false, "status: machine-readable output")
 	yes := fs.Bool("yes", false, "off / on: confirm the change")
-	if err := fs.Parse(args); err != nil {
+	// Les deux options sont booléennes : le verbe peut venir avant ou après
+	// elles (`yolo off --yes`, comme l'écrit la doc, ou `yolo --yes off`).
+	var flags, verbs []string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			flags = append(flags, arg)
+		} else {
+			verbs = append(verbs, arg)
+		}
+	}
+	if err := fs.Parse(flags); err != nil {
 		return cli.ExitUsage
 	}
-	if fs.NArg() != 1 {
+	if len(verbs) != 1 {
 		return fail(env, cli.ExitUsage, "usage: edge-setup yolo status [--json] | off --yes | on --yes")
 	}
-	verb := fs.Arg(0)
+	verb := verbs[0]
 	if verb != "status" && verb != "off" && verb != "on" {
 		return fail(env, cli.ExitUsage, "yolo: unknown verb %q (status | off | on)", verb)
 	}
