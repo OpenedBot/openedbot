@@ -51,6 +51,7 @@ type Yolo struct {
 	applied string
 	lastAt  time.Time
 	state   string
+	stateAt time.Time
 	wake    chan struct{}
 }
 
@@ -76,6 +77,12 @@ const (
 	yoloAuditBatch     = 64
 	yoloDefaultTick    = 2 * time.Second
 	yoloApproveTimeout = 10 * time.Second
+	// openedbot ignores yolo.* frames received before it admits the link
+	// and acknowledges only the audit: unacknowledged audit goes out again
+	// after yoloAuditResendAfter, and the state at least every
+	// yoloStateResendEvery (its ingest is idempotent).
+	yoloAuditResendAfter = 15 * time.Second
+	yoloStateResendEvery = time.Minute
 )
 
 func (y *Yolo) logf(format string, args ...any) {
@@ -300,16 +307,19 @@ func (y *Yolo) report() {
 	frame, err := EncodeYoloState(leases, killedAt)
 	if err == nil {
 		y.mu.Lock()
-		changed := string(frame) != y.state
+		changed := string(frame) != y.state || time.Since(y.stateAt) >= yoloStateResendEvery
 		y.mu.Unlock()
 		if changed {
 			if err := send(websocket.MessageText, frame); err != nil {
 				return
 			}
 			y.mu.Lock()
-			y.state = string(frame)
+			y.state, y.stateAt = string(frame), time.Now()
 			y.mu.Unlock()
 		}
+	}
+	if y.Audit.Resend(yoloAuditResendAfter) {
+		y.logf("yolo audit not acknowledged within %s: sending it again", yoloAuditResendAfter)
 	}
 	for {
 		batch := y.Audit.NextBatch(yoloAuditBatch)

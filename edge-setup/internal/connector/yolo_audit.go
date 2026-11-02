@@ -118,8 +118,10 @@ type YoloAudit struct {
 	// sealer seals one entry into the creation audit; nil when the creation
 	// audit is not enabled on this host.
 	sealer func(YoloAuditEntry) error
-	// sentThrough is the last seq sent on the current session.
+	// sentThrough is the last seq sent on the current session; sentAt is
+	// when the last batch went out.
 	sentThrough uint64
+	sentAt      time.Time
 }
 
 // OpenYoloAudit loads the outbox and verifies its chain. A chain that does
@@ -358,8 +360,23 @@ func (a *YoloAudit) NextBatch(max int) []YoloAuditEntry {
 	}
 	if len(out) > 0 {
 		a.sentThrough = out[len(out)-1].Seq
+		a.sentAt = a.now()
 	}
 	return out
+}
+
+// Resend rewinds the session when what it sent is still unacknowledged
+// after the given delay: openedbot drops a yolo.audit that arrives before it
+// admits the link, and a lost ack looks the same. Ingest is idempotent on
+// (runtimeId, seq), so sending twice is harmless; never sending is not.
+func (a *YoloAudit) Resend(after time.Duration) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.sentThrough <= a.state.AckedThrough || a.now().Sub(a.sentAt) < after {
+		return false
+	}
+	a.sentThrough = a.state.AckedThrough
+	return true
 }
 
 // Unsent rolls back a batch that could not be sent.

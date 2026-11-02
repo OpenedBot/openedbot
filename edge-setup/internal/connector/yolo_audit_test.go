@@ -166,6 +166,42 @@ func TestYoloAuditBatchesDecodeAsFrames(t *testing.T) {
 	}
 }
 
+// openedbot drops a yolo.audit received before it admits the link: what
+// stays unacknowledged goes out again, and nothing once it is acknowledged.
+func TestYoloAuditResendsWhatStaysUnacknowledged(t *testing.T) {
+	clock := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
+	audit, err := OpenYoloAudit(t.TempDir(), testRuntime, func() time.Time { return clock })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := audit.Record(record(leaseA)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	audit.StartSession()
+	if sent := audit.NextBatch(10); len(sent) != 2 {
+		t.Fatalf("first send: %d", len(sent))
+	}
+	if audit.Resend(15*time.Second) || len(audit.NextBatch(10)) != 0 {
+		t.Fatal("resent before the delay")
+	}
+	clock = clock.Add(16 * time.Second)
+	if !audit.Resend(15 * time.Second) {
+		t.Fatal("unacknowledged audit not resent")
+	}
+	if again := audit.NextBatch(10); len(again) != 2 || again[0].Seq != 1 {
+		t.Fatalf("resend: %+v", again)
+	}
+	if err := audit.Ack(2); err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(time.Minute)
+	if audit.Resend(15 * time.Second) {
+		t.Fatal("acknowledged audit resent")
+	}
+}
+
 // The vector openedbot's decoder reads: a sealed audit holding one run
 // creation and one YOLO auto-approval (creation-audit-v2-yolo.*).
 func TestCreationAuditYoloVectorMatchesTestdata(t *testing.T) {
