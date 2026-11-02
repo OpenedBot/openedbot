@@ -508,6 +508,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/organization-permission-policy.ts
 	bun tests/integration/yolo-leases.ts
 	bun tests/integration/yolo-link-ingest.ts
+	bun tests/integration/yolo-link.ts
 	bun tests/integration/tool-policies.ts
 	bun tests/integration/permission-rules.ts
 	bun tests/integration/permission-grants.ts
@@ -593,7 +594,7 @@ e2e-api: ## Parcours HTTP cloud; exige la stack locale déjà lancée (make dev)
 	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/api-cloud.ts
 
-e2e-bot: ## Bots e2e sur le runtime lié (SCENARIOS=lifecycle|greeting|fast-path|coordination|model-reset|permissions|all, ARGS=...); rapport HTML dans tmp/e2e-bot/; exige make dev.
+e2e-bot: ## Bots e2e sur le runtime lié (SCENARIOS=lifecycle|greeting|fast-path|coordination|model-reset|permissions|all|yolo, ARGS=...); rapport HTML dans tmp/e2e-bot/; exige make dev.
 	@$(REQUIRE_API)
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : bots jetables, purgés et nettoyage hôte vérifié avant la fin.\n'
 	$(LOAD_ENV_OPT) E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts $(or $(SCENARIOS),lifecycle) $(ARGS)
