@@ -187,20 +187,24 @@ func TestYoloStatusJSON(t *testing.T) {
 	}
 }
 
-// The verb may come before its flags, as the docs write it.
+// The verb may come before its flags, as the docs write it. Only the
+// parsing: running a verb needs root on Linux and, on macOS, the user's
+// real runtime.
 func TestYoloFlagsAfterTheVerb(t *testing.T) {
-	yoloHost(t)
-	for _, args := range [][]string{{"status", "--json"}, {"--json", "status"}} {
-		env, out, _ := yoloEnv()
-		if code := runYolo(env, args); code != cli.ExitOK {
-			t.Fatalf("yolo %v: code %d", args, code)
+	for _, c := range []struct {
+		args    []string
+		verb    string
+		jsonOut bool
+	}{
+		{[]string{"status", "--json"}, "status", true},
+		{[]string{"--json", "status"}, "status", true},
+		{[]string{"off", "--yes"}, "off", false},
+		{[]string{"--yes", "on"}, "on", false},
+	} {
+		env, _, _ := yoloEnv()
+		verb, jsonOut, code := parseYoloArgs(env, c.args)
+		if code != cli.ExitOK || verb != c.verb || jsonOut != c.jsonOut {
+			t.Fatalf("yolo %v: verb %q json %v code %d", c.args, verb, jsonOut, code)
 		}
-		if !strings.HasPrefix(strings.TrimSpace(out.String()), "{") {
-			t.Fatalf("yolo %v: not JSON: %q", args, out.String())
-		}
-	}
-	env, _, _ := yoloEnv()
-	if code := runYolo(env, []string{"off", "--yes"}); code != cli.ExitOK {
-		t.Fatalf("yolo off --yes: code %d", code)
 	}
 }
