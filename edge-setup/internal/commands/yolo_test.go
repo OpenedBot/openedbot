@@ -65,7 +65,7 @@ func TestYoloVerbsRefuseWithoutYes(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(runtimeRoot, "profiles", "designer", "plugins", yoloApprovalPlugin, yoloProfileFile)); err != nil {
 		t.Fatalf("a refused verb removed a profile's lease: %v", err)
 	}
-	for _, args := range [][]string{{}, {"maybe"}, {"off", "now"}} {
+	for _, args := range [][]string{{}, {"maybe"}, {"off", "now"}, {"--yes"}} {
 		env, _, _ := yoloEnv()
 		if code := runYolo(env, args); code != cli.ExitUsage {
 			t.Fatalf("yolo %v: code %d, want usage", args, code)
@@ -184,5 +184,23 @@ func TestYoloStatusJSON(t *testing.T) {
 	out.Reset()
 	if code := yoloStatus(env, false); code != cli.ExitOK || !strings.Contains(out.String(), "YOLO off since") || !strings.Contains(out.String(), "2 auto-approval(s)") {
 		t.Fatalf("status text: %s", out.String())
+	}
+}
+
+// The verb may come before its flags, as the docs write it.
+func TestYoloFlagsAfterTheVerb(t *testing.T) {
+	yoloHost(t)
+	for _, args := range [][]string{{"status", "--json"}, {"--json", "status"}} {
+		env, out, _ := yoloEnv()
+		if code := runYolo(env, args); code != cli.ExitOK {
+			t.Fatalf("yolo %v: code %d", args, code)
+		}
+		if !strings.HasPrefix(strings.TrimSpace(out.String()), "{") {
+			t.Fatalf("yolo %v: not JSON: %q", args, out.String())
+		}
+	}
+	env, _, _ := yoloEnv()
+	if code := runYolo(env, []string{"off", "--yes"}); code != cli.ExitOK {
+		t.Fatalf("yolo off --yes: code %d", code)
 	}
 }
