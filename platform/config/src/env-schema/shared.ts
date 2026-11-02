@@ -92,7 +92,7 @@ export const SHARED_ENV: readonly EnvVar[] = [
     name: "OPENEDBOT_YOLO_LEASE_PREVIOUS_KEYS",
     scope: "api",
     tier: "production",
-    doc: "Comma-separated retired YOLO lease seeds: only their public keys are published, so hosts still verify the leases they signed (24 h at most) during a rotation.",
+    doc: "Comma-separated retired YOLO lease seeds, most recent first: only their public keys are published, so hosts still verify the leases they signed (24 h at most) during a rotation; each key endorses the next newer one in link.context, so a host pinned on an older key follows the rotation.",
     example: "",
     secret: true,
   },

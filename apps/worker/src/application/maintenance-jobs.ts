@@ -20,6 +20,7 @@ import { processProfileProvision } from "../maintenance/profile-provisions";
 import { processRuntimeModelSelection } from "../maintenance/runtime-model-selection";
 import { processBotHostCleanup } from "../maintenance/bot-host-cleanups";
 import { reconcileHostApprovalPolicies } from "../maintenance/approval-policy-reconciliation";
+import { syncYoloLeases } from "../maintenance/yolo-lease-sync";
 import { reconcileCapabilityBaselines } from "../maintenance/capability-baseline-reconciliation";
 import { processReviewProfiles } from "../maintenance/review-profiles";
 import { processApprovalReviews } from "../maintenance/approval-reviews";
@@ -110,6 +111,15 @@ export function maintenanceJobs(
       name: "approval-policy-reconciliation",
       everyMs: config.routineTickMs,
       run: (signal) => guardedPass("worker.approval_policy_reconcile_failed", () => reconcileHostApprovalPolicies(db, config, signal)),
+    },
+    {
+      // Mode YOLO : baux échus marqués, baux non livrés et révocations non confirmées repoussés au lien.
+      name: "yolo-lease-sync",
+      everyMs: config.routineTickMs,
+      run: (signal) => guardedPass("worker.yolo_lease_sync_failed", async () => {
+        const sync = await syncYoloLeases(db, config, signal);
+        if (sync.expired + sync.pushed + sync.failed > 0) console.info(JSON.stringify({ event: "worker.yolo_lease_sync", ...sync }));
+      }),
     },
     {
       // PERM2-7: a gate under review has 15 s end to end; claim it fast.

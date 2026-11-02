@@ -84,9 +84,20 @@
       "runtime-link"
     ]
   },
-  "permission_yolo_audit": "execution",
+  "permission_yolo_audit": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "permission_yolo_audit_quarantine": "runtime-link",
   "permission_yolo_consents": "execution",
-  "permission_yolo_leases": "execution",
+  "permission_yolo_leases": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
   "playbooks": "roster",
   "product_features": {
     "owner": "staff",

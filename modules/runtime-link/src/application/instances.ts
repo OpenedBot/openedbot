@@ -1,6 +1,11 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { RelayDialError, type RelayDialer, type RelayRequest } from "@openedbot/hermes";
-import { RELAY_STAGE_HEADER, type RelayLinkRotateFrame } from "@openedbot/contracts-connector";
+import {
+  RELAY_STAGE_HEADER,
+  type RelayLinkRotateFrame,
+  type RelayYoloLeaseFrame,
+  type RelayYoloRevokeFrame,
+} from "@openedbot/contracts-connector";
 import type { Db } from "@openedbot/platform-db";
 import { LINK_PROBE_TIMEOUT_MS, parseLinkProbeResult, type LinkProbeResult } from "../domain/link-probe";
 
@@ -39,6 +44,8 @@ export type RuntimeLinkLocator = {
   forwardDial(runtimeId: string, request: RelayRequest, signal?: AbortSignal): Promise<Response>;
   forwardRotate(runtimeId: string, frame: RelayLinkRotateFrame): Promise<boolean>;
   forwardClose(runtimeId: string, code: number, reason: string): Promise<boolean>;
+  /** Mode YOLO : `yolo.lease` / `yolo.revoke` poussé par l'instance propriétaire (`true` : écrit sur le lien). */
+  forwardYolo(runtimeId: string, frame: RelayYoloLeaseFrame | RelayYoloRevokeFrame): Promise<boolean>;
   /** Sonde le lien sur l'instance propriétaire ; attend son verdict, borné. */
   forwardProbe(runtimeId: string, expectedGeneration: string | null): Promise<LinkProbeResult>;
 };
@@ -57,6 +64,7 @@ export const NO_RUNTIME_LINK_LOCATOR: RuntimeLinkLocator = {
   },
   forwardRotate: async () => false,
   forwardClose: async () => false,
+  forwardYolo: async () => false,
   forwardProbe: async () => ({ outcome: "no_link" }),
 };
 
@@ -215,6 +223,11 @@ export function createRuntimeLinkLocator(
         code,
         reason,
       });
+    },
+    async forwardYolo(runtimeId, frame) {
+      const target = await remoteUrl(runtimeId);
+      if (!("url" in target)) return false;
+      return forwardControl(fetchImpl, config, target.url, runtimeId, { kind: "yolo", frame });
     },
     async forwardProbe(runtimeId, expectedGeneration) {
       const target = await remoteUrl(runtimeId);

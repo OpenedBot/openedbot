@@ -17,6 +17,7 @@ export const TRANSACTIONAL_EMAIL_KINDS = [
   "runtime_link_down",
   "runtime_link_restored",
   "runtime_connector_outdated",
+  "yolo_audit_quarantined",
 ] as const;
 
 export type TransactionalEmailKind = (typeof TRANSACTIONAL_EMAIL_KINDS)[number];

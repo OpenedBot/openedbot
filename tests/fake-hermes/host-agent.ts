@@ -11,12 +11,18 @@
  *     LOCAL bearer (the bearer never crosses the wire);
  *   - keeps a per-run journal fed by its own upstream events subscription and
  *     replays `GET /v1/runs/{id}/events?since=<n>` from it, `id:` per frame;
- *   - relays `/v1/capabilities` with `features.event_replay: true`.
+ *   - relays `/v1/capabilities` with `features.event_replay: true`;
+ *   - YOLO mode (announce `yolo_lease` in `features`): records the
+ *     `yolo.lease` / `yolo.revoke` / `yolo.audit.ack` frames and the
+ *     `link.context.leaseKeys` it receives, and emits `yolo.state` and a
+ *     hash-chained `yolo.audit` (genesis per runtime, as edge-setup does).
+ *     It verifies no signature: the real host does (`yolo_lease.go`).
  *
  * Test double only: bodies are buffered (bounded), not streamed, and the
  * journal lives in memory.
  */
 
+import { createHash, randomUUID } from "node:crypto";
 import {
   decodeBinaryFrame,
   decodeTextFrame,
@@ -29,7 +35,25 @@ import {
   RELAY_MAX_RESPONSE_BODY,
   type RelayDiagnosticFrame,
   type RelayTextFrame,
+  type RelayYoloAuditEntry,
+  type RelayYoloAuditFrame,
+  type RelayYoloLeaseState,
+  type YoloLeaseKey,
 } from "@openedbot/contracts-connector";
+
+/** What openedbot pushed about YOLO leases, in arrival order. */
+export type HostAgentYoloFrame = Extract<RelayTextFrame, { t: "yolo.lease" | "yolo.revoke" | "yolo.audit.ack" }>;
+
+/** One auto-approval to journal: the arguments' hash only, as the real host. */
+export type HostAgentYoloRecord = {
+  leaseId: string;
+  profile: string;
+  gateKind: "plugin_tool" | "terminal_danger";
+  toolKey: string | null;
+  /** Hashed here: the frame never carries the arguments. */
+  args: string;
+  occurredAt?: number;
+};
 
 export type HostAgentAuth =
   | { kind: "enrollment"; ticket: string }
@@ -44,6 +68,8 @@ export type HostAgentOptions = {
   /** Local bearer, added by the host — never received from the wire. */
   gatewayToken: string;
   agent?: string;
+  /** `hello.features`, e.g. `yolo_lease` and `yolo_thread_scope` for YOLO mode. */
+  features?: string[];
   log?: (event: string, fields: Record<string, unknown>) => void;
 };
 
@@ -62,8 +88,93 @@ export class FakeHostAgent {
   private issuedWaiters: Array<(issued: { runtimeId: string; linkToken: string }) => void> = [];
   private closedCode: number | null = null;
   private readonly diagnosticWaiters = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+  private readonly yoloReceived: HostAgentYoloFrame[] = [];
+  private yoloWaiters: Array<() => void> = [];
+  private receivedLeaseKeys: YoloLeaseKey[] | null = null;
+  /** The local audit chain: what was written, and the last link. */
+  private readonly yoloJournal: RelayYoloAuditEntry[] = [];
 
   constructor(private readonly options: HostAgentOptions) {}
+
+  /** Every `yolo.lease` / `yolo.revoke` / `yolo.audit.ack` received so far. */
+  get yoloFrames(): readonly HostAgentYoloFrame[] {
+    return this.yoloReceived;
+  }
+
+  /** `link.context.leaseKeys` as last received, or `null`. */
+  get leaseKeys(): readonly YoloLeaseKey[] | null {
+    return this.receivedLeaseKeys;
+  }
+
+  /** Resolves with the first received YOLO frame (from `from` on) that matches. */
+  waitYolo(match: (frame: HostAgentYoloFrame) => boolean, from = 0, timeoutMs = 10_000): Promise<HostAgentYoloFrame> {
+    return new Promise((resolve, reject) => {
+      const check = (): boolean => {
+        const found = this.yoloReceived.slice(from).find(match);
+        if (found) resolve(found);
+        return Boolean(found);
+      };
+      if (check()) return;
+      const timer = setTimeout(() => {
+        this.yoloWaiters = this.yoloWaiters.filter((waiter) => waiter !== wake);
+        reject(new Error("the expected YOLO frame did not arrive in time"));
+      }, timeoutMs);
+      const wake = () => {
+        if (!check()) return;
+        clearTimeout(timer);
+        this.yoloWaiters = this.yoloWaiters.filter((waiter) => waiter !== wake);
+      };
+      this.yoloWaiters.push(wake);
+    });
+  }
+
+  /** `yolo.state`: what this host says it holds; `killedAt` mimics `edge-setup yolo off`. */
+  sendYoloState(leases: RelayYoloLeaseState[], killedAt?: number): void {
+    this.sendText(killedAt === undefined ? { t: "yolo.state", leases } : { t: "yolo.state", leases, killedAt });
+  }
+
+  /**
+   * Appends the records to the local chain and sends the whole unacknowledged
+   * tail as one `yolo.audit`. `entryHash = SHA-256(0x01 || canonical(entry
+   * without entryHash) || prevHash)`, written here independently of the code
+   * under test.
+   */
+  sendYoloAudit(runtimeId: string, records: HostAgentYoloRecord[]): RelayYoloAuditFrame {
+    for (const record of records) {
+      const previous = this.yoloJournal.at(-1);
+      const body = {
+        seq: (previous?.seq ?? 0) + 1,
+        eventId: randomUUID(),
+        occurredAt: record.occurredAt ?? Math.floor(Date.now() / 1000),
+        leaseId: record.leaseId,
+        profile: record.profile,
+        gateKind: record.gateKind,
+        toolKey: record.toolKey,
+        argsHash: createHash("sha256").update(record.args).digest("hex"),
+        prevHash: previous?.entryHash ?? createHash("sha256").update(`ohb-yolo-audit/v1/genesis${runtimeId}`).digest("hex"),
+      };
+      this.yoloJournal.push({ ...body, entryHash: fakeYoloEntryHash(body) });
+    }
+    const frame = yoloAuditFrameOf(runtimeId, this.yoloJournal);
+    this.sendText(frame);
+    return frame;
+  }
+
+  /** Sends any `yolo.audit`, a tampered one included: the cloud must quarantine, not drop. */
+  sendYoloAuditFrame(frame: RelayYoloAuditFrame): void {
+    this.sendText(frame);
+  }
+
+  /** What `yolo.audit.ack` lets the host purge, as edge-setup does. */
+  private purgeYoloJournal(toSeq: number): void {
+    while (this.yoloJournal[0] && this.yoloJournal[0].seq <= toSeq) this.yoloJournal.shift();
+  }
+
+  private noteYolo(frame: HostAgentYoloFrame): void {
+    this.yoloReceived.push(frame);
+    if (frame.t === "yolo.audit.ack") this.purgeYoloJournal(frame.toSeq);
+    for (const wake of [...this.yoloWaiters]) wake();
+  }
 
   get linkIssued(): { runtimeId: string; linkToken: string } | null {
     return this.issued;
@@ -101,7 +212,10 @@ export class FakeHostAgent {
       ws.addEventListener("open", () => resolve(), { once: true });
       ws.addEventListener("error", () => reject(new Error(`host agent could not dial ${this.options.wsUrl}`)), { once: true });
     });
-    this.sendText({ t: "hello", protocol: 1, agent: this.options.agent ?? "fake-host-agent/1" });
+    this.sendText({
+      t: "hello", protocol: 1, agent: this.options.agent ?? "fake-host-agent/1",
+      ...(this.options.features ? { features: this.options.features } : {}),
+    });
   }
 
   /** Resolves once the broker has issued the link credentials (enrollment only). */
@@ -179,6 +293,14 @@ export class FakeHostAgent {
       case "link.issued":
         this.issued = { runtimeId: frame.runtimeId, linkToken: frame.linkToken };
         for (const wake of this.issuedWaiters.splice(0)) wake(this.issued);
+        return;
+      case "link.context":
+        if (frame.leaseKeys) this.receivedLeaseKeys = frame.leaseKeys;
+        return;
+      case "yolo.lease":
+      case "yolo.revoke":
+      case "yolo.audit.ack":
+        this.noteYolo(frame);
         return;
       case "req":
         if (frame.body === "stream") {
@@ -364,6 +486,21 @@ export class FakeHostAgent {
       }
     })();
   }
+}
+
+/** Canonical JSON of a flat entry (sorted keys, ASCII strings, integers, null) is JSON.stringify of the sorted object. */
+function fakeYoloEntryHash(body: Omit<RelayYoloAuditEntry, "entryHash">): string {
+  const sorted = Object.fromEntries(Object.entries(body).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  return createHash("sha256").update(Uint8Array.of(0x01)).update(JSON.stringify(sorted)).update(Buffer.from(body.prevHash, "hex")).digest("hex");
+}
+
+/** At most 128 entries per frame, as the contract bounds it; the rest goes after the ack. */
+function yoloAuditFrameOf(runtimeId: string, journal: readonly RelayYoloAuditEntry[]): RelayYoloAuditFrame {
+  const entries = journal.slice(0, 128);
+  const first = entries[0];
+  const last = entries.at(-1);
+  if (!first || !last) throw new Error("the YOLO journal is empty: nothing to send");
+  return { t: "yolo.audit", runtimeId, entries: [...entries], fromSeq: first.seq, toSeq: last.seq, tail: last.entryHash };
 }
 
 function concat(chunks: Uint8Array[]): Uint8Array {

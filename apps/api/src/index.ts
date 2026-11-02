@@ -68,6 +68,7 @@ import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
 import { yoloRoutes } from "./routes/identity/yolo-routes";
 import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
+import { createLinkYoloPublisher, yoloLinkLeaseKeys } from "@openedbot/runtime-link/application/link-yolo";
 import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
 import { unhandledErrorBody } from "./interfaces/http/unhandled-error";
@@ -255,8 +256,9 @@ const anchorBlocking = (organizationId: string) => entitlements.has(PRO_ENTITLEM
 // Le broker du lien connecteur vit dans le processus : une connexion par
 // runtime, tenue par CETTE instance. Les routes le joignent par `runtimeLinks()`.
 const linkBroker = runtimeLinkConfig.mode === "embedded"
-  ? new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: auditWorm, anchorBlocking }) })
+  ? new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: auditWorm, anchorBlocking, webAppUrl: config.webUrl }) })
   : null;
+const yoloSigning = readYoloLeaseSigningConfig(process.env);
 const instanceRegistry = createApiInstanceRegistry(db, {
   instanceId,
   apiInternalUrl: config.apiInternalUrl,
@@ -269,7 +271,7 @@ const linkLocator = createRuntimeLinkLocator(db, {
 });
 installRuntimeLinkLocator(linkLocator);
 installRuntimeLinks(instanceAwareRuntimeLinks(linkBroker ? brokerRuntimeLinks(linkBroker) : NO_RUNTIME_LINKS, linkLocator));
-const linkGateway = linkBroker ? createRuntimeLinkGateway({ db, config, broker: linkBroker }) : null;
+const linkGateway = linkBroker ? createRuntimeLinkGateway({ db, config, broker: linkBroker, leaseKeys: yoloLinkLeaseKeys(yoloSigning) }) : null;
 const idleTimeout = Number(process.env.API_IDLE_TIMEOUT ?? 255);
 if (!Number.isSafeInteger(idleTimeout) || idleTimeout < 1 || idleTimeout > 255) {
   throw new Error("API_IDLE_TIMEOUT must be an integer between 1 and 255 seconds.");
@@ -431,7 +433,8 @@ app.route("/api/alert-channels", alertChannelRoutes(db, config));
 // (étape 8b) ; en solo, la route n'existe pas (404).
 app.route("/api/organization/permissions", permissionPolicyRoutes(db));
 // Mode YOLO : sans clé de signature, l'API démarre et refuse l'octroi (503).
-app.route("/api/organization/yolo", yoloRoutes(db, { signing: readYoloLeaseSigningConfig(process.env) }));
+// La poussée `yolo.lease` / `yolo.revoke` : le lien d'ici, sinon l'instance qui le tient ; le worker repousse le reste.
+app.route("/api/organization/yolo", yoloRoutes(db, { signing: yoloSigning, publisher: createLinkYoloPublisher(linkBroker, linkLocator) }));
 app.route("/api/organization", memberRoutes(db, config));
 // Montages `session` des plug-ins pro, sous `/api/pro/<id>` : derrière la
 // session ; sans l'entitlement déclaré par le montage, la route n'existe pas (404).

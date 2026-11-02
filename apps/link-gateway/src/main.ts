@@ -10,6 +10,8 @@ import { API_INSTANCE_HEARTBEAT_MS, createApiInstanceRegistry, createRuntimeLink
 import { startRuntimeLinkServer } from "@openedbot/runtime-link/application/server";
 import { createRuntimeLinkGateway, RUNTIME_LINK_INTERNAL_PREFIX } from "@openedbot/runtime-link/application/gateway";
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
+import { yoloLinkLeaseKeys } from "@openedbot/runtime-link/application/link-yolo";
+import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { runtimeLinkInternalRoutes } from "./internal-relay";
 
@@ -28,10 +30,11 @@ const locator = createRuntimeLinkLocator(db, instanceConfig);
 // AuditAnchor : chaîne locale, puis le bucket WORM (OHB-57, installation
 // legacy). Aucun plug-in n'est chargé ici : un ancrage externe en échec n'y
 // est jamais bloquant, il se journalise (`worm_write_failed`).
-const broker = new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm) }), log });
+const broker = new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm), webAppUrl: config.webUrl }), log });
 // `link.context` annonce la dernière version d'edge-setup : la même source que l'API.
 createConnectorReleaseFeed({ url: config.connectorReleasesUrl, versions: config.connectorVersions }).start();
-const gateway = createRuntimeLinkGateway({ db, config, broker, log });
+// Mode YOLO : les clés publiques de bail (les mêmes variables que l'API), épinglées par l'hôte.
+const gateway = createRuntimeLinkGateway({ db, config, broker, log, leaseKeys: yoloLinkLeaseKeys(readYoloLeaseSigningConfig(process.env)) });
 const app = new Hono();
 app.get("/health", async (context) => {
   await db`select 1`;

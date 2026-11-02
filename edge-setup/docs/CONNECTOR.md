@@ -1342,6 +1342,23 @@ chaque décision et toutes les 2 s (pas de signal), vide les profils et
 annonce `killedAt`. Un fichier de kill illisible vaut un kill.
 `yolo on --yes` ne lève que le refus local (voir OPERATIONS.md).
 
+Côté openedbot (`modules/runtime-link/src/application/link-yolo.ts`).
+`leaseKeys` liste la clé courante puis les clés retirées, de la plus récente à
+la plus ancienne, chacune endossée par la suivante : un hôte épinglé sur une
+clé ancienne remonte la chaîne d'une clé par connexion. `yolo.state` écrit la
+livraison et l'état de chaque bail cité ; un bail vivant que l'hôte ne cite
+pas lui est renvoyé, un bail qu'il dit actif sans qu'openedbot le tienne pour
+vivant reçoit `yolo.revoke`. `killedAt` révoque côté openedbot tout bail émis
+jusque-là (cause `host_cli`), un bail `rejected` aussi (`host_rejected`).
+`yolo.audit` est revérifié (hash recalculé, suite exacte du dernier maillon
+reçu, entrée déjà reçue à l'identique, bail de ce runtime) puis inséré sans
+doublon sur (runtime, `seq`) ; une tranche qui ne se vérifie pas est mise en
+quarantaine telle que reçue, journalisée (`anchor_tampered`) et signalée aux
+owners et admins, jamais jetée. `yolo.audit.ack` part après le commit, au
+journal comme en quarantaine ; une écriture ratée n'est pas accusée et l'hôte
+renvoie. Le worker repousse les baux non livrés et les révocations non
+confirmées, et marque `expired` un bail échu sans nouvelle de l'hôte.
+
 Limites. Sous Linux, l'état du connecteur est hors de portée du gateway
 (`InaccessiblePaths=`) et la socket opérateur est réservée à l'unité
 connecteur ; sous un bail, la liste dure interdit au bot de toucher au plugin et

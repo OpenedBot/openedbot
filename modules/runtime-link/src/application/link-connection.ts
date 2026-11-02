@@ -14,6 +14,7 @@ import {
   type RelayTextFrame,
 } from "@openedbot/contracts-connector";
 import { hashCredential } from "@openedbot/platform-db/credential";
+import { handleLinkYoloFrame } from "./link-yolo";
 import {
   LinkLeaseLostError,
   type LinkSocket,
@@ -135,9 +136,7 @@ export class LinkConnection {
     return this.identity;
   }
 
-  get isClosed(): boolean {
-    return this.closed;
-  }
+  get isClosed(): boolean { return this.closed; }
 
   get isAdmitted(): boolean { return this.admitted; }
   whenAdmitted(): Promise<void> { return this.admission; }
@@ -400,8 +399,8 @@ export class LinkConnection {
         this.settle(pending, new RelayDialError("L'hôte a annulé la requête.", "after_dispatch", "LINK_CANCELLED"));
         return;
       }
-      default:
-        this.options.log("runtime_link.unexpected_frame", { runtimeId: this.identity?.runtimeId ?? null, type: frame.t });
+      default: // Mode YOLO (`yolo.state`, `yolo.audit`) : `link-yolo.ts`.
+        if (!handleLinkYoloFrame(this, this.options, frame)) this.options.log("runtime_link.unexpected_frame", { runtimeId: this.identity?.runtimeId ?? null, type: frame.t });
     }
   }
 

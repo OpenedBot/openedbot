@@ -7,7 +7,7 @@ import {
   RELAY_MAX_FEATURES,
   RELAY_MAX_RESPONSE_BODY,
   type RelayLinkContextFrame,
-  type RelayTextFrame,
+  type RelayTextFrame, type YoloLeaseKey,
 } from "@openedbot/contracts-connector";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
@@ -143,6 +143,7 @@ export type RuntimeLinkGatewayDependencies = {
   /** Les URL WebSocket qu'une preuve peut nommer (défaut : dérivées de la configuration). */
   wsUrls?: string[];
   log?: LinkLogger;
+  leaseKeys?: YoloLeaseKey[]; // Mode YOLO : `link.context.leaseKeys` (`yoloLinkLeaseKeys`, link-yolo.ts).
 };
 
 type UpgradeServer = {
@@ -385,15 +386,13 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
   }
 
   /**
-   * `link.context` : quel openedbot est derrière ce lien : palier,
-   * origine, organisation et son propriétaire (le membre `owner` le plus
-   * ancien). L'hôte le nomme dans ses alertes Discord et son `status`, et
-   * l'enrôlement l'écrit dans `link.json` : la trame précède `link.issued`.
-   * Données d'affichage, sauf `limits` : la borne des features que l'API
-   * applique à `hello` et `capabilities`, annoncée ici pour que l'hôte n'en
-   * liste jamais plus (`docs/CONNECTOR.md`, « Borne des features »). Un échec
-   * est journalisé, jamais fatal, et un hôte plus ancien ignore la trame, ou ses
-   * champs qu'il ne connaît pas.
+   * `link.context` : quel openedbot est derrière ce lien : palier, origine, organisation et son
+   * propriétaire (le membre `owner` le plus ancien). L'hôte le nomme dans ses alertes Discord et son
+   * `status`, et l'enrôlement l'écrit dans `link.json` : la trame précède `link.issued`. Données
+   * d'affichage, sauf `limits` (la borne des features que l'API applique à `hello` et `capabilities`,
+   * pour que l'hôte n'en liste jamais plus, `docs/CONNECTOR.md`, « Borne des features ») et `leaseKeys`
+   * (les clés de bail YOLO que l'hôte épingle). Un échec est journalisé, jamais fatal ; un hôte plus
+   * ancien ignore la trame, ou ses champs qu'il ne connaît pas.
    */
   async function sendLinkContext(connection: LinkConnection, identity: LinkIdentity): Promise<void> {
     const frame: RelayLinkContextFrame = {
@@ -405,6 +404,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       // La borne que `decodeTextFrame` applique à `hello` et `capabilities` : l'hôte
       // la retient (persistée avec le contexte) pour dimensionner son prochain `hello`.
       limits: { features: RELAY_MAX_FEATURES },
+      ...(deps.leaseKeys?.length ? { leaseKeys: deps.leaseKeys } : {}),
     };
     if (config.connectorVersions.latestVersion) frame.latestVersion = config.connectorVersions.latestVersion;
     if (config.connectorVersions.minimumVersion) frame.minimumVersion = config.connectorVersions.minimumVersion;

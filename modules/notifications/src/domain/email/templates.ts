@@ -8,6 +8,7 @@ import { RUNTIME_TEMPLATES } from "./templates/runtime";
 import { STAFF_TEMPLATES } from "./templates/staff";
 import { WAITLIST_TEMPLATES } from "./templates/waitlist";
 import { SUPPORT_TEMPLATES } from "./templates/support";
+import { YOLO_TEMPLATES } from "./templates/yolo";
 
 export { OPENEDBOT_SUPPORT_DISCORD_URL };
 
@@ -28,6 +29,7 @@ const TEMPLATES: Record<TransactionalEmailKind, Record<TransactionalEmailLocale,
   ...STAFF_TEMPLATES,
   ...WAITLIST_TEMPLATES,
   ...SUPPORT_TEMPLATES,
+  ...YOLO_TEMPLATES,
 };
 
 export function renderTransactionalEmail(message: {
