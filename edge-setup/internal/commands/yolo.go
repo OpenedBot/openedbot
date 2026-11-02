@@ -35,35 +35,9 @@ const (
 )
 
 func runYolo(env cli.Env, args []string) int {
-	fs := newFlagSet("yolo", env)
-	jsonOut := fs.Bool("json", false, "status: machine-readable output")
-	yes := fs.Bool("yes", false, "off / on: confirm the change")
-	// Les deux options sont booléennes : le verbe peut venir avant ou après
-	// elles (`yolo off --yes`, comme l'écrit la doc, ou `yolo --yes off`).
-	var flags, verbs []string
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			flags = append(flags, arg)
-		} else {
-			verbs = append(verbs, arg)
-		}
-	}
-	if err := fs.Parse(flags); err != nil {
-		return cli.ExitUsage
-	}
-	if len(verbs) != 1 {
-		return fail(env, cli.ExitUsage, "usage: edge-setup yolo status [--json] | off --yes | on --yes")
-	}
-	verb := verbs[0]
-	if verb != "status" && verb != "off" && verb != "on" {
-		return fail(env, cli.ExitUsage, "yolo: unknown verb %q (status | off | on)", verb)
-	}
-	if verb != "status" && !*yes {
-		what := "off refuses every YOLO lease on this host and stops the auto-approvals now"
-		if verb == "on" {
-			what = "on lifts the local refusal of `yolo off`; it creates no lease"
-		}
-		return fail(env, cli.ExitRefused, "yolo %s; add --yes (nothing was changed)", what)
+	verb, jsonOut, code := parseYoloArgs(env, args)
+	if code != cli.ExitOK {
+		return code
 	}
 	if code := prepareConnectorHost(env); code != 0 {
 		return code
@@ -85,7 +59,42 @@ func runYolo(env cli.Env, args []string) int {
 	case "on":
 		return yoloOn(env)
 	}
-	return yoloStatus(env, *jsonOut)
+	return yoloStatus(env, jsonOut)
+}
+
+// parseYoloArgs reads the verb and its options. Both options are boolean:
+// the verb may come before or after them (`yolo off --yes`, as the docs
+// write it, or `yolo --yes off`).
+func parseYoloArgs(env cli.Env, args []string) (verb string, jsonOut bool, code int) {
+	fs := newFlagSet("yolo", env)
+	jsonFlag := fs.Bool("json", false, "status: machine-readable output")
+	yes := fs.Bool("yes", false, "off / on: confirm the change")
+	var flags, verbs []string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			flags = append(flags, arg)
+		} else {
+			verbs = append(verbs, arg)
+		}
+	}
+	if err := fs.Parse(flags); err != nil {
+		return "", false, cli.ExitUsage
+	}
+	if len(verbs) != 1 {
+		return "", false, fail(env, cli.ExitUsage, "usage: edge-setup yolo status [--json] | off --yes | on --yes")
+	}
+	verb = verbs[0]
+	if verb != "status" && verb != "off" && verb != "on" {
+		return "", false, fail(env, cli.ExitUsage, "yolo: unknown verb %q (status | off | on)", verb)
+	}
+	if verb != "status" && !*yes {
+		what := "off refuses every YOLO lease on this host and stops the auto-approvals now"
+		if verb == "on" {
+			what = "on lifts the local refusal of `yolo off`; it creates no lease"
+		}
+		return "", false, fail(env, cli.ExitRefused, "yolo %s; add --yes (nothing was changed)", what)
+	}
+	return verb, *jsonFlag, cli.ExitOK
 }
 
 type yoloInstanceStatus struct {
