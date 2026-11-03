@@ -111,6 +111,11 @@ jobs:
         run: make typecheck test
       - name: Package
         working-directory: apps/desktop
+        env:
+          # electron-builder skips signing on a pull request, which leaves the
+          # app with a broken seal. The identity is ad hoc (no certificate, no
+          # secret), so a PR build is signed exactly like a release.
+          CSC_FOR_PULL_REQUEST: "true"
         run: make package-mac NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
       - name: Check the app
         working-directory: apps/desktop
