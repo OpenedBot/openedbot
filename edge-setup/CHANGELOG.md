@@ -10,7 +10,7 @@ La numérotation repart de v0.0.1 avec le dépôt autonome et la nouvelle origin
 de téléchargement. Les versions v0.2.0 à v1.4.0, publiées depuis l'ancien
 dépôt, restent listées plus bas pour l'historique.
 
-## Unreleased
+## v0.0.5 - 2026-11-03
 
 ### Sécurité
 
@@ -22,6 +22,7 @@ dépôt, restent listées plus bas pour l'historique.
 - `--admin-sudo password|nopasswd` choisit la règle sudo de `hermes-admin` (`password` par défaut).
 - `--admin-password-file` lit ce mot de passe dans un fichier réservé à son propriétaire, pour une installation sans terminal.
 - Le connecteur prévient openedbot dès que les outils, les serveurs MCP ou les compétences de la machine changent, y compris quand le changement est fait directement sur la machine. La page des connecteurs s'ouvre alors déjà à jour, sans attendre la machine. Le connecteur ne lit que les noms et les dates des fichiers concernés, jamais leur contenu.
+- Une image ou un PDF qu'un bot fabrique pour vous s'affiche désormais dans la conversation, prêt à être ouvert ou téléchargé. Le connecteur ne lit que le fichier que le bot désigne dans son espace de travail, et seulement s'il s'agit vraiment d'une image ou d'un PDF de 1 Mo au plus : un raccourci vers un autre endroit de la machine, un dossier ou tout autre fichier est refusé.
 - Un nouveau bot est prêt près de trois fois plus vite (de 25 s à moins de 10 s sur une petite machine). Ses outils sont réglés en une seule écriture, au lieu d'un par un. Ses compétences intégrées sont réglées pendant la création même du bot. La liste des outils disponibles n'est plus relue à chaque nouveau bot.
 
 ### Corrigé
