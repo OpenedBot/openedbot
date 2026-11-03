@@ -41,10 +41,18 @@ type BotDialogsState = {
    * regeneration, not always `bot.threadId`. `null`: the bot's own thread.
    */
   manageThreadId: string | null;
+  /**
+   * « Première routine » ticked at creation: the bot's routines open once it
+   * exists. Held here, not by the creation surface, because the home form is
+   * gone by then (creation opens the bot's waiting screen at once).
+   */
+  routineBot: BotDto | null;
   openCreate: (source?: BotDto | null) => void;
   closeCreate: () => void;
   openManage: (botId: string, page?: BotManagePage | null, threadId?: string | null) => void;
   closeManage: () => void;
+  openRoutines: (bot: BotDto) => void;
+  closeRoutines: () => void;
 };
 
 export const useBotDialogs = create<BotDialogsState>()((set) => ({
@@ -53,8 +61,11 @@ export const useBotDialogs = create<BotDialogsState>()((set) => ({
   manageBotId: null,
   managePage: null,
   manageThreadId: null,
+  routineBot: null,
   openCreate: (source = null) => set({ createOpen: true, createSource: source, manageBotId: null, managePage: null, manageThreadId: null }),
   closeCreate: () => set({ createOpen: false }),
   openManage: (botId, page = null, threadId = null) => set({ manageBotId: botId, managePage: page, manageThreadId: threadId }),
   closeManage: () => set({ manageBotId: null, managePage: null, manageThreadId: null }),
+  openRoutines: (bot) => set({ routineBot: bot }),
+  closeRoutines: () => set({ routineBot: null }),
 }));

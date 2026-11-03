@@ -35,7 +35,23 @@ export const botProfileRepair = {
 } as const;
 
 export const botProfileProvision = {
-  preparing: "Setting up their profile on your server…",
+  preparingShort: "Getting ready…",
+  deleteWhenReady: "You can delete it as soon as it is ready.",
+  stepSpace: "Creating their space on your server",
+  stepRules: "Setting their approval rules",
+  stepTools: "Plugging in their tools",
+  stepsLabel: "Setting up {name}",
+  toolWeb: "Web",
+  toolTerminal: "Terminal",
+  toolFile: "Files",
+  toolCodeExecution: "Code",
+  toolVision: "Vision",
+  toolSkills: "Skills",
+  toolBrowser: "Browser",
+  toolImageGen: "Images",
+  toolTodo: "Tasks",
+  toolMemory: "Memory",
+  toolSessionSearch: "History",
   failed: "Their profile could not be created on your server.",
   retry: "Retry",
 } as const;

@@ -105,6 +105,9 @@ type Client struct {
 	PingInterval time.Duration
 	PongTimeout  time.Duration
 	IdleTimeout  time.Duration
+	// InventoryPollInterval spaces the inventory fingerprint reads; zero means
+	// InventoryPollInterval (the constant).
+	InventoryPollInterval time.Duration
 	// Operator readiness clock and delay can be replaced without sleeping in tests.
 	now  func() time.Time
 	wait func(context.Context, time.Duration) error
@@ -852,6 +855,11 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 	// bound closes 4401 on one name more, and the host reads that as a refusal.
 	bound := c.FeatureBound()
 	announced, dropped := announceFeatures(c.linkFeatures(), features, bound)
+	// No hello feature for this: hello is bounded, and a link feature would
+	// push an operator capability out for an API that announced no bound.
+	// openedbot learns that this host watches from the first inventory.changed
+	// of the session. Enrollment and retirement never watch.
+	watchInventory := c.Auth.EnrollmentTicket == "" && !c.retiring && !c.stopAfterHandshake && c.operatorAvailable()
 	c.logDroppedFeatures("hello", bound, dropped)
 	c.noteHelloFeatures(0)
 	// One endpoint per session: the dial and the proof must name the same.
@@ -923,6 +931,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 		}()
 	}
 	confirmed := false
+	inventoryWatchStarted := false
 	// Proof of possession: until the broker challenges (or PoPWindow passes
 	// without a challenge, older broker), no request is dispatched.
 	popStart, proved, popSkipped := c.now(), false, false
@@ -1090,6 +1099,12 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 				}
 			}
 			c.Logf("link context: environment=%s ohb=%s owner=%s", lc.Environment, lc.OHB, lc.Owner.Email)
+			// Only an openedbot that lists inventory.changed may receive it:
+			// an older one closes the link on an unknown frame type.
+			if watchInventory && !inventoryWatchStarted && acceptsInventoryChanged(f) {
+				inventoryWatchStarted = true
+				go c.watchInventory(ctx, send)
+			}
 			if c.Auth.EnrollmentTicket == "" && c.OnOriginMoved != nil && c.originFallback == "" {
 				if moved, ok := MovedWSURL(wsURL, lc.OHB); ok && moved != c.originRefused {
 					c.pendingWSURL = moved

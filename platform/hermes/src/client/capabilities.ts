@@ -391,6 +391,19 @@ export async function hostToolsets(ctx: HermesClientContext): Promise<HermesHost
 }
 
 /**
+ * Les skills installées à la racine, lues par l'opérateur de l'hôte
+ * (`skills_inventory`), au même format que `/v1/skills`. Le repli de
+ * `capabilityInventory` quand le gateway échoue sur `/v1/skills` : Hermes
+ * 0.21.3 à 0.22.6 y passe un argument retiré et répond 500 à chaque appel
+ * (amont #142575, correctif PR #142662).
+ */
+export async function hostSkills(ctx: HermesClientContext): Promise<HermesCapabilityInventory["skills"]> {
+  const response = await ctx.hostRequest("/hermes-setup/skills", { method: "GET" }, "safe", PROVIDER_POLL_TIMEOUT_MS);
+  if (!response.ok) await ctx.throwProviderResponse(response);
+  return parseSkills(await ctx.providerJson(response));
+}
+
+/**
  * Active ou désactive un toolset sur l'hôte.
  *
  * L'état rendu est celui que l'hôte a RELU sur `/v1/toolsets` après

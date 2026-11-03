@@ -59,6 +59,13 @@ const (
 	TPong          = "pong"
 )
 
+// TInventoryChanged is sent by the host when the files behind its inventory
+// (toolsets, MCP servers and logins, skills) moved, and once per session for
+// what changed while the link was down. It carries nothing: openedbot re-reads
+// the inventory through the usual routes. Sent only to an openedbot whose
+// link.context lists it in accepts.
+const TInventoryChanged = "inventory.changed"
+
 // Features announced in hello describe the fixed host routes served through
 // hermes-operator (docs/CONNECTOR.md, « Fournisseurs par le lien »).
 const (
@@ -125,6 +132,15 @@ const (
 	// Without it the restart interrupts the running turns, and openedbot says
 	// so before the owner confirms.
 	FeatureGatewayGracefulRestart = "gateway_graceful_restart"
+	// FeatureSkillsInventory is GET /hermes-setup/skills: the root's installed
+	// skills, read by the operator. openedbot reads it only when the gateway's
+	// /v1/skills fails (Hermes 0.21.3 to 0.22.6, upstream #142575).
+	FeatureSkillsInventory = "skills_inventory"
+	// FeatureProfileToolsetsBatch is POST /hermes-setup/profiles/{slug}/toolsets:
+	// several toolsets of one profile written in one request, one CLI call per
+	// direction. openedbot falls back on the per-toolset route without it,
+	// which stays correct, only slower (a profile's capability baseline).
+	FeatureProfileToolsetsBatch = "profile_toolsets_batch"
 )
 
 // HostFeatures is every feature name the operator may announce, in the fixed
@@ -162,6 +178,8 @@ var HostFeatures = []string{
 	FeatureMCPProfileDisconnect,
 	FeatureMCPLiveReload,
 	FeatureGatewayGracefulRestart,
+	FeatureSkillsInventory,
+	FeatureProfileToolsetsBatch,
 }
 
 // FeatureCreationAuditV2 is a LINK feature, announced in hello only: the
@@ -331,6 +349,11 @@ type Text struct {
 	Code         string            `json:"code,omitempty"`
 	Message      string            `json:"message,omitempty"`
 	Stage        string            `json:"stage,omitempty"`
+
+	// Accepts (link.context) lists the optional host frames this openedbot
+	// understands. An older openedbot closes the link on an unknown frame
+	// type, so such a frame is only ever sent when listed here.
+	Accepts []string `json:"accepts,omitempty"`
 }
 
 // AuditKeyRef is one retired master key openedbot still hands out so the
@@ -375,6 +398,11 @@ type LinkContext struct {
 
 // MaxLinkContextText bounds every link.context string.
 const MaxLinkContextText = 256
+
+// MaxLinkContextAccepts bounds link.context accepts.
+const MaxLinkContextAccepts = 16
+
+var frameTypeRe = regexp.MustCompile(`^[a-z][a-z0-9_.]{0,63}$`)
 
 // EncodeText serialises a control frame.
 func EncodeText(f Text) ([]byte, error) {
@@ -444,7 +472,7 @@ func DecodeText(b []byte) (Text, error) {
 		if f.RuntimeID == "" || f.LinkToken == "" {
 			return f, errors.New("link.rotate without runtimeId or linkToken")
 		}
-	case TLinkRetire:
+	case TLinkRetire, TInventoryChanged:
 	case TLinkRetired:
 		if f.RuntimeID == "" {
 			return f, errors.New("link.retired without runtimeId")
@@ -467,6 +495,14 @@ func DecodeText(b []byte) (Text, error) {
 		}
 		if f.Limits != nil && f.Limits.Features != nil && *f.Limits.Features < 1 {
 			return f, errors.New("link.context limits.features must be an integer of at least 1")
+		}
+		if len(f.Accepts) > MaxLinkContextAccepts {
+			return f, fmt.Errorf("link.context accepts lists more than %d frame types", MaxLinkContextAccepts)
+		}
+		for _, name := range f.Accepts {
+			if !frameTypeRe.MatchString(name) {
+				return f, fmt.Errorf("link.context accepts %q, which is not a frame type", name)
+			}
 		}
 	case TLinkChallenge:
 		if _, err := enroll.ParsePoPNonce(f.Nonce); err != nil {

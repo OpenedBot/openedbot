@@ -13,6 +13,14 @@ icon: LifeBuoy
 
 If the machine is not ready, follow the guide to [link your machine](/docs/machine). If the problem is about a provider or a model, see [the settings](/docs/reglages#ai-provider-and-model).
 
+## The conversation shows "Needs review"
+
+An answer was cut before openedbot knew whether it had finished (for example when the machine or the service restarts while the bot works). So as not to do the same action twice, the bot starts nothing else in this conversation. Click **Needs review**, at the top of the conversation, then:
+
+- **Reconcile**: openedbot asks your machine again what really happened. This is the right first choice.
+- **Abandon**: you give up on this answer.
+- **Retry with risk**: the bot starts again, at the risk of repeating an action already done.
+
 ## I can't find my machine
 
 Check that you opened the right workspace, then open **Settings > Edge**. If no machine appears there, go through the steps on the [Link a machine](/docs/machine) page again.

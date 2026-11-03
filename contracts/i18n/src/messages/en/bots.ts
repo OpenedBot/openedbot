@@ -84,6 +84,7 @@ export const botCapabilities = {
   scopeNote:
     "The inventory describes runtime {runtime}: it is identical for every bot in this workspace, and a bot’s profile does not narrow it. Only the calls below belong to @{slug}.",
   profileScopeNote: "These capabilities apply only to @{slug}.",
+  liveNote: "A switch applies from its next message, including in a conversation already under way: it opens a fresh Hermes session there, and the history carries over.",
   summary: "{tools} callable tools · {skills} installed skills",
   unconfiguredWarning_one: "{count} enabled tool will not succeed: its configuration is missing on the runtime.",
   unconfiguredWarning_other: "{count} enabled tools will not succeed: their configuration is missing on the runtime.",
@@ -141,48 +142,6 @@ export const botCapabilities = {
   errorsOpenRun: "Open in thread",
   errorsLoadFailed: "Tool errors could not be read.",
   errorsMore: "Load more",
-} as const;
-
-export const computerPanel = {
-  title: "Computer",
-  agentControlUnavailableTitle: "Operator access only",
-  agentControlUnavailable:
-    "This Box desktop is not bound to the runtime tools. The bot cannot see or control this screen.",
-  loading: "Reading Computer state…",
-  loadFailed: "Computer state could not be loaded.",
-  readOnly: "You can inspect this Computer, but only owners and admins can start, open, capture, or stop it.",
-  stop: "Sleep",
-  stopFailed: "Computer shutdown could not be confirmed. Refresh its state before retrying.",
-  previewAlt: "Real capture of {name}'s Computer",
-  capturedAt: "Captured {date}",
-  popupBlocked: "The tab was blocked. Open the desktop with this link.",
-  openLink: "Open desktop link",
-  groupSelect: "Computer for",
-  status: {
-    unsupported: "Computer unsupported",
-    off: "Computer off",
-    provisioning: "Computer starting…",
-    ready: "Computer ready",
-    capturing: "Capturing…",
-    error: "Computer unavailable",
-  },
-  reason: {
-    capabilityNotReported: "This runtime reports no Computer capability. No preview or desktop can be shown.",
-    capabilityUnsupported: "This backend explicitly does not support Computer.",
-    off: "The Computer is currently off.",
-    backendError: "The Computer backend returned an error.",
-    provisioningFailed: "The Computer could not start.",
-    captureFailed: "The capture failed.",
-    openFailed: "Opening the desktop failed.",
-    refreshFailed: "Refreshing the Computer state failed.",
-  },
-  noPreview: "No preview is fabricated: a real backend capture is required.",
-  callbackFailed: "The Computer action failed. Retry or refresh its state.",
-  open: "Open desktop",
-  capture: "Refresh capture",
-  retry: "Retry",
-  refresh: "Refresh",
-  configureRuntime: "Configure runtime",
 } as const;
 
 export const botMemory = {

@@ -10,7 +10,7 @@
  * hors de la colonne (salon) garde le même rendu.
  */
 :root {
-  --ohb-thread-page: #fcfcfc;
+  --ohb-thread-page: #f5f5f6;
   --ohb-thread-ink: #1c1c1c;
   --ohb-thread-muted: rgb(28 28 28 / 0.68);
   --ohb-thread-marker: rgb(28 28 28 / 0.56);
@@ -37,7 +37,8 @@
 }
 
 .dark {
-  --ohb-thread-page: #121212;
+  /* OpenBot's canvas, like the main card it sits in (`--bui-background-secondary-default`). */
+  --ohb-thread-page: #1a1a1a;
   --ohb-thread-ink: #f5f5f5;
   --ohb-thread-muted: rgb(245 245 245 / 0.66);
   --ohb-thread-marker: rgb(245 245 245 / 0.54);

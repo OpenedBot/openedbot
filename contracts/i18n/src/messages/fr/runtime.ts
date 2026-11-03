@@ -142,9 +142,7 @@ export const providerLimits = {
   resetUnknown: ":",
   unavailable: "n/d",
   providerUnavailable: "Le runtime ne lit pas encore les limites de ce fournisseur.",
-  providersUnavailable: "Le runtime ne publie pas encore de relevé pour ces fournisseurs.",
   providerUnsupported: "Ce fournisseur n’expose aucune API de relevé de compte.",
-  providersUnsupported: "Ces fournisseurs n’exposent aucune API de relevé de compte.",
   providerKeyless: "{provider} est servi anonymement, sans compte ni clé : son quota s’applique par adresse IP chez le fournisseur, il n’existe donc aucun relevé à lire.",
   unmeasured: "Sans relevé",
   inService: "En service",
@@ -160,6 +158,16 @@ export const providerLimits = {
   botsLoading: "Lecture des bots…",
   estimated: "Fournisseur actuellement résolu, pas une preuve de facturation.",
   noBots: "Aucun bot n’utilise ce fournisseur.",
+  apiKey: "Clé API",
+  apiKeyNote: "Facturé à l’usage, sans quota de forfait. Jetons comptés par openedbot sur les runs terminés.",
+  usageDay: "24 h",
+  usageMonth: "30 jours",
+  usageTokens: "{tokens} jetons",
+  usageSplit: "{input} en entrée · {output} en sortie",
+  usageRunsOne: "1 run",
+  usageRunsMany: "{count} runs",
+  usageLoading: "Lecture de la consommation…",
+  usageFailed: "Consommation indisponible pour le moment.",
 } as const;
 
 export const runtimeAlerts = {
@@ -370,6 +378,11 @@ export const connectorUpgrade = {
   dialogDone: "J’ai lancé la commande",
   upToDateTitle: "Runtime à jour",
   upToDate: "edge-setup {version} est installé sur « {runtime} ».",
+  hermesTitle: "Mise à jour de Hermes disponible",
+  hermesVersions: "Hermes installé : {current} · avec la dernière version d’edge-setup : {latest}",
+  hermesHow: "Hermes se met à jour avec edge-setup : lancez cette commande sur l’hôte. openedbot ne met jamais à jour votre machine lui-même.",
+  hermesBadge: "Mise à jour de Hermes",
+  hermesBadgeAria: "Hermes {version} est disponible : ouvrir les réglages du runtime",
 } as const;
 
 export const providerIncidents = {

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ChevronDown, Info, RefreshCw, Unplug } from "lucide-react";
@@ -24,6 +24,37 @@ import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
  * doublon coûtait un emplacement fixe pour un nombre qui ne bouge qu'aux
  * extrêmes.
  */
+
+/** Ce qu'openedbot a compté sur les runs terminés d'un fournisseur, sur une fenêtre. */
+export type ProviderConsumption = { runs: number; inputTokens: number; outputTokens: number; tokens: number };
+
+/** Les deux fenêtres lues pour un compte à clé API : la journée et le mois. */
+const CONSUMPTION_DAYS = { day: 1, month: 30 } as const;
+
+/**
+ * Les jetons par fournisseur, à partir de la ventilation par modèle : un run
+ * ne garde que son modèle, et c'est le catalogue du runtime qui dit quel
+ * fournisseur le sert (le même résolveur que pour les bots). Un modèle
+ * qu'aucun fournisseur branché ne revendique n'est attribué à personne.
+ */
+export function consumptionByProvider(
+  models: ReadonlyArray<{ model: string | null; runs: number; inputTokens: number; outputTokens: number; tokens: number }>,
+  resolve: (model: string | null) => string | null,
+): Map<string, ProviderConsumption> {
+  const totals = new Map<string, ProviderConsumption>();
+  for (const row of models) {
+    const provider = resolve(row.model);
+    if (!provider) continue;
+    const current = totals.get(provider) ?? { runs: 0, inputTokens: 0, outputTokens: 0, tokens: 0 };
+    totals.set(provider, {
+      runs: current.runs + row.runs,
+      inputTokens: current.inputTokens + row.inputTokens,
+      outputTokens: current.outputTokens + row.outputTokens,
+      tokens: current.tokens + row.tokens,
+    });
+  }
+  return totals;
+}
 
 type ProviderBot = {
   id: string;
@@ -69,7 +100,7 @@ export function providerLimitsAlerting(limits: ProviderLimits): boolean {
 export function providerLimitsWorthShowing(limits: ProviderLimits): boolean {
   if (!limits.canView || limits.runtimeId === null || limits.pending) return false;
   if (limits.readFailed || limits.status === "error" || limits.status === "disconnected") return true;
-  return limits.peak !== null;
+  return limits.peak !== null || limits.hasApiKey;
 }
 
 export type ProviderLimits = ReturnType<typeof useProviderLimits>;
@@ -108,6 +139,27 @@ export function useProviderLimits(_active: boolean) {
   // en dépend, donc il est lu même panneau fermé (la barre l'a déjà en cache).
   // Les jetons bots, eux, ne servent qu'au récap déplié.
   const roster = useQuery({ queryKey: queryKeys.roster, queryFn: api.roster, enabled: canView, retry: false });
+  /*
+    La consommation n'a de sens que pour un compte à clé API : il est facturé
+    sur ces jetons, il n'a pas d'autre relevé. Sous un abonnement elle se
+    lirait comme sa facture, ce qu'elle n'est pas (voir plus bas). Elle ne
+    part donc que si le relevé a trouvé une clé API.
+  */
+  const hasApiKey = (limits.data?.providers ?? []).some((snapshot) => snapshot.source === "api_key");
+  const consumptionDay = useQuery({
+    queryKey: queryKeys.usageModelsWindow(CONSUMPTION_DAYS.day),
+    queryFn: () => api.usageModels(CONSUMPTION_DAYS.day),
+    enabled: canView && hasApiKey,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const consumptionMonth = useQuery({
+    queryKey: queryKeys.usageModelsWindow(CONSUMPTION_DAYS.month),
+    queryFn: () => api.usageModels(CONSUMPTION_DAYS.month),
+    enabled: canView && hasApiKey,
+    staleTime: 60_000,
+    retry: false,
+  });
   const refresh = useMutation({
     mutationFn: () => api.runtimeProviderUsage(runtimeId!, true),
     onSuccess: (data) => queryClient.setQueryData(queryKeys.runtimeProviderUsage(runtimeId!), data),
@@ -156,6 +208,17 @@ export function useProviderLimits(_active: boolean) {
   if (runtime?.selectedProvider) inService.add(runtime.selectedProvider);
   for (const bot of providerBots) if (bot.provider) inService.add(bot.provider);
   const servicedProviders = providers.filter((provider) => inService.has(provider.slug));
+  const catalogProviders = catalog.data?.providers ?? [];
+  const resolveModel = (model: string | null) => resolveBotProvider(model, {
+    selectedProvider: runtime?.selectedProvider ?? null,
+    selectedModel: runtime?.selectedModel ?? null,
+  }, catalogProviders);
+  const consumption = {
+    day: consumptionDay.data ? consumptionByProvider(consumptionDay.data.models, resolveModel) : null,
+    month: consumptionMonth.data ? consumptionByProvider(consumptionMonth.data.models, resolveModel) : null,
+    pending: consumptionDay.isPending || consumptionMonth.isPending,
+    failed: consumptionDay.isError || consumptionMonth.isError,
+  };
   const readFailed = limits.isError || catalog.isError || roster.isError;
 
   return {
@@ -165,6 +228,9 @@ export function useProviderLimits(_active: boolean) {
     snapshots,
     providerBots,
     inService,
+    consumption,
+    /** Un compte à clé API branché : il a sa consommation à montrer, même sans quota. */
+    hasApiKey: providers.some((provider) => snapshots.get(provider.slug)?.source === "api_key"),
     peak: peakUsedPercent(providers, snapshots),
     /** Le pic des seuls fournisseurs en service : c'est lui qui alerte. */
     servicePeak: peakUsedPercent(servicedProviders, snapshots),
@@ -184,6 +250,10 @@ export function useProviderLimits(_active: boolean) {
     refresh: () => {
       void catalog.refetch();
       void roster.refetch();
+      if (hasApiKey) {
+        void consumptionDay.refetch();
+        void consumptionMonth.refetch();
+      }
       refresh.mutate();
     },
   };
@@ -195,7 +265,7 @@ export function useProviderLimits(_active: boolean) {
  * choisit son cadre.
  */
 export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLimits; onNavigate?: () => void }) {
-  const { t, locale } = useT();
+  const { t, locale, formatNumber, plural } = useT();
   // Slugs dont le dépli a été basculé à la main : l'état effectif d'une ligne
   // est le défaut (déplié quand les limites ne se lisent pas) XOR ce bascule.
   const [toggled, setToggled] = useState<ReadonlySet<string>>(() => new Set());
@@ -226,28 +296,29 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
       : t("providerLimits.botsOnly");
 
   /*
-    Deux populations, pas une liste homogène. Un fournisseur sans endpoint de
-    relevé n'est pas « en attente d'une valeur » : il n'en aura jamais. Lui
-    donner la même ligne qu'un abonnement mesuré, jauge et pourcentage compris,
-    dépense l'écran à répéter « rien à dire ». Le mesuré prend la scène ; le
-    reste se replie en note.
+    Un bloc par fournisseur, et tous les blocs ont la même forme, sur le modèle
+    de t3code : une ligne de compte (icône, nom · forfait ou « Clé API », en
+    service), puis soit une ligne par fenêtre sur une grille commune (libellé,
+    jauge, valeur, réinitialisation), soit une phrase quand il n'y a rien à
+    mesurer. Avant, un abonnement prenait un grand chiffre, une clé API des
+    cartes, et le reste une liste à chevrons : trois mises en page pour une
+    seule question, « où est mon mur ».
   */
   const rows = providers.map((provider) => {
     const snapshot = snapshots.get(provider.slug)
       ?? unavailableSnapshot(provider.slug, hasLimits ? t("providerLimits.providerUnavailable") : null);
+    const percent = primaryWindow(snapshot)?.usedPercent ?? null;
+    const kind: ProviderRowKind = percent !== null ? "measured" : snapshot.source === "api_key" ? "apiKey" : "unmeasured";
     return {
       provider,
-      percent: primaryWindow(snapshot)?.usedPercent ?? null,
-      reset: resetLabel(primaryWindow(snapshot)?.resetAt ?? null, t),
-      reason: snapshot.unavailableReason,
-      // `unsupported` est définitif : l'hôte n'a aucun endpoint de compte à
-      // interroger (tier anonyme, clé API sans API de facturation). Ce n'est
-      // pas un « n/d » à réessayer, et la ligne ne doit pas le suggérer.
-      unsupported: snapshot.source === "unsupported",
+      snapshot,
+      kind,
+      percent,
       // Ce fournisseur sert vraiment : un bot le résout, ou le runtime le
       // servirait au prochain tour. C'est lui que l'on regarde en premier, et
       // lui seul qui allume la barre latérale.
       inService: limits.inService.has(provider.slug),
+      notice: kind === "unmeasured" ? unmeasuredNotice(snapshot, provider.name, t) : null,
       bots: limits.providerBots.filter((bot) => bot.provider === provider.slug),
       open: toggled.has(provider.slug) ? !defaultRowOpen : defaultRowOpen,
       toggle: () => setToggled((current) => {
@@ -261,126 +332,126 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
   // est « où est MON mur », pas « dans quel ordre le catalogue les liste ». Un
   // compte branché mais inutilisé garde sa ligne, sous celles qui travaillent.
   const byServiceThenPercent = (a: { inService: boolean; percent: number | null }, b: typeof a) =>
-    Number(b.inService) - Number(a.inService) || (b.percent ?? 0) - (a.percent ?? 0);
-  const measured = rows.filter((row) => row.percent !== null).sort(byServiceThenPercent);
-  const unmeasured = rows.filter((row) => row.percent === null).sort(byServiceThenPercent);
-  // Une explication par nature d'absence, pas par ligne : « jamais mesurable »
-  // et « pas lu cette fois » ne se corrigent pas de la même façon. Le texte
-  // brut du runtime est un diagnostic (souvent anglais) : il reste en `title`.
-  // Un tier anonyme a sa raison exacte, nommée : elle vaut mieux qu'une
-  // catégorie, et elle explique aussi pourquoi aucune clé ne lui est demandée.
-  const keylessNotes = unmeasured
-    .filter((row) => row.unsupported && isKeylessProvider(row.provider.slug))
-    .map((row) => t("providerLimits.providerKeyless", { provider: row.provider.name }));
-  const unsupportedCount = unmeasured.filter((row) => row.unsupported && !isKeylessProvider(row.provider.slug)).length;
-  const unavailableCount = unmeasured.filter((row) => !row.unsupported && row.reason !== null).length;
-  const unmeasuredNotes = [
-    ...keylessNotes,
-    unsupportedCount > 0 ? t(unsupportedCount > 1 ? "providerLimits.providersUnsupported" : "providerLimits.providerUnsupported") : null,
-    unavailableCount > 0 ? t(unavailableCount > 1 ? "providerLimits.providersUnavailable" : "providerLimits.providerUnavailable") : null,
-  ].filter((note): note is string => note !== null);
+    Number(b.inService) - Number(a.inService) || (b.percent ?? -1) - (a.percent ?? -1);
+  const readable = rows.filter((row) => row.kind !== "unmeasured").sort(byServiceThenPercent);
+  const unmeasured = rows.filter((row) => row.kind === "unmeasured").sort(byServiceThenPercent);
+  // Le fournisseur EN SERVICE se lit en premier, même sans relevé : ouvrir sur
+  // un quota que personne n'utilise faisait lire un mur qui n'est pas le nôtre.
+  const unmeasuredFirst = !readable.some((row) => row.inService) && unmeasured.some((row) => row.inService);
   const botListProps = {
     loading: limits.botsPending,
     empty: limits.botsReadFailed ? t("botsTable.unavailable") : t("providerLimits.noBots"),
     loadingLabel: t("providerLimits.botsLoading"),
     estimated: t("providerLimits.estimated"),
   };
+  const compact = (value: number) => formatNumber(value, { notation: "compact", maximumFractionDigits: 1 });
+  const consumptionOf = (slug: string, window: "day" | "month") =>
+    limits.consumption[window]?.get(slug) ?? { runs: 0, inputTokens: 0, outputTokens: 0, tokens: 0 };
 
-  /*
-    Le fournisseur EN SERVICE se lit en premier, même sans relevé : quand plus
-    aucun compte mesuré ne sert, ouvrir sur un quota que personne n'utilise
-    faisait lire un mur qui n'est pas le nôtre.
-  */
-  const serviceFirst = !measured.some((row) => row.inService) && unmeasured.some((row) => row.inService);
+  const renderRow = (row: (typeof rows)[number]) => (
+    <section
+      key={row.provider.slug}
+      data-provider-row={row.provider.slug}
+      data-provider-kind={row.kind}
+      className="rounded-xl border border-border/60 px-3 pt-2.5 pb-1"
+    >
+      <header className="flex min-h-6 min-w-0 items-center gap-2">
+        <ProviderIcon provider={row.provider.slug} name={row.provider.name} decorative />
+        <h3 className="min-w-0 truncate text-sm font-medium text-foreground">{row.provider.name}</h3>
+        {row.kind === "apiKey" ? (
+          <span className="shrink-0 text-xs text-muted-foreground">· {t("providerLimits.apiKey")}</span>
+        ) : row.snapshot.plan ? (
+          <span className="min-w-0 truncate text-xs text-muted-foreground">· {row.snapshot.plan}</span>
+        ) : null}
+        {row.inService ? (
+          <span className="ms-auto inline-flex shrink-0 items-center gap-1.5 text-[11px] leading-4 text-muted-foreground">
+            <span aria-hidden className="size-1.5 rounded-full bg-pos-700" />
+            {t("providerLimits.inService")}
+          </span>
+        ) : null}
+      </header>
 
-  const measuredSection = (
-    <>
-      {measured.map((row) => (
-        <section key={row.provider.slug} className="border-t border-border/70 py-4 first:border-t-0 first:pt-2">
-          {/* Le nombre est posé au mur que la barre vise : bord droit de la
-              jauge, là où 100 % tomberait. */}
-          <div className="flex items-center gap-2.5">
-            <ProviderIcon provider={row.provider.slug} name={row.provider.name} decorative />
-            <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{row.provider.name}</h3>
-            {row.inService ? (
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-4 text-muted-foreground">
-                {t("providerLimits.inService")}
-              </span>
-            ) : null}
-            <span className={cn("shrink-0 text-2xl leading-none font-medium tracking-tight tabular-nums", percentTone(row.percent!))}>
-              {t("providerLimits.usedPercentValue", { percent: Math.round(row.percent!) })}
-            </span>
-          </div>
-          <UsageBar
-            className="mt-3"
-            value={row.percent!}
-            label={t("providerLimits.usedLabel", { percent: Math.round(row.percent!), reset: row.reset ?? t("providerLimits.resetUnknown") })}
-          />
-          <div className="mt-3 flex min-h-11 items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-xs text-muted-foreground">
-              {row.reset ? t("providerLimits.resetIn", { reset: row.reset }) : null}
-            </p>
-            <BotsDisclosure
-              label={t("providerLimits.botsUsage")}
-              ariaLabel={`${row.provider.name} · ${t("providerLimits.botsUsage")}`}
-              open={row.open}
-              onToggle={row.toggle}
-            />
-          </div>
-          {row.open ? <BotUsageList bots={row.bots} className="rounded-lg bg-surface p-3" {...botListProps} /> : null}
-        </section>
-      ))}
-    </>
-  );
-
-  const unmeasuredSection = (
-    <>
-      {unmeasured.length > 0 ? (
-        <section className={cn(measured.length > 0 ? "pt-2" : "pt-3")}>
-          <h3 className="pb-2 text-xs text-muted-foreground">{t("providerLimits.unmeasured")}</h3>
-          <ul className="overflow-hidden rounded-xl border border-border/60 bg-surface">
-            {unmeasured.map((row) => (
-              <li key={row.provider.slug} className="border-b border-border/60 last:border-b-0">
-                <button
-                  type="button"
-                  aria-expanded={row.open}
-                  onClick={row.toggle}
-                  // Le texte du runtime est souvent anglais : diagnostic au survol,
-                  // pas copie d'interface. Le groupe porte l'explication localisée.
-                  title={row.reason ?? undefined}
-                  className="ohb-press flex min-h-11 w-full items-center gap-2.5 px-3 text-left outline-none ohb-row hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                >
-                  <ProviderIcon provider={row.provider.slug} name={row.provider.name} decorative />
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{row.provider.name}</span>
-                  {row.inService ? (
-                    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] leading-4 text-muted-foreground">
-                      {t("providerLimits.inService")}
-                    </span>
-                  ) : null}
-                  {/* « Sans relevé » est déjà le titre de la section, et la note
-                      du bas dit pourquoi : répéter « non mesurable » sur chaque
-                      ligne ne fait que remplir la largeur. Un « n/d », lui,
-                      reste écrit : il dit une lecture qui A ÉCHOUÉ cette fois,
-                      donc quelque chose qui peut revenir au prochain essai. */}
-                  {row.unsupported ? null : (
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {t("providerLimits.unavailable")}
-                    </span>
-                  )}
-                  <span className="sr-only">· {t("providerLimits.botsUsage")}</span>
-                  <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", row.open && "rotate-180")} aria-hidden />
-                </button>
-                {row.open ? <BotUsageList bots={row.bots} className="border-t border-border/60 px-3 py-2.5" {...botListProps} /> : null}
-              </li>
-            ))}
-          </ul>
-          {unmeasuredNotes.map((note) => (
-            <p key={note} className="pt-2 text-xs leading-snug text-muted-foreground">{note}</p>
-          ))}
-        </section>
+      {row.kind === "measured" ? (
+        <div className={LIMIT_GRID}>
+          {row.snapshot.windows.filter((window) => window.usedPercent !== null).map((window, index) => {
+            const used = window.usedPercent!;
+            const reset = resetLabel(window.resetAt, t);
+            return (
+              <Fragment key={`${window.label}-${index}`}>
+                <span className="min-w-0 truncate text-xs text-muted-foreground" title={window.label}>{window.label}</span>
+                <UsageBar
+                  value={used}
+                  label={t("providerLimits.usedLabel", { percent: Math.round(used), reset: reset ?? t("providerLimits.resetUnknown") })}
+                />
+                <span className={cn("text-end text-xs font-medium tabular-nums", percentTone(used))}>
+                  {t("providerLimits.usedPercentValue", { percent: Math.round(used) })}
+                </span>
+                <span className="text-end text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                  {reset ? t("providerLimits.resetIn", { reset }) : null}
+                </span>
+              </Fragment>
+            );
+          })}
+        </div>
+      ) : row.kind === "apiKey" ? (
+        <>
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{t("providerLimits.apiKeyNote")}</p>
+          {limits.consumption.failed ? (
+            <p role="status" className="mt-2 text-xs text-warn-700">{t("providerLimits.usageFailed")}</p>
+          ) : limits.consumption.pending ? (
+            <p role="status" className="mt-2 text-xs text-muted-foreground">{t("providerLimits.usageLoading")}</p>
+          ) : (
+            <dl className={LIMIT_GRID}>
+              {(["day", "month"] as const).map((window) => {
+                const usage = consumptionOf(row.provider.slug, window);
+                const split = t("providerLimits.usageSplit", { input: compact(usage.inputTokens), output: compact(usage.outputTokens) });
+                return (
+                  <Fragment key={window}>
+                    <dt className="min-w-0 truncate text-xs text-muted-foreground">
+                      {t(window === "day" ? "providerLimits.usageDay" : "providerLimits.usageMonth")}
+                    </dt>
+                    {/* Le détail entrée / sortie au survol, comme le détail d'une
+                        fenêtre chez t3code : la ligne reste d'une seule hauteur. */}
+                    <dd className="col-span-2 min-w-0 truncate text-xs text-foreground tabular-nums" title={split}>
+                      <span className="font-medium">{t("providerLimits.usageTokens", { tokens: compact(usage.tokens) })}</span>
+                      <span className="sr-only"> · {split}</span>
+                    </dd>
+                    <dd className="text-end text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+                      {plural(usage.runs, { one: t("providerLimits.usageRunsOne"), other: t("providerLimits.usageRunsMany", { count: formatNumber(usage.runs) }) })}
+                    </dd>
+                  </Fragment>
+                );
+              })}
+            </dl>
+          )}
+        </>
+      ) : row.notice ? (
+        // Le texte brut du runtime est un diagnostic (souvent anglais) : il
+        // reste au survol, la phrase visible est localisée.
+        <p className="mt-1.5 text-xs leading-snug text-muted-foreground" title={row.snapshot.unavailableReason ?? undefined}>
+          {row.notice}
+        </p>
       ) : null}
-    </>
+
+      <BotsDisclosure
+        label={t("providerLimits.botsUsage")}
+        ariaLabel={`${row.provider.name} · ${t("providerLimits.botsUsage")}`}
+        open={row.open}
+        onToggle={row.toggle}
+      />
+      {row.open ? <BotUsageList bots={row.bots} className="mb-2 rounded-lg bg-surface p-2.5" {...botListProps} /> : null}
+    </section>
   );
+
+  const readableSection = readable.length > 0 ? (
+    <div className="flex flex-col gap-2">{readable.map(renderRow)}</div>
+  ) : null;
+  const unmeasuredSection = unmeasured.length > 0 ? (
+    <section className="flex flex-col gap-2">
+      <h3 className="px-0.5 text-xs text-muted-foreground">{t("providerLimits.unmeasured")}</h3>
+      {unmeasured.map(renderRow)}
+    </section>
+  ) : null;
 
   return (
     <div data-provider-limits-panel="">
@@ -398,7 +469,7 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
 
       {/* Quand la lecture a eu lieu, et de quoi la refaire. Le libellé visible
           tient dans le nom accessible (WCAG 2.5.3), il ne le contredit pas. */}
-      <div className="mb-2 flex min-h-11 items-center justify-between gap-2">
+      <div className="mb-1 flex min-h-11 items-center justify-between gap-2">
         <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground" role="status">{headerText}</p>
         <button
           type="button"
@@ -412,11 +483,33 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
         </button>
       </div>
 
-      {serviceFirst ? unmeasuredSection : null}
-      {measuredSection}
-      {serviceFirst ? null : unmeasuredSection}
+      <div className="flex flex-col gap-4">
+        {unmeasuredFirst ? unmeasuredSection : readableSection}
+        {unmeasuredFirst ? readableSection : unmeasuredSection}
+      </div>
     </div>
   );
+}
+
+type ProviderRowKind = "measured" | "apiKey" | "unmeasured";
+
+/** La grille commune des lignes : libellé, jauge, valeur, réinitialisation (t3code `LimitWindows`). */
+const LIMIT_GRID = "mt-2 grid grid-cols-[minmax(0,6.5rem)_minmax(3rem,1fr)_auto_auto] items-center gap-x-3 gap-y-2";
+
+/**
+ * La phrase d'un fournisseur sans relevé, comme `limitsNotice` chez t3code :
+ * une seule ligne qui dit pourquoi, au lieu d'un « n/d ». `null` quand la
+ * bannière du panneau l'explique déjà pour tous (lien fermé, runtime muet).
+ */
+function unmeasuredNotice(snapshot: ProviderUsageSnapshotDto, name: string, t: ReturnType<typeof useT>["t"]): string | null {
+  if (snapshot.source === "unsupported") {
+    // Un tier anonyme a sa raison exacte, nommée : elle explique aussi
+    // pourquoi aucune clé ne lui est demandée.
+    return isKeylessProvider(snapshot.provider)
+      ? t("providerLimits.providerKeyless", { provider: name })
+      : t("providerLimits.providerUnsupported");
+  }
+  return snapshot.unavailableReason !== null ? t("providerLimits.providerUnavailable") : null;
 }
 
 /** Seuils : la couleur du chiffre et celle de la jauge disent la même chose. */
@@ -444,9 +537,9 @@ function BotsDisclosure({
       aria-label={ariaLabel}
       aria-expanded={open}
       onClick={onToggle}
-      className="ohb-press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="ohb-press -ms-1.5 mt-1 inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
     >
-      <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+      <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden />
       {label}
     </button>
   );

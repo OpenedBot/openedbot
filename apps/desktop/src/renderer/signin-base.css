@@ -56,6 +56,10 @@ html[data-theme="light"] {
   color-scheme: light;
 }
 
+html[data-theme="dark"] img[src$="/ohb-icon.webp"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* Nothing shows until the template stylesheet is in: an unstyled flash of
    this markup would look broken. The preload sets data-ready on load, or
    after a short timeout so a missing file never leaves a blank window. */
@@ -234,4 +238,9 @@ html[data-theme="light"] .theme-moon {
     animation: none;
     opacity: 0.6;
   }
+}
+
+/* The footnote's message carries its own line break, before « openedbot ». */
+.footnote {
+  white-space: pre-line;
 }

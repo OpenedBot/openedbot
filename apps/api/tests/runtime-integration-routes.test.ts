@@ -84,6 +84,7 @@ function mount(options: {
   /** The features the link persisted for a connector runtime. */
   linkFeatures?: string[];
   hostToolsets?: () => Promise<{ platform: string; settable: string[]; availability: null }>;
+  hostSkills?: () => Promise<HermesCapabilityInventory["skills"]>;
   hostProfileInventory?: () => Promise<HermesProfileInventory>;
   hostDeleteProfile?: (slug: string) => Promise<void>;
   deleteSession?: (sessionId: string) => Promise<void>;
@@ -135,6 +136,11 @@ function mount(options: {
       hostToolsets: async () => {
         if (!options.hostToolsets) throw new HermesClientError("absent", 404, "HERMES_OPERATOR_UNAVAILABLE");
         return options.hostToolsets();
+      },
+      hostSkills: async () => {
+        writes.push("host skills");
+        if (!options.hostSkills) throw new HermesClientError("absent", 404, "HERMES_OPERATOR_UNAVAILABLE");
+        return options.hostSkills();
       },
       hostProfileInventory: async () => {
         if (!options.hostProfileInventory) throw new HermesClientError("absent", 404, "HERMES_OPERATOR_UNAVAILABLE");
@@ -321,6 +327,29 @@ describe("GET /runtime/integrations", () => {
       },
       inventoryError: null,
     });
+  });
+
+  test("/v1/skills en échec : les skills viennent de l'opérateur quand l'hôte annonce skills_inventory", async () => {
+    const failedSkills = async () => ({ ...inventory, skills: null, skillsFailed: true });
+    const hostSkills = [{ name: "plan", description: "Plan workflow", category: "software-development" }];
+    const mounted = mount({ readInventory: failedSkills, hostFeatures: ["skills_inventory"], hostSkills: async () => hostSkills });
+    const body = await (await mounted.app.request("/integrations")).json() as Record<string, unknown>;
+    expect(body).toMatchObject({ skills: [expect.objectContaining({ name: "plan" })], skillsError: null, totals: { skills: 1 } });
+    expect(mounted.writes()).toEqual(["host skills"]);
+  });
+
+  test("le repli des skills échoue ou n'est pas annoncé : l'erreur d'origine reste affichée, jamais une liste vide", async () => {
+    const failedSkills = async () => ({ ...inventory, skills: null, skillsFailed: true });
+    const failing = mount({
+      readInventory: failedSkills,
+      hostFeatures: ["skills_inventory"],
+      hostSkills: async () => { throw new HermesClientError("boom", 502, "HERMES_UNREACHABLE"); },
+    });
+    expect(await (await failing.app.request("/integrations")).json()).toMatchObject({ skills: null, skillsError: { code: "HERMES_SKILLS_UNAVAILABLE" } });
+
+    const unannounced = mount({ readInventory: failedSkills, hostFeatures: [], hostSkills: async () => [] });
+    expect(await (await unannounced.app.request("/integrations")).json()).toMatchObject({ skills: null, skillsError: { code: "HERMES_SKILLS_UNAVAILABLE" } });
+    expect(unannounced.writes()).toEqual([]);
   });
 
   test("publie seulement la preuve de frontière d'administration, jamais le corps Hermes", async () => {

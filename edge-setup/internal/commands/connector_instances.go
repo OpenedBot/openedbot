@@ -206,6 +206,28 @@ func linkTakeover(inst layout.ConnectorInstance, origin string) (previous *LinkF
 	return cur, cur.OHB != origin
 }
 
+// originTakenBy is the other linked instance, if any, that already dials
+// origin. One Hermes gateway is one organization's runtime: every instance
+// shares the gateway bearer (runtime.env), so its profiles, sessions and
+// memories too. Two instances on the same origin would hand that surface to
+// two organizations of one openedbot, which nothing there isolates. Named
+// instances exist for distinct origins (dev next to prod).
+//
+// Not a security boundary (root can rewrite link.json by hand): a guard
+// against linking a second organization by mistake, before the ticket is spent.
+func originTakenBy(inst layout.ConnectorInstance, origin string) (layout.ConnectorInstance, *LinkFile) {
+	for _, other := range linkedInstances() {
+		if other == inst {
+			continue
+		}
+		lf, err := readLinkFile(other)
+		if err == nil && lf != nil && lf.OHB == origin {
+			return other, lf
+		}
+	}
+	return "", nil
+}
+
 // instanceStatus is one line of `status` and one entry of its JSON.
 type instanceStatus struct {
 	Name      string `json:"name"`

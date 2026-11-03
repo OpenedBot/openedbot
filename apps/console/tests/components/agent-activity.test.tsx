@@ -238,12 +238,11 @@ describe("prefers-reduced-motion", () => {
   const css = readFileSync(new URL("../../src/styles/components/agent-activity.css", import.meta.url), "utf8");
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
 
-  test("every motion of the fold, the rows, the live shimmer and the composer band stops", () => {
+  test("every motion of the fold, the rows and the live shimmer stops", () => {
     expect(reduced).toContain(".ohb-disclosure");
     expect(reduced).toMatch(/\.ohb-thinking-shimmer \{\s*animation: none;/);
     expect(reduced).toMatch(/\[data-turn-activity\]\[data-live\] \[data-activity-row\] \{\s*animation: none;/);
     expect(reduced).toMatch(/\.ohb-activity-chevron \{\s*transition: none;/);
-    expect(reduced).toMatch(/\.ohb-composer-loader \{\s*display: none;/);
   });
 
   test("the rolling labels swap instantly", () => {

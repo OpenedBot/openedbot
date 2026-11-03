@@ -5,6 +5,7 @@ import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { permissionPipelineOf, type PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-contract";
 import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
 import type { BotRow } from "../domain/bot-dto";
+import { nextSectionRowPosition } from "./sections";
 import type { EditorSettings, UpdateBotInput } from "../domain/bot-input";
 
 /** Les bots de l'organisation avec leur activité, tels que les voit un opérateur (`userId`). */
@@ -17,7 +18,7 @@ export function readRosterBots(
   return tx<BotRow[]>`
         select b.id, t.id as "threadId", b.name, b.slug, b.description, b.instructions, b.model,
                b.reasoning_effort as "reasoningEffort", b.section_id as "sectionId", b.position,
-               b.pinned, b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
+               b.pinned, b.pin_position as "pinPosition", b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
                b.notify_on_finish as "notifyOnFinish", b.speech_rate as "speechRate", b.permission_mode as "permissionMode",
                b.hermes_profile as "hermesProfile",
                b.approval_policy_mode as "approvalPolicyMode", b.approval_policy_effective_at as "approvalPolicyEffectiveAt",
@@ -26,6 +27,8 @@ export function readRosterBots(
                  where i.organization_id = b.organization_id and i.bot_id = b.id and i.reservation_released_at is null limit 1) as "profileImportStatus",
                (select case when pp.status in ('queued','running') then 'preparing' when pp.status = 'failed' then 'failed' else null end
                   from bot_profile_provisions pp where pp.organization_id = b.organization_id and pp.bot_id = b.id) as "profileProvisionStatus",
+               (select pp.progress from bot_profile_provisions pp where pp.organization_id = b.organization_id
+                   and pp.bot_id = b.id and pp.status in ('queued','running')) as "profileProvisionProgress",
                (select case
                  -- Everything is deleted and only the late re-read waits (up to
                  -- verify passes x 60 s, see BOT_HOST_CLEANUP_VERIFY_DELAY_SECONDS):
@@ -53,7 +56,9 @@ export function readRosterBots(
                  select 1 from runs active_run
                   where active_run.organization_id = b.organization_id
                     and active_run.thread_id = t.id
+                    -- unknown + ambiguous waits on a human (« À vérifier »), it is not thinking.
                     and active_run.status in ('queued','starting','running','awaiting_approval','relaying','unknown')
+                    and not (active_run.status = 'unknown' and active_run.external_state = 'ambiguous')
                ) as running,
                (
                  select left(coalesce(m.content->0->>'text', ''), 160) from messages m
@@ -112,7 +117,7 @@ export function readBotRows(tx: TransactionDb, organizationId: string, id: strin
   return tx<BotRow[]>`
     select b.id, t.id as "threadId", b.name, b.slug, b.description, b.instructions, b.model,
            b.reasoning_effort as "reasoningEffort", b.section_id as "sectionId", b.position,
-           b.pinned, b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
+           b.pinned, b.pin_position as "pinPosition", b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
                b.notify_on_finish as "notifyOnFinish", b.speech_rate as "speechRate", b.permission_mode as "permissionMode",
                b.hermes_profile as "hermesProfile",
            b.approval_policy_mode as "approvalPolicyMode", b.approval_policy_effective_at as "approvalPolicyEffectiveAt",
@@ -121,6 +126,8 @@ export function readBotRows(tx: TransactionDb, organizationId: string, id: strin
                  where i.organization_id = b.organization_id and i.bot_id = b.id and i.reservation_released_at is null limit 1) as "profileImportStatus",
            (select case when pp.status in ('queued','running') then 'preparing' when pp.status = 'failed' then 'failed' else null end
               from bot_profile_provisions pp where pp.organization_id = b.organization_id and pp.bot_id = b.id) as "profileProvisionStatus",
+           (select pp.progress from bot_profile_provisions pp where pp.organization_id = b.organization_id
+               and pp.bot_id = b.id and pp.status in ('queued','running')) as "profileProvisionProgress",
            (select case
                  -- Everything is deleted and only the late re-read waits (up to
                  -- verify passes x 60 s, see BOT_HOST_CLEANUP_VERIFY_DELAY_SECONDS):
@@ -151,11 +158,7 @@ export async function nextBotPosition(
   organizationId: string,
   sectionId: string,
 ): Promise<number> {
-  const positions = await tx<Array<{ next: number }>>`
-    select coalesce(max(position), -1) + 1 as next from bots
-     where organization_id = ${organizationId} and section_id = ${sectionId}
-  `;
-  return Number(positions[0]?.next ?? 0);
+  return nextSectionRowPosition(tx, organizationId, sectionId);
 }
 
 /** Le prochain rang dans la section visée par un déplacement : le bot déplacé ne compte pas. */
@@ -165,12 +168,7 @@ export async function nextBotPositionExcluding(
   sectionId: string,
   botId: string,
 ): Promise<number> {
-  const positions = await tx<Array<{ next: number }>>`
-    select coalesce(max(position), -1) + 1 as next from bots
-     where organization_id = ${organizationId} and section_id = ${sectionId}
-       and id <> ${botId}
-  `;
-  return Number(positions[0]?.next ?? 0);
+  return nextSectionRowPosition(tx, organizationId, sectionId, { kind: "bot", id: botId });
 }
 
 /** Le bot et son fil par défaut, dans la même transaction. */
@@ -294,7 +292,7 @@ export async function updateBotRow(
       instructions = coalesce(${input.instructions}, instructions),
       model = case when ${input.model !== undefined} then ${input.model ?? null} else model end,
       reasoning_effort = case when ${input.reasoningEffort !== undefined} then ${input.reasoningEffort ?? null} else reasoning_effort end,
-      pinned = coalesce(${input.pinned}, pinned),
+      pinned = coalesce(${input.pinned}, pinned), pin_position = case when ${input.pinned ?? null}::boolean is false then null else pin_position end,
       face = case when ${input.face !== undefined} then ${input.face ?? null} else face end,
       voice_id = case when ${voiceId !== undefined} then ${voiceId ?? null} else voice_id end,
       label = case when ${editor.label !== undefined} then ${editor.label ?? null} else label end,
@@ -579,7 +577,7 @@ export type BotDeletionScope = {
   deletedAt: Date | null;
   profile: string | null;
   profileManaged: boolean;
-  threads: Array<{ sessionId: string; threadId: string }>;
+  threads: Array<{ sessionId: string; threadId: string; sessionGeneration: number }>;
   workflows: Array<{ workflowId: string }>;
 };
 
@@ -598,8 +596,8 @@ export async function readBotDeletionScope(
      where organization_id = ${organizationId} and id = ${botId}
   `;
   if (!bots[0]) return null;
-  const threads = await tx<Array<{ sessionId: string; threadId: string }>>`
-    select hermes_session_id as "sessionId", id as "threadId" from threads
+  const threads = await tx<Array<{ sessionId: string; threadId: string; sessionGeneration: number }>>`
+    select hermes_session_id as "sessionId", id as "threadId", hermes_session_generation as "sessionGeneration" from threads
      where organization_id = ${organizationId} and bot_id = ${botId}
   `;
   const workflows = await tx<Array<{ workflowId: string }>>`

@@ -214,7 +214,9 @@ try {
   const left = await target<Array<{ count: number }>>`select count(*)::int as count from alert_deliveries where channel_id = ${channelId}`;
   assert(left[0]?.count === 0, "its deliveries cascade");
   assert(!(await deleteOrganizationAlertChannel(api, organizationB, spare.channel.id)), "RLS: another organization cannot remove a channel");
-  const apiQueue = await withTenant(api, organizationA, (tx) => tx`select 1 from alert_deliveries`.then(() => "read", (error) => String(error)));
+  // The refusal is caught outside the transaction: caught inside, it leaves an
+  // aborted transaction whose COMMIT Bun >= 1.4.4 reports as an error.
+  const apiQueue = await withTenant(api, organizationA, (tx) => tx`select 1 from alert_deliveries`).then(() => "read", (error) => String(error));
   assert(apiQueue !== "read", "the API has no access to the delivery queue");
 
   console.log("OHB-157 PostgreSQL proof passed: alert channels are encrypted and tenant-scoped, a link alert queues one delivery per enabled channel once, Discord outages back off, deleted webhooks disable their channel, a 🔴 the outage outlived is dropped, 🟢 follows 🔴, tests are throttled and deletions cascade.");

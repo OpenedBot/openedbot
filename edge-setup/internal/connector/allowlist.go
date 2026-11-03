@@ -47,6 +47,9 @@ const a2aPeerSeg = `[a-z0-9][a-z0-9._-]{0,63}`
 // the hyphen: bundled skills include `hermes-agent` and hub entries with
 // dashes. Uppercase is refused because names are lowercased on disk.
 const skillSeg = `[a-z0-9][a-z0-9_-]{0,63}`
+// workspaceFileSeg is one file name at the root of the bots' `/workspace`:
+// no slash, no leading dot, a fixed list of viewable extensions.
+const workspaceFileSeg = `[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(png|jpg|jpeg|webp|pdf)`
 const uuidSeg = `[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`
 
 // HostPrefix is the path prefix of the routes served on the host.
@@ -124,6 +127,10 @@ var Allowlist = []Route{
 	{Method: "POST", Path: regexp.MustCompile(`^/hermes-setup/profiles$`), Host: true},
 	{Method: "DELETE", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `$`), Host: true},
 	{Method: "POST", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `/toolsets/` + toolsetSeg + `$`), Host: true},
+	// Several toolsets of one profile in one write (feature
+	// profile_toolsets_batch); the names travel in the body, each checked
+	// against the toolset class by the operator.
+	{Method: "POST", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `/toolsets$`), Host: true},
 	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `/memory$`), Host: true},
 	{Method: "POST", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `/memory$`), Host: true},
 	{Method: "POST", Path: regexp.MustCompile(`^/hermes-setup/profiles/` + profileSeg + `/model$`), Host: true},
@@ -148,6 +155,14 @@ var Allowlist = []Route{
 	// start time), the read openedbot reconciles with its own dispatches
 	// to detect a run created outside the link. Never a message, never a path.
 	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/sessions-inventory$`), Host: true},
+	// Host route: one file a bot made, read from the root of the terminal
+	// sandbox's `/workspace`, so the worker can attach what the bot named in
+	// a `MEDIA:` line. A bounded file name, never a path or a directory; the
+	// operator also proves the bytes are an image or a PDF. Root only, no query.
+	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/workspace/files/` + workspaceFileSeg + `$`), Host: true},
+	// Host route: the root's installed skills, read by the operator; the
+	// fallback for a gateway whose /v1/skills fails (upstream #142575).
+	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/skills$`), Host: true},
 	// The host operator reads only the fixed A2A Agent Card path on loopback.
 	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/a2a/agent-card$`), Host: true},
 	{Method: "GET", Path: regexp.MustCompile(`^/hermes-setup/a2a/audit$`), Host: true},
@@ -184,6 +199,9 @@ func Match(method, path string) *Route {
 		return nil
 	}
 	if (p == "/hermes-setup/a2a/peers" || strings.HasPrefix(p, "/hermes-setup/a2a/peers/")) && (profiled || hasQuery) {
+		return nil
+	}
+	if strings.HasPrefix(p, "/hermes-setup/workspace/") && (profiled || hasQuery) {
 		return nil
 	}
 	method = strings.ToUpper(method)

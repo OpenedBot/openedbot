@@ -1,6 +1,7 @@
 import { HermesClient, createRelayTransport } from "@openedbot/hermes";
 import {
   decodeTextFrame,
+  RELAY_ACCEPTED_HOST_FRAMES,
   RELAY_CLOSE_PROBE_FAILED,
   RELAY_CLOSE_UNAUTHORIZED,
   RELAY_FEATURE_CREATION_AUDIT_V2,
@@ -17,7 +18,6 @@ import { consumeRuntimeEnrollment } from "@openedbot/runtimes/sql/runtime-enroll
 import {
   insertConnectorRuntime,
   registerLinkDevicePublicKey,
-  writeLinkAgent,
   writeLinkOrigin,
 } from "@openedbot/runtimes/sql/runtime-link-rows";
 import { enrolledRuntimeActivation } from "./enroll-activation";
@@ -30,7 +30,7 @@ import {
   type RuntimeLinkBroker,
 } from "./broker";
 import { auditKeyFrame, ensureAuditKey } from "./audit-keys";
-import { enqueueConnectorUpgradeNotice } from "./connector-notices";
+import { recordLinkAgent } from "./link-agent-record";
 import { devTunnelWsUrl, expectedLinkWsUrls, LINK_POP_TIMEOUT_MS, linkPopNonce, linkSignedOrigin, verifyLinkProof } from "./link-pop";
 import { RUNTIME_LINK_WS_PATH } from "../domain/ws-path";
 import {
@@ -45,7 +45,6 @@ import { probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtim
 import { readAllRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
 import { lockRuntimeDeclarations } from "@openedbot/runtimes/sql/runtime-replacement";
 import { logEvent } from "@openedbot/platform-observability";
-import { runtimeConnector } from "@openedbot/platform-config/connector-version";
 
 /**
  * La montée WebSocket du lien connecteur. Le relais interne vers le worker
@@ -116,6 +115,8 @@ export type LinkSocketData = {
   connection: LinkConnection | null;
   helloTimer: ReturnType<typeof setTimeout> | null;
   pop?: LinkPopState | null;
+  /** `hello.hermesVersion`, écrit avec l'agent au `bind` (0162). */
+  hermesVersion?: string | null;
   /** Hors production : `ws://127.0.0.1:<port>` du tunnel composé (en-tête `Host`), voir devTunnelWsUrl. */
   devTunnelWsUrl?: string | null;
 };
@@ -339,49 +340,10 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       connection.sendFrame(auditKeyFrame(identity.runtimeId, keys));
       log("runtime_link.audit_key_sent", { runtimeId: identity.runtimeId, keyId: keys.current.keyId, previous: keys.previous.length });
     }
-    if (ws.data.credential.kind === "link") await recordLinkAgent(ws, connection, connection.link!);
+    if (ws.data.credential.kind === "link") {
+      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, { peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null });
+    }
     await sendLinkContext(connection, identity);
-  }
-
-  /** L'agent n'est retenu qu'après admission ; ce signalement ne ferme jamais le lien. */
-  async function recordLinkAgent(ws: LinkWebSocket, connection: LinkConnection, identity: LinkIdentity): Promise<void> {
-    const agent = connection.agent?.slice(0, 256);
-    if (agent === undefined) return;
-    const connector = runtimeConnector(agent, null, config.connectorVersions);
-    if (connector?.outdated && connector.minimumVersion) {
-      const meta = { ip: ws.data.peer.ip, agent, minimum: connector.minimumVersion };
-      broker.journal(identity, "agent_outdated", meta);
-      log("runtime_link.agent_outdated", { runtimeId: identity.runtimeId, ...meta });
-    }
-    try {
-      await withCredential(db, identity.tokenHash, async (tx) => {
-        await writeLinkAgent(tx, identity, { agent, generation: connection.link?.generation ?? null });
-      });
-    } catch (error) {
-      log("runtime_link.agent_write_failed", { runtimeId: identity.runtimeId, error: String(error) });
-    }
-    if (connector?.outdated && connector.version && connector.minimumVersion) {
-      // Once per (runtime, installed, target): a reconnect loop finds the
-      // notice already written. A failure is logged and never ends the link.
-      const notice = {
-        organizationId: identity.organizationId,
-        runtimeId: identity.runtimeId,
-        installedVersion: connector.version,
-        targetVersion: connector.minimumVersion,
-        latestVersion: connector.latestVersion,
-        upgradeCommand: connector.upgradeCommand,
-      };
-      try {
-        const queued = await withTenant(db, identity.organizationId, (tx) => enqueueConnectorUpgradeNotice(tx, notice, config.webUrl));
-        if (queued.queued) {
-          log("runtime_link.connector_notice_queued", {
-            runtimeId: identity.runtimeId, installed: notice.installedVersion, target: notice.targetVersion, emails: queued.emails,
-          });
-        }
-      } catch (error) {
-        log("runtime_link.connector_notice_failed", { runtimeId: identity.runtimeId, error: String(error) });
-      }
-    }
   }
 
   /**
@@ -389,11 +351,10 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
    * origine, organisation et son propriétaire (le membre `owner` le plus
    * ancien). L'hôte le nomme dans ses alertes Discord et son `status`, et
    * l'enrôlement l'écrit dans `link.json` : la trame précède `link.issued`.
-   * Données d'affichage, sauf `limits` : la borne des features que l'API
-   * applique à `hello` et `capabilities`, annoncée ici pour que l'hôte n'en
-   * liste jamais plus (`docs/CONNECTOR.md`, « Borne des features »). Un échec
-   * est journalisé, jamais fatal, et un hôte plus ancien ignore la trame, ou ses
-   * champs qu'il ne connaît pas.
+   * Données d'affichage, sauf `limits` (la borne des features de `hello` et
+   * `capabilities`, « Borne des features ») et `accepts` (les trames
+   * facultatives de l'hôte que ce broker comprend). Un échec est journalisé,
+   * jamais fatal ; un hôte plus ancien ignore la trame ou ses champs inconnus.
    */
   async function sendLinkContext(connection: LinkConnection, identity: LinkIdentity): Promise<void> {
     const frame: RelayLinkContextFrame = {
@@ -404,7 +365,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       ohb: config.linkPublicUrl ?? config.publicUrl,
       // La borne que `decodeTextFrame` applique à `hello` et `capabilities` : l'hôte
       // la retient (persistée avec le contexte) pour dimensionner son prochain `hello`.
-      limits: { features: RELAY_MAX_FEATURES },
+      limits: { features: RELAY_MAX_FEATURES }, accepts: [...RELAY_ACCEPTED_HOST_FRAMES],
     };
     if (config.connectorVersions.latestVersion) frame.latestVersion = config.connectorVersions.latestVersion;
     if (config.connectorVersions.minimumVersion) frame.minimumVersion = config.connectorVersions.minimumVersion;
@@ -582,6 +543,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
         clearHelloTimer(ws);
         const connection = broker.open(ws);
         connection.agent = frame.agent ?? null;
+        ws.data.hermesVersion = frame.hermesVersion ?? null;
         // Ce que l'hôte sait faire, tel qu'il l'a dit : rien de plus.
         connection.features = frame.features ?? [];
         connection.devicePublicKey = frame.devicePublicKey ?? null;

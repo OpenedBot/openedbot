@@ -81,6 +81,9 @@ function fakeClientFactory(options: {
   toolsets?: typeof heavyToolsets;
   onInventory?: () => Promise<HermesProfileInventory>;
   onToolset?: (profile: string, name: string, enabled: boolean) => Promise<{ enabled: boolean }>;
+  onToolsets?: (profile: string, toolsets: Record<string, boolean>) => Promise<Array<{ name: string; enabled: boolean }>>;
+  /** Records one entry per batch write the default host takes. */
+  batches?: Array<Record<string, boolean>>;
   onBundled?: (profile: string, enabled: boolean) => Promise<BundledState>;
   onSettable?: () => Promise<{ platform: string; settable: string[] }>;
   onIsolation?: (profile: string) => Promise<HermesProfileIsolation>;
@@ -91,13 +94,22 @@ function fakeClientFactory(options: {
   // read, as on a real host, so the post-write verification can pass.
   const state = new Map((options.toolsets ?? heavyToolsets).map((toolset) => [toolset.name, toolset.enabled] as const));
   const current = () => [...state].map(([name, enabled]) => ({ name, enabled }));
-  return (() => ({
+  const readInventory = options.onInventory ?? (async () => inventory(candidate.profile, current()));
+  return ((target: { hermesProfile: string | null }) => ({
     hostToolsets: options.onSettable ?? (async () => ({ platform: "api_server", settable: [...state.keys(), "web", "terminal", "skills"], availability: null })),
-    hostProfileInventory: options.onInventory ?? (async () => inventory(candidate.profile, current())),
+    hostProfileInventory: readInventory,
+    // The profile client's gateway view (`/p/<slug>/v1/toolsets`), from the
+    // same host state: `null` when the gateway does not serve the profile.
+    toolsets: async () => (await readInventory()).profiles.find((row) => row.name === target.hermesProfile)?.toolsets ?? null,
     hostSetProfileToolset: options.onToolset ?? (async (_profile: string, name: string, enabled: boolean) => {
       options.written?.push(`${name}:${enabled}`);
       state.set(name, enabled);
       return { enabled };
+    }),
+    hostSetProfileToolsets: options.onToolsets ?? (async (_profile: string, toolsets: Record<string, boolean>) => {
+      options.batches?.push(toolsets);
+      for (const [name, enabled] of Object.entries(toolsets)) state.set(name, enabled);
+      return Object.keys(toolsets).sort().map((name) => ({ name, enabled: state.get(name)! }));
     }),
     hostSetProfileBundledSkills: options.onBundled ?? (async (profile: string, enabled: boolean) => ({
       profile, requested: enabled, bundled: 74, bundledEnabled: 0, applied: true,
@@ -577,7 +589,7 @@ describe("capability baseline during the provision", () => {
   const job = { organization_id: "org-1", bot_id: "bot-new", runtime_id: "runtime-1" };
 
   /** `fakeDb`, plus the provision's own bot and runtime read (`target`, or none). */
-  function provisionDb(target: { profile: string; host_holds_policy: boolean } | null, fresh: Partial<FreshRow> = {}) {
+  function provisionDb(target: { profile: string; host_holds_policy: boolean; toolsets_batch?: boolean } | null, fresh: Partial<FreshRow> = {}) {
     const base = fakeDb([], fresh);
     const db = ((parts: TemplateStringsArray, ...values: unknown[]) => {
       if ([...parts].join(" ").includes("select b.hermes_profile as profile")) {
@@ -628,5 +640,90 @@ describe("capability baseline during the provision", () => {
       expect(await provisionCapabilityBaseline(db, {} as WorkerConfig, job, fakeClientFactory({ written }), runLocked)).toBe(expected);
       expect(written).toEqual([]);
     }
+  });
+
+  test("a host that announces profile_toolsets_batch takes the baseline's toolsets in one write", async () => {
+    const { db, calls } = provisionDb({ profile: "scout", host_holds_policy: true, toolsets_batch: true });
+    const written: string[] = [];
+    const batches: Array<Record<string, boolean>> = [];
+    let outcome: string | undefined;
+    await captureInfo(async () => {
+      outcome = await provisionCapabilityBaseline(db, {} as WorkerConfig, job, fakeClientFactory({ written, batches }), runLocked);
+    });
+    expect(outcome).toBe("applied");
+    expect(written).toEqual([]);
+    expect(batches).toEqual([{ web: true, vision: true, skills: true }]);
+    const read = calls.find((call) => call.sql.includes("select b.hermes_profile as profile"))!;
+    expect(read.sql).toContain("as toolsets_batch");
+    expect(read.values).toContain("profile_toolsets_batch");
+    expect(calls.at(-1)!.values).toEqual([CAPABILITY_BASELINE_VERSION, "org-1", "bot-new"]);
+  });
+
+  test("announces the toolsets it enables, settable ones only, before writing them (0164)", async () => {
+    const { db } = provisionDb({ profile: "scout", host_holds_policy: true, toolsets_batch: true });
+    const order: string[] = [];
+    const batches: Array<Record<string, boolean>> = [];
+    const factory = fakeClientFactory({ written: [], batches });
+    await captureInfo(async () => {
+      await provisionCapabilityBaseline(db, {} as WorkerConfig, job, factory, runLocked, undefined, {
+        onTools: async (names) => { order.push(`tools:${names.join(",")}`); expect(batches).toEqual([]); },
+      });
+    });
+    // Every toolset the bot will have on, already-on ones included; never one the host cannot set.
+    expect(order).toEqual(["tools:web,terminal,file,code_execution,vision,skills"]);
+    expect(batches).toEqual([{ web: true, vision: true, skills: true }]);
+  });
+
+  test("a settable list read before the profile creation is used, and a failed one is read again", async () => {
+    for (const [prefetched, reads] of [[new Set(["web", "vision", "skills", "terminal"]), 0], [null, 1]] as const) {
+      const { db } = provisionDb({ profile: "scout", host_holds_policy: true });
+      const written: string[] = [];
+      let settableReads = 0;
+      const factory = fakeClientFactory({
+        written,
+        onSettable: async () => { settableReads += 1; return { platform: "api_server", settable: ["web", "vision", "skills", "terminal"] }; },
+      });
+      let outcome: string | undefined;
+      await captureInfo(async () => {
+        outcome = await provisionCapabilityBaseline(db, {} as WorkerConfig, job, factory, runLocked, undefined, { settable: Promise.resolve(prefetched) });
+      });
+      expect(outcome).toBe("applied");
+      expect(settableReads).toBe(reads);
+      expect(written).toEqual(["web:true", "vision:true", "skills:true"]);
+    }
+  });
+
+  test("bundled skills the creation proved off are not written again, and the version is stamped", async () => {
+    const { db, calls } = provisionDb({ profile: "scout", host_holds_policy: true, toolsets_batch: true });
+    let bundledWrites = 0;
+    const factory = fakeClientFactory({ onBundled: async (profile, enabled) => {
+      bundledWrites += 1;
+      return { profile, requested: enabled, bundled: 74, bundledEnabled: 0, applied: true };
+    } });
+    let outcome: string | undefined;
+    await captureInfo(async () => {
+      outcome = await provisionCapabilityBaseline(db, {} as WorkerConfig, job, factory, runLocked, undefined, { bundledSkillsOff: true });
+    });
+    expect(outcome).toBe("applied");
+    expect(bundledWrites).toBe(0);
+    expect(calls.at(-1)!.values).toEqual([CAPABILITY_BASELINE_VERSION, "org-1", "bot-new"]);
+  });
+
+  test("a profile the gateway does not serve is not written, and the version is not stamped", async () => {
+    const { db, calls } = provisionDb({ profile: "scout", host_holds_policy: true, toolsets_batch: true });
+    const batches: Array<Record<string, boolean>> = [];
+    const factory = fakeClientFactory({ batches, onInventory: async () => inventory("another-profile") });
+    await expect(provisionCapabilityBaseline(db, {} as WorkerConfig, job, factory, runLocked)).rejects.toMatchObject({ code: "PROFILE_NOT_FOUND" });
+    expect(batches).toEqual([]);
+    expect(calls.some((call) => call.sql.includes("update bots set capability_baseline_version"))).toBe(false);
+  });
+
+  test("a batch answer that does not show a write is unverified, and the version is not stamped", async () => {
+    const { db, calls } = provisionDb({ profile: "scout", host_holds_policy: true, toolsets_batch: true });
+    const factory = fakeClientFactory({
+      onToolsets: async (_profile, toolsets) => Object.keys(toolsets).map((name) => ({ name, enabled: name !== "vision" })),
+    });
+    await expect(provisionCapabilityBaseline(db, {} as WorkerConfig, job, factory, runLocked)).rejects.toMatchObject({ code: "PROFILE_UNVERIFIED" });
+    expect(calls.some((call) => call.sql.includes("update bots set capability_baseline_version"))).toBe(false);
   });
 });

@@ -3,6 +3,8 @@
 export const settings = {
   appearance: {
     title: "Appearance and language",
+    interfaceTitle: "Interface",
+    colorsTitle: "Colours",
     description:
       "The theme and the language are stored locally, in this browser: they follow neither the account nor the install.",
     themeTitle: "Theme",
@@ -83,20 +85,7 @@ export const settingsSidebar = {
   signOut: "Sign out",
   leaveImpersonation: "Leave assistance mode",
   signingOut: "Signing out…",
-  openAsPage: "Open as a page",
   leaveSettings: "Leave settings",
-  openAsWindow: "Open in a window",
-  displayLabel: "Open settings",
-  displayHint: "In a window over the current screen, or as a page with the menu on the left.",
-  displayModal: "Window",
-  displayPage: "Page",
-} as const;
-
-export const operatorSettingsDialog = {
-  title: "Settings",
-  openSettings: "Open settings",
-  navLabel: "Settings sections",
-  backToSettings: "Back to settings",
 } as const;
 
 export const settingsNotifications = {
@@ -214,7 +203,7 @@ export const settingsAccount = {
   mobileDescription: "Sign the iPhone app in by scanning a QR code: no password to retype on the phone.",
   mobileShow: "Show QR code",
   mobileDialogTitle: "Connect a phone",
-  mobileDialogDescription: "In the openedbot app, choose “Scan a code” and point it at this QR code. It opens a session in your name and works once.",
+  mobileDialogDescription: "In the openedbot app, tap “Scan a code” and point it at this QR code. It works once.",
   mobileLinkLabel: "Equivalent link",
   mobileLinkHint: "Paste it in the app when the phone has no camera available.",
   mobileCopy: "Copy link",
@@ -240,7 +229,7 @@ export const settingsAccount = {
   googleUnlinkNeedsPassword: "Set a password before unlinking Google: it would be the account's only way in.",
   googleUnlinkTitle: "Disconnect Google?",
   googleUnlinkDescription:
-    "You will no longer be able to sign in with Google until you connect it again here. Your other devices will be signed out.",
+    "You will no longer be able to sign in with Google. Your other devices will be signed out.",
   googleUnlinkConfirm: "Disconnect Google",
   googleUnlinking: "Disconnecting…",
   googleUnlinkedDone: "Google is unlinked from your account.",
@@ -291,7 +280,7 @@ export const settingsProfile = {
     "Starting from scratch wipes this local database’s workspace data (bots, threads, runs, connectors) and replays the onboarding from step 0. Your account, organization, session and runtime are kept: you stay signed in, and the machine stays linked.",
   devWipeWorkspaceConfirmTitle: "Wipe the workspace data?",
   devWipeWorkspaceConfirmDescription:
-    "Permanently destroys the bots, threads, runs and connectors of this local database. Keeps your account, your organization, your session and your linked runtime. This cannot be undone.",
+    "Erases the bots, threads, runs and connectors of this local database. Your account and runtime stay. This cannot be undone.",
   devWipeWorkspaceConfirm: "Wipe and start over",
   devWipeWorkspaceError: "Could not wipe the workspace data.",
 } as const;

@@ -38,6 +38,8 @@ import {
 } from "./handoff";
 import { advanceGroupTx, assistantMessageForCompletion, groupSendState } from "./rooms";
 import { assistantContent, storeRuntimeArtifacts } from "./transcript";
+import { extractOutputMedia, workspaceMediaNames } from "../../domain/output-media";
+import { fetchWorkspaceMedia } from "./output-media-fetch";
 import type { GroupRunContext, RunContext, RunEventIdentityRow } from "./types";
 import { log } from "./util";
 import {
@@ -182,8 +184,18 @@ export async function persistEvents(
   // Hors transaction : lecture du transcript + écriture du magasin. Un échec
   // de copie n'empêche pas le tour de se clore : le texte reste, la puce non.
   const completed = events.find((event) => event.type === "run.completed");
+  // Les fichiers que la réponse livre (`MEDIA:` intégré par Hermes, ou lu sur
+  // l'hôte dans `/workspace`) deviennent des pièces jointes ; le texte
+  // enregistré (run, événement, message) n'en garde ni les octets ni le chemin.
+  const delivering = completed && !isServiceStepKind(context.stepKind);
+  const fetched = delivering ? await fetchWorkspaceMedia(context, client, workspaceMediaNames(completed.payload.output)) : undefined;
+  const delivered = delivering ? extractOutputMedia(completed.payload.output, fetched) : null;
+  if (completed && delivered && delivered.text !== completed.payload.output) {
+    completed.payload.output = delivered.text;
+    if (delivered.unresolved.length) log("worker.output_media_unresolved", { runId: context.id, organizationId: context.organizationId, files: delivered.unresolved });
+  }
   const runtimeArtifacts = completed && !isServiceStepKind(context.stepKind)
-    ? await storeRuntimeArtifacts(config, context, completed, client)
+    ? await storeRuntimeArtifacts(config, context, completed, client, delivered?.images ?? [])
     : [];
   // PERM2-9: "Never wait" is read through the port, resolved before the
   // transaction, and only when a gate needs it.

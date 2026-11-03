@@ -8,6 +8,7 @@ import {
   useAttachmentCanvas,
   type MessageAttachmentChip,
 } from "./attachment-canvas";
+import { ThreadImageDialog } from "./thread-image-dialog";
 
 /**
  * Une pièce jointe DU FIL : le fichier lui-même, pas son souvenir.
@@ -19,11 +20,12 @@ import {
  * démontage : sans ça, faire défiler un long fil garderait chaque image en
  * mémoire jusqu'à la fermeture de la fenêtre.
  *
- * Une image se montre en vignette, un document reste une puce nommée. Dans les
- * deux cas, le CLIC ouvre le canevas de lecture à côté du fil
- * (`attachment-canvas.tsx`) : c'est là qu'on lit un fichier, pas dans une bulle
- * de conversation. Hors canevas (aucun fournisseur au-dessus), le clic retombe
- * sur le téléchargement : un contrôle qui ne fait rien serait pire.
+ * Une image se montre en vignette : son CLIC l'ouvre en grand dans une boîte
+ * modale à 75 % de la vue (`thread-image-dialog.tsx`), pas dans le canevas.
+ * Un document reste une puce nommée : son clic ouvre le canevas de lecture à
+ * côté du fil (`attachment-canvas.tsx`). Hors canevas (aucun fournisseur
+ * au-dessus), il retombe sur le téléchargement : un contrôle qui ne fait rien
+ * serait pire.
  *
  * Rien n'est chargé pour un document tant qu'on ne l'ouvre pas : afficher son
  * nom n'exige pas de lire son contenu.
@@ -37,6 +39,7 @@ export const AttachmentTile = memo(function AttachmentTile({
   const canvas = useAttachmentCanvas();
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [viewing, setViewing] = useState(false);
 
   /**
    * Sans `id`, il n'y a RIEN à ouvrir : le fichier de ce message n'a jamais
@@ -90,7 +93,7 @@ export const AttachmentTile = memo(function AttachmentTile({
         {url ? (
           <button
             type="button"
-            onClick={activate}
+            onClick={() => setViewing(true)}
             aria-label={t("threadTimeline.attachmentOpen", { name: attachment.name })}
             className="block outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -109,6 +112,7 @@ export const AttachmentTile = memo(function AttachmentTile({
           </span>
           <span className="shrink-0">{formatBytes(locale, attachment.bytes)}</span>
         </figcaption>
+        {url ? <ThreadImageDialog attachment={attachment} url={url} open={viewing} onClose={() => setViewing(false)} /> : null}
       </figure>
     );
   }

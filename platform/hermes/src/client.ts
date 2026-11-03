@@ -8,6 +8,7 @@ import * as providers from "./client/providers";
 import * as runs from "./client/runs";
 import * as sessions from "./client/sessions";
 import * as skillsHub from "./client/skills-hub";
+import * as workspaceFiles from "./client/workspace-files";
 import { createHermesClientContext, type HermesClientContext } from "./client/context";
 import { directResponseEvidence, type DirectResponseEvidence } from "./client/evidence";
 import { resolveHermesTimeouts } from "./client/timeouts";
@@ -183,6 +184,10 @@ export class HermesClient {
     return capabilities.hostToolsets(this.ctx);
   }
 
+  async hostSkills(): Promise<HermesCapabilityInventory["skills"]> {
+    return capabilities.hostSkills(this.ctx);
+  }
+
   async hostProfileInventory(): Promise<HermesProfileInventory> {
     return profiles.hostProfileInventory(this.ctx);
   }
@@ -191,10 +196,15 @@ export class HermesClient {
     return profiles.hostProfileAvatar(this.ctx, slug);
   }
 
+  /** Un fichier qu'un bot a désigné par `MEDIA:/workspace/<nom>` (image ou PDF). */
+  async hostWorkspaceFile(name: string): Promise<workspaceFiles.HermesWorkspaceFile> {
+    return workspaceFiles.hostWorkspaceFile(this.ctx, name);
+  }
+
   async hostCreateProfile(
     name: string,
-    displayNameOrOptions?: string | HermesHostProfileCreateOptions,
-  ): Promise<HermesCreatedHostProfile> {
+    displayNameOrOptions?: string | profiles.HermesHostProfileCreateRequest,
+  ): Promise<profiles.HermesCreatedHostProfileResult> {
     return profiles.hostCreateProfile(this.ctx, name, displayNameOrOptions);
   }
 
@@ -222,6 +232,13 @@ export class HermesClient {
     enabled: boolean,
   ): Promise<HermesProfileToolsetState> {
     return profiles.hostSetProfileToolset(this.ctx, profile, name, enabled);
+  }
+
+  async hostSetProfileToolsets(
+    profile: string,
+    toolsets: Readonly<Record<string, boolean>>,
+  ): Promise<HermesProfileToolsetState[]> {
+    return profiles.hostSetProfileToolsets(this.ctx, profile, toolsets);
   }
 
   async hostApprovalPolicy(slug: string): Promise<HermesApprovalPolicyState> {

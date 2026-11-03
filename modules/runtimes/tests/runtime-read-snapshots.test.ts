@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { invalidateSnapshots, readThrough, type RuntimeReadKind, type SnapshotStore } from "../src/application/runtime-read-snapshots";
+import {
+  invalidateSnapshots,
+  readThrough,
+  WATCHED_SNAPSHOT_FRESH_MS,
+  WATCHED_SNAPSHOT_STALE_MS,
+  watchedReadPolicy,
+  type RuntimeReadKind,
+  type SnapshotStore,
+} from "../src/application/runtime-read-snapshots";
+import { inventoryWatch } from "../src/application/runtime-access";
 
 type Row = { document: unknown; observedAt: Date; invalidatedAt: Date | null };
 
@@ -149,5 +158,70 @@ describe("runtime read snapshots", () => {
     await expect(old).resolves.toBe("before-write");
     await expect(proof).resolves.toBe("after-write");
     expect(reads).toBe(2);
+  });
+});
+
+describe("runtime read snapshots : signal d'inventaire de l'hôte (0160)", () => {
+  test("a snapshot observed before the host's last signal is served at once and re-read, even when young", async () => {
+    const store = memoryStore();
+    store.rows.set("signal/runtime/mcp", saved("before-change", 90_000));
+    let finish!: (value: string) => void;
+    let reads = 0;
+    const response = await readThrough(store, {
+      ...input("signal", () => { reads += 1; return new Promise((resolve) => { finish = resolve; }); }, 100_000),
+      changedAt: new Date(95_000),
+    });
+    expect(response).toBe("before-change");
+    expect(reads).toBe(1);
+    finish("after-change");
+    await Bun.sleep(0);
+    expect(store.rows.get("signal/runtime/mcp")?.document).toBe("after-change");
+  });
+
+  test("a snapshot observed after the signal stays fresh: no host read", async () => {
+    const store = memoryStore();
+    store.rows.set("after/runtime/mcp", saved("current", 96_000));
+    let reads = 0;
+    await expect(readThrough(store, {
+      ...input("after", async () => { reads += 1; return "live"; }, 100_000),
+      changedAt: new Date(95_000),
+    })).resolves.toBe("current");
+    expect(reads).toBe(0);
+  });
+
+  test("a watched host keeps its snapshot fresh for an hour and serves it for a day", async () => {
+    const watched = watchedReadPolicy({ changedAt: new Date(0), watched: true });
+    expect(watched.freshMs).toBe(WATCHED_SNAPSHOT_FRESH_MS);
+    expect(watched.staleMs).toBe(WATCHED_SNAPSHOT_STALE_MS);
+
+    const store = memoryStore();
+    store.rows.set("watched/runtime/mcp", saved("kept", 1_000));
+    let reads = 0;
+    const read = async () => { reads += 1; return "live"; };
+    // Thirty minutes: past the default fresh window, still fresh for a watched host.
+    await expect(readThrough(store, { ...input("watched", read, 1_000 + 30 * 60_000), ...watched })).resolves.toBe("kept");
+    expect(reads).toBe(0);
+    // Twelve hours: past the default stale window, served at once and re-read.
+    await expect(readThrough(store, { ...input("watched", read, 1_000 + 12 * 60 * 60_000), ...watched })).resolves.toBe("kept");
+    expect(reads).toBe(1);
+  });
+
+  test("a host that does not watch keeps the default bounds, and its signal still makes older snapshots stale", () => {
+    expect(watchedReadPolicy(undefined)).toEqual({});
+    const unwatched = watchedReadPolicy({ changedAt: new Date(5), watched: false });
+    expect(unwatched).toEqual({ changedAt: new Date(5) });
+  });
+});
+
+describe("inventoryWatch : un hôte surveille quand il a signalé sur la connexion en cours", () => {
+  const at = (ms: number) => new Date(ms);
+  test("signal after the current connection: watched", () => {
+    expect(inventoryWatch({ reachability: "connector", linkConnectedAt: at(10), inventoryChangedAt: at(12) })).toEqual({ changedAt: at(12), watched: true });
+  });
+  test("signal from a previous connection, no signal, no link or a direct runtime: not watched", () => {
+    expect(inventoryWatch({ reachability: "connector", linkConnectedAt: at(20), inventoryChangedAt: at(12) }).watched).toBe(false);
+    expect(inventoryWatch({ reachability: "connector", linkConnectedAt: at(20), inventoryChangedAt: null }).watched).toBe(false);
+    expect(inventoryWatch({ reachability: "connector", linkConnectedAt: null, inventoryChangedAt: at(12) }).watched).toBe(false);
+    expect(inventoryWatch({ reachability: "direct", linkConnectedAt: at(10), inventoryChangedAt: at(12) }).watched).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { workflowSessionKey } from "./autonomous-workflow";
 import { personaDraftSessionKey } from "./persona-draft";
 import { greetingSessionKey } from "./bot-greeting-session";
 import { compactionSessionKey } from "@openedbot/conversation/domain/thread-compaction";
+import { threadSessionKeys } from "@openedbot/conversation/domain/thread-session";
 
 /**
  * TOUTES les sessions qu'openedbot a pu ouvrir sur le runtime pour ce bot.
@@ -24,13 +25,14 @@ export function botRuntimeSessionIds(
   organizationId: string,
   botId: string,
   scope: {
-    threads: ReadonlyArray<{ sessionId: string; threadId: string }>;
+    threads: ReadonlyArray<{ sessionId: string; threadId: string; sessionGeneration?: number | null }>;
     workflows: ReadonlyArray<{ workflowId: string }>;
   },
 ): string[] {
   const ids = new Set<string>();
   for (const thread of scope.threads) {
-    ids.add(thread.sessionId);
+    // Chaque génération de la session du fil (0163) est une session de l'hôte.
+    for (const key of threadSessionKeys(thread.sessionId, Number(thread.sessionGeneration ?? 0))) ids.add(key);
     ids.add(compactionSessionKey(organizationId, thread.threadId));
     // Lives on the default profile (DEV-OHB-244); a missing one is a 404.
     ids.add(greetingSessionKey(thread.sessionId));

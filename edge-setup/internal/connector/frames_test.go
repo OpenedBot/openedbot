@@ -205,6 +205,8 @@ func TestAllowlist(t *testing.T) {
 		"GET /p/prod-1/hermes-setup/profiles": "host", "GET /p/prod-1/hermes-setup/profiles/seo-geo/avatar": "host",
 		"POST /hermes-setup/profiles": "host", "DELETE /hermes-setup/profiles/scout": "host",
 		"POST /hermes-setup/profiles/scout/toolsets/web":                                              "host",
+		"POST /hermes-setup/profiles/scout/toolsets":                                                  "host",
+		"POST /p/prod-1/hermes-setup/profiles/scout/toolsets":                                         "host",
 		"POST /hermes-setup/profiles/scout/model":                                                     "host",
 		"POST /p/prod-1/hermes-setup/profiles/scout/model":                                            "host",
 		"POST /p/prod-1/hermes-setup/profiles/scout/mcp/servers/linear":                               "host",
@@ -245,9 +247,11 @@ func TestAllowlist(t *testing.T) {
 		"GET /hermes-setup/providers/x/usage", "POST /hermes-setup/usage",
 		"POST /hermes-setup/a2a/agent-card", "GET /hermes-setup/a2a/agent-card/extra",
 		"POST /hermes-setup/a2a/message/send", "GET /hermes-setup/a2a/agent-card/../message/send",
-		// A toolset is never written in bulk, and its key admits neither a
-		// dash nor an uppercase letter: the only write is one named toolset.
-		"POST /hermes-setup/toolsets", "DELETE /hermes-setup/toolsets/web", "GET /hermes-setup/toolsets/web",
+		// A root toolset is never written in bulk (only a profile's are, by
+		// POST .../profiles/{slug}/toolsets), and its key admits neither a
+		// dash nor an uppercase letter.
+		"POST /hermes-setup/toolsets", "GET /hermes-setup/profiles/scout/toolsets",
+		"DELETE /hermes-setup/profiles/scout/toolsets", "POST /hermes-setup/profiles/Scout/toolsets", "DELETE /hermes-setup/toolsets/web", "GET /hermes-setup/toolsets/web",
 		"POST /hermes-setup/toolsets/Web", "POST /hermes-setup/toolsets/web-search",
 		// The catalogue installs, it is not listed through that route, and an
 		// MCP server is never edited in place.

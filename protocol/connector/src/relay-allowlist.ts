@@ -158,6 +158,8 @@ export const RELAY_ALLOWLIST: ReadonlyArray<RelayRoute> = Object.freeze([
   route("POST", "^/hermes-setup/profiles$", { host: true }),
   route("DELETE", `^/hermes-setup/profiles/${PROFILE_SEGMENT}$`, { host: true }),
   route("POST", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/toolsets/${TOOLSET_SEGMENT}$`, { host: true }),
+  // Several toolsets of one profile (feature profile_toolsets_batch); the names travel in the body.
+  route("POST", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/toolsets$`, { host: true }),
   // La mémoire du profil (MEMORY.md / USER.md) par le magasin amont : une
   // lecture, et une écriture nommée par action (add / replace / remove).
   route("GET", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/memory$`, { host: true }),
@@ -185,6 +187,9 @@ export const RELAY_ALLOWLIST: ReadonlyArray<RelayRoute> = Object.freeze([
   // début), que le worker recoupe avec ses propres dispatches pour repérer un
   // run créé hors du lien. Jamais un message, jamais un chemin.
   route("GET", "^/hermes-setup/sessions-inventory$", { host: true }),
+  // Route hôte : les skills installées à la racine, lues par l'opérateur ; le
+  // repli quand le `/v1/skills` du gateway échoue (amont #142575).
+  route("GET", "^/hermes-setup/skills$", { host: true }),
   // Read only the pinned A2A Agent Card through the host operator. The host
   // always targets its fixed loopback listener; no URL or path crosses the link.
   route("GET", "^/hermes-setup/a2a/agent-card$", { host: true }),

@@ -24,13 +24,9 @@ export const threadContext = {
   planLimits: "Limites du forfait · {plan}",
   planLimitsAll: "Limites des forfaits",
   planLimitsOpen: "Voir le détail des quotas",
-  preambleMeasured:
-    "Le contexte est estimé à quatre caractères par jeton, comme l’amont. Le préambule de Hermes (identité, mémoire, skills, schémas d’outils) est mesuré sur l’hôte ; les outils MCP n’y sont pas comptés.",
   turnCost: "Dernier tour : {tokens} jetons facturés, itérations d’outils comprises.",
-  occupancyEstimated: "Le contexte est estimé à quatre caractères par jeton, comme l’amont, et hors préambule que le runtime ajoute lui-même : c’est un plancher.",
   tabContext: "Contexte",
   tabQuotas: "Quotas",
-  modelLine: "Modèle : {model}.",
   open: "Voir le contexte et les quotas",
   title: "Contexte et quotas",
   description:
@@ -46,12 +42,6 @@ export const threadContext = {
   free: "Libre",
   expand: "Détailler la fenêtre",
   collapse: "Replier la fenêtre",
-  windowFromTable:
-    "La taille de la fenêtre vient de la table de modèles de Hermes : ce runtime ne la publie pas.",
-  windowFromDefault:
-    "Ce modèle est absent de la table de Hermes : la fenêtre affichée est le plafond par défaut qu’il applique dans ce cas.",
-  windowUnknown:
-    "La taille de la fenêtre est inconnue pour ce modèle : seuls les jetons consommés sont affichés.",
   groupOpen: "Voir le contexte et le modèle de chaque membre",
   groupTitle: "Contexte du crew",
   groupDescription: "Chaque membre tourne dans sa propre session, avec son modèle et sa propre fenêtre de contexte.",

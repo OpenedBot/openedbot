@@ -207,7 +207,7 @@ export function BotProfileRepair({ bot, status, variant = "overlay", onClose }: 
           role="alertdialog"
           aria-modal="true"
           aria-labelledby={`bot-profile-repair-${bot.id}`}
-          className="my-auto flex w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-[var(--shadow-elevated)] dark:bg-surface"
+          className="my-auto flex w-full max-w-2xl flex-col rounded-xl border border-border bg-card shadow-[var(--shadow-elevated)]"
         >
           <div className="relative border-b border-border px-5 py-4 pe-12">
             {onClose ? (

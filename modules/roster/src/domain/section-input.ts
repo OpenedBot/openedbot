@@ -55,3 +55,13 @@ export function readSectionOrder(value: unknown): Array<{ kind: "bot" | "group";
     return { kind, id: rowId };
   });
 }
+
+/** `{ order: ["<sectionId>", …] }` : l'ordre des sections éditables, des uuid sans doublon. */
+export function readSectionsOrder(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > SECTION_ORDER_MAX) {
+    throw new HttpError(400, "SECTIONS_ORDER_INVALID", "L'ordre des sections est invalide.");
+  }
+  const ids = value.map((item) => readSectionId(item));
+  if (new Set(ids).size !== ids.length) throw new HttpError(400, "SECTIONS_ORDER_INVALID", "L'ordre des sections est invalide.");
+  return ids;
+}

@@ -88,6 +88,38 @@ test("sans barre, la coque garde ses quatre coins", () => {
   expect(container.querySelector("[data-composer-shell]")?.className.split(/\s+/)).toContain("rounded-[var(--radius-2-5xl)]");
 });
 
+// La cible de réponse s'applique toujours au prochain envoi : un avis du
+// runtime (coupure, puis « rétabli » quand l'envoi revient) ne doit pas la
+// cacher, sans quoi on répondrait à un message qu'on ne voit plus.
+test("un avis du runtime laisse la réponse en cours visible et annulable", () => {
+  let cancelled = 0;
+  const { container } = render(
+    <I18nProvider>
+      <Composer
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+        botName="Hermes"
+        disabled={false}
+        running={false}
+        notice={<span data-test-notice="">Runtime hors ligne</span>}
+        replyPreview={{ author: "Ada", text: "Le message cité" }}
+        onCancelReply={() => cancelled++}
+      />
+    </I18nProvider>,
+  );
+  const notice = container.querySelector("[data-composer-notice]");
+  const reply = container.querySelector("[data-composer-reply]");
+  if (!notice || !reply) throw new Error("avis ou onglet de réponse absent");
+  expect(notice.querySelector("[data-test-notice]")).not.toBeNull();
+  expect(reply.textContent).toContain("Réponse à Ada");
+  // L'onglet de réponse vient après l'avis, au plus près de la carte.
+  expect(notice.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Annuler la réponse" }));
+  expect(cancelled).toBe(1);
+});
+
 test("on desktop, Escape stops the run in progress when the field is empty", () => {
   let cancelled = 0;
   renderComposer("", true, () => {}, () => { cancelled += 1; });
@@ -132,18 +164,12 @@ test("the stop button announces its Escape shortcut on desktop", () => {
   expect(stop.getAttribute("title")).toBe("Arrêter la génération (Échap)");
 });
 
-test("the band of light runs around the card only while a run works", () => {
-  const { unmount } = renderComposer("", true);
-  const loader = document.querySelector<SVGElement>("[data-composer-shell] [data-composer-loader]");
-  expect(loader).not.toBeNull();
-  expect(loader!.hasAttribute("data-active")).toBe(true);
-  expect(loader!.getAttribute("aria-hidden")).toBe("true");
-  // Native SVG blur, never a CSS filter (ignored by WebKit on SVG).
-  expect(loader!.querySelector("filter feGaussianBlur")).not.toBeNull();
-  unmount();
-
-  renderComposer("", false);
-  expect(document.querySelector("[data-composer-loader]")?.hasAttribute("data-active")).toBe(false);
+// Plus de bande lumineuse autour de la carte pendant un run (retirée à la
+// demande) : « Réfléchit… » dans le fil et le bouton Stop suffisent.
+test("no band of light runs around the card while a run works", () => {
+  renderComposer("", true);
+  expect(document.querySelector("[data-composer-shell] svg[data-composer-loader]")).toBeNull();
+  expect(screen.getByRole("button", { name: "Arrêter la génération" })).toBeTruthy();
 });
 
 test("un run actif garde Stop seul quand le brouillon est vide", () => {

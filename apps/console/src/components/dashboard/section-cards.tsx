@@ -13,12 +13,12 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-  Skeleton,
   cn,
 } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
+import { SectionCardsSkeleton } from "./overview-skeleton";
 
 /**
  * Les quatre cartes du bloc `dashboard-01`, avec nos chiffres.
@@ -27,40 +27,6 @@ import { BUTTON } from "../settings/primitives";
  * il faudrait comparer à une période précédente qu'on ne calcule pas, et une
  * flèche inventée ferait passer une décoration pour une mesure.
  */
-/**
- * La silhouette des quatre tuiles pendant le chargement : mêmes cartes (bord,
- * rayon, grille), avec le libellé, le grand chiffre, la pastille et le pied à
- * leur place : un bloc plein ne disait pas « quatre mesures arrivent ».
- */
-function SectionCardsSkeleton({ label, flush }: { label: string; flush?: boolean }) {
-  return (
-    <div
-      role="status"
-      aria-label={label}
-      className={cn(
-        "grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4",
-        !flush && "px-4 lg:px-6",
-      )}
-    >
-      {[0, 1, 2, 3].map((index) => (
-        <div key={index} className="flex h-32 flex-col justify-between rounded-xl border border-border bg-card p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="space-y-2">
-              <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
-              <Skeleton className="h-7 w-16 motion-reduce:animate-none" />
-            </div>
-            <Skeleton className="h-5 w-20 rounded-full motion-reduce:animate-none" />
-          </div>
-          <div className="space-y-1.5">
-            <Skeleton className="h-3 w-3/4 motion-reduce:animate-none" />
-            <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function SectionCards({ flush = false }: { flush?: boolean }) {
   const { t, formatNumber: number, locale } = useT();
   const overview = useQuery({

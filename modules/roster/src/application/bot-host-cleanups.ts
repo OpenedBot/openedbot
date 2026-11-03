@@ -74,7 +74,8 @@ export async function claimBotHostCleanup(db: SQL, workerId: string): Promise<Bo
 export async function executeBotHostCleanup(db: SQL, job: BotHostCleanupRow, deps: BotHostCleanupDependencies): Promise<void> {
   if (deps.signal?.aborted) return;
   const host = deps.client(job.runtime_id, job.session_profile);
-  // The early greeting session lives on the default profile, not the bot's.
+  // An early greeting session (bots created before the greeting waited for
+  // their profile) lives on the default profile, not the bot's.
   const sessionHost = (sessionId: string) =>
     isGreetingSessionKey(sessionId) && job.session_profile ? deps.client(job.runtime_id, null) : host;
   const holdLease = async () => {

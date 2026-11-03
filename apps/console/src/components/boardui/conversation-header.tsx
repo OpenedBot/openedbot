@@ -1,14 +1,13 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { RiFlaskLine, RiGroupLine, RiMoreFill, RiSettings3Line } from "@remixicon/react";
 import type { BotDto } from "@openedbot/contracts-api";
 import { useAgentEditor } from "../../lib/bots/agent-editor";
 import { useT } from "../../lib/i18n";
-import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
 import { useAccountLayout } from "../../lib/shell/account-layout";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { AccountMenu } from "./account-menu";
 import { BotFace } from "../bot-face";
-import { GroupDialog } from "../group-dialog";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger, BuiSectionLabel } from "./menu";
 import { BAR_ICON_BUTTON, BoardHeader } from "./board-chrome";
 
@@ -49,9 +48,7 @@ export function ConversationHeader({
   const toggleEditor = useAgentEditor((state) => state.toggle);
   const showEditor = useAgentEditor((state) => state.show);
   const [optionsOpen, setOptionsOpen] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
-  // `GroupDialog` observes the roster even closed: mount it on first open only.
-  const groupMounted = useOpenedOnce(groupOpen);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -87,7 +84,7 @@ export function ConversationHeader({
                     <button
                       type="button"
                       className={`${BUI_PANEL_ITEM} text-body-medium text-text-primary`}
-                      onClick={() => { setOptionsOpen(false); setGroupOpen(true); }}
+                      onClick={() => { setOptionsOpen(false); void navigate({ to: "/g/new", search: { with: bot.id } }); }}
                     >
                       <RiGroupLine className="size-4 shrink-0" />
                       {t("boardui.startGroupChat")}
@@ -118,7 +115,6 @@ export function ConversationHeader({
           </>
         )}
       />
-      {groupMounted ? <GroupDialog open={groupOpen} onClose={() => setGroupOpen(false)} initialMemberIds={[bot.id]} /> : null}
     </>
   );
 }

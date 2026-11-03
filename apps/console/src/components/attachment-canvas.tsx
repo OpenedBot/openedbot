@@ -4,7 +4,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import Markdown from "react-markdown";
@@ -139,7 +142,56 @@ const CLOSE_MS = 200;
  * document ou une image, pas une conversation dont les lignes cassent trop
  * tôt.
  */
+/**
+ * La carte du canevas au bureau : la surface de la carte de la barre latérale
+ * (`BOARD_SIDEBAR_CARD`), même fond et même bord. Elle se pose sur le fond du
+ * fil (`CANVAS_GUTTER`), comme la barre latérale sur la page : transparente,
+ * la gouttière laissait voir le gris de `main` sous la carte, en rectangle.
+ */
+const CANVAS_CARD = "overflow-hidden rounded-3xl border border-border-button-white bg-background-secondary-default shadow-sm";
+const CANVAS_GUTTER = "bg-background";
 const ATTACHMENT_CANVAS_WIDTH = "w-[min(42rem,38vw)] min-w-80";
+
+/**
+ * La largeur du canevas se règle à la main : une poignée sur son bord, côté
+ * fil. `null` = la largeur par défaut (`ATTACHMENT_CANVAS_WIDTH`), celle
+ * qu'un double-clic sur la poignée rétablit. Le réglage survit au
+ * rechargement : c'est une préférence d'écran, pas un état du fil.
+ */
+export const CANVAS_MIN_WIDTH = 320;
+/** Ce que le fil garde au moins à côté du canevas : un composer utilisable. */
+export const CANVAS_THREAD_MIN_WIDTH = 360;
+const CANVAS_KEY_STEP = 32;
+const CANVAS_WIDTH_KEY = "ohb:attachment-canvas-width";
+
+/** La largeur bornée : jamais sous le minimum, jamais au point d'écraser le fil. */
+export function clampCanvasWidth(width: number, rowWidth: number | null): number {
+  const max = rowWidth === null ? Number.POSITIVE_INFINITY : Math.max(CANVAS_MIN_WIDTH, rowWidth - CANVAS_THREAD_MIN_WIDTH);
+  return Math.round(Math.min(Math.max(width, CANVAS_MIN_WIDTH), max));
+}
+
+/** La largeur mémorisée, ou `null` : rien de stocké, valeur illisible, ou stockage indisponible. */
+export function readCanvasWidth(): number | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(CANVAS_WIDTH_KEY);
+    if (raw == null) return null;
+    const width = Number(raw);
+    return Number.isFinite(width) && width >= CANVAS_MIN_WIDTH ? Math.round(width) : null;
+  } catch {
+    // Stockage refusé (navigation privée, politique du profil) : la largeur
+    // par défaut, et le réglage vit le temps de la session.
+    return null;
+  }
+}
+
+export function writeCanvasWidth(width: number | null): void {
+  try {
+    if (width === null) globalThis.localStorage?.removeItem(CANVAS_WIDTH_KEY);
+    else globalThis.localStorage?.setItem(CANVAS_WIDTH_KEY, String(width));
+  } catch {
+    // Même cas que la lecture : rien à mémoriser, rien de cassé.
+  }
+}
 
 /**
  * Le panneau lui-même : à côté du fil, jamais par-dessus.
@@ -278,6 +330,69 @@ export function AttachmentCanvas() {
     };
   }, [displayed, shownId, shownKind]);
 
+  // La largeur réglée à la poignée, bornée par la rangée qui contient le fil :
+  // la fenêtre qui rétrécit ne doit pas pousser le fil sous son minimum.
+  const asideRef = useRef<HTMLElement>(null);
+  const [width, setWidth] = useState<number | null>(readCanvasWidth);
+  const [rowWidth, setRowWidth] = useState<number | null>(null);
+  const [resizing, setResizing] = useState(false);
+  const drag = useRef<{ pointerId: number; startX: number; startWidth: number; sign: 1 | -1 } | null>(null);
+  const mounted = Boolean(close);
+  useEffect(() => {
+    const row = asideRef.current?.parentElement;
+    if (isMobile || !row || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setRowWidth(entry.contentRect.width);
+    });
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [isMobile, mounted]);
+  // Mémorisée au lâcher, pas à chaque pixel du glisser.
+  useEffect(() => {
+    if (!resizing) writeCanvasWidth(width);
+  }, [resizing, width]);
+  const shownWidth = !isMobile && width !== null ? clampCanvasWidth(width, rowWidth) : null;
+  const maxWidth = rowWidth === null ? undefined : Math.max(CANVAS_MIN_WIDTH, rowWidth - CANVAS_THREAD_MIN_WIDTH);
+
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const aside = asideRef.current;
+    if (event.button !== 0 || !aside) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    // La poignée est côté fil : à gauche en LTR, où tirer vers la gauche
+    // élargit ; à droite en RTL, où c'est l'inverse.
+    const sign = getComputedStyle(aside).direction === "rtl" ? -1 : 1;
+    drag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: aside.getBoundingClientRect().width, sign };
+    setResizing(true);
+  };
+  const moveResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = drag.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    setWidth(clampCanvasWidth(current.startWidth + current.sign * (current.startX - event.clientX), rowWidth));
+  };
+  const endResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    drag.current = null;
+    setResizing(false);
+  };
+  const keyResize = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const aside = asideRef.current;
+    if (!aside) return;
+    const rtl = getComputedStyle(aside).direction === "rtl";
+    const base = aside.getBoundingClientRect().width;
+    const wider = rtl ? "ArrowRight" : "ArrowLeft";
+    const narrower = rtl ? "ArrowLeft" : "ArrowRight";
+    let next: number | null | undefined;
+    if (event.key === wider) next = base + CANVAS_KEY_STEP;
+    else if (event.key === narrower) next = base - CANVAS_KEY_STEP;
+    else if (event.key === "Home") next = CANVAS_MIN_WIDTH;
+    else if (event.key === "End") next = maxWidth ?? base;
+    else if (event.key === "Enter") next = null;
+    if (next === undefined) return;
+    event.preventDefault();
+    setWidth(next === null ? null : clampCanvasWidth(next, rowWidth));
+  };
+
   // Hors fournisseur seulement. Le panneau reste MONTÉ même vide : une
   // transition CSS ne joue que sur un élément qui existait déjà à la frame
   // précédente : le monter au moment de l'ouverture le ferait apparaître
@@ -285,8 +400,12 @@ export function AttachmentCanvas() {
   if (!close) return null;
 
   const open = active;
+  // L'intérieur garde la largeur réglée, même pendant le repli (voir plus bas).
+  const innerWidth = shownWidth !== null ? { width: shownWidth } : undefined;
   return (
     <aside
+      ref={asideRef}
+      style={open && shownWidth !== null ? { width: shownWidth } : undefined}
       aria-label={shownPanel ? shownPanel.label : t("attachmentCanvas.label", { name: displayed?.name ?? "" })}
       aria-hidden={!open}
       // Refermé, le panneau ne doit pas rester dans l'ordre de tabulation le
@@ -325,27 +444,54 @@ export function AttachmentCanvas() {
               "absolute inset-0 bg-background transition-[transform,opacity]",
               open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0",
             ]
-          // Bureau : le MÊME traitement de carte que le canva du guichet
-          // (`support-panel.tsx`) : `rounded-3xl shadow-sm`, gouttière de
-          // 8 px. La transition porte sur la largeur du CONTENEUR ; la carte
-          // intérieure garde sa taille finale dans un parent qui coupe, sinon
-          // le texte se recomposerait à chaque frame. La marge n'est PAS sur
-          // le conteneur : un `m-2` survivrait au `w-0` et laisserait une
-          // bande vide une fois le panneau refermé.
+          // Bureau : une carte (`CANVAS_CARD`) dans une gouttière de 8 px au
+          // fond du fil (`CANVAS_GUTTER`). La transition porte sur la largeur
+          // du CONTENEUR ; la carte intérieure garde sa taille finale dans un
+          // parent qui coupe, sinon le texte se recomposerait à chaque frame.
+          // La marge n'est PAS sur le conteneur : un `m-2` survivrait au
+          // `w-0` et laisserait une bande vide une fois le panneau refermé.
           : [
-              "relative transition-[width,opacity]",
+              // Au glisser, la largeur suit le pointeur : pas d'animation qui traîne derrière.
+              "relative",
+              resizing ? "transition-none select-none" : "transition-[width,opacity]",
+              CANVAS_GUTTER,
               open ? cn(ATTACHMENT_CANVAS_WIDTH, "opacity-100") : "pointer-events-none w-0 opacity-0",
             ],
       )}
     >
+      {/* La poignée occupe la gouttière côté fil (8 px) : on la trouve au bord
+          de la carte sans qu'elle mange le contenu. Aucun trait dessiné :
+          seul le curseur de redimensionnement la signale. Bureau seulement :
+          au téléphone le panneau prend tout l'écran. */}
+      {!isMobile && open ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("attachmentCanvas.resize")}
+          title={t("attachmentCanvas.resize")}
+          aria-valuemin={CANVAS_MIN_WIDTH}
+          aria-valuemax={maxWidth}
+          aria-valuenow={shownWidth ?? undefined}
+          tabIndex={0}
+          data-canvas-resize=""
+          onPointerDown={startResize}
+          onPointerMove={moveResize}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          onLostPointerCapture={endResize}
+          onDoubleClick={() => setWidth(null)}
+          onKeyDown={keyResize}
+          className="absolute inset-y-0 start-0 z-10 w-2 cursor-col-resize touch-none outline-none"
+        />
+      ) : null}
       {shownPanel ? (
-        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"))}>
+        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"))} style={innerWidth}>
           <div
             ref={panelSlotRef}
             data-canvas-panel=""
             className={cn(
               "flex min-h-0 flex-1 flex-col",
-              !isMobile && "overflow-hidden rounded-3xl bg-background shadow-sm",
+              !isMobile && CANVAS_CARD,
             )}
           />
         </div>
@@ -359,11 +505,12 @@ export function AttachmentCanvas() {
             // avec le panneau.
             isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"),
           )}
+          style={innerWidth}
         >
           <div
             className={cn(
               "flex min-h-0 flex-1 flex-col",
-              !isMobile && "overflow-hidden rounded-3xl bg-background shadow-sm",
+              !isMobile && CANVAS_CARD,
             )}
           >
             <header

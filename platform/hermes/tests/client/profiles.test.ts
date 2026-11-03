@@ -333,6 +333,41 @@ test("hostSetProfileModels writes many profiles in one call and never reads an u
   expect(sent).toHaveLength(1);
 });
 
+describe("hostSetProfileToolsets", () => {
+  const state = (name: string, enabled: boolean) =>
+    ({ name, profile: "scout", platform: "api_server", enabled, requested: enabled, applied: true });
+
+  test("posts the batch in name order as one mutation and returns one read-back state per name", async () => {
+    const { client, sent } = fakeTransport(() => Response.json({
+      profile: "scout", platform: "api_server", toolsets: [state("browser", false), state("web", true)],
+    }));
+    const states = await client.hostSetProfileToolsets("scout", { web: true, browser: false });
+    expect(states.map(({ name, enabled }) => [name, enabled])).toEqual([["browser", false], ["web", true]]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ path: "/hermes-setup/profiles/scout/toolsets", method: "POST", kind: "mutation" });
+    expect(JSON.parse(sent[0]!.body!)).toEqual({ toolsets: { browser: false, web: true } });
+  });
+
+  test("an answer missing a name, naming another profile or repeating a name is invalid, never a partial write", async () => {
+    for (const toolsets of [
+      [state("web", true)],
+      [state("web", true), { ...state("browser", false), profile: "other" }],
+      [state("web", true), state("web", true)],
+    ]) {
+      const { client } = fakeTransport(() => Response.json({ profile: "scout", platform: "api_server", toolsets }));
+      await expect(client.hostSetProfileToolsets("scout", { web: true, browser: false })).rejects.toBeInstanceOf(HermesClientError);
+    }
+  });
+
+  test("refuses a bad profile, an empty batch or a bad name before any request", async () => {
+    const { client, sent } = fakeTransport(() => Response.json({}));
+    await expect(client.hostSetProfileToolsets("default", { web: true })).rejects.toMatchObject({ code: "PROFILE_INVALID" });
+    await expect(client.hostSetProfileToolsets("scout", {})).rejects.toMatchObject({ code: "BODY_INVALID" });
+    await expect(client.hostSetProfileToolsets("scout", { "web-search": true })).rejects.toMatchObject({ code: "TOOLSET_INVALID" });
+    expect(sent).toHaveLength(0);
+  });
+});
+
 describe("hostSetProfileBundledSkills", () => {
   const answer = { profile: "scout", requested: false, bundled: 74, bundledEnabled: 0, applied: true };
 
@@ -420,5 +455,30 @@ describe("hostRemoveProfileMcpServer", () => {
     const { client } = fakeTransport(() =>
       Response.json({ error: { code: "PROFILE_NOT_FOUND", message: "no profile named scout exists" } }, { status: 404 }));
     await expect(client.hostRemoveProfileMcpServer("scout", "linear")).rejects.toMatchObject({ code: "PROFILE_NOT_FOUND" });
+  });
+});
+
+describe("hostCreateProfile bundledSkills", () => {
+  const bundled = { profile: "scout", requested: false, bundled: 74, bundledEnabled: 3, applied: true };
+
+  test("asks the creation to turn the bundled skills off and keeps a proven answer", async () => {
+    const { client, sent } = fakeTransport(() => Response.json({ profile: scout, bundledSkills: bundled }, { status: 201 }));
+    await expect(client.hostCreateProfile("scout", { displayName: "Scout", bundledSkills: false })).resolves.toEqual({ ...scout, bundledSkills: bundled });
+    expect(JSON.parse(String(sent[0]!.body))).toEqual({ name: "scout", displayName: "Scout", bundledSkills: false });
+  });
+
+  test("an answer for another profile, a requested true or an unreadable state is no proof", async () => {
+    for (const answer of [{ ...bundled, profile: "other" }, { ...bundled, requested: true }, { profile: "scout" }]) {
+      const { client } = fakeTransport(() => Response.json({ profile: scout, bundledSkills: answer }, { status: 201 }));
+      const created = await client.hostCreateProfile("scout", { bundledSkills: false });
+      expect(created.bundledSkills).toBeUndefined();
+    }
+  });
+
+  test("a creation that did not ask sends no field and ignores a stray answer", async () => {
+    const { client, sent } = fakeTransport(() => Response.json({ profile: scout, bundledSkills: bundled }, { status: 201 }));
+    const created = await client.hostCreateProfile("scout", "Scout");
+    expect(created.bundledSkills).toBeUndefined();
+    expect(JSON.parse(String(sent[0]!.body))).toEqual({ name: "scout", displayName: "Scout" });
   });
 });

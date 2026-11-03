@@ -114,7 +114,7 @@ export function toolsetStatusMap(t: ReturnType<typeof useT>["t"]): Record<Runtim
  * activation, et `hermes tools` imprime ses refus en sortant quand même en 0).
  * Ce cas s'affiche comme l'échec qu'il est, au lieu du succès qu'on aurait cru.
  */
-function useToolsetToggle() {
+export function useToolsetToggle() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { name: string; enabled: boolean }) =>

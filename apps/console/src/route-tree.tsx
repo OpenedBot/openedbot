@@ -54,7 +54,9 @@ import { api, queryKeys } from "./lib/api";
 import { queryClient } from "./lib/query-client";
 import { readSupportDeskAvailable } from "./lib/support/support-desk-availability";
 import { resolveLegacyConversation } from "./lib/thread/conversation-href";
-import { prefetchConversation, prefetchConversationForPath, prefetchGroupConversation, restoreConversationForPath } from "./lib/thread/conversation-prefetch";
+import { prefetchConversation, prefetchConversationForPath, restoreConversationForPath } from "./lib/thread/conversation-prefetch";
+import { readGlobalSearchFocus } from "./lib/thread/global-search-focus";
+import { groupRoutes } from "./group-routes";
 import { SHOW_DEV_SETTINGS } from "./lib/shell/dev-settings-ui";
 import { needsOnboarding } from "./lib/session/onboarding-gate";
 import { needsPasswordChange, PASSWORD_CHANGE_PATH } from "./lib/session/password-change-gate";
@@ -71,7 +73,7 @@ import { SupportLauncher } from "./components/support/support-launcher";
 import { WebWorkflowNotificationBridge } from "./components/web-workflow-notification-bridge";
 import { BrowserTabMetadata } from "./components/browser-tab-metadata";
 import { CompactEmpty } from "./components/compact/compact-frame";
-import { nativeBridge } from "./lib/platform/native-bridge";
+import { nativeAuth, nativeBridge } from "./lib/platform/native-bridge";
 import { COMPACT_PATH, primeNativeSession, readCompactLastBot } from "./lib/shell/compact-shell";
 import {
   CloudSessionGate,
@@ -95,7 +97,6 @@ const FLEET_SCREENS = proConsole().fleet?.screens;
 const OrganizationSetupScreen = lazyRouteComponent(() => import("./screens/onboarding/organization"), "OrganizationSetupScreen");
 const MobileSettingsScreen = lazyRouteComponent(() => import("./components/mobile/mobile-settings-screen"), "MobileSettingsScreen");
 const InboxScreen = lazyRouteComponent(() => import("./screens/conversation/inbox"), "InboxScreen");
-const GroupConversationScreen = lazyRouteComponent(() => import("./screens/conversation/group-conversation"), "GroupConversationScreen");
 const MemberInvitationScreen = lazyRouteComponent(() => import("./screens/auth/member-invitation"), "MemberInvitationScreen");
 const LoginScreen = lazyRouteComponent(() => import("./screens/auth/login"), "LoginScreen");
 const ChangePasswordScreen = lazyRouteComponent(() => import("./screens/auth/change-password"), "ChangePasswordScreen");
@@ -188,12 +189,12 @@ const loginRoute = createRoute({
       const target = search.redirect && search.redirect.startsWith("/") ? search.redirect : "/";
       throw redirect({ to: target, replace: true });
     }
-    // Coque native : la session vient de ses jetons, pas d'un cookie. Le
-    // formulaire web ne pourrait rien y poser (les requêtes partent sans
-    // cookie) : la coque reprend la main et montre sa page de connexion.
-    // Une API injoignable (`unknown`) n'efface rien : ce n'est pas un refus.
+    // Coque native : la session vient de ses jetons. Une coque qui sait mener
+    // la connexion (`nativeAuth`) reste ici et passe par son pont ; une plus
+    // ancienne reprend la main et montre sa page locale. Une API injoignable
+    // (`unknown`) n'efface rien : ce n'est pas un refus.
     const bridge = nativeBridge();
-    if (bridge && status.kind === "none") await bridge.signOut();
+    if (bridge && !nativeAuth() && status.kind === "none") await bridge.signOut();
   },
   component: LoginRoute,
 });
@@ -608,18 +609,6 @@ function ConversationLegacyGone() {
   );
 }
 
-/** Un salon de groupe (bot mode « Groups ») : même cadre, en-tête différent. */
-const groupConversationRoute = createRoute({
-  getParentRoute: () => appFrameRoute,
-  path: "/g/$groupId",
-  validateSearch: (search: Record<string, unknown>): { focus?: string } => ({
-    focus: readGlobalSearchFocus(search.focus),
-  }),
-  // Not awaited, like the bot conversation: roster then the room's thread.
-  loader: ({ params }) => prefetchGroupConversation(params.groupId),
-  component: GroupConversationScreen,
-});
-
 /** Le guichet : `/support` ouvre le fil le plus récent, `/support/:id` celui-là. */
 const supportRoute = createRoute({
   getParentRoute: () => appFrameRoute,
@@ -633,12 +622,6 @@ const supportRoute = createRoute({
   },
   component: SupportScreen,
 });
-
-function readGlobalSearchFocus(value: unknown): string | undefined {
-  return typeof value === "string" && value.length <= 200 && /^(?:message|event|run):/u.test(value)
-    ? value
-    : undefined;
-}
 
 /**
  * Le cadre des réglages, avec SA barre : sur le modèle d'opentrack, où les
@@ -1023,7 +1006,7 @@ const routeTree = rootRoute.addChildren([
     botConversationRoute,
     chatSessionRedirectRoute,
     conversationLegacyRoute,
-    groupConversationRoute,
+    ...groupRoutes(appFrameRoute),
     supportRoute,
     ...devRoutes,
   ]),

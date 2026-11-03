@@ -3,38 +3,6 @@ import { DEFAULT_LOCALE, formatDate as formatDateI18n, t, type Locale } from "@o
 /** `fr-FR`/`en-US` : la même correspondance que le socle i18n, locale au sens `Intl`. */
 const INTL_LOCALE: Record<Locale, string> = { fr: "fr-FR", en: "en-US" };
 
-/**
- * Palettes des avatars, dans l'esprit de la capture : un dégradé saturé par
- * bot, stable dans le temps.
- *
- * Une liste fixe plutôt qu'un HSL calculé : les teintes tirées au hasard
- * tombent régulièrement sur des bruns ou des kakis, et deux bots voisins
- * finissent indiscernables.
- */
-const GRADIENTS = [
-  "from-teal-400 to-emerald-600",
-  "from-amber-400 to-orange-600",
-  "from-violet-400 to-indigo-600",
-  "from-sky-400 to-blue-600",
-  "from-rose-400 to-pink-600",
-  "from-lime-400 to-green-600",
-  "from-fuchsia-400 to-purple-600",
-  "from-cyan-400 to-teal-600",
-] as const;
-
-/**
- * Hachage déterministe : le même bot garde sa couleur d'un lancement à
- * l'autre, et d'une machine à l'autre. Un compteur d'ordre d'affichage ne
- * tiendrait pas : la liste se réordonne à chaque message.
- */
-export function gradientFor(seed: string): string {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (Math.imul(hash, 31) + seed.charCodeAt(index)) >>> 0;
-  }
-  return GRADIENTS[hash % GRADIENTS.length]!;
-}
-
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
@@ -66,14 +34,6 @@ export function listTimestamp(
   if (elapsedDays < 6) return date.toLocaleDateString(INTL_LOCALE[locale], { weekday: "short" });
   return date.toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "short" });
 }
-
-/** L'heure d'un message dans le fil. */
-export function messageTime(value: string | Date, locale: Locale = DEFAULT_LOCALE): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "numeric", minute: "2-digit" });
-}
-
 
 /**
  * `locale` par défaut à "fr" : les écrans qui n'ont pas encore été

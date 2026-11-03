@@ -3,11 +3,10 @@ import { lazyRouteComponent, useRouterState } from "@tanstack/react-router";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { FleetClientSettingsContext } from "../../pro-console/slots";
 import { proConsole, useProFeature } from "../../pro-console/registry";
-import { CardSkeleton } from "../../components/settings/primitives";
+import { OverviewBodySkeleton, SettingsBodySkeleton } from "./settings-skeletons";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { useSettingsOverlay, type OverlaySettingsPath } from "../../lib/shell/settings-overlay";
 import { isRuntimeSection } from "./installation/cloud/cloud-shared";
-import { SettingsPane } from "./pane";
 
 // Each settings body is its own chunk: the console boots on a conversation,
 // and loading every settings screen with it cost the first paint. The
@@ -30,28 +29,16 @@ const CloudSecuritySettings = lazyRouteComponent(() => import("./journal/securit
 
 type SettingsSection = () => ReactElement;
 
-/**
- * Le repli d'un corps de réglages pendant le chargement de son module : une
- * carte dans les marges de `SettingsPane`, pour que la modale ne reste pas
- * vide entre son titre et le contenu.
- */
-export function SettingsBodySkeleton() {
-  const { t } = useT();
-  return (
-    <SettingsPane>
-      <CardSkeleton label={t("common.loading")} />
-    </SettingsPane>
-  );
-}
+export { SettingsBodySkeleton } from "./settings-skeletons";
 
-function section(titleKey: MessageKey, Body: ComponentType): SettingsSection {
+function section(titleKey: MessageKey, Body: ComponentType, Fallback: ComponentType = SettingsBodySkeleton): SettingsSection {
   return function SettingsSection() {
     const { t } = useT();
     return (
       <>
         <SiteHeader title={t(titleKey)} />
         <FleetClientSettingsContext>
-          <Suspense fallback={<SettingsBodySkeleton />}>
+          <Suspense fallback={<Fallback />}>
             <Body />
           </Suspense>
         </FleetClientSettingsContext>
@@ -99,7 +86,7 @@ function RuntimeOverlaySettings() {
  * Runtime tabs adapt their search parameters to the masked overlay URL.
  */
 export const SETTINGS_SECTIONS: Record<OverlaySettingsPath, SettingsSection> = {
-  "/settings": section("settingsSidebar.overview", CloudSettingsOverview),
+  "/settings": section("settingsSidebar.overview", CloudSettingsOverview, OverviewBodySkeleton),
   "/settings/account": section("settingsSidebar.account", AccountSettings),
   "/settings/profile": section("fleet.myAccount", AccountProfileSettings),
   "/settings/team": section("fleet.myTeam", OrganizationTeamSettings),

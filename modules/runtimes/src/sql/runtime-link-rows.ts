@@ -11,14 +11,17 @@ import { pgTextArray } from "@openedbot/platform-db/text-array";
 /** Le runtime dont le lien s'écrit : identifiant, organisation et hash du jeton présenté. */
 export type LinkRuntimeScope = { runtimeId: string; organizationId: string; tokenHash: string };
 
-/** L'agent n'est retenu qu'après admission ; la génération doit encore être celle du lien. */
+/**
+ * L'agent et la version Hermes de `hello` (0055, 0162) ne sont retenus
+ * qu'après admission ; la génération doit encore être celle du lien.
+ */
 export async function writeLinkAgent(
   tx: Db,
   scope: LinkRuntimeScope,
-  input: { agent: string; generation: string | null },
+  input: { agent: string; hermesVersion: string | null; generation: string | null },
 ): Promise<void> {
   await tx`
-    update runtimes set link_agent = ${input.agent}, link_agent_seen_at = now()
+    update runtimes set link_agent = ${input.agent}, link_hermes_version = ${input.hermesVersion}, link_agent_seen_at = now()
      where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}
        and revoked_at is null and link_connected_at is not null
        and link_generation = ${input.generation}::bigint
@@ -176,6 +179,45 @@ export async function bumpToolsetEpoch(tx: Db, scope: LinkRuntimeScope): Promise
        and (link_token_hash = ${scope.tokenHash}
          or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
   `;
+}
+
+/**
+ * 0163 : une écriture relayée a changé les capacités de la racine (`profile`
+ * nul) ou d'un profil. Le profil est un segment déjà validé par la route
+ * relayée ; la carte ne grandit que d'une clé par profil.
+ */
+export async function markCapabilitiesChanged(tx: Db, scope: LinkRuntimeScope, profile: string | null): Promise<void> {
+  if (profile === null) {
+    await tx`
+      update runtimes set capabilities_changed_at = now()
+       where id = ${scope.runtimeId} and organization_id = ${scope.organizationId} and revoked_at is null
+         and (link_token_hash = ${scope.tokenHash}
+           or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
+    `;
+    return;
+  }
+  await tx`
+    update runtimes
+       set profile_capabilities_changed_at = jsonb_set(profile_capabilities_changed_at, array[${profile}::text], to_jsonb(now()))
+     where id = ${scope.runtimeId} and organization_id = ${scope.organizationId} and revoked_at is null
+       and (link_token_hash = ${scope.tokenHash}
+         or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
+  `;
+}
+
+/**
+ * L'hôte a signalé que son inventaire a bougé (`inventory.changed`). Rendu :
+ * `true` quand la ligne du runtime de ce jeton a été marquée.
+ */
+export async function markInventoryChanged(tx: Db, scope: LinkRuntimeScope): Promise<boolean> {
+  const rows = await tx`
+    update runtimes set inventory_changed_at = now()
+     where id = ${scope.runtimeId} and organization_id = ${scope.organizationId} and revoked_at is null
+       and (link_token_hash = ${scope.tokenHash}
+         or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
+    returning id
+  `;
+  return rows.length > 0;
 }
 
 /**

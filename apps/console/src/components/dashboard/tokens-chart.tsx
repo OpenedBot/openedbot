@@ -27,6 +27,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@openedbot/browser-ui-kit/components/ui/chart";
+import { ChartPlotSkeleton } from "./overview-skeleton";
 import type { UsagePoint } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
@@ -50,20 +51,6 @@ const FORMATS: Record<Granularity, { tick: Intl.DateTimeFormatOptions; tooltip: 
   month: { tick: { month: "short", year: "2-digit" }, tooltip: { month: "long", year: "numeric" } },
   year: { tick: { year: "numeric" }, tooltip: { year: "numeric" } },
 };
-
-/** Même silhouette de chargement que le graphique d'activité. */
-function TokensChartSkeleton({ label }: { label: string }) {
-  return (
-    <div role="status" aria-label={label} className="flex h-[250px] w-full flex-col gap-2">
-      <Skeleton className="min-h-0 w-full flex-1 motion-reduce:animate-none" />
-      <div className="flex justify-between px-2">
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <Skeleton key={index} className="h-3 w-10 motion-reduce:animate-none" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function TokensChart() {
   const { t, formatDate, formatNumber, locale } = useT();
@@ -112,8 +99,12 @@ export function TokensChart() {
         <CardDescription>
           <span className="hidden @[540px]/card:block">{t("chartTokens.descriptionFull")}</span>
           <span className="@[540px]/card:hidden">{t("chartTokens.descriptionShort")}</span>
+          {/* La ligne du total garde sa place pendant le chargement : sans
+              elle la carte grandissait de 20 px à l'arrivée des chiffres. */}
           <span className="block text-foreground">
-            {hasData && t("chartTokens.totalForPeriod", { count: formatNumber(periodTotal) })}
+            {usage.isPending
+              ? <span className="flex h-5 items-center"><Skeleton className="h-3.5 w-40 motion-reduce:animate-none" /></span>
+              : hasData && t("chartTokens.totalForPeriod", { count: formatNumber(periodTotal) })}
           </span>
         </CardDescription>
         <CardAction>
@@ -151,7 +142,7 @@ export function TokensChart() {
 
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         {usage.isPending ? (
-          <TokensChartSkeleton label={t("common.loading")} />
+          <ChartPlotSkeleton label={t("common.loading")} />
         ) : !hasData ? (
           <div className="flex min-h-40 flex-wrap items-center justify-center gap-3 text-sm" role="alert">
             <span>{t("dashboardMetrics.unavailable")}</span>

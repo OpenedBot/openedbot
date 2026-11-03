@@ -1,5 +1,5 @@
 import { ipcMain, nativeTheme, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
-import { TEXT_ZOOM_FACTORS, type IpcChannel, type PasswordCredentials } from "../shared/bridge";
+import { TEXT_ZOOM_FACTORS, type IpcChannel, type PasswordCredentials, type SigninLocale } from "../shared/bridge";
 import type { AuthService } from "./auth";
 import { consoleOrigins, parseTrustedExternalUrl, type DesktopConfig } from "./config";
 import { isLegalSlug, readSigninContext } from "./signin-context";
@@ -11,6 +11,13 @@ export type IpcDeps = {
   signinUrl: string;
   /** Any bridge call from the console proves it supports the shell. */
   onBridgeUse(): void;
+  /**
+   * `ohb:sign-out` arrived while the shell is already signed out. When the
+   * window shows the console's /login, that console predates the shared
+   * sign-in screen and hands sign-in back: the window switches to the local
+   * page and answers true. False: not that case, sign out as usual.
+   */
+  fallBackToLocalSignin(): boolean;
   /** The console's text size (Apparence), as a page zoom factor already validated. */
   onTextZoom(factor: number): void;
   /** The zoom a console page starts with, read synchronously by the preload. */
@@ -30,7 +37,7 @@ function handle<T>(channel: IpcChannel, handler: (event: IpcMainInvokeEvent, ...
   ipcMain.handle(channel, (event, ...args: unknown[]) => handler(event, ...args));
 }
 
-export function registerIpc({ auth, config, signinUrl, onBridgeUse, onTextZoom, initialTextZoom }: IpcDeps): void {
+export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLocalSignin, onTextZoom, initialTextZoom }: IpcDeps): void {
   const trustedOrigins = consoleOrigins(config);
   const isTrusted = (origin: string | null): boolean => origin !== null && trustedOrigins.includes(origin);
 
@@ -86,9 +93,16 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, onTextZoom, 
     onBridgeUse();
   };
 
+  const isSigninSender = (event: IpcMainInvokeEvent): boolean => senderHref(event)?.split(/[?#]/)[0] === signinUrl;
+
   const fromSignin = (event: IpcMainInvokeEvent): void => {
-    const href = senderHref(event);
-    if (!href || href.split(/[?#]/)[0] !== signinUrl) throw new Error("Forbidden sender");
+    if (!isSigninSender(event)) throw new Error("Forbidden sender");
+  };
+
+  // The sign-in doors both screens drive: the console's own /login (the one
+  // screen shared with the browser) and the local fallback page. Nobody else.
+  const fromSigninScreen = (event: IpcMainInvokeEvent): void => {
+    if (!isSigninSender(event)) fromConsole(event);
   };
 
   handle("ohb:read-access-token", (event) => {
@@ -109,12 +123,25 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, onTextZoom, 
 
   handle("ohb:sign-out", (event) => {
     fromConsole(event);
+    // Signing out again would reload the same /login, which would call this
+    // again: an old console's loop, broken by the local page.
+    if (!auth.isSignedIn() && fallBackToLocalSignin()) return;
     auth.signOut();
   });
 
   handle("auth:start", (event) => {
-    fromSignin(event);
+    fromSigninScreen(event);
     auth.startSignIn();
+  });
+
+  handle("auth:email-code", (event, email, locale) => {
+    fromSigninScreen(event);
+    auth.requestEmailCode(parseEmail(email), parseLocale(locale));
+  });
+
+  handle("auth:email-verify", (event, email, code) => {
+    fromSigninScreen(event);
+    auth.verifyEmailCode(parseEmail(email), parseEmailCode(code));
   });
 
   handle("auth:password", (event, raw) => {
@@ -123,7 +150,7 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, onTextZoom, 
   });
 
   handle("auth:cancel", (event) => {
-    fromSignin(event);
+    fromSigninScreen(event);
     auth.cancelSignIn();
   });
 
@@ -152,4 +179,23 @@ function parseCredentials(raw: unknown): PasswordCredentials {
     throw new Error("Invalid e-mail code payload");
   }
   return { email, password, emailCode: record.emailCode };
+}
+
+// Shape checks only (the API owns the real rules): anything else is not a
+// form submission and is refused before any request leaves. The errors never
+// quote the value.
+function parseEmail(raw: unknown): string {
+  const email = typeof raw === "string" ? raw.trim() : "";
+  if (email.length < 3 || email.length > 320 || !email.includes("@")) throw new Error("Invalid e-mail payload");
+  return email;
+}
+
+function parseLocale(raw: unknown): SigninLocale {
+  if (raw !== "fr" && raw !== "en") throw new Error("Invalid locale payload");
+  return raw;
+}
+
+function parseEmailCode(raw: unknown): string {
+  if (typeof raw !== "string" || !/^\d{6}$/.test(raw)) throw new Error("Invalid e-mail code payload");
+  return raw;
 }

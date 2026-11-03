@@ -21,9 +21,12 @@ dépôt, restent listées plus bas pour l'historique.
 
 - `--admin-sudo password|nopasswd` choisit la règle sudo de `hermes-admin` (`password` par défaut).
 - `--admin-password-file` lit ce mot de passe dans un fichier réservé à son propriétaire, pour une installation sans terminal.
+- Le connecteur prévient openedbot dès que les outils, les serveurs MCP ou les compétences de la machine changent, y compris quand le changement est fait directement sur la machine. La page des connecteurs s'ouvre alors déjà à jour, sans attendre la machine. Le connecteur ne lit que les noms et les dates des fichiers concernés, jamais leur contenu.
+- Un nouveau bot est prêt près de trois fois plus vite (de 25 s à moins de 10 s sur une petite machine). Ses outils sont réglés en une seule écriture, au lieu d'un par un. Ses compétences intégrées sont réglées pendant la création même du bot. La liste des outils disponibles n'est plus relue à chaque nouveau bot.
 
 ### Corrigé
 
+- La page des compétences d'openedbot affichait « Hermes n'a pas pu lister ses skills » avec les versions récentes de Hermes, à cause d'un défaut de Hermes lui-même. Le connecteur lit désormais la liste directement sur la machine quand Hermes échoue.
 - Avec `--password-policy`, un changement de mot de passe pouvait échouer faute du dictionnaire de mots de passe : edge-setup installe désormais `cracklib-runtime` avec la politique.
 
 ## v0.0.4 - 2026-11-01

@@ -19,11 +19,11 @@ import {
 import { FailureState } from "../../../components/failure-state";
 import { McpPanel } from "./connectors/connectors-mcp";
 import { ConnectorsDesktop } from "./connectors/connectors-desktop";
+import { ConnectorsDesktopSkeleton } from "./connectors/connectors-skeleton";
 import { InventoryAlerts, SkillDialog, ToolsetDialog, groupSkills, toolsetStatusMap } from "./connectors/connectors-parts";
 import { SettingsPane } from "../pane";
 import {
   BUTTON,
-  CardSkeleton,
   EmptyState,
   Note,
   SectionHeading,
@@ -157,11 +157,7 @@ export function ConnectorsSettings() {
             <InsetGroupedStatic label={t("common.loading")} />
           </InsetGroupedSection>
         ) : (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[0, 1, 2].map((item) => <CardSkeleton key={item} label={t("common.loading")} rows={2} />)}
-            </div>
-          </>
+<ConnectorsDesktopSkeleton label={t("common.loading")} />
         )}
       </SettingsPane>
     );

@@ -317,7 +317,8 @@ test("la jauge suit l'occupation de la session, pas le coût du tour", async () 
   fireEvent.click(tab);
   expect(await screen.findByText("Résultats d’outils")).toBeTruthy();
   expect(screen.getByText(/143 223 jetons facturés/)).toBeTruthy();
-  expect(screen.getByText(/estimé à quatre caractères par jeton/)).toBeTruthy();
+  // La note de méthode (modèle, provenance de la fenêtre, estimation) a été retirée.
+  expect(screen.queryByText(/estimé à quatre caractères par jeton/)).toBeNull();
 });
 
 function completedWith(contextUsage: unknown) {
@@ -370,7 +371,8 @@ test("la carte ventile le tour et le préambule de l'hôte, MCP listé sans êtr
   // Le groupe des outils du tour s'ouvre seul et nomme ses appels.
   fireEvent.click(screen.getByRole("button", { name: /Outils du tour/ }));
   expect(await screen.findByText("3 appels")).toBeTruthy();
-  expect(screen.getByText(/mesuré sur l’hôte/)).toBeTruthy();
+  // La note de méthode (modèle, provenance de la fenêtre, estimation) a été retirée.
+  expect(screen.queryByText(/mesuré sur l’hôte/)).toBeNull();
 });
 
 // Un hôte qui ne publie pas encore son préambule : il existe quand même, la
@@ -385,7 +387,8 @@ test("sans préambule publié, la carte le liste comme non mesuré", async () =>
   }));
   fireEvent.click(await screen.findByRole("button", { name: "Voir le contexte et les quotas" }));
   expect(await screen.findByText("Préambule Hermes (non mesuré)")).toBeTruthy();
-  expect(screen.getByText(/c’est un plancher/)).toBeTruthy();
+  // La note de méthode (modèle, provenance de la fenêtre, estimation) a été retirée.
+  expect(screen.queryByText(/c’est un plancher/)).toBeNull();
 });
 
 // Le bas de la carte BoardUI : les fenêtres du forfait en service, et une

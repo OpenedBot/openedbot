@@ -3,19 +3,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { IconKey, IconLock, IconShieldCheck } from "@tabler/icons-react";
 import { useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT } from "../../../lib/i18n";
-import {
-  ACTIONS,
-  BUTTON,
-  CardHeading,
-  SettingsCard,
-  StatusList,
-  StatusRow,
-  ToneBadge,
-} from "../../../components/settings/primitives";
+import { ACTIONS, BUTTON, ListRow, ListSection, ToneBadge } from "../../../components/settings/primitives";
+import { SettingsCardGrid } from "../../../components/settings/settings-card-grid";
 import { InsetGroupedRow, InsetGroupedSection, InsetGroupedStatic } from "../../../components/mobile/inset-grouped";
 import { FleetA2APolicySettings, OrganizationPermissionRulesSettings } from "../../../pro-console/slots";
 import { OrganizationPermissionPolicySettings } from "../../../components/settings/organization-permission-policy";
-import { useSettingsModal } from "../../../lib/shell/settings-modal-context";
 import { SettingsPane } from "../pane";
 
 /**
@@ -34,7 +26,6 @@ import { SettingsPane } from "../pane";
 export function PoliciesSettings() {
   const { t } = useT();
   // Dans la modale, son en-tête porte déjà le titre : celui-ci reste aux lecteurs d'écran.
-  const inModal = useSettingsModal() !== null;
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [policyFooter, setPolicyFooter] = useState<ReactNode>(null);
@@ -107,73 +98,54 @@ export function PoliciesSettings() {
   return (
     <SettingsPane>
       <div>
-        <h1 className={inModal ? "sr-only" : "text-base font-semibold tracking-tight"}>{t("settingsPolicies.title")}</h1>
+        <h1 className="text-base font-semibold tracking-tight">{t("settingsPolicies.title")}</h1>
         <p className="mt-1 max-w-[72ch] text-sm text-muted-foreground">
           {t("settingsPolicies.description")}
         </p>
       </div>
 
-      <SettingsCard className="space-y-4">
-        <CardHeading
+      {/* Les garanties, en lecture seule : trois cartes côte à côte, une ligne
+          par règle (`DESIGN.md` › Bureau › Regrouper et aligner). Les
+          réglages modifiables suivent, pleine largeur. */}
+      <SettingsCardGrid trio>
+        <ListSection
           title={t("settingsPolicies.approvalsTitle")}
           description={t("settingsPolicies.approvalsDescription")}
           action={<ToneBadge tone="success">{t("settingsPolicies.enforcedBadge")}</ToneBadge>}
-        />
-        <StatusList className="rounded-xl border border-border">
-          <StatusRow label={t("settingsPolicies.decisionLabel")} value={t("settingsPolicies.decisionValue")} />
-          <StatusRow label={t("settingsPolicies.permanentLabel")} value={t("settingsPolicies.permanentValue")} />
-          <StatusRow label={t("settingsPolicies.expiryLabel")} value={t("settingsPolicies.expiryValue")} />
-        </StatusList>
-        <div className={ACTIONS}>
-          <Link to="/settings/decisions" className={BUTTON.secondary}>
-            <IconShieldCheck className="size-4" />
-            {t("settingsPolicies.decisionsLink")}
-          </Link>
-        </div>
-      </SettingsCard>
+          footer={<div className={ACTIONS}><Link to="/settings/decisions" className={BUTTON.secondary}><IconShieldCheck className="size-4" />{t("settingsPolicies.decisionsLink")}</Link></div>}
+        >
+          <ListRow label={t("settingsPolicies.decisionLabel")} description={t("settingsPolicies.decisionValue")} />
+          <ListRow label={t("settingsPolicies.permanentLabel")} description={t("settingsPolicies.permanentValue")} />
+          <ListRow label={t("settingsPolicies.expiryLabel")} description={t("settingsPolicies.expiryValue")} />
+        </ListSection>
+        <ListSection
+          title={t("settingsPolicies.runtimeTitle")}
+          description={t("settingsPolicies.runtimeDescription")}
+          action={<IconKey className="size-5 text-muted-foreground" aria-hidden="true" />}
+          footer={<div className={ACTIONS}><Link to="/settings/runtime" className={BUTTON.secondary}>{t("settingsPolicies.runtimeLink")}</Link></div>}
+        >
+          <ListRow label={t("settingsPolicies.rolesLabel")} description={t("settingsPolicies.rolesValue")} />
+          <ListRow label={t("settingsPolicies.adminChannelLabel")} description={t("settingsPolicies.adminChannelValue")} />
+          <ListRow label={t("settingsPolicies.draftLabel")} description={t("settingsPolicies.draftValue")} />
+          <ListRow label={t("settingsPolicies.secretsLabel")} description={t("settingsPolicies.secretsValue")} />
+        </ListSection>
+        <ListSection
+          title={t("settingsPolicies.dataTitle")}
+          description={t("settingsPolicies.dataDescription")}
+          action={<IconLock className="size-5 text-muted-foreground" aria-hidden="true" />}
+          footer={<div className={ACTIONS}><Link to="/settings/security" className={BUTTON.secondary}>{t("settingsPolicies.securityLink")}</Link></div>}
+        >
+          <ListRow label={t("settingsPolicies.isolationLabel")} description={t("settingsPolicies.isolationValue")} />
+          <ListRow label={t("settingsPolicies.transportLabel")} description={t("settingsPolicies.transportValue")} />
+          <ListRow label={t("settingsPolicies.journalLabel")} description={t("settingsPolicies.journalValue")} />
+        </ListSection>
+      </SettingsCardGrid>
 
       <OrganizationPermissionPolicySettings />
 
       <OrganizationPermissionRulesSettings />
 
       <FleetA2APolicySettings />
-
-      <SettingsCard className="space-y-4">
-        <CardHeading
-          title={t("settingsPolicies.runtimeTitle")}
-          description={t("settingsPolicies.runtimeDescription")}
-          action={<IconKey className="size-5 text-muted-foreground" aria-hidden="true" />}
-        />
-        <StatusList className="rounded-xl border border-border">
-          <StatusRow label={t("settingsPolicies.rolesLabel")} value={t("settingsPolicies.rolesValue")} />
-          <StatusRow label={t("settingsPolicies.adminChannelLabel")} value={t("settingsPolicies.adminChannelValue")} />
-          <StatusRow label={t("settingsPolicies.draftLabel")} value={t("settingsPolicies.draftValue")} />
-          <StatusRow label={t("settingsPolicies.secretsLabel")} value={t("settingsPolicies.secretsValue")} />
-        </StatusList>
-        <div className={ACTIONS}>
-          <Link to="/settings/runtime" className={BUTTON.secondary}>
-            {t("settingsPolicies.runtimeLink")}
-          </Link>
-        </div>
-      </SettingsCard>
-
-      <SettingsCard className="space-y-4">
-        <CardHeading
-          title={t("settingsPolicies.dataTitle")}
-          description={t("settingsPolicies.dataDescription")}
-          action={<IconLock className="size-5 text-muted-foreground" aria-hidden="true" />}
-        />
-        <StatusList className="rounded-xl border border-border">
-          <StatusRow label={t("settingsPolicies.isolationLabel")} value={t("settingsPolicies.isolationValue")} />
-          <StatusRow label={t("settingsPolicies.transportLabel")} value={t("settingsPolicies.transportValue")} />
-          <StatusRow label={t("settingsPolicies.journalLabel")} value={t("settingsPolicies.journalValue")} />
-        </StatusList>
-        <div className={ACTIONS}>
-          <Link to="/settings/security" className={BUTTON.secondary}>
-            {t("settingsPolicies.securityLink")}
-          </Link>
-        </div>
-      </SettingsCard>
 
       <nav aria-label={t("legal.navigationLabel")} className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <Link to="/legal/$slug" params={{ slug: "mentions" }} className="underline underline-offset-4 hover:text-foreground">

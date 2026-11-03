@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "../lib/i18n";
 
 /** Seconds before each automatic retry: a link that bounces comes back fast, a stopped host does not. */
@@ -30,46 +30,23 @@ function PulseDot({ className }: { className: string }) {
 // rounded at the top only, its lower part tucked under the composer card,
 // which `Composer` places 28 px in from each side (`notice`).
 const TAB = "flex min-h-[46px] items-start gap-2 rounded-t-2xl px-3 pt-2 pb-5 text-xs leading-5";
+// The dot sits in a box exactly one text line high (`leading-5`), centred:
+// an inline wrapper put it on the text baseline, a few pixels under the
+// middle of the sentence it heads.
+const DOT_SLOT = "flex h-5 shrink-0 items-center";
 const TAB_ACTION =
   "shrink-0 cursor-pointer rounded-md px-1.5 font-medium outline-none hover:underline focus-visible:ring-2 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-60";
 
-type TabPalette = {
-  surface: string;
-  style?: CSSProperties;
-  strong: string;
-  soft: string;
-  faint: string;
-  dot: string;
-  ring: string;
-};
-
 /**
- * The tab and the badge wear the bot's colour, the exact `--bot-tint` of the
- * user bubbles, white on it: a generic danger red sat next to the bot's own
- * red and read as a mismatched shade. A bot without a coloured face keeps the
- * BoardUI grey tab, with an amber dot as the only alarm.
+ * Offline is an outage: the tab and the badge wear the solid destructive red
+ * of the « Supprimer » button (`--btn-danger`), white on it, in both themes
+ * and whatever the bot's colour. Back online is news, not an alarm: Apple's
+ * system blue (`systemBlue`, light #007AFF / dark #0A84FF), white on it.
  */
-export function runtimeTabPalette(tint: string | null | undefined): TabPalette {
-  if (tint) {
-    return {
-      surface: "",
-      style: { backgroundColor: tint },
-      strong: "text-white",
-      soft: "text-white/85",
-      faint: "text-white/75",
-      dot: "bg-white",
-      ring: "focus-visible:ring-white/70",
-    };
-  }
-  return {
-    surface: "bg-background-tertiary-default",
-    strong: "text-text-primary",
-    soft: "text-text-secondary",
-    faint: "text-text-tertiary",
-    dot: "bg-warn-700",
-    ring: "focus-visible:ring-ring",
-  };
-}
+export const RUNTIME_OFFLINE_SURFACE = "bg-[var(--btn-danger)] text-white";
+export const RUNTIME_RESTORED_SURFACE = "bg-[#007aff] text-white dark:bg-[#0a84ff]";
+const OFFLINE_FAINT = "text-white/80";
+const OFFLINE_RING = "focus-visible:ring-white/70";
 
 /**
  * The runtime is down while the thread is open. Before, a blurred modal said
@@ -87,7 +64,6 @@ export function useRuntimeOfflineNotice({
   offline,
   since,
   retrying,
-  tint,
   onRetry,
   onOpenRuntime,
 }: {
@@ -95,8 +71,6 @@ export function useRuntimeOfflineNotice({
   /** `link.lastSeenAt` of the connector, ISO. */
   since: string | null | undefined;
   retrying: boolean;
-  /** The bot's bubble colour (`botBubbleColor`), or null for the grey tab. */
-  tint?: string | null;
   onRetry: () => void;
   onOpenRuntime: () => void;
 }): ReactNode {
@@ -140,11 +114,10 @@ export function useRuntimeOfflineNotice({
     retry.current();
   }, [attempt, left, offline, retrying]);
 
-  const palette = runtimeTabPalette(tint);
   if (restored && !offline) {
     return (
-      <div role="status" data-runtime-notice="restored" className={`${TAB} ${palette.surface} ${palette.soft}`} style={palette.style}>
-        <span className={`mt-1.5 size-2 shrink-0 rounded-full ${tint ? palette.dot : "bg-pos-700"}`} aria-hidden />
+      <div role="status" data-runtime-notice="restored" className={`${TAB} ${RUNTIME_RESTORED_SURFACE}`}>
+        <span className={DOT_SLOT} aria-hidden><span className="size-2 rounded-full bg-white" /></span>
         <span className="min-w-0 flex-1 truncate">{t("runtimeOffline.restored")}</span>
       </div>
     );
@@ -157,19 +130,19 @@ export function useRuntimeOfflineNotice({
     onRetry();
   };
   return (
-    <div role="alert" data-runtime-notice="offline" className={`${TAB} ${palette.surface}`} style={palette.style}>
-      <span className="mt-1.5"><PulseDot className={palette.dot} /></span>
+    <div role="alert" data-runtime-notice="offline" className={`${TAB} ${RUNTIME_OFFLINE_SURFACE}`}>
+      <span className={DOT_SLOT}><PulseDot className="bg-white" /></span>
       <p className="min-w-0 flex-1 truncate">
-        <span className={`font-medium ${palette.strong}`}>
+        <span className="font-medium">
           {retrying ? t("runtimeOffline.retrying") : t("runtimeOffline.title")}
         </span>
-        {time ? <span className={palette.faint}> {t("runtimeOffline.since", { time })}</span> : null}
+        {time ? <span className={OFFLINE_FAINT}> {t("runtimeOffline.since", { time })}</span> : null}
         <span className="sr-only"> {t("runtimeOffline.body")}</span>
       </p>
-      <button type="button" className={`${TAB_ACTION} ${palette.ring} ${palette.strong}`} disabled={retrying} onClick={manualRetry}>
+      <button type="button" className={`${TAB_ACTION} ${OFFLINE_RING}`} disabled={retrying} onClick={manualRetry}>
         {retrying ? t("runtimeOffline.retrying") : t("runtimeOffline.retryIn", { seconds: left })}
       </button>
-      <button type="button" className={`${TAB_ACTION} ${palette.ring} ${palette.soft}`} onClick={onOpenRuntime}>
+      <button type="button" className={`${TAB_ACTION} ${OFFLINE_RING} ${OFFLINE_FAINT}`} onClick={onOpenRuntime}>
         {t("runtimeOffline.details")}
       </button>
     </div>
@@ -180,27 +153,22 @@ export function useRuntimeOfflineNotice({
 export function RuntimeOfflineBadge({
   since,
   retrying,
-  tint,
   onClick,
 }: {
   since: string | null | undefined;
   retrying: boolean;
-  /** Same colour as the composer's tab: the bot's bubble colour, or grey. */
-  tint?: string | null;
   onClick: () => void;
 }) {
   const { t, locale } = useT();
   const time = formatOfflineSince(since, locale);
-  const palette = runtimeTabPalette(tint);
   return (
     <button
       type="button"
       onClick={onClick}
       title={time ? t("runtimeOffline.badgeTitle", { time }) : t("runtimeOffline.title")}
-      style={palette.style}
-      className={`inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-xs font-medium outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-border-focus-ring ${palette.surface} ${tint ? palette.strong : palette.soft}`}
+      className={`inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-xs font-medium outline-none hover:bg-[var(--btn-danger-hover)] focus-visible:ring-2 focus-visible:ring-border-focus-ring ${RUNTIME_OFFLINE_SURFACE}`}
     >
-      <PulseDot className={palette.dot} />
+      <PulseDot className="bg-white" />
       {retrying ? t("runtimeOffline.retrying") : t("runtimeOffline.badge")}
     </button>
   );

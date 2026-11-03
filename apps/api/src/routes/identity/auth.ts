@@ -189,6 +189,9 @@ export function authMiddleware(
       const agencyAvailable = await fleetWorkspacesEnabled(agencyEnabled, found);
       if (actingFleetId && !agencyAvailable) throw new HttpError(403, "WORKSPACE_ACCESS_REVOKED", "Le contexte agence n’est plus disponible.");
       const pinned = found.kind !== "web" || Boolean(found.impersonatedByStaffUserId);
+      // Native sans organisation (0158) : routes de compte comme le web, pour
+      // la définir ; elle reste épinglée, aucun en-tête n'ouvre un autre espace.
+      const accountReachable = !pinned || (found.kind === "native" && !found.organizationId);
       if (actingFleetId && pinned) {
         throw new HttpError(403, "TENANT_MISMATCH", "Cette session ne peut pas agir pour une agence.");
       }
@@ -211,7 +214,7 @@ export function authMiddleware(
       const role = actingFleetId ? "agency" : access?.role ?? null;
       if (!access || !role || !agencyAccessAllowed(access, agencyAvailable)) {
         const selectedDisabledAgency = !agencyAvailable && access?.kind === "agency";
-        if (accountPath && !pinned && (
+        if (accountPath && accountReachable && (
           (context.req.path !== "/api/auth/me" || !requestedOrganization) || selectedDisabledAgency
         )) return { ...found, organizationId: EMPTY_WORKSPACE_ID, role: "member" as const };
         throw new HttpError(403, "WORKSPACE_ACCESS_REVOKED", "Vous n’avez plus accès à cet espace.");
@@ -331,12 +334,9 @@ export function authRoutes(
         return context.html(callbackPage(true));
       }
       if (result.native) {
+        // Sans organisation, le desktop l'ouvre dans l'onboarding (0158).
         const member = await resolveGoogleIdentity(db, result.identity, { waitlistRequired });
-        // Un code natif est lié à une organisation : le compte la définit d'abord sur le web.
-        if (!member.organizationId) {
-          throw new HttpError(403, "AUTH_NOT_A_MEMBER", "Définissez d’abord votre organisation depuis l’application web.");
-        }
-        await google.completeNative(result.attemptId, { ...member, organizationId: member.organizationId });
+        await google.completeNative(result.attemptId, member);
       } else {
         const member = await resolveGoogleIdentity(db, result.identity, { waitlistRequired });
         await google.completeWeb(result.attemptId, member.user);
@@ -715,7 +715,7 @@ export function writeWebSessionCookies(
   });
 }
 
-function loginEmail(value: unknown): string {
+export function loginEmail(value: unknown): string {
   const email = normalizeEmail(assertString(value, "L’adresse email", { max: 320 }));
   if (!isEmailSyntaxValid(email)) throw new HttpError(400, "EMAIL_INVALID", "Adresse email invalide.");
   return email;

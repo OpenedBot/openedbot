@@ -29,11 +29,18 @@ export type RuntimeRow = {
   linkGeneration?: string | null;
   /** Dernière déclaration du connecteur (0055), absente des anciennes projections. */
   linkAgent?: string | null;
+  /** `hello.hermesVersion` de la même déclaration (0162), brut ; absent des projections qui ne le lisent pas. */
+  linkHermesVersion?: string | null;
   /** Origine signée à la dernière preuve (0110). Absente des projections qui ne la lisent pas. */
   linkOrigin?: string | null;
   linkAgentSeenAt?: Date | null;
   /** Host features announced by connector hello; direct runtimes expose none. */
   linkFeatures: string[];
+  /**
+   * Dernier `inventory.changed` de l'hôte (0160) ; `null` tant qu'il n'en a
+   * envoyé aucun. Absent des projections qui ne le lisent pas.
+   */
+  inventoryChangedAt?: Date | null;
   /** Dernière rotation du jeton de lien (0027) ; `null` si jamais tourné. */
   linkRotatedAt: Date | null;
   /** Dernier événement `replaced` du journal du lien (0027). */
@@ -70,9 +77,10 @@ export function readRuntimeRows(tx: Bun.TransactionSQL, organizationId: string) 
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
-           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt",
+           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
+           inventory_changed_at as "inventoryChangedAt",
            (select max(e.occurred_at) from runtime_link_events e
              where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'replaced') as "linkLastReplacedAt",
            (select max(e.occurred_at) from runtime_link_events e
@@ -97,9 +105,10 @@ export function readAllRuntimeRows(tx: Bun.TransactionSQL, organizationId: strin
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
-           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt",
+           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
+           inventory_changed_at as "inventoryChangedAt",
            (select max(e.occurred_at) from runtime_link_events e
              where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'replaced') as "linkLastReplacedAt",
            (select max(e.occurred_at) from runtime_link_events e
@@ -123,9 +132,10 @@ export function readRuntimeRowById(tx: Bun.TransactionSQL, organizationId: strin
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
-           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt",
+           link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
+           inventory_changed_at as "inventoryChangedAt",
            (select max(e.occurred_at) from runtime_link_events e
              where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'replaced') as "linkLastReplacedAt",
            (select max(e.occurred_at) from runtime_link_events e

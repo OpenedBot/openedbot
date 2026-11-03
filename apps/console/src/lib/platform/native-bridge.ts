@@ -9,8 +9,8 @@ import type { AuthStore } from "@openedbot/browser-api-client";
  * (access token natif de 15 min, rafraîchi côté coque avec un refresh token
  * rotatif que le renderer ne voit jamais) : chaque requête part en
  * `Authorization: Bearer`, sans cookie ni CSRF (`auth.ts` de l'API n'exige le
- * CSRF que sur une session cookie). Le contrat est figé par `openedbot-desktop` :
- * ces quatre fonctions, rien de plus.
+ * CSRF que sur une session cookie). Le contrat est tenu par `apps/desktop`
+ * (`src/shared/bridge.ts`) : ces quatre fonctions, plus `auth`, optionnel.
  */
 export type OhbNativeBridge = {
   /** Le jeton courant, rafraîchi par la coque s'il expire ; `null` déconnecté. */
@@ -22,6 +22,32 @@ export type OhbNativeBridge = {
   /** Efface les jetons côté coque et montre sa page de connexion. */
   signOut(): Promise<void>;
   shell: { platform: "windows"; version: string };
+  /**
+   * La connexion menée par la coque depuis l'écran `/login` de la console
+   * (même écran que le navigateur). Absent d'une coque plus ancienne : la
+   * console lui rend alors la main (`signOut`) et la coque montre sa page locale.
+   */
+  auth?: NativeAuthBridge;
+};
+
+/** L'état de connexion poussé par la coque (`SigninState` de `apps/desktop/src/shared/bridge.ts`). */
+export type NativeSigninState =
+  | { status: "idle"; reason?: "signed-out" | "session-lost" }
+  | { status: "waiting" | "submitting" | "code_required" | "sending" | "verifying" }
+  | { status: "code_sent"; email: string }
+  | { status: "error"; code: string; message: string; params?: Record<string, string> };
+
+/**
+ * Le PKCE, le vérificateur et les jetons restent dans le processus principal
+ * de la coque : la page ne fait que demander, et lire l'issue par `onState`.
+ */
+export type NativeAuthBridge = {
+  requestEmailCode(email: string, locale: "fr" | "en"): Promise<void>;
+  verifyEmailCode(email: string, code: string): Promise<void>;
+  startGoogle(): Promise<void>;
+  cancel(): Promise<void>;
+  /** Reçoit aussitôt le dernier état connu, puis chaque changement ; renvoie le désabonnement. */
+  onState(listener: (state: NativeSigninState) => void): () => void;
 };
 
 declare global {
@@ -41,6 +67,15 @@ export const NATIVE_SESSION_MARK = "native";
 export function nativeBridge(): OhbNativeBridge | null {
   const bridge = globalThis.window?.__OHB_NATIVE__;
   return bridge && typeof bridge.readAccessToken === "function" ? bridge : null;
+}
+
+/** La connexion par la coque, si cette coque la sait mener ; `null` dans un navigateur ou une coque ancienne. */
+export function nativeAuth(): NativeAuthBridge | null {
+  const auth = nativeBridge()?.auth;
+  return auth && typeof auth.requestEmailCode === "function" && typeof auth.verifyEmailCode === "function"
+    && typeof auth.startGoogle === "function" && typeof auth.cancel === "function" && typeof auth.onState === "function"
+    ? auth
+    : null;
 }
 
 export function isNativeShell(): boolean {

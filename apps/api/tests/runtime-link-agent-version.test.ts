@@ -126,7 +126,7 @@ describe("déclaration hello et migration", () => {
     const write = session.statements.find(({ sql }) => sql.includes("set link_agent ="));
     expect(write?.sql).toContain("link_agent_seen_at = now()");
     expect(write?.sql).toContain("link_generation =");
-    expect(write?.values).toEqual(["hermes-setup/v0.1.0", "rt", "org", "42", "hash", "hash"]);
+    expect(write?.values).toEqual(["hermes-setup/v0.1.0", null, "rt", "org", "42", "hash", "hash"]);
     const meta = { ip: "203.0.113.7", agent: "hermes-setup/v0.1.0", minimum: "v0.2.0" };
     expect(session.events.filter(({ kind }) => kind === "agent_outdated")).toEqual([{ kind: "agent_outdated", meta: { ...meta, instanceId: "agent-version-test", generation: "42" } }]);
     expect(session.logs).toContainEqual({ event: "runtime_link.agent_outdated", fields: { runtimeId: "rt", ...meta } });
@@ -146,7 +146,7 @@ describe("déclaration hello et migration", () => {
       expect(session.events.some(({ kind }) => kind === "agent_outdated")).toBe(false);
       expect(session.logs.some(({ event }) => event === "runtime_link.agent_outdated")).toBe(false);
       // Sans seuils : ni latestVersion ni minimumVersion ; seule la borne des features accompagne le palier et l'origine.
-      if (!Object.keys(env).length) expect(session.frames.find(({ t }) => t === "link.context")).toEqual({ t: "link.context", environment: "dev", ohb: config().publicUrl, limits: { features: RELAY_MAX_FEATURES } });
+      if (!Object.keys(env).length) expect(session.frames.find(({ t }) => t === "link.context")).toEqual({ t: "link.context", environment: "dev", ohb: config().publicUrl, limits: { features: RELAY_MAX_FEATURES }, accepts: ["inventory.changed"] });
     }
   });
 

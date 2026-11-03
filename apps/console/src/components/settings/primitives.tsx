@@ -1,6 +1,5 @@
 import { Children, isValidElement, useState, type ComponentProps, type ReactNode } from "react";
 import { Badge, cn, useIsMobile } from "@openedbot/browser-ui-kit";
-import { useSettingsModal } from "../../lib/shell/settings-modal-context";
 
 /**
  * Les briques communes des écrans de réglages : l'équivalent, chez nous, de
@@ -80,7 +79,6 @@ export function SectionHeading({
   action?: ReactNode;
 }) {
   const isMobile = useIsMobile();
-  const inModal = useSettingsModal() !== null;
   if (isMobile) {
     return (
       <div data-settings-caption="" className="px-4 pb-1">
@@ -95,7 +93,7 @@ export function SectionHeading({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <h1 className={inModal ? "sr-only" : "text-base font-semibold tracking-tight"}>{title}</h1>
+        <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         {description ? (
           <p className="max-w-[72ch] text-sm text-muted-foreground">{description}</p>
         ) : null}
@@ -121,13 +119,13 @@ export function SectionHeading({
  * Sur desktop rien ne bouge.
  */
 /**
- * Desktop: a muted shell carrying the title, and the content raised in a white
- * panel inside it (the `SettingsSection` pattern of the design system). Shared by
+ * Desktop: ONE card, as `Card`: `bg-card` (white / #262626), the title on top,
+ * the content under a hairline (`DESIGN.md` › Bureau › Carte). Shared by
  * `SettingsCard`, `ListSection` and the data tables.
  */
-export const SETTINGS_SHELL = "rounded-2xl border border-border/60 bg-background-secondary-default p-1";
-export const SETTINGS_PANEL = "rounded-xl border border-border/60 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:bg-surface";
-const SHELL_HEADER = "px-3 pt-2.5 pb-2";
+export const SETTINGS_SHELL = "overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm";
+export const SETTINGS_PANEL = "rounded-xl border border-border/60 bg-card shadow-sm";
+const SHELL_HEADER = "px-4 pt-3.5 pb-3";
 
 export function SettingsCard({
   children,
@@ -169,8 +167,7 @@ export function SettingsCard({
   }
 
   if (!isMobile) {
-    // The title goes on the shell, everything else in the raised panel. The
-    // card's `className` lays out its content, so it stays on the panel.
+    // Title on top, content under a hairline; `className` lays out the content.
     let heading: ReactNode = caption || footer ? <CardHeading title={caption ?? ""} description={footer} action={captionAction} /> : null;
     const content: ReactNode[] = [];
     for (const child of Children.toArray(children)) {
@@ -183,7 +180,7 @@ export function SettingsCard({
     return (
       <section data-settings-card="" className={SETTINGS_SHELL} {...rest}>
         <div className={SHELL_HEADER}>{heading}</div>
-        <div className={cn(SETTINGS_PANEL, padded && "p-4", className)}>{content}</div>
+        <div className={cn("border-t border-border/60 [&>:first-child]:mt-0", padded && "p-4", className)}>{content}</div>
       </section>
     );
   }
@@ -483,7 +480,8 @@ export function ListSection({
     );
   }
   return (
-    <section data-settings-list="" className={cn(SETTINGS_SHELL, className)}>
+    // La coque grise autour d'un panneau bordé doublait le cadre en sombre.
+    <section data-settings-list="" className={cn("flex flex-col", SETTINGS_SHELL, className)}>
       <div className={cn("flex items-start justify-between gap-3", SHELL_HEADER)}>
         <div className="min-w-0">
           <h2 className="text-sm font-medium text-foreground">{title}</h2>
@@ -493,10 +491,10 @@ export function ListSection({
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
-      <ul className={cn("divide-y divide-border/60 overflow-hidden", SETTINGS_PANEL)}>
+      <ul className="divide-y divide-border/60 border-t border-border/60">
         {children}
       </ul>
-      {footer ? <div className="space-y-2 px-3 pt-2 pb-2">{footer}</div> : null}
+      {footer ? <div className="mt-auto space-y-2 border-t border-border/60 px-4 py-3">{footer}</div> : null}
     </section>
   );
 }
@@ -679,29 +677,29 @@ export function Note({
  * dégradé rouge pour un geste qui retire ou délie. L'accent suit la couleur
  * choisie par l'opérateur : rien n'est codé en bleu ici.
  */
+/** La pilule de Grok Bot (`sand-kit-button` md, 32 px) ; couleurs : jetons `--btn-*` (ui-kit `app.css`). */
 const BUTTON_SHAPE =
-  "ohb-settings-action inline-flex items-center justify-center text-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium cursor-pointer outline-none transition-[background-color,background-image,border-color,box-shadow,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed";
+  "ohb-settings-action inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 text-center text-sm font-medium cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed";
 
 /** Le bouton d'action des réglages, une variante par nature de geste, jamais grisé pour de faux. */
 export const BUTTON = {
-  /** Le geste principal d'un écran ou d'une modale : enregistrer, valider. */
-  primary: `${BUTTON_SHAPE} ohb-settings-action-primary border border-transparent bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-primary-hover)] active:bg-[image:var(--gradient-primary-active)] disabled:bg-[image:var(--gradient-primary-disabled)] disabled:text-muted-foreground disabled:shadow-none`,
-  /** Un geste ordinaire, sans enjeu : changer, annuler, modifier. */
-  secondary: `${BUTTON_SHAPE} border border-input bg-card text-foreground shadow-[var(--shadow-xs)] hover:border-border hover:bg-surface-hover active:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none`,
-  /** Le « ghost » de BoardUI : un geste qui AJOUTE ou relie, moins fort que `primary`. */
-  soft: `${BUTTON_SHAPE} border border-transparent bg-[var(--button-ghost)] text-[var(--button-ghost-fg)] hover:bg-[var(--button-ghost-hover)] active:bg-[var(--button-ghost-active)] disabled:bg-[var(--button-ghost-disabled)] disabled:text-[var(--button-ghost-disabled-fg)]`,
+  /** Le geste principal d'un écran ou d'une modale : enregistrer, valider. Neutre plein. */
+  primary: `${BUTTON_SHAPE} ohb-settings-action-primary bg-[var(--btn-neutral)] text-[var(--btn-neutral-fg)] hover:bg-[var(--btn-neutral-hover)] disabled:bg-[var(--btn-neutral-disabled)] disabled:text-foreground/30`,
+  /** Un geste ordinaire, sans enjeu : changer, annuler, modifier. Voile neutre. */
+  secondary: `${BUTTON_SHAPE} bg-[var(--btn-veil)] text-foreground hover:bg-[var(--btn-veil-hover)] disabled:text-foreground/30`,
+  /** Un geste qui AJOUTE ou relie, moins fort que `primary` : voile bleu. */
+  soft: `${BUTTON_SHAPE} bg-[var(--btn-accent)]/10 text-[var(--btn-accent)] hover:bg-[var(--btn-accent)]/15 disabled:opacity-40`,
+  /** La petite pilule (sm, 24 px) : un geste secondaire dans une ligne ou une liste. */
   small:
-    "ohb-settings-action inline-flex items-center justify-center text-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs cursor-pointer outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-  /** Un geste qui retire, supprime ou délie. */
-  danger: `${BUTTON_SHAPE} border border-transparent bg-[image:var(--gradient-danger)] text-white shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-danger-hover)] active:bg-[image:var(--gradient-danger-active)] disabled:bg-[image:var(--gradient-danger-disabled)] disabled:text-neg-700 disabled:shadow-none`,
-  /** La confirmation pleine en bleu d'une modale : valider un geste non destructif. */
-  confirm: `${BUTTON_SHAPE} border border-transparent bg-info-700 text-background shadow-[var(--shadow-xs)] hover:bg-info-700/90 active:bg-info-700/80 disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none`,
+    "ohb-settings-action inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--btn-veil)] px-2 text-center text-xs font-medium text-foreground cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out hover:bg-[var(--btn-veil-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-foreground/30",
+  /** Un geste qui retire, supprime ou délie. Rouge plein. */
+  danger: `${BUTTON_SHAPE} bg-[var(--btn-danger)] text-white hover:bg-[var(--btn-danger-hover)] disabled:opacity-40`,
+  /** La confirmation bleue d'une modale : valider un geste non destructif. */
+  confirm: `${BUTTON_SHAPE} bg-[var(--btn-accent)] text-white hover:bg-[var(--btn-accent-hover)] disabled:opacity-40`,
   /** Le jumeau bleu de `danger` : un geste informatif (copier une référence). */
-  info:
-    "ohb-settings-action inline-flex items-center justify-center text-center gap-1.5 rounded-md border border-info-700/40 px-3 py-1.5 text-sm text-info-700 cursor-pointer outline-none hover:bg-info-soft focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+  info: `${BUTTON_SHAPE} bg-[var(--btn-accent)]/10 text-[var(--btn-accent)] hover:bg-[var(--btn-accent)]/15 disabled:opacity-40`,
   /** Le jumeau vert : l'état « c'est fait » d'un bouton (copié, enregistré). */
-  success:
-    "ohb-settings-action inline-flex items-center justify-center text-center gap-1.5 rounded-md border border-pos-700/40 bg-pos-soft px-3 py-1.5 text-sm text-pos-700 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+  success: `${BUTTON_SHAPE} bg-pos-soft text-pos-700 disabled:opacity-40`,
 } as const;
 
 export const FIELD =

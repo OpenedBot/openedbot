@@ -167,7 +167,7 @@ describe("group section move", () => {
       }
       if (sql.includes("select bot_id as id from group_members")) return Promise.resolve([{ id: "bot-1" }, { id: "bot-2" }]);
       if (sql.includes("select id from sections")) return Promise.resolve(sectionExists ? [{ id: VALID }] : []);
-      if (sql.includes("coalesce(max(position), -1) + 1")) return Promise.resolve([{ next: 3 }]);
+      if (sql.includes("coalesce(greatest(")) return Promise.resolve([{ next: 3 }]);
       if (sql.includes("update bot_groups set")) return Promise.resolve([{ id: "group-1" }]);
       return Promise.resolve([]);
     }) as unknown as SQL;

@@ -58,22 +58,24 @@ export const legal = {
 } as const;
 
 export const login = {
-  emailCodeTitle: "Inscription ou connexion par email",
-  emailCodeSent: "Un code a été envoyé à {email}. Il expire dans 10 minutes.",
+  codeTitle: "Consultez votre boîte de réception",
+  emailPlaceholder: "vous@exemple.com",
+  sendCode: "Envoyer le code",
+  sendingCode: "Envoi du code…",
+  verifying: "Vérification…",
+  or: "ou",
+  emailCodeSent: "Un code a été envoyé à {email}.",
+  emailCodeExpiry: "Il expire dans 10 minutes.",
   emailCodeLabel: "Code à 6 chiffres",
   emailCodeVerify: "Vérifier et continuer",
   emailCodeResend: "Renvoyer un code",
-  continue: "Continuer",
-  signingInAs: "Connexion avec {email}",
-  changeEmail: "Modifier",
-  emailCodeInstead: "Recevoir un code par email",
-  passwordInstead: "Utiliser mon mot de passe",
+  changeEmail: "Changer d’e-mail",
   emailCodeResendIn: "Renvoyer un code dans {seconds} s",
-  emailCodeResent: "Un nouveau code a été envoyé à {email}. Il remplace le précédent et expire dans 10 minutes.",
+  emailCodeResent: "Un nouveau code a été envoyé à {email}. Il remplace le précédent.",
   waitlistLink: "Rejoindre la liste d’attente",
 
-  title: "Bon retour.",
-  intro: "Connectez-vous pour retrouver vos bots et vos conversations.",
+  title: "Se connecter à openedbot",
+  intro: "Utilisez votre e-mail pour vous connecter ou créer un compte. Nous vous enverrons un code à usage unique.",
   sessionExpired: "Votre session a expiré : reconnectez-vous.",
   sessionRevoked: "Cette session a été révoquée (Réglages → Sécurité) : reconnectez-vous.",
   alphaClosed: {
@@ -86,15 +88,10 @@ export const login = {
   googleWaiting: "En attente de la connexion dans le navigateur : cette page se met à jour toute seule.",
   googleCancel: "Annuler",
   passwordEmail: "Adresse e-mail",
-  passwordPassword: "Mot de passe",
   passwordShow: "Afficher le mot de passe",
   passwordHide: "Masquer le mot de passe",
-  passwordSubmit: "Se connecter",
-  passwordSubmitting: "Connexion…",
-  googleDisabledNotConfigured:
-    "Le SSO Google n’est pas configuré sur cet environnement. Utilisez l’adresse e-mail et le mot de passe de votre compte cloud.",
-  googleDisabledOriginUnsupported:
-    "Le SSO Google n’aboutit pas depuis cet accès réseau local : Google n’accepte pas une adresse IP privée comme URI de redirection, et la session reviendrait sur l’hôte de l’API. Connectez-vous avec l’adresse e-mail et le mot de passe.",
+  googleDisabledNotConfigured: "Le SSO Google n’est pas configuré sur cet environnement. Connectez-vous avec un code reçu par e-mail.",
+  googleDisabledOriginUnsupported: "Le SSO Google n’aboutit pas depuis cet accès réseau local : Google n’accepte pas une adresse IP privée comme URI de redirection. Connectez-vous avec un code reçu par e-mail.",
   failed: {
     EMAIL_LOGIN_CODE_INVALID: "Code invalide ou expiré. Demandez un nouveau code.",
     EMAIL_LOGIN_CODE_UNSENT: "Le code n’a pas pu être envoyé. Réessayez.",
@@ -109,7 +106,7 @@ export const login = {
     AUTH_EMAIL_NOT_ALLOWED:
       "Cette adresse n’est pas encore ouverte sur openedbot : inscrivez-vous à la liste d’attente, nous vous écrirons dès que votre accès sera validé.",
     AUTH_NOT_A_MEMBER:
-      "Ce compte est reconnu, mais il n’appartient pas à cette organisation : demandez une invitation à un administrateur.",
+      "Ce compte n’a pas encore d’organisation active : terminez la création de votre espace depuis l’application web, puis reconnectez-vous ici.",
     AUTH_SIGNUP_FAILED:
       "La création du compte n’a pas abouti après Google : recommencez, et prévenez le support si cela se reproduit.",
     MEMBER_QUOTA_REACHED:
@@ -143,11 +140,17 @@ export const login = {
     NOT_ENROLLED: "L’authentification cloud n’est pas configurée.",
     UNAUTHORIZED: "Cette session n’est plus valide : reconnectez-vous.",
     SERVICE_UNAVAILABLE: "Le service de connexion est temporairement indisponible. Réessayez dans quelques instants.",
+    NETWORK: "La connexion a échoué. Vérifiez votre réseau puis réessayez.",
+    TIMEOUT: "Délai dépassé : la connexion n’a pas abouti en 5 minutes.",
+    GOOGLE_REFUSED: "La connexion Google a été refusée ou a expiré. Réessayez.",
+    LOOPBACK_BUSY: "Le port local 47813 est occupé : fermez l’application qui l’utilise puis réessayez.",
+    REDIRECT_URI_INVALID: "Cette version de l’application n’est pas autorisée par le serveur : mettez-la à jour.",
+    BAD_RESPONSE: "Réponse inattendue du serveur de connexion. Réessayez.",
     UNKNOWN: "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.",
   },
   unavailableTitle: "Connexion temporairement indisponible",
   unreachable: "Nous ne pouvons pas charger les moyens de connexion pour le moment. Réessayez dans quelques instants.",
-  ledgerFootnote: "Vos bots tournent sur votre machine. openedbot garde vos conversations et vos réglages.",
+  ledgerFootnote: "Vos bots tournent sur votre machine.\nopenedbot garde vos conversations et vos réglages.",
 } as const;
 
 export const changePassword = {

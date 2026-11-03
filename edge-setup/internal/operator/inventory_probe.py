@@ -46,10 +46,12 @@ MAX_PROFILES = 32
 MAX_SOUL = 8_000
 MAX_ROUTINES = 20
 MAX_AVATAR = 256 * 1024
+MAX_SKILLS = 1024
 
 PLATFORM = "api_server"
 VERBS = {
     "toolsets",
+    "skills",
     "model-context",
     "mcp-inventory",
     "mcp-add",
@@ -446,6 +448,32 @@ def verb_toolsets(_request):
         "settable": sorted(set(settable))[:MAX_TOOLS],
         "availability": toolset_availability(names),
     }
+
+
+def verb_skills(_request):
+    """The root's installed skills, in the shape of the gateway's /v1/skills.
+
+    openedbot reads it only when /v1/skills fails: Hermes 0.21.3 to 0.22.6
+    pass a removed `include_editorial` keyword there and answer 500 on every
+    call (upstream #142575, fix in PR #142662). This is the same listing
+    without that keyword, the one `hermes skills list` and the route intend:
+    name, description, category, disabled skills included.
+    """
+    try:
+        from tools.skills_tool import find_all_skills, sort_skills
+    except ImportError:
+        from tools.skills_tool import _find_all_skills as find_all_skills, _sort_skills as sort_skills
+    rows = []
+    for skill in sort_skills(find_all_skills(skip_disabled=False))[:MAX_SKILLS]:
+        name = text(skill.get("name"), MAX_NAME * 4)
+        if not name:
+            continue
+        rows.append({
+            "name": name,
+            "description": text(skill.get("description"), 1024),
+            "category": text(skill.get("category"), MAX_NAME * 2),
+        })
+    return {"object": "list", "data": rows}
 
 
 def verb_mcp_inventory(_request):
@@ -1078,6 +1106,9 @@ def verb_profile_create(request):
         ):
             raise Refused("PROFILE_INVALID", "displayName must be a non-empty text value of at most 120 characters")
     api_server_key = secret(request.get("apiServerKey"), "the API server key")
+    bundled_skills = request.get("bundledSkills")
+    if bundled_skills is not None and bundled_skills is not False:
+        raise Refused("BODY_INVALID", "bundledSkills can only be false")
     if not multiplex_enabled():
         raise Refused("MULTIPLEX_OFF", "gateway.multiplex_profiles is not enabled")
     model_raw, provider_raw = request.get("model"), request.get("provider")
@@ -1106,7 +1137,15 @@ def verb_profile_create(request):
         except (Exception, SystemExit):
             pass
         raise
-    return {"profile": profile, "verified": created_profile_verified(name, profile, provider, model)}
+    result = {"profile": profile, "verified": created_profile_verified(name, profile, provider, model)}
+    if bundled_skills is False:
+        # Best effort: the profile is created either way. Without the
+        # `bundledSkills` answer, openedbot writes the bundled skills itself.
+        try:
+            result["bundledSkills"] = apply_profile_bundled_skills(name, False)
+        except (Exception, SystemExit):
+            pass
+    return result
 
 
 def created_profile_verified(name, profile, provider, model):
@@ -1526,7 +1565,14 @@ def verb_profile_bundled_skills_set(request):
         raise Refused("BODY_INVALID", "enabled must be true or false")
     if name not in named_profile_names() and not os.path.isfile(os.path.join(hermes_home(), "profiles", name, "config.yaml")):
         raise Refused("PROFILE_NOT_FOUND", "no profile named " + name + " exists")
+    return apply_profile_bundled_skills(name, enabled)
 
+
+def apply_profile_bundled_skills(name, enabled):
+    """Turn the skills shipped with Hermes on or off in one profile's config,
+    then read the file back. Shared by the bundled-skills verb and the profile
+    creation, which applies it in the same process (one interpreter less on
+    a new bot's provisioning)."""
     skills_dir = os.path.join(hermes_home(), "profiles", name, "skills")
     manifest = os.path.join(skills_dir, ".bundled_manifest")
     manifest_names = set()
@@ -2937,6 +2983,7 @@ def context_preamble(profile, config):
 
 HANDLERS = {
     "toolsets": verb_toolsets,
+    "skills": verb_skills,
     "model-context": verb_model_context,
     "mcp-inventory": verb_mcp_inventory,
     "mcp-add": verb_mcp_add,

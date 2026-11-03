@@ -36,9 +36,11 @@ set -euo pipefail
 #
 #   "$migrations": { "0139_permission_review.sql": { "owner": "permissions", "debt": { "until": "...", "reason": "..." } } }
 #
-# Owners are module names (modules/<name>), plus two technical owners:
-# `db` (schema_migrations) and `webhooks` (a context served by apps/api that
-# has no module yet). Writers are module names.
+# Owners are module names (modules/<name>), plus three technical owners:
+# `db` (schema_migrations), `webhooks` (a context served by apps/api that
+# has no module yet) and `api` (api_errors, the journal of the API's own
+# unhandled errors, written by apps/api and purged by apps/worker). Writers
+# are module names.
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 

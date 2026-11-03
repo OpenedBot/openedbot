@@ -27,7 +27,7 @@ import {
  * fil de `docs/CONNECTOR.md` (trames texte JSON, corps `[u32 id][bytes]`).
  */
 
-type LivenessLog = Array<{ write: "connected" | "seen" | "disconnected" | "capabilities" | "toolsets_written"; runtimeId: string; features?: string[]; reason?: string }>;
+type LivenessLog = Array<{ write: "connected" | "seen" | "disconnected" | "capabilities" | "toolsets_written" | "capabilities_written"; runtimeId: string; features?: string[]; reason?: string; profile?: string | null }>;
 type EventLog = Array<{ runtimeId: string; kind: LinkEventKind; meta: LinkEventMeta }>;
 
 function recordingLiveness(log: LivenessLog, events?: EventLog): LinkLivenessStore {
@@ -46,6 +46,9 @@ function recordingLiveness(log: LivenessLog, events?: EventLog): LinkLivenessSto
     },
     async toolsetsWritten(link) {
       log.push({ write: "toolsets_written", runtimeId: link.runtimeId });
+    },
+    async capabilitiesWritten(link, profile) {
+      log.push({ write: "capabilities_written", runtimeId: link.runtimeId, profile });
     },
     ...(events
       ? {
@@ -259,6 +262,22 @@ describe("runtime link broker : multiplexage", () => {
     await write;
     expect(bumps()).toEqual([{ write: "toolsets_written", runtimeId: "rt-epoch" }]);
   });
+
+  test("a relayed skill switch marks its profile once the host answered, before the caller sees the answer (0163)", async () => {
+    const harness = startHarness();
+    const host = await harness.connect("rt-capabilities");
+    const dial = harness.broker.dialer("rt-capabilities");
+    const marks = () => harness.liveness.filter((entry) => entry.write === "capabilities_written");
+    const write = dial({ method: "POST", path: "/p/nova/hermes-setup/profiles/nova/skills/claude-code", headers: {}, body: null });
+    await host.waitFrame((frame) => frame.t === "req" && frame.id === 1);
+    await Bun.sleep(20);
+    expect(marks()).toHaveLength(0);
+    await answer(host, 1, '{"enabled":false}');
+    await write;
+    expect(marks()).toEqual([{ write: "capabilities_written", runtimeId: "rt-capabilities", profile: "nova" }]);
+    // A skill is not a toolset: the worker's toolset cache is left alone.
+    expect(harness.liveness.filter((entry) => entry.write === "toolsets_written")).toHaveLength(0);
+  });
 });
 
 describe("runtime link broker : annulation et délais", () => {
@@ -439,6 +458,76 @@ describe("runtime link broker : remplacement et vitalité", () => {
     expect(log.filter((entry) => entry.write === "capabilities").map((entry) => entry.features))
       .toEqual([["first"], ["feature_999"]]);
     expect(broker.connected("rt-flood")).toBe(true);
+    broker.closeAll();
+  });
+
+  test("inventory.changed is recorded, then hands the runtime to the application for a background read", async () => {
+    const log: LivenessLog = [];
+    const liveness = recordingLiveness(log);
+    const marked: string[] = [];
+    liveness.inventoryChanged = async (link) => { marked.push(link.runtimeId); return true; };
+    const warmed: string[] = [];
+    const broker = new RuntimeLinkBroker({ instanceId: "api-test", liveness, log: () => {}, onInventoryChanged: (link) => warmed.push(link.runtimeId) });
+    const connection = broker.open({ send: () => 1, close() {} });
+    broker.bind(connection, identity("rt-inventory"));
+    for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+    connection.handleText({ t: "inventory.changed" });
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    expect(marked).toEqual(["rt-inventory"]);
+    expect(warmed).toEqual(["rt-inventory"]);
+    broker.closeAll();
+  });
+
+  test("a flood of inventory.changed during a stalled write costs one more write, never one per frame", async () => {
+    const liveness = recordingLiveness([]);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let writes = 0;
+    liveness.inventoryChanged = async () => {
+      writes++;
+      if (writes === 1) await gate;
+      return true;
+    };
+    const warmed: string[] = [];
+    const broker = new RuntimeLinkBroker({ instanceId: "api-test", liveness, log: () => {}, onInventoryChanged: (link) => warmed.push(link.runtimeId) });
+    const connection = broker.open({ send: () => 1, close() {} });
+    broker.bind(connection, identity("rt-chatty"));
+    for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+    for (let index = 0; index < 500; index++) connection.handleText({ t: "inventory.changed" });
+    expect(writes).toBe(1);
+    release();
+    for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+    expect(writes).toBe(2);
+    expect(warmed).toEqual(["rt-chatty", "rt-chatty"]);
+    broker.closeAll();
+  });
+
+  test("a revoked runtime's inventory.changed marks nothing and starts no read; a failed write is logged, not thrown", async () => {
+    const liveness = recordingLiveness([]);
+    let fail = false;
+    liveness.inventoryChanged = async () => {
+      if (fail) throw new Error("database down");
+      return false;
+    };
+    const warmed: string[] = [];
+    const logged: string[] = [];
+    const broker = new RuntimeLinkBroker({
+      instanceId: "api-test",
+      liveness,
+      log: (event) => logged.push(event),
+      onInventoryChanged: (link) => warmed.push(link.runtimeId),
+    });
+    const connection = broker.open({ send: () => 1, close() {} });
+    broker.bind(connection, identity("rt-gone"));
+    for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+    connection.handleText({ t: "inventory.changed" });
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    fail = true;
+    connection.handleText({ t: "inventory.changed" });
+    for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+    expect(warmed).toEqual([]);
+    expect(logged).toContain("runtime_link.inventory_changed_failed");
+    expect(broker.connected("rt-gone")).toBe(true);
     broker.closeAll();
   });
 

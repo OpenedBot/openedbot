@@ -3,6 +3,8 @@ import type { RelayAuditAnchorFrame } from "@openedbot/contracts-connector";
 import { withCredential, withTenant, type Db } from "@openedbot/platform-db";
 import {
   bumpToolsetEpoch,
+  markCapabilitiesChanged,
+  markInventoryChanged,
   markLinkConnected,
   markLinkDisconnected,
   markLinkSeen,
@@ -165,6 +167,14 @@ export function createLinkLivenessStore(db: Db, options: LinkLivenessStoreOption
       await withTenant(db, link.organizationId, async (tx) => {
         await bumpToolsetEpoch(tx, link);
       });
+    },
+    async capabilitiesWritten(link, profile) {
+      await withTenant(db, link.organizationId, async (tx) => {
+        await markCapabilitiesChanged(tx, link, profile);
+      });
+    },
+    async inventoryChanged(link) {
+      return withTenant(db, link.organizationId, (tx) => markInventoryChanged(tx, link));
     },
     async auditAnchor(link, frame) {
       const receivedAt = now().toISOString();

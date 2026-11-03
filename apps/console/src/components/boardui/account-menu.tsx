@@ -123,7 +123,7 @@ function UsageMenuItem({ mobileDrawer, onSelect }: { mobileDrawer: boolean; onSe
  * langue et la déconnexion. Réglages et Support ont quitté le pied de la barre.
  */
 type AccountMenuProps = {
-  variant?: "footer" | "avatar" | "avatar-name" | "rail";
+  variant?: "footer" | "avatar" | "avatar-name";
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
 };
@@ -335,7 +335,7 @@ export const AccountMenu = memo(function AccountMenu({
   // (`mockups/header.html`, `.me`) : visage, handle, adresse, puis la roue
   // qui ouvre les Réglages d'un clic. La ligne ouvre le menu du compte. Le
   // survol couvre toute la ligne, roue comprise : c'est un seul bloc à l'œil.
-  if (variant === "avatar" || variant === "rail") {
+  if (variant === "avatar") {
     return (
       <BuiPopover open={open} onOpenChange={setOpen}>
         <BuiPopoverTrigger asChild>
@@ -345,14 +345,14 @@ export const AccountMenu = memo(function AccountMenu({
             aria-label={t("boardui.accountMenu", { name })}
             className={cn(
               "relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-colors hover:bg-board-row-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-              variant === "rail" ? "size-10" : "size-9",
+              "size-9",
             )}
           >
             {avatar("size-7")}
             {supportUnread > 0 ? <span aria-hidden data-support-unread={supportUnread} className="absolute top-0.5 right-0.5 size-2.5 rounded-full bg-primary ring-2 ring-background" /> : null}
           </button>
         </BuiPopoverTrigger>
-        <BuiPopoverContent side={side} align={align} sideOffset={variant === "rail" ? 8 : 6} className="w-[243px] gap-[7px]" aria-label={t("boardui.accountMenu", { name })}>
+        <BuiPopoverContent side={side} align={align} sideOffset={6} className="w-[243px] gap-[7px]" aria-label={t("boardui.accountMenu", { name })}>
           {panel}
         </BuiPopoverContent>
       </BuiPopover>

@@ -1,0 +1,77 @@
+/*
+  « Gérer le bot » au bureau : la fenêtre de réglages d'OpenBot, valeurs lues
+  dans ses tokens (`@openbot/brand`, `settings-modal.css`, 02-11-2026).
+  Panneau gris, cartes un cran au-dessus et sans bordure (rayon 12 px), un
+  filet entre deux lignes en retrait de 16 px, intitulé de groupe en regular
+  13/18, titre de ligne 14/20 medium, valeurs à 60 % du texte. La modale a un
+  rayon de 14 px et un liseré de 1 px au lieu d'une bordure.
+*/
+.ohb-manage {
+  --ohb-manage-canvas: #f5f5f6;
+  --ohb-manage-card: #ffffff;
+  --ohb-manage-hover: #f0f0f2;
+  --ohb-manage-divider: rgba(20, 20, 20, 0.07);
+  --ohb-manage-ring: rgba(20, 20, 20, 0.1);
+  --ohb-manage-title: #141414;
+  --ohb-manage-caption: #3a3a3c;
+  --ohb-manage-muted: rgba(20, 20, 20, 0.6);
+  border: 0;
+  border-radius: 14px;
+  background-color: var(--ohb-manage-canvas);
+  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--ohb-manage-ring);
+}
+
+.dark .ohb-manage {
+  --ohb-manage-canvas: #1a1a1a;
+  --ohb-manage-card: #212121;
+  --ohb-manage-hover: #242424;
+  --ohb-manage-divider: rgba(255, 255, 255, 0.035);
+  --ohb-manage-ring: rgba(255, 255, 255, 0.1);
+  --ohb-manage-title: #ffffff;
+  --ohb-manage-caption: #dcdcdc;
+  --ohb-manage-muted: rgba(255, 255, 255, 0.59);
+}
+
+.ohb-manage-group {
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: var(--ohb-manage-card);
+}
+
+.ohb-manage-group > li + li {
+  position: relative;
+}
+
+.ohb-manage-group > li + li::before {
+  content: "";
+  position: absolute;
+  inset-inline: 16px;
+  top: 0;
+  height: 1px;
+  background-color: var(--ohb-manage-divider);
+  pointer-events: none;
+}
+
+.ohb-manage-row:hover:not(:disabled) {
+  background-color: var(--ohb-manage-hover);
+}
+
+.ohb-manage-caption {
+  color: var(--ohb-manage-caption);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.ohb-manage-title {
+  color: var(--ohb-manage-title);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.ohb-manage-muted {
+  color: var(--ohb-manage-muted);
+  font-size: 13px;
+  line-height: 18px;
+}

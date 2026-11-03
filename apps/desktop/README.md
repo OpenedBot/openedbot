@@ -12,13 +12,14 @@ openedbot is the cloud console that drives AI agents installed on your own serve
 repository is a thin Electron shell around it; it re-implements **nothing** of the product. It:
 
 - loads the full openedbot web console (`OPENEDBOT_CONSOLE_URL`);
-- handles native sign-in, always with PKCE: Google through the system browser, or e-mail and
-  password;
+- handles native sign-in, always with PKCE: a one-time e-mail code, or Google through the system
+  browser;
 - exposes a minimal bridge to the page, `window.__OHB_NATIVE__`;
 - on macOS, hosts the native notch popup (openedbot-notch).
 
-The whole UI (bots, threads, settings) comes from the console. Only the sign-in page is local
-(`src/renderer/signin.html`).
+The whole UI (bots, threads, settings) comes from the console, sign-in included: signed out, the
+window shows the console's `/login`, which signs in through `__OHB_NATIVE__.auth`. The local page
+(`src/renderer/signin.html`) is only a fallback for a console that predates that screen.
 
 **Scope:** macOS (Apple Silicon) first, Windows x64 always built, sideloaded. Out of scope: Linux,
 auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on first launch).

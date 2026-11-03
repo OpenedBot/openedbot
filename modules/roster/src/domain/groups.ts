@@ -6,7 +6,7 @@ import { assertString } from "@openedbot/platform-config/http-body";
 import { readSectionId } from "./section-id";
 
 export type GroupRow = {
-  id: string; name: string; instructions: string; defaultResponder: unknown; answerMode?: unknown; threadId: string; sectionId: string; position: number; pinned?: boolean; needsYou: boolean;
+  id: string; name: string; instructions: string; defaultResponder: unknown; answerMode?: unknown; threadId: string; sectionId: string; position: number; pinned?: boolean; pinPosition?: number | null; needsYou: boolean;
   awaitingApproval: boolean; unread?: boolean; hidden?: boolean; running: boolean; preview: string | null; lastActivityAt: Date | string;
   createdAt: Date | string; updatedAt: Date | string;
 };

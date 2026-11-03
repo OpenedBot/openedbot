@@ -33,7 +33,15 @@ export function replyQuoteText(content: MessageContent): string {
 
 /** Une ligne pour le bandeau composer, jamais le pavé entier. */
 export function replyPreviewSnippet(text: string, max = 92): string {
-  const flat = text.replace(/^#{1,3}\s+/gm, "").replace(/\s+/g, " ").trim();
+  // Ni clôtures de code, ni titres, ni liens, ni emphases : la ligne se lit
+  // comme du texte, pas comme du markdown brut.
+  const flat = text
+    .replace(/^\s*(```|~~~)[\w-]*\s*$/gm, "")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|`)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!flat) return "…";
   if (flat.length <= max) return flat;
   return `${flat.slice(0, max - 1)}…`;

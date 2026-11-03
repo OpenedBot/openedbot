@@ -3,7 +3,7 @@ import { canOperateWorkspace } from "@openedbot/contracts-api";
 import { Switch, toast } from "@openedbot/browser-ui-kit";
 import { api, errorMessage, queryKeys } from "../../../../lib/api";
 import { useT } from "../../../../lib/i18n";
-import { CardHeading, Note, SettingsCard } from "../../../../components/settings/primitives";
+import { ListRow, ListSection, Note } from "../../../../components/settings/primitives";
 
 /**
  * PERM2-4, D-3: the runtime switch "dangerous commands: always allow". It
@@ -35,33 +35,38 @@ export function RuntimeTerminalSwitch({ runtimeId }: { runtimeId: string }) {
 
   if (!operator) return null;
   return (
-    <SettingsCard className="space-y-3" data-runtime-terminal-switch="">
-      <CardHeading
+    // Une liste d'une ligne (`DESIGN.md` › Bureau) : le titre et sa phrase en
+    // en-tête, puis le réglage sur UNE ligne, l'interrupteur à droite et
+    // l'avertissement dessous ; qui l'a changé, en pied.
+    <div data-runtime-terminal-switch="">
+      <ListSection
         title={t("cloudRuntimeSettings.terminalSwitchTitle")}
         description={t("cloudRuntimeSettings.terminalSwitchDescription")}
-      />
-      {settings.isError ? (
-        <Note tone="danger" role="alert">{t("cloudRuntimeSettings.terminalSwitchLoadFailed")}</Note>
-      ) : (
-        <>
-          <label className="flex min-h-11 items-center justify-between gap-3">
-            <span className="text-sm text-text-primary">{t("cloudRuntimeSettings.terminalSwitchLabel")}</span>
+        footer={data?.updatedAt && data.updatedByName ? (
+          <p className="text-xs text-text-tertiary">
+            {t("cloudRuntimeSettings.terminalSwitchUpdated", { name: data.updatedByName, date: formatDate(data.updatedAt) })}
+          </p>
+        ) : undefined}
+      >
+        {settings.isError ? (
+          <li className="p-4"><Note tone="danger" role="alert">{t("cloudRuntimeSettings.terminalSwitchLoadFailed")}</Note></li>
+        ) : (
+          <ListRow
+            label={t("cloudRuntimeSettings.terminalSwitchLabel")}
+            description={<span className="text-warn-700">{t("cloudRuntimeSettings.terminalSwitchWarning")}</span>}
+            descriptionId={warningId}
+          >
             <Switch
               checked={data?.terminalDangerAlways === true}
               onCheckedChange={(value) => toggle.mutate(value)}
               disabled={!data || toggle.isPending}
+              aria-label={t("cloudRuntimeSettings.terminalSwitchLabel")}
               aria-describedby={warningId}
               className="shrink-0"
             />
-          </label>
-          <p id={warningId} className="text-xs leading-5 text-warn-700">{t("cloudRuntimeSettings.terminalSwitchWarning")}</p>
-          {data?.updatedAt && data.updatedByName ? (
-            <p className="text-xs text-text-tertiary">
-              {t("cloudRuntimeSettings.terminalSwitchUpdated", { name: data.updatedByName, date: formatDate(data.updatedAt) })}
-            </p>
-          ) : null}
-        </>
-      )}
-    </SettingsCard>
+          </ListRow>
+        )}
+      </ListSection>
+    </div>
   );
 }

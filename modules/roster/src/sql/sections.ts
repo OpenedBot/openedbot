@@ -3,6 +3,53 @@ import { moveTeamImportsToSection } from "@openedbot/portability/sql/team-import
 
 export type SectionRow = { id: string; name: string; position: number; collapsed: boolean; context?: string };
 
+/**
+ * Le prochain rang libre d'une section, une ligne qui y arrive (création ou
+ * déplacement) se range en dernier. Bots et salons partagent le même ordre
+ * (`PUT /api/sections/:id/order` les entrelace) : le maximum se prend sur
+ * les deux tables, sinon un bot neuf prendrait le rang d'un salon.
+ *
+ * La ligne de section est verrouillée jusqu'à la fin de la transaction :
+ * deux créations simultanées liraient le même maximum et partageraient un
+ * rang. `orderSection` prend le même verrou, une réécriture d'ordre ne se
+ * croise pas avec une arrivée. `exclude` : la ligne déplacée ne compte pas.
+ */
+export async function nextSectionRowPosition(
+  tx: TransactionDb,
+  organizationId: string,
+  sectionId: string,
+  exclude?: { kind: "bot" | "group"; id: string },
+): Promise<number> {
+  await lockSectionRow(tx, organizationId, sectionId);
+  const excludedBot = exclude?.kind === "bot" ? exclude.id : null;
+  const excludedGroup = exclude?.kind === "group" ? exclude.id : null;
+  const positions = await tx<Array<{ next: number }>>`
+    select coalesce(greatest(
+      (select max(position) from bots
+        where organization_id = ${organizationId} and section_id = ${sectionId}
+          and (${excludedBot}::uuid is null or id <> ${excludedBot}::uuid)),
+      (select max(position) from bot_groups
+        where organization_id = ${organizationId} and section_id = ${sectionId}
+          and (${excludedGroup}::uuid is null or id <> ${excludedGroup}::uuid))
+    ), -1) + 1 as next
+  `;
+  return Number(positions[0]?.next ?? 0);
+}
+
+/** Verrouille la section pour la transaction ; `false` si elle n'existe pas. */
+export async function lockSectionRow(
+  tx: TransactionDb,
+  organizationId: string,
+  sectionId: string,
+): Promise<boolean> {
+  const locked = await tx<Array<{ id: string }>>`
+    select id from sections
+     where organization_id = ${organizationId} and id = ${sectionId}
+     for update
+  `;
+  return Boolean(locked[0]);
+}
+
 /** Les sections de l'organisation, dans l'ordre d'affichage. */
 export function readSections(tx: TransactionDb, organizationId: string): Promise<SectionRow[]> {
   return tx<SectionRow[]>`
@@ -174,4 +221,55 @@ export async function deleteSectionMovingRows(
   await tx`
     delete from sections where organization_id = ${organizationId} and id = ${sectionId}
   `;
+}
+
+/**
+ * Réécrit le rang des sections éditables : `order[i]` passe juste après la
+ * section par défaut, à `defaultPosition + 1 + i`. `unique (organization_id,
+ * position)` : tout le monde part d'abord sur un rang négatif distinct
+ * (`-1 - position`), sinon la première écriture heurte une voisine.
+ */
+export async function writeSectionsOrder(
+  tx: TransactionDb,
+  organizationId: string,
+  defaultSectionId: string,
+  order: ReadonlyArray<string>,
+): Promise<void> {
+  const base = await readSectionPosition(tx, organizationId, defaultSectionId);
+  if (base === null) return;
+  await tx`
+    update sections set position = -1 - position
+     where organization_id = ${organizationId} and id <> ${defaultSectionId}
+  `;
+  for (const [index, sectionId] of order.entries()) {
+    await tx`
+      update sections set position = ${base + 1 + index}, updated_at = now()
+       where organization_id = ${organizationId} and id = ${sectionId}
+    `;
+  }
+}
+
+/** Une ligne citée par l'ordre des épinglés : épinglée, à ce rang ; `false` si elle n'existe pas. */
+export async function placeInPins(
+  tx: TransactionDb,
+  organizationId: string,
+  kind: "bot" | "group",
+  rowId: string,
+  position: number,
+): Promise<boolean> {
+  const updated = kind === "bot"
+    ? await tx<Array<{ id: string }>>`
+        update bots set pinned = true, pin_position = ${position}, updated_at = now()
+         where organization_id = ${organizationId} and id = ${rowId} returning id
+      `
+    : await tx<Array<{ id: string }>>`
+        update bot_groups set pinned = true, pin_position = ${position}, updated_at = now()
+         where organization_id = ${organizationId} and id = ${rowId} returning id
+      `;
+  return Boolean(updated[0]);
+}
+
+/** Sérialise les écritures de rang des sections d'une organisation (création, réordonnancement). */
+export async function lockSections(tx: TransactionDb, organizationId: string): Promise<void> {
+  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('sections'))`;
 }

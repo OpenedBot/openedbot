@@ -361,6 +361,16 @@ func runLink(env cli.Env, args []string) int {
 			return fail(env, cli.ExitFailure, "connector service definition could not be verified (the ticket was not spent)")
 		}
 	}
+	if other, lf := originTakenBy(inst, u.String()); lf != nil {
+		relink := "edge-setup link --ohb " + u.String() + " --yes"
+		if !other.IsDefault() {
+			relink += " --name " + string(other)
+		}
+		return fail(env, cli.ExitRefused,
+			"the %s instance already links this host to %s (runtime %s): a second link to the same openedbot would share this Hermes gateway, its profiles and sessions, with another organization. "+
+				"One gateway serves one organization; to move this host to another one, re-link that instance instead: `%s` (the ticket was not spent)",
+			other.Label(), lf.OHB, lf.RuntimeID, relink)
+	}
 	// What is owed instead is the truth, before the ticket is spent: which
 	// origin this host leaves, and which runtime goes stale there.
 	previous, switching := linkTakeover(inst, u.String())

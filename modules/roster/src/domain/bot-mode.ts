@@ -77,6 +77,7 @@ export function buildBotModeInstructions(input: {
       : "- You cannot change your own persona or settings. Tell the operator they can edit them in the agent editor (Persona / General), or enable \"self-edit proposals\" there.",
     "- Mentions (`@slug`) are the only way to reach another bot. Your own tools stay available in this run, including web_search and web_extract. Never claim you looked something up unless a tool result in this run shows it. Memory is not a source for a recipe, a current fact, or a citation.",
     "- NEVER use delegation or background tools (delegate_task, async delegation, subagents): the platform does not track them, so their results are lost. Do the work NOW, inside this run, and never promise to \"come back later\" or to follow up: no follow-up of yours can reach this conversation.",
+    FILE_DELIVERY_RULE,
     // OHB-105 : Nova affirmait avoir écrit `profiles/nova/cron/jobs.json`.
     // `cronjob` est refusé par contrat (runtime-contract.ts) et ce store n'est
     // pas monté dans le sandbox : rien ne se déclenchait. Les routines openedbot
@@ -103,6 +104,20 @@ export function buildBotModeInstructions(input: {
  * `web_search` puis `web_extract`. Posée seulement si le toolset `web` est
  * actif : jamais un outil promis qui n'existe pas.
  */
+/**
+ * Livrer un fichier fabriqué (image, PDF, page). Mesuré le 03-11 : un bot a
+ * dessiné un PNG dans `/tmp/out` de son bac à sable docker et répondu
+ * `MEDIA:/tmp/out/superagent.png` ; seul `/workspace` y est monté sur l'hôte,
+ * donc le serveur API de Hermes n'a rien pu intégrer et le fil a montré la
+ * ligne brute. Le worker lit un `MEDIA:/workspace/<nom>` sur l'hôte et le
+ * joint au message (`workspaceMediaNames`, `extractOutputMedia`) ; la route
+ * hôte ne sert qu'un nom simple à la racine, d'où la consigne. Le 03-11 :
+ * un schéma 800x450 agrandi dans la fenêtre modale (≈ 4x sur Retina) était
+ * flou, et le bot avait retiré les accents : d'où le 2x et DejaVu Sans.
+ */
+export const FILE_DELIVERY_RULE =
+  "- To show the operator an image or a PDF you made, save it directly in `/workspace/` under a plain name (letters, digits, `-`, `_`; e.g. `/workspace/chart.png`; no subfolder), because paths elsewhere in a terminal sandbox are invisible outside it. Then put `MEDIA:/workspace/<name>` alone on its own line in your reply. The platform attaches the file to your message; never paste its bytes or base64. Draw images at 2x at least (asked 800x450: render 1600x900, fonts and strokes scaled too) so text stays sharp when enlarged, and keep accents with a font that has them (DejaVu Sans: `/usr/share/fonts/truetype/dejavu/`).";
+
 export const WEB_ANSWER_RULE =
   "- For anything in the world (a price, the weather, news, a score): `web_search`, then `web_extract` on the best one or two pages, then answer. Do not ask permission to search. Name the pages you read, never a home page. Keep `execute_code` and the terminal for calculations or processing a search cannot do.";
 

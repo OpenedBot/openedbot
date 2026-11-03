@@ -5,14 +5,12 @@ import { SHOW_DEV_SETTINGS } from "./dev-settings-ui";
 import type { RuntimeSection } from "../../screens/settings/installation/cloud/cloud-shared";
 
 /**
- * Les rubriques des réglages qui s'ouvrent PAR-DESSUS l'écran courant, au
- * bureau. Ouvrir `/settings` comme une page démontait toute l'app (le fil, la
- * barre, le cadre) puis la remontait sous la modale : mesuré à ~400 ms sur un
- * long fil. Ici l'URL affichée reste `/settings/...` (masque TanStack), mais
- * l'emplacement réel ne change pas : le fil reste monté derrière.
- *
- * Runtime tabs use the masked URL search while the underlying app stays mounted.
- * Reloading or pasting a settings URL still opens its standalone route.
+ * Les rubriques des réglages. Au bureau elles s'ouvrent en page du cadre
+ * depuis le 02-11-2026 (la fenêtre au-dessus de l'écran courant a été retirée,
+ * décision opérateur). La surcouche ne sert plus qu'à la fenêtre compacte du
+ * desktop, qui ouvre la rubrique dans le navigateur (`compact-frame.tsx`), et
+ * `settingsOverlayPath` relit les entrées d'historique écrites du temps de la
+ * fenêtre (`SettingsOverlayHost`).
  */
 export const OVERLAY_SETTINGS_PATHS = [
   "/settings",
@@ -59,11 +57,7 @@ export type SettingsOverlay = {
   close: () => void;
 };
 
-/**
- * Fourni par le cadre bureau de l'app ; absent sur mobile et dans la page
- * `/settings`. Valeur stable : la rubrique ouverte n'y est pas, sinon chaque
- * ouverture re-rendrait tous les consommateurs, écran de conversation compris.
- */
+/** Fourni par la fenêtre compacte du desktop seulement. */
 export const SettingsOverlayContext = createContext<SettingsOverlay | null>(null);
 
 export function useSettingsOverlay(): SettingsOverlay | null {
@@ -71,9 +65,8 @@ export function useSettingsOverlay(): SettingsOverlay | null {
 }
 
 /**
- * Ouvre une rubrique des réglages : en surcouche quand le cadre la porte et
- * que la rubrique s'y prête, sinon comme une page. Le cadre ne porte la
- * surcouche que si l'opérateur a choisi « Fenêtre » (`settings-display.ts`).
+ * Ouvre une rubrique des réglages : comme une page, sauf dans la fenêtre
+ * compacte du desktop, qui la confie au navigateur.
  *
  * Sans rubrique : « Mon compte » au bureau, « Activité » n'étant plus la porte
  * d'entrée des réglages ; sur téléphone, `/settings` est la liste des rubriques.

@@ -76,7 +76,11 @@ export function miscRoutes(db: Db, options: MiscRoutesOptions): Hono<{ Variables
 
   routes.get("/usage/models", async (context) => {
     const auth = context.get("auth");
-    const usage = await withTenant(db, auth.organizationId, (tx) => usageByModel(tx, auth.organizationId));
+    // Sans `days`, la fenêtre historique de 90 jours : les appelants existants
+    // ne changent pas. La carte des quotas lit 1 et 30 jours.
+    const rawDays = context.req.query("days");
+    const days = rawDays === undefined ? USAGE_MODELS_WINDOW_DAYS : usageWindowDays(rawDays);
+    const usage = await withTenant(db, auth.organizationId, (tx) => usageByModel(tx, auth.organizationId, days));
     return context.json(usage);
   });
 
@@ -88,14 +92,7 @@ export function miscRoutes(db: Db, options: MiscRoutesOptions): Hono<{ Variables
   routes.get("/usage/bots", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
-    const rawDays = context.req.query("days") ?? "7";
-    if (!/^[0-9]{1,2}$/.test(rawDays)) {
-      throw new HttpError(400, "USAGE_DAYS_INVALID", "La fenêtre d’usage doit être un nombre de jours entre 1 et 90.");
-    }
-    const days = Number(rawDays);
-    if (!Number.isSafeInteger(days) || days < 1 || days > 90) {
-      throw new HttpError(400, "USAGE_DAYS_INVALID", "La fenêtre d’usage doit être un nombre de jours entre 1 et 90.");
-    }
+    const days = usageWindowDays(context.req.query("days") ?? "7");
     const usage = await withTenant(db, auth.organizationId, (tx) => usageByBot(tx, auth.organizationId, days));
     return context.json(usage);
   });
@@ -233,6 +230,15 @@ export async function usageSeries(
 
 export const USAGE_MODELS_WINDOW_DAYS = 90;
 
+/** Une fenêtre d'usage en jours, de 1 à 90 ; autre chose est un 400, jamais un défaut silencieux. */
+function usageWindowDays(raw: string): number {
+  const days = /^[0-9]{1,2}$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(days) || days < 1 || days > 90) {
+    throw new HttpError(400, "USAGE_DAYS_INVALID", "La fenêtre d’usage doit être un nombre de jours entre 1 et 90.");
+  }
+  return days;
+}
+
 /**
  * Ventilation des runs achevés par modèle persisté, même horodatage et
  * même index que `usageSeries` (`coalesce(ended_at, created_at)`).
@@ -246,11 +252,15 @@ export async function usageByModel(
   const rows = await tx<Array<{
     model: string | null;
     runs: string | number;
+    inputTokens: string | number;
+    outputTokens: string | number;
     tokens: string | number;
     lastAt: Date | string;
   }>>`
     select nullif(coalesce(model, ''), '') as model,
            count(*) as runs,
+           coalesce(sum((usage->>'inputTokens')::bigint), 0) as "inputTokens",
+           coalesce(sum((usage->>'outputTokens')::bigint), 0) as "outputTokens",
            coalesce(sum((usage->>'totalTokens')::bigint), 0) as tokens,
            max(coalesce(ended_at, created_at)) as "lastAt"
       from runs
@@ -265,6 +275,8 @@ export async function usageByModel(
     models: rows.map((row) => ({
       model: row.model && row.model.trim() ? row.model : null,
       runs: Number(row.runs ?? 0),
+      inputTokens: Number(row.inputTokens ?? 0),
+      outputTokens: Number(row.outputTokens ?? 0),
       tokens: Number(row.tokens ?? 0),
       lastAt: isoInstant(row.lastAt),
     })),

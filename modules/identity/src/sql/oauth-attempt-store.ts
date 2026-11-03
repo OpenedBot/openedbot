@@ -13,7 +13,8 @@ export type NativeOptions = { codeChallenge: string; redirectUri: string; client
 export type LinkOptions = { userId: string };
 export type NativeGoogleCompletion = {
   userId: string;
-  organizationId: string;
+  /** `null` : compte sans organisation, envoyé à l'onboarding comme sur le web. */
+  organizationId: string | null;
   user: { email: string; displayName: string | null };
 };
 

@@ -6,7 +6,7 @@
 
 .ohb-salon-shell,
 .ohb-salon {
-  --salon-paper: #f9f9f9;
+  --salon-paper: #f5f5f6;
   --salon-hole: #f9f9f9;
   --salon-ink: #17203a;
   --salon-muted: #6e7382;
@@ -24,7 +24,8 @@
 
 .dark .ohb-salon-shell,
 .dark .ohb-salon {
-  --salon-paper: #121212;
+  /* The main card's grey (OpenBot's canvas): the home is not a darker hole in it. */
+  --salon-paper: #1a1a1a;
   --salon-hole: #f5f4ef;
   --salon-ink: #f5f4ef;
   --salon-muted: #a6a39a;

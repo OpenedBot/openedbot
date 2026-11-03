@@ -36,7 +36,7 @@ import {
   windowTimelineEntries,
 } from "../lib/thread/thread-window";
 import { useT } from "../lib/i18n";
-import { runTimings } from "../lib/run/run-timing";
+import { runClockStart, runTimings } from "../lib/run/run-timing";
 import { speechRateFor } from "../lib/voice/speech-rates";
 import { markdownToSpeechText } from "../lib/voice/speech-text";
 import {
@@ -1413,10 +1413,10 @@ function ThreadTimelineView({
           const showAuthorLabel = members.some((member) => authorLabelEntryKeys.has(member.key));
           const groupSettled = isSettledIndex(index, runId);
           const groupRun = runsById.get(runId);
+          const runStart = groupRun ? runClockStart(groupRun) : Number.NaN;
           const workedMs = !live && groupRun?.createdAt && groupRun.endedAt
-            ? Math.max(0, Date.parse(groupRun.endedAt) - Date.parse(groupRun.createdAt))
+            ? Math.max(0, Date.parse(groupRun.endedAt) - runStart)
             : null;
-          const runStart = groupRun?.createdAt ? Date.parse(groupRun.createdAt) : Number.NaN;
           const activitySig = [
             live,
             answering,
@@ -1480,7 +1480,7 @@ function ThreadTimelineView({
           let activeRunId: string | null = null;
           for (const candidate of runsById.values()) {
             if (candidate.status === "completed" || candidate.status === "failed" || candidate.status === "cancelled") continue;
-            const created = candidate.createdAt ? Date.parse(candidate.createdAt) : Number.NaN;
+            const created = runClockStart(candidate);
             if (Number.isFinite(created) && (since === null || created > since)) {
               since = created;
               activeRunId = candidate.id;

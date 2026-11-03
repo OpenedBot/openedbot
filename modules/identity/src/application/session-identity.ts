@@ -26,7 +26,10 @@ export async function resolveSessionIdentity(db: Db, credentialHash: string): Pr
     const sessionOrganization = found.organizationId ?? EMPTY_WORKSPACE_ID;
     await tx`select set_config('app.organization_id', ${sessionOrganization}, true)`;
     const access = await readWorkspaceAccess(tx, found.userId, sessionOrganization);
-    if (!access?.role && (found.kind !== "web" || found.impersonatedByStaffUserId)) return null;
+    // Sans rôle, seule une session sans espace à défendre passe : web hors
+    // assistance, ou native encore sans organisation (0158).
+    const orgless = found.kind === "web" ? !found.impersonatedByStaffUserId : !found.organizationId;
+    if (!access?.role && !orgless) return null;
     const email = await readUserEmail(tx, found.userId);
     if (!email) return null;
     return { userId: found.userId, organizationId: sessionOrganization, email, csrfHash: found.csrfHash };

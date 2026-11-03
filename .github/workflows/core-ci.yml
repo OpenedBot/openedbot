@@ -1,0 +1,122 @@
+# Contrôles du cœur TypeScript (apps, platform, contracts, modules, browser,
+# tests, scripts) : typecheck, tests unitaires, frontières et licences, puis
+# tests d'intégration contre un PostgreSQL jetable. Aucun plug-in pro
+# (./plugins) en CI : le cœur tourne en solo, c'est attendu. Aucun secret,
+# aucun .env.local : les cibles make tournent sur leurs valeurs par défaut.
+# Actions épinglées par SHA ; Bun épinglé par packageManager (package.json).
+name: core-ci
+
+on:
+  # No trigger-level `paths`: a filtered-out workflow reports no check at all,
+  # which leaves a required check pending forever. `core-ci ok` is the one
+  # check to require.
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  # A new push to a PR cancels its obsolete run; every commit on main keeps
+  # its own complete result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: make typecheck
+
+  unit:
+    # Includes tests/scripts/make-dev-contract.sh (real `make dev` with
+    # stubbed launchers and a temporary env file), the Python provider-fault
+    # test (python3 ships with ubuntu-24.04) and the vite build-id test, which
+    # needs git (also preinstalled).
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: make test-unit
+
+  deps:
+    name: Dependency boundaries and licences
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: make deps-check
+
+  integration:
+    # Migrations, tenant RLS, replays and queues against a throwaway
+    # PostgreSQL, same major and image as the dev-infra container. With
+    # INTEGRATION_DATABASE_URL set, `make test-integration` skips db-up (no
+    # docker), postgres-rls.sh creates the roles and the ohb_integration
+    # database through the admin URL and drops it on exit, and every bun
+    # script creates and drops its own uniquely named database. Trust auth
+    # keeps any password out of this file: the service lives only as long as
+    # this job, on an ephemeral runner with no inbound access.
+    name: Integration tests (PostgreSQL 17)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      INTEGRATION_ADMIN_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+      INTEGRATION_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/ohb_integration
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: PostgreSQL client and server versions
+        # postgres-rls.sh drives psql (the runner's preinstalled client).
+        run: |
+          psql --version
+          psql -v ON_ERROR_STOP=1 -At "$INTEGRATION_ADMIN_DATABASE_URL" -c 'show server_version'
+      - run: make test-integration
+
+  ci-ok:
+    # The single required check. It always runs and passes only when every
+    # job succeeded: a failed, cancelled or skipped job fails it.
+    name: core-ci ok
+    if: always()
+    needs: [typecheck, unit, deps, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check every job result
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e '[.[] | .result] | all(. == "success")' > /dev/null

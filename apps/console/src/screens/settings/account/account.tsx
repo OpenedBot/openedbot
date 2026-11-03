@@ -1,6 +1,7 @@
 import { canManageWorkspaceMembers } from "@openedbot/contracts-api";
 import { useAccountWorkspaces } from "../../../components/workspace/workspace-navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { SettingsCardGrid } from "../../../components/settings/settings-card-grid";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconCheck, IconX } from "@tabler/icons-react";
 import QRCode from "qrcode";
@@ -107,10 +108,13 @@ function AccountPage({ team }: { team: boolean }) {
         description={t("settingsAccount.description")}
       />
       {impersonating ? <Note tone="warning">{t("settingsAccount.impersonation")}</Note> : null}
-      <ProfileSection />
-      <ConnectionSection />
-      {isNativeShell() ? null : <MobileSection />}
-      <WorkspaceSection />
+      <SettingsCardGrid>
+        <ProfileSection />
+        <ConnectionSection />
+        {isNativeShell() ? null : <MobileSection />}
+        <WorkspaceSection />
+        {team && !isMobile && session ? <SignOutSection impersonating={impersonating} /> : null}
+      </SettingsCardGrid>
       {team && session?.session.role !== "agency" ? (
         <MembersCard
           canManage={canManage}
@@ -121,10 +125,6 @@ function AccountPage({ team }: { team: boolean }) {
         />
       ) : null}
       {team ? <FleetGrantsCard /> : null}
-      {/* Au bureau, la déconnexion vit ici plutôt que dans le menu des
-          rubriques ; le téléphone la garde au bas de sa liste, et le cadre
-          agence dans sa barre. */}
-      {team && !isMobile && session ? <SignOutSection impersonating={impersonating} /> : null}
     </SettingsPane>
   );
 }

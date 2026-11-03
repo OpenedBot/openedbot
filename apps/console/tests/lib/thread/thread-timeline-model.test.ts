@@ -314,4 +314,18 @@ describe("modèle incrémental du fil", () => {
       "ohb-artifact-probe.html",
     ]);
   });
+
+  test("la ligne MEDIA: d'un fichier joint sort du texte diffusé ; un fichier absent garde son nom", () => {
+    const fixture = threadFixture({ turns: 1, liveLastTurn: false });
+    const assistant = fixture.messages.find((message) => message.role === "assistant")!;
+    const lastText = [...fixture.events].reverse().find((event) => event.type === "agent.message" && event.runId === assistant.runId)!;
+    lastText.payload = { text: "Voici :\n\nMEDIA:/workspace/vert_ok.png\n\nMEDIA:/tmp/out/perdu.png\n\nFin." };
+    assistant.content = [...assistant.content, { type: "attachment", id: "file-1", name: "vert_ok.png", contentType: "image/png", kind: "image", bytes: 4157 }];
+    const bubbles = buildTimelineModel(modelInput(fixture, { running: false })).shown.filter((entry) => entry.kind === "assistant");
+    const text = bubbles.map((entry) => (entry.kind === "assistant" ? entry.text : "")).join("\n");
+    expect(text).not.toContain("MEDIA:");
+    expect(text).toContain("`perdu.png`");
+    expect(text).not.toContain("vert_ok.png");
+  });
 });
+

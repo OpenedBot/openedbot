@@ -1,12 +1,12 @@
 import type { TransactionDb } from "@openedbot/platform-db";
 
-/** Un run `persona_draft` en file, sur le fil de brouillon d'un bot (ou d'un bot à créer). */
+/** Un run `persona_draft` en file, sur le fil de brouillon d'un bot. */
 export async function insertPersonaDraftRun(
   tx: TransactionDb,
   input: {
     organizationId: string;
     threadId: string;
-    botId: string | null;
+    botId: string;
     prompt: string;
     sessionKey: string;
   },

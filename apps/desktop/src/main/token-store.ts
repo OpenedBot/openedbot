@@ -10,7 +10,9 @@ export type NativeTokens = {
   accessToken: string;
   accessTokenExpiresAt: string;
   refreshToken: string;
-  organizationId: string;
+  // null: an account that has not defined its organization yet. The console
+  // runs its onboarding in the window; the next rotation carries the new one.
+  organizationId: string | null;
 };
 
 // One file per API (production keeps `tokens.bin`): a session is only ever
@@ -26,7 +28,7 @@ export function isNativeTokens(value: unknown): value is NativeTokens {
     typeof record.accessToken === "string" &&
     typeof record.accessTokenExpiresAt === "string" &&
     typeof record.refreshToken === "string" &&
-    typeof record.organizationId === "string"
+    (typeof record.organizationId === "string" || record.organizationId === null)
   );
 }
 

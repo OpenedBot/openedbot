@@ -1,5 +1,5 @@
 import { isoOrNull } from "@openedbot/contracts-primitives";
-import type { BotFaceSpec, BotPermissionMode, BotReplyLanguage, BotSpeechRate } from "@openedbot/contracts-api";
+import type { BotFaceSpec, BotPermissionMode, BotProfileProvisionProgress, BotReplyLanguage, BotSpeechRate } from "@openedbot/contracts-api";
 
 export type BotRow = {
   id: string;
@@ -13,6 +13,8 @@ export type BotRow = {
   sectionId: string;
   position: number;
   pinned: boolean;
+  /** Rang dans la grille des épinglés (0159) ; `null` = pas encore rangé. */
+  pinPosition?: number | null;
   face: BotFaceSpec | null;
   voiceId: string | null;
   label: string | null;
@@ -27,6 +29,7 @@ export type BotRow = {
   approvalPolicyEffectiveAt?: Date | string | null;
   profileImportStatus?: "configuring" | "needs_attention" | null;
   profileProvisionStatus?: "preparing" | "failed" | null;
+  profileProvisionProgress?: BotProfileProvisionProgress | null;
   hostCleanupStatus?: "pending" | "verifying" | "failed" | null;
   archivedAt: Date | string | null;
   deletedAt: Date | string | null;

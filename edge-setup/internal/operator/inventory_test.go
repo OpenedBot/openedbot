@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,13 +71,13 @@ func TestCapabilitiesAnnounceOnlyWhatTheHostCanServe(t *testing.T) {
 	// A probe without a gateway reader cannot PROVE a toolset write, so it
 	// serves MCP and the profile inventory, and stays silent about toolsets.
 	partial := &Server{Probe: (&probeRecorder{}).probe()}
-	if got := partial.features(); len(got) != 5 || got[2] != "mcp_management" || got[3] != "profile_inventory" || got[4] != "model_context" {
+	if got := partial.features(); len(got) != 6 || got[2] != "mcp_management" || got[3] != "profile_inventory" || got[4] != "model_context" || got[5] != SkillsInventoryFeature {
 		t.Fatalf("features %v", got)
 	}
 	_, _, srv := inventoryServer(t, nil, `{"data":[]}`)
 	status, out := call(t, srv, "GET", "/capabilities", "")
 	features, _ := out["features"].([]any)
-	if status != 200 || len(features) != 6 {
+	if status != 200 || len(features) != 7 {
 		t.Fatalf("%d %v", status, out)
 	}
 	profiled := &Server{Probe: (&probeRecorder{replies: map[string]string{
@@ -192,6 +193,48 @@ func TestProfileCreateSpendsNoInventoryReadWhenTheProbeVerifiedTheProfile(t *tes
 				t.Fatalf("readBack marker %v in %v", marked, out)
 			}
 		})
+	}
+}
+
+func TestProfileCreateTurnsTheBundledSkillsOffInTheSameProbe(t *testing.T) {
+	scout := `{"name":"scout","displayName":"Scout"}`
+	for _, tc := range []struct {
+		name, create string
+		want         map[string]any
+	}{
+		{"applied", `{"profile":` + scout + `,"verified":true,"bundledSkills":{"profile":"scout","enabled":false,"bundled":74,"bundledEnabled":3,"essential":3}}`,
+			map[string]any{"profile": "scout", "requested": false, "bundled": float64(74), "bundledEnabled": float64(3), "applied": true}},
+		{"not reported (best effort failed)", `{"profile":` + scout + `,"verified":true}`, nil},
+		{"incoherent", `{"profile":` + scout + `,"verified":true,"bundledSkills":{"profile":"other","enabled":false,"bundled":1,"bundledEnabled":0,"essential":0}}`, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := &probeRecorder{replies: map[string]string{"profile-create": tc.create}}
+			s := &Server{Probe: recorder.probe(), GatewayToken: func() (string, error) { return "root-bearer", nil }}
+			httpSrv := httptest.NewServer(s.Handler())
+			defer httpSrv.Close()
+			status, out := call(t, httpSrv, "POST", "/profiles", `{"name":"scout","bundledSkills":false}`)
+			if status != http.StatusCreated || len(recorder.seen) != 1 || !strings.Contains(recorder.bodies[0], `"bundledSkills":false`) {
+				t.Fatalf("%d %v %v", status, out, recorder.bodies)
+			}
+			got, present := out["bundledSkills"].(map[string]any)
+			if tc.want == nil {
+				if present {
+					t.Fatalf("an unproven bundled state was answered: %v", out)
+				}
+				return
+			}
+			if fmt.Sprint(got) != fmt.Sprint(tc.want) {
+				t.Fatalf("bundledSkills %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	recorder := &probeRecorder{replies: map[string]string{}}
+	s := &Server{Probe: recorder.probe(), GatewayToken: func() (string, error) { return "root-bearer", nil }}
+	httpSrv := httptest.NewServer(s.Handler())
+	defer httpSrv.Close()
+	if status, out := call(t, httpSrv, "POST", "/profiles", `{"name":"scout","bundledSkills":true}`); status != http.StatusBadRequest || errorCode(out) != "BODY_INVALID" || len(recorder.seen) != 0 {
+		t.Fatalf("bundledSkills true: %d %v", status, out)
 	}
 }
 
@@ -888,6 +931,30 @@ func TestAWriteDropsTheCachedReads(t *testing.T) {
 	}
 }
 
+func TestAProfileScopedWriteKeepsTheRootReadsAndDropsTheProfiles(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	recorder := &countingProbe{replies: map[string]string{
+		"toolsets":                   settableWebBrowser,
+		"profiles":                   `{"profiles":[]}`,
+		"profile-bundled-skills-set": `{"profile":"scout","enabled":false,"bundled":2,"bundledEnabled":0,"essential":0}`,
+	}}
+	srv := cachedServer(t, recorder, &clock)
+
+	call(t, srv, "GET", "/toolsets", "")
+	call(t, srv, "GET", "/profiles", "")
+	if status, out := call(t, srv, "POST", "/profiles/scout/bundled-skills", `{"enabled":false}`); status != 200 {
+		t.Fatalf("bundled skills %d %v", status, out)
+	}
+	call(t, srv, "GET", "/toolsets", "")
+	call(t, srv, "GET", "/profiles", "")
+	// The write changed scout's home only: the root's settable list stays
+	// cached (a cold read costs seconds inside a provisioning), the profile
+	// inventory does not.
+	if recorder.count("toolsets") != 1 || recorder.count("profiles") != 2 {
+		t.Fatalf("profile-scoped write: %v", recorder.calls)
+	}
+}
+
 func TestConcurrentReadsShareOneInterpreterStart(t *testing.T) {
 	clock := time.Unix(1_800_000_000, 0)
 	recorder := &countingProbe{
@@ -946,6 +1013,39 @@ func TestAReadThatRacedAWriteIsServedOnceAndNeverCached(t *testing.T) {
 	call(t, srv, "GET", "/mcp/servers", "")
 	if recorder.count("mcp-inventory") != 2 {
 		t.Fatalf("a read that raced a write must not be cached: %v", recorder.calls)
+	}
+}
+
+func TestARootReadThatRacedAProfileWriteIsStillCached(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	recorder := &countingProbe{
+		replies: map[string]string{
+			"toolsets":                   settableWebBrowser,
+			"profile-bundled-skills-set": `{"profile":"scout","enabled":false,"bundled":2,"bundledEnabled":0,"essential":0}`,
+		},
+		delay: 120 * time.Millisecond,
+	}
+	srv := cachedServer(t, recorder, &clock)
+
+	// The settable list is read ahead while a new profile is written: the
+	// write changes that profile only, so the root read stays worth keeping.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		resp, err := http.Get(srv.URL + "/toolsets")
+		if err == nil {
+			resp.Body.Close()
+		}
+	}()
+	time.Sleep(20 * time.Millisecond)
+	if status, _ := call(t, srv, "POST", "/profiles/scout/bundled-skills", `{"enabled":false}`); status != 200 {
+		t.Fatal("the profile write failed")
+	}
+	<-done
+
+	call(t, srv, "GET", "/toolsets", "")
+	if recorder.count("toolsets") != 1 {
+		t.Fatalf("a root read voided by a profile write: %v", recorder.calls)
 	}
 }
 

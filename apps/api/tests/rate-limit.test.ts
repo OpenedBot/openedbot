@@ -112,6 +112,9 @@ describe("rate limiter", () => {
     expect(API_RATE_RULES["POST /api/auth/login/code"]).toEqual({ windowMs: 60_000, max: 5, shared: AUTH_EMAIL_CODE_BUDGET });
     expect(API_RATE_RULES["POST /api/auth/login"]).toEqual({ windowMs: 60_000, max: 10, shared: AUTH_EMAIL_CODE_BUDGET });
     expect(API_RATE_RULES["POST /api/auth/native/authorize"]).toEqual({ windowMs: 60_000, max: 20, shared: AUTH_EMAIL_CODE_BUDGET });
+    // Code checks issue nothing: the desktop's code door matches the web one.
+    expect(API_RATE_RULES["POST /api/auth/login/code/verify"]).toEqual({ windowMs: 60_000, max: 10 });
+    expect(API_RATE_RULES["POST /api/auth/native/code/verify"]).toEqual(API_RATE_RULES["POST /api/auth/login/code/verify"]);
     expect(AUTH_EMAIL_CODE_BUDGET).toEqual({ name: "auth-email-code", windowMs: 60_000, max: 10 });
     expect(API_RATE_RULES["POST /api/hooks/*"]?.max).toBe(10);
     expect(API_RATE_RULES["POST /api/*"]?.max).toBeGreaterThan(0);
@@ -162,6 +165,20 @@ describe("rate limiter", () => {
       expect((await call(hono, paths[attempt % paths.length]!)).status).toBe(200);
     }
     expect((await call(hono, paths[1]!)).status).toBe(429);
+  });
+
+  test("/native/code/verify plafonne à 10, hors du budget d'émission de code", async () => {
+    const hono = new Hono<{ Variables: AppVariables }>();
+    hono.use("/api/auth/*", rateLimiter(API_RATE_RULES, { trustProxy: true }));
+    for (const path of ["/api/auth/native/code/verify", "/api/auth/login/code"]) {
+      hono.post(path, (context) => context.json({ ok: true }));
+    }
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      expect((await call(hono, "/api/auth/native/code/verify")).status).toBe(200);
+    }
+    expect((await call(hono, "/api/auth/native/code/verify")).status).toBe(429);
+    // Ten checks spent nothing of the shared issuance budget.
+    expect((await call(hono, "/api/auth/login/code")).status).toBe(200);
   });
 
   test("refuse un même budget partagé déclaré avec deux fenêtres", () => {

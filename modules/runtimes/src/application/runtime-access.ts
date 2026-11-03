@@ -54,6 +54,8 @@ export async function readRuntimeSecret(
   selectedProvider: string | null;
   selectedModel: string | null;
   reasoningEffort: string | null;
+  /** Voir `inventoryWatch` : quand l'hôte a dit son inventaire changé, et s'il le surveille. */
+  inventory?: InventoryWatch;
 } | null> {
   const runtime = await withTenant(db, organizationId, async (tx) => {
     const rows = runtimeId ? await readRuntimeRowById(tx, organizationId, runtimeId) : await readRuntimeRows(tx, organizationId);
@@ -71,7 +73,27 @@ export async function readRuntimeSecret(
     selectedProvider: runtime.selectedProvider,
     selectedModel: runtime.selectedModel,
     reasoningEffort: runtime.reasoningEffort,
+    inventory: inventoryWatch(runtime),
   };
+}
+
+/**
+ * Ce que le connecteur dit de l'inventaire de son hôte (0160).
+ *
+ * `changedAt` : le dernier `inventory.changed` ; un instantané observé avant
+ * est périmé. `watched` : l'hôte en a envoyé un depuis la connexion en cours
+ * (le connecteur en envoie un à chaque connexion, puis à chaque changement) :
+ * tant que le lien tient, un instantané plus récent reste juste.
+ */
+export type InventoryWatch = { changedAt: Date | null; watched: boolean };
+
+export function inventoryWatch(runtime: Pick<RuntimeRow, "reachability" | "linkConnectedAt" | "inventoryChangedAt">): InventoryWatch {
+  const changedAt = runtime.inventoryChangedAt ?? null;
+  const watched = runtime.reachability === "connector"
+    && changedAt !== null
+    && runtime.linkConnectedAt !== null
+    && changedAt.getTime() >= runtime.linkConnectedAt.getTime();
+  return { changedAt, watched };
 }
 
 export async function assertLinkReachable(

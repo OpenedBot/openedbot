@@ -3,6 +3,8 @@
 export const settings = {
   appearance: {
     title: "Apparence et langue",
+    interfaceTitle: "Interface",
+    colorsTitle: "Couleurs",
     description:
       "Le thème et la langue sont stockés localement, dans ce navigateur : ils ne suivent ni le compte ni l'installation.",
     themeTitle: "Thème",
@@ -84,20 +86,7 @@ export const settingsSidebar = {
   signOut: "Se déconnecter",
   leaveImpersonation: "Quitter le mode assistance",
   signingOut: "Déconnexion…",
-  openAsPage: "Ouvrir en page",
   leaveSettings: "Quitter les réglages",
-  openAsWindow: "Ouvrir en fenêtre",
-  displayLabel: "Ouvrir les réglages",
-  displayHint: "En fenêtre par-dessus l’écran en cours, ou en page avec le menu à gauche.",
-  displayModal: "Fenêtre",
-  displayPage: "Page",
-} as const;
-
-export const operatorSettingsDialog = {
-  title: "Réglages",
-  openSettings: "Ouvrir les réglages",
-  navLabel: "Rubriques des réglages",
-  backToSettings: "Retour aux réglages",
 } as const;
 
 export const settingsNotifications = {
@@ -216,7 +205,7 @@ export const settingsAccount = {
   mobileDescription: "Connectez l’application iPhone en scannant un QR : aucun mot de passe à retaper sur le téléphone.",
   mobileShow: "Afficher le QR",
   mobileDialogTitle: "Connecter un téléphone",
-  mobileDialogDescription: "Dans l’application openedbot, choisissez « Scanner un code » et visez ce QR. Il ouvre une session à votre nom et ne sert qu’une fois.",
+  mobileDialogDescription: "Dans l’app openedbot, touchez « Scanner un code » et visez ce QR. Il ne sert qu’une fois.",
   mobileLinkLabel: "Lien équivalent",
   mobileLinkHint: "À coller dans l’application si le téléphone n’a pas de caméra disponible.",
   mobileCopy: "Copier le lien",
@@ -242,7 +231,7 @@ export const settingsAccount = {
   googleUnlinkNeedsPassword: "Définissez un mot de passe avant de délier Google : ce serait la seule entrée du compte.",
   googleUnlinkTitle: "Déconnecter Google ?",
   googleUnlinkDescription:
-    "Vous ne pourrez plus vous connecter avec Google tant que vous ne l’aurez pas reconnecté ici. Vos autres appareils seront déconnectés.",
+    "Vous ne pourrez plus vous connecter avec Google. Vos autres appareils seront déconnectés.",
   googleUnlinkConfirm: "Déconnecter Google",
   googleUnlinking: "Déconnexion…",
   googleUnlinkedDone: "Google est délié de votre compte.",
@@ -293,7 +282,7 @@ export const settingsProfile = {
     "Repartir de zéro vide les données de l’espace de cette base locale (bots, discussions, runs, connecteurs) et rejoue l’accueil depuis l’étape 0. Votre compte, votre organisation, votre session et votre runtime sont conservés : vous restez connecté, et la machine reste reliée.",
   devWipeWorkspaceConfirmTitle: "Vider les données de l’espace ?",
   devWipeWorkspaceConfirmDescription:
-    "Détruit définitivement les bots, discussions, runs et connecteurs de cette base locale. Conserve votre compte, votre organisation, votre session et votre runtime relié. Cette action est irréversible.",
+    "Efface les bots, discussions, runs et connecteurs de cette base locale. Votre compte et votre runtime restent. C’est irréversible.",
   devWipeWorkspaceConfirm: "Vider et repartir de zéro",
   devWipeWorkspaceError: "Impossible de vider les données de l’espace.",
 } as const;

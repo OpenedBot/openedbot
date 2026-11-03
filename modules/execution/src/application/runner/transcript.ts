@@ -3,7 +3,8 @@ import type { RunEvent } from "../../domain/hermes-events";
 import { projectAgentPlan, type AgentPlan } from "@openedbot/execution/domain/agent-plan";
 import { projectWebSearches, type WebSearchTrail } from "@openedbot/execution/domain/agent-web-search";
 import { currentTurnMessages } from "@openedbot/execution/domain/agent-transcript";
-import { projectRuntimeArtifacts } from "@openedbot/execution/domain/runtime-artifacts";
+import { projectRuntimeArtifacts, type RuntimeArtifact } from "@openedbot/execution/domain/runtime-artifacts";
+import { ATTACHMENT_LIMITS } from "@openedbot/conversation/domain/attachments";
 import { artifactObjectKey, putArtifactBlob } from "../artifact-store";
 import type { MessageContent } from "@openedbot/contracts-api";
 import type { WorkerConfig } from "../worker-config";
@@ -75,24 +76,28 @@ export function assistantContent(
 /**
  * Copie les fichiers monstrables du tour vers le magasin des pièces jointes.
  *
- * Le contenu vient des arguments d'écriture du transcript : le connecteur
- * n'a pas de lecture de fichier. Best-effort : un blob refusé n'échoue pas
- * le run.
+ * Le contenu vient des arguments d'écriture du transcript (le connecteur
+ * n'a pas de lecture de fichier) et des images que la réponse finale livrait
+ * intégrées (`extractOutputMedia`), dans les limites d'un message.
+ * Best-effort : un blob refusé n'échoue pas le run.
  */
 export async function storeRuntimeArtifacts(
   config: WorkerConfig,
   context: Pick<RunContext, "id" | "organizationId" | "sessionId" | "workflowId">,
   event: RunEvent,
   client: HermesClient | undefined,
+  delivered: readonly RuntimeArtifact[] = [],
 ): Promise<StoredRuntimeArtifact[]> {
-  if (!config.blob) return [];
+  if (!config.blob) {
+    if (delivered.length) log("worker.output_media_dropped", { runId: context.id, organizationId: context.organizationId, reason: "no_blob_store", count: delivered.length });
+    return [];
+  }
   let messages = Array.isArray(event.payload.turnMessages) ? event.payload.turnMessages : null;
   if (!messages && client) {
     const transcript = await readAgentTranscript(context, client);
     messages = transcript.turn;
   }
-  if (!messages || messages.length === 0) return [];
-  const projected = projectRuntimeArtifacts(messages);
+  const projected = withinMessageLimits([...(messages?.length ? projectRuntimeArtifacts(messages) : []), ...delivered]);
   if (projected.length === 0) return [];
   const stored: StoredRuntimeArtifact[] = [];
   for (const artifact of projected) {
@@ -119,4 +124,17 @@ export async function storeRuntimeArtifacts(
     }
   }
   return stored;
+}
+
+/** Le transcript et la réponse se partagent les limites d'un même message. */
+function withinMessageLimits(artifacts: readonly RuntimeArtifact[]): RuntimeArtifact[] {
+  const kept: RuntimeArtifact[] = [];
+  let total = 0;
+  for (const artifact of artifacts) {
+    if (kept.length >= ATTACHMENT_LIMITS.maxCount) break;
+    if (total + artifact.data.byteLength > ATTACHMENT_LIMITS.maxBytesTotal) continue;
+    kept.push(artifact);
+    total += artifact.data.byteLength;
+  }
+  return kept;
 }

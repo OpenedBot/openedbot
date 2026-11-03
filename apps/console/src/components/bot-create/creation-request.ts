@@ -28,6 +28,11 @@ export type BotCreationRequest = {
   copied: Omit<PortableBotCreationDraft, "name" | "instructions" | "face" | "hermesProfile" | "label"> | null;
   /** The label a preset brings when the role field stays empty. */
   presetLabel: string | null;
+  /**
+   * The provider of a model picked before creation (the home form): it settles
+   * which provider serves a model id two of them offer (`CreateBotInput`).
+   */
+  provider?: string | null;
 };
 
 /** The single API call of a creation: settings travel with the bot row. */
@@ -39,6 +44,7 @@ export async function sendBotCreation(request: BotCreationRequest): Promise<BotD
     ...request.copied,
     name: request.name,
     ...(request.hermesProfile ? { hermesProfile: request.hermesProfile } : {}),
+    ...(request.provider ? { provider: request.provider } : {}),
     face: request.face,
     instructions: request.instructions,
     ...(description ? { description } : {}),
