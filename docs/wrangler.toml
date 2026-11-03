@@ -1,9 +1,7 @@
-# docs.openedbot.app: the static build in dist/ behind a small IP gate
-# (worker/gate.js). The gate runs before every asset and serves only the
-# networks of the ALLOWED_NETS secret, which never enters the repository; a
-# missing list refuses everything. Custom domain only, no workers.dev alias.
+# docs.openedbot.app: the static build in dist/, served to everyone. No Worker
+# code: Cloudflare serves the assets directly and public/_headers applies.
+# Custom domain only, no workers.dev alias.
 name = "openedbot-docs"
-main = "worker/gate.js"
 compatibility_date = "2026-10-26"
 workers_dev = false
 preview_urls = false
@@ -11,7 +9,5 @@ routes = [{ pattern = "docs.openedbot.app", custom_domain = true }]
 
 [assets]
 directory = "./dist"
-binding = "ASSETS"
-run_worker_first = true
 html_handling = "auto-trailing-slash"
 not_found_handling = "404-page"
