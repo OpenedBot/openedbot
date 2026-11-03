@@ -84,6 +84,13 @@ put "$dist/SHA256SUMS.sigstore.json" "edge-setup/$version/SHA256SUMS.sigstore.js
 put "$dist/SHA256SUMS" "edge-setup/$version/SHA256SUMS"
 for asset in "${assets[@]}"; do put "$dist/$asset" "edge-setup/$asset"; done
 put "$dist/SHA256SUMS" "edge-setup/SHA256SUMS"
+# The anchor the console's update feed reads (RUNTIME_CONNECTOR_RELEASES_URL):
+# the version and the SHA-256 of each file, from the verified manifest. Written
+# just before LATEST, so it never announces a release LATEST does not serve.
+jq -n --arg version "$version" --rawfile sums "$dist/SHA256SUMS" '
+	{tool: {version: $version, sha256: ($sums | split("\n") | map(select(length > 0) | split(" ") | map(select(length > 0)) | {key: (.[1] | ltrimstr("*")), value: .[0]}) | from_entries)}}
+' > "$work/edge-setup.json"
+put "$work/edge-setup.json" "edge-setup/edge-setup.json"
 printf '%s\n' "$version" > "$work/LATEST"
 put "$work/LATEST" "edge-setup/LATEST"
 
@@ -93,6 +100,8 @@ for manifest in "$version/SHA256SUMS" "SHA256SUMS"; do
 done
 curl -fsS --proto '=https' -o "$work/readback" "$base/$version/SHA256SUMS.sigstore.json" || die "public read-back of the signature failed"
 cmp -s "$work/readback" "$dist/SHA256SUMS.sigstore.json" || die "public signature differs from the local one"
+curl -fsS --proto '=https' -o "$work/readback" "$base/edge-setup.json" || die "public read-back of the anchor failed"
+cmp -s "$work/readback" "$work/edge-setup.json" || die "public anchor differs from $version"
 curl -fsS --proto '=https' -o "$work/readback" "$base/LATEST" || die "public read-back of LATEST failed"
 cmp -s "$work/readback" "$work/LATEST" || die "public LATEST differs from $version"
 echo "publish-r2: $version served by $base"

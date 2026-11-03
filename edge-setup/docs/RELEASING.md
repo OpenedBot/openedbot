@@ -11,6 +11,7 @@ origin of the binaries is Cloudflare R2 behind a read-only Worker:
 ```
 https://releases.openedbot.app/edge-setup/vX.Y.Z/...                 immutable, signed
 https://releases.openedbot.app/edge-setup/LATEST                     latest version string
+https://releases.openedbot.app/edge-setup/edge-setup.json            latest version and digests, for the console
 https://releases.openedbot.app/edge-setup/SHA256SUMS                 unversioned copies, for hosts
 https://releases.openedbot.app/edge-setup/edge-setup_linux_{amd64,arm64}   older than signed releases
 ```
@@ -31,8 +32,9 @@ check fails, they **fail closed**: nothing is installed or replaced, there is
 no fallback. `--release-url` refuses the retired GitHub releases repository
 (exit 2).
 
-Versioning restarted at **v0.0.1** with this repository. Hosts still on v1.x
-carry the retired default base and see v0.0.1 as older: their one-time
+Versioning restarted at **v0.0.1** with this repository, and reached v1.0.0
+on 2026-11-03. Hosts still on a v1.x of the former repository carry the
+retired default base and see the new v1.0.0 as the same or older: their one-time
 migration is in `CHANGELOG.md` (`upgrade --allow-downgrade --release-url`).
 The former GitHub releases mirror is gone: nothing reads or publishes to it. A
 v1.x binary is rebuilt from its tag in `OpenedBot/openedbot` if it is ever
@@ -51,14 +53,28 @@ never with `make deploy`, except in explicit dev mode.
    tagged: the bootstrap installs that release by default, and `make build-all`
    refuses a release whose bootstrap pins another one.
 3. Commit, tag `edge-setup/vX.Y.Z` (monorepo OpenedBot/openedbot) and push both.
-   `.github/workflows/edge-setup-release.yml` runs on the tag: connector
-   contract on both sides (the core is the monorepo root), `make test`,
-   `make test-release`, `make build-all`, then `make sign` (cosign keyless,
-   GitHub OIDC) and `make verify-signatures`, the check a host makes. It uploads
-   the signed files as the workflow artifact `edge-setup-vX.Y.Z` (kept 30 days)
-   and publishes nothing.
-4. Publish from the clean tagged tree, with an R2 write token that never
-   enters CI, once the release run of the tag has succeeded:
+   `.github/workflows/edge-setup-release.yml` runs on the tag:
+   - job `verify`: connector contract on both sides (the core is the monorepo
+     root), `make test`, `make test-release`, `make build-all`, then `make sign`
+     (cosign keyless, GitHub OIDC) and `make verify-signatures`, the check a
+     host makes. It uploads the signed files as the workflow artifact
+     `edge-setup-vX.Y.Z` (kept 30 days);
+   - job `publish`: downloads that artifact, verifies every signature again,
+     extracts the `## vX.Y.Z` entry of `CHANGELOG.md` (refused by
+     `notes-check` like a manual release), then runs `scripts/publish-r2.sh`.
+     Nothing is rebuilt: the bytes published are the bytes signed.
+4. Check the release: `curl -fsS https://releases.openedbot.app/edge-setup/LATEST`
+   names the new version, and the console announces it within the hour.
+
+The R2 write token lives only in the GitHub environment `edge-setup-r2`
+(secret `CLOUDFLARE_R2_TOKEN`, variable `CF_ACCOUNT_ID`), whose deployment
+policy admits the `edge-setup/v*` tags and nothing else: a branch, a pull
+request or a dispatch never sees it. It is a Cloudflare API token with the
+single permission Account, Workers R2 Storage, Edit, on this account only.
+Without the secret the `publish` job fails red and nothing is written.
+
+Manual fallback, from the clean tagged tree, once the release run of the tag
+has succeeded (a token never stored on disk in clear):
 
 ```bash
 git status --short --branch
@@ -81,11 +97,13 @@ the CI built from the tag, so those are the bytes published.
     directory without signatures;
   - writes `vX.Y.Z/` first (each file with its bundle, then the manifest's
     bundle, then the versioned `SHA256SUMS` **last**), then the unversioned copies (binaries,
-    then `SHA256SUMS`), then `LATEST` **last of all**, so a host never reads a
+    then `SHA256SUMS`), then the anchor `edge-setup.json` (version and SHA-256
+    of each file, read by the console's update feed), then `LATEST` **last of
+    all**, so a host never reads a
     manifest that lists a file not yet served, and a failed write leaves the
     previous latest untouched;
-  - reads back from the public origin both manifests, the signature and
-    `LATEST`, and compares them.
+  - reads back from the public origin both manifests, the signature, the
+    anchor and `LATEST`, and compares them.
 
 The token is read from a `0600` header file, never from argv. Its scope should
 be R2 write on the `openedbot-releases` bucket only. Publishing needs `gh`

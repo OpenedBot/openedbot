@@ -62,8 +62,8 @@ const anchor = {
 };
 
 describe("parseConnectorRelease, independent anchor", () => {
-  test("the default feed is the .well-known anchor on openedbot.app, never GitHub", () => {
-    expect(DEFAULT_CONNECTOR_RELEASES_URL).toBe("https://openedbot.app/.well-known/edge-setup.json");
+  test("the default feed is the anchor on the releases origin, never GitHub", () => {
+    expect(DEFAULT_CONNECTOR_RELEASES_URL).toBe("https://releases.openedbot.app/edge-setup/edge-setup.json");
   });
 
   test("reads the tool version and points the dialog at the public page", () => {

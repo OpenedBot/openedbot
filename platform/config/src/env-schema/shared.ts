@@ -196,8 +196,8 @@ export const SHARED_ENV: readonly EnvVar[] = [
     name: "RUNTIME_CONNECTOR_RELEASES_URL",
     scope: "api",
     tier: "default_only",
-    doc: "URL of the independent edge-setup anchor (`{ tool: { version, sha256 } }`), or the GitHub API URL of a mirror's latest release, read every hour by the API and the link gateway: its version becomes the latest connector version (above RUNTIME_CONNECTOR_LATEST_VERSION, which stays the floor and the fallback); a GitHub release also feeds its notes to the console's update dialog. Default in production: https://openedbot.app/.well-known/edge-setup.json; empty elsewhere (no network in dev and tests). `off` disables it.",
-    productionExample: "https://openedbot.app/.well-known/edge-setup.json",
+    doc: "URL of the edge-setup anchor that publish-r2.sh writes next to LATEST (`{ tool: { version, sha256 } }`), or the GitHub API URL of a mirror's latest release, read every hour by the API and the link gateway: its version becomes the latest connector version (above RUNTIME_CONNECTOR_LATEST_VERSION, which stays the floor and the fallback); a GitHub release also feeds its notes to the console's update dialog. Default in production: https://releases.openedbot.app/edge-setup/edge-setup.json; empty elsewhere (no network in dev and tests). `off` disables it.",
+    productionExample: "https://releases.openedbot.app/edge-setup/edge-setup.json",
   },
   {
     name: "RUNTIME_TOKEN_ENCRYPTION_PREVIOUS_KEYS",
