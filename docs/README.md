@@ -106,7 +106,7 @@ file. A command change is made on both sides, in the same move.
 ## Testing
 
 ```bash
-bun run test        # install script, _headers, scope, gate, llms
+bun run test        # install script, _headers, scope, llms
 bun run check       # types
 bun run build && bun run check:links
 ```
@@ -116,10 +116,9 @@ managed destinations, root refusal, publication race, single origin) and checks 
 
 ## Deployment
 
-Cloudflare Worker `openedbot-docs` (`wrangler.toml`): the static assets of `dist/` behind an IP
-filter (`worker/gate.js`), on the custom domain `docs.openedbot.app`, with no `workers.dev`
-alias. The whole site, `/install` included, is served only to the networks listed in the Worker
-secret `ALLOWED_NETS` (kept outside the repository); without a list, everything is refused (403).
+Cloudflare Worker `openedbot-docs` (`wrangler.toml`): the static assets of `dist/`, served to
+everyone with no Worker code (`public/_headers` applies), on the custom domain
+`docs.openedbot.app`, with no `workers.dev` alias.
 `scripts/deploy.sh` checks types, tests and links, builds the `public` scope, deploys `dist/`,
 then reads `/install` back from the public origin. The Cloudflare token stays in the
 environment, never in an argument.
@@ -137,7 +136,6 @@ src/
   lib/            docs scope, hidden-link unlinking, llms generation
   layouts/, styles/, assets/
 public/           install script, _headers, static files
-worker/           Cloudflare Worker IP gate
 scripts/          link checker, deploy script
 tests/            bun tests
 ```
