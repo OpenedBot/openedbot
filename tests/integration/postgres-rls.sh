@@ -38,6 +38,11 @@ purge_fn_expected="ohb_migrator/true/true/s/search_path=pg_catalog, pg_temp|fals
 
 # Preuve 0092 : etape de workflow, DM, identite forgee ecrasee, bail perime,
 # rejeu sans doublon, ecriture API estampillee, puis rien pour un autre tenant.
+# Preuve 0169 : deux fonctions du role de migration, EXECUTE pour ohb_worker
+# seul ; tables illisibles par le worker ; restent le code recent et le vivant,
+# la session vivante, la recente et la native dont le jeton vaut encore.
+retention_purges_expected="ohb_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true;ohb_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true|api_call=42501,codes_left=c2,c3,sessions_left=a3,a4,a5,worker_codes=42501,worker_sessions=42501"
+
 run_events_identity_expected="step/dm/overwritten/denied/1/91000000-0000-4000-8000-000000000043|0/0"
 
 if [[ "$database" != "ohb_integration" ]]; then
@@ -253,6 +258,14 @@ SQL
     -f "$root/tests/integration/session-visibility.sql")"
   if [[ "$session_visibility" != "0/1/0/0" ]]; then
     printf 'Session visibility proof failed; expected zero by tenant alone, one for the owner, zero for another user and zero rows revoked by another user, got:\n%s\n' "$session_visibility" >&2
+    exit 1
+  fi
+
+  # 0169 : purges des codes de connexion et des sessions, par fonction seule.
+  retention_purges="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
+    -f "$root/tests/integration/retention-purges.sql" | tail -n 1)"
+  if [[ "$retention_purges" != "$retention_purges_expected" ]]; then
+    printf 'Retention purges proof failed; got:\n%s\nexpected:\n%s\n' "$retention_purges" "$retention_purges_expected" >&2
     exit 1
   fi
 
@@ -706,6 +719,14 @@ session_visibility="$(docker exec -i "$container" sh -ceu \
   < "$root/tests/integration/session-visibility.sql")"
 if [[ "$session_visibility" != "0/1/0/0" ]]; then
   printf 'Session visibility proof failed; expected zero by tenant alone, one for the owner, zero for another user and zero rows revoked by another user, got:\n%s\n' "$session_visibility" >&2
+  exit 1
+fi
+
+retention_purges="$(docker exec -i "$container" sh -ceu \
+  'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
+  < "$root/tests/integration/retention-purges.sql" | tail -n 1)"
+if [[ "$retention_purges" != "$retention_purges_expected" ]]; then
+  printf 'Retention purges proof failed; got:\n%s\nexpected:\n%s\n' "$retention_purges" "$retention_purges_expected" >&2
   exit 1
 fi
 

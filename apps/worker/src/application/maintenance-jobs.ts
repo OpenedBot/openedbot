@@ -5,6 +5,8 @@ import { deleteBlob } from "../infrastructure/blob-store";
 import { reapPoisonRuns, sweepExpiredRuns } from "@openedbot/execution/application/queue";
 import { purgeOldToolErrors } from "@openedbot/execution/application/tool-errors";
 import { processTenantDeletion } from "@openedbot/identity/application/tenant-deletion";
+import { purgeDeadSessions, purgeSpentEmailLoginCodes } from "@openedbot/identity/sql/auth-retention";
+import { purgeDeliveredEmails } from "@openedbot/notifications/sql/email-retention";
 import {
   createTransactionalEmailSender,
   processEmailOutbox,
@@ -251,6 +253,9 @@ export function maintenanceJobs(
         await purgeOldSupportEvents(db, config.supportEventsRetentionDays);
         await purgeClosedSupportConversations(db, config.supportRetentionDays);
         await purgeOldApiErrors(db);
+        await purgeSpentEmailLoginCodes(db);
+        await purgeDeadSessions(db);
+        await purgeDeliveredEmails(db);
       },
     },
   ];
