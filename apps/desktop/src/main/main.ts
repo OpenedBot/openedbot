@@ -1,5 +1,5 @@
 import "./env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback
-import { app, dialog, Menu } from "electron";
+import { app, dialog, Menu, net, powerMonitor } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createAuthService, type AuthService } from "./auth";
@@ -15,6 +15,7 @@ import { registerShortcuts, unregisterShortcuts } from "./shortcuts";
 import { devUserDataName, targetLabel } from "./target";
 import { createTray, type ShellTray } from "./tray";
 import { createShellWindow, type ShellWindow } from "./window";
+import { createYoloMonitor, killOutcomeMessage, type YoloMonitor } from "./yolo";
 
 // No product logic lives here: this process only hosts the console in a native
 // window, owns the OAuth session, and exposes it through a minimal bridge.
@@ -29,6 +30,7 @@ function start(): void {
   let tray: ShellTray | null = null;
   let auth: AuthService | null = null;
   let popupHost: PopupHost | null = null;
+  let yolo: YoloMonitor | null = null;
   let stopLoopback = (): void => {};
 
   // The window dies with the app, never on its own: the tray keeps it alive.
@@ -51,6 +53,7 @@ function start(): void {
     // Closing its stdin is enough: the popup quits on EOF (and would on our exit anyway).
     popupHost?.stop();
     shellWindow?.allowClose();
+    yolo?.stop();
     auth?.dispose();
     stopLoopback();
   });
@@ -141,6 +144,7 @@ function start(): void {
           shellWindow?.loadConsole();
           shellWindow?.bringToFront();
           popupHost?.notifySignedIn();
+          yolo?.start();
           tray?.refresh();
         },
         onSignedOut: (reason) => {
@@ -149,6 +153,7 @@ function start(): void {
           // Signing in happens in the window, whatever the display mode.
           if (!shellWindow?.isVisible()) shellWindow?.bringToFront();
           popupHost?.notifySignedOut();
+          yolo?.stop();
           tray?.refresh();
         },
         onSigninState: (state) => shellWindow?.sendSigninState(state),
@@ -230,6 +235,29 @@ function start(): void {
     });
     popupHost = host;
 
+    // YOLO badge and kill switch (yolo.ts). The shell never grants a lease.
+    const monitor = createYoloMonitor({
+      apiOrigin: config.apiOrigin,
+      auth: service,
+      fetch: (url, init) => net.fetch(url, init),
+      confirmKill: async () => {
+        const { response } = await dialog.showMessageBox({
+          type: "warning",
+          buttons: ["Annuler", "Couper YOLO partout"],
+          defaultId: 0,
+          cancelId: 0,
+          message: "Couper YOLO partout ?",
+          detail:
+            "Tous les baux YOLO de l’organisation sont révoqués et chaque runtime est prévenu. Les bots redemandent ensuite une approbation selon leur mode habituel.",
+        });
+        return response === 1;
+      },
+      onChange: () => tray?.refresh(),
+    });
+    yolo = monitor;
+    // Back from sleep: leases may have ended or been cut meanwhile.
+    powerMonitor.on("resume", () => void monitor.pollNow());
+
     tray = createTray({
       window,
       targetLabel: label,
@@ -239,7 +267,17 @@ function start(): void {
       displayMode: popupSupported
         ? { current: () => displayMode, popupAvailable: () => locatePopupBundle() !== null, set: setDisplayMode }
         : undefined,
+      yolo: {
+        snapshot: () => monitor.snapshot(),
+        killEverywhere: () => {
+          void monitor.killEverywhere().then((outcome) => {
+            const report = killOutcomeMessage(outcome);
+            if (report) void dialog.showMessageBox({ type: report.type, message: report.message, detail: report.detail });
+          });
+        },
+      },
     });
+    if (restored) monitor.start();
 
     registerShortcuts(() => window.toggle());
     registerIpc({
