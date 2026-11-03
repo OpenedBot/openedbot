@@ -9,21 +9,14 @@
  *                            the organization's command blocklist on a
  *                            terminal gate (an unreadable command is refused
  *                            whenever a list exists)
- *   2. yolo      -> deny     under an active YOLO lease only (and where
- *                 | once     `bypass` would be allowed, outside plan): the
- *                            hardline list, the lease's deny-list and its
- *                            protections refuse; anything else is approved.
- *                            What cannot be identified falls to the floor.
- *   3. floor     -> human    unidentified gate, a sensitive path the
+ *   2. floor     -> human    unidentified gate, a sensitive path the
  *                            descriptor names, the terminal circuit breaker,
  *                            no `once` choice, in every mode
- *   4. effective mode        min(bot mode, ceiling); enforce_review turns
+ *   3. effective mode        min(bot mode, ceiling); enforce_review turns
  *                            bypass into auto; no proven review profile turns
  *                            auto into manual; plan stays plan
- *                            (`effectivePermissionMode` names the rule that
- *                            lowered it, as `effectiveBotPermission` does)
- *   5. opaque, deletion      human outside bypass (D-8)
- *   6. paths                 Ask / manual -> human; auto -> Always, grant or
+ *   4. opaque, deletion      human outside bypass (D-8)
+ *   5. paths                 Ask / manual -> human; auto -> Always, grant or
  *                            terminal switch -> once, else review; bypass ->
  *                            once
  *
@@ -31,19 +24,13 @@
  * this code does not know asks (iso Grok Bot: unknown -> needs approval).
  */
 
-import { yoloPolicyBlock, type EffectivePermissionReason } from "@openedbot/contracts-api";
-import type { YoloLeaseDenyList } from "@openedbot/contracts-connector";
-import { commandDeletes, commandHitsCircuitBreaker, isSensitivePath } from "@openedbot/roster/domain/editor-directives";
-import { commandMatchesBlocklist } from "./command-blocklist";
+import { commandDeletes, commandHitsCircuitBreaker, isSensitivePath, shellWords } from "@openedbot/roster/domain/editor-directives";
 import type { GateDescriptor, GateKind } from "./gate-identity";
-import { yoloDenyListHit, yoloHardlineHit, yoloProtectionHit, type YoloGateSubject } from "./yolo-hardline";
-
-export { commandMatchesBlocklist } from "./command-blocklist";
 
 export type PermissionModeId = "manual" | "plan" | "auto" | "bypass";
 export type PermissionCeiling = "manual" | "auto" | "bypass";
 export type PermissionOutcome = "deny" | "human" | "once" | "review";
-export type DecisionStage = "forbidden" | "yolo" | "floor" | "opaque" | "deletion" | "tool_policy" | "grant" | "review" | "full" | "human" | "unattended";
+export type DecisionStage = "forbidden" | "floor" | "opaque" | "deletion" | "tool_policy" | "grant" | "review" | "full" | "human" | "unattended";
 
 export type PermissionGate = {
   kind: GateKind;
@@ -70,16 +57,7 @@ export type PermissionPolicy = {
   terminalAlways: boolean;
   /** Command prefixes the organization refuses (PERM2-8). */
   commandBlocklist: readonly string[];
-  /**
-   * An ACTIVE YOLO lease that covers this gate's bot: already verified
-   * (signature, runtime, time window) by `yolo-lease.ts`. Absent or `null`:
-   * none, the pipeline is the one without YOLO.
-   */
-  yolo?: YoloGatePolicy | null;
 };
-
-/** What the pipeline reads of a lease: who to name, and what it never approves. */
-export type YoloGatePolicy = { leaseId: string; deny: YoloLeaseDenyList; protect: readonly string[] };
 
 export type PermissionDecision = {
   outcome: PermissionOutcome;
@@ -87,14 +65,9 @@ export type PermissionDecision = {
   /** A stable code for logs and `decision_detail`, never a gate argument. */
   reason: string;
   effectiveMode: PermissionModeId;
-  /** The YOLO lease that answered (stage `yolo`). */
-  yoloLeaseId?: string;
   /** PERM2-9: the stage and reason that held the gate for a person nobody is. */
   heldBy?: { stage: DecisionStage; reason: string };
 };
-
-/** Step 4: the effective mode, and why it is below the stored one (`null`: it is not). */
-export type EffectivePermissionMode = { mode: PermissionModeId; reason: EffectivePermissionReason | null };
 
 const MODE_RANK: Record<PermissionCeiling, number> = { manual: 0, auto: 1, bypass: 2 };
 /** Tools of a toolset no policy may open (`ALWAYS_FORBIDDEN_TOOLSETS`). */
@@ -105,29 +78,14 @@ function storedMode(mode: string | null): PermissionModeId {
   return mode === "plan" || mode === "auto" || mode === "bypass" ? mode : "manual";
 }
 
-/**
- * Step 4 alone: what the bot's mode is worth under its organization today,
- * and which rule brought it down. The last rule that applied names it, as
- * `effectiveBotPermission` does for the console (a test keeps both in line).
- */
-export function effectivePermissionMode(policy: Pick<PermissionPolicy, "mode" | "ceiling" | "enforceReview" | "reviewProven">): EffectivePermissionMode {
+/** Step 3 alone: what the bot's mode is worth under its organization today. */
+export function effectivePermissionMode(policy: Pick<PermissionPolicy, "mode" | "ceiling" | "enforceReview" | "reviewProven">): PermissionModeId {
   const mode = storedMode(policy.mode);
-  if (mode === "plan") return { mode, reason: null };
-  let effective: PermissionCeiling = mode;
-  let reason: EffectivePermissionReason | null = null;
-  if (policy.ceiling && MODE_RANK[policy.ceiling] < MODE_RANK[effective]) {
-    effective = policy.ceiling;
-    reason = "ceiling";
-  }
-  if (effective === "bypass" && policy.enforceReview) {
-    effective = "auto";
-    reason = "enforce_review";
-  }
-  if (effective === "auto" && !policy.reviewProven) {
-    effective = "manual";
-    reason = "review_unproven";
-  }
-  return effective === mode ? { mode, reason: null } : { mode: effective, reason };
+  if (mode === "plan") return "plan";
+  let effective: PermissionCeiling = policy.ceiling && MODE_RANK[policy.ceiling] < MODE_RANK[mode] ? policy.ceiling : mode;
+  if (effective === "bypass" && policy.enforceReview) effective = "auto";
+  if (effective === "auto" && !policy.reviewProven) effective = "manual";
+  return effective;
 }
 
 /** A stored value outside the closed set asks; absent and `inherit` follow the mode. */
@@ -142,6 +100,26 @@ function descriptorPaths(descriptor: GateDescriptor | null): string[] {
   return paths.filter((path): path is string => typeof path === "string");
 }
 
+/**
+ * Each blocklist entry is a command prefix of words (`git push --force`). A
+ * command matches when one of its segments starts with those words, past
+ * variable assignments and `sudo`. `null`: the command cannot be read.
+ */
+export function commandMatchesBlocklist(command: string, blocklist: readonly string[]): boolean | null {
+  const patterns = blocklist.map((entry) => shellWords(entry.trim())).filter((words): words is string[] => !!words && words.length > 0);
+  for (const segment of command.split(/\s*(?:&&|\|\||[;\n|]|\$\(|`)\s*/)) {
+    if (!segment.trim()) continue;
+    const words = shellWords(segment.trim());
+    if (words === null) return null;
+    let start = 0;
+    while (start < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[start] ?? "")) start += 1;
+    if (words[start] === "sudo" || words[start] === "command") start += 1;
+    const head = words.slice(start).map((word, index) => (index === 0 ? word.split("/").pop() ?? word : word));
+    if (patterns.some((pattern) => pattern.every((word, index) => head[index] === word))) return true;
+  }
+  return false;
+}
+
 function forbidden(gate: PermissionGate, policy: PermissionPolicy, toolPolicy: string): string | null {
   if (toolPolicy === "block") return "tool_blocked";
   if (gate.kind === "plugin_tool" && storedMode(policy.mode) === "plan") return "plan_write";
@@ -152,31 +130,6 @@ function forbidden(gate: PermissionGate, policy: PermissionPolicy, toolPolicy: s
     if (matched !== false) return matched === null ? "command_unreadable" : "command_blocklisted";
   }
   return null;
-}
-
-/**
- * Step 2, under an active lease. A gate the host could not identify, or
- * without a `once` choice, cannot be checked against the hardline list: it is
- * left to the floor (`null`), never approved blind. A lease is honored only
- * where `bypass` would be (the API refuses it elsewhere; a policy tightened
- * since then wins until the lease is revoked), and never in plan.
- */
-function yoloStage(gate: PermissionGate, policy: PermissionPolicy, mode: PermissionModeId): [PermissionOutcome, string] | null {
-  const yolo = policy.yolo;
-  if (!yolo || mode === "plan" || yoloPolicyBlock({ maxMode: policy.ceiling, enforceReview: policy.enforceReview })) return null;
-  if (gate.kind === "unknown" || !gate.choices.includes("once")) return null;
-  if (gate.kind === "plugin_tool" && (!gate.descriptor || !gate.toolKey)) return null;
-  if (gate.kind === "terminal_danger" && gate.command === null) return null;
-  const subject: YoloGateSubject = {
-    toolKey: gate.toolKey,
-    paths: descriptorPaths(gate.descriptor),
-    command: gate.kind === "terminal_danger" ? gate.command : null,
-  };
-  if (yoloHardlineHit(subject)) return ["deny", "yolo_hardline"];
-  const denied = yoloDenyListHit(subject, yolo.deny);
-  if (denied !== false) return ["deny", denied === null ? "command_unreadable" : "yolo_denied"];
-  if (yoloProtectionHit(subject, yolo.protect)) return ["deny", "yolo_protected"];
-  return ["once", "yolo_lease"];
 }
 
 function floor(gate: PermissionGate): string | null {
@@ -199,16 +152,12 @@ function deletes(gate: PermissionGate): boolean {
 
 export function decidePermission(gate: PermissionGate, policy: PermissionPolicy): PermissionDecision {
   const toolPolicy = toolPolicyOf(gate, policy);
-  // The decision keeps its stored shape (worker golden); the downgrade
-  // reason is read from `effectivePermissionMode` where it is shown.
-  const effectiveMode = effectivePermissionMode(policy).mode;
+  const effectiveMode = effectivePermissionMode(policy);
   const decide = (outcome: PermissionOutcome, stage: DecisionStage, reason: string): PermissionDecision =>
     ({ outcome, stage, reason, effectiveMode });
 
   const refused = forbidden(gate, policy, toolPolicy);
   if (refused) return decide("deny", "forbidden", refused);
-  const yolo = yoloStage(gate, policy, effectiveMode);
-  if (yolo) return { ...decide(yolo[0], "yolo", yolo[1]), yoloLeaseId: policy.yolo!.leaseId };
   const held = floor(gate);
   if (held) return decide("human", "floor", held);
   if (effectiveMode === "plan") return decide("human", "human", "plan_mode");

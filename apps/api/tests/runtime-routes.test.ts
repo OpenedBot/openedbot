@@ -549,7 +549,6 @@ describe("POST /test : capacités hôte d'un runtime direct", () => {
       forwardDial: async () => new Response(null, { status: 599 }),
       forwardRotate: async () => false,
       forwardClose: async () => false,
-      forwardYolo: async () => false,
       forwardProbe: async () => ({ outcome: "no_link" }),
     };
     const links: RuntimeLinks = {
@@ -581,7 +580,6 @@ describe("POST /test : capacités hôte d'un runtime direct", () => {
       forwardDial: async () => new Response(null, { status: 599 }),
       forwardRotate: async () => false,
       forwardClose: async () => false,
-      forwardYolo: async () => false,
       forwardProbe: async () => ({ outcome: "no_link" }),
     };
     const { app, calls } = mount([connector], {}, { ...NO_RUNTIME_LINKS }, locator);
@@ -610,7 +608,6 @@ describe("POST /test : capacités hôte d'un runtime direct", () => {
       forwardDial: async () => new Response(null, { status: 599 }),
       forwardRotate: async () => false,
       forwardClose: async () => false,
-      forwardYolo: async () => false,
       forwardProbe: async () => ({ outcome: "no_link" }),
     };
     const { app, calls } = mount([connector], {}, { ...NO_RUNTIME_LINKS }, locator);
@@ -655,7 +652,6 @@ describe("POST /test : capacités hôte d'un runtime direct", () => {
       forwardDial: async () => new Response(null, { status: 599 }),
       forwardRotate: async () => false,
       forwardClose: async () => false,
-      forwardYolo: async () => false,
       forwardProbe: async () => ({ outcome: "no_link" }),
     };
     const { app } = mount([oldRuntime, newRuntime], {}, links, locator, [{ runtimeId: "runtime-new" }]);
@@ -722,7 +718,6 @@ describe("POST /test : capacités hôte d'un runtime direct", () => {
         forwardDial: async () => new Response(null, { status: 599 }),
         forwardRotate: async () => false,
         forwardClose: async () => false,
-        forwardYolo: async () => false,
         forwardProbe: async (_runtimeId, generation) => {
           forwarded.push(generation);
           return { outcome: "reconnect_requested", generation: "7" };
@@ -987,7 +982,6 @@ describe("rotation du jeton de lien et retrait confirmé", () => {
       forwardDial: async () => new Response(null, { status: 599 }),
       forwardRotate: async () => false,
       forwardClose: async () => false,
-      forwardYolo: async () => false,
       forwardProbe: async () => ({ outcome: "no_link" }),
     };
 

@@ -1,4 +1,4 @@
-import type { BotPermissionMode, EffectivePermission } from "../permissions/policy";
+import type { BotPermissionMode } from "../permissions/policy";
 import type { BotFaceSpec } from "../shared/bot-face";
 
 type BotIsolation = "profile";
@@ -53,12 +53,6 @@ export type BotDto = {
   notifyOnFinish?: boolean;
   speechRate?: BotSpeechRate;
   permissionMode?: BotPermissionMode;
-  /**
-   * Le mode dans lequel le bot tourne vraiment, la règle qui l'a abaissé
-   * (`reason`, jamais tue) et le bail YOLO qui le couvre. Rendu par
-   * `GET /api/bots` ; absent ailleurs et sur les anciens serveurs.
-   */
-  effectivePermission?: EffectivePermission;
   hermesProfile: string | null;
   /** openedbot created and owns the corresponding named host profile. */
   /** Absent on responses from servers before OHB-28. */

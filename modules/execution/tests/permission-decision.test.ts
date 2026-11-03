@@ -12,7 +12,6 @@ import {
   type PermissionPolicy,
 } from "../src/domain/permission-decision";
 import type { GateDescriptor } from "../src/domain/gate-identity";
-import { YOLO_DEFAULT_PROTECT } from "../src/domain/yolo-hardline";
 
 const CHOICES = ["once", "session", "always", "deny"];
 const DIGEST = "0".repeat(64);
@@ -139,16 +138,6 @@ describe("permission pipeline, every combination", () => {
     }
   });
 
-  test("a lowered mode always says why, an unlowered one never does", () => {
-    for (const row of ROWS) {
-      const stored = ["plan", "auto", "bypass"].includes(row.policy.mode ?? "") ? row.policy.mode : "manual";
-      const effective = effectivePermissionMode(row.policy);
-      expect(effective.mode).toBe(row.decision.effectiveMode);
-      if (effective.mode === stored) expect(effective.reason).toBeNull();
-      else expect(["ceiling", "enforce_review", "review_unproven"]).toContain(effective.reason!);
-    }
-  });
-
   test("the effective mode never exceeds the ceiling, enforce_review or an unproven reviewer", () => {
     for (const row of ROWS) {
       const mode = row.decision.effectiveMode;
@@ -199,18 +188,8 @@ describe("permission pipeline, named rows", () => {
     expect(decide(gate, policy as Partial<PermissionPolicy>)).toMatchObject({ outcome, stage });
   });
 
-  test.each([
-    [{ mode: "bypass", ceiling: "manual" }, "manual", "ceiling"],
-    [{ mode: "bypass", enforceReview: true }, "auto", "enforce_review"],
-    [{ mode: "auto", reviewProven: false }, "manual", "review_unproven"],
-    [{ mode: "bypass", ceiling: "auto", reviewProven: false }, "manual", "review_unproven"],
-  ] as const)("the downgrade %o is named: %s (%s)", (policy, mode, reason) => {
-    expect(effectivePermissionMode({ ...base, ...policy })).toEqual({ mode, reason });
-    expect(decide("write", policy as Partial<PermissionPolicy>)).toMatchObject({ effectiveMode: mode });
-  });
-
   test("an unknown stored mode is manual", () => {
-    expect(effectivePermissionMode({ mode: "superuser", ceiling: null, enforceReview: false, reviewProven: true })).toEqual({ mode: "manual", reason: null });
+    expect(effectivePermissionMode({ mode: "superuser", ceiling: null, enforceReview: false, reviewProven: true })).toBe("manual");
   });
 
   test("a human once is re-checked against the interdictions only", () => {
@@ -279,63 +258,5 @@ describe("parity with the legacy decision, no new policy", () => {
       const v2 = decidePermission(terminal(command), policy(mode)).outcome === "once";
       expect({ command, v2 }).toEqual({ command, v2: legacy });
     }
-  });
-});
-
-describe("YOLO lease stage", () => {
-  const yolo = { leaseId: "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01", deny: { commands: [], tools: [], paths: [] }, protect: [...YOLO_DEFAULT_PROTECT] };
-  const base: PermissionPolicy = { mode: "manual", ceiling: null, enforceReview: false, reviewProven: true, toolPolicy: null, grantActive: false, terminalAlways: false, commandBlocklist: [], yolo };
-  const decide = (gate: keyof typeof GATES, policy: Partial<PermissionPolicy> = {}) => decidePermission(GATES[gate]!, { ...base, ...policy });
-  const STRUCTURAL = new Set(["unknown", "unreadable", "writeNoOnce"]);
-
-  test.each([
-    ["write", {}, "once", "yolo", "yolo_lease"],
-    ["patchDeletes", {}, "once", "yolo", "yolo_lease"],
-    ["executeCode", {}, "once", "yolo", "yolo_lease"],
-    ["rm", {}, "once", "yolo", "yolo_lease"],
-    ["write", { toolPolicy: "ask" }, "once", "yolo", "yolo_lease"],
-    ["writeSensitive", {}, "deny", "yolo", "yolo_protected"],
-    ["patchEnv", {}, "deny", "yolo", "yolo_protected"],
-    ["rmRoot", {}, "deny", "yolo", "yolo_hardline"],
-    ["push", { yolo: { ...yolo, deny: { commands: ["git push"], tools: [], paths: [] } } }, "deny", "yolo", "yolo_denied"],
-    ["unbalanced", { yolo: { ...yolo, deny: { commands: ["npm publish"], tools: [], paths: [] } } }, "deny", "yolo", "command_unreadable"],
-    ["mcp", { yolo: { ...yolo, deny: { commands: [], tools: ["mcp:linear:create_issue"], paths: [] } } }, "deny", "yolo", "yolo_denied"],
-    ["write", { yolo: { ...yolo, deny: { commands: [], tools: [], paths: ["notes"] } } }, "deny", "yolo", "yolo_denied"],
-    ["cronjob", {}, "deny", "forbidden", "tool_forbidden"],
-    ["write", { toolPolicy: "block" }, "deny", "forbidden", "tool_blocked"],
-    ["push", { commandBlocklist: ["git push"] }, "deny", "forbidden", "command_blocklisted"],
-    ["unknown", {}, "human", "floor", "gate_unidentified"],
-    ["unreadable", {}, "human", "floor", "command_unreadable"],
-    ["writeNoOnce", {}, "human", "floor", "no_once_choice"],
-    ["write", { mode: "plan" }, "deny", "forbidden", "plan_write"],
-    ["chmod", { mode: "plan" }, "human", "human", "plan_mode"],
-    ["write", { ceiling: "auto" }, "human", "human", "manual_mode"],
-    ["write", { mode: "bypass", enforceReview: true }, "review", "review", "review_enforced"],
-    ["write", { yolo: null }, "human", "human", "manual_mode"],
-  ] as const)("%s %o -> %s (%s, %s)", (gate, policy, outcome, stage, reason) => {
-    expect(decide(gate, policy as Partial<PermissionPolicy>)).toMatchObject({ outcome, stage, reason });
-  });
-
-  test("an answer of the lease names it", () => {
-    expect(decide("write")).toEqual({ outcome: "once", stage: "yolo", reason: "yolo_lease", effectiveMode: "manual", yoloLeaseId: yolo.leaseId });
-    expect(decide("rmRoot")).toMatchObject({ yoloLeaseId: yolo.leaseId });
-    expect(decide("cronjob")).not.toHaveProperty("yoloLeaseId");
-  });
-
-  test("every combination: an interdiction stays one, the lease answers or refuses, only what cannot be identified falls to the floor", () => {
-    for (const row of ROWS) {
-      const withLease = decidePermission(GATES[row.gate]!, { ...row.policy, yolo });
-      const honored = row.decision.effectiveMode !== "plan" && (row.policy.ceiling === null || row.policy.ceiling === "bypass") && !row.policy.enforceReview;
-      if (isForbidden(row)) expect(withLease).toEqual(row.decision);
-      else if (!honored) expect(withLease).toEqual(row.decision);
-      else if (STRUCTURAL.has(row.gate)) expect({ row: row.gate, ...withLease }).toMatchObject({ outcome: "human", stage: "floor" });
-      else expect({ row: row.gate, ...withLease }).toMatchObject({ stage: "yolo" });
-      if (["writeSensitive", "patchEnv", "rmRoot"].includes(row.gate)) expect(withLease.outcome).not.toBe("once");
-    }
-  });
-
-  test("a run nobody attends keeps the lease's answers as they are", () => {
-    expect(unattendedDecision(decide("write"), true)).toEqual(decide("write"));
-    expect(unattendedDecision(decide("rmRoot"), true)).toEqual(decide("rmRoot"));
   });
 });

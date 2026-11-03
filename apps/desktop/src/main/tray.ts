@@ -2,7 +2,6 @@ import { app, Menu, nativeImage, Tray } from "electron";
 import type { DisplayMode } from "./preferences";
 import { TRAY_ICON_16_BASE64, TRAY_ICON_32_BASE64 } from "./tray-icons";
 import type { ShellWindow } from "./window";
-import { yoloStatusLabel, type YoloSnapshot } from "./yolo";
 
 export type ShellTray = {
   /** Rebuilds the menu so checkbox and enabled states follow the app state. */
@@ -24,37 +23,7 @@ export type TrayOptions = {
     popupAvailable(): boolean;
     set(mode: DisplayMode): void;
   };
-  /** YOLO badge, countdown and kill switch (yolo.ts). Granting stays in the console. */
-  yolo?: {
-    snapshot(): YoloSnapshot;
-    /** Confirms natively, kills, reports: fire and forget. */
-    killEverywhere(): void;
-  };
 };
-
-/** The status line and "Couper YOLO partout", signed in only. */
-function yoloItems(options: TrayOptions): Electron.MenuItemConstructorOptions[] {
-  const yolo = options.yolo;
-  if (!yolo || !options.isSignedIn()) return [];
-  const state = yolo.snapshot();
-  const status = yoloStatusLabel(state, Date.now());
-  const items: Electron.MenuItemConstructorOptions[] = [];
-  if (status) items.push({ label: status, enabled: false });
-  // Shown with no live lease too: a host may hold one the cloud believes over,
-  // and the kill reaches every runtime anyway. Hidden after a 403 (not owner or admin).
-  if (state.canKill) {
-    items.push({
-      label: state.killing ? "Coupure de YOLO…" : "Couper YOLO partout…",
-      enabled: !state.killing,
-      click: () => yolo.killEverywhere(),
-    });
-  }
-  return items.length > 0 ? [...items, { type: "separator" }] : [];
-}
-
-function yoloStatus(options: TrayOptions): string | null {
-  return options.yolo && options.isSignedIn() ? yoloStatusLabel(options.yolo.snapshot(), Date.now()) : null;
-}
 
 const DISPLAY_MODE_LABELS: ReadonlyArray<[DisplayMode, string]> = [
   ["window", "Fenêtre"],
@@ -95,11 +64,8 @@ function createIcon(): Electron.NativeImage {
  */
 function createDockMenu(options: TrayOptions): ShellTray {
   const refresh = (): void => {
-    // The Dock badge is the macOS YOLO badge; the countdown is in the menu.
-    app.dock?.setBadge(yoloStatus(options) ? "YOLO" : "");
     app.dock?.setMenu(
       Menu.buildFromTemplate([
-        ...yoloItems(options),
         ...displayModeItems(options),
         {
           label: "Toujours au premier plan",
@@ -118,14 +84,11 @@ function createDockMenu(options: TrayOptions): ShellTray {
 export function createTray(options: TrayOptions): ShellTray {
   if (process.platform === "darwin") return createDockMenu(options);
   const tray = new Tray(createIcon());
-  const baseTooltip = options.targetLabel ? `openedbot (${options.targetLabel})` : "openedbot";
+  tray.setToolTip(options.targetLabel ? `openedbot (${options.targetLabel})` : "openedbot");
 
   const refresh = (): void => {
-    const status = yoloStatus(options);
-    tray.setToolTip(status ? `${baseTooltip} · ${status}` : baseTooltip);
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        ...yoloItems(options),
         { label: "Afficher / Masquer", click: () => options.window.toggle() },
         {
           label: "Toujours au premier plan",

@@ -63,11 +63,8 @@ type Client struct {
 	Journal        *Journal
 	Diagnostics    *DiagnosticSpool
 	CreationAudit  *CreationAudit
-	// Yolo enforces YOLO leases on this host (yolo.go); nil: the host
-	// announces no yolo feature and ignores yolo.* frames.
-	Yolo   *Yolo
-	Logf   func(string, ...any)
-	Health func(component string, available bool)
+	Logf           func(string, ...any)
+	Health         func(component string, available bool)
 	// OnLinkIssued receives the credentials during enrollment.
 	OnLinkIssued func(runtimeID, token string) error
 	// OnLinkRotated durably persists a replacement link token before it is
@@ -155,9 +152,6 @@ type Client struct {
 	// retiring makes the session ask openedbot to revoke this runtime
 	// (link.retire) and end once it confirms (link.retired), for Retire.
 	retiring bool
-	// yoloSessions carries the session_id read from a POST /v1/runs body,
-	// by request id, to the response that names the run (yolo_client.go).
-	yoloSessions map[uint32]string
 }
 
 // LinkContext is the last context openedbot sent, zero until the first
@@ -272,7 +266,7 @@ func (c *Client) readOperatorFeatures(parent context.Context) ([]string, bool) {
 	}
 	out := make([]string, 0, len(doc.Features))
 	for _, name := range doc.Features {
-		if featureRe.MatchString(name) && c.serves(name) {
+		if featureRe.MatchString(name) {
 			out = append(out, name)
 		}
 	}
@@ -903,13 +897,10 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 	if c.OperatorSocket != "" && len(features) == 0 {
 		go c.watchOperator(ctx, send)
 	}
-	var stopAnchors, detachYolo func()
+	var stopAnchors func()
 	defer func() {
 		if stopAnchors != nil {
 			stopAnchors()
-		}
-		if detachYolo != nil {
-			detachYolo()
 		}
 	}()
 	defer c.abortAll()
@@ -967,9 +958,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 		}
 		if c.Diagnostics != nil && c.Auth.EnrollmentTicket == "" {
 			go c.sendDiagnostics(ctx, send)
-		}
-		if c.Yolo != nil && c.Auth.EnrollmentTicket == "" {
-			detachYolo = c.Yolo.Attach(send)
 		}
 	}
 	for {
@@ -1041,9 +1029,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 				continue
 			}
 			c.Logf("creation audit armed under key %s", f.KeyID)
-			if c.Yolo != nil {
-				c.Yolo.Audit.Seal()
-			}
 		case TLinkChallenge:
 			if c.DeviceKey == nil {
 				c.Logf("link.challenge received but this host has no device key; run `edge-setup link --rekey --yes`")
@@ -1095,10 +1080,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			// back to DefaultMaxFeatures, as an API that never announces one.
 			if f.Limits != nil && f.Limits.Features != nil {
 				lc.FeatureLimit = *f.Limits.Features
-			}
-			lc.LeaseKeys = f.LeaseKeys
-			if c.Yolo != nil && c.Auth.EnrollmentTicket == "" {
-				c.Yolo.PinKeys(f.LeaseKeys)
 			}
 			c.mu.Lock()
 			announcedBefore := c.featureBound
@@ -1156,10 +1137,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			}
 			c.noteRequest(f)
 			go c.serve(ctx, f, send)
-		case TYoloLease, TYoloRevoke, TYoloAuditAck:
-			if c.Yolo != nil && c.Auth.EnrollmentTicket == "" {
-				c.Yolo.OnFrame(f)
-			}
 		case TEnd:
 			c.endBody(f.ID)
 		case TCancel:
@@ -1339,7 +1316,6 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 	req.Header.Set("Authorization", "Bearer "+c.Bearer)
 	req.Header.Del("Cookie")
 	req.Host = ""
-	runSession := c.captureRunSession(f, req)
 	var attempt CreationAuditEvent
 	audited := c.CreationAudit != nil && req.Method == "POST" && strippedPath(f.Path) == "/v1/runs"
 	if audited {
@@ -1383,7 +1359,6 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 		return
 	}
 	defer resp.Body.Close()
-	runSession(f.ID)
 	// Capabilities: the gateway does not know what the link adds. Rewrite
 	// its JSON with the link features (docs/CONNECTOR.md); a body that is
 	// not JSON is relayed untouched.
@@ -1540,7 +1515,6 @@ func (c *Client) relayStream(ctx context.Context, f Text, send sender, resp *htt
 	if f.Method == "POST" && strings.HasSuffix(strings.SplitN(f.Path, "?", 2)[0], "/v1/runs") && resp.StatusCode/100 == 2 && c.Journal != nil {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, MaxResponseBody))
 		if id := runIDFrom(body); id != "" {
-			c.noteYoloRun(f.ID, id, profileOf(f.Path))
 			c.startTail(id, profileOf(f.Path))
 		}
 		_ = send(websocket.MessageBinary, EncodeBinary(f.ID, body))
@@ -1744,9 +1718,6 @@ func (c *Client) startTail(runID, profile string) {
 						terminal := IsTerminal(block)
 						if _, _, err := c.Journal.Append(runID, block, terminal); err != nil {
 							log.Printf("journal %s: %v", runID, err)
-						}
-						if c.Yolo != nil {
-							c.Yolo.Observe(ctx, runID, profile, block)
 						}
 						if terminal {
 							return

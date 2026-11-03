@@ -159,9 +159,8 @@ Règles de l'hôte (`internal/connector`) :
 - **Un ordre fixe.** Les features du lien (`creation_audit_v2`) d'abord, puis
   celles de l'opérateur dans l'ordre de `HostFeatures` (`frames.go`) :
   fournisseurs, toolsets et MCP, OAuth MCP et redémarrage du gateway, profils,
-  inventaire de sessions, A2A, puis `model_context`, `provider_sdks`,
-  `skills_hub` (openedbot a sa propre table de repli pour le contexte) et enfin
-  `yolo_lease`, `yolo_thread_scope` (voir « Bail YOLO »).
+  inventaire de sessions, A2A, puis `model_context`, `provider_sdks` et enfin
+  `skills_hub` (openedbot a sa propre table de repli pour le contexte).
   Un nom que ce connecteur ne connaît pas passe après les noms
   connus, par ordre alphabétique : l'ordre ne dépend jamais de celui de
   l'opérateur. Quand la borne est plus petite que la liste, la coupe prend la
@@ -1324,116 +1323,6 @@ Ce que ça ne couvre pas : root vivant pendant l'exécution (la clé est en
 mémoire du processus), l'horloge du VPS, une création qui n'emprunte pas le
 lien. Une ancre absente (lien tombé entre l'écriture et l'envoi) est rattrapée
 par la position renvoyée à la session suivante.
-
-## Bail YOLO
-
-Un bail YOLO fait approuver sans humain les portes d'un runtime, d'un bot
-(`profile`) ou d'un fil (`sessionKey` = SHA-256 hex du `session_id` Hermes)
-pendant au plus 24 h. openedbot le signe ; l'hôte le vérifie hors ligne,
-l'applique, et peut toujours le refuser. Il ne peut pas en créer.
-
-Features : `yolo_lease` et `yolo_thread_scope`, annoncées par l'opérateur (et
-donc par `capabilities`) seulement quand le démon a pu ouvrir son magasin de
-baux et que l'opérateur sert `PUT /yolo` et le spool d'audit. Sans elles,
-openedbot n'envoie aucune trame `yolo.*`.
-
-Trames (décodage strict, vecteurs partagés dans `relay-frames.vectors.json`) :
-
-| Trame | Sens | Corps |
-|---|---|---|
-| `yolo.lease` | openedbot → hôte | `lease` (bail v1), `keyId` (32 hex), `signature` (Ed25519, base64) |
-| `yolo.revoke` | openedbot → hôte | `leaseId` ou `all: true`, `revokedAt` |
-| `yolo.state` | hôte → openedbot | `leases[]` (`leaseId`, `status` active\|expired\|revoked\|rejected, `reason`), `killedAt` si `yolo off` |
-| `yolo.audit` | hôte → openedbot | `runtimeId`, `fromSeq`, `toSeq`, `tail`, `entries[]` chaînées |
-| `yolo.audit.ack` | openedbot → hôte | `toSeq` |
-
-`yolo.state` part à chaque connexion et à chaque changement (bail accepté,
-refusé, expiré, révoqué, kill).
-
-Signature. Le message signé est `"ohb-yolo-lease/v1\n"` suivi du JSON
-canonique du bail (celui de l'audit de création). `keyId` = 16 premiers octets
-hex de SHA-256(clé publique). Les clés viennent de `link.context.leaseKeys`
-(au plus 8) ou de `link.json` (`lease_keys`, posé à la liaison, toujours
-digne de foi : seul root l'écrit). La toute première annonce est épinglée
-(TOFU) dans `yolo-keys.json` ; ensuite une clé nouvelle doit porter
-`endorsedBy` (une clé déjà épinglée) et `endorsement`, signature de
-`"ohb-yolo-key/v1\n" + keyId + "\n" + publicKey`. Un `keyId` épinglé ne change
-jamais de clé, une clé n'est jamais désépinglée par le lien, et un fichier de
-clés corrompu interdit tout nouveau TOFU.
-
-Contrôles, à la réception puis à chaque décision (horloge relue) : forme
-stricte, signature, `runtimeId` du lien, `notBefore - 300 s ≤ now <
-expiresAt`, `expiresAt - notBefore ≤ 86400`, pierre tombale absente
-(`yolo.revoke`, gardée 24 h + 300 s ; `all` révoque tout bail émis jusqu'à
-`revokedAt`), `issuedAt > killedAt` du kill local. Un minuteur retire le bail à
-son échéance. Le magasin est `yolo-leases.json` (0600, écriture atomique),
-revérifié en entier au démarrage : un bail falsifié sur disque est abandonné.
-
-Application. Le démon pousse l'ensemble des baux actifs à l'opérateur
-(`PUT /yolo`, socket opérateur). Celui-ci écrit, pour chaque profil couvert,
-`plugins/ohb_approval_policy/yolo.json` (même propriétaire que les autres
-fichiers du plugin) avec le bail le plus étroit (fil, puis bot, puis runtime)
-et `hardline.json`, la liste dure embarquée dans le binaire ; il retire
-`yolo.json` des autres profils. Le plugin relit `yolo.json` à chaque appel,
-revérifie `expiresAt` et la portée, puis :
-
-- liste dure, liste `deny` du bail ou protection touchée : `block` ;
-- porte sans identité ou patch opaque : il demande, comme sans bail ;
-- sinon il note l'auto-approbation dans `yolo-audit.jsonl` (fsync) et laisse
-  passer ; si la note échoue, il demande.
-
-Un `yolo.json` illisible, corrompu ou expiré ramène au mode `ask_writes`.
-
-Approbations natives du terminal (Tier-2). `approvals.mode` reste `manual`
-et aucun yolo de session Hermes n'est activé. Le connecteur observe déjà
-chaque run qu'il a dispatché ; un `approval.request` du terminal couvert par un
-bail, hors liste dure, interdits et protections, est d'abord noté dans l'audit,
-puis répondu `once` par `POST /v1/runs/{id}/approval` sur le gateway loopback.
-Au moindre doute (pas de choix `once`, commande vide, bail absent ou expiré,
-audit impossible), la porte reste à un humain. La liste dure native de Hermes
-s'applique toujours en amont.
-
-Audit. Chaque auto-approbation devient une entrée
-`{seq, eventId, occurredAt, leaseId, profile, gateKind, toolKey, argsHash,
-prevHash, entryHash}` de `yolo-pending.jsonl` (fsync avant d'approuver), avec
-`entryHash = SHA-256(0x01 || canonical(entrée sans entryHash) || prevHash)` et
-`genesis = SHA-256("ohb-yolo-audit/v1/genesis" || runtimeId)`. L'entrée est
-scellée dans l'audit de création chiffré (événement `kind:
-"yolo_auto_approved"`) dès qu'une clé `audit.key` est là, et part en
-`yolo.audit` par lots de 64 ; elle est purgée après `yolo.audit.ack` et
-scellement. Hôte non armé : elle attend. Plus de 4096 entrées en attente :
-plus aucune auto-approbation. Les notes du plugin sont reprises par
-`POST /yolo/audit/drain` puis acquittées par `DELETE /yolo/audit/drain`.
-
-Kill. `edge-setup yolo off --yes` écrit `yolo-kill.json` et retire les
-`yolo.json` des profils, démon arrêté ou non ; le démon relit le fichier à
-chaque décision et toutes les 2 s (pas de signal), vide les profils et
-annonce `killedAt`. Un fichier de kill illisible vaut un kill.
-`yolo on --yes` ne lève que le refus local (voir OPERATIONS.md).
-
-Côté openedbot (`modules/runtime-link/src/application/link-yolo.ts`).
-`leaseKeys` liste la clé courante puis les clés retirées, de la plus récente à
-la plus ancienne, chacune endossée par la suivante : un hôte épinglé sur une
-clé ancienne remonte la chaîne d'une clé par connexion. `yolo.state` écrit la
-livraison et l'état de chaque bail cité ; un bail vivant que l'hôte ne cite
-pas lui est renvoyé, un bail qu'il dit actif sans qu'openedbot le tienne pour
-vivant reçoit `yolo.revoke`. `killedAt` révoque côté openedbot tout bail émis
-jusque-là (cause `host_cli`), un bail `rejected` aussi (`host_rejected`).
-`yolo.audit` est revérifié (hash recalculé, suite exacte du dernier maillon
-reçu, entrée déjà reçue à l'identique, bail de ce runtime) puis inséré sans
-doublon sur (runtime, `seq`) ; une tranche qui ne se vérifie pas est mise en
-quarantaine telle que reçue, journalisée (`anchor_tampered`) et signalée aux
-owners et admins, jamais jetée. `yolo.audit.ack` part après le commit, au
-journal comme en quarantaine ; une écriture ratée n'est pas accusée et l'hôte
-renvoie. Le worker repousse les baux non livrés et les révocations non
-confirmées, et marque `expired` un bail échu sans nouvelle de l'hôte.
-
-Limites. Sous Linux, l'état du connecteur est hors de portée du gateway
-(`InaccessiblePaths=`) et la socket opérateur est réservée à l'unité
-connecteur ; sous un bail, la liste dure interdit au bot de toucher au plugin et
-à `yolo.json`. Sous macOS, tout tourne sous le même utilisateur : un processus
-local de cet utilisateur peut écrire `yolo.json`, la garantie s'arrête à la
-signature vérifiée par le démon.
 
 ## Invariants
 

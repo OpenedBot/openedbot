@@ -341,37 +341,6 @@ développement. Chaque instance a alors sa propre clé device, son unité et son
 et `--rekey` prend le même `--name` que `link` ; `status` les liste toutes.
 Voir « Instances nommées » dans [CONNECTOR.md](CONNECTOR.md).
 
-## Mode YOLO
-
-Un bail YOLO, accordé dans openedbot par un propriétaire ou un admin, fait
-approuver sans humain les portes d'un runtime, d'un bot ou d'un fil pendant au
-plus 24 h. L'hôte ne fait que vérifier et appliquer : il ne crée jamais de
-bail. La liste dure (identifiants, `/etc/hermes`, auto-modification du plugin
-d'approbation), la liste d'interdits du bail et ses protections ne sont
-jamais approuvées par un bail. Les commandes ci-dessous marchent hors ligne,
-démon arrêté ou non :
-
-```bash
-edge-setup yolo status
-edge-setup yolo off --yes
-edge-setup yolo on --yes
-```
-
-`status` liste par instance les baux tenus, leur échéance et les
-auto-approbations pas encore accusées par openedbot (`--json` pour une
-machine). `off` écrit `yolo-kill.json` dans l'état du connecteur et retire les
-`yolo.json` des profils : le plugin redemande dès son appel suivant, un démon
-qui tourne coupe tout en moins de 2 s et le signale à openedbot au prochain
-lien. Tout bail émis avant ce moment reste refusé, même après `on`, qui ne lève
-que le refus local des baux suivants. Sans `--yes`, rien n'est changé.
-
-En mode solo local (un espace dont le propriétaire est le seul membre, et qui
-a activé « YOLO par défaut (solo) »), openedbot renouvelle pour lui un bail de
-runtime de 24 h. `.ssh`, `.env` (et `.env.*`) et le trousseau restent toujours
-protégés. Ce renouvellement s'arrête dès qu'un deuxième membre rejoint
-l'espace, et `off` le coupe aussi : openedbot remet le réglage à faux en
-l'apprenant, et ne renouvelle plus rien tant qu'on ne l'a pas rallumé.
-
 ## Sauvegarde, destruction
 
 Ce qui vaut la peine d'être sauvegardé tient dans `/srv/hermes/data`

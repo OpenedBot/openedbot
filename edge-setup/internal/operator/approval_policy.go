@@ -16,7 +16,6 @@ import (
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/exec"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/fsx"
-	"github.com/OpenedBot/openedbot/edge-setup/internal/yolohardline"
 )
 
 //go:embed approval_policy_plugin/* approval_policy_config.py
@@ -236,13 +235,7 @@ func (p approvalPolicyService) bundleCurrent(slug string) bool {
 			return false
 		}
 	}
-	rules := filepath.Join(pluginDir, yoloHardlineFile)
-	installed, err := fsx.Lstat(rules)
-	if err != nil || !installed.Exists || installed.Symlink || !installed.Regular || installed.Owner != p.owner {
-		return false
-	}
-	got, err := os.ReadFile(rules)
-	return err == nil && string(got) == string(yolohardline.JSON)
+	return true
 }
 
 func validBlockedTools(keys []string) bool {
@@ -412,11 +405,6 @@ func (p approvalPolicyService) install(slug string) (bool, error) {
 				return false, err
 			}
 		}
-	}
-	// The YOLO rules: data the plugin reads at each call under a lease, so
-	// a change needs no reload and does not make the profile pending.
-	if err := writeIfChanged(filepath.Join(pluginDir, yoloHardlineFile), yolohardline.JSON, p.owner); err != nil {
-		return false, err
 	}
 	return changed, nil
 }

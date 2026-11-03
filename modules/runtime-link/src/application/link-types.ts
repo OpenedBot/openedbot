@@ -1,10 +1,4 @@
-import type {
-  RelayAuditAnchorFrame,
-  RelayDiagnosticFrame,
-  RelayYoloAuditFrame,
-  RelayYoloLeaseFrame,
-  RelayYoloStateFrame,
-} from "@openedbot/contracts-connector";
+import type { RelayAuditAnchorFrame, RelayDiagnosticFrame } from "@openedbot/contracts-connector";
 import type { AnchorWrite } from "./audit-keys";
 import { LINK_RECONNECT_REASON } from "../domain/link-probe";
 
@@ -83,26 +77,6 @@ export type LinkEventMeta = {
   keyId?: string;
   writeSeq?: number;
 };
-
-/**
- * Ce que `yolo.state` laisse à faire sur le lien : les baux vivants que
- * l'hôte ne cite pas (à lui redonner) et ceux qu'il dit actifs alors
- * qu'openedbot ne les tient plus pour vivants (à lui retirer).
- */
-export type YoloStateOutcome = {
-  redeliver: RelayYoloLeaseFrame[];
-  revoke: string[];
-  /** Baux révoqués ici à cause de l'hôte : `yolo off` (`host_cli`) ou un refus (`host_rejected`). */
-  revokedByHost: number;
-};
-
-/** Pourquoi une tranche `yolo.audit` part en quarantaine plutôt qu'au journal. */
-export type YoloAuditQuarantineReason = "hash_mismatch" | "prev_mismatch" | "seq_gap" | "conflict" | "unknown_lease";
-
-/** `recorded` et `duplicate` comme `quarantined` sont conservés : l'hôte peut purger jusqu'à `toSeq`. */
-export type YoloAuditOutcome =
-  | { outcome: "recorded" | "duplicate"; inserted: number }
-  | { outcome: "quarantined"; reason: YoloAuditQuarantineReason; brokenSeq: number };
 
 /** Les écritures de vitalité (`link_*`, `last_health_status`), injectables dans les tests. */
 export class LinkLeaseLostError extends Error {
@@ -190,18 +164,6 @@ export type LinkLivenessStore = {
    * lien se relie par un nouvel enrôlement.
    */
   emergencyRotate?(link: LinkIdentity, meta: LinkEventMeta): Promise<void>;
-  /**
-   * Mode YOLO (`link-yolo.ts`) : l'état des baux que l'hôte tient. Livraison et
-   * état hôte écrits ; un `killedAt` (`edge-setup yolo off`) révoque ici les
-   * baux qu'il a tués (`host_cli`), un refus de l'hôte aussi (`host_rejected`).
-   */
-  yoloState?(link: LinkIdentity, frame: RelayYoloStateFrame): Promise<YoloStateOutcome>;
-  /**
-   * Mode YOLO : une tranche de l'audit local des auto-approbations. Chaîne
-   * revérifiée, insertion idempotente sur (runtime, séquence) ; une chaîne
-   * rompue part en quarantaine, journalisée et signalée, jamais jetée.
-   */
-  yoloAudit?(link: LinkIdentity, frame: RelayYoloAuditFrame): Promise<YoloAuditOutcome>;
 };
 
 export type LinkLogger = (event: string, fields: Record<string, unknown>) => void;

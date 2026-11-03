@@ -10,8 +10,6 @@ import { API_INSTANCE_HEARTBEAT_MS, createApiInstanceRegistry, createRuntimeLink
 import { startRuntimeLinkServer } from "@openedbot/runtime-link/application/server";
 import { createRuntimeLinkGateway, RUNTIME_LINK_INTERNAL_PREFIX } from "@openedbot/runtime-link/application/gateway";
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
-import { yoloLinkLeaseKeys } from "@openedbot/runtime-link/application/link-yolo";
-import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { runtimeLinkInternalRoutes } from "./internal-relay";
 
@@ -48,14 +46,13 @@ const signalInventoryChanged = (link: { organizationId: string; runtimeId: strin
 };
 const broker = new RuntimeLinkBroker({
   instanceId,
-  liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm), webAppUrl: config.webUrl }),
+  liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm) }),
   log,
   onInventoryChanged: signalInventoryChanged,
 });
 // `link.context` annonce la dernière version d'edge-setup : la même source que l'API.
 createConnectorReleaseFeed({ url: config.connectorReleasesUrl, versions: config.connectorVersions }).start();
-// Mode YOLO : les clés publiques de bail (les mêmes variables que l'API), épinglées par l'hôte.
-const gateway = createRuntimeLinkGateway({ db, config, broker, log, leaseKeys: yoloLinkLeaseKeys(readYoloLeaseSigningConfig(process.env)) });
+const gateway = createRuntimeLinkGateway({ db, config, broker, log });
 const app = new Hono();
 app.get("/health", async (context) => {
   await db`select 1`;

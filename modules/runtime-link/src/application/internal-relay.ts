@@ -13,7 +13,6 @@ import { SSE_HEARTBEAT_INTERVAL_MS } from "@openedbot/platform-config/sse-heartb
 import { constantTimeEqual } from "@openedbot/platform-db/credential";
 import { relayFailureStatus, type RuntimeLinkBroker } from "./broker";
 import { parseProbeGeneration, type LinkProbeResult } from "../domain/link-probe";
-import { pushLocalYolo, readYoloControlFrame } from "./link-yolo";
 import {
   loopResponse,
   RUNTIME_LINK_INTERNAL_PREFIX,
@@ -136,14 +135,10 @@ export function runtimeLinkInternalRelay(
     const runtimeId = context.req.param("runtimeId");
     const hopped = relayHopped((name) => context.req.header(name));
     const body = await jsonBody(context.req.raw);
-    // Mode YOLO : un bail ou une révocation, poussé seulement à un hôte qui sait l'appliquer.
-    const yolo = body.kind === "yolo" ? readYoloControlFrame(body.frame) : null;
-    if (body.kind === "yolo" && !yolo) return relayFailure(400, "HERMES_LINK_BAD_REQUEST", "Trame de contrôle invalide.", "before_dispatch");
     if (!broker?.connected(runtimeId)) {
       if (hopped) return loopResponse();
       const location = await locator.locate(runtimeId);
       if (location.kind === "remote") {
-        if (yolo) return context.json({ pushed: await locator.forwardYolo(runtimeId, yolo) });
         if (body.kind === "close") {
           const code = typeof body.code === "number" ? body.code : RELAY_CLOSE_UNAUTHORIZED;
           const reason = typeof body.reason === "string" ? body.reason : "LINK_ROTATED";
@@ -162,7 +157,6 @@ export function runtimeLinkInternalRelay(
       }
       return unavailableResponse(location.kind === "unavailable" ? location.detail : "no_link");
     }
-    if (yolo) return context.json({ pushed: pushLocalYolo(broker, runtimeId, yolo) === "pushed" });
     if (body.kind === "close") {
       const code = typeof body.code === "number" ? body.code : RELAY_CLOSE_UNAUTHORIZED;
       const reason = typeof body.reason === "string" ? body.reason : "LINK_ROTATED";

@@ -180,12 +180,6 @@ var HostFeatures = []string{
 	FeatureGatewayGracefulRestart,
 	FeatureSkillsInventory,
 	FeatureProfileToolsetsBatch,
-	// The newest, and dispensable: without them openedbot grants no YOLO
-	// lease to this host and keeps asking (frames_yolo.go). The operator
-	// announces them when it can write yolo.json; the connector keeps them
-	// only when it holds a lease store (Client.serves).
-	FeatureYoloLease,
-	FeatureYoloThreadScope,
 }
 
 // FeatureCreationAuditV2 is a LINK feature, announced in hello only: the
@@ -341,32 +335,25 @@ type Text struct {
 	Organization *LinkOrganization `json:"organization,omitempty"`
 	Owner        *LinkOwner        `json:"owner,omitempty"`
 	Limits       *LinkLimits       `json:"limits,omitempty"`
-	// LeaseKeys (link.context) are the public keys YOLO leases are signed
-	// with, pinned by the host (yolo_lease.go).
-	LeaseKeys []YoloLeaseKey    `json:"leaseKeys,omitempty"`
-	Previous  []AuditKeyRef     `json:"previous,omitempty"`
-	WriteSeq  uint64            `json:"writeSeq,omitempty"`
-	Count     int               `json:"count,omitempty"`
-	Dropped   uint64            `json:"dropped,omitempty"`
-	Tail      string            `json:"tail,omitempty"`
-	ID        uint32            `json:"id,omitempty"`
-	Method    string            `json:"method,omitempty"`
-	Path      string            `json:"path,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Body      string            `json:"body,omitempty"`
-	Status    int               `json:"status,omitempty"`
-	Code      string            `json:"code,omitempty"`
-	Message   string            `json:"message,omitempty"`
-	Stage     string            `json:"stage,omitempty"`
+	Previous     []AuditKeyRef     `json:"previous,omitempty"`
+	WriteSeq     uint64            `json:"writeSeq,omitempty"`
+	Count        int               `json:"count,omitempty"`
+	Dropped      uint64            `json:"dropped,omitempty"`
+	Tail         string            `json:"tail,omitempty"`
+	ID           uint32            `json:"id,omitempty"`
+	Method       string            `json:"method,omitempty"`
+	Path         string            `json:"path,omitempty"`
+	Headers      map[string]string `json:"headers,omitempty"`
+	Body         string            `json:"body,omitempty"`
+	Status       int               `json:"status,omitempty"`
+	Code         string            `json:"code,omitempty"`
+	Message      string            `json:"message,omitempty"`
+	Stage        string            `json:"stage,omitempty"`
 
 	// Accepts (link.context) lists the optional host frames this openedbot
 	// understands. An older openedbot closes the link on an unknown frame
 	// type, so such a frame is only ever sent when listed here.
 	Accepts []string `json:"accepts,omitempty"`
-
-	// Yolo is the strictly decoded body of a yolo.* frame (frames_yolo.go);
-	// those frames are encoded by EncodeYoloState / EncodeYoloAudit.
-	Yolo *YoloFrame `json:"-"`
 }
 
 // AuditKeyRef is one retired master key openedbot still hands out so the
@@ -407,9 +394,6 @@ type LinkContext struct {
 	// carry one. The daemon persists it next to the rest of the context so the
 	// first hello after a restart already honors it.
 	FeatureLimit int
-	// LeaseKeys are the YOLO lease keys announced; the enrollment writes
-	// them into link.json, the daemon pins them (yolo_lease.go).
-	LeaseKeys []YoloLeaseKey
 }
 
 // MaxLinkContextText bounds every link.context string.
@@ -512,9 +496,6 @@ func DecodeText(b []byte) (Text, error) {
 		if f.Limits != nil && f.Limits.Features != nil && *f.Limits.Features < 1 {
 			return f, errors.New("link.context limits.features must be an integer of at least 1")
 		}
-		if err := validLeaseKeys(f.LeaseKeys); err != nil {
-			return f, err
-		}
 		if len(f.Accepts) > MaxLinkContextAccepts {
 			return f, fmt.Errorf("link.context accepts lists more than %d frame types", MaxLinkContextAccepts)
 		}
@@ -564,12 +545,6 @@ func DecodeText(b []byte) (Text, error) {
 			return f, errors.New("err requires id, code and a valid stage")
 		}
 	case TPing, TPong:
-	case TYoloLease, TYoloRevoke, TYoloState, TYoloAudit, TYoloAuditAck:
-		yolo, err := decodeYoloFrame(f.T, b)
-		if err != nil {
-			return f, err
-		}
-		f.Yolo = yolo
 	default:
 		return f, fmt.Errorf("unknown frame type %q", f.T)
 	}

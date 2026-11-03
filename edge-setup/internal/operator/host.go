@@ -106,8 +106,6 @@ func Host(runner exec.Runner, token string, logf func(string, ...any)) *Server {
 	server.ApprovalPolicyRead = approvalPolicy.state
 	server.ApprovalPolicyWrite = approvalPolicy.write
 	server.GatewayRestarted = approvalPolicy.gatewayRestarted
-	yolo := yoloService{runtimeRoot: layout.RuntimeRoot, owner: hermes.ServiceOwner(), logf: logf}
-	server.YoloApply, server.YoloDrain, server.YoloDrained = yolo.apply, yolo.drain, yolo.drained
 	if err := ProbeInstalled(); err != nil {
 		if logf != nil {
 			logf("the toolset and MCP verbs are unavailable: %v", err)

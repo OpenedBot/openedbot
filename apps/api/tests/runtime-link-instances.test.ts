@@ -185,7 +185,6 @@ function stubLocator(locate: (runtimeId: string) => Promise<LinkLocation>, remot
     },
     forwardRotate: async () => false,
     forwardClose: async () => false,
-    forwardYolo: async () => false,
     forwardProbe: async () => ({ outcome: "no_link" }),
   };
 }

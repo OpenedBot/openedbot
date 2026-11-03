@@ -8,7 +8,6 @@ import { SettingsCardGrid } from "../../../components/settings/settings-card-gri
 import { InsetGroupedRow, InsetGroupedSection, InsetGroupedStatic } from "../../../components/mobile/inset-grouped";
 import { FleetA2APolicySettings, OrganizationPermissionRulesSettings } from "../../../pro-console/slots";
 import { OrganizationPermissionPolicySettings } from "../../../components/settings/organization-permission-policy";
-import { YoloLeasesCard } from "../../../components/yolo/yolo-leases-card";
 import { SettingsPane } from "../pane";
 
 /**
@@ -61,7 +60,6 @@ export function PoliciesSettings() {
           />
         </InsetGroupedSection>
         <OrganizationPermissionPolicySettings mobile onMobileFooterChange={setPermissionFooter} />
-        <YoloLeasesCard />
         <OrganizationPermissionRulesSettings />
         <FleetA2APolicySettings mobile onMobileFooterChange={setPolicyFooter} />
         <InsetGroupedSection caption={t("settingsPolicies.dataTitle")}>
@@ -144,9 +142,6 @@ export function PoliciesSettings() {
       </SettingsCardGrid>
 
       <OrganizationPermissionPolicySettings />
-
-      {/* À côté du plafond : les baux YOLO en cours et « Couper YOLO partout ». */}
-      <YoloLeasesCard />
 
       <OrganizationPermissionRulesSettings />
 

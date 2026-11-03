@@ -1,10 +1,9 @@
 import { EnrollmentStep } from "../../../../components/runtime-command";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRefresh } from "@tabler/icons-react";
 import { cn, Dialog, toast } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../../../lib/api";
-import { formatCountdown, useCountdown } from "../../../../lib/countdown";
 import { useT } from "../../../../lib/i18n";
 import type { RuntimeEnrollmentTicketDto } from "@openedbot/contracts-api";
 import { BUTTON } from "../../../../components/settings/primitives";
@@ -34,13 +33,33 @@ function isDevelopmentLinkCommand(command: string): boolean {
  * connexion tenable pour un client quelconque : l'application ne se connecte
  * jamais à sa machine, c'est sa machine qui vient à elle, en sortant.
  */
-/*
- * Le compte à rebours du ticket (`lib/countdown.ts`) : la seule chose qui
- * bouge toute seule ici. Un horodatage de fin (« jusqu'à 11:39:27 »)
- * demandait à l'opérateur de faire la soustraction pendant qu'il court après
- * un shell. On affiche donc ce qui lui sert (le temps qui reste), et on le
- * fait battre à la seconde.
+/**
+ * Le compte à rebours du ticket : la seule chose qui bouge toute seule ici.
+ *
+ * Un horodatage de fin (« jusqu'à 11:39:27 ») demandait à l'opérateur de faire
+ * la soustraction pendant qu'il court après un shell. On affiche donc ce qui
+ * lui sert (le temps qui reste), et on le fait battre à la seconde.
  */
+function useCountdown(expiresAt: string): { remainingMs: number; ratio: number } {
+  const endsAt = new Date(expiresAt).getTime();
+  const [now, setNow] = useState(() => Date.now());
+  // La durée totale est mesurée au montage : le ticket vient d'être créé, donc
+  // la jauge part pleine sans que l'API ait à publier son TTL.
+  const [startedAt] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+  const remainingMs = Math.max(0, endsAt - now);
+  const totalMs = Math.max(1, endsAt - startedAt);
+  return { remainingMs, ratio: Math.min(1, remainingMs / totalMs) };
+}
+
+function formatCountdown(remainingMs: number): string {
+  const seconds = Math.ceil(remainingMs / 1_000);
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
 /**
  * Une étape de l'appairage : son rang, son titre, sa charge utile copiable.

@@ -22,8 +22,7 @@
     "./legacy-env-guard": "./src/legacy-env-guard.ts",
     "./rate-limit": "./src/rate-limit.ts",
     "./runtime-mode": "./src/runtime-mode.ts",
-    "./sse-heartbeat": "./src/sse-heartbeat.ts",
-    "./yolo-lease-signing": "./src/yolo-lease-signing.ts"
+    "./sse-heartbeat": "./src/sse-heartbeat.ts"
   },
   "scripts": {
     "test": "bun test tests",

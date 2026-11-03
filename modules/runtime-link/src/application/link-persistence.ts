@@ -24,7 +24,6 @@ import {
   type AuditAnchoring,
 } from "./audit-anchor";
 import { sanitizeDiagnosticText } from "../domain/diagnostics";
-import { createLinkYoloPersistence } from "./link-yolo";
 import {
   LinkLeaseLostError,
   type LinkIdentity,
@@ -59,8 +58,6 @@ export type LinkLivenessStoreOptions = {
   /** Remplace l'ancrage construit à partir de `worm` (tests, plug-in). */
   anchoring?: AuditAnchoring;
   now?: () => Date;
-  /** Origine de la PWA : le lien de l'e-mail d'un audit YOLO mis en quarantaine. */
-  webAppUrl?: string;
 };
 
 export function createLinkLivenessStore(db: Db, options: LinkLivenessStoreOptions = {}): LinkLivenessStore {
@@ -230,8 +227,6 @@ export function createLinkLivenessStore(db: Db, options: LinkLivenessStoreOption
         await insertRuntimeLinkEvent(tx, link.organizationId, link.runtimeId, "rotated", meta);
       });
     },
-    // Mode YOLO : l'état des baux et l'audit des auto-approbations (`link-yolo.ts`).
-    ...createLinkYoloPersistence(db, { webAppUrl: options.webAppUrl, log: logEvent }),
   };
   return store;
 }

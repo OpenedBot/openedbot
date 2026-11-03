@@ -502,10 +502,6 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/review-profiles.ts
 	bun tests/integration/approval-review.ts
 	bun tests/integration/organization-permission-policy.ts
-	bun tests/integration/yolo-leases.ts
-	bun tests/integration/yolo-link-ingest.ts
-	bun tests/integration/yolo-solo-local.ts
-	bun tests/integration/yolo-link.ts
 	bun tests/integration/tool-policies.ts
 	bun tests/integration/permission-rules.ts
 	bun tests/integration/permission-grants.ts
@@ -559,12 +555,7 @@ CONTRACT_COPIES := \
 	$(CONTRACT_GO)/test/golden/forbidden-toolsets/forbidden-toolsets.json=modules/runtimes/tests/fixtures/forbidden-toolsets.json \
 	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.bin=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.bin \
 	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.json=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.json \
-	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.key.txt=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.key.txt \
-	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.bin=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.bin \
-	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.json=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.json \
-	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2-yolo.key.txt=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2-yolo.key.txt \
-	$(CONTRACT_GO)/test/golden/yolo-hardline/hardline.json=modules/execution/tests/fixtures/yolo-hardline.json \
-	$(CONTRACT_GO)/test/golden/yolo-lease/lease-v1.json=modules/execution/tests/fixtures/yolo-lease/lease-v1.json
+	$(CONTRACT_GO)/internal/connector/testdata/creation-audit-v2.key.txt=$(CONTRACT_TS)/tests/fixtures/creation-audit/creation-audit-v2.key.txt
 
 contract-check: ## [contrat] Copies identiques des fixtures du fil, puis tests Go et TS du connecteur (EDGE_SETUP_DIR, défaut edge-setup/).
 	@if [ ! -f "$(CONTRACT_GO)/go.mod" ]; then \
@@ -579,8 +570,7 @@ contract-check: ## [contrat] Copies identiques des fixtures du fil, puis tests G
 	if [ "$$status" -ne 0 ]; then exit 1; fi; \
 	printf '$(C_OK)[make]$(C_RESET) Fixtures du fil identiques des deux côtés.\n'
 	cd $(CONTRACT_GO) && go test -count=1 ./internal/connector/... ./internal/pins/...
-	EDGE_SETUP_DIR="$(abspath $(CONTRACT_GO))" bun test $(CONTRACT_TS)/tests/transport $(CONTRACT_TS)/tests/creation-audit modules/runtimes/tests/runtime-contract.test.ts \
-		modules/execution/tests/yolo-hardline.test.ts modules/execution/tests/yolo-lease.test.ts
+	EDGE_SETUP_DIR="$(abspath $(CONTRACT_GO))" bun test $(CONTRACT_TS)/tests/transport $(CONTRACT_TS)/tests/creation-audit modules/runtimes/tests/runtime-contract.test.ts
 	@printf '$(C_OK)[make]$(C_RESET) Contrat connecteur tenu des deux côtés.\n'
 
 # ─── E2E et charge ───────────────────────────────────────────────────────────
@@ -591,7 +581,7 @@ e2e-api: ## Parcours HTTP cloud; exige la stack locale déjà lancée (make dev)
 	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/api-cloud.ts
 
-e2e-bot: ## Bots e2e sur le runtime lié (SCENARIOS=lifecycle|greeting|fast-path|coordination|model-reset|permissions|all|yolo, ARGS=...); rapport HTML dans tmp/e2e-bot/; exige make dev.
+e2e-bot: ## Bots e2e sur le runtime lié (SCENARIOS=lifecycle|greeting|fast-path|coordination|model-reset|permissions|all, ARGS=...); rapport HTML dans tmp/e2e-bot/; exige make dev.
 	@$(REQUIRE_API)
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : bots jetables, purgés et nettoyage hôte vérifié avant la fin.\n'
 	$(LOAD_ENV_OPT) E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts $(or $(SCENARIOS),lifecycle) $(ARGS)

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { RiFlashlightLine, RiFlaskLine, RiGroupLine, RiMoreFill, RiSettings3Line } from "@remixicon/react";
+import { RiFlaskLine, RiGroupLine, RiMoreFill, RiSettings3Line } from "@remixicon/react";
 import type { BotDto } from "@openedbot/contracts-api";
 import { useAgentEditor } from "../../lib/bots/agent-editor";
 import { useT } from "../../lib/i18n";
@@ -8,7 +8,6 @@ import { useAccountLayout } from "../../lib/shell/account-layout";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { AccountMenu } from "./account-menu";
 import { BotFace } from "../bot-face";
-import { useYoloThreadAction } from "../yolo/yolo-bot-section";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger, BuiSectionLabel } from "./menu";
 import { BAR_ICON_BUTTON, BoardHeader } from "./board-chrome";
 
@@ -25,13 +24,9 @@ import { BAR_ICON_BUTTON, BoardHeader } from "./board-chrome";
  *
  * `status` passe avant tout le reste : un état qui empêche le tour (le
  * runtime hors ligne) se lit avant ce que le tour coûterait.
- *
- * `threadId` : le fil affiché, que « Activer YOLO dans cette conversation »
- * vise (owner et admin seulement).
  */
 export function ConversationHeader({
   bot,
-  threadId,
   extra,
   status,
   context,
@@ -40,7 +35,6 @@ export function ConversationHeader({
   onOpenFeatureLab,
 }: {
   bot: BotDto;
-  threadId?: string | null;
   extra?: ReactNode;
   status?: ReactNode;
   context?: ReactNode;
@@ -55,13 +49,6 @@ export function ConversationHeader({
   const showEditor = useAgentEditor((state) => state.show);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const navigate = useNavigate();
-  const yolo = useYoloThreadAction({
-    botId: bot.id,
-    threadId,
-    closeMenu: () => setOptionsOpen(false),
-    itemClassName: `${BUI_PANEL_ITEM} text-body-medium text-text-primary`,
-    icon: <RiFlashlightLine className="size-4 shrink-0" />,
-  });
 
   return (
     <>
@@ -110,7 +97,6 @@ export function ConversationHeader({
                       <RiSettings3Line className="size-4 shrink-0" />
                       {t("boardui.advancedSettings")}
                     </button>
-                    {yolo.item}
                     {onOpenFeatureLab ? (
                       <button
                         type="button"
@@ -129,7 +115,6 @@ export function ConversationHeader({
           </>
         )}
       />
-      {yolo.dialog}
     </>
   );
 }

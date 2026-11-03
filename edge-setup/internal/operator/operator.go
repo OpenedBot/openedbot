@@ -163,13 +163,8 @@ type Server struct {
 	A2APolicyReady      func(context.Context) bool
 	ApprovalPolicyRead  func(context.Context, string) (approvalPolicyState, error)
 	ApprovalPolicyWrite func(context.Context, string, approvalPolicyRequest) (approvalPolicyState, error)
-	// YoloApply writes the profiles' yolo.json; YoloDrain / YoloDrained hand
-	// the plugin spools to the connector (yolo.go). Connector-only verbs.
-	YoloApply   func(context.Context, []yoloApplied) error
-	YoloDrain   func(context.Context) ([]yoloSpoolRecord, error)
-	YoloDrained func(context.Context) error
-	Now         func() time.Time
-	Logf        func(string, ...any)
+	Now                 func() time.Time
+	Logf                func(string, ...any)
 	// InventoryRoots are the files GET /inventory/fingerprint watches. An
 	// empty RuntimeRoot answers 404: the connector then never signals.
 	InventoryRoots InventoryRoots
@@ -345,10 +340,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /profiles/models", s.setProfileModels)
 	mux.HandleFunc("GET /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.ApprovalPolicyWrite))
 	mux.HandleFunc("PUT /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.ApprovalPolicyWrite))
-	// YOLO: called by the connector itself, never relayed (no allowlist entry).
-	mux.HandleFunc("PUT /yolo", yoloApplyHandler(s.YoloApply))
-	mux.HandleFunc("POST /yolo/audit/drain", yoloDrainHandler(s.YoloDrain, s.YoloDrained))
-	mux.HandleFunc("DELETE /yolo/audit/drain", yoloDrainHandler(s.YoloDrain, s.YoloDrained))
 	mux.HandleFunc("POST /profiles/{slug}/skills/{skill}", s.setProfileSkill)
 	mux.HandleFunc("POST /profiles/{slug}/bundled-skills", s.setProfileBundledSkills)
 	mux.HandleFunc("POST /profiles/{slug}/providers/{provider}/credentials", s.addProfileCredential)
@@ -445,12 +436,6 @@ func (s *Server) features() []string {
 	// one request at a time, which stays correct, only slower.
 	if s.Probe != nil && multiplex && s.Inventory != nil {
 		features = append(features, profileToolsetsBatchFeature)
-	}
-	// Newest of all: the plugin can enforce a YOLO lease from yolo.json, on a
-	// session too (its hook receives session_id). The connector drops both
-	// when it holds no lease store.
-	if s.YoloApply != nil && s.YoloDrain != nil && s.ApprovalPolicyWrite != nil {
-		features = append(features, yoloFeature, yoloThreadFeature)
 	}
 	return features
 }

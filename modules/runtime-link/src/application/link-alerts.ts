@@ -4,7 +4,6 @@ import {
   enqueueRuntimeLinkDownDeliveries,
   enqueueRuntimeLinkRestoredDeliveries,
 } from "@openedbot/notifications/sql/alert-channels";
-import { workspaceSlug } from "./link-yolo-alerts";
 
 /**
  * Alertes de panne durable du lien connecteur, côté worker.
@@ -202,6 +201,13 @@ async function enqueueRuntimeLinkEmails(
     if (queued) inserted += 1;
   }
   return inserted;
+}
+
+async function workspaceSlug(tx: SQL, organizationId: string): Promise<string> {
+  const organization = await tx<Array<{ slug: string }>>`
+    select slug from organizations where id = ${organizationId}
+  `;
+  return organization[0]?.slug ?? organizationId;
 }
 
 /** La charge utile du gabarit `runtime_link_down` : jamais de jeton ni d'adresse IP. */

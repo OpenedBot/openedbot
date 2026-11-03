@@ -8,20 +8,16 @@
  */
 
 import type { SQL } from "bun";
-import { parseYoloLease, RelayFrameError } from "@openedbot/contracts-connector";
 import type { GateDescriptor, GateIdentity } from "../../domain/gate-identity";
 import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
 import {
   decidePermission,
-  effectivePermissionMode,
   humanChoiceStillAllowed,
   unattendedDecision,
   type PermissionDecision,
   type PermissionGate,
   type PermissionPolicy,
-  type YoloGatePolicy,
 } from "../../domain/permission-decision";
-import { readGateYoloLeaseTx } from "../../sql/yolo-leases";
 import type { PermissionRules } from "../../domain/permission-rules";
 import { permissionRuleSourceFor } from "./permission-rule-sources";
 
@@ -47,8 +43,6 @@ export type GateState = {
   revision: number | string;
   reviewProven: boolean;
   rules: PermissionRules;
-  /** The active YOLO lease that covers the gate's run, if any. */
-  yolo: YoloGatePolicy | null;
 };
 
 type PolicyRow = { pipeline: "legacy" } | ({ pipeline: "v2" } & GateState);
@@ -80,38 +74,7 @@ function policyOf(state: GateState, planOnly: boolean): PermissionPolicy {
     grantActive: state.rules.grants.grantId !== null,
     terminalAlways: state.rules.grants.terminalAlways,
     commandBlocklist: state.rules.organizationPolicy.commandBlocklist,
-    yolo: state.yolo,
   };
-}
-
-/**
- * The YOLO lease that covers this run (migration 0158), read under the bot
- * lock: a grant or a revocation locks the organization `for update` and
- * raises the revision of the bots it covers, so the forwarding claim redoes
- * a decision taken before it. The table is tenant-scoped for the worker:
- * the read is bound to the run's organization, then the previous tenant is
- * put back, as `readGrantsTx` does. A stored payload this code cannot read
- * is no lease: it never widens a gate.
- */
-async function readYoloTx(tx: SQL, context: GateRunContext, botId: string): Promise<YoloGatePolicy | null> {
-  if (!context.runtimeId) return null;
-  const rows = await tx<Array<{ previous: string }>>`
-    select coalesce(current_setting('app.organization_id', true), '') as previous
-  `;
-  await tx`select set_config('app.organization_id', ${context.organizationId}, true)`;
-  try {
-    const row = await readGateYoloLeaseTx(tx, {
-      organizationId: context.organizationId, runtimeId: context.runtimeId, botId, threadId: context.threadId ?? null,
-    });
-    if (!row) return null;
-    const lease = parseYoloLease(row.payload);
-    return { leaseId: row.id, deny: lease.deny, protect: lease.protect };
-  } catch (error) {
-    if (error instanceof RelayFrameError) return null;
-    throw error;
-  } finally {
-    await tx`select set_config('app.organization_id', ${rows[0]?.previous ?? ""}, true)`;
-  }
 }
 
 /**
@@ -124,8 +87,7 @@ async function readYoloTx(tx: SQL, context: GateRunContext, botId: string): Prom
  * come from the organization's `PermissionRuleSource`, chosen before the
  * locks and read under them.
  */
-async function readPolicyTx(tx: SQL, context: GateRunContext, gate: GateIdentity): Promise<PolicyRow | null> {
-  const { organizationId, botId } = context;
+async function readPolicyTx(tx: SQL, organizationId: string, botId: string, gate: GateIdentity): Promise<PolicyRow | null> {
   const flags = await tx<Array<{ pipeline: string }>>`
     select permission_pipeline as pipeline from organizations where id = ${organizationId}
   `;
@@ -148,8 +110,7 @@ async function readPolicyTx(tx: SQL, context: GateRunContext, gate: GateIdentity
   // PERM2-7a: without a fresh proof of the review profile, `auto` is `manual`.
   const reviewProven = await readReviewProven(tx, organizationId);
   const rules = await source.read(tx, { organizationId, botId, gateKind: gate.gateKind, toolKey: gate.toolKey });
-  const yolo = await readYoloTx(tx, context, botId);
-  return { pipeline: "v2", mode: bot.mode, revision: bot.revision, reviewProven, rules, yolo };
+  return { pipeline: "v2", mode: bot.mode, revision: bot.revision, reviewProven, rules };
 }
 
 
@@ -157,26 +118,15 @@ async function readPolicyTx(tx: SQL, context: GateRunContext, gate: GateIdentity
  * The run a gate belongs to. `neverWait` is the snapshot its workflow took
  * from a routine with "Never wait" (PERM2-9, `workflows.never_wait`): nobody
  * is there to answer, so a human gate is refused at once. `planOnly`: the
- * operator asked this turn for a plan (`runs.plan_only`, 0155). `runtimeId`
- * and `threadId` find the YOLO lease that covers the run; without a runtime,
- * no lease applies.
+ * operator asked this turn for a plan (`runs.plan_only`, 0155).
  */
-export type GateRunContext = {
-  organizationId: string;
-  botId: string;
-  neverWait: boolean;
-  planOnly?: boolean;
-  runtimeId?: string;
-  threadId?: string | null;
-};
+export type GateRunContext = { organizationId: string; botId: string; neverWait: boolean; planOnly?: boolean };
 
 function decideV2(row: GateState, gate: GateIdentity, choices: readonly unknown[], context: GateRunContext): Extract<GateResolution, { pipeline: "v2" }> {
   // `review` only comes out with a proven review profile (effective mode
   // `auto`): the gate is born `reviewing` and the reviewer answers it (PERM2-7).
   const policy = policyOf(row, context.planOnly === true);
   const decision = unattendedDecision(decidePermission(permissionGate(gate, choices), policy), context.neverWait);
-  // The rule that lowered the bot's mode is named, never silent.
-  const lowered = effectivePermissionMode(policy).reason;
   return {
     pipeline: "v2",
     decision,
@@ -185,8 +135,6 @@ function decideV2(row: GateState, gate: GateIdentity, choices: readonly unknown[
     detail: {
       reason: decision.reason,
       effectiveMode: decision.effectiveMode,
-      ...(lowered ? { effectiveReason: lowered } : {}),
-      ...(decision.yoloLeaseId ? { yoloLeaseId: decision.yoloLeaseId } : {}),
       ...(decision.heldBy ? { heldStage: decision.heldBy.stage, heldReason: decision.heldBy.reason } : {}),
       // PERM2-11: the journal names the grant that answered, and its author.
       ...(decision.stage === "grant" && decision.reason === "grant" && row.rules.grants.grantId
@@ -201,7 +149,7 @@ export async function resolveGateTx(
   gate: GateIdentity,
   choices: readonly unknown[],
 ): Promise<GateResolution> {
-  const row = await readPolicyTx(tx, context, gate);
+  const row = await readPolicyTx(tx, context.organizationId, context.botId, gate);
   // A bot gone mid-run, or a legacy organization: today's behavior.
   if (!row || row.pipeline !== "v2") return { pipeline: "legacy" };
   return decideV2(row, gate, choices, context);
@@ -231,7 +179,7 @@ export async function checkBeforeForwardTx(
   },
 ): Promise<ForwardCheck> {
   if (approval.decidedByKind === null) return { action: "forward" };
-  const row = await readPolicyTx(tx, context, approval.gate);
+  const row = await readPolicyTx(tx, context.organizationId, context.botId, approval.gate);
   if (!row || row.pipeline !== "v2") return { action: "forward" };
   if (approval.decidedByKind !== "policy") {
     if (approval.choice !== "once") return { action: "forward" };
