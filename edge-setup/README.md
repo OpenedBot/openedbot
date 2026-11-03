@@ -29,17 +29,17 @@ PAM, journald, unattended upgrades, sandbox) is entirely **opt-in**.
 ```
 
 The wire contract between the host and openedbot (relay frames, the gateway
-route allowlist, named operator verbs) is specified in openedbot-protocol
-(`SPEC.md`); the host-side reference is [`docs/CONNECTOR.md`](docs/CONNECTOR.md).
+route allowlist, named operator verbs) is specified in
+[`protocol/SPEC.md`](../protocol/SPEC.md); the host-side reference is [`docs/CONNECTOR.md`](docs/CONNECTOR.md).
 
 ## Where it fits
 
 | Component | Role |
 |---|---|
-| **edge-setup** (this repo) | Host side: installer, hardening and outbound connector |
-| openedbot-main | Cloud side: the openedbot console, API and link gateway (Apache-2.0 open core) |
-| openedbot-protocol | The connector protocol specification and test vectors, for any agent or gateway |
-| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype for openedbot |
+| **`edge-setup/`** (this directory) | Host side: installer, hardening and outbound connector |
+| [`apps/`](../README.md) | Cloud side: the openedbot console, API and link gateway (Apache-2.0 open core) |
+| [`protocol/`](../protocol/README.md) | The connector protocol specification and test vectors, for any agent or gateway |
+| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype for openedbot (its own repository) |
 
 ## Supported hosts
 

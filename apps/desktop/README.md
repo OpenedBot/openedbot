@@ -9,7 +9,7 @@
 ## Overview
 
 openedbot is the cloud console that drives AI agents installed on your own servers. This
-repository is a thin Electron shell around it; it re-implements **nothing** of the product. It:
+app is a thin Electron shell around it; it re-implements **nothing** of the product. It:
 
 - loads the full openedbot web console (`OPENEDBOT_CONSOLE_URL`);
 - handles native sign-in, always with PKCE: a one-time e-mail code, or Google through the system
@@ -26,12 +26,12 @@ auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on fir
 
 ## Where it fits
 
-| Repository | Role |
+| Part | Role |
 |---|---|
-| [openedbot-main](https://github.com/OpenedBot/openedbot) | Console and API (open core, Apache-2.0) loaded by this shell |
-| **openedbot-desktop** (this repo) | Electron shell, native sign-in, popup host |
-| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Native notch popup embedded in the macOS build |
-| [edge-setup](https://github.com/OpenedBot/openedbot) | Server-side installer and connector |
+| [`apps/console`, `apps/api`](../../README.md) | Console and API (open core, Apache-2.0) loaded by this shell |
+| **`apps/desktop`** (this app) | Electron shell, native sign-in, popup host |
+| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Native notch popup embedded in the macOS build (its own repository) |
+| [`edge-setup/`](../../edge-setup/README.md) | Server-side installer and connector |
 
 ## Features
 
@@ -52,8 +52,8 @@ auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on fir
 - No Node install needed to run the app: Electron ships its own
 - An openedbot console to target (see [Configuration](#configuration))
 - For `make package-mac`: a Mac and the popup bundle built in an
-  [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) checkout, next to this
-  repository by default (`make -C ../openedbot-notch bundle` from the repository root;
+  [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) checkout, next to the
+  openedbot checkout by default (`make -C ../openedbot-notch bundle` from the monorepo root;
   `NOTCH_DIR=/path/to/openedbot-notch` otherwise)
 
 ## Quick start
