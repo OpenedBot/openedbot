@@ -1,0 +1,255 @@
+# Builds the desktop app (apps/desktop): the macOS .dmg (arm64, signed ad hoc,
+# notch popup embedded) and the Linux AppImage and .deb (x64). A pull request
+# that touches the app builds them as run artifacts. A desktop/vX.Y.Z tag also
+# publishes them as a GitHub release, under stable names, so
+# https://github.com/OpenedBot/openedbot/releases/latest/download/<file> always
+# serves the newest build. No developer certificate, no notarisation, no
+# auto-update feed (apps/desktop/README.md).
+# Actions pinned by SHA; Bun pinned by packageManager (package.json).
+name: desktop-release
+
+on:
+  pull_request:
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-release.yml
+  push:
+    tags: ["desktop/v*"]
+  workflow_dispatch:
+    inputs:
+      notch_ref:
+        description: "OpenedBot/openedbot-notch ref to embed"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NOTCH_REF: ${{ github.event.inputs.notch_ref || 'main' }}
+
+jobs:
+  version:
+    name: Resolve the version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: v
+        # The ref goes through the environment, never the script body: `${{ }}`
+        # is substituted before the shell reads the line.
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$(jq -r .version apps/desktop/package.json)"
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "apps/desktop/package.json has no X.Y.Z version: $version" >&2; exit 2 ;;
+          esac
+          release=false
+          if [ "$REF_TYPE" = "tag" ]; then
+            # A tag that disagrees with package.json would publish files whose
+            # names and About box carry another version.
+            if [ "$REF_NAME" != "desktop/v$version" ]; then
+              echo "tag $REF_NAME does not match apps/desktop/package.json ($version): want desktop/v$version" >&2
+              exit 2
+            fi
+            release=true
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+  mac:
+    name: macOS dmg (arm64)
+    needs: version
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: OpenedBot/openedbot-notch
+          ref: ${{ env.NOTCH_REF }}
+          path: openedbot-notch
+      - name: Toolchain (newest Xcode on the image)
+        # Same choice as the notch's own CI: older Swift times out on its views.
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$xcode"
+          echo "$xcode"
+          swift --version
+      - name: Build the notch popup (signed ad hoc)
+        env:
+          OPENEDBOT_NOTCH_ADHOC: "1"
+        run: |
+          # An older notch ref signs with a keychain identity whose trust
+          # prompt hangs a runner until the timeout: stop at once instead.
+          grep -q OPENEDBOT_NOTCH_ADHOC openedbot-notch/scripts/dev-sign.sh || {
+            echo "OpenedBot/openedbot-notch@$NOTCH_REF predates ad hoc signing (OPENEDBOT_NOTCH_ADHOC): pick a newer notch_ref" >&2
+            exit 1
+          }
+          make -C openedbot-notch bundle
+          echo "NOTCH_SHA=$(git -C openedbot-notch rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install
+        working-directory: apps/desktop
+        run: |
+          bun install --frozen-lockfile
+          bun x install-electron
+      - name: Typecheck and tests
+        working-directory: apps/desktop
+        run: make typecheck test
+      - name: Package
+        working-directory: apps/desktop
+        run: make package-mac NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
+      - name: Check the app
+        working-directory: apps/desktop
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          app=release/mac-arm64/openedbot.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q '^Signature=adhoc$'
+          [ -x "$app/Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup" ]
+          [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION" ]
+          hdiutil verify "release/openedbot-$VERSION-mac-arm64.dmg"
+      - name: Stage under the release name
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir -p out
+          cp "apps/desktop/release/openedbot-$VERSION-mac-arm64.dmg" out/openedbot-mac-arm64.dmg
+          echo "$NOTCH_SHA" > out/notch-sha.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-mac
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux AppImage and deb (x64)
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install
+        working-directory: apps/desktop
+        run: |
+          bun install --frozen-lockfile
+          bun x install-electron
+      - name: Typecheck and tests
+        working-directory: apps/desktop
+        run: make typecheck test
+      - name: Package
+        working-directory: apps/desktop
+        run: make package-linux
+      - name: Check the packages
+        working-directory: apps/desktop
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          # electron-builder spells the architecture per target (amd64 for the
+          # .deb, x86_64 for the AppImage): find each file by its extension.
+          one() { set -- $1; [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "want exactly one file, got: $*" >&2; exit 1; }; echo "$1"; }
+          deb="$(one 'release/*.deb')"
+          appimage="$(one 'release/*.AppImage')"
+          echo "DEB=apps/desktop/$deb" >> "$GITHUB_ENV"
+          echo "APPIMAGE=apps/desktop/$appimage" >> "$GITHUB_ENV"
+          dpkg-deb --info "$deb"
+          [ "$(dpkg-deb --field "$deb" Version)" = "$VERSION" ]
+          # The Google return (ohb://auth/callback) needs the scheme handler.
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/ohb'
+          [ -x "$appimage" ]
+      - name: Smoke launch
+        # The packaged app must stay up for 20 s on a virtual display (timeout
+        # exits 124); a crash at startup exits sooner with another status.
+        # --no-sandbox: the runner forbids the unprivileged user namespaces the
+        # Chromium sandbox needs, which an installed .deb gets through its
+        # setuid chrome-sandbox.
+        working-directory: apps/desktop
+        run: |
+          set +e
+          xvfb-run --auto-servernum timeout 20 release/linux-unpacked/openedbot --no-sandbox
+          status=$?
+          set -e
+          [ "$status" -eq 124 ] || { echo "the app exited with $status before 20 s" >&2; exit 1; }
+      - name: Stage under the release names
+        run: |
+          mkdir -p out
+          cp "$APPIMAGE" out/openedbot-linux-x86_64.AppImage
+          cp "$DEB" out/openedbot-linux-amd64.deb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-linux
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish the GitHub release
+    needs: [version, mac, linux]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          path: out
+          merge-multiple: true
+      - name: Checksums and notes
+        working-directory: out
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          notch="$(cat notch-sha.txt)"
+          rm notch-sha.txt
+          sha256sum openedbot-mac-arm64.dmg openedbot-linux-x86_64.AppImage openedbot-linux-amd64.deb > SHA256SUMS
+          cat SHA256SUMS
+          {
+            echo "openedbot desktop $VERSION."
+            echo
+            echo "| System | File |"
+            echo "|---|---|"
+            echo "| macOS, Apple Silicon | \`openedbot-mac-arm64.dmg\` |"
+            echo "| Debian, Ubuntu (x64) | \`openedbot-linux-amd64.deb\` |"
+            echo "| Other Linux (x64) | \`openedbot-linux-x86_64.AppImage\` |"
+            echo
+            echo "No developer certificate: on macOS, the first launch is refused, then allowed from System Settings › Privacy & Security › Open Anyway. Install steps: apps/desktop/README.md."
+            echo
+            echo "Notch popup: OpenedBot/openedbot-notch@$notch."
+          } > ../notes.md
+      - name: Create or update the release
+        # A re-run of the same tag replaces the files instead of failing.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          files="out/openedbot-mac-arm64.dmg out/openedbot-linux-x86_64.AppImage out/openedbot-linux-amd64.deb out/SHA256SUMS"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
+            gh release upload "$TAG" $files --clobber
+          else
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $files --verify-tag --latest --title "openedbot desktop $VERSION" --notes-file notes.md
+          fi
+          echo "Release $TAG: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

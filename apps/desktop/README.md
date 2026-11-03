@@ -1,6 +1,6 @@
 # openedbot Desktop
 
-**The openedbot console in a native desktop window, for macOS and Windows.**
+**The openedbot console in a native desktop window, for macOS, Windows and Linux.**
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)
@@ -21,8 +21,26 @@ The whole UI (bots, threads, settings) comes from the console, sign-in included:
 window shows the console's `/login`, which signs in through `__OHB_NATIVE__.auth`. The local page
 (`src/renderer/signin.html`) is only a fallback for a console that predates that screen.
 
-**Scope:** macOS (Apple Silicon) first, Windows x64 always built, sideloaded. Out of scope: Linux,
-auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on first launch).
+**Scope:** macOS (Apple Silicon) first, Windows x64 and Linux x64 also built, sideloaded. Out of
+scope: auto-update, a developer certificate and notarisation (Gatekeeper / SmartScreen warn on
+first launch). The macOS app is signed ad hoc only.
+
+## Download and install
+
+Releases are GitHub releases of this repository, built by
+[`.github/workflows/desktop-release.yml`](../../.github/workflows/desktop-release.yml) from a
+`desktop/vX.Y.Z` tag. Each one carries `SHA256SUMS`. The latest build is always at
+`https://github.com/OpenedBot/openedbot/releases/latest/download/<file>`:
+
+| System | File | Install |
+|---|---|---|
+| macOS, Apple Silicon | `openedbot-mac-arm64.dmg` | Drag *openedbot* to *Applications*. First launch: macOS refuses it, then *System Settings › Privacy & Security › Open Anyway* |
+| Debian, Ubuntu (x64) | `openedbot-linux-amd64.deb` | `sudo apt install ./openedbot-linux-amd64.deb`, then *openedbot* in the applications menu |
+| Other Linux (x64) | `openedbot-linux-x86_64.AppImage` | `chmod +x openedbot-linux-x86_64.AppImage` and run it (needs FUSE 2: `libfuse2`) |
+
+On Linux, the session is kept across launches only with a system vault (GNOME Keyring /
+libsecret or KWallet); without one, the app signs in again at each launch. Ubuntu 24.04 and
+later restrict the sandbox of AppImages: prefer the `.deb` there.
 
 ## Where it fits
 
@@ -82,7 +100,8 @@ dependencies and the Electron binary first when needed), and `make stop` also st
 | `make logs` | Latest events from the shell's SQLite diagnostics log |
 | `make lab` | Design lab for the sign-in page (<http://localhost:5317>) |
 | `make popup-check` | Check the popup bundle to embed |
-| `make package-mac` | Unsigned dmg + zip, macOS arm64, into `release/` (on a Mac) |
+| `make package-mac` | Dmg + zip, macOS arm64, signed ad hoc, into `release/` (on a Mac) |
+| `make package-linux` | Unsigned AppImage + deb, Linux x64, into `release/` |
 | `make package-win` | Unsigned portable zip, Windows x64, into `release/` |
 | `make package-win-installer` | Unsigned NSIS installer (Wine required from Linux) |
 | `make clean` | Remove `dist/` and `release/` |
@@ -104,8 +123,8 @@ Precedence: environment variable, then `config.json`, then build-time defaults
 Development-only variables: `OPENEDBOT_TARGET` (`prod` or an API URL), `OPENEDBOT_POPUP_APP` (path to a popup bundle),
 `OPENEDBOT_REMOTE_DEBUGGING_PORT`.
 
-`config.json` lives in `%APPDATA%\openedbot\` (Windows) or
-`~/Library/Application Support/openedbot/` (macOS). Plain `http://` is accepted only for
+`config.json` lives in `%APPDATA%\openedbot\` (Windows),
+`~/Library/Application Support/openedbot/` (macOS) or `~/.config/openedbot/` (Linux). Plain `http://` is accepted only for
 `localhost`, loopback, private networks and `.local` / `.lan` / `.test` hosts; everything else
 must be `https://`. The API must list the redirect URI in its native redirect URIs.
 
@@ -121,8 +140,10 @@ older `config.json` or build that names the apex keeps working (`src/main/target
 - Google opens the system browser (PKCE S256) while the shell polls the API every 1.5 s (5 min
   max). E-mail and password go through `POST /api/auth/native/authorize`; in production only
   Google is offered.
-- Tokens are encrypted with the OS vault (DPAPI on Windows, Keychain on macOS) in `tokens.bin`.
-  Without a vault the session stays in memory; nothing is written in clear.
+- Tokens are encrypted with the OS vault (DPAPI on Windows, Keychain on macOS, libsecret or
+  KWallet on Linux) in `tokens.bin`. Without a vault the session stays in memory; nothing is
+  written in clear. Linux's `basic_text` fallback (a key built into Chromium) counts as no vault
+  (`src/main/vault.ts`).
 - The access token is renewed 60 s before expiry; a refused refresh shows the sign-in page again.
 - Browser callback: `ohb://auth/callback`, falling back to `http://127.0.0.1:47813/callback`.
 

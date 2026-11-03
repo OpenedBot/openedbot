@@ -1,5 +1,7 @@
-# Sideload builds only: unsigned Windows x64 (zip, NSIS) and macOS arm64 (dmg, zip).
-# No auto-update feed, no code signing, so SmartScreen will warn on first run.
+# Sideload builds only: unsigned Windows x64 (zip, NSIS), macOS arm64 (dmg, zip,
+# signed ad hoc) and Linux x64 (AppImage, deb). No auto-update feed and no
+# developer certificate: SmartScreen and Gatekeeper warn on first run.
+# .github/workflows/desktop-release.yml builds the macOS and Linux files.
 appId: app.openedbot.desktop
 productName: openedbot
 copyright: Copyright (c) 2026 Kévin Aubrée
@@ -47,8 +49,8 @@ nsis:
   perMachine: false
   deleteAppDataOnUninstall: false
 
-# macOS, Apple Silicon. Unsigned and not notarized: Gatekeeper blocks the first
-# launch (right-click > Open, or System Settings > Privacy & Security).
+# macOS, Apple Silicon. Signed ad hoc, not notarized: Gatekeeper blocks the first
+# launch of a downloaded copy (System Settings > Privacy & Security > Open Anyway).
 mac:
   target:
     - target: dmg
@@ -60,7 +62,13 @@ mac:
   icon: build/icon.icns
   category: public.app-category.productivity
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
-  identity: null
+  # Ad hoc ("-"), not null: an unsigned bundle whose Electron seal was broken by
+  # packaging (Info.plist, the embedded popup) is reported "damaged" once
+  # downloaded, with no way to open it; a consistent ad hoc signature gets the
+  # "Open Anyway" path instead. Hardened runtime off: with an ad hoc identity it
+  # enforces library validation, which rejects the Electron frameworks.
+  identity: "-"
+  hardenedRuntime: false
   # Registers ohb:// with Launch Services so the Google return lands here.
   protocols:
     - name: openedbot
@@ -74,3 +82,32 @@ mac:
   extraFiles:
     - from: popup-bundle/OHBPopup.app
       to: Helpers/OHBPopup.app
+
+# Linux x64: an AppImage (any distribution, nothing to install) and a .deb
+# (Debian, Ubuntu). Unsigned. The window, tray and menus follow the Windows
+# path (src/main): no popup, which is macOS only.
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  executableName: openedbot
+  icon: src/renderer/icon.png
+  category: Office
+  synopsis: Drive your AI agents from a native window
+  # The .deb control file needs a maintainer; package.json has no author.
+  maintainer: openedbot <no-reply@openedbot.app>
+  vendor: openedbot
+  # The .desktop entry declares x-scheme-handler/ohb, so the desktop opens the
+  # Google return (ohb://auth/callback) with this app once it is installed
+  # (.deb, or an AppImage integrated by the desktop). Otherwise
+  # setAsDefaultProtocolClient fails and src/main/deep-link.ts falls back to the
+  # loopback callback.
+  protocols:
+    - name: openedbot
+      schemes:
+        - ohb

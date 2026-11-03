@@ -15,7 +15,8 @@
     "start": "electron .",
     "package:win:zip": "electron-builder --win zip",
     "package:win:nsis": "electron-builder --win nsis",
-    "package:mac": "electron-builder --mac"
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux"
   },
   "engines": {
     "node": ">=20"

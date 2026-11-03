@@ -63,7 +63,7 @@ runtime.
 | `apps/worker` | Claims queued runs and executes them on the bot's runtime; maintenance jobs | Bun workspace |
 | `apps/link-gateway` | Ends the outbound links that hosts open | Bun workspace |
 | `apps/console` | Web console (React, Vite) | Bun workspace |
-| `apps/desktop` | Desktop app for macOS and Windows; on macOS it embeds the notch popup from [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Electron, own toolchain |
+| `apps/desktop` | Desktop app for macOS, Windows and Linux; on macOS it embeds the notch popup from [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Electron, own toolchain |
 | `modules/` | One package per business context: `identity`, `roster`, `conversation`, `execution`, `runtimes`, … | Bun workspaces |
 | `platform/` | Server foundations: database, configuration, observability, Hermes client, integrations | Bun workspaces |
 | `contracts/` | Pure contracts shared by servers and browser: API DTOs, events, errors, i18n (`zod` only) | Bun workspaces |
