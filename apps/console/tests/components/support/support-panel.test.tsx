@@ -246,7 +246,7 @@ describe("la porte e-mail du guichet", () => {
       const stream = calls.find((call) => call.url.includes("/events"));
       expect(stream).toBeTruthy();
       expect(stream?.url).toContain("cursor=5");
-      expect(stream?.headers["X-OHB-Support-Token"]).toBe("jeton-de-test-assez-long-0123456789");
+      expect(stream?.headers["X-OpenedBot-Support-Token"]).toBe("jeton-de-test-assez-long-0123456789");
       expect(stream?.url).not.toContain("jeton-de-test");
     });
   });
@@ -304,7 +304,7 @@ describe("l’historique du visiteur", () => {
     });
     const read = calls.find((call) => call.method === "GET" && call.url.endsWith(id));
     expect(read).toBeTruthy();
-    expect(read?.headers["X-OHB-Support-Token"]).toBeUndefined();
+    expect(read?.headers["X-OpenedBot-Support-Token"]).toBeUndefined();
   });
 
   test("deux fils : la liste s’ouvre, et un clic ouvre l’ancien", async () => {

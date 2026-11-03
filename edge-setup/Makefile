@@ -24,9 +24,8 @@ SIGNED_DIR ?= dist-signed
 # Monorepo OpenedBot/openedbot : la racine (application openedbot, qui porte la
 # moitié TypeScript du contrat du lien) et docs/ (site de documentation, que
 # check-docs compare à docs/ d'ici). Surchargeables, jamais devinés ailleurs.
-ifneq ($(origin OHB_DIR),undefined) # rename:keep (one-release fallback)
-$(warning OHB_DIR is deprecated: rename it to OPENEDBOT_MAIN_DIR (old name read for one more release)) # rename:keep
-OPENEDBOT_MAIN_DIR ?= $(strip $(OHB_DIR))# rename:keep
+ifneq ($(origin OHB_DIR),undefined)
+$(error OHB_DIR is no longer read: set OPENEDBOT_MAIN_DIR instead, and unset OHB_DIR)
 endif
 OPENEDBOT_MAIN_DIR ?= ..
 DOCS_DIR ?= ../docs

@@ -48,7 +48,7 @@ export class Session {
       "Content-Type": "application/json",
       Cookie: cookie,
       "X-CSRF-Token": auth.csrfToken,
-      "X-OHB-Organization": auth.organizationId,
+      "X-OpenedBot-Organization": auth.organizationId,
     };
     const response = await fetch(`${config.apiUrl}/api/runtime`, { headers });
     const { runtime } = (await response.json()) as { runtime: RuntimePublicDto | null };

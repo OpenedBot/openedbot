@@ -59,9 +59,9 @@ directory ignored by git: clone or symlink the plug-in checkout there
 `plugins/admin`, and the checkout's `make/*.mk` fragments, if any, are included by the
 Makefile.
 
-> The packages are named `@openedbot/*` and the variables `OPENEDBOT_*` (the legacy `OHB_*`
-> names are still read for one release, with a warning); `X-OHB-*` headers are technical
-> names kept for compatibility.
+> The packages are named `@openedbot/*` and the variables `OPENEDBOT_*` (a retired `OHB_*`
+> name is no longer read: the apps and the Makefile refuse to start and name its successor), the
+> headers `X-OpenedBot-*` (the former `X-OHB-*` request headers are still read for one release).
 
 ## License
 

@@ -5,7 +5,7 @@ import { request, sharedRead, supportTokenHeader } from "./http";
 export const supportApi = {
   /**
    * Le guichet de support. Hors tenant, sans session : le jeton du visiteur
-   * voyage dans `X-OHB-Support-Token`, jamais dans un cookie.
+   * voyage dans `X-OpenedBot-Support-Token`, jamais dans un cookie.
    *
    * `tokenOverride: ""` n'est pas une coquetterie. Sans lui, un 401 sur ces
    * routes passerait par le nettoyage de session de `attempt()` et

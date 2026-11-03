@@ -145,7 +145,7 @@ export function authHeadersFor(token: string): Record<string, string> {
  * lirait comme un jeton difforme.
  */
 export function supportTokenHeader(token: string | null): Record<string, string> {
-  return token ? { "X-OHB-Support-Token": token } : {};
+  return token ? { "X-OpenedBot-Support-Token": token } : {};
 }
 
 export function cloudHeaders(method: string, includeOrganization = true, native = false): Record<string, string> {
@@ -155,8 +155,8 @@ export function cloudHeaders(method: string, includeOrganization = true, native 
   // Un bearer natif n'a pas de CSRF à prouver : l'API ne l'exige que sur un cookie.
   const csrfToken = native ? null : (readWebCsrfToken() ?? session?.csrfToken);
   return {
-    ...(includeOrganization && organizationId ? { "X-OHB-Organization": organizationId } : {}),
-    ...(fleetId ? { "X-OHB-Fleet": fleetId } : {}),
+    ...(includeOrganization && organizationId ? { "X-OpenedBot-Organization": organizationId } : {}),
+    ...(fleetId ? { "X-OpenedBot-Fleet": fleetId } : {}),
     ...(csrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)
       ? { "X-CSRF-Token": csrfToken }
       : {}),

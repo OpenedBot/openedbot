@@ -162,7 +162,6 @@ assert_no_preparation dev-admin "$admin_plan"
 # runtime mode is no longer passed: the apps always run in external mode.
 for target in dev dev-api dev-worker; do
   assert_literal_count "$target" "$(dry_run "$target")" "scripts/env.ts --check" 1
-  assert_not_contains "$target" "$(dry_run "$target")" 'OHB_RUNTIME_MODE' # rename:keep
 done
 
 # Profiles. The default profile is `fake`: the apps run against
@@ -173,13 +172,9 @@ for profile in fake bundled external; do
 done
 
 # Without MODE=, the profile follows DEV_HERMES_URL in the env file (the fake
-# gateway or nothing: fake; any other runtime: external), and a legacy
-# bundled workstation keeps its profile for one release.
-legacy_bundled_env='OHB_RUNTIME_MODE=bundled' # rename:keep
+# gateway or nothing: fake; any other runtime: external).
 external_env='DEV_HERMES_URL=https://runtime.example.test'
 fake_env='DEV_HERMES_URL=http://127.0.0.1:18642'
-derived_bundled_seed_plan="$(dry_run_with_env "$legacy_bundled_env" db-seed)"
-assert_literal_count "db-seed (legacy env bundled)" "$derived_bundled_seed_plan" 'OPENEDBOT_DEV_PROFILE="bundled"' 1
 derived_external_seed_plan="$(dry_run_with_env "$external_env" db-seed)"
 assert_literal_count "db-seed (env external)" "$derived_external_seed_plan" 'OPENEDBOT_DEV_PROFILE="external"' 1
 derived_fake_seed_plan="$(dry_run_with_env "$fake_env" db-seed)"
@@ -195,7 +190,6 @@ assert_literal_count "db-seed MODE=bundled (env external)" "$explicit_bundled_pl
 setup_plan="$(dry_run setup)"
 assert_not_contains setup "$setup_plan" "hermes-image-tag.ts"
 assert_literal_count setup "$setup_plan" 'OPENEDBOT_DEV_PROFILE="fake"' 1
-assert_not_contains setup "$setup_plan" 'OHB_RUNTIME_MODE' # rename:keep
 assert_literal_count setup "$setup_plan" "scripts/setup.sh" 1
 
 bundled_setup_plan="$(dry_run setup MODE=bundled)"

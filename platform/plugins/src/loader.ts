@@ -156,8 +156,8 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
 }
 
 /**
- * Prefixes of the core's own variables: `OPENEDBOT_`, and `OHB_`, the prefix
- * they carried until the OPENEDBOT_ rename (still read for one release).
+ * Prefixes of the core's own variables: `OPENEDBOT_`, and `OHB_`, the retired
+ * one, which no process starts with (platform/config/src/legacy-env.ts).
  */
 const CORE_ENV_PREFIXES = ["OPENEDBOT_", "OHB_"] as const; // rename:keep
 

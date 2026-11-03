@@ -33,7 +33,7 @@ export const RELAY_CLOSE_UNAUTHORIZED = 4401;
 export type RelayErrStage = "before_dispatch" | "after_dispatch";
 
 /** En-tête posé par le relais interne quand la réponse décrit une panne du LIEN, pas une réponse gateway. */
-export const RELAY_STAGE_HEADER = "X-OHB-Relay-Stage";
+export const RELAY_STAGE_HEADER = "X-OpenedBot-Relay-Stage";
 
 /**
  * Capacité annoncée dans `hello.features` : l'hôte sert les quatre routes

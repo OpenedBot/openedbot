@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-include scripts/lib/env-aliases.mk
+include scripts/lib/legacy-env.mk
 # Réglages propres au poste, jamais versionnés (.gitignore) : Makefile.local,
 # s'il existe, peut poser par exemple LINK_DEV_HOST=user@your-vm.
 -include $(CURDIR)/Makefile.local
@@ -16,16 +16,12 @@ ENV_FILE ?= .env.local
 # profile without repeating MODE= on every command:
 #   DEV_HERMES_URL absent, empty or the fake gateway   -> fake
 #   DEV_HERMES_URL=<any other runtime>                 -> external
-#   legacy OHB_RUNTIME_MODE=bundled (one release)      -> bundled (rename:keep)
 # The fake gateway URL is the one scripts/setup.sh writes for the fake profile.
 FAKE_HERMES_URL := http://127.0.0.1:18642
 env_file_value = $(strip $(lastword $(shell sed -n 's/^$(1)=//p' "$(ENV_FILE)" 2>/dev/null)))
-ENV_FILE_LEGACY_RUNTIME_MODE := $(call env_file_value,OHB_RUNTIME_MODE)# rename:keep (dropped variable, read one release)
 ENV_FILE_HERMES_URL := $(call env_file_value,DEV_HERMES_URL)
 
-ifeq ($(ENV_FILE_LEGACY_RUNTIME_MODE),bundled)
-MODE ?= bundled
-else ifeq ($(ENV_FILE_HERMES_URL),)
+ifeq ($(ENV_FILE_HERMES_URL),)
 MODE ?= fake
 else ifeq ($(ENV_FILE_HERMES_URL),$(FAKE_HERMES_URL))
 MODE ?= fake
@@ -41,7 +37,7 @@ endif
 # Vite compris ; un `bun run --cwd apps/api dev` lancé à la main ne charge
 # donc plus rien.
 ENV_FILES = $(ENV_FILE)
-LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a; . "$(CURDIR)/scripts/lib/env-aliases.sh";
+LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a; . "$(CURDIR)/scripts/lib/legacy-env.sh";
 LOAD_ENV = if [ ! -f "$(ENV_FILE)" ]; then printf '%s is missing. Run make setup.\n' "$(ENV_FILE)" >&2; exit 1; fi; $(LOAD_ENV_FILES)
 LOAD_ENV_OPT = $(LOAD_ENV_FILES)
 
@@ -457,7 +453,7 @@ test-dual: ## Tests unitaires deux fois : solo (sans plug-in), puis avec les plu
 	@echo "== test-dual : solo (OPENEDBOT_PLUGINS et OPENEDBOT_CONSOLE_PLUGINS vides)"
 	OPENEDBOT_PLUGINS= OPENEDBOT_CONSOLE_PLUGINS= $(MAKE) test-unit
 	@test -f "plugins/packages/pro-staff/src/plugin.ts" || { echo "test-dual : pas de plug-ins dans ./plugins (clonez ou liez le checkout des plug-ins en ./plugins)"; exit 2; }
-	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR) OHB_CORE_DIR=$(CURDIR) # rename:keep (plug-in checkout older than the rename)
+	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)
 	@echo "== test-dual : pro (OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
 	OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) $(MAKE) test-unit
 
@@ -479,7 +475,7 @@ solo-check: ## Console solo sans aucun écran pro (bundle et routes), contrôle 
 	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/solo.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/solo" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts solo "$(SOLO_CHECK_DIR)/solo.json"
 	bun apps/console/scripts/solo-bundle-strings.ts solo "$(SOLO_CHECK_DIR)/solo" $(SOLO_CHECK_MESSAGES)
-	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR) OHB_CORE_DIR=$(CURDIR) # rename:keep (plug-in checkout older than the rename)
+	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)
 	@echo "== solo-check : build pro (OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
 	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) OPENEDBOT_CONSOLE_MODULE_REPORT="$(SOLO_CHECK_DIR)/pro.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(SOLO_CHECK_DIR)/pro" --emptyOutDir
 	bun apps/console/scripts/solo-bundle-check.ts pro "$(SOLO_CHECK_DIR)/pro.json"
@@ -516,11 +512,11 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/unattended-gates.ts
 	bun tests/integration/bot-settings-tool.ts
 	bun tests/integration/run-identity-replay.ts
-	OHB118_CLEAN_EOF=1 bun tests/integration/run-identity-replay.ts
-	OHB118_STATUS_RECOVERY=1 bun tests/integration/run-identity-replay.ts
-	OHB118_STATUS_RECOVERY=failed bun tests/integration/run-identity-replay.ts
+	OPENEDBOT_TEST_118_CLEAN_EOF=1 bun tests/integration/run-identity-replay.ts
+	OPENEDBOT_TEST_118_STATUS_RECOVERY=1 bun tests/integration/run-identity-replay.ts
+	OPENEDBOT_TEST_118_STATUS_RECOVERY=failed bun tests/integration/run-identity-replay.ts
 	bun tests/integration/run-crash-replay.ts
-	OHB115_STATUS_RECOVERY=1 bun tests/integration/run-crash-replay.ts
+	OPENEDBOT_TEST_115_STATUS_RECOVERY=1 bun tests/integration/run-crash-replay.ts
 	bun tests/integration/busy-followup.ts
 	bun tests/integration/steer-lock-order.ts
 	bun tests/integration/worker-queue-lease.ts

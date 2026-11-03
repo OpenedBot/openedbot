@@ -185,8 +185,8 @@ export class ApiClient {
       ...init,
       credentials: "include",
       headers: {
-        "X-OHB-Organization": organizationId,
-        ...(actingFleetId ? { "X-OHB-Fleet": actingFleetId } : {}),
+        "X-OpenedBot-Organization": organizationId,
+        ...(actingFleetId ? { "X-OpenedBot-Fleet": actingFleetId } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(csrf && !["GET", "HEAD", "OPTIONS"].includes(method) ? { "X-CSRF-Token": csrf } : {}),
         ...init.headers,
@@ -301,7 +301,7 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Shared invitation endpoints; callers supply their existing session-aware transport. */
 export function agencyInvitationApi(request: <T>(path: string, init?: RequestInit) => Promise<T>) {
-  const agencyHeaders = (id: string) => ({ "X-OHB-Organization": id });
+  const agencyHeaders = (id: string) => ({ "X-OpenedBot-Organization": id });
   return {
     previewAgencyInvitation: (token: string) => request<AgencyClientInvitationPreview>(`/api/pro/agency/invite/${encodeURIComponent(token)}`),
     registerAgencyInvitee: (token: string, password: string) => request<{ user: { id: string; email: string }; organizationId: null; csrfToken: string }>(`/api/pro/agency/invite/${encodeURIComponent(token)}/register`, {

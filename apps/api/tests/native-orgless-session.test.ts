@@ -31,7 +31,7 @@ function app(session: { organizationId: string | null }) {
 
 function request(path: string, init: { method?: string; organization?: string } = {}) {
   const headers: Record<string, string> = { Authorization: "Bearer access" };
-  if (init.organization) headers["X-OHB-Organization"] = init.organization;
+  if (init.organization) headers["X-OpenedBot-Organization"] = init.organization;
   return new Request(`http://localhost${path}`, { method: init.method ?? "GET", headers });
 }
 

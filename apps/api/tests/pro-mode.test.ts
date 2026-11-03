@@ -216,7 +216,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
         const app = new Hono();
         app.use("/api/*", compatPathRedirects(aliases.paths, () => app.routes));
         app.route("/api/organization", memberRoutes(db, { webUrl: "https://app.ohb.test" } as ApiConfig));
-        app.get("/api/probe", (c) => c.json({ fleet: requestHeader(c, "X-OHB-Fleet") ?? null, query: requestQuery(c, "fleetId") ?? null }));
+        app.get("/api/probe", (c) => c.json({ fleet: requestHeader(c, "X-OpenedBot-Fleet") ?? null, query: requestQuery(c, "fleetId") ?? null }));
         for (const [from, to] of [
           ["/api/agency/fleet?days=7", "/api/pro/agency/fleet?days=7"],
           ["/api/invite/agency/tok", "/api/pro/agency/invite/tok"],

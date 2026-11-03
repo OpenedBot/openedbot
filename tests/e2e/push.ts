@@ -43,7 +43,7 @@ const cookie = setCookie.split(",").map((part) => part.trim().split(";")[0]).fil
 const headers = {
   Cookie: cookie,
   "X-CSRF-Token": loginBody.csrfToken,
-  "X-OHB-Organization": loginBody.organizationId,
+  "X-OpenedBot-Organization": loginBody.organizationId,
   "Content-Type": "application/json",
 };
 

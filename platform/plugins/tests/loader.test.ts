@@ -292,7 +292,7 @@ describe("capabilities and compatibility aliases (step 11.2)", () => {
 
   test("well-formed aliases are accepted and listed by kind", () => {
     const aliases = {
-      headers: [{ from: "X-OHB-Acme", to: "X-OHB-Fleet" }],
+      headers: [{ from: "X-OpenedBot-Acme", to: "X-OpenedBot-Fleet" }],
       queries: [{ from: "acmeId", to: "fleetId" }],
       paths: [{ from: "/api/acme", to: "/api/pro/acme" }],
       entitlements: [{ from: "acme.workspaces", to: "fleet.workspaces" }],
@@ -309,9 +309,9 @@ describe("capabilities and compatibility aliases (step 11.2)", () => {
 
   test.each([
     [{ colours: [] }, "invalid aliases.colours"],
-    [{ headers: [{ from: "Authorization", to: "X-OHB-Fleet" }] }, "invalid header alias"],
+    [{ headers: [{ from: "Authorization", to: "X-OpenedBot-Fleet" }] }, "invalid header alias"],
     [{ queries: [{ from: "a-b", to: "fleetId" }] }, "invalid query alias"],
-    [{ headers: [{ from: "X-OHB-Fleet", to: "X-OHB-Fleet" }] }, "invalid aliases.headers entry"],
+    [{ headers: [{ from: "X-OpenedBot-Fleet", to: "X-OpenedBot-Fleet" }] }, "invalid aliases.headers entry"],
     [{ paths: [{ from: "/api/acme/x", to: "/api/pro/acme" }, { from: "/api", to: "/api/pro/acme" }] }, "too broad"],
     // The session root: exact only, towards the core allowlist only, never a subtree.
     [{ paths: [{ from: "/api/auth/x", to: "/api/pro/acme" }] }, "must be exact and target an allowlisted path"],
@@ -320,7 +320,7 @@ describe("capabilities and compatibility aliases (step 11.2)", () => {
     [{ paths: [{ from: "/api/auth", to: "/api/auth/assisted-sessions/claim", exact: true }] }, "loops"],
     [{ paths: [{ from: "/api/acme/old", to: "/api/auth/me", exact: true }] }, "must be exact and target an allowlisted path"],
     [{ paths: [{ from: "/api/acme/old", to: "/api/pro/acme", exact: "yes" }] }, "invalid aliases.paths entry"],
-    [{ headers: [{ from: "X-OHB-Acme", to: "X-OHB-Fleet", exact: true }] }, "invalid aliases.headers entry"],
+    [{ headers: [{ from: "X-OpenedBot-Acme", to: "X-OpenedBot-Fleet", exact: true }] }, "invalid aliases.headers entry"],
     [{ paths: [{ from: "/api/pro/acme", to: "/api/acme" }] }, "reserved"],
     [{ paths: [{ from: "/internal/acme", to: "/api/acme" }] }, "reserved"],
     [{ paths: [{ from: "/api/acme", to: "/api/acme/v2" }] }, "loops"],
@@ -348,7 +348,7 @@ describe("manifest.env: deployment variables a plug-in declares (step 11.5)", ()
     }
   });
 
-  test("refuses an OPENEDBOT_* or legacy OHB_* name, a reserved core name and a duplicate", () => {
+  test("refuses an OPENEDBOT_* or retired OHB_* name, a reserved core name and a duplicate", () => {
     expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_PLUGINS" }]))).toBe('manifest.env "OPENEDBOT_PLUGINS" is a core variable');
     expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_BILLING_KEY" }]))).toBe('manifest.env "OPENEDBOT_BILLING_KEY" is a core variable');
     expect(invalidPluginReason(declaring([{ name: "OHB_BILLING_KEY" }]))).toBe('manifest.env "OHB_BILLING_KEY" is a core variable'); // rename:keep
