@@ -173,7 +173,8 @@ export function BotManageDialog({
     switch (id) {
       case "persona": return personaSummary(bot.instructions) ?? t("botManage.value.personaEmpty");
       case "model": return bot.model ?? t("botManage.value.modelRuntime");
-      case "approvals": return t(`boardui.permission.${bot.permissionMode ?? "manual"}`);
+      // A YOLO lease that covers the bot wins over its mode, as in the header badge.
+      case "approvals": return bot.effectivePermission?.yolo ? t("yolo.badge") : t(`boardui.permission.${bot.permissionMode ?? "manual"}`);
       case "coordination": return t(normalizeAutonomyPolicy(bot.autonomy).enabled ? "botManage.value.on" : "botManage.value.off");
       case "runtime": return runtime?.name ?? undefined;
       case "webhooks": return t("botManage.value.parked");

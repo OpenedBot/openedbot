@@ -93,6 +93,12 @@ export const queryKeys = {
     workspaceQueryKey(activeOrganizationId(), "runtime-permission-settings", runtimeId),
   /** Mode solo local : le consentement, lu pour l'interrupteur « YOLO par défaut (solo) ». */
   get yoloSoloConsent() { return workspaceQueryKey(activeOrganizationId(), "yolo-solo-consent"); },
+  /** Every `GET /yolo/leases` read sits under this root: a grant, a revoke or a kill invalidates them all. */
+  get yoloLeasesRoot() { return workspaceQueryKey(activeOrganizationId(), "yolo-leases"); },
+  yoloLeases: (filters: { runtimeId?: string; botId?: string; threadId?: string } = {}) =>
+    workspaceQueryKey(activeOrganizationId(), "yolo-leases", filters.runtimeId ?? "", filters.botId ?? "", filters.threadId ?? ""),
+  get yoloConsent() { return workspaceQueryKey(activeOrganizationId(), "yolo-consent"); },
+  get yoloAudit() { return workspaceQueryKey(activeOrganizationId(), "yolo-audit"); },
   botRuntimeMemory: (botId: string) =>
     workspaceQueryKey(activeOrganizationId(), "bot-runtime-memory", botId),
   personaDraft: (botId: string) =>

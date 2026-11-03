@@ -21,6 +21,7 @@ import { conversation, threadActivity, threadContext, threadFind, threadScreen, 
 import { waitlist } from "./messages/en/waitlist";
 import { yoloSolo } from "./messages/en/yolo-solo";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/en/workspace";
+import { yolo } from "./messages/en/yolo";
 
 export const en = {
   fleet,
@@ -119,4 +120,5 @@ export const en = {
   boardui,
   planCard,
   compactShell,
+  yolo,
 } as const;
