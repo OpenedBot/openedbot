@@ -1,11 +1,7 @@
-import fcntl
 import hashlib
 import json
-import os
 import posixpath
 import re
-import time
-import uuid
 from pathlib import Path
 
 # PERM2-A: every gate names its tool (`rule_key`, which Hermes turns into
@@ -161,217 +157,8 @@ def descriptor_line(tool_key, deletes, opaque, described, digest):
     return f"ohb-gate/v1 {hashlib.sha256(text.encode('utf-8')).hexdigest()} {text}"
 
 
-# YOLO lease (docs/CONNECTOR.md, « Bail YOLO »). The connector verifies the
-# signed lease; the operator writes the leases covering this profile into
-# yolo.json, and the shared rules into hardline.json, next to this file. Both
-# are re-read at every call: a lease expires here even when the connector is
-# dead, `edge-setup yolo off` removes the file, and anything unreadable,
-# expired or malformed falls back to ask_writes (fail closed). Under a lease a
-# write passes after the hardline, the deny-list and the protections, once it
-# is appended to yolo-audit.jsonl; if that append fails, it is asked instead.
-YOLO_FILE = "yolo.json"
-HARDLINE_FILE = "hardline.json"
-SPOOL_FILE = "yolo-audit.jsonl"
-TERMINAL_TOOLS = ("terminal",)
-SCOPE_RANK = {"thread": 3, "bot": 2, "runtime": 1}
-_COMMAND_SEPARATORS = re.compile(r"[\"'`;&|<>()=\s]+")
-_SEGMENT_SPLIT = re.compile(r"\s*(?:&&|\|\||[;\n|]|\$\(|`)\s*")
-_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_rules_cache = {}
-
-
-def _rules(directory):
-    """The compiled hardline.json, cached on its signature; None when unusable."""
-    path = directory / HARDLINE_FILE
-    try:
-        stat = path.stat()
-        key = (stat.st_mtime_ns, stat.st_size)
-        if _rules_cache.get("key") == key:
-            return _rules_cache["rules"]
-        doc = json.loads(path.read_text(encoding="utf-8"))
-        if doc.get("version") != 1:
-            return None
-        hard = doc["hardline"]
-        rules = {
-            "tools": [str(name) for name in hard["tools"]],
-            "paths": [(rule["id"], re.compile(rule["pattern"])) for rule in hard["paths"]],
-            "commands": [(rule["id"], re.compile(rule["pattern"])) for rule in hard["commands"]],
-            "protect": {
-                pid: ([re.compile(p) for p in spec.get("paths", [])], [re.compile(p) for p in spec.get("commands", [])])
-                for pid, spec in doc["protect"].items()
-            },
-            "default": [str(pid) for pid in doc["defaultProtect"]],
-        }
-    except Exception:
-        return None
-    _rules_cache.update(key=key, rules=rules)
-    return rules
-
-
-def _lease(directory, profile, session_id, now):
-    """The lease of yolo.json covering this call, or None (no lease, or doubt)."""
-    try:
-        doc = json.loads((directory / YOLO_FILE).read_text(encoding="utf-8"))
-        if doc.get("v") != 1 or not isinstance(doc.get("leases"), list):
-            return None
-        session_key = hashlib.sha256(session_id.encode("utf-8")).hexdigest() if isinstance(session_id, str) and session_id else None
-        best = None
-        for lease in doc["leases"]:
-            scope = lease["scope"]
-            if not (int(lease["notBefore"]) <= now < int(lease["expiresAt"])):
-                continue
-            if scope == "thread":
-                covers = lease["profile"] == profile and session_key is not None and lease["sessionKey"] == session_key
-            elif scope == "bot":
-                covers = lease["profile"] == profile
-            else:
-                covers = scope == "runtime"
-            deny = lease["deny"]
-            if not covers or not isinstance(lease["protect"], list) or not all(isinstance(deny[k], list) for k in ("commands", "tools", "paths")):
-                continue
-            if best is None or (SCOPE_RANK[scope], lease["expiresAt"]) > (SCOPE_RANK[best["scope"]], best["expiresAt"]):
-                best = lease
-        return best
-    except Exception:
-        return None
-
-
-def _shell_words(text):
-    """Words split on spaces and tabs, quotes removed; None on an open quote."""
-    words, current, quote = [], "", None
-    for char in text:
-        if quote:
-            if char == quote:
-                quote = None
-            else:
-                current += char
-        elif char in ("'", '"'):
-            quote = char
-        elif char in (" ", "\t"):
-            if current:
-                words.append(current)
-            current = ""
-        else:
-            current += char
-    if quote:
-        return None
-    if current:
-        words.append(current)
-    return words
-
-
-def _command_denied(command, blocklist):
-    """True / False, or None when the command cannot be read."""
-    patterns = [words for words in (_shell_words(entry.strip()) for entry in blocklist) if words]
-    for segment in _SEGMENT_SPLIT.split(command):
-        segment = segment.strip()
-        if not segment:
-            continue
-        words = _shell_words(segment)
-        if words is None:
-            return None
-        start = 0
-        while start < len(words) and _ASSIGNMENT.match(words[start]):
-            start += 1
-        if start < len(words) and words[start] in ("sudo", "command"):
-            start += 1
-        head = list(words[start:])
-        if head:
-            head[0] = head[0].rsplit("/", 1)[-1]
-        if any(pattern == head[: len(pattern)] for pattern in patterns):
-            return True
-    return False
-
-
-def _deny_path(path, entry):
-    def trim(value):
-        return value.rstrip("/") if len(value) > 1 else value
-
-    target, denied = trim(path), trim(entry)
-    if not denied:
-        return False
-    if target == denied or target.startswith("/" if denied == "/" else denied + "/"):
-        return True
-    return ("/" + denied.lstrip("/") + "/") in ("/" + target + "/")
-
-
-def _yolo_verdict(rules, lease, tool_key, paths, command):
-    """None lets the gate pass; otherwise why it is refused (same order as openedbot)."""
-    if tool_key and tool_key in rules["tools"]:
-        return f"hardline tool:{tool_key}"
-    for rule_id, regex in rules["paths"]:
-        if any(regex.search(path) for path in paths):
-            return f"hardline {rule_id}"
-    if command is not None:
-        for rule_id, regex in rules["commands"]:
-            if regex.search(command):
-                return f"hardline {rule_id}"
-        words = [word for word in _COMMAND_SEPARATORS.split(command) if word]
-        for rule_id, regex in rules["paths"]:
-            if any(regex.search(word) for word in words):
-                return f"hardline {rule_id}"
-    deny = lease["deny"]
-    if tool_key and tool_key in deny["tools"]:
-        return "organization deny-list"
-    if any(_deny_path(path, entry) for path in paths for entry in deny["paths"]):
-        return "organization deny-list"
-    if command is not None and deny["commands"]:
-        hit = _command_denied(command, deny["commands"])
-        if hit is None:
-            return "unreadable command"
-        if hit:
-            return "organization deny-list"
-    for pid in dict.fromkeys(rules["default"] + list(lease["protect"])):
-        spec = rules["protect"].get(pid)
-        if spec is None:
-            continue
-        if any(regex.search(path) for regex in spec[0] for path in paths):
-            return f"protected {pid}"
-        if command is not None and any(regex.search(command) for regex in spec[1]):
-            return f"protected {pid}"
-    return None
-
-
-def _record(directory, lease, tool_key, digest, now):
-    """Append one auto-approval to the spool, durably; False when it could not be."""
-    line = json.dumps({
-        "v": 1, "eventId": str(uuid.uuid4()), "occurredAt": now, "leaseId": lease["leaseId"],
-        "gateKind": "plugin_tool", "toolKey": tool_key, "argsHash": digest,
-    }, separators=(",", ":")) + "\n"
-    path = directory / SPOOL_FILE
-    try:
-        for _ in range(3):
-            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                # The connector renames the spool under this same lock: write
-                # only into the file still at the path.
-                if os.fstat(fd).st_ino != os.stat(path, follow_symlinks=False).st_ino:
-                    continue
-                os.write(fd, line.encode("utf-8"))
-                os.fsync(fd)
-                return True
-            finally:
-                os.close(fd)
-    except Exception:
-        return False
-    return False
-
-
-def _paths(described):
-    if described is None:
-        return []
-    args = described[3]
-    paths = [args["path"]] if isinstance(args.get("path"), str) else []
-    paths += [path for path in args.get("paths", []) if isinstance(path, str)]
-    return paths
-
-
 def register(ctx):
-    directory = Path(__file__).parent
-    policy_path = directory / "policy.json"
-    # <root>/profiles/<slug>/plugins/ohb_approval_policy
-    profile = directory.parent.parent.name
+    policy_path = Path(__file__).parent / "policy.json"
 
     def before_tool(tool_name: str, **kwargs):
         try:
@@ -384,38 +171,17 @@ def register(ctx):
             mode = "ask_writes"
         # An unreadable list blocks nothing more, and asks like any write.
         blocked = set(blocked) if isinstance(blocked, list) and all(isinstance(key, str) for key in blocked) else set()
-        gated = tool_name in NATIVE_WRITE_TOOLS or tool_name.startswith("mcp_")
-        if mode == "off" or not (gated or tool_name in TERMINAL_TOOLS):
+        if mode == "off" or not (tool_name in NATIVE_WRITE_TOOLS or tool_name.startswith("mcp_")):
             return None
         if mode == "block_writes":
-            return {"action": "block", "message": f"Blocked {tool_name}: this bot is in plan mode."} if gated else None
+            return {"action": "block", "message": f"Blocked {tool_name}: this bot is in plan mode."}
         args = kwargs.get("args")
-        now = int(time.time())
-        lease = _lease(directory, profile, kwargs.get("session_id"), now)
-        if not gated:
-            # A terminal command is not gated here; under a lease it is checked
-            # before Hermes' own approval, which the connector answers.
-            rules = _rules(directory) if lease is not None else None
-            command = args.get("command") if isinstance(args, dict) else None
-            if rules is None or not isinstance(command, str):
-                return None
-            reason = _yolo_verdict(rules, lease, None, [], command)
-            return {"action": "block", "message": f"Blocked {tool_name} under a YOLO lease: {reason}."} if reason else None
         try:
             described = describe(tool_name, args)
         except Exception:
             described = None
         if described is not None and described[0] in blocked:
             return {"action": "block", "message": f"Blocked {tool_name}: this tool is blocked for this bot."}
-        # A gate without identity, or a patch nobody can read, is a human's.
-        rules = _rules(directory) if lease is not None and described is not None and not (tool_name == "patch" and described[2]) else None
-        if rules is not None:
-            code = args.get("code") if tool_name == "execute_code" and isinstance(args, dict) and isinstance(args.get("code"), str) else None
-            reason = _yolo_verdict(rules, lease, described[0], _paths(described), code)
-            if reason:
-                return {"action": "block", "message": f"Blocked {tool_name} under a YOLO lease: {reason}."}
-            if _record(directory, lease, described[0], _args_digest(args), now):
-                return None
         sentence = f"Approve write-capable tool {tool_name}."
         if described is None:
             # No provable identity: Hermes keys the gate on the tool name and

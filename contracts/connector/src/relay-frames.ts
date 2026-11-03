@@ -8,8 +8,6 @@
  */
 
 import { isUuid } from "@openedbot/contracts-primitives";
-import { RelayFrameError } from "./relay-frame-error";
-import { decodeYoloFrame, isYoloFrameType, parseYoloLeaseKeys, type RelayYoloFrame, type YoloLeaseKey } from "./relay-frames-yolo";
 
 /** Version du protocole annoncée dans `hello`. */
 export const RELAY_PROTOCOL = 1 as const;
@@ -191,8 +189,6 @@ export type RelayLinkContextFrame = {
    * inconnus, alors qu'une trame de plus aurait fini en « unknown frame type ».
    */
   limits?: RelayLinkContextLimits;
-  /** Clés publiques des baux YOLO, épinglées par l'hôte (`relay-frames-yolo.ts`). */
-  leaseKeys?: YoloLeaseKey[];
   /** Les trames facultatives de l'hôte que cette API comprend (une API plus ancienne ferme le lien sur un type inconnu). */
   accepts?: string[];
 };
@@ -232,12 +228,16 @@ export type RelayTextFrame =
   | RelayCancelFrame
   | RelayErrFrame
   | RelayPingFrame
-  | RelayPongFrame
-  | RelayYoloFrame;
+  | RelayPongFrame;
 
 export type RelayFrameType = RelayTextFrame["t"];
 
-export { RelayFrameError };
+export class RelayFrameError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "RelayFrameError";
+  }
+}
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -385,7 +385,6 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
         ...withOptional("latestVersion", optionalString(frame, "latestVersion")),
         ...withOptional("minimumVersion", optionalString(frame, "minimumVersion")),
         ...withOptional("limits", optionalLinkContextLimits(frame)),
-        ...withOptional("leaseKeys", parseYoloLeaseKeys(frame.leaseKeys)),
         ...withOptional("accepts", optionalAccepts(frame)),
       };
     }
@@ -422,7 +421,6 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
     case "pong":
       return { t };
     default:
-      if (isYoloFrameType(t)) return decodeYoloFrame(t, frame);
       throw new RelayFrameError(`unknown frame type "${t}"`);
   }
 }

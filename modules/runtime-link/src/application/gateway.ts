@@ -8,7 +8,7 @@ import {
   RELAY_MAX_FEATURES,
   RELAY_MAX_RESPONSE_BODY,
   type RelayLinkContextFrame,
-  type RelayTextFrame, type YoloLeaseKey,
+  type RelayTextFrame,
 } from "@openedbot/contracts-connector";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
@@ -144,7 +144,6 @@ export type RuntimeLinkGatewayDependencies = {
   /** Les URL WebSocket qu'une preuve peut nommer (défaut : dérivées de la configuration). */
   wsUrls?: string[];
   log?: LinkLogger;
-  leaseKeys?: YoloLeaseKey[]; // Mode YOLO : `link.context.leaseKeys` (`yoloLinkLeaseKeys`, link-yolo.ts).
 };
 
 type UpgradeServer = {
@@ -352,9 +351,10 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
    * origine, organisation et son propriétaire (le membre `owner` le plus
    * ancien). L'hôte le nomme dans ses alertes Discord et son `status`, et
    * l'enrôlement l'écrit dans `link.json` : la trame précède `link.issued`.
-   * Données d'affichage, sauf `limits` (borne des features de `hello` et `capabilities`), `accepts`
-   * (trames facultatives de l'hôte comprises ici) et `leaseKeys` (clés de bail YOLO que l'hôte épingle).
-   * Un échec est journalisé, jamais fatal ; un hôte plus ancien ignore la trame ou ses champs inconnus.
+   * Données d'affichage, sauf `limits` (la borne des features de `hello` et
+   * `capabilities`, « Borne des features ») et `accepts` (les trames
+   * facultatives de l'hôte que ce broker comprend). Un échec est journalisé,
+   * jamais fatal ; un hôte plus ancien ignore la trame ou ses champs inconnus.
    */
   async function sendLinkContext(connection: LinkConnection, identity: LinkIdentity): Promise<void> {
     const frame: RelayLinkContextFrame = {
@@ -363,9 +363,9 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       // L'origine du lien, pas celle de la PWA : un hôte >= v0.5.7 la suit
       // seul quand elle partage le domaine parent (`connector.MovedWSURL`).
       ohb: config.linkPublicUrl ?? config.publicUrl,
-      // La borne de `decodeTextFrame` pour `hello` et `capabilities`, que l'hôte retient pour son prochain `hello`.
+      // La borne que `decodeTextFrame` applique à `hello` et `capabilities` : l'hôte
+      // la retient (persistée avec le contexte) pour dimensionner son prochain `hello`.
       limits: { features: RELAY_MAX_FEATURES }, accepts: [...RELAY_ACCEPTED_HOST_FRAMES],
-      ...(deps.leaseKeys?.length ? { leaseKeys: deps.leaseKeys } : {}),
     };
     if (config.connectorVersions.latestVersion) frame.latestVersion = config.connectorVersions.latestVersion;
     if (config.connectorVersions.minimumVersion) frame.minimumVersion = config.connectorVersions.minimumVersion;

@@ -37,7 +37,6 @@ import {
 import { formatDate } from "../../../lib/format";
 import { SettingsPane } from "../pane";
 import { DevicesList, DevicesTable, describeDevice, isActiveSession } from "./devices-table";
-import { YoloAuditSection } from "../../../components/yolo/yolo-audit-section";
 
 /** Référence stable pour l'état « pas encore chargé » : voir `others` plus bas. */
 const EMPTY_SESSIONS: AccountSessionDto[] = [];
@@ -427,7 +426,6 @@ export function CloudSecuritySettings() {
             </Tabs>
           )}
 
-          <YoloAuditSection />
           <Note tone="neutral">{t("settingsSecurity.hermesNote")}</Note>
         </>
       ) : null}

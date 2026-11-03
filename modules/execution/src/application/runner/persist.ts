@@ -236,7 +236,7 @@ export async function persistEvents(
       // event, and no client raises a badge for it (PERM2-7).
       const gate = event.type === "approval.requested" ? approvalGateIdentity(event.payload.gate) : null;
       const resolution = gate
-        ? await resolveGateTx(tx as unknown as SQL, { organizationId: context.organizationId, botId: context.botId, neverWait, planOnly: context.planOnly === true, runtimeId: context.runtimeId, threadId: context.threadId }, gate,Array.isArray(payload.choices) ? payload.choices : [])
+        ? await resolveGateTx(tx as unknown as SQL, { organizationId: context.organizationId, botId: context.botId, neverWait, planOnly: context.planOnly === true }, gate,Array.isArray(payload.choices) ? payload.choices : [])
         : null;
       if (event.type === "approval.requested") {
         payload.approvalRequestId = validApprovalRequestId(payload.approvalRequestId);

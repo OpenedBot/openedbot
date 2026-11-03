@@ -10,8 +10,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./a2a": "./src/a2a.ts",
-    "./yolo": "./src/relay-frames-yolo.ts"
+    "./a2a": "./src/a2a.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

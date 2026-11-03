@@ -52,7 +52,6 @@ const ALLOWED_PLATFORM = [
   "platform/config/src/rate-limit.ts",
   "platform/config/src/runtime-mode.ts",
   "platform/config/src/sse-heartbeat.ts",
-  "platform/config/src/yolo-lease-signing.ts",
   "platform/db/src/credential.ts",
   "platform/db/src/db.ts",
   "platform/db/src/text-array.ts",

@@ -39,9 +39,6 @@ type LinkFile struct {
 	Environment  string                      `json:"ohb_environment,omitempty"`
 	Organization *connector.LinkOrganization `json:"organization,omitempty"`
 	Owner        *connector.LinkOwner        `json:"owner,omitempty"`
-	// LeaseKeys are the YOLO lease keys openedbot announced at enrollment:
-	// pinned unconditionally by the daemon, since only root writes this file.
-	LeaseKeys []connector.YoloLeaseKey `json:"lease_keys,omitempty"`
 }
 
 // linkContext is what link.json (enrollment) or the overlay (daemon) holds
@@ -441,7 +438,6 @@ func runLink(env cli.Env, args []string) int {
 				owner := received.Owner
 				lf.Owner = &owner
 			}
-			lf.LeaseKeys = received.LeaseKeys
 		}
 		data, err := json.MarshalIndent(lf, "", "  ")
 		if err != nil {
@@ -473,9 +469,7 @@ func runLink(env cli.Env, args []string) int {
 		// The daemon-owned overlays of the link we just left are keyed by the
 		// old runtime id, so they are already inert; removing them keeps
 		// `status` from naming an openedbot this host no longer dials.
-		// The YOLO leases and pinned lease keys belong to the old runtime too;
-		// yolo-kill.json stays: the host owner's refusal outlives a link.
-		for _, name := range []string{"link-token.json", "link-context.json", "link-origin.json", "yolo-leases.json", "yolo-keys.json"} {
+		for _, name := range []string{"link-token.json", "link-context.json", "link-origin.json"} {
 			_ = os.Remove(filepath.Join(stateDirOf(inst), name))
 		}
 	}
@@ -688,7 +682,6 @@ func runConnectorDaemon(env cli.Env) int {
 		c.CreationAudit = audit
 		defer audit.Close()
 	}
-	yolo := openYolo(c, stateDir, lf)
 	c.OnOriginMoved = func(wsURL string) error {
 		return persistMovedLinkOrigin(originPath, lf.RuntimeID, wsURL, time.Now())
 	}
@@ -716,10 +709,6 @@ func runConnectorDaemon(env cli.Env) int {
 	}
 	ctx, cancel := ctxWithSignals()
 	defer cancel()
-	if yolo != nil {
-		defer yolo.Store.Stop()
-		go yolo.Run(ctx)
-	}
 	go func() {
 		t := time.NewTicker(time.Hour)
 		defer t.Stop()
@@ -768,30 +757,6 @@ func runConnectorDaemon(env cli.Env) int {
 		return fail(env, cli.ExitLinkRefused, "%v", err)
 	}
 	return fail(env, cli.ExitFailure, "%v", err)
-}
-
-// openYolo opens the YOLO lease store and its audit outbox. Any failure
-// leaves YOLO off for this run (nil): the link works as before, every gate
-// asks, and the yolo_* features are not announced.
-func openYolo(c *connector.Client, stateDir string, lf LinkFile) *connector.Yolo {
-	store, err := connector.OpenYoloStore(stateDir, lf.RuntimeID, lf.LeaseKeys, time.Now, c.Logf)
-	if err != nil {
-		c.Logf("yolo disabled: lease store could not be opened: %v", err)
-		return nil
-	}
-	audit, err := connector.OpenYoloAudit(stateDir, lf.RuntimeID, time.Now)
-	if err != nil {
-		store.Stop()
-		c.Logf("yolo disabled: audit outbox could not be opened: %v", err)
-		return nil
-	}
-	if c.CreationAudit != nil {
-		audit.SetSealer(c.CreationAudit.SealYolo)
-	}
-	y := &connector.Yolo{Store: store, Audit: audit, Apply: c.ApplyYolo, Drain: c.DrainYolo,
-		Drained: c.DrainedYolo, Approve: c.AnswerApproval, Logf: c.Logf}
-	c.Yolo = y
-	return y
 }
 
 // runOperatorDaemon is `internal operator`: root, one Unix socket, the fixed

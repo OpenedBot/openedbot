@@ -43,9 +43,6 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 			return approvalPolicyState{Mode: request.Mode, PluginEnabled: true}, nil
 		},
 		SkillsHubReady: true,
-		YoloApply:      func(context.Context, []yoloApplied) error { return nil },
-		YoloDrain:      func(context.Context) ([]yoloSpoolRecord, error) { return nil, nil },
-		YoloDrained:    func(context.Context) error { return nil },
 	}
 }
 
@@ -67,11 +64,9 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 // interrupts the running turns, which is only pessimistic. The tenth is
 // skills_inventory: an API that drops it shows the gateway's /v1/skills
 // failure as is. The eleventh is profile_toolsets_batch: an API that drops it
-// writes a profile's toolsets one by one, as before. The twelfth and
-// thirteenth are yolo_lease and yolo_thread_scope: an API that drops them
-// grants this host no YOLO lease and keeps asking a human, the behavior of
-// every host before them. The API in this repository announces a bound of 64.
-const beyondDefaultAcknowledged = 13
+// writes a profile's toolsets one by one, as before. The API in this
+// repository announces a bound of 64.
+const beyondDefaultAcknowledged = 11
 
 // The guard behind the incident where the next operator feature would have made
 // every updated host's hello 17 names long. It reads the REAL operator, in every

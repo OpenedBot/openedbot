@@ -66,8 +66,6 @@ export type FakeHermesOptions = {
   emitTodoScenario?: boolean;
   /** Finish runs with the Hermes v0.22.2 gateway interruption event. */
   interruptRun?: boolean;
-  /** The command a `FAKE_APPROVAL:terminal` gate shows (default `rm -rf ./build`). */
-  terminalCommand?: string;
 };
 
 type FakeRunStatus = "queued" | "running" | "waiting_for_approval" | "completed" | "cancelled" | "interrupted";
@@ -117,10 +115,10 @@ const FAKE_GATE_DESCRIPTORS: Record<string, { deletes: string; opaque: boolean; 
   cronjob: { deletes: "unknown", opaque: false, args: {} },
 };
 
-export function fakeApprovalGate(gate: string, requestId: string, terminalCommand = "rm -rf ./build"): Record<string, unknown> {
+export function fakeApprovalGate(gate: string, requestId: string): Record<string, unknown> {
   if (gate.toLowerCase() === "terminal") {
     return {
-      command: terminalCommand,
+      command: "rm -rf ./build",
       pattern_key: "recursive delete",
       pattern_keys: ["recursive delete"],
       description: "recursive delete",
@@ -214,7 +212,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
         run.pendingApprovals.push({ requestId, resolve });
       });
       run.status = "waiting_for_approval";
-      emit({ event: "approval.request", run_id: run.id, timestamp: Date.now() / 1_000, ...fakeApprovalGate(match[1]!, requestId, options.terminalCommand) });
+      emit({ event: "approval.request", run_id: run.id, timestamp: Date.now() / 1_000, ...fakeApprovalGate(match[1]!, requestId) });
       const choice = await answered;
       if (choice === "__withdrawn__") return;
       run.status = "running";

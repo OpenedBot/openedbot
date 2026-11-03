@@ -881,7 +881,7 @@ export function ConversationScreen() {
                 disabled={threadLoading || pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing || provisioning}
               />
             )}
-            <PermissionModeBadge bot={bot} threadId={activeThreadId} onOpen={openBotApprovals} compact />
+            <PermissionModeBadge bot={bot} onOpen={openBotApprovals} compact />
           </div>
         ) : undefined}
         actions={
@@ -1110,7 +1110,7 @@ export function ConversationScreen() {
         >
           {isMobile ? null : (
             <DevRenderProfiler id="conversation-header"><ConversationHeader
-              bot={bot} threadId={activeThreadId}
+              bot={bot}
               status={runtimeOffline ? (
                 <RuntimeOfflineBadge
                   since={runtime?.link?.lastSeenAt}
@@ -1123,7 +1123,7 @@ export function ConversationScreen() {
                   {/* Un mode qui sort de l'ordinaire (Mode plan, Accès
                       complet) se voit ici, en lecture : il se change dans la
                       fiche du bot. Au téléphone, dans le sous-titre. */}
-                  <PermissionModeBadge bot={bot} threadId={activeThreadId} onOpen={openBotApprovals} />
+                  <PermissionModeBadge bot={bot} onOpen={openBotApprovals} />
                   {!threadLoading && thread.data ? (
                     <WorkflowOverview
                       threadId={thread.data.id}

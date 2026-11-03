@@ -71,19 +71,7 @@ export type CreationAuditEvent = {
   status?: number;
   remoteId?: string;
   outcome?: string;
-  /** `yolo_auto_approved` : une auto-approbation sous bail YOLO (phase `decision`). */
-  kind?: string;
-  leaseId?: string;
-  /** Absent pour une approbation native du terminal. */
-  toolKey?: string;
-  gateKind?: string;
-  /** Hash des arguments, jamais les arguments. */
-  argsHash?: string;
 };
-
-/** Le `kind` d'une auto-approbation YOLO scellée par l'hôte. */
-export const CREATION_AUDIT_KIND_YOLO = "yolo_auto_approved";
-const CREATION_AUDIT_YOLO_FIELDS = ["kind", "leaseId", "toolKey", "gateKind", "argsHash"] as const;
 
 /** Le clair de `snapshot.bin`. */
 export type CreationAuditSnapshot = {
@@ -237,8 +225,8 @@ export function sealCreationAudit(
 
 /**
  * Le clair tel que Go le sérialise : tous les champs du snapshot sont présents
- * (pas d'`omitempty`), seuls `status`, `remoteId`, `outcome` et les champs
- * YOLO d'un événement sont omis quand ils sont vides.
+ * (pas d'`omitempty`), seuls `status`, `remoteId` et `outcome` d'un
+ * événement sont omis quand ils sont vides.
  */
 function snapshotForWire(snapshot: CreationAuditSnapshot): Record<string, unknown> {
   return {
@@ -264,7 +252,6 @@ function eventForWire(event: CreationAuditEvent): Record<string, unknown> {
   if (event.status) out.status = event.status;
   if (event.remoteId) out.remoteId = event.remoteId;
   if (event.outcome) out.outcome = event.outcome;
-  for (const key of CREATION_AUDIT_YOLO_FIELDS) if (event[key]) out[key] = event[key];
   return out;
 }
 
@@ -333,14 +320,6 @@ function parseEvent(value: unknown): CreationAuditEvent {
   }
   if (raw.remoteId !== undefined) event.remoteId = text("remoteId");
   if (raw.outcome !== undefined) event.outcome = text("outcome");
-  // An auto-approval under a YOLO lease: additive fields, same schema 2. The
-  // arguments are never there, only their hash.
-  for (const key of CREATION_AUDIT_YOLO_FIELDS) {
-    if (raw[key] !== undefined) event[key] = text(key);
-  }
-  if (event.kind !== undefined && (event.kind !== CREATION_AUDIT_KIND_YOLO || !event.leaseId || !event.gateKind || !HEX64.test(event.argsHash ?? ""))) {
-    throw new CreationAuditError("AUDIT_FORMAT_INVALID", "Auto-approbation YOLO invalide.");
-  }
   return event;
 }
 

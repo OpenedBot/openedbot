@@ -5,7 +5,6 @@ import {
   encodeBinaryFrame,
   encodeTextFrame,
   type RelayTextFrame,
-  type YoloLeaseKey,
 } from "@openedbot/contracts-connector";
 import { readApiConfig, type ApiConfig } from "../../src/infrastructure/config";
 import { hashCredential } from "../../src/infrastructure/crypto";
@@ -84,10 +83,6 @@ export type SessionOptions = {
   config?: ApiConfig;
   /** Latence de chaque requête, comme une vraie base : sans elle, tout `await` se résout avant la trame suivante. */
   dbLatencyMs?: number;
-  /** Mode YOLO : les clés de `link.context.leaseKeys`. */
-  leaseKeys?: YoloLeaseKey[];
-  /** Mode YOLO : la persistance de `yolo.state` / `yolo.audit` (absente : non branchée). */
-  yolo?: Pick<LinkLivenessStore, "yoloState" | "yoloAudit">;
 };
 
 export type SharedFixture = {
@@ -169,7 +164,6 @@ function recordingLiveness(records: LivenessRecord[], options: SessionOptions): 
     },
     async dispatched(link, record) { records.push({ write: "dispatched", runtimeId: link.runtimeId, record }); },
     async emergencyRotate(link, meta) { records.push({ write: "emergency_rotate", runtimeId: link.runtimeId, meta }); },
-    ...options.yolo,
   };
 }
 
@@ -194,7 +188,6 @@ export function startShared(options: SessionOptions = {}): SharedFixture {
     popTimeoutMs: options.popTimeoutMs ?? 2_000,
     wsUrls,
     log: (event, fields) => logs.push({ event, fields }),
-    ...(options.leaseKeys ? { leaseKeys: options.leaseKeys } : {}),
   };
   const gateway = createRuntimeLinkGateway(deps);
   const server = Bun.serve<LinkSocketData, string>({

@@ -12,8 +12,6 @@ import {
 import { cn, toast } from "@openedbot/browser-ui-kit";
 import { ApiError, api, permissionContextQueryOptions, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
-import { YoloBadge } from "../yolo/yolo-badge";
-import { useThreadYoloLease, yoloIgnoredReason } from "../yolo/yolo-shared";
 
 type IconType = ComponentType<{ className?: string }>;
 
@@ -177,32 +175,20 @@ const NOTABLE_MODES: ReadonlySet<BotPermissionMode> = new Set(["plan", "bypass"]
  *
  * When the organization or an unproven reviewer makes the bot act otherwise,
  * the badge names the EFFECTIVE mode and says why.
- *
- * A YOLO lease that covers the bot wins over every mode: the badge becomes
- * « YOLO » and its countdown. The lease of `threadId` first (the gate's own
- * order: thread, bot, runtime), then the one the roster says covers the bot.
  */
 export function PermissionModeBadge({
   bot,
-  threadId,
   onOpen,
   compact = false,
 }: {
   bot: BotDto;
-  /** The conversation shown, whose own YOLO lease the badge looks for. */
-  threadId?: string | null;
   onOpen: () => void;
   /** The phone header's subtitle line: text size of that line, no padding. */
   compact?: boolean;
 }) {
   const { t } = useT();
   const context = usePermissionContext();
-  const threadLease = useThreadYoloLease(threadId);
   const current = bot.permissionMode ?? "manual";
-  const yolo = threadLease && yoloIgnoredReason(current, context) === null
-    ? { leaseId: threadLease.id, scope: threadLease.scope, expiresAt: threadLease.expiresAt }
-    : bot.effectivePermission?.yolo ?? null;
-  if (yolo) return <YoloBadge key={yolo.leaseId} leaseId={yolo.leaseId} expiresAt={yolo.expiresAt} scope={yolo.scope} onOpen={onOpen} compact={compact} />;
   if (!NOTABLE_MODES.has(current)) return null;
   const { icon: Icon, flip } = MODE_ICONS[current];
   const label = t(`boardui.permission.${current}`);

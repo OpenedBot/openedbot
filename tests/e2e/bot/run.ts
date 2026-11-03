@@ -5,8 +5,7 @@
  *   E2E_ALLOW_REAL_RUNS=1 bun tests/e2e/bot/run.ts [scenario...] [options]
  *
  * Scenarios: lifecycle (default), greeting, fast-path, coordination,
- *            model-reset, permissions, all; yolo only when named (it grants
- *            YOLO leases on an existing bot, never part of `all`).
+ *            model-reset, permissions, all.
  * Options:   --samples N (greeting, model-reset)   --messages N (fast-path)
  *            --label L   --out DIR    --keep   --purge-early   --locale en
  *            --defer-cleanup (bench: purge all bots at the end, in parallel)
@@ -33,11 +32,8 @@ import { greeting } from "./scenarios/greeting";
 import { lifecycle } from "./scenarios/lifecycle";
 import { modelReset } from "./scenarios/model-reset";
 import { permissions } from "./scenarios/permissions";
-import { yolo } from "./scenarios/yolo";
 
 const SCENARIOS: Scenario[] = [lifecycle, greeting, fastPath, coordination, modelReset, permissions];
-/** Played only when named: never part of `all`. */
-const NAMED_ONLY: Scenario[] = [yolo];
 
 function log(event: string, fields: Record<string, unknown> = {}): void {
   console.log(JSON.stringify({ event: `e2e.${event}`, ...fields }));
@@ -46,9 +42,8 @@ function log(event: string, fields: Record<string, unknown> = {}): void {
 function pick(names: string[]): Scenario[] {
   if (names.includes("all")) return SCENARIOS;
   return names.map((name) => {
-    const known = [...SCENARIOS, ...NAMED_ONLY];
-    const found = known.find((scenario) => scenario.id === name);
-    if (!found) throw new ConfigError(`Unknown scenario "${name}". Known: ${known.map((scenario) => scenario.id).join(", ")}, all.`);
+    const found = SCENARIOS.find((scenario) => scenario.id === name);
+    if (!found) throw new ConfigError(`Unknown scenario "${name}". Known: ${SCENARIOS.map((scenario) => scenario.id).join(", ")}, all.`);
     return found;
   });
 }

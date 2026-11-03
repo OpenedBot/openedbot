@@ -18,9 +18,7 @@ import { botHostCleanup, botProfileProvision, botProfileRepair, profileImport } 
 import { mobileSettingsHints, mobileSettingsRuntimes, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/en/settings";
 import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/en/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/en/thread";
-import { yoloSolo } from "./messages/en/yolo-solo";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/en/workspace";
-import { yolo } from "./messages/en/yolo";
 
 export const en = {
   fleet,
@@ -53,7 +51,6 @@ export const en = {
   settingsPolicies,
   orgPermissionPolicy,
   runtimeAlerts,
-  yoloSolo,
   settingsNotifications,
   pushNotifications,
   memberInvitation,
@@ -116,5 +113,4 @@ export const en = {
   boardui,
   planCard,
   compactShell,
-  yolo,
 } as const;

@@ -40,8 +40,7 @@ auto-update, code signing and notarisation (Gatekeeper / SmartScreen warn on fir
   controls on Windows)
 - "Always on top", remembered across launches
 - Global shortcut `Cmd+Shift+O` (macOS) / `Ctrl+Shift+O` (Windows) to show or hide the window
-- macOS Dock menu / Windows tray icon: always on top, display mode, sign out, quit, and the
-  YOLO status with "Couper YOLO partout" (see [YOLO mode](#yolo-mode))
+- macOS Dock menu / Windows tray icon: always on top, display mode, sign out, quit
 - Closing hides the window; only *Quit* stops the app. Single instance.
 - On sign-out or session loss, console storage for that origin is cleared (language, theme and
   sidebar state are kept)
@@ -135,70 +134,11 @@ tokens over stdin/stdout (one JSON line per message, protocol in
 [`src/shared/popup-protocol.ts`](src/shared/popup-protocol.ts)). If the popup crashes it is
 restarted with backoff; after 5 failures in a row the shell falls back to *Window* mode.
 
-## YOLO mode
-
-A YOLO lease lets the host auto-approve a thread's, a bot's or a runtime's requests until it
-expires (4 h by default, 24 h at most). The shell shows it and can cut it; it never grants one.
-
-- **Shell** (`src/main/yolo.ts`): polls the leases every 30 s while signed in, and right away
-  after sign-in, after a resume from sleep and after a kill. While a lease is live: a `YOLO`
-  badge on the Dock icon (macOS) or a status in the tray tooltip (Windows), and a disabled
-  menu line `YOLO actif · encore 3 h 05` (`(n baux)` when several). "Couper YOLO partout…"
-  asks for confirmation in a native box, then calls `POST /kill`. The entry shows whenever the
-  user is signed in, live lease or not (a host may hold a lease the cloud believes over): the
-  shell does not know the role, so the first `403` hides it until the session changes. A
-  failed poll keeps the last leases on screen; their countdown keeps running.
-- **No grant from the desktop, on purpose.** The API takes a native session for a human, and
-  any local process able to read the shell's token (a bot on the same machine) would pass for
-  the user. Granting therefore stays in the console, behind its first-time confirmation.
-
-### Contract for openedbot-notch
-
-The popup calls the API itself, with the token the shell hands it over the popup protocol
-(`token` reply: `accessToken` and `organizationId`). No new popup message: the protocol
-stays at v1. Same routes and rules as the shell:
-
-| | `GET /api/organization/yolo/leases` | `POST /api/organization/yolo/kill` |
-|---|---|---|
-| Who | any member | owner and admin; `403 ROLE_REQUIRED` otherwise |
-| Body | none (optional query `runtimeId`, `botId`, `threadId`) | none |
-| Answer | `200 { leases: YoloLeaseDto[] }` | `200 { revoked: number, runtimes: number }` |
-
-Headers on both: `Authorization: Bearer <accessToken>`, `X-OHB-Organization: <organizationId>`,
-`Accept: application/json`. A native bearer needs no CSRF token. A `401` means one forced
-token refresh (`token` with `force: true`), then one retry; errors are `{ error: { code } }`.
-
-`YoloLeaseDto` (`contracts/api/src/permissions/yolo.ts`), dates in ISO 8601 UTC:
-
-```json
-{
-  "id": "uuid", "scope": "thread | bot | runtime", "runtimeId": "uuid",
-  "botId": "uuid | null", "threadId": "uuid | null", "grantedByUserId": "uuid",
-  "issuedAt": "…", "expiresAt": "…", "revokedAt": null,
-  "hostState": "pending | active | expired | revoked | rejected", "deliveredAt": "… | null"
-}
-```
-
-Countdown semantics:
-
-- Only live leases come back (not revoked, `expiresAt` in the future, 200 at most). A lease is
-  shown while `now < expiresAt` and its `hostState` is `pending` or `active`; `rejected`,
-  `expired` and `revoked` mean the host is not auto-approving under it. Treat an unknown
-  `scope` as a lease all the same.
-- The countdown is the one of the live lease that **ends last** (ties: smallest `id`), always
-  computed against the server's `expiresAt`, never a local duration. When it reaches zero the
-  next lease of the list takes over, or YOLO is off, without waiting for the next poll.
-- Shell format, by the minute and rounded down: `3 h 05`, `42 min`, `< 1 min`.
-- An unreadable answer rejects the whole list (keep the previous one); a list that cannot be
-  fetched leaves the badge up rather than hiding it.
-- After a kill, read the leases back; the hosts confirm on their side (`edge-setup yolo off`
-  also works offline on the host itself).
-
 ## Testing
 
 ```sh
 make typecheck   # tsc --noEmit
-make test        # bun test: popup protocol, theme IPC, target, diagnostics, YOLO
+make test        # bun test: popup protocol, theme IPC, target, diagnostics
 ```
 
 ## Project structure

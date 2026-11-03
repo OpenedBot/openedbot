@@ -95,19 +95,4 @@ export const TRANSACTIONAL_EMAIL_SAMPLE_DATA: Record<
     settingsUrl: "https://openedbot.app/o/atelier/settings/runtime",
     webAppUrl: "https://openedbot.app",
   },
-  yolo_audit_quarantined: {
-    runtimeName: "MacBook atelier",
-    reason: "prev_mismatch",
-    fromSeq: 41,
-    toSeq: 48,
-    receivedAt: "2026-11-02T09:14:00.000Z",
-    settingsUrl: "https://openedbot.app/o/atelier/settings/runtime",
-    webAppUrl: "https://openedbot.app",
-  },
-  yolo_solo_default_ended: {
-    organizationName: "Atelier",
-    reason: "members",
-    settingsUrl: "https://openedbot.app/o/atelier/settings/runtime",
-    webAppUrl: "https://openedbot.app",
-  },
 };
