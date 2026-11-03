@@ -58,7 +58,8 @@ export type AuthContext = {
 export type AppVariables = { auth: AuthContext };
 
 /** The request header naming the fleet organization acting for the client (a mandate). */
-export const FLEET_HEADER = "X-OHB-Fleet";
+export const FLEET_HEADER = "X-OpenedBot-Fleet";
+export const ORGANIZATION_HEADER = "X-OpenedBot-Organization";
 /** Its query form, for a GET that cannot set a header (a download link). */
 export const FLEET_QUERY = "fleetId";
 
@@ -163,15 +164,14 @@ export function authMiddleware(
     const credential = bearer || cookie;
     if (!credential) throw new HttpError(401, "AUTH_REQUIRED", "Authentification requise.");
     const credentialHash = hashCredential(credential);
-    const headerOrganization = context.req.header("X-OHB-Organization");
+    const headerOrganization = requestHeader(context, ORGANIZATION_HEADER);
     const downloadOrganization = context.req.method === "GET" ? context.req.query("organizationId") : undefined;
     if (headerOrganization && downloadOrganization && headerOrganization !== downloadOrganization) {
       throw new HttpError(403, "TENANT_MISMATCH", "Les contextes d’espace ne correspondent pas.");
     }
     const requestedOrganization = headerOrganization || downloadOrganization;
     if (requestedOrganization) assertWorkspaceId(requestedOrganization);
-    // `X-OHB-Fleet` / `?fleetId=` (step 11.2); an old name is read only
-    // where a loaded plug-in declares it as an alias (`requestHeader`).
+    // `X-OpenedBot-Fleet` / `?fleetId=` (step 11.2); an old name only through an alias (`requestHeader`).
     const headerFleet = requestHeader(context, FLEET_HEADER);
     const queryFleet = context.req.method === "GET" ? requestQuery(context, FLEET_QUERY) : undefined;
     if (headerFleet && queryFleet && headerFleet !== queryFleet) {

@@ -27,7 +27,7 @@ describe("cloud auth bootstrap", () => {
     await api.authMe();
 
     const headers = new Headers(requestInit?.headers);
-    expect(headers.has("X-OHB-Organization")).toBe(false);
+    expect(headers.has("X-OpenedBot-Organization")).toBe(false);
     expect(queryKeys.authMe).toEqual(["auth", "me"]);
   });
 

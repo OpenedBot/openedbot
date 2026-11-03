@@ -40,7 +40,7 @@ export function SupportImage({
     let objectUrl: string | null = null;
     setFailed(false);
     void fetch(`${API_ORIGIN}/api/support/attachments/${attachment.id}`, {
-      headers: token ? { "X-OHB-Support-Token": token } : {},
+      headers: token ? { "X-OpenedBot-Support-Token": token } : {},
       credentials: "include",
     })
       .then(async (response) => {

@@ -1,4 +1,4 @@
-import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
+import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";
@@ -299,7 +299,7 @@ app.use("*", async (context, next) => {
     context.header("Vary", "Origin");
   }
   if (context.req.method === "OPTIONS") {
-    context.header("Access-Control-Allow-Headers", ["Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OHB-Organization", "X-OHB-Fleet", ...compatHeaderNames(), "X-OHB-Support-Token", "Last-Event-ID"].join(", "));
+    context.header("Access-Control-Allow-Headers", ["Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OpenedBot-Organization", "X-OpenedBot-Fleet", ...compatHeaderNames(), "X-OpenedBot-Support-Token", "Last-Event-ID"].join(", "));
     context.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     return context.body(null, 204);
   }

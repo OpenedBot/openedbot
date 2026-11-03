@@ -26,6 +26,11 @@ uses [semantic versioning](https://semver.org/) as described in
   the field answers without it; openedbot then writes them through
   `POST /hermes-setup/profiles/{slug}/bundled-skills`.
 
+### Changed
+- `RELAY_STAGE_HEADER` is now `X-OpenedBot-Relay-Stage`. `relayStageOf`
+  still reads the former `X-OHB-Relay-Stage` (`LEGACY_RELAY_STAGE_HEADER`)
+  for one release. Hosts never read or set this header.
+
 ## [1.0.0] - 2026-10-28
 
 First versioned release of the specification. Wire protocol `1`.

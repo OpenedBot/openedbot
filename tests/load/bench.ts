@@ -351,7 +351,7 @@ function headers(session: LoadSession, extra: Record<string, string> = {}): Reco
   const index = sessionIndex.get(session) ?? 0;
   return {
     Authorization: `Bearer ${session.accessToken}`,
-    "X-OHB-Organization": session.organizationId,
+    "X-OpenedBot-Organization": session.organizationId,
     "X-Forwarded-For": `10.${Math.floor(index / 65_025)}.${Math.floor(index / 255) % 255}.${1 + (index % 255)}`,
     ...extra,
   };

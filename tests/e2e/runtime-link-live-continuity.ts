@@ -111,7 +111,7 @@ try {
   const auth = await response.json() as { organizationId: string; csrfToken: string };
   const cookie = response.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
   assert(cookie && auth.organizationId && auth.csrfToken, "Incomplete login session.");
-  secrets.push(cookie, auth.csrfToken); headers = { Cookie: cookie, "X-OHB-Organization": auth.organizationId, "X-CSRF-Token": auth.csrfToken };
+  secrets.push(cookie, auth.csrfToken); headers = { Cookie: cookie, "X-OpenedBot-Organization": auth.organizationId, "X-CSRF-Token": auth.csrfToken };
   logout = async () => { await api("/api/auth/logout", "POST"); };
   baseline = await journal(); known = new Set(baseline.map((event) => event.id));
   assert(baseline.length > 0, "Missing journal boundary."); await verifyLink();

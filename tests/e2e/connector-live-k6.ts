@@ -66,7 +66,7 @@ try {
   const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
   if (!cookie || !auth.organizationId || !auth.csrfToken) throw new Error("Login did not establish a session and organization.");
   secrets.push(cookie, auth.csrfToken);
-  const headers = { Cookie: cookie, "X-OHB-Organization": auth.organizationId };
+  const headers = { Cookie: cookie, "X-OpenedBot-Organization": auth.organizationId };
   logout = async () => {
     await request("/api/auth/logout", { method: "POST", headers: { ...headers, "X-CSRF-Token": auth.csrfToken! } });
   };

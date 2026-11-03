@@ -37,8 +37,12 @@ export function isCapabilityEntitlement(entitlement: string): boolean {
   return (Object.values(CAPABILITY_ENTITLEMENTS) as string[]).includes(entitlement);
 }
 
-/** Header names a plug-in may alias: the core's own `X-OHB-*` request headers. */
-export const ALIAS_HEADER_RE = /^X-OHB-[A-Za-z][A-Za-z0-9-]{0,39}$/;
+/**
+ * Header names a plug-in may alias: the core's own `X-OpenedBot-*` request
+ * headers, or a name under the former `X-OHB-` prefix (the old side of an
+ * alias).
+ */
+export const ALIAS_HEADER_RE = /^X-(?:OpenedBot|OHB)-[A-Za-z][A-Za-z0-9-]{0,39}$/;
 /** Query parameter names a plug-in may alias. */
 export const ALIAS_QUERY_RE = /^[a-z][A-Za-z0-9]{0,39}$/;
 /** Absolute paths a plug-in may redirect: lower-case segments, no trailing slash. */
@@ -104,7 +108,7 @@ export type ProPluginManifest = {
  * hands the plug-in the declared names that are set (`HookContext.env`),
  * and the API refuses to start in production while a loaded plug-in misses
  * one marked `requiredInProduction`. A name the core itself declares (its
- * environment schema), an `OPENEDBOT_*` name (or a legacy `OHB_*` one) or a duplicate is refused by the
+ * environment schema), an `OPENEDBOT_*` name (or a retired `OHB_*` one) or a duplicate is refused by the
  * loader: a plug-in never reads the core's variables this way.
  */
 export type PluginEnvVariable = {
@@ -247,7 +251,7 @@ export type ImpersonationSource = {
  * The help desk (open-core step 11.3): the public, sessionless routes a
  * visitor writes to support through. The core keeps the URL, `/api/support/*`,
  * mounted before the session middleware with its rate rules, its CORS header
- * (`X-OHB-Support-Token`) and its exclusion from compression; the plug-in
+ * (`X-OpenedBot-Support-Token`) and its exclusion from compression; the plug-in
  * that runs the backoffice answers them. Without such a plug-in (solo) every
  * path under it is the core 404 `NOT_FOUND` and `/api/health` reports
  * `supportDesk: false`. At most one loaded plug-in provides it: the API keeps

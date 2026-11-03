@@ -40,7 +40,7 @@ describe("classifyLocalEnvEntry: plug-in variables", () => {
   });
 });
 
-describe("OHB_* -> OPENEDBOT_* rename (one release)", () => {
+describe("retired OHB_* names: env-audit --apply rewrites them", () => {
   test("an old name is renamed, never removed, even when empty", () => {
     expect(classifyLocalEnvEntry({ name: "OHB_POSTGRES_CONTAINER", value: "pg" }, "external")).toBe("rename"); // rename:keep
     // The database name now comes from API_DATABASE_URL: the copy is removed.

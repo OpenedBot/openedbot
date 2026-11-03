@@ -1,16 +1,16 @@
 /**
- * One-release fallback for the OHB_* -> OPENEDBOT_* rename of the
- * environment variables. An old name still set is copied to its new name
- * (when the new one is unset) with one deprecation warning per name; the
- * new name always wins. Delete this file, `env-aliases-apply.ts`, the shell
- * table (scripts/lib/env-aliases.sh) and the Makefile one
- * (scripts/lib/env-aliases.mk) in the release after the rename.
+ * The retired OHB_* environment names. They are NO LONGER READ: an entry
+ * point (legacy-env-guard.ts), the Makefile (scripts/lib/legacy-env.mk) and
+ * the recipes that source the env file (scripts/lib/legacy-env.sh) refuse
+ * to run while one is set, rather than start with a setting silently lost.
  *
- * `make env-audit --apply` (scripts/env.ts) rewrites the same names in the
- * env files, values kept: see `renamedEnvName`.
+ * The tables below are only the migration map: the refusal names the new
+ * variable of each old one, and `make env-prune` (scripts/env.ts --audit
+ * --apply) rewrites an env file under the new names, values kept or
+ * converted.
  */
 
-/** Old name -> new name. Mirrored by scripts/lib/env-aliases.sh (tested). */
+/** Old name -> new name. Mirrored by scripts/lib/legacy-env.sh (tested). */
 export const ENV_RENAMES: Readonly<Record<string, string>> = {
   OHB_ENV: "OPENEDBOT_ENV",
   OHB_PRO_PLUGINS: "OPENEDBOT_PLUGINS",
@@ -136,10 +136,10 @@ export function foldEnvMerges(env: Record<string, string | undefined>): { name: 
   return folded;
 }
 
-/** Old names that are no longer read at all: warned about, then ignored. */
+/** Old names with no successor: removed, never renamed. */
 export const ENV_DROPPED: readonly string[] = ["OHB_RUNTIME_MODE", "OHB_RUNTIME_ADMIN_MODE"];
 
-/** Old names whose value now comes from another variable: warned about, then ignored. */
+/** Names whose value now comes from another variable (the OPENEDBOT_ ones are warned about, then ignored). */
 export const ENV_DERIVED: Readonly<Record<string, string>> = {
   OHB_DATABASE_NAME: "API_DATABASE_URL",
   OHB_POSTGRES_PORT: "API_DATABASE_URL",
@@ -156,59 +156,64 @@ export function renamedEnvName(name: string): string | undefined {
   return undefined;
 }
 
-const warned = new Set<string>();
+/** The prefix no current variable carries. */
+export const LEGACY_ENV_PREFIX = "OHB_";
 
-function warnOnce(name: string, message: string, warn: (message: string) => void): void {
-  if (warned.has(name)) return;
-  warned.add(name);
-  warn(message);
+/** What to do with one retired name, for the refusal message. Never a value. */
+export function legacyEnvAdvice(name: string): string {
+  const next = renamedEnvName(name);
+  if (next) return `rename it to ${next}`;
+  const into = mergedEnvTarget(name);
+  if (into) return `folded into ${into}: set ${into} instead`;
+  if (Object.hasOwn(ENV_DERIVED, name)) return `retired, its value comes from ${ENV_DERIVED[name]}: remove it`;
+  return "retired: remove it";
+}
+
+/** The retired names set in `env`, sorted. */
+export function legacyEnvNames(env: Readonly<Record<string, string | undefined>>): string[] {
+  return Object.keys(env)
+    .filter((name) => name.startsWith(LEGACY_ENV_PREFIX) && env[name] !== undefined)
+    .sort();
 }
 
 /**
- * Copies every renamed variable still set under its old name to the new one
- * (when unset) and warns once per old name. Returns the warnings emitted by
- * this call. Never prints a value.
+ * The refusal for the retired names set in `env`, or null when there is
+ * none. Names only: a value (a token, a URL with a secret) never appears.
  */
-export function applyEnvAliases(
-  env: Record<string, string | undefined> = process.env,
+export function legacyEnvRefusal(env: Readonly<Record<string, string | undefined>>): string | null {
+  const names = legacyEnvNames(env);
+  if (!names.length) return null;
+  return [
+    `openedbot refuses to start: ${names.length === 1 ? "this variable uses" : "these variables use"} the retired OHB_ prefix and ${names.length === 1 ? "is" : "are"} no longer read.`,
+    ...names.map((name) => `  ${name}: ${legacyEnvAdvice(name)}`),
+    "Fix them where the environment is defined (shell, env file, secret, compose file). In a checkout, `make env-prune` rewrites .env.local under the new names, values kept.",
+  ].join("\n");
+}
+
+const warned = new Set<string>();
+
+/**
+ * Warns once about each OPENEDBOT_ name whose value now comes from another
+ * variable (ENV_DERIVED), and returns the warnings emitted by this call.
+ * The OHB_ ones are refused by `legacyEnvRefusal`, never warned about.
+ */
+export function warnDerivedEnv(
+  env: Readonly<Record<string, string | undefined>> = process.env,
   warn: (message: string) => void = (message) => process.stderr.write(`${message}\n`),
 ): string[] {
   const emitted: string[] = [];
-  const emit = (name: string, message: string) => {
-    const before = warned.size;
-    warnOnce(name, message, warn);
-    if (warned.size > before) emitted.push(message);
-  };
   for (const name of Object.keys(env)) {
-    const value = env[name];
-    if (value === undefined) continue;
-    if (ENV_DROPPED.includes(name)) {
-      emit(name, `${name} is retired and ignored: remove it from the environment.`);
-      continue;
-    }
-    if (Object.hasOwn(ENV_DERIVED, name)) {
-      emit(name, `${name} is retired and ignored: its value now comes from ${ENV_DERIVED[name]}; remove it.`);
-      continue;
-    }
-    const next = renamedEnvName(name);
-    if (!next) continue;
-    const current = env[next];
-    if (current === undefined) {
-      env[next] = value;
-      emit(name, `${name} is deprecated: rename it to ${next} (old name read for one more release).`);
-    } else if (current !== value) {
-      emit(name, `${name} and ${next} are both set with different values: ${next} wins; remove ${name}.`);
-    } else {
-      emit(name, `${name} is deprecated: remove it, ${next} is already set.`);
-    }
-  }
-  for (const { name, into } of foldEnvMerges(env)) {
-    emit(name, `${name} is deprecated: it is folded into ${into} (converted for one more release); set ${into} instead.`);
+    if (env[name] === undefined || name.startsWith(LEGACY_ENV_PREFIX) || !Object.hasOwn(ENV_DERIVED, name)) continue;
+    if (warned.has(name)) continue;
+    warned.add(name);
+    const message = `${name} is retired and ignored: its value now comes from ${ENV_DERIVED[name]}; remove it.`;
+    warn(message);
+    emitted.push(message);
   }
   return emitted;
 }
 
 /** For the tests: forget which names were already warned about. */
-export function resetEnvAliasWarnings(): void {
+export function resetDerivedEnvWarnings(): void {
   warned.clear();
 }

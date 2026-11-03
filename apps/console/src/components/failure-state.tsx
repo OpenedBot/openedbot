@@ -98,7 +98,7 @@ export type FailurePathShape = { hops: readonly HopKey[]; crossedIntoStop: boole
  *
  * openedbot est un relais (navigateur, API, lien connecteur, runtime) et l'API
  * distingue déjà une panne du lien d'une réponse de la gateway
- * (`X-OHB-Relay-Stage`). Ce trajet est donc un FAIT du produit, pas une
+ * (`X-OpenedBot-Relay-Stage`). Ce trajet est donc un FAIT du produit, pas une
  * décoration : il répond à la seule question qu'un opérateur ne peut pas
  * deviner, « jusqu'où est-ce allé », et c'est elle qui décide du geste suivant.
  *

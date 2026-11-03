@@ -129,7 +129,7 @@ const guestToken = openedBody.token;
 if (!conversationId || !guestToken) fail("L'ouverture n'a rendu ni identifiant de fil ni jeton.");
 if (openedBody.snapshot?.status !== "open") fail("Un fil neuf devrait être ouvert.");
 if ((openedBody.snapshot?.messages ?? []).length !== 0) fail("Un fil neuf ne devrait porter aucun message.");
-const guestHeaders = { "X-OHB-Support-Token": guestToken, "Content-Type": "application/json" };
+const guestHeaders = { "X-OpenedBot-Support-Token": guestToken, "Content-Type": "application/json" };
 /** Tout fil créé par cette passe, effacé dans le `finally` quoi qu'il arrive. */
 const created: string[] = [conversationId];
 step(`fil ${conversationId} ouvert pour ${guestEmail}`);
@@ -345,7 +345,7 @@ try {
   // Un jeton étranger ne l'obtient pas, et la réponse ne dit pas qu'elle
   // existe : c'est la RLS du fil parent qui décide, pas un `where`.
   const stranger = await fetch(`${baseUrl}/api/support/attachments/${file.id}`, {
-    headers: { "X-OHB-Support-Token": `etranger-${"0".repeat(24)}` },
+    headers: { "X-OpenedBot-Support-Token": `etranger-${"0".repeat(24)}` },
   });
   if (stranger.status !== 404) {
     fail(`Un jeton étranger obtient HTTP ${stranger.status} sur la capture, 404 attendu.`);
@@ -374,7 +374,7 @@ try {
   /* -------------- 5. un autre jeton n'ouvre rien du tout ---------------- */
 
   const foreign = await fetch(`${baseUrl}/api/support/conversations/${conversationId}`, {
-    headers: { "X-OHB-Support-Token": "ce-jeton-nouvre-rien-du-tout-0123456789" },
+    headers: { "X-OpenedBot-Support-Token": "ce-jeton-nouvre-rien-du-tout-0123456789" },
   });
   if (foreign.status !== 404) {
     fail(`Un jeton étranger obtient HTTP ${foreign.status}, 404 attendu (et surtout pas 200).`);

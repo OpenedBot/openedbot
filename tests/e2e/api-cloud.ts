@@ -14,7 +14,7 @@ const setCookie = login.headers.get("set-cookie") ?? "";
 const cookie = setCookie.split(",").map((part) => part.trim().split(";")[0]).filter(Boolean).join("; ");
 if (!cookie || !loginBody.csrfToken || !loginBody.organizationId) throw new Error("Cloud login did not return session cookies and organization.");
 
-const headers = { Cookie: cookie, "X-CSRF-Token": loginBody.csrfToken, "X-OHB-Organization": loginBody.organizationId };
+const headers = { Cookie: cookie, "X-CSRF-Token": loginBody.csrfToken, "X-OpenedBot-Organization": loginBody.organizationId };
 for (const path of ["/api/auth/me", "/api/bots", "/api/runtime", "/api/overview", "/api/inbox"]) {
   const response = await fetch(`${baseUrl}${path}`, { headers });
   if (!response.ok) throw new Error(`${path} failed with HTTP ${response.status}: ${await response.text()}`);

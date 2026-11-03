@@ -1,4 +1,4 @@
-import "./env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback
+import "./legacy-env-guard"; // first: refuses a retired OHB_* variable
 import { app, dialog, Menu } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

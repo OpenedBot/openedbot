@@ -48,8 +48,8 @@ describe("ApiClient.events", () => {
       if (event.cursor !== undefined) cursors.push(event.cursor);
     }
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.get("X-OHB-Organization")).toBe("org-1");
-    expect(calls[0]!.get("X-OHB-Fleet")).toBe("agency-a");
+    expect(calls[0]!.get("X-OpenedBot-Organization")).toBe("org-1");
+    expect(calls[0]!.get("X-OpenedBot-Fleet")).toBe("agency-a");
     expect(cursors).toEqual([8]);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toBeInstanceOf(ApiClientError);

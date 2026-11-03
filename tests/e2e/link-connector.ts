@@ -50,7 +50,7 @@ if (!cookie || !loginBody.csrfToken || !loginBody.organizationId) {
 const headers = {
   Cookie: cookie,
   "X-CSRF-Token": loginBody.csrfToken,
-  "X-OHB-Organization": loginBody.organizationId,
+  "X-OpenedBot-Organization": loginBody.organizationId,
   "Content-Type": "application/json",
 };
 

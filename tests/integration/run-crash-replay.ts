@@ -14,7 +14,7 @@ import type { WorkerConfig } from "../../modules/execution/src/application/worke
 import { withDisposablePostgres } from "./disposable-postgres";
 import { admitFixtureMessage, assertAdmittedMessageDurable } from "./admitted-message";
 
-const CHILD_REPORT_PREFIX = "OHB115_CHILD ";
+const CHILD_REPORT_PREFIX = "OPENEDBOT_TEST_115_CHILD ";
 const FAKE_GATEWAY_TOKEN = `gateway-${crypto.randomUUID()}`;
 const INTERNAL_WORKER_TOKEN = `internal-${crypto.randomUUID()}`;
 const ORGANIZATION_ID = crypto.randomUUID();
@@ -31,7 +31,7 @@ const USER_INPUT = "Crash replay identity fixture";
 const FINAL_OUTPUT = "Recovered output after worker restart.";
 const MAX_RUN_WAIT_MS = 25_000;
 const MAX_SETUP_WAIT_MS = 15_000;
-const STATUS_RECOVERY = process.env.OHB115_STATUS_RECOVERY === "1";
+const STATUS_RECOVERY = process.env.OPENEDBOT_TEST_115_STATUS_RECOVERY === "1";
 
 let currentPhase = "startup";
 
@@ -206,11 +206,11 @@ async function runChild(_mode: ChildMode): Promise<void> {
   let phase = "read-private-environment";
   let db: SQL | null = null;
   try {
-    const databaseUrl = process.env.OHB115_DATABASE_URL;
-    const apiInternalUrl = process.env.OHB115_API_INTERNAL_URL;
-    const runtimeLinkUrl = process.env.OHB115_RUNTIME_LINK_URL;
-    const internalToken = process.env.OHB115_INTERNAL_TOKEN;
-    const workerId = process.env.OHB115_WORKER_ID;
+    const databaseUrl = process.env.OPENEDBOT_TEST_115_DATABASE_URL;
+    const apiInternalUrl = process.env.OPENEDBOT_TEST_115_API_INTERNAL_URL;
+    const runtimeLinkUrl = process.env.OPENEDBOT_TEST_115_RUNTIME_LINK_URL;
+    const internalToken = process.env.OPENEDBOT_TEST_115_INTERNAL_TOKEN;
+    const workerId = process.env.OPENEDBOT_TEST_115_WORKER_ID;
     if (!databaseUrl || !apiInternalUrl || !runtimeLinkUrl || !internalToken || !workerId) {
       throw new Error("private child configuration unavailable");
     }
@@ -239,7 +239,7 @@ async function runChild(_mode: ChildMode): Promise<void> {
 
     phase = "claim-run";
     const claimed = await claimRun(db, workerConfig);
-    if (!claimed || claimed.id !== process.env.OHB115_RUN_ID) throw new Error("seeded run was not claimed");
+    if (!claimed || claimed.id !== process.env.OPENEDBOT_TEST_115_RUN_ID) throw new Error("seeded run was not claimed");
     if (typeof claimed.leaseGeneration !== "number") throw new Error("claim lease generation was not normalized");
     reportChild({ phase: "claim-run", result: "claimed", generation: Number(claimed.leaseGeneration) });
     phase = "execute-run";
@@ -263,7 +263,7 @@ function spawnWorker(mode: ChildMode, values: Record<string, string>): {
     HOME: inherited.HOME ?? "/tmp",
     TMPDIR: inherited.TMPDIR ?? "/tmp",
     LANG: inherited.LANG ?? "C.UTF-8",
-    OHB115_CHILD_MODE: mode,
+    OPENEDBOT_TEST_115_CHILD_MODE: mode,
     ...values,
   };
   const child = Bun.spawn([process.execPath, fileURLToPath(import.meta.url), "--child", mode], {
@@ -541,12 +541,12 @@ async function parentMain(): Promise<void> {
         await waitUntil(() => hub.subscriberCount() > 0, MAX_SETUP_WAIT_MS, "real API SSE did not subscribe to EventHub");
 
         const childValues = (workerId: string): Record<string, string> => ({
-          OHB115_DATABASE_URL: url,
-          OHB115_API_INTERNAL_URL: apiOrigin,
-          OHB115_RUNTIME_LINK_URL: relayOrigin,
-          OHB115_INTERNAL_TOKEN: INTERNAL_WORKER_TOKEN,
-          OHB115_WORKER_ID: workerId,
-          OHB115_RUN_ID: RUN_ID,
+          OPENEDBOT_TEST_115_DATABASE_URL: url,
+          OPENEDBOT_TEST_115_API_INTERNAL_URL: apiOrigin,
+          OPENEDBOT_TEST_115_RUNTIME_LINK_URL: relayOrigin,
+          OPENEDBOT_TEST_115_INTERNAL_TOKEN: INTERNAL_WORKER_TOKEN,
+          OPENEDBOT_TEST_115_WORKER_ID: workerId,
+          OPENEDBOT_TEST_115_RUN_ID: RUN_ID,
         });
 
         currentPhase = "start-first-worker";

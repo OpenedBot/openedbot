@@ -7,7 +7,7 @@ import {
   type RelayDialer,
   type RelayRequest,
 } from "@openedbot/hermes";
-import { RELAY_STAGE_HEADER, type RelayErrStage } from "@openedbot/contracts-connector";
+import { RELAY_STAGE_HEADER, relayStageOf, type RelayErrStage } from "@openedbot/contracts-connector";
 import type { WorkerConfig } from "./worker-config";
 
 /**
@@ -70,7 +70,7 @@ export function relayProxyUrl(apiInternalUrl: string, runtimeId: string, path: s
 
 /**
  * Le dialer du worker : une requête HTTP vers le relais, avec le bearer
- * interne. Une réponse marquée `X-OHB-Relay-Stage` est une panne du lien,
+ * interne. Une réponse marquée `X-OpenedBot-Relay-Stage` est une panne du lien,
  * rendue comme `RelayDialError` datée de son étape pour que le transport la
  * classe (`not_sent` / `ambiguous`). Sans marque, c'est la réponse du gateway.
  */
@@ -103,7 +103,7 @@ export function createWorkerRelayDialer(
       // une mutation `ambiguous` : on ne prétend pas que rien n'est parti.
       throw error;
     }
-    const stage = response.headers.get(RELAY_STAGE_HEADER);
+    const stage = relayStageOf(response.headers);
     if (stage === "before_dispatch" || stage === "after_dispatch") {
       throw await relayFailure(response, stage);
     }

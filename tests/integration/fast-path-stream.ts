@@ -380,7 +380,7 @@ async function main(): Promise<void> {
       assert(!JSON.stringify(replayedPrivate).includes(sentinel), "Replay leaked private runtime data");
       assert(replayedPrivate.map((frame) => frame.event).join(",") === "tool.call,raw", "Redaction changed event ordering or types");
 
-      if (process.env.OHB116_CANONICAL_CASE !== "terminal") {
+      if (process.env.OPENEDBOT_TEST_116_CANONICAL_CASE !== "terminal") {
         const approvalRunId = crypto.randomUUID();
         const approvalBotId = crypto.randomUUID();
         const approvalThreadId = crypto.randomUUID();

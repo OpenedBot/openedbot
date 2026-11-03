@@ -167,7 +167,8 @@ docs/           developer notes (Windows workstation)
 - Product documentation: <https://docs.openedbot.app>
 - [`docs/WINDOWS_DEV.md`](docs/WINDOWS_DEV.md): developing from a Windows workstation
 
-Variables are named `OPENEDBOT_*` (legacy `OHB_*` names are still read for one release).
+Variables are named `OPENEDBOT_*`. A retired `OHB_*` name is no longer read: the app refuses to
+start and names its successor.
 Names such as `ohb://`, `window.__OHB_NATIVE__` and `OHBPopup.app` are technical
 identifiers kept for compatibility.
 

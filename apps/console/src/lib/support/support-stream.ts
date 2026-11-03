@@ -46,7 +46,7 @@ export function openSupportStream(input: {
 }): SupportStreamHandle {
   return openSupportEventStream<SupportEventDto>({
     url: (cursor) => `${API_ORIGIN}/api/support/conversations/${input.conversationId}/events?cursor=${cursor}`,
-    headers: input.token ? { "X-OHB-Support-Token": input.token } : undefined,
+    headers: input.token ? { "X-OpenedBot-Support-Token": input.token } : undefined,
     cursor: input.cursor,
     onEvent: input.handlers.onEvent,
     onStatus: input.handlers.onStatus,

@@ -70,7 +70,7 @@ function stubFetch(options: Options = {}) {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method ?? "GET";
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : null;
-    const organizationId = new Headers(init?.headers).get("X-OHB-Organization");
+    const organizationId = new Headers(init?.headers).get("X-OpenedBot-Organization");
     calls.push({ method, url, body, organizationId });
     const custom = options.onRequest?.(method, url, body);
     if (custom) return custom;

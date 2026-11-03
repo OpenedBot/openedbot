@@ -24,7 +24,7 @@ import {
   type EnvVar,
 } from "../platform/config/src/env-schema";
 import { RUNTIME_MODE } from "../platform/config/src/runtime-mode";
-import { mergedEnvTarget, renamedEnvName } from "../platform/config/src/env-aliases";
+import { legacyEnvRefusal, mergedEnvTarget, renamedEnvName } from "../platform/config/src/legacy-env";
 import {
   assertUniqueEnvNames,
   classifyLocalEnvEntry,
@@ -56,6 +56,10 @@ async function runCheck(): Promise<void> {
     throw new Error(`No ${path} found. Run \`make setup\`, or copy each .env.example next to it.`);
   }
   const merged = mergeEnvFiles(files);
+  // A retired OHB_* name makes every app refuse to start: say so here first,
+  // with the same advice (`make env-prune` rewrites them).
+  const legacy = legacyEnvRefusal(merged.values);
+  if (legacy) throw new Error(legacy.replace("openedbot refuses to start", `${path} would not start openedbot`));
   const values = withRenamedEnvValues(merged.values);
   const { sourceOf } = merged;
 
@@ -304,7 +308,7 @@ async function runAudit(): Promise<void> {
         continue;
       }
       if (decision === "rename") {
-        // The value moves to the new name; never dropped (one-release rename).
+        // The value moves to the new name; never dropped.
         const next = renamedEnvName(parsed.name)!;
         if (presentNames.has(next)) {
           renamed.push(`${parsed.name} -> ${next}, already set: old line removed (${local.path})`);
@@ -339,7 +343,7 @@ async function runAudit(): Promise<void> {
 
   console.info(`${localName}: removable empty or obsolete variables: ${removable.sort().join(", ") || "none"}.`);
   if (renamed.length) {
-    console.info(`${localName}: ${apply ? "renamed" : "to rename (OHB_* -> OPENEDBOT_*, values kept or converted; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
+    console.info(`${localName}: ${apply ? "renamed" : "to rename (retired OHB_* -> OPENEDBOT_*, values kept or converted; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
   }
   if (kept.length) console.info(`${localName}: preserved non-empty non-local variables: ${[...new Set(kept)].sort().join(", ")}.`);
   for (const line of misfiled.sort()) {
