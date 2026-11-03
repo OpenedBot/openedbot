@@ -24,6 +24,7 @@ import { BloubBotFace } from "../bloub-bot";
 import { BotFace } from "../bot-face";
 import { BuiCloseGlyph, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import { BuiSelect, PreferencesCard, type SelectOption } from "./agent-editor-preferences";
+import { InlineEditorSlot } from "./agent-editor-slot";
 
 const INLINE_QUERY = EDITOR_INLINE_QUERY;
 
@@ -95,16 +96,9 @@ export function AgentEditorPanel() {
 
   if (inline) {
     return (
-      <div
-        className="min-h-0 shrink-0 overflow-hidden transition-[width,opacity] duration-300 ease-out motion-reduce:transition-none"
-        style={{ width: visible ? 356 : 0, opacity: visible ? 1 : 0 }}
-        aria-hidden={!visible}
-        inert={!visible}
-      >
-        <div className="h-full w-[356px] ps-4">
-          {bot && editorMounted ? <AgentEditor key={bot.id} bot={bot} onClose={close} /> : null}
-        </div>
-      </div>
+      <InlineEditorSlot visible={visible}>
+        {bot && editorMounted ? <AgentEditor key={bot.id} bot={bot} onClose={close} /> : null}
+      </InlineEditorSlot>
     );
   }
   if (!visible || !bot) return null;

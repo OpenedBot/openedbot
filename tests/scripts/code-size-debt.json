@@ -6,7 +6,7 @@
   "apps/api/src/routes/execution/workflow-routes.ts": 633,
   "apps/api/src/routes/identity/auth.ts": 722,
   "apps/api/src/routes/overview/misc-routes.ts": 605,
-  "apps/console/src/components/boardui/agent-editor-panel.tsx": 729,
+  "apps/console/src/components/boardui/agent-editor-panel.tsx": 723,
   "apps/console/src/components/boardui/board-sidebar.tsx": 1019,
   "apps/console/src/components/bot-capabilities-panel.tsx": 615,
   "apps/console/src/components/composer-model-picker.tsx": 950,
