@@ -230,8 +230,8 @@
   transform: translateY(-2px);
 }
 
-.ohb-salon-cta:focus-visible,
-.ohb-salon-ghost:focus-visible {
+:root[data-keyboard-focus] .ohb-salon-cta:focus-visible,
+:root[data-keyboard-focus] .ohb-salon-ghost:focus-visible {
   outline: 2px solid var(--salon-ink);
   outline-offset: 3px;
 }

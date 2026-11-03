@@ -77,8 +77,8 @@
   background: var(--accent-700);
 }
 
-.ohb-mode-cta:focus-visible,
-.ohb-mode-row-target:focus-visible {
+:root[data-keyboard-focus] .ohb-mode-cta:focus-visible,
+:root[data-keyboard-focus] .ohb-mode-row-target:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
@@ -249,7 +249,7 @@
 }
 
 .ohb-mode-row-target:hover .ohb-mode-row-go,
-.ohb-mode-row-target:focus-visible .ohb-mode-row-go {
+:root[data-keyboard-focus] .ohb-mode-row-target:focus-visible .ohb-mode-row-go {
   opacity: 1;
   transform: none;
 }

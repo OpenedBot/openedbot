@@ -128,7 +128,7 @@ export function TreeView<T extends object>({
             "group/tree-view flex w-full min-w-0 flex-col rounded-3xl border border-border-button-default bg-background-primary-default p-2 outline-none",
             renderer === TREE_VIEW_RENDERER ? "gap-0" : "gap-0.5",
             "data-[empty]:px-4 data-[empty]:py-8 data-[empty]:text-center data-[empty]:text-body-regular data-[empty]:text-text-tertiary",
-            "data-[focus-visible]:ring-2 data-[focus-visible]:ring-border-focus-ring",
+            "in-[[data-keyboard-focus]]:data-[focus-visible]:ring-2 in-[[data-keyboard-focus]]:data-[focus-visible]:ring-border-focus-ring",
             typeof className === "function" ? className(state) : className,
           )}
         />
@@ -216,7 +216,7 @@ export function TreeViewItem<T extends object = object>({
                   <AriaButton
                     slot="chevron"
                     isDisabled={isDisabled}
-                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground-icon-tertiary outline-none transition-colors hover:text-foreground-icon-primary data-[focus-visible]:ring-2 data-[focus-visible]:ring-border-focus-ring"
+                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground-icon-tertiary outline-none transition-colors hover:text-foreground-icon-primary in-[[data-keyboard-focus]]:data-[focus-visible]:ring-2 in-[[data-keyboard-focus]]:data-[focus-visible]:ring-border-focus-ring"
                   >
                     <RiArrowRightSLine
                       aria-hidden

@@ -9,8 +9,7 @@
 @import "./components/bot-create.css";
 @import "./components/bot-manage.css";
 @import "./components/native-titlebar.css";
-@import "./components/native-focus.css";
-@import "./components/pointer-focus.css";
+@import "./components/keyboard-focus.css";
 @import "./components/native-app.css";
 @import "./components/interactive-cursor.css";
 @import "./components/brand.css";

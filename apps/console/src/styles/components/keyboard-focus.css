@@ -1,0 +1,12 @@
+/*
+  Pas d'anneau de focus qui apparaît tout seul (voir `lib/shell/keyboard-focus.ts`).
+
+  Les utilitaires Tailwind `focus-visible:` et `focus-within:` attendent déjà
+  `data-keyboard-focus` (variantes redéfinies dans `browser/ui-kit`), comme les
+  règles `:focus-visible` écrites à la main. Reste le contour par défaut du
+  navigateur sur un lien, un élément `tabindex` ou un champ sans
+  `outline-none` : il suit la même règle ici.
+*/
+:root:not([data-keyboard-focus]) :focus-visible {
+  outline: none;
+}
