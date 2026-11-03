@@ -45,7 +45,7 @@ export function GoalDialog({
         onChange={(event) => setValue(event.target.value)}
         placeholder={t("boardui.goalPlaceholder")}
         aria-label={t("boardui.goal")}
-        className="block w-full resize-none rounded-2lg bg-background-tertiary-default px-2.5 py-2 text-body-regular text-text-primary outline-none ring-2 ring-inset ring-transparent placeholder:text-text-tertiary focus:ring-border-focus-ring"
+        className="block w-full resize-none rounded-2lg bg-background-tertiary-default px-2.5 py-2 text-body-regular text-text-primary outline-none ring-2 ring-inset ring-transparent placeholder:text-text-tertiary focus-visible:ring-border-focus-ring"
       />
     </Dialog>
   );

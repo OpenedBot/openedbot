@@ -10,7 +10,7 @@ import { AppErrorBoundary } from "./components/app-error-boundary";
 import { retireLegacyServiceWorker } from "./lib/platform/legacy-service-worker";
 import { router } from "./route-tree";
 import { applyNativeTitlebar } from "./lib/platform/native-titlebar";
-import { trackPointerFocus } from "./lib/shell/pointer-focus";
+import { trackKeyboardFocus } from "./lib/shell/keyboard-focus";
 import { applyStoredTextSize } from "./lib/shell/text-size";
 import "katex/dist/katex.min.css";
 import "./styles/globals.css";
@@ -25,9 +25,10 @@ paintStoredTheme();
 // `lib/platform/native-titlebar.ts`). Sans la coque, ne fait rien.
 applyNativeTitlebar();
 
-// Un bouton cliqué ne prend pas l'anneau de focus à la touche suivante (Échap
-// qui ferme les réglages) ; Tab le rend. Voir `lib/shell/pointer-focus.ts`.
-trackPointerFocus();
+// Pas d'anneau ni de bordure de focus qui apparaît tout seul (autoFocus,
+// dialogue, menu fermé, retour dans la fenêtre) ; Tab le rend. Voir
+// `lib/shell/keyboard-focus.ts`.
+trackKeyboardFocus();
 
 // La taille du texte (Apparence) : la coque native zoome la fenêtre dès le
 // chargement, avant que React ne peigne (voir `lib/shell/text-size.ts`).

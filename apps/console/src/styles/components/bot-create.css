@@ -99,7 +99,7 @@
   color: var(--color-text-primary);
 }
 
-.ohb-new-bot-close:focus-visible {
+:root[data-keyboard-focus] .ohb-new-bot-close:focus-visible {
   box-shadow: 0 0 0 2px var(--color-border-focus-ring);
 }
 
@@ -166,7 +166,7 @@
   background: var(--color-background-tertiary-default);
 }
 
-.ohb-new-bot-card-action:focus-visible {
+:root[data-keyboard-focus] .ohb-new-bot-card-action:focus-visible {
   box-shadow: 0 0 0 2px var(--color-border-focus-ring);
 }
 

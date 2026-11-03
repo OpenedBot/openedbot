@@ -75,7 +75,7 @@ export function SegmentedRadio<T extends string | null>({
           key={option.value ?? "none"}
           className={cn(
             OPTION,
-            "cursor-pointer text-muted-foreground hover:text-foreground has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
+            "cursor-pointer text-muted-foreground hover:text-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
             option.value === value && SELECTED,
           )}
         >

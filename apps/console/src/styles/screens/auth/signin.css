@@ -70,7 +70,7 @@
   outline: none;
 }
 
-.si-brand:focus-visible {
+:root[data-keyboard-focus] .si-brand:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 30%, transparent);
 }
 
@@ -142,7 +142,7 @@
   color: var(--si-muted-fg);
 }
 
-.si-input:focus-visible {
+:root[data-keyboard-focus] .si-input:focus-visible {
   border-color: var(--si-ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 22%, transparent);
 }
@@ -202,10 +202,10 @@
   opacity: 0.45;
 }
 
-.si-primary:focus-visible,
-.si-secondary:focus-visible,
-.si-google:focus-visible,
-.si-link:focus-visible {
+:root[data-keyboard-focus] .si-primary:focus-visible,
+:root[data-keyboard-focus] .si-secondary:focus-visible,
+:root[data-keyboard-focus] .si-google:focus-visible,
+:root[data-keyboard-focus] .si-link:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 30%, transparent);
 }
@@ -249,7 +249,7 @@
   font-weight: 600;
 }
 
-.si-otp-box:focus-visible {
+:root[data-keyboard-focus] .si-otp-box:focus-visible {
   border-color: var(--si-ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 22%, transparent);
 }

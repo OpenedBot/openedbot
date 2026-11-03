@@ -173,7 +173,7 @@
   pointer-events: none;
 }
 
-.lg-field-control:focus-within > svg {
+:root[data-keyboard-focus] .lg-field-control:focus-within > svg {
   color: var(--lg-fg);
 }
 
@@ -213,7 +213,7 @@
 }
 
 .lg-eye:hover,
-.lg-eye:focus-visible {
+:root[data-keyboard-focus] .lg-eye:focus-visible {
   color: var(--lg-fg);
 }
 
@@ -226,7 +226,7 @@
   color: var(--lg-muted-fg);
 }
 
-.lg-field-control input:focus-visible {
+:root[data-keyboard-focus] .lg-field-control input:focus-visible {
   border-color: var(--lg-ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--lg-ring) 22%, transparent);
 }
@@ -513,12 +513,12 @@ a.lg-submit {
   transform: translateY(0);
 }
 
-.lg-brand:focus-visible,
-.lg-secondary:focus-visible,
-.lg-submit:focus-visible,
-.lg-ghost:focus-visible,
-.lg-locale-option:focus-visible,
-.lg-theme-toggle:focus-visible {
+:root[data-keyboard-focus] .lg-brand:focus-visible,
+:root[data-keyboard-focus] .lg-secondary:focus-visible,
+:root[data-keyboard-focus] .lg-submit:focus-visible,
+:root[data-keyboard-focus] .lg-ghost:focus-visible,
+:root[data-keyboard-focus] .lg-locale-option:focus-visible,
+:root[data-keyboard-focus] .lg-theme-toggle:focus-visible {
   outline: 2px solid var(--lg-ring);
   outline-offset: 2px;
 }

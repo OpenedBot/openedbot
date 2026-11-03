@@ -70,6 +70,15 @@
   on the pointer, not on the breakpoint (HIG / WCAG 2.5.8).
 */
 @custom-variant fine (@media (pointer: fine));
+/*
+  Anneaux et bordures de focus : seulement quand Tab (ou les flèches) a
+  déplacé le focus. Un focus posé tout seul (autoFocus, ouverture d'un
+  dialogue, menu fermé, retour dans la fenêtre, clic) n'en montre aucun ;
+  `data-keyboard-focus` est posé par `apps/console/src/lib/shell/keyboard-focus.ts`.
+  `focus:` reste brut : il porte le surlignage des lignes de menu au survol.
+*/
+@custom-variant focus-visible (&:is(:root[data-keyboard-focus] *):focus-visible);
+@custom-variant focus-within (&:is(:root[data-keyboard-focus] *):focus-within);
 
 /*
   Largeurs du cadre, en @theme NON inline : l'utilitaire doit compiler vers
@@ -1608,7 +1617,7 @@ html.theme-transitioning *::after {
 [data-composer-shell] {
   box-shadow: var(--shadow-xs);
 }
-[data-composer-shell]:focus-within {
+:root[data-keyboard-focus] [data-composer-shell]:focus-within {
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 [data-composer-send-action] {
