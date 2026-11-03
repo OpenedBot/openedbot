@@ -15,8 +15,9 @@
  *   - YOLO mode (announce `yolo_lease` in `features`): records the
  *     `yolo.lease` / `yolo.revoke` / `yolo.audit.ack` frames and the
  *     `link.context.leaseKeys` it receives, and emits `yolo.state` and a
- *     hash-chained `yolo.audit` (genesis per runtime, as edge-setup does).
- *     It verifies no signature: the real host does (`yolo_lease.go`).
+ *     hash-chained `yolo.audit` (genesis per runtime, as edge-setup does),
+ *     journaled offline and flushed when the link is back. The lease
+ *     verification and the decisions live in ./host-yolo.ts.
  *
  * Test double only: bodies are buffered (bounded), not streamed, and the
  * journal lives in memory.
@@ -70,6 +71,10 @@ export type HostAgentOptions = {
   agent?: string;
   /** `hello.features`, e.g. `yolo_lease` and `yolo_thread_scope` for YOLO mode. */
   features?: string[];
+  /** YOLO mode: each `yolo.lease` / `yolo.revoke` / `yolo.audit.ack`, as it arrives (`FakeHostYolo.receive`). */
+  onYolo?: (frame: HostAgentYoloFrame) => void;
+  /** YOLO mode: `link.context.leaseKeys`, as they arrive (`FakeHostYolo.pin`). */
+  onLeaseKeys?: (keys: YoloLeaseKey[]) => void;
   log?: (event: string, fields: Record<string, unknown>) => void;
 };
 
@@ -91,8 +96,10 @@ export class FakeHostAgent {
   private readonly yoloReceived: HostAgentYoloFrame[] = [];
   private yoloWaiters: Array<() => void> = [];
   private receivedLeaseKeys: YoloLeaseKey[] | null = null;
-  /** The local audit chain: what was written, and the last link. */
+  /** The local audit chain: what was written and not acknowledged yet. */
   private readonly yoloJournal: RelayYoloAuditEntry[] = [];
+  /** The last acknowledged link: the chain goes on from it once the journal is purged. */
+  private yoloAcked: RelayYoloAuditEntry | null = null;
 
   constructor(private readonly options: HostAgentOptions) {}
 
@@ -135,13 +142,22 @@ export class FakeHostAgent {
 
   /**
    * Appends the records to the local chain and sends the whole unacknowledged
-   * tail as one `yolo.audit`. `entryHash = SHA-256(0x01 || canonical(entry
+   * tail as one `yolo.audit`.
+   */
+  sendYoloAudit(runtimeId: string, records: HostAgentYoloRecord[]): RelayYoloAuditFrame {
+    this.recordYoloAudit(runtimeId, records);
+    return this.flushYoloAudit(runtimeId);
+  }
+
+  /**
+   * Appends the records to the local chain only, link or no link (what the
+   * host journals while offline). `entryHash = SHA-256(0x01 || canonical(entry
    * without entryHash) || prevHash)`, written here independently of the code
    * under test.
    */
-  sendYoloAudit(runtimeId: string, records: HostAgentYoloRecord[]): RelayYoloAuditFrame {
+  recordYoloAudit(runtimeId: string, records: HostAgentYoloRecord[]): void {
     for (const record of records) {
-      const previous = this.yoloJournal.at(-1);
+      const previous = this.yoloJournal.at(-1) ?? this.yoloAcked;
       const body = {
         seq: (previous?.seq ?? 0) + 1,
         eventId: randomUUID(),
@@ -155,9 +171,18 @@ export class FakeHostAgent {
       };
       this.yoloJournal.push({ ...body, entryHash: fakeYoloEntryHash(body) });
     }
+  }
+
+  /** Sends the unacknowledged tail as one `yolo.audit` (when the link is back). */
+  flushYoloAudit(runtimeId: string): RelayYoloAuditFrame {
     const frame = yoloAuditFrameOf(runtimeId, this.yoloJournal);
     this.sendText(frame);
     return frame;
+  }
+
+  /** The local entries not acknowledged yet, oldest first. */
+  get yoloPending(): readonly RelayYoloAuditEntry[] {
+    return this.yoloJournal;
   }
 
   /** Sends any `yolo.audit`, a tampered one included: the cloud must quarantine, not drop. */
@@ -167,12 +192,13 @@ export class FakeHostAgent {
 
   /** What `yolo.audit.ack` lets the host purge, as edge-setup does. */
   private purgeYoloJournal(toSeq: number): void {
-    while (this.yoloJournal[0] && this.yoloJournal[0].seq <= toSeq) this.yoloJournal.shift();
+    while (this.yoloJournal[0] && this.yoloJournal[0].seq <= toSeq) this.yoloAcked = this.yoloJournal.shift()!;
   }
 
   private noteYolo(frame: HostAgentYoloFrame): void {
     this.yoloReceived.push(frame);
     if (frame.t === "yolo.audit.ack") this.purgeYoloJournal(frame.toSeq);
+    this.options.onYolo?.(frame);
     for (const wake of [...this.yoloWaiters]) wake();
   }
 
@@ -295,7 +321,10 @@ export class FakeHostAgent {
         for (const wake of this.issuedWaiters.splice(0)) wake(this.issued);
         return;
       case "link.context":
-        if (frame.leaseKeys) this.receivedLeaseKeys = frame.leaseKeys;
+        if (frame.leaseKeys) {
+          this.receivedLeaseKeys = frame.leaseKeys;
+          this.options.onLeaseKeys?.(frame.leaseKeys);
+        }
         return;
       case "yolo.lease":
       case "yolo.revoke":
