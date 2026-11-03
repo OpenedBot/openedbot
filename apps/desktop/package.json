@@ -5,6 +5,7 @@
   "private": true,
   "description": "openedbot desktop shell: a compact native window around the openedbot web console",
   "license": "Apache-2.0",
+  "homepage": "https://openedbot.app",
   "main": "dist/main/main.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
