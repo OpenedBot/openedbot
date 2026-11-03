@@ -41,7 +41,7 @@ import type { YoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lea
 import { withTenant, type Db, type TransactionDb } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { logEvent } from "@openedbot/platform-observability";
-import { enqueueYoloAuditQuarantineEmails } from "./link-alerts";
+import { enqueueYoloAuditQuarantineEmails } from "./link-yolo-alerts";
 import type { LinkLocation } from "./instances";
 import type {
   ConnectionOptions,

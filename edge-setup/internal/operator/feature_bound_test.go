@@ -71,7 +71,7 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 // thirteenth are yolo_lease and yolo_thread_scope: an API that drops them
 // grants this host no YOLO lease and keeps asking a human, the behavior of
 // every host before them. The API in this repository announces a bound of 64.
-const beyondDefaultAcknowledged = 11
+const beyondDefaultAcknowledged = 13
 
 // The guard behind the incident where the next operator feature would have made
 // every updated host's hello 17 names long. It reads the REAL operator, in every
