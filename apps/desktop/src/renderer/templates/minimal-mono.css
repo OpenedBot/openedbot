@@ -1,0 +1,624 @@
+/*
+  minimal-mono: Swiss minimalism. One flush-left axis drawn as a hairline at
+  the golden section of the window (38.2 %), the form hanging off it in a
+  narrow column. True black on white (and the reverse), Inter at two weights
+  only (400 and 700), every size and gap on an 8 px baseline grid. The left
+  field is not empty: the brand mark tops it and the footnote anchors it,
+  like the masthead and colophon of a poster. The Google mark is the only
+  colour on the page.
+*/
+html[data-theme="dark"] {
+  --bg: #000000;
+  --fg: #ffffff;
+  /* Achromatic tints of the foreground, for hairlines and hovers only:
+     never for text, which stays pure fg so contrast is 21:1. */
+  --rule: rgb(255 255 255 / 28%);
+  --wash: rgb(255 255 255 / 10%);
+}
+
+html[data-theme="light"] {
+  --bg: #ffffff;
+  --fg: #000000;
+  --rule: rgb(0 0 0 / 22%);
+  --wash: rgb(0 0 0 / 6%);
+}
+
+html {
+  /* The grid unit. Line heights, gaps and control heights are multiples. */
+  --u: 8px;
+  --m: calc(var(--u) * 5);
+  --gutter: calc(var(--u) * 4);
+  --col: 24rem;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* No art at all: the brief is type and space. */
+.art {
+  display: none;
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+/* Three tracks: the left field up to the golden axis, the form column, and
+   the rest. The footer dissolves into the grid (display: contents) so its
+   two halves can sit in different tracks: the colophon in the left field,
+   the switches at the right edge, and the column keeps the full height. */
+.main {
+  display: grid;
+  grid-template-columns: [field] minmax(0, 38.2%) [column] minmax(0, var(--col)) [rest] minmax(0, 1fr);
+  grid-template-rows: [top] auto [middle] 1fr [bottom] auto;
+  min-height: 100vh;
+  padding: var(--m) 0;
+}
+
+/* The axis itself: a hairline from the top to the bottom of the window. */
+.main::before {
+  grid-column: column;
+  grid-row: top / -1;
+  margin-block: calc(var(--m) * -1);
+  border-left: 1px solid var(--rule);
+  content: "";
+  pointer-events: none;
+}
+
+.brand {
+  grid-column: field;
+  grid-row: top;
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  justify-self: start;
+  gap: var(--u);
+  margin-left: var(--m);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+
+/* The mascot reduced to a grey value, so it obeys the black and white
+   rule. In light it is inverted: a white helmet on white would vanish, a
+   black one with a white visor still reads as the same mark. */
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  filter: grayscale(1) contrast(1.15);
+}
+
+html[data-theme="light"] .brand-mark {
+  filter: grayscale(1) invert(1) contrast(1.2);
+}
+
+.content {
+  grid-column: column;
+  grid-row: top / -1;
+  align-self: center;
+  width: 100%;
+  padding-left: var(--gutter);
+}
+
+.footer {
+  display: contents;
+}
+
+.legal {
+  grid-column: field;
+  grid-row: bottom;
+  align-self: end;
+  padding: 0 var(--gutter) 0 var(--m);
+}
+
+.controls {
+  grid-column: rest;
+  grid-row: bottom;
+  display: flex;
+  align-items: center;
+  align-self: end;
+  justify-self: end;
+  gap: calc(var(--u) * 2);
+  margin-right: var(--m);
+}
+
+/* ─── Type ───────────────────────────────────────────────────────────────── */
+
+/* The one bold element: a large, tight title. Everything else is 400. */
+.title {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 56px;
+  letter-spacing: -0.04em;
+}
+
+.lead {
+  max-width: 21rem;
+  margin-top: calc(var(--u) * 2);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.note {
+  margin-top: calc(var(--u) * 3);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 2);
+  margin-top: calc(var(--u) * 5);
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+/* Square corners, no shadow: a button is a ruled rectangle. */
+.btn {
+  display: inline-flex;
+  height: calc(var(--u) * 6);
+  align-items: center;
+  justify-content: flex-start;
+  gap: calc(var(--u) * 1.5);
+  width: 100%;
+  padding: 0 calc(var(--u) * 2);
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
+  cursor: pointer;
+  transition: background-color 120ms linear, color 120ms linear;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  background: transparent;
+  color: var(--fg);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--wash);
+}
+
+.btn-primary {
+  justify-content: space-between;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+/* A plain square at the right end of the primary button: a decorative
+   glyph that marks it as the end of the reading line, not a word. */
+.btn-primary::after {
+  width: var(--u);
+  height: var(--u);
+  flex: none;
+  content: "";
+  background: currentColor;
+  transition: transform 120ms linear;
+}
+
+.btn-primary:hover:not(:disabled)::after {
+  transform: translateX(-4px);
+}
+
+.dev-submit::after {
+  display: none;
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 24px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  text-decoration-thickness: 2px;
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 2);
+  margin: 0;
+}
+
+/* The divider is a short rule then the word, flush left like the rest. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--u);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.divider::before {
+  width: calc(var(--u) * 3);
+  height: 1px;
+  content: "";
+  background: var(--fg);
+}
+
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--rule);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+/* Fields are a single underline: the column already gives the form its
+   edge, a box around each input would only repeat it. */
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  display: none;
+}
+
+.control input {
+  width: 100%;
+  height: calc(var(--u) * 5);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--fg);
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  caret-color: var(--fg);
+}
+
+.control-secret input {
+  padding-right: calc(var(--u) * 5);
+}
+
+/* Focus thickens the underline to 3 px: unmistakable, still on the grid. */
+.control input:focus-visible {
+  box-shadow: inset 0 -2px 0 var(--fg);
+}
+
+.eye {
+  position: absolute;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 4);
+  height: calc(var(--u) * 4);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+/* No colour for tone: weight of ink does the work. Neutral is a hairline
+   box, warning a heavy left rule, danger the page inverted. */
+.note,
+.pending {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--u) * 1.5);
+  padding: var(--u) calc(var(--u) * 1.5);
+  border: 1px solid var(--fg);
+  font-size: 13px;
+  line-height: 24px;
+}
+
+.note[data-tone="warning"] {
+  border-left-width: 4px;
+}
+
+.note[data-tone="danger"] {
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.waiting {
+  flex-direction: column;
+  gap: var(--u);
+}
+
+.pending {
+  align-items: center;
+}
+
+.pending .matrix {
+  color: var(--fg);
+}
+
+.hint {
+  font-size: 13px;
+  line-height: 24px;
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 0 0 0 calc(var(--u) * 1.5);
+  border-left: 4px solid var(--fg);
+  line-height: 24px;
+}
+
+.hint[data-tone="danger"] {
+  font-weight: 700;
+}
+
+/* Seeded accounts, development only: a dashed frame says "not the real
+   path" without any colour. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u);
+  padding: calc(var(--u) * 2);
+  border: 1px dashed var(--fg);
+}
+
+.dev-title,
+.dev-role {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.dev-hint,
+.dev-account {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.dev-list {
+  display: grid;
+  gap: calc(var(--u) * 2);
+}
+
+.dev-choice {
+  display: grid;
+  gap: var(--u);
+  padding-top: calc(var(--u) * 2);
+  border-top: 1px solid var(--rule);
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+}
+
+.dev-submit {
+  width: auto;
+  height: calc(var(--u) * 4);
+  flex: 1 1 140px;
+  justify-content: center;
+  font-size: 13px;
+}
+
+/* ─── Colophon and switches ─────────────────────────────────────────────── */
+
+.footnote {
+  max-width: 17rem;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 calc(var(--u) * 2);
+  margin-top: var(--u);
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 24px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.locale {
+  display: inline-flex;
+  gap: var(--u);
+}
+
+/* The pressed language is the bold one, underlined: the only other place
+   the second weight appears, so it reads as "selected" at once. */
+.locale-option {
+  min-width: calc(var(--u) * 3);
+  height: calc(var(--u) * 4);
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.locale-option[aria-pressed="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
+.locale-option[aria-pressed="false"]:hover {
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 4);
+  height: calc(var(--u) * 4);
+  padding: 0;
+  border: 1px solid var(--fg);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--wash);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+
+/* ─── Window sizes ──────────────────────────────────────────────────────── */
+
+/* Large windows: one step up the scale, still on the grid. */
+@media (min-width: 1500px) and (min-height: 960px) {
+  html {
+    --m: calc(var(--u) * 7);
+    --col: 27rem;
+  }
+
+  .title {
+    font-size: 64px;
+    line-height: 72px;
+  }
+
+  .lead {
+    font-size: 17px;
+    line-height: 32px;
+  }
+
+  .actions {
+    margin-top: calc(var(--u) * 6);
+  }
+}
+
+/* Narrow windows: the golden axis would squeeze the column against the
+   right edge, so the column takes what is left and the gutter tightens. */
+@media (max-width: 899px) {
+  html {
+    --gutter: calc(var(--u) * 3);
+    --col: 22rem;
+  }
+
+  .main {
+    grid-template-columns: [field] minmax(0, 36%) [column] minmax(0, var(--col)) [rest] minmax(0, 1fr);
+  }
+
+  .footnote {
+    max-width: 14rem;
+  }
+}
+
+/* Short windows: smaller title and tighter steps, still multiples of 8. */
+@media (max-height: 720px) {
+  html {
+    --m: calc(var(--u) * 3);
+  }
+
+  .title {
+    font-size: 32px;
+    line-height: 40px;
+    letter-spacing: -0.035em;
+  }
+
+  .lead {
+    margin-top: var(--u);
+    font-size: 14px;
+  }
+
+  .actions {
+    margin-top: calc(var(--u) * 3);
+  }
+
+  .btn {
+    height: calc(var(--u) * 5);
+  }
+
+  .control input {
+    height: calc(var(--u) * 4);
+  }
+
+  .password {
+    gap: calc(var(--u) * 2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn-primary::after {
+    transition: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-left: calc(var(--m) + 65px);
+}

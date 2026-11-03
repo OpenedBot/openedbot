@@ -1,0 +1,118 @@
+---
+title: Dépannage
+description: Rollback SSH déclenché, verify-access refusé, lien fermé (4401, 4004, 4001), LINK_BUSY, upgrade refusé, tickets, codes de sortie.
+---
+
+Chaque refus de l'outil est accompagné d'un message ; le lire d'abord. Les
+codes de sortie (`2` refus sans mutation, `64` usage, `69` non implémenté,
+`77` root requis) sont détaillés dans [Démarrer](/fr/docs/getting-started#codes-de-sortie).
+
+`status` (lecture seule) montre les phases, le mode, les marqueurs de
+transaction et les versions installées ; `doctor` contrôle le runtime de bout
+en bout.
+
+## Installation initiale
+
+L’installation publique passe par `curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh`,
+qui ne télécharge que depuis `releases.openedbot.app` et vérifie la signature
+de la release avant le SHA-256 du binaire. « carries no signature » désigne
+une release non signée (jusqu’à v0.0.2) : demander une release signée avec
+`--version`. « does not verify » : ne pas contourner, rien n’a été installé.
+`--dry-run` refait tous les contrôles sans rien écrire. Ne téléchargez pas depuis
+une ancienne adresse GitHub Releases : ce dépôt n’existe plus. Voir
+[edge-setup](/fr/docs/edge-setup). Un refus d'architecture ou de système
+pendant `detect` ou `up` signifie que l'hôte n'est pas pris en charge ;
+il faut Debian 12+ ou Ubuntu 24.04+, `amd64` ou `arm64` et systemd. Une
+protection optionnelle refusée (« require Debian 13 ») se retire de la
+commande `up` sur cet hôte. Cgroup v2 n'est requis que par `--sandbox`.
+
+## Accès SSH et rollback
+
+| Symptôme | Geste |
+|---|---|
+| `verify-access` refuse | Lire son message : mauvaise session (ouvrir une **nouvelle** connexion SSH avec la clé admin, pas la session qui a lancé `up`), `sudo` absent, journal sans `Accepted publickey`. Rien n'est désarmé : la fenêtre de 600 s court toujours. |
+| Verrouillé avant `verify-access` | Attendre : le timer restaure l'accès en ≤ 600 s. `status` montre `rolled_back=true`. Investiguer, puis `up` à nouveau. |
+| Rollback déclenché (`rolled_back=true`) | Le timer `hermes-hardening-rollback` a restauré drop-in sshd, quatre fichiers UFW et compte cloud-init depuis ses sauvegardes, sans lire l'état JSON. `journalctl -u hermes-hardening-rollback` dit pourquoi ; relancer `up` quand la cause est comprise. |
+| `rolled_back` mais accès toujours coupé | Console fournisseur. `journalctl -u hermes-hardening-rollback` explique quelle restauration a échoué ; les sauvegardes sont sous `/var/backups/hermes-access/`. |
+| `up` : « the admin account pre-exists and was not created by this tool » | Hôte provisionné par l'ancien outil. Depuis une session **root** : `edge-setup reset --yes --remove-admin`, puis `up`. Voir [Remise à zéro](/fr/docs/reset). |
+| `up` : « debian exists without authorized_keys; refusing to quarantine an unaudited state » | Retirer le compte cloud-init à la main (`userdel -r debian`) s'il n'a plus d'usage, puis relancer `up`. |
+| `up` s'arrête avant P7 : redémarrage requis | `/var/run/reboot-required` existe. Redémarrer, relancer la même commande : elle reprend au même point. |
+| « must run as root » (code 77) | Auto-élévation désactivée (`EDGE_SETUP_NO_SUDO=1`) ou `sudo` absent. Lancer depuis root, ou installer `sudo`. |
+
+## Transactions
+
+| Symptôme | Geste |
+|---|---|
+| « a transaction is active » (`upgrade`, `reset`, code 2) | Le marqueur `/var/lib/hermes-host-hardening/active` existe. Attendre son commit (`verify-access`) ou son rollback (timer de 600 s), puis réessayer. |
+
+## Gateway et sandbox
+
+| Symptôme | Geste |
+|---|---|
+| Gateway muet | `doctor` ; `journalctl -u hermes-gateway`. Le bearer se lit dans `/srv/hermes/data/runtime.env` (root ou `hermes` seulement). |
+| `doctor` refuse un listener wildcard | Le gateway doit écouter `127.0.0.1:8642` seulement ; un `0.0.0.0` dans la configuration Hermes est un défaut à corriger, pas à contourner. |
+| Docker rootless mort au boot (LXC) | Plage subuid hors de l'espace du CT, ou `nesting` absent. Voir [Conteneur LXC](/fr/docs/prerequisites#conteneur-lxc-proxmox-ve) ; sans nesting, ne pas sélectionner `--sandbox` (contrôle d'audit `SKIP`). |
+
+## Lien openedbot
+
+`journalctl -u hermes-connector` (ou `hermes-connector@<name>` pour une
+instance nommée) montre le code de fermeture ; le démon reconnecte avec
+backoff (`1 s × 2^n`, plafond 60 s).
+
+| Symptôme | Geste |
+|---|---|
+| Lien fermé **4401** | Authentification refusée : ticket ou jeton de lien invalide, ou `hello` absent. Au premier `link` : le ticket est faux, expiré (5 min) ou déjà consommé → ouvrir un nouveau ticket dans openedbot. En reconnexion : le jeton persisté ne vaut plus → nouveau ticket + `link`. |
+| Lien fermé **4004** `LINK_REVOKED` | Le runtime a été révoqué côté openedbot. Nouveau ticket + `link`. |
+| Lien fermé **4001** `LINK_REPLACED` | Une connexion plus récente pour le même runtime a pris le relais : un second hôte, ou un second démon, utilise le même jeton. Ne garder qu'un seul `hermes-connector` par instance ; sinon révoquer et ré-enrôler. Deux instances **nommées** distinctes sont deux runtimes distincts et ne se remplacent pas. |
+| `err LINK_POP_PENDING` | La requête est arrivée avant `link.proof` : la preuve de possession n'est pas encore faite sur cette session. Passager en début de session ; persistant, c'est une clé device absente ou refusée (`status` montre la clé scellée par instance) → `link --rekey --yes [--name …]`. |
+| `link` : « replacing the link to `<origine>` (runtime `<id>`) » | Ce n'est pas un refus : l'instance visée était liée à une autre origine openedbot, et ce ticket la reprend ici, sans drapeau à lever. L'avertissement arrive avant la lecture du ticket ; l'openedbot quitté garde un runtime que l'hôte ne rappellera plus, à y retirer. Pour garder les deux liens, poser le nouveau à côté avec `--name dev`. Voir [Instances nommées](/fr/docs/commands#instances-nommées). |
+| Un runtime lié ne remonte plus après un `link` de développement | Un `link` sans `--name` vise l'instance par défaut et la fait changer d'origine. `edge-setup status` liste chaque instance avec la sienne : si la production ne pointe plus où il faut, la ré-enrôler avec un nouveau ticket, et refaire le lien de développement avec `--name dev`. |
+| Lien fermé **4003** `LINK_PROBE_FAILED` | La sonde d'enrôlement (`/health`, `/v1/capabilities`, `/v1/toolsets`) a échoué à travers le tuyau ; aucune ligne créée, le ticket reste utilisable jusqu'à son TTL. `doctor`, puis relancer `link`. |
+| Fermeture **1009** | Message WebSocket de plus de 4 MiB, ou hôte qui continue d'émettre plus de 8 MiB pour une réponse que openedbot a déjà refusée. Une requête de plus de 1 MiB ou une réponse de plus de 4 MiB, seule, échoue en `HERMES_PROTOCOL_LIMIT` sans fermer le lien. Regarder la requête en cause côté openedbot. |
+| `err LINK_BUSY` | Plus de 64 requêtes en vol sur le lien ; la requête est refusée `before_dispatch` (jamais envoyée au gateway). Symptôme d'un gateway lent ou de flux `events` accumulés : `doctor`, `journalctl -u hermes-gateway`. |
+| `err HERMES_OPERATOR_UNAVAILABLE` | Le socket `/run/hermes-operator/operator.sock` ne répond pas : `systemctl status hermes-operator`. |
+| `link` : « the ticket must look like `<enrollmentId>.<secret>` » | Le ticket lu sur stdin (ou `--ticket-file`) est tronqué ou mal collé. |
+| `link` : « the ticket was refused (wrong secret or already used) », « the ticket expired (5 minutes) », « the enrollment is not claimable » | Ouvrir un nouveau ticket dans openedbot (*Réglages › Installation › Edge › Ajouter un runtime › Appairer depuis le serveur*). |
+| `--ohb must be an https:// origin without path, query or credentials` | Passer l'origine seule, sans chemin : `--ohb https://link.openedbot.app`. |
+| En dev, `link` s'arrête sur `dial: … connection refused` vers `localhost:8790` | Rien n'écoute sur ce port côté VPS : le tunnel SSH inverse n'est pas ouvert sur le poste (`make link-dev-status` dit si celui de `make link-dev-up` tourne), ou le VPS a été joint par un `ssh` sans `-R`. Un lien déjà présent (`link` l'écrase, sans drapeau) et le runtime côté openedbot n'y sont pour rien : le ticket n'a pas été envoyé. Rouvrir le tunnel dans un terminal du poste, rejouer la commande. |
+| En dev, l'origine d'un tunnel Cloudflare lancé à la main ne répond plus, ou son URL a changé | Ce tunnel tourne devant l'application openedbot locale, pas sur le VPS, et une URL qui change est une origine qui change : vérifier openedbot puis `cloudflared` sur la machine de développement, créer un nouveau ticket, rejouer `link` avec la nouvelle origine. Le gateway doit rester sur `127.0.0.1:8642`. |
+
+## `upgrade` refusé
+
+`upgrade` vérifie, dans l'ordre : `--yes`, root, aucune transaction active,
+la signature Sigstore de `SHA256SUMS` pour le tag de la version, puis une fois
+le SHA-256 de la nouvelle release contre `SHA256SUMS`. Un
+refus (code 2) ne modifie rien. Les autres commandes ne rejouent pas cette
+vérification. `--from` + `--tag` est réservé à la voie interne `make deploy`
+par SSH pour un build local non publié.
+
+| Message | Cause, geste |
+|---|---|
+| « add --yes (nothing was changed) » | `upgrade` remplace le binaire et redémarre ses unités : confirmer avec `--yes`. |
+| « a transaction is active » | Voir *Transactions* ci-dessus. |
+| « --from requires --tag `<hex>` », « --tag must be 64 hex characters », « --sha256 was removed » | Voie développeur interne : laisser `make deploy HOST=user@host` calculer le tag HMAC et déposer le build par SSH ; un condensé nu n'est plus accepté. |
+| « no deployment key on this host; run `edge-setup deploy-key set` » | Le VPS n'a pas la clé de déploiement partagée : la poser une fois par `ssh -t HOST sudo edge-setup deploy-key set < ~/.config/edge-setup/deploy.key` ([Exploitation](/fr/docs/operations)). |
+| « sha256 mismatch », « tag mismatch », « not an ELF executable » | Le fichier déposé n'est pas le binaire attendu, ou n'a pas été tagué avec la clé de cet hôte. Re-télécharger ou relancer `make deploy`. |
+| « downloaded binary does not match SHA256SUMS » | Le binaire téléchargé ne correspond pas à son condensé : téléchargement tronqué, miroir corrompu ou substitué. Ne pas contourner ; relancer, vérifier `--release-url`. |
+| « SHA256SUMS: HTTP 404 », « SHA256SUMS does not list edge-setup_linux_… » | La release (ou le miroir) ne publie pas de `SHA256SUMS`, ou pas pour cette architecture. |
+| « this release carries no signature (SHA256SUMS.sigstore.json); only signed releases are installed » | La release visée n'est pas signée (toutes jusqu'à v0.0.2), ou le miroir ne publie pas les signatures. Viser une release signée (v0.0.3 ou plus) ; un binaire signé ne réinstalle pas une release non signée. |
+| « signature does not verify for … » | La signature ne vient pas du workflow de release exécuté sur le tag de cette version : release substituée ou miroir altéré. Ne pas contourner ; rien n'a été écrit. |
+| « signature trust root (Sigstore TUF) » | L'hôte n'obtient pas la racine de confiance de Sigstore : il doit joindre `tuf-repo-cdn.sigstore.dev` en HTTPS. |
+| « latest release pointer … » | L'origine (ou le miroir) ne sert pas un `LATEST` lisible : réessayer, ou viser une version avec `--release-url https://…/vX.Y.Z`. |
+| « candidate vX is older than the installed vY; add --allow-downgrade » | `upgrade` interroge le binaire candidat, déjà vérifié, puis compare les deux versions. Il refuse une version antérieure sans rien écrire. Passer `--allow-downgrade` pour l'accepter volontairement. Deux versions qui ne sont pas toutes deux du semver (`dev`, une empreinte de commit) ne peuvent pas être ordonnées : la comparaison est alors ignorée avec un message. |
+| « this binary (…) is not the released … » (`self-verify`) | Le binaire courant n'est pas celui listé pour son architecture : build local ou release retirée. Réinstaller depuis une release. |
+
+## Après une mise à jour
+
+Dans openedbot, lancer « Vérifier le lien » sur le runtime pour qu'il relise
+`/hermes-setup/capabilities` : `upgrade` redémarre `hermes-operator`
+(toujours) et `hermes-connector` (`try-restart`), et le `hello` du lien
+ré-annonce les `features` courantes. Si `upgrade` a changé les directives de
+l'unité `hermes-gateway` pendant que des runs étaient en cours, il ne l'a pas
+redémarrée : la console affiche « redémarrage en attente », à lancer quand plus
+aucun run n'est actif (ou `sudo systemctl restart hermes-gateway`).
+
+## Sauvegarde, destruction
+
+Voir [Opérations](/fr/docs/operations#sauvegarde-destruction) et
+[Remise à zéro](/fr/docs/reset).

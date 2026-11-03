@@ -1,0 +1,10 @@
+{
+  "alwaysForbidden": [
+    "cronjob",
+    "delegation"
+  ],
+  "profileRestricted": [
+    "memory",
+    "session_search"
+  ]
+}

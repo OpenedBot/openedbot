@@ -1,0 +1,212 @@
+---
+title: Getting started
+description: Download the binary, choose the protections, link openedbot and set a provider key.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`edge-setup` runs **on the host**, as a single binary. In production, it
+links the host to openedbot through the link origin
+`https://link.openedbot.app`. In development, a reverse SSH
+tunnel brings the local openedbot application onto the VPS loopback; nothing is
+published and nothing is installed in front of the VPS gateway. Nothing drives
+the VPS over outbound SSH.
+
+Every mutation requires `--yes`. An option that affects access requires `--console-confirmed`.
+No flag accepts a secret: the bearer, provider key and link token
+go through stdin or a `0600` file, never through argv, never into a log,
+never through `--json`.
+
+The public binaries, their `SHA256SUMS` and its signature are served by
+`https://releases.openedbot.app/edge-setup`, one version per `vX.Y.Z/`
+directory. `edge-setup`, the link
+protocol and the openedbot core are open source under the Apache-2.0 license
+(repository publication planned).
+`link` targets `https://link.openedbot.app` by default: `--ohb` is only
+needed for another openedbot origin.
+If that origin does not respond, installation and `upgrade` fail without
+installing anything, with no fallback to GitHub.
+
+<Aside type="note" title="No sudo to type">
+`up` and `upgrade` create the `/usr/local/bin/edge-setup` link. Only
+`version`, `help` and `self-verify` run as is; any other command started
+as non-root re-executes itself through `sudo` (stdin preserved).
+`EDGE_SETUP_NO_SUDO=1` disables this; without `sudo` installed → "must run as
+root" (code 77). The examples write `sudo` only for the first commands,
+before `up` creates the link.
+</Aside>
+
+## Single network architecture
+
+The gateway listens only on `127.0.0.1:8642`. The VPS connector opens an
+outbound WebSocket connection to openedbot: no inbound application port, no
+domain and no certificate on the VPS side. The gateway bearer never leaves
+the host. Only the openedbot origin changes: `link.openedbot.app` in production, the
+VPS loopback served by a reverse SSH tunnel from the workstation in
+development. The same host can carry both links at once: see
+[Named instances](/docs/commands#named-instances).
+
+## Part 1: Install and secure the VPS and Hermes
+
+### 1. Install the binary
+
+The installation (`curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh`),
+the signature and SHA-256 checks and the manual path from
+`https://releases.openedbot.app/edge-setup` are described on the
+[edge-setup](/docs/edge-setup) page. The bootstrap validates neither the
+distribution nor cgroup v2: `detect`, then the `up` preflight, take care of
+that (see [Prerequisites](/docs/prerequisites)).
+
+Releases are signed keyless with Sigstore: the release workflow of the
+`OpenedBot/openedbot` repository, run on the tag `edge-setup/vX.Y.Z`, signs
+`SHA256SUMS` (`SHA256SUMS.sigstore.json`), and no other identity is accepted
+for that version. Each `upgrade` does the same thing as the installation: HTTPS
+to the release origin, signature verification, then **one** check, before
+writing, of the new release's SHA-256 against `SHA256SUMS`. An unsigned release
+is refused. These checks are not repeated on every command.
+
+The binary is placed under `/usr/local/sbin/edge-setup`; the first `up`
+copies it under `/usr/local/lib/hermes-setup/` and creates the
+`/usr/local/bin/edge-setup` link, so you no longer need to type `sudo`.
+
+#### `self-verify`
+
+```bash
+edge-setup self-verify
+edge-setup self-verify --release-url https://miroir.example.org/edge-setup
+```
+
+Without root and only on demand, this diagnostic shows the path and the
+SHA-256 of the current binary, downloads `SHA256SUMS` and its signature,
+verifies the signature, then checks that the binary's digest is in the list
+for its architecture. It is never called
+implicitly by `status`, `doctor` or any other command.
+
+`--release-url` points to another mirror. A URL is not a secret, but it
+must use `https://`, and a redirect that leaves HTTPS is refused. The mirror
+must publish the original signatures. The old GitHub release repository is
+refused (exit 2).
+
+### 2. See what the host allows
+
+```bash
+sudo edge-setup detect
+sudo edge-setup plan
+```
+
+`plan` writes nothing.
+
+### 3. Install Hermes
+
+```bash
+sudo edge-setup detect
+sudo edge-setup up --yes
+```
+
+Minimal mode creates the single system account `hermes`, installs the runtime,
+the loopback gateway and the connector. It does not reconfigure the customer's
+system. For a fully hardened profile:
+
+```bash
+sudo edge-setup up \
+  --sandbox --persistent-journal --unattended-upgrades \
+  --sudo-logging --password-policy --disable-llmnr \
+  --firewall --allow-inbound 22/tcp --fail2ban \
+  --ssh-hardening --quarantine-cloud-user \
+  --admin-key /root/admin.pub --console-confirmed --yes
+#   … from ANOTHER terminal, within 600 s:
+ssh hermes-admin@203.0.113.10  &&  edge-setup verify-access
+```
+
+A new protection affecting access arms a 600 s rollback. Without
+`verify-access` from a **new** SSH session within that window, the timer
+restores the previous access.
+
+The details of phases P1 to P9, of every positive option and of recovery are in
+[Operations](/docs/operations).
+
+## Part 2: Link the secured gateway to openedbot
+
+In each environment, first make the openedbot origin reachable, then open
+*Settings › Installation › Edge › Add a runtime › Pair from the server*. The ticket is valid for five
+minutes and can be used only once.
+
+### Production
+
+```bash
+edge-setup link --ohb https://link.openedbot.app --yes
+# Paste the ticket at the hidden prompt.
+```
+
+`https://link.openedbot.app` is the link origin the API announces in the
+enrollment command. A host already paired on `https://openedbot.app` follows
+it on its own.
+
+### Development
+
+Make the local openedbot API reachable from the VPS through a reverse SSH tunnel:
+the workstation is not published, and the link travels inside SSH. The tunnel
+runs on the development machine: **never** on the VPS and never in front of
+`127.0.0.1:8642`.
+
+```bash
+# Development machine; the openedbot API must already answer on :8790 (make dev).
+# Short path, at the root of the openedbot-main repository: tunnel, ticket and link for an
+# instance named after the workstation.
+make link-dev-up HOST=hermes-admin@203.0.113.10
+# Or once per workstation, in Makefile.local at the repository root (never
+# committed): LINK_DEV_HOST=user@your-vm. Then `make link-dev-up` alone uses it;
+# HOST= on the command line still wins.
+
+# Manual path. Development machine, reverse SSH tunnel:
+ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:8790:127.0.0.1:8790 hermes-admin@203.0.113.10
+
+# VPS, in another session
+edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb --name dev
+```
+
+`--insecure-ohb` opens `http://` only on the host loopback; a public or LAN
+origin in clear text is still refused. `--name dev` creates a **named
+instance** next to the production link created above: without it, this `link`
+would target the same instance and replace the production link (it reports
+the origin it is leaving before reading the ticket, but does not refuse). See
+[Named instances](/docs/commands#named-instances).
+
+What only real HTTPS allows (Google OAuth from a mobile device) is first checked on a VM. A Cloudflare tunnel
+started by hand in front of the local application remains an advanced
+option, never in front of the VPS gateway.
+
+In both environments, the VPS connector initiates the WSS connection and
+no inbound application port is opened on the VPS. The link relays only a
+closed list of routes: no shell, no free-form command, no file path.
+
+### Provider keys
+
+```bash
+edge-setup credentials add --api-key-file /root/anthropic.key --yes anthropic
+```
+
+The provider name comes last: argument parsing stops at the first word that
+is not an option. The key goes through stdin or a `0600` file, never as an
+argument. `add` is only
+validated after re-reading `/api/model/options` on the loopback. See
+[Provider credentials](/docs/commands#provider-credentials).
+
+### Check everything
+
+```bash
+edge-setup audit --strict
+```
+
+`doctor`, `status` and `export` are read-only.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success. |
+| `1` | Execution failure (preflight error, unreachable host, underlying command failed…). |
+| `2` | **Refused by a gate**: `--yes` missing, active transaction, digest mismatch, non-ELF file… Nothing was changed. |
+| `64` | Usage error (`EX_USAGE`): unknown command, invalid flag, extra positional argument. |
+| `69` | Not implemented in this version (`EX_UNAVAILABLE`): `update` without `--self`. |
+| `77` | Root required (`EX_NOPERM`): self-elevation disabled or `sudo` missing. |

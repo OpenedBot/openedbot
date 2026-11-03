@@ -1,0 +1,5 @@
+name: ohb_a2a_policy
+version: 1.0.0
+description: Enforce named A2A peer policy and expose a private host snapshot.
+hooks:
+  - pre_tool_call

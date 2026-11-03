@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      `interactive-widget=resizes-content` : sur Chromium Android le clavier
+      rétrécit le viewport de mise en page, et le composer reste au-dessus de
+      lui sans calcul. Safari iOS l'ignore ; `use-visual-viewport-height.ts`
+      y fait le même travail à la main.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <!--
+      `color-scheme` + fond inline : le moteur peint le fond AVANT le CSS
+      bundle, sinon la fenêtre s'ouvre dans une couleur puis bascule (le
+      « flash »). Le CLAIR est la base et le sombre l'exception, comme
+      DEFAULT_MODE dans `browser/ui-kit/src/theme/config.ts` : les deux doivent bouger
+      ensemble. Les deux `theme-color` ci-dessous ne servent qu'au premier
+      rendu ; `browser/ui-kit/src/theme/context.tsx` les réécrit ensuite avec la couleur
+      RÉSOLUE.
+    -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212" />
+    <meta name="apple-mobile-web-app-title" content="openedbot" />
+    <link rel="icon" href="/favicon.ico?v=bloub" sizes="16x16 32x32 48x48" />
+    <!-- Mesure d'audience : Umami auto-hébergé, sans cookie. -->
+    <script defer src="https://umami.pulseview.app/script.js" data-website-id="97980bd4-f239-418e-859f-72b1abe31c31"></script>
+    <link rel="icon" type="image/png" href="/favicon-32x32.png?v=bloub" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=bloub" sizes="any" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png?v=bloub" />
+    <title>openedbot</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("ohb:theme");
+          // « light » et non « system » : le même défaut que DEFAULT_MODE dans
+          // `browser/ui-kit/src/theme/config.ts`. Les deux doivent bouger ensemble, sinon
+          // la page est peinte dans une couleur que React remplace aussitôt.
+          var mode = raw ? JSON.parse(raw).mode : "light";
+          var dark = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {
+          // Sans localStorage : le clair, qui est déjà la couleur de base.
+        }
+      })();
+      // Réglages › Apparence › Taille du texte, avant la première peinture :
+      // la coque de bureau zoome la fenêtre d'après cet attribut. Posé par
+      // `main.tsx` seulement, il arrivait après la silhouette, peinte à 100 %
+      // puis rétrécie d'un coup. Jumeau de `src/lib/shell/text-size.ts` (clé,
+      // tailles, défaut 11, base 14).
+      (function () {
+        var size = 11;
+        try {
+          var stored = Number(localStorage.getItem("ohb:settings-text-size"));
+          if ([10, 11, 12, 13, 14].indexOf(stored) >= 0) size = stored;
+        } catch (e) {
+          // Stockage refusé : la taille par défaut.
+        }
+        document.documentElement.setAttribute("data-ohb-text-zoom", String(size / 14));
+      })();
+      // La silhouette du cadre (`#ohb-boot`, plus bas) ne se montre qu'à qui
+      // entre DANS l'application : une session existe (navigateur, ou pont de
+      // la coque native posé par son preload avant ce script) et le chemin
+      // n'est pas une page publique ni un parcours sans barre latérale.
+      // `main.tsx` la retire au premier rendu du routeur.
+      (function () {
+        // Match nativeTitlebarFor without setting the app's titlebar attribute.
+        if (window.__OHB_NATIVE__) {
+          var nativeTitlebar = /^Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent) ? "mac"
+            : /^Win/.test(navigator.platform) || /Windows/.test(navigator.userAgent) ? "windows" : null;
+          if (nativeTitlebar) document.documentElement.setAttribute("data-ohb-boot-titlebar", nativeTitlebar);
+        }
+        try {
+          var path = location.pathname;
+          var outside = /(^|\/)(login|legal|change-password|onboarding)(\/|$)/.test(path);
+          var session = !!window.__OHB_NATIVE__ || !!localStorage.getItem("ohb:cloud-session");
+          // `/` is the app on every host (the public page lives on the public
+          // site, `src/lib/session/public-site.ts`): it gets the app silhouette too.
+          if (session && !outside) document.documentElement.setAttribute("data-ohb-booting", "");
+          // Fleet addresses (twin of FLEET_ADDRESS in the agency console module)
+          // and client addresses share the agency frame (rail, bar, client list).
+          var fleet = /^\/(?:fleets|(?:o\/[^/]+\/)?fleet)(?:\/|$)/.test(path);
+          var fleetClient = /^\/o\/[^/]+\/clients\/[^/]+(?:\/|$)/.test(path);
+          // `/` opens an agency's fleet when the tab's organization is an own
+          // agency (`route-tree.tsx`, index route): read it from the same
+          // stores as `lib/session/cloud-session.ts` and `lib/workspace/workspace-directory.ts`.
+          var directory = JSON.parse(sessionStorage.getItem("ohb:workspace-directory") || "{}");
+          function ownFleet(key) {
+            var wanted = String(key).toLowerCase();
+            var found = (directory.workspaces || []).filter(function (w) {
+              return String(w.id).toLowerCase() === wanted || String(w.slug).toLowerCase() === wanted;
+            })[0];
+            return !!found && found.kind === "agency" && found.role !== "agency";
+          }
+          var stored = JSON.parse(localStorage.getItem("ohb:cloud-session") || "{}");
+          var tabOrganization = sessionStorage.getItem("ohb:workspace:" + (stored.userId || stored.csrfToken));
+          var activeOrganization = tabOrganization || stored.organizationId;
+          if (!fleet && path === "/" && session) fleet = ownFleet(activeOrganization);
+          // Any other app address of an own agency draws the agency frame too:
+          // its team and profile, and the routes it shares with a personal
+          // workspace (`/support`, `/inbox`, `/settings/...`), with or without
+          // the `/o/<agency>` prefix. Twin of `activeOwnFleetHint` in
+          // the agency console module (`agency-hint.ts`) and `fleetAccountInPath` in
+          // `src/lib/workspace/workspace-location.ts`.
+          var framed = path.match(/^\/o\/([^/]+)(\/.*)?$/i);
+          var fleetAccount = !fleet && !fleetClient && session && !outside
+            && (framed ? !!framed[2] && framed[2] !== "/" && ownFleet(framed[1]) : path !== "/" && ownFleet(activeOrganization));
+          if (fleet || fleetClient || fleetAccount) document.documentElement.setAttribute("data-ohb-boot-fleet", "");
+          // No fleet board cards in the main card: it holds a client or account page.
+          if (fleetClient || fleetAccount) document.documentElement.setAttribute("data-ohb-boot-fleet-client", "");
+          // L'accent choisi, posé dès le décor : le premier rendu React l'a déjà
+          // (`paintStoredTheme` le repose ensuite, même attribut, même valeur).
+          var theme = JSON.parse(localStorage.getItem("ohb:theme") || "{}");
+          if (typeof theme.accent === "string") document.documentElement.setAttribute("data-accent", theme.accent);
+          // La barre latérale repliée (`board-chrome.tsx`) : la silhouette aussi.
+          if (localStorage.getItem("ohb:sidebar-collapsed") === "1") document.documentElement.setAttribute("data-ohb-sidebar-collapsed", "");
+          // La disposition C, celle par défaut : le rail d'icônes de
+          // `BoardIconRail`. Jumeau de `readAccountLayout` dans
+          // `src/lib/shell/account-layout.ts` (clé, valeurs, défaut) : une valeur
+          // absente ou inconnue vaut « c ». L'ancienne clé de dev
+          // (`ohb.dev.accountLayout`) dessinait la coque sans rail alors que
+          // l'application, elle, en avait un.
+          var layout = localStorage.getItem("ohb:accountLayout");
+          if (["base", "a", "b", "c"].indexOf(layout) < 0) layout = "c";
+          if (layout === "c" && !(fleet || fleetClient || fleetAccount)) document.documentElement.setAttribute("data-ohb-boot-rail", "");
+        } catch (e) {
+          // Sans localStorage : pas de silhouette, la page reste unie.
+        }
+      })();
+    </script>
+    <style>
+      html, body {
+        margin: 0;
+        background: #ffffff;
+        color: #15140f;
+      }
+      html.dark,
+      html.dark body {
+        background: #121212;
+        color: #f5f4ef;
+      }
+
+      /*
+        La silhouette du cadre BoardUI pendant le chargement du JS : sans elle,
+        la page restait blanche plus d'une seconde avant que React ne monte.
+        Même géométrie que le vrai cadre et que `AppFrameSkeleton`
+        (`components/skeletons/frame-skeletons.tsx`), qui prend le relais
+        pendant les gardes : les deux doivent bouger ensemble, sinon le passage
+        de l'une à l'autre se voit.
+        - Barre du haut de 46 px (`BoardTopBar`) : l'organisation, le repli,
+          Précédent et Suivant, puis sur une conversation le fil d'Ariane
+          (« Salon › visage nom ») et ses actions.
+        - Barre latérale de 272 px (marge gauche de 12 px) : une carte grise
+          au rayon 24 et au liseré blanc (`BOARD_SIDEBAR_CARD`), ses trois
+          boutons, les liens Salon et À traiter avec leur libellé, puis le
+          roster dessiné d'après sa dernière forme (`ohb:boot-sidebar`,
+          `lib/session/boot-shape.ts`) : tuiles épinglées, intitulés de section,
+          rangées de 44 px. La ligne du compte de 50 px en bas.
+        - Carte principale grise au rayon 24, sans bord ni ombre ; sur
+          `/bot/:id` ou `/g/:id`, la colonne de lecture du fil (48rem, 56rem
+          au-delà de 100rem), ses messages et le composer.
+        - Sur `/settings/...` : le menu des réglages à la place des
+          conversations, « Salon › rubrique » dans la barre, et le corps de
+          la rubrique (tuiles et graphiques d'Activité, une carte ailleurs).
+        - Rail de 56 px (variante C) : Salon et À traiter en haut ; en bas le
+          runtime, le thème, la langue, Réglages et la déconnexion.
+        Les couleurs sont les jetons `--bui-*` de `styles/components/boardui.css`
+        et les rampes `--accent-*` de `browser/ui-kit/src/styles/app.css`,
+        recopiés ici parce que ces CSS ne sont pas encore chargés.
+
+        Seul ce qui DÉPEND DE DONNÉES pulse (`i`). Le décor toujours identique
+        (boutons, icônes, libellés de navigation, accent choisi) est peint tel
+        qu'il sera (`b`).
+      */
+      #ohb-boot {
+        display: none;
+      }
+      html[data-ohb-booting] #ohb-boot {
+        --boot-full: #fff;
+        --boot-surface: #f7f7f7;
+        --boot-card-edge: #fff;
+        --boot-raised: #fff;
+        --boot-shape: #ebebeb;
+        --boot-icon: lab(48.496% 0 0);
+        --boot-text: lab(2.75381% 0 0);
+        --boot-text-2: lab(48.496% 0 0);
+        --boot-text-3: lab(66.128% 0 0);
+        --boot-divider: #dedede;
+        --boot-dot: lab(48.496% 0 0 / 0.3);
+        --boot-tile: #fff;
+        --boot-tile-edge: #e5e5e5;
+        --boot-tile-shape: #f7f7f7;
+        --boot-column: 48rem;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        background: var(--boot-full);
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      html.dark[data-ohb-booting] #ohb-boot {
+        --boot-full: #121212;
+        --boot-surface: lab(7.78201% 0 0);
+        --boot-card-edge: lab(15.7305% 0.613764 -2.16959);
+        --boot-raised: lab(15.204% 0 0);
+        --boot-shape: lab(15.204% 0 0);
+        --boot-text: lab(98.26% 0 0);
+        --boot-text-3: lab(34.924% 0 0);
+        --boot-divider: lab(27.036% 0 0);
+        --boot-tile: rgb(38, 38, 38);
+        --boot-tile-edge: rgb(255 255 255 / 0.1);
+        --boot-tile-shape: #404040;
+      }
+      @media (min-width: 100rem) {
+        html[data-ohb-booting] #ohb-boot {
+          --boot-column: 56rem;
+        }
+      }
+      #ohb-boot * {
+        box-sizing: border-box;
+      }
+      #ohb-boot i {
+        display: block;
+        flex-shrink: 0;
+        background: var(--boot-shape);
+        border-radius: 6px;
+        animation: ohb-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      #ohb-boot svg {
+        fill: currentColor;
+      }
+      #ohb-boot .round {
+        border-radius: 999px;
+      }
+      /* La barre du haut (`BoardTopBar`). */
+      #ohb-boot .bar {
+        display: flex;
+        flex: 0 0 46px;
+        align-items: center;
+        gap: 4px;
+        padding: 0 12px;
+      }
+      /* Reserve the same corners as native-titlebar.css before app CSS loads. */
+      html[data-ohb-boot-titlebar="mac"] #ohb-boot .bar::before {
+        content: "";
+        flex: 0 0 72px;
+      }
+      html[data-ohb-boot-titlebar="windows"] #ohb-boot .bar {
+        padding-inline-end: calc(
+          100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) + 12px
+        );
+      }
+      #ohb-boot .org {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 6px;
+      }
+      /* The organization face is fixed artwork (seed "ohb-organization" in
+         BotFace), the label the one recorded on the last visit
+         (`ohb:boot-identity`, `src/lib/session/boot-identity.ts`): neither pulses. */
+      #ohb-boot .org .orgface {
+        flex: 0 0 18px;
+        object-fit: contain;
+      }
+      #ohb-boot .org .orgname {
+        max-width: 160px;
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 18px;
+        color: var(--boot-text);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #ohb-boot .ico {
+        display: inline-flex;
+        flex: 0 0 30px;
+        align-items: center;
+        justify-content: center;
+        height: 30px;
+        color: var(--boot-icon);
+      }
+      #ohb-boot .ico svg {
+        width: 18px;
+        height: 18px;
+      }
+      /* Le « + » de Grok Bot : un rond gris, pas un aplat d'accent. */
+      #ohb-boot .ico.create {
+        margin-inline-start: 4px;
+        border-radius: 999px;
+        background: var(--boot-shape);
+        color: var(--boot-icon);
+      }
+      /* 8 px entre le repli et Précédent, comme `BoardTopBar`. */
+      #ohb-boot .history {
+        display: flex;
+        margin-inline-start: 4px;
+        opacity: 0.35;
+      }
+      #ohb-boot .bartools,
+      #ohb-boot .crumb,
+      #ohb-boot .acts,
+      #ohb-boot .thread,
+      #ohb-boot .composer {
+        display: none;
+      }
+      #ohb-boot .bartools {
+        align-items: center;
+        gap: 4px;
+      }
+      #ohb-boot .bartools .sep {
+        width: 1px;
+        height: 18px;
+        margin: 0 4px 0 8px;
+        background: var(--boot-divider);
+      }
+      #ohb-boot .crumb {
+        flex: 1;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        padding: 0 4px;
+        font-size: 13px;
+        line-height: 18px;
+        font-weight: 500;
+      }
+      #ohb-boot .crumb .salon {
+        padding: 0 4px;
+        color: var(--boot-text-2);
+        white-space: nowrap;
+      }
+      #ohb-boot .crumb .chev {
+        color: var(--boot-text-3);
+      }
+      #ohb-boot .crumb .title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 6px;
+      }
+      #ohb-boot .acts {
+        align-items: center;
+        gap: 4px;
+      }
+      #ohb-boot.conv .crumb,
+      #ohb-boot.conv .acts,
+      #ohb-boot.conv .thread,
+      #ohb-boot.conv .composer {
+        display: flex;
+      }
+      /* La flotte d'agence (module console de l'agence) : rail, navigation
+         interne, synthèse et cartes clients, sans barre latérale personnelle. */
+      #ohb-boot > .fleet {
+        display: none;
+      }
+      html[data-ohb-boot-fleet] #ohb-boot > .bar,
+      html[data-ohb-boot-fleet] #ohb-boot > .body {
+        display: none;
+      }
+      html[data-ohb-boot-fleet] #ohb-boot > .fleet {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+      }
+      #ohb-boot .fleet .fbar {
+        display: flex;
+        flex: 0 0 46px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+      }
+      html[data-ohb-boot-titlebar="mac"] #ohb-boot .fleet .fbar::before {
+        content: "";
+        flex: 0 0 72px;
+      }
+      #ohb-boot .fleet .fbar .search {
+        width: 320px;
+        height: 30px;
+        margin: 0 auto;
+        border-radius: 10px;
+        background: var(--boot-surface);
+        border: 1px solid var(--boot-divider);
+        animation: none;
+      }
+      #ohb-boot .fleet .fbody {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        padding: 0 12px 12px 12px;
+      }
+      /* The desktop agency frame has no rail: sections are client tabs. */
+      #ohb-boot .fleet .rail {
+        display: none;
+        flex: 0 0 63px;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        padding-top: 14px;
+      }
+      #ohb-boot .fleet .fnav {
+        display: flex;
+        flex: 0 0 256px;
+        flex-direction: column;
+        gap: 14px;
+        margin-inline-end: 12px;
+        padding: 16px;
+        border-radius: 14px;
+        background: var(--boot-surface);
+      }
+      #ohb-boot .fleet .fmain {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+        padding: 16px;
+        background: var(--boot-full);
+        overflow: hidden;
+      }
+      #ohb-boot .fleet .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+      html[data-ohb-boot-fleet-client] #ohb-boot .fleet .cards {
+        display: none;
+      }
+      #ohb-boot .fleet .cards.clients {
+        align-items: start;
+      }
+      #ohb-boot .fleet .tile {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 128px;
+        padding: 16px;
+        border-radius: 16px;
+        background: var(--boot-surface);
+      }
+      #ohb-boot .fleet .clients .tile {
+        min-height: 260px;
+      }
+      @media (max-width: 767px) {
+        #ohb-boot .fleet .rail,
+        #ohb-boot .fleet .fnav,
+        #ohb-boot .fleet .fbar .search {
+          display: none;
+        }
+        #ohb-boot .fleet .fbody {
+          padding-inline-start: 12px;
+        }
+        #ohb-boot .fleet .cards {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      /* Sous la barre : la colonne de la barre latérale et la carte principale. */
+      #ohb-boot .body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      #ohb-boot .side {
+        display: flex;
+        flex: 0 0 272px;
+        min-height: 0;
+        padding: 0 0 12px 12px;
+      }
+      #ohb-boot .card {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        padding: 7px;
+        border: 1px solid var(--boot-card-edge);
+        border-radius: 24px;
+        background: var(--boot-surface);
+      }
+      #ohb-boot .top {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      #ohb-boot .top b {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 36px;
+        border-radius: 999px;
+        background: var(--boot-shape);
+        color: var(--boot-icon);
+      }
+      #ohb-boot .top b.create {
+        background: var(--boot-shape);
+        color: var(--boot-icon);
+      }
+      #ohb-boot .top svg {
+        width: 20px;
+        height: 20px;
+      }
+      #ohb-boot .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-top: 12px;
+      }
+      #ohb-boot .nav b {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+        padding: 0 10px;
+        color: var(--boot-text);
+        font-size: 13px;
+        line-height: 18px;
+        font-weight: 500;
+      }
+      #ohb-boot .nav svg {
+        flex: 0 0 16px;
+        height: 16px;
+        color: var(--boot-icon);
+      }
+      #ohb-boot .rows {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 4px;
+        min-height: 0;
+        margin-top: 4px;
+        overflow: hidden;
+      }
+      #ohb-boot .pins {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+        padding: 8px 4px 12px;
+      }
+      #ohb-boot .pin {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        width: 116px;
+        padding: 6px 4px;
+      }
+      #ohb-boot .pin .face {
+        width: 64px;
+        height: 64px;
+      }
+      #ohb-boot .block {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #ohb-boot .label {
+        display: flex;
+        align-items: center;
+        height: 28px;
+        padding: 6px 10px 0;
+      }
+      #ohb-boot .row {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 10px;
+        height: 44px;
+        padding: 4px 10px;
+      }
+      #ohb-boot .face {
+        flex: 0 0 28px;
+        height: 28px;
+        border-radius: 999px;
+      }
+      #ohb-boot .lines {
+        display: grid;
+        flex: 1;
+        gap: 6px;
+      }
+      #ohb-boot .l1 {
+        width: 66%;
+        height: 16px;
+      }
+      #ohb-boot .l2 {
+        width: 92%;
+        height: 12px;
+      }
+      #ohb-boot .foot {
+        margin-top: 6px;
+      }
+      #ohb-boot .foot .row {
+        height: 50px;
+        padding: 8px 10px;
+      }
+      #ohb-boot .foot .face {
+        flex-basis: 26px;
+        height: 26px;
+      }
+      #ohb-boot .main {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        padding: 0 12px 12px;
+      }
+      #ohb-boot .scene {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+        overflow: hidden;
+        border-radius: 24px;
+        background: var(--boot-surface);
+      }
+      /* La colonne de lecture (`data-thread-column`, thread-timeline.css). */
+      #ohb-boot .thread {
+        flex: 1;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 12px;
+        min-height: 0;
+        padding: 16px 24px;
+        overflow: hidden;
+      }
+      #ohb-boot .turn {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+        max-width: var(--boot-column);
+        margin-inline: auto;
+      }
+      #ohb-boot .ask {
+        align-self: flex-end;
+        max-width: 80%;
+        height: 42px;
+        border-radius: 16px;
+      }
+      #ohb-boot .answer {
+        display: grid;
+        gap: 8px;
+        padding-top: 4px;
+      }
+      #ohb-boot .answer i:first-child {
+        max-width: 100%;
+        height: 16px;
+      }
+      #ohb-boot .answer i:last-child {
+        width: 40px;
+        height: 12px;
+      }
+      #ohb-boot .composer {
+        padding: 8px 24px 16px;
+      }
+      #ohb-boot .shell {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+        max-width: calc(var(--boot-column) + 0.5rem);
+        margin-inline: auto;
+        padding: 6px 8px;
+        border-radius: 24px;
+        background: var(--boot-raised);
+        box-shadow: 0 1px 2px 0 #0000000d;
+      }
+      #ohb-boot .shell .line {
+        height: 28px;
+        margin: 6px 0;
+        border-radius: 12px;
+      }
+      #ohb-boot .shell .tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #ohb-boot .shell .dot {
+        width: 32px;
+        height: 32px;
+      }
+      #ohb-boot .shell .chip {
+        width: 80px;
+        height: 24px;
+      }
+      #ohb-boot .shell .gap {
+        flex: 1;
+      }
+      /* Barre latérale repliée : sa rangée d'outils monte dans la barre du haut. */
+      html[data-ohb-sidebar-collapsed] #ohb-boot .side,
+      html[data-ohb-sidebar-collapsed] #ohb-boot .org {
+        display: none;
+      }
+      html[data-ohb-sidebar-collapsed] #ohb-boot .bartools {
+        display: flex;
+      }
+      /* Variante C (dev) : le rail de 56 px sur toute la hauteur (`BoardIconRail`,
+         board-rails.tsx), sans organisation dans la barre ; en tête de liste,
+         la recherche et le « + », Salon et À traiter passent dans le rail. */
+      #ohb-boot .brail {
+        display: none;
+      }
+      html[data-ohb-boot-rail] #ohb-boot {
+        padding-inline-start: 56px;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .brail {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        display: flex;
+        width: 56px;
+        flex-direction: column;
+        align-items: center;
+        padding-bottom: 12px;
+      }
+      #ohb-boot .brail .logo {
+        display: flex;
+        flex: 0 0 46px;
+        align-items: center;
+      }
+      /* macOS : les feux couvrent la rangée du logo du rail, l'application le
+         masque (native-titlebar.css) et la barre ne leur réserve que ce qui
+         dépasse du rail (16 px, plus 4 px d'écart jusqu'au repli). */
+      html[data-ohb-boot-titlebar="mac"] #ohb-boot .brail .logo img {
+        visibility: hidden;
+      }
+      html[data-ohb-boot-titlebar="mac"][data-ohb-boot-rail] #ohb-boot .bar::before {
+        flex-basis: 20px;
+      }
+      /* Match the loaded app before its brand stylesheet arrives. */
+      html.dark #ohb-boot .brail .logo img {
+        filter: invert(1) hue-rotate(180deg);
+      }
+      #ohb-boot .brail .grp {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      #ohb-boot .brail .grp b {
+        position: relative;
+        display: flex;
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        color: var(--boot-icon);
+      }
+      #ohb-boot .brail svg {
+        width: 18px;
+        height: 18px;
+      }
+      /* Le runtime : pastille neutre, comme pendant sa première lecture. */
+      #ohb-boot .brail .runtime .dot {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--boot-dot);
+        box-shadow: 0 0 0 2px var(--boot-full);
+      }
+      #ohb-boot .brail .sep {
+        width: 20px;
+        height: 1px;
+        margin: 2px 0;
+        background: var(--boot-divider);
+      }
+      /* L'icône montre le thème vers lequel on irait : la lune en clair, le soleil en sombre. */
+      #ohb-boot .brail .sun,
+      html.dark #ohb-boot .brail .moon {
+        display: none;
+      }
+      html.dark #ohb-boot .brail .sun {
+        display: block;
+      }
+      #ohb-boot .brail .lang {
+        font-size: 11px;
+        line-height: 1;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+      }
+      #ohb-boot svg.tb {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #ohb-boot .brail .gap {
+        flex: 1;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .org,
+      html[data-ohb-boot-rail] #ohb-boot .nav,
+      html[data-ohb-boot-rail] #ohb-boot .foot {
+        display: none;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .side {
+        padding-inline-start: 0;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .top {
+        display: flex;
+        margin-bottom: 4px;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .top b {
+        height: 32px;
+        border-radius: 8px;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .top b.search {
+        flex: 1;
+        justify-content: flex-start;
+        padding-inline-start: 10px;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .top b.create {
+        flex: 0 0 32px;
+        border-radius: 999px;
+      }
+      html[data-ohb-boot-rail] #ohb-boot .top svg {
+        width: 16px;
+        height: 16px;
+      }
+      /* Une rubrique des réglages (`SettingsFrame`) : le menu des réglages à la
+         place des conversations (`SettingsPageSidebar`), « Salon › rubrique »
+         dans la barre, et le corps dans la carte : tuiles et graphiques sur
+         Activité (`OverviewBodySkeleton`), une carte ailleurs
+         (`SettingsBodySkeleton`). Mêmes mesures que le vrai menu : boutons de
+         36 px, groupes espacés de 20 px, intitulé de 20 px. */
+      #ohb-boot .snav,
+      #ohb-boot .pane {
+        display: none;
+      }
+      html[data-ohb-booting] #ohb-boot.settings .top,
+      html[data-ohb-booting] #ohb-boot.settings .nav,
+      html[data-ohb-booting] #ohb-boot.settings .rows,
+      html[data-ohb-booting] #ohb-boot.settings .foot {
+        display: none;
+      }
+      /* Le menu des réglages reste ouvert même barre repliée, avec sa marge de 12 px. */
+      html[data-ohb-booting] #ohb-boot.settings .side {
+        display: flex;
+        padding-inline-start: 12px;
+      }
+      #ohb-boot.settings .snav {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #ohb-boot .sitem {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 36px;
+        padding: 8px;
+        border-radius: 10px;
+        color: var(--boot-text-2);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 500;
+      }
+      #ohb-boot .sitem.on {
+        background: var(--boot-shape);
+        color: var(--boot-text);
+      }
+      #ohb-boot .sitem svg {
+        flex: 0 0 20px;
+        height: 20px;
+        color: var(--boot-icon);
+      }
+      #ohb-boot .sitem span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #ohb-boot .sgrp {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding-top: 4px;
+      }
+      #ohb-boot .sgrp > span {
+        padding-inline-start: 8px;
+        color: var(--boot-text-2);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 500;
+      }
+      #ohb-boot .sgrp > div {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #ohb-boot.settings .crumb {
+        display: flex;
+      }
+      #ohb-boot.settings .crumb .title {
+        color: var(--boot-text);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      #ohb-boot.settings .pane.section,
+      #ohb-boot.settings.overview .pane.overview {
+        display: flex;
+      }
+      #ohb-boot.settings.overview .pane.section {
+        display: none;
+      }
+      /* `SettingsPane` dans `SettingsPage` (24 px en haut ; 12 px de côté, 16 px dès 1024 px) ; les tuiles et les graphiques suivent la
+         largeur de la page, comme `@container/main` : 2 colonnes dès 36rem,
+         4 tuiles et 2 graphiques dès 64rem. */
+      #ohb-boot .pane {
+        flex: 1;
+        flex-direction: column;
+        gap: 24px;
+        min-height: 0;
+        padding: 24px 12px;
+        overflow: hidden;
+        container-type: inline-size;
+      }
+      @media (min-width: 1024px) {
+        #ohb-boot .pane {
+          padding-inline: 16px;
+        }
+      }
+      /* Activité déborde toujours (tableau des bots, configuration) : la vraie
+         page porte une barre de défilement fine, sa place est réservée ici. */
+      #ohb-boot .pane.overview {
+        scrollbar-width: thin;
+        scrollbar-gutter: stable;
+      }
+      #ohb-boot .tiles {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      #ohb-boot .charts {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+      @container (min-width: 36rem) {
+        #ohb-boot .tiles {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @container (min-width: 64rem) {
+        #ohb-boot .tiles {
+          grid-template-columns: repeat(4, 1fr);
+        }
+        #ohb-boot .charts {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      #ohb-boot .tile,
+      #ohb-boot .chart,
+      #ohb-boot .scard {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--boot-tile-edge);
+        border-radius: 14px;
+        background: var(--boot-tile);
+      }
+      /* Les barres d'une carte, d'un cran plus claires (`ON_CARD`, overview-skeleton.tsx). */
+      #ohb-boot .tile i,
+      #ohb-boot .chart i,
+      #ohb-boot .scard i {
+        background: var(--boot-tile-shape);
+      }
+      #ohb-boot .tile {
+        justify-content: space-between;
+        height: 140px;
+        padding: 16px;
+      }
+      #ohb-boot .tile .head,
+      #ohb-boot .chart .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      /* Titre de 14 px, puis des lignes de description de 20 px. */
+      #ohb-boot .chart .head > div {
+        display: flex;
+        flex-direction: column;
+      }
+      #ohb-boot .chart .head .d {
+        height: 14px;
+        margin: 3px 0;
+      }
+      #ohb-boot .chart .head > div > i:first-child {
+        margin-bottom: 5px;
+      }
+      #ohb-boot .tile .foot2 {
+        display: grid;
+        gap: 6px;
+      }
+      #ohb-boot .chart {
+        gap: 24px;
+        min-height: 390px;
+        padding: 24px;
+      }
+      #ohb-boot .chart.tokens {
+        min-height: 410px;
+      }
+      #ohb-boot .chart .plot {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 250px;
+        margin-top: auto;
+      }
+      #ohb-boot .chart .plot > i {
+        flex: 1;
+      }
+      #ohb-boot .chart .ticks {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 8px;
+      }
+      #ohb-boot .chart .ticks i {
+        width: 40px;
+        height: 12px;
+      }
+      #ohb-boot .scard {
+        gap: 12px;
+        border-radius: 12px;
+        padding: 16px;
+      }
+      #ohb-boot .scard .row40 {
+        height: 40px;
+        border-radius: 8px;
+      }
+      /* Téléphone : `MobileFrame` range la barre dans un tiroir, la scène occupe tout. */
+      @media (max-width: 767px) {
+        #ohb-boot .bar,
+        #ohb-boot .side,
+        html[data-ohb-boot-rail] #ohb-boot .brail {
+          display: none;
+        }
+        html[data-ohb-boot-rail] #ohb-boot {
+          padding-inline-start: 0;
+        }
+        #ohb-boot .main {
+          padding: 0;
+        }
+        #ohb-boot .scene {
+          border-radius: 0;
+        }
+        #ohb-boot.conv .thread,
+        #ohb-boot.conv .composer {
+          display: none;
+        }
+      }
+      @keyframes ohb-boot-pulse {
+        50% {
+          opacity: 0.5;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #ohb-boot i {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ohb-boot" role="status" aria-busy="true" aria-label="Chargement">
+      <!-- Remix Icon (Apache 2.0) : les icônes de `BoardTopBar`, `BoardSidebar` et `ConversationHeader` ; Tabler Icons (MIT, `svg.tb`) : celles du runtime et du menu des réglages. -->
+      <div class="brail" aria-hidden="true">
+        <div class="logo"><img src="/brand/ohb-icon.webp" alt="" width="28" height="28"></div>
+        <div class="grp"><b><svg viewBox="0 0 24 24"><path d="M13 19H19V9.97815L12 4.53371L5 9.97815V19H11V13H13V19ZM21 20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V9.48907C3 9.18048 3.14247 8.88917 3.38606 8.69972L11.3861 2.47749C11.7472 2.19663 12.2528 2.19663 12.6139 2.47749L20.6139 8.69972C20.8575 8.88917 21 9.18048 21 9.48907V20Z"/></svg></b><b><svg viewBox="0 0 24 24"><path d="M21 3C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H21ZM7.41604 14H4V19H20V14H16.584C15.8124 15.7659 14.0503 17 12 17C9.94968 17 8.1876 15.7659 7.41604 14ZM20 5H4V12H9C9 13.6569 10.3431 15 12 15C13.6569 15 15 13.6569 15 12H20V5Z"/></svg></b></div>
+        <span class="gap"></span>
+        <div class="grp"><b class="runtime"><svg class="tb" viewBox="0 0 24 24"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M15 20h-9a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h12"/><path d="M7 8v.01"/><path d="M7 16v.01"/><path d="M20 15l-2 3h3l-2 3"/></svg><span class="dot"></span></b><span class="sep"></span><b><svg class="sun" viewBox="0 0 24 24"><path d="M12 18C8.68629 18 6 15.3137 6 12C6 8.68629 8.68629 6 12 6C15.3137 6 18 8.68629 18 12C18 15.3137 15.3137 18 12 18ZM12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16ZM11 1H13V4H11V1ZM11 20H13V23H11V20ZM3.51472 4.92893L4.92893 3.51472L7.05025 5.63604L5.63604 7.05025L3.51472 4.92893ZM16.9497 18.364L18.364 16.9497L20.4853 19.0711L19.0711 20.4853L16.9497 18.364ZM19.0711 3.51472L20.4853 4.92893L18.364 7.05025L16.9497 5.63604L19.0711 3.51472ZM5.63604 16.9497L7.05025 18.364L4.92893 20.4853L3.51472 19.0711L5.63604 16.9497ZM23 11V13H20V11H23ZM4 11V13H1V11H4Z"/></svg><svg class="moon" viewBox="0 0 24 24"><path d="M10 7C10 10.866 13.134 14 17 14C18.9584 14 20.729 13.1957 21.9995 11.8995C22 11.933 22 11.9665 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C12.0335 2 12.067 2 12.1005 2.00049C10.8043 3.27098 10 5.04157 10 7ZM4 12C4 16.4183 7.58172 20 12 20C15.0583 20 17.7158 18.2839 19.062 15.7621C18.3945 15.9187 17.7035 16 17 16C12.0294 16 8 11.9706 8 7C8 6.29648 8.08133 5.60547 8.2379 4.938C5.71611 6.28423 4 8.9417 4 12Z"/></svg></b><b class="lang">fr</b><span class="sep"></span><b><svg viewBox="0 0 24 24"><path d="M3.33946 17.0002C2.90721 16.2515 2.58277 15.4702 2.36133 14.6741C3.3338 14.1779 3.99972 13.1668 3.99972 12.0002C3.99972 10.8345 3.3348 9.824 2.36353 9.32741C2.81025 7.71651 3.65857 6.21627 4.86474 4.99001C5.7807 5.58416 6.98935 5.65534 7.99972 5.072C9.01009 4.48866 9.55277 3.40635 9.4962 2.31604C11.1613 1.8846 12.8847 1.90004 14.5031 2.31862C14.4475 3.40806 14.9901 4.48912 15.9997 5.072C17.0101 5.65532 18.2187 5.58416 19.1346 4.99007C19.7133 5.57986 20.2277 6.25151 20.66 7.00021C21.0922 7.7489 21.4167 8.53025 21.6381 9.32628C20.6656 9.82247 19.9997 10.8336 19.9997 12.0002C19.9997 13.166 20.6646 14.1764 21.6359 14.673C21.1892 16.2839 20.3409 17.7841 19.1347 19.0104C18.2187 18.4163 17.0101 18.3451 15.9997 18.9284C14.9893 19.5117 14.4467 20.5941 14.5032 21.6844C12.8382 22.1158 11.1148 22.1004 9.49633 21.6818C9.55191 20.5923 9.00929 19.5113 7.99972 18.9284C6.98938 18.3451 5.78079 18.4162 4.86484 19.0103C4.28617 18.4205 3.77172 17.7489 3.33946 17.0002ZM8.99972 17.1964C10.0911 17.8265 10.8749 18.8227 11.2503 19.9659C11.7486 20.0133 12.2502 20.014 12.7486 19.9675C13.1238 18.8237 13.9078 17.8268 14.9997 17.1964C16.0916 16.5659 17.347 16.3855 18.5252 16.6324C18.8146 16.224 19.0648 15.7892 19.2729 15.334C18.4706 14.4373 17.9997 13.2604 17.9997 12.0002C17.9997 10.74 18.4706 9.5632 19.2729 8.6665C19.1688 8.4405 19.0538 8.21822 18.9279 8.00021C18.802 7.78219 18.667 7.57148 18.5233 7.36842C17.3457 7.61476 16.0911 7.43414 14.9997 6.80405C13.9083 6.17395 13.1246 5.17768 12.7491 4.03455C12.2509 3.98714 11.7492 3.98646 11.2509 4.03292C10.8756 5.17671 10.0916 6.17364 8.99972 6.80405C7.9078 7.43447 6.65245 7.61494 5.47428 7.36803C5.18485 7.77641 4.93463 8.21117 4.72656 8.66637C5.52881 9.56311 5.99972 10.74 5.99972 12.0002C5.99972 13.2604 5.52883 14.4372 4.72656 15.3339C4.83067 15.5599 4.94564 15.7822 5.07152 16.0002C5.19739 16.2182 5.3324 16.4289 5.47612 16.632C6.65377 16.3857 7.90838 16.5663 8.99972 17.1964ZM11.9997 15.0002C10.3429 15.0002 8.99972 13.6571 8.99972 12.0002C8.99972 10.3434 10.3429 9.00021 11.9997 9.00021C13.6566 9.00021 14.9997 10.3434 14.9997 12.0002C14.9997 13.6571 13.6566 15.0002 11.9997 15.0002ZM11.9997 13.0002C12.552 13.0002 12.9997 12.5525 12.9997 12.0002C12.9997 11.4479 12.552 11.0002 11.9997 11.0002C11.4474 11.0002 10.9997 11.4479 10.9997 12.0002C10.9997 12.5525 11.4474 13.0002 11.9997 13.0002Z"/></svg></b><b><svg viewBox="0 0 24 24"><path d="M5 22C4.44772 22 4 21.5523 4 21V3C4 2.44772 4.44772 2 5 2H19C19.5523 2 20 2.44772 20 3V6H18V4H6V20H18V18H20V21C20 21.5523 19.5523 22 19 22H5ZM18 16V13H11V11H18V8L23 12L18 16Z"/></svg></b></div>
+      </div>
+      <div class="bar" aria-hidden="true">
+        <div class="org"><img class="orgface" src="/bots/bot-comet.webp" alt="" width="18" height="18"><i style="width:64px;height:14px"></i></div>
+        <b class="ico"><svg viewBox="0 0 24 24"><path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM8 5H4V19H8V5ZM10 5V19H20V5H10Z"/></svg></b>
+        <div class="bartools"><b class="ico"><svg viewBox="0 0 24 24"><path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"/></svg></b><b class="ico"><svg viewBox="0 0 24 24"><path d="M21 13.2422V20H22V22H2V20H3V13.2422C1.79401 12.435 1 11.0602 1 9.5C1 8.67286 1.22443 7.87621 1.63322 7.19746L4.3453 2.5C4.52393 2.1906 4.85406 2 5.21132 2H18.7887C19.1459 2 19.4761 2.1906 19.6547 2.5L22.3575 7.18172C22.7756 7.87621 23 8.67286 23 9.5C23 11.0602 22.206 12.435 21 13.2422ZM19 13.9725C18.8358 13.9907 18.669 14 18.5 14C17.2409 14 16.0789 13.478 15.25 12.6132C14.4211 13.478 13.2591 14 12 14C10.7409 14 9.5789 13.478 8.75 12.6132C7.9211 13.478 6.75911 14 5.5 14C5.331 14 5.16417 13.9907 5 13.9725V20H19V13.9725ZM5.78865 4L3.35598 8.21321C3.12409 8.59843 3 9.0389 3 9.5C3 10.8807 4.11929 12 5.5 12C6.53096 12 7.44467 11.3703 7.82179 10.4295C8.1574 9.59223 9.3426 9.59223 9.67821 10.4295C10.0553 11.3703 10.969 12 12 12C13.031 12 13.9447 11.3703 14.3218 10.4295C14.6574 9.59223 15.8426 9.59223 16.1782 10.4295C16.5553 11.3703 17.469 12 18.5 12C19.8807 12 21 10.8807 21 9.5C21 9.0389 20.8759 8.59843 20.6347 8.19746L18.2113 4H5.78865Z"/></svg></b><b class="ico create"><svg viewBox="0 0 24 24"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"/></svg></b><span class="sep"></span></div>
+        <div class="history"><b class="ico"><svg viewBox="0 0 24 24"><path d="M10.8284 12.0007L15.7782 16.9504L14.364 18.3646L8 12.0007L14.364 5.63672L15.7782 7.05093L10.8284 12.0007Z"/></svg></b><b class="ico"><svg viewBox="0 0 24 24"><path d="M13.1717 12.0007L8.22192 7.05093L9.63614 5.63672L16.0001 12.0007L9.63614 18.3646L8.22192 16.9504L13.1717 12.0007Z"/></svg></b></div>
+        <div class="crumb"><span class="salon">Salon</span><span class="chev">›</span><span class="title"><i class="round" style="width:20px;height:20px"></i><i style="width:160px;height:14px"></i></span></div>
+        <div class="acts"><i style="width:40px;height:16px;margin-inline-end:4px"></i><i class="round" style="width:144px;height:30px"></i><b class="ico"><svg viewBox="0 0 24 24"><path d="M12 2.58582L18.2071 8.79292L16.7929 10.2071L13 6.41424V16H11V6.41424L7.20711 10.2071L5.79289 8.79292L12 2.58582ZM3 18V14H5V18C5 18.5523 5.44772 19 6 19H18C18.5523 19 19 18.5523 19 18V14H21V18C21 19.6569 19.6569 21 18 21H6C4.34315 21 3 19.6569 3 18Z"/></svg></b><b class="ico"><svg viewBox="0 0 24 24"><path d="M5 10C3.9 10 3 10.9 3 12C3 13.1 3.9 14 5 14C6.1 14 7 13.1 7 12C7 10.9 6.1 10 5 10ZM19 10C17.9 10 17 10.9 17 12C17 13.1 17.9 14 19 14C20.1 14 21 13.1 21 12C21 10.9 20.1 10 19 10ZM12 10C10.9 10 10 10.9 10 12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12C14 10.9 13.1 10 12 10Z"/></svg></b></div>
+      </div>
+      <div class="body" aria-hidden="true">
+        <div class="side">
+          <div class="card">
+            <div class="top">
+              <b class="search"><svg viewBox="0 0 24 24"><path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"/></svg></b>
+              <span></span>
+              <b class="create"><svg viewBox="0 0 24 24"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"/></svg></b>
+            </div>
+            <div class="nav">
+              <b><svg viewBox="0 0 24 24"><path d="M13 19H19V9.97815L12 4.53371L5 9.97815V19H11V13H13V19ZM21 20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V9.48907C3 9.18048 3.14247 8.88917 3.38606 8.69972L11.3861 2.47749C11.7472 2.19663 12.2528 2.19663 12.6139 2.47749L20.6139 8.69972C20.8575 8.88917 21 9.18048 21 9.48907V20Z"/></svg><span>Salon</span></b>
+              <b><svg viewBox="0 0 24 24"><path d="M21 3C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H21ZM7.41604 14H4V19H20V14H16.584C15.8124 15.7659 14.0503 17 12 17C9.94968 17 8.1876 15.7659 7.41604 14ZM20 5H4V12H9C9 13.6569 10.3431 15 12 15C13.6569 15 15 13.6569 15 12H20V5Z"/></svg><span class="inbox">À traiter</span></b>
+            </div>
+            <div class="rows"></div>
+            <div class="foot"><div class="row"><i class="face"></i><div class="lines"><i class="l1"></i><i class="l2"></i></div></div></div>
+<div class="snav">
+              <b class="sitem"><svg viewBox="0 0 24 24"><path d="M7.82843 10.9999H20V12.9999H7.82843L13.1924 18.3638L11.7782 19.778L4 11.9999L11.7782 4.22168L13.1924 5.63589L7.82843 10.9999Z"/></svg><span data-l="leave">Quitter les réglages</span></b>
+              <div class="sgrp"><span data-l="me">Moi</span><div><b class="sitem" data-url="/settings/account"><svg class="tb" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 10a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855"/></svg><span data-l="/settings/account">Mon compte</span></b><b class="sitem" data-url="/settings/appearance"><svg class="tb" viewBox="0 0 24 24"><path d="M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25"/><path d="M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg><span data-l="/settings/appearance">Apparence et langue</span></b></div></div>
+              <div class="sgrp"><span data-l="workspace">Espace de travail</span><div><b class="sitem" data-url="/settings"><svg class="tb" viewBox="0 0 24 24"><path d="M3 12h4l3 8l4 -16l3 8h4"/></svg><span data-l="/settings">Activité</span></b><b class="sitem" data-url="/settings/archives"><svg class="tb" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"/><path d="M10 12l4 0"/></svg><span data-l="/settings/archives">Archives</span></b></div></div>
+              <div class="sgrp"><span data-l="bots">Bots et runtime</span><div><b class="sitem" data-url="/settings/runtime"><svg class="tb" viewBox="0 0 24 24"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M15 20h-9a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h12"/><path d="M7 8v.01"/><path d="M7 16v.01"/><path d="M20 15l-2 3h3l-2 3"/></svg><span data-l="/settings/runtime">Runtime</span></b><b class="sitem" data-url="/settings/models"><svg class="tb" viewBox="0 0 24 24"><path d="M15.5 13a3.5 3.5 0 0 0 -3.5 3.5v1a3.5 3.5 0 0 0 7 0v-1.8"/><path d="M8.5 13a3.5 3.5 0 0 1 3.5 3.5v1a3.5 3.5 0 0 1 -7 0v-1.8"/><path d="M17.5 16a3.5 3.5 0 0 0 0 -7h-.5"/><path d="M19 9.3v-2.8a3.5 3.5 0 0 0 -7 0"/><path d="M6.5 16a3.5 3.5 0 0 1 0 -7h.5"/><path d="M5 9.3v-2.8a3.5 3.5 0 0 1 7 0v10"/></svg><span data-l="/settings/models">Modèles</span></b><b class="sitem" data-url="/settings/connectors"><svg class="tb" viewBox="0 0 24 24"><path d="M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5"/><path d="M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5"/><path d="M3 21l2.5 -2.5"/><path d="M18.5 5.5l2.5 -2.5"/><path d="M10 11l-2 2"/><path d="M13 14l-2 2"/></svg><span data-l="/settings/connectors">Connecteurs</span></b></div></div>
+              <div class="sgrp"><span data-l="control">Contrôle</span><div><b class="sitem" data-url="/settings/policies"><svg class="tb" viewBox="0 0 24 24"><path d="M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06"/><path d="M15 19l2 2l4 -4"/></svg><span data-l="/settings/policies">Politiques</span></b><b class="sitem" data-url="/settings/decisions"><svg class="tb" viewBox="0 0 24 24"><path d="M12 8l0 4l2 2"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg><span data-l="/settings/decisions">Décisions</span></b><b class="sitem" data-url="/settings/security"><svg class="tb" viewBox="0 0 24 24"><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg><span data-l="/settings/security">Sécurité</span></b></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="main">
+          <div class="scene">
+            <div class="thread">
+          <div class="turn"><i class="ask" style="width:176px"></i><div class="answer"><i style="width:320px"></i><i></i></div></div>
+          <div class="turn"><i class="ask" style="width:112px"></i><div class="answer"><i style="width:96px"></i><i></i></div></div>
+          <div class="turn"><i class="ask" style="width:240px"></i><div class="answer"><i style="width:416px"></i><i></i></div></div>
+          <div class="turn"><i class="ask" style="width:144px"></i><div class="answer"><i style="width:224px"></i><i></i></div></div>
+          <div class="turn"><i class="ask" style="width:96px"></i><div class="answer"><i style="width:160px"></i><i></i></div></div>
+            </div>
+            <div class="composer">
+              <div class="shell">
+                <i class="line"></i>
+                <div class="tools"><i class="dot round"></i><i class="chip round"></i><span class="gap"></span><i class="dot round"></i><i class="dot round"></i></div>
+              </div>
+            </div>
+            <div class="pane overview"><div class="tiles"><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div></div><div class="charts"><div class="chart"><div class="head"><div><i style="width:128px;height:14px"></i><i class="d" style="width:224px"></i></div><i style="width:160px;height:36px;border-radius:8px"></i></div><div class="plot"><i></i><div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="chart tokens"><div class="head"><div><i style="width:128px;height:14px"></i><i class="d" style="width:224px"></i><i class="d" style="width:160px"></i></div><i style="width:160px;height:36px;border-radius:8px"></i></div><div class="plot"><i></i><div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div></div></div>
+            <div class="pane section"><div class="scard"><i style="width:160px;height:16px"></i><i class="row40"></i><i class="row40"></i><i class="row40"></i></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet" aria-hidden="true">
+        <div class="fbar"><i class="round" style="width:18px;height:18px"></i><i style="width:72px;height:14px"></i><i style="width:96px;height:14px;margin-inline-start:24px"></i><i class="search"></i><i class="round" style="width:18px;height:18px"></i></div>
+        <div class="fbody">
+          <div class="rail"><i style="width:18px;height:18px"></i><i style="width:18px;height:18px"></i><i style="width:18px;height:18px"></i><i style="width:18px;height:18px"></i><i style="width:18px;height:18px"></i></div>
+          <div class="fnav"><i style="width:56px;height:10px"></i><i style="width:80%;height:12px"></i><i style="width:70%;height:12px"></i><i style="width:75%;height:12px"></i><i style="width:60%;height:12px"></i><i style="width:56px;height:10px;margin-top:12px"></i><i style="width:100%;height:30px"></i><i style="width:100%;height:30px"></i></div>
+          <div class="fmain"><i style="width:220px;height:28px"></i><div class="cards"><div class="tile"><i style="width:45%;height:14px"></i><i style="width:30%;height:22px"></i><i style="width:70%;height:10px"></i></div><div class="tile"><i style="width:45%;height:14px"></i><i style="width:30%;height:22px"></i><i style="width:70%;height:10px"></i></div><div class="tile"><i style="width:45%;height:14px"></i><i style="width:30%;height:22px"></i><i style="width:70%;height:10px"></i></div></div><div class="cards clients"><div class="tile"><i style="width:55%;height:14px"></i><i class="round" style="width:84px;height:18px"></i><i style="width:80%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:60%;height:30px"></i></div><div class="tile"><i style="width:55%;height:14px"></i><i class="round" style="width:84px;height:18px"></i><i style="width:80%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:60%;height:30px"></i></div><div class="tile"><i style="width:55%;height:14px"></i><i class="round" style="width:84px;height:18px"></i><i style="width:80%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:100%;height:10px"></i><i style="width:60%;height:30px"></i></div></div></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Ce que la page ne connaît qu'au chargement : la langue des libellés,
+      // la forme du dernier roster (`lib/session/boot-shape.ts`, mêmes bornes) et si
+      // l'adresse est une conversation (`isConversationPath`).
+      (function () {
+        var boot = document.getElementById("ohb-boot");
+        if (!boot) return;
+        try {
+          var locale = localStorage.getItem("ohb:locale") || (navigator.language || "").slice(0, 2).toLowerCase();
+          if (locale === "en") {
+            boot.setAttribute("aria-label", "Loading");
+            boot.querySelector(".inbox").textContent = "Inbox";
+          }
+          if (/\/(?:bot|g)\/[^/]+\/?$/.test(location.pathname)) boot.className = "conv";
+          boot.querySelector(".brail .lang").textContent = locale === "en" ? "en" : "fr";
+          // Une rubrique des réglages : `settingsPathOf` (frame-skeletons.tsx).
+          var internal = location.pathname.replace(/^\/o\/[^/]+/, "").replace(/\/+$/, "") || "/";
+          if (internal === "/settings" || internal.indexOf("/settings/") === 0) {
+            boot.className = internal === "/settings" ? "settings overview" : "settings";
+            if (locale === "en") {
+              var english = {
+                leave: "Leave settings", me: "Me", workspace: "Workspace", bots: "Bots and runtime", control: "Control",
+                "/settings/account": "My account", "/settings/appearance": "Appearance and language", "/settings": "Activity",
+                "/settings/models": "Models", "/settings/connectors": "Connectors", "/settings/policies": "Policies",
+                "/settings/decisions": "Decisions", "/settings/security": "Security"
+              };
+              boot.querySelectorAll(".snav [data-l]").forEach(function (node) {
+                var text = english[node.getAttribute("data-l")];
+                if (text) node.textContent = text;
+              });
+            }
+            // La rubrique ouverte, comme `isSettingsEntryActive` (Runtime couvre aussi l'import des agents).
+            var section = internal === "/settings/agents" ? "/settings/runtime" : internal;
+            boot.querySelectorAll(".snav [data-url]").forEach(function (node) {
+              var url = node.getAttribute("data-url");
+              if (url === "/settings" ? section === url : section === url || section.indexOf(url + "/") === 0) {
+                node.className += " on";
+                var title = boot.querySelector(".crumb .title");
+                title.textContent = node.textContent;
+              }
+            });
+          }
+          try {
+            var identity = JSON.parse(localStorage.getItem("ohb:boot-identity") || "null");
+            var session = JSON.parse(localStorage.getItem("ohb:cloud-session") || "null");
+            var orgSlot = boot.querySelector(".org i");
+            if (orgSlot && identity && session && typeof identity.label === "string" && identity.label
+              && typeof identity.userId === "string" && identity.userId === session.userId) {
+              var orgName = document.createElement("span");
+              orgName.className = "orgname";
+              orgName.textContent = identity.label.slice(0, 64);
+              orgSlot.replaceWith(orgName);
+            }
+          } catch (e) { /* the label keeps pulsing */ }
+          var shape = null;
+          try { shape = JSON.parse(localStorage.getItem("ohb:boot-sidebar") || "null"); } catch (e) { shape = null; }
+          if (!shape || typeof shape.pins !== "number" || !Array.isArray(shape.blocks)) shape = { pins: 0, blocks: [{ label: true, rows: 5 }] };
+          var rows = boot.querySelector(".rows");
+          var html = "";
+          var pins = Math.max(0, Math.min(Math.floor(shape.pins), 6));
+          if (pins > 0) {
+            html += '<div class="pins">';
+            for (var p = 0; p < pins; p++) html += '<div class="pin"><i class="face"></i><i style="width:64px;height:14px"></i></div>';
+            html += "</div>";
+          }
+          var left = 18;
+          for (var b = 0; b < shape.blocks.length && left > 0; b++) {
+            var block = shape.blocks[b] || {};
+            var count = Math.max(0, Math.min(Math.floor(Number(block.rows) || 0), left));
+            left -= count;
+            html += '<div class="block">';
+            if (block.label === true) html += '<div class="label"><i style="width:64px;height:12px"></i></div>';
+            for (var r = 0; r < count; r++) html += '<div class="row"><i class="face"></i><div class="lines"><i class="l1"></i><i class="l2"></i></div></div>';
+            html += "</div>";
+          }
+          rows.innerHTML = html;
+        } catch (e) {
+          // Sans localStorage : la forme par défaut, cinq rangées sous un intitulé.
+          var fallback = '<div class="block"><div class="label"><i style="width:64px;height:12px"></i></div>';
+          for (var d = 0; d < 5; d++) fallback += '<div class="row"><i class="face"></i><div class="lines"><i class="l1"></i><i class="l2"></i></div></div>';
+          boot.querySelector(".rows").innerHTML = fallback + "</div>";
+        }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

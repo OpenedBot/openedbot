@@ -1,0 +1,35 @@
+{
+  "name": "@openedbot/notifications",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./application/*": "./src/application/*.ts",
+    "./domain/*": "./src/domain/*.ts",
+    "./domain/email/*": "./src/domain/email/*.ts",
+    "./sql/*": "./src/sql/*.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-errors": "workspace:*",
+    "@openedbot/contracts-events": "workspace:*",
+    "@openedbot/contracts-i18n": "workspace:*",
+    "@openedbot/contracts-locale": "workspace:*",
+    "@openedbot/contracts-primitives": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/platform-db": "workspace:*",
+    "@openedbot/platform-integrations": "workspace:*",
+    "nodemailer": "^10.0.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "@types/nodemailer": "^8.0.1",
+    "typescript": "^5.9.3"
+  }
+}

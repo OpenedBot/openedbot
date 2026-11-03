@@ -1,0 +1,13 @@
+{
+  "name": "@openedbot/contracts-connector",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "openedbot connector protocol: relay frame codec, gateway route allowlist and A2A agent card types (spec 1.0.0, wire protocol 1).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./a2a": "./src/a2a.ts"
+  },
+  "files": ["src"]
+}

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+  <!--
+    Fallback only. Signed out, the shell shows the console's own /login (the
+    screen the browser shows too, driven through __OHB_NATIVE__.auth). This
+    page stays for a console that predates that screen: it hands sign-in back
+    with signOut() and the shell loads this page instead (window.ts,
+    localSigninFallback). Remove it, with templates/, signin-base.css,
+    src/preload/signin-page.ts, the auth:password / auth:context /
+    auth:open-legal channels and design-lab, one release after every deployed
+    console serves the shared /login.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <!-- No script here on purpose: the preload wires every control, picks the
+         template stylesheet, the language and the theme, so the page can run
+         with a CSP that forbids scripts and inline style attributes. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>openedbot</title>
+    <link rel="stylesheet" href="signin-base.css" />
+  </head>
+  <!--
+    The template contract (src/renderer/templates/README.md): one markup for
+    every template, the same ids and classes, so the preload and the main
+    process never know which template is on screen. A template is one CSS
+    file that styles this tree; the optional decoration (.art, .deco) is
+    there for templates that want it and hidden by the others.
+  -->
+  <body data-state="idle">
+    <!-- macOS and Windows (html[data-platform="darwin"|"win32"],
+         signin-base.css): the strip that moves the window now that it has no
+         title bar. First in the document so the controls after it can punch
+         holes in it. -->
+    <div class="titlebar" aria-hidden="true"></div>
+    <div class="shell">
+      <div class="art" aria-hidden="true">
+        <div class="art-image"></div>
+        <div class="deco">
+          <span class="d d1"></span><span class="d d2"></span><span class="d d3"></span><span class="d d4"></span>
+          <span class="d d5"></span><span class="d d6"></span><span class="d d7"></span><span class="d d8"></span>
+          <span class="d d9"></span><span class="d d10"></span><span class="d d11"></span><span class="d d12"></span>
+        </div>
+        <img class="art-mascot" src="assets/ohb-icon.webp" alt="" width="160" height="160" />
+      </div>
+
+      <main class="main">
+        <header class="brand">
+          <img class="brand-mark" src="assets/ohb-icon.webp" alt="" width="32" height="32" />
+          <span class="brand-name">openedbot</span>
+        </header>
+
+        <div class="content">
+          <div class="copy">
+            <h1 class="title" data-i18n="title">Bon retour.</h1>
+            <p class="lead" data-i18n="intro">Connectez-vous pour retrouver vos bots et vos conversations.</p>
+          </div>
+
+          <div id="signin-note" class="note" role="alert" data-tone="neutral" hidden></div>
+
+          <div class="actions">
+            <p id="providers-loading" class="hint" data-i18n="loading" hidden>Chargement…</p>
+
+            <button id="google-button" class="btn btn-google" type="button">
+              <svg class="google-mark" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+              </svg>
+              <span data-i18n="google">Continuer avec Google</span>
+            </button>
+            <p id="google-disabled" class="hint hint-warning" hidden></p>
+
+            <div class="waiting">
+              <div class="pending" role="status">
+                <span class="matrix" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+                <span data-i18n="googleWaiting">En attente de la connexion dans le navigateur : cette fenêtre se met à jour toute seule.</span>
+              </div>
+              <button id="google-cancel" class="btn-text" type="button" data-i18n="googleCancel">Annuler</button>
+            </div>
+
+            <form id="password-form" class="password">
+              <p class="divider"><span data-i18n="passwordDivider">ou</span></p>
+              <div class="field">
+                <label class="label" for="password-email" data-i18n="passwordEmail">Adresse e-mail</label>
+                <span class="control">
+                  <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" /><path d="m3 7 9 6 9-6" /></svg>
+                  <input id="password-email" type="email" name="email" autocomplete="username" required />
+                </span>
+              </div>
+              <div class="field">
+                <label class="label" for="password-secret" data-i18n="passwordPassword">Mot de passe</label>
+                <span class="control control-secret">
+                  <svg class="field-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6z" /><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0-2 0" /><path d="M8 11V7a4 4 0 1 1 8 0v4" /></svg>
+                  <input id="password-secret" type="password" name="password" autocomplete="current-password" required />
+                  <button id="password-eye" class="eye" type="button" aria-pressed="false" data-i18n-label="passwordShow" aria-label="Afficher le mot de passe">
+                    <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0-4 0" /><path d="M21 12c-2.4 4-5.4 6-9 6c-3.6 0-6.6-2-9-6c2.4-4 5.4-6 9-6c3.6 0 6.6 2 9 6" /></svg>
+                    <svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.585 10.587a2 2 0 0 0 2.829 2.828" /><path d="M16.681 16.673a8.717 8.717 0 0 1-4.681 1.327c-3.6 0-6.6-2-9-6c1.272-2.12 2.712-3.678 4.32-4.674m2.86-1.146a9.055 9.055 0 0 1 1.82-.18c3.6 0 6.6 2 9 6c-.666 1.11-1.379 2.067-2.138 2.87" /><path d="M3 3l18 18" /></svg>
+                  </button>
+                </span>
+              </div>
+              <div id="password-code-field" hidden>
+                <p class="hint" data-i18n="passwordCodeSent">Un code à 6 chiffres a été envoyé à cette adresse.</p>
+                <div class="field">
+                  <label class="label" for="password-code" data-i18n="passwordCodeLabel">Code à 6 chiffres</label>
+                  <span class="control">
+                    <input id="password-code" type="text" name="emailCode" autocomplete="one-time-code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" disabled />
+                  </span>
+                </div>
+                <button id="password-code-resend" class="btn-text" type="button" data-i18n="passwordCodeResend">Recevoir un nouveau code</button>
+              </div>
+              <button id="password-submit" class="btn btn-primary" type="submit" data-i18n="passwordSubmit">Se connecter</button>
+
+              <div id="dev-accounts" class="dev" hidden>
+                <p class="dev-title" data-i18n="devTitle">Comptes de développement</p>
+                <p class="dev-hint" data-i18n="devHint">Choisis le compte propriétaire personnel ou le compte opérateur agence.</p>
+                <div id="dev-list" class="dev-list"></div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <footer class="footer">
+          <div class="legal">
+            <p class="footnote" data-i18n="ledgerFootnote">Vos bots tournent sur votre machine.
+openedbot garde vos conversations et vos réglages.</p>
+            <nav id="legal-links" class="legal-links" data-i18n-label="legalNav" aria-label="Documents légaux" hidden></nav>
+          </div>
+          <div class="controls">
+            <span id="env-badge" class="env-badge" hidden></span>
+            <div class="locale" role="group" data-i18n-label="language" aria-label="Langue">
+              <button class="locale-option" type="button" data-locale="fr" aria-pressed="true">fr</button>
+              <button class="locale-option" type="button" data-locale="en" aria-pressed="false">en</button>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="true" aria-label="Thème clair">
+              <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z" /></svg>
+              <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0" /><path d="M3 12h1m8-9v1m8 8h1m-9 8v1m-6.4-15.4l.7.7m12.1-.7l-.7.7m0 11.4l.7.7m-12.1-.7l-.7.7" /></svg>
+            </button>
+          </div>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

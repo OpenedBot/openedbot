@@ -1,0 +1,76 @@
+# Sideload builds only: unsigned Windows x64 (zip, NSIS) and macOS arm64 (dmg, zip).
+# No auto-update feed, no code signing, so SmartScreen will warn on first run.
+appId: app.openedbot.desktop
+productName: openedbot
+copyright: Copyright (c) 2026 Kévin Aubrée
+
+directories:
+  output: release/
+
+# The main process loads src/renderer/signin.html straight from the app
+# archive (tsc only emits TypeScript), so that folder ships next to dist/.
+files:
+  - dist/**
+  - src/renderer/**
+  - package.json
+  - LICENSE
+  - NOTICE
+
+asar: true
+
+# Never publish from here: artifacts are copied by hand.
+publish: null
+
+# Two artifacts from the same win-unpacked tree. The zip is the portable test
+# build (unzip, run openedbot.exe) and needs no Wine when cross-building from
+# Linux; the NSIS installer does (makensis runs through Wine), see Makefile.
+win:
+  target:
+    - target: zip
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  # Derived from the official brand/bloub-batman.png; electron-builder derives the .ico.
+  # With signAndEditExecutable off, openedbot.exe itself keeps the Electron icon in
+  # Explorer: only the installer uses this one. The running window and taskbar
+  # get it from BrowserWindow `icon` (src/main/window.ts).
+  icon: src/renderer/icon.png
+  # No certificate: skip signing and the rcedit pass (which needs Wine when
+  # cross-building from Linux).
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+
+# macOS, Apple Silicon. Unsigned and not notarized: Gatekeeper blocks the first
+# launch (right-click > Open, or System Settings > Privacy & Security).
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+  icon: build/icon.icns
+  category: public.app-category.productivity
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  identity: null
+  # Registers ohb:// with Launch Services so the Google return lands here.
+  protocols:
+    - name: openedbot
+      schemes:
+        - ohb
+  # The popup (openedbot Notch) is built in its own repository,
+  # OpenedBot/openedbot-notch (`make -C $NOTCH_DIR bundle`), and embedded as
+  # is, never as source: `make package-mac` checks it and stages it in
+  # popup-bundle/. src/main/popup-host.ts runs Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup
+  # with --hosted. extraFiles is relative to Contents/ on macOS.
+  extraFiles:
+    - from: popup-bundle/OHBPopup.app
+      to: Helpers/OHBPopup.app

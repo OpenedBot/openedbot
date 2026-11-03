@@ -1,0 +1,452 @@
+{
+  "about": "YOLO lease v1 vector. The message signed is signingPrefix followed by canonical (the canonical JSON of the creation audit, audit_format.go). The seed is a PUBLIC TEST SEED (bytes 0x00..0x1f), never a real key. A verifier pins pinnedKeys, checks the signature, then the lease at now for runtimeId; each invalid case names the issue it must be refused with.",
+  "signingPrefix": "ohb-yolo-lease/v1\n",
+  "testSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "publicKey": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+  "keyId": "56475aa75463474c0285df5dbf2bcab7",
+  "pinnedKeys": [
+    {
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "publicKey": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
+    }
+  ],
+  "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+  "now": 1793491260,
+  "lease": {
+    "v": 1,
+    "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+    "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+    "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+    "scope": "thread",
+    "profile": "designer",
+    "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+    "issuedAt": 1793491200,
+    "notBefore": 1793491200,
+    "expiresAt": 1793505600,
+    "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+    "deny": {
+      "commands": [
+        "git push --force"
+      ],
+      "tools": [
+        "send_message"
+      ],
+      "paths": [
+        ".aws"
+      ]
+    },
+    "protect": [
+      "git_config",
+      "git_hooks",
+      "ssh",
+      "env",
+      "id_rsa",
+      "credentials",
+      "keychain"
+    ]
+  },
+  "canonical": "{\"deny\":{\"commands\":[\"git push --force\"],\"paths\":[\".aws\"],\"tools\":[\"send_message\"]},\"expiresAt\":1793505600,\"grantedBy\":\"7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d\",\"issuedAt\":1793491200,\"leaseId\":\"5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01\",\"notBefore\":1793491200,\"organizationId\":\"0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b\",\"profile\":\"designer\",\"protect\":[\"git_config\",\"git_hooks\",\"ssh\",\"env\",\"id_rsa\",\"credentials\",\"keychain\"],\"runtimeId\":\"8f3b2c1d-1111-4222-8333-444455556666\",\"scope\":\"thread\",\"sessionKey\":\"08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279\",\"v\":1}",
+  "signature": "ro6QMSEEiciMPCTe+ARYmlb4Ydt2aINaOi7GVE2yMxZ1lxFE0IFOsLWdf3eZanGt8+akIOowMkdHoDkU6boEAQ==",
+  "invalid": [
+    {
+      "name": "expired",
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "ro6QMSEEiciMPCTe+ARYmlb4Ydt2aINaOi7GVE2yMxZ1lxFE0IFOsLWdf3eZanGt8+akIOowMkdHoDkU6boEAQ==",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "now": 1793505600,
+      "issue": "expired"
+    },
+    {
+      "name": "not yet valid beyond the clock skew",
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "ro6QMSEEiciMPCTe+ARYmlb4Ydt2aINaOi7GVE2yMxZ1lxFE0IFOsLWdf3eZanGt8+akIOowMkdHoDkU6boEAQ==",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "now": 1793490899,
+      "issue": "not_yet_valid"
+    },
+    {
+      "name": "longer than 24 hours",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793577601,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "6ov3ji5CCR7yoFGLaNt6QmfBuFnQ741oHpOoH5O/16Blh65vAuF3mW/GgX5zEY+Dl9ZeR3TRMmUku0g1VYWXBw==",
+      "now": 1793491260,
+      "issue": "duration_exceeded"
+    },
+    {
+      "name": "another runtime",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "9e8d7c6b-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "Fo3IF6Kpuz8B2tZVXD5TTAXH9YmTjFjRk8xZUU9l8LQKnp7eCllTtFGY8wt3EnWeikxebaOHm5abM4dy1XEGDw==",
+      "now": 1793491260,
+      "issue": "runtime_mismatch"
+    },
+    {
+      "name": "signed by a key that is not pinned",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "keyId": "24f6ed6acbfe1009c030d7ca567c33ca",
+      "signature": "iZMnf5UOAv0Sm8SNXb6gHFwi0RvrNc+7nCZMp8+2d1l+UVG2HYfixgHd46F3FGDvppfK8orpwIJdIQsiXWIvDA==",
+      "now": 1793491260,
+      "issue": "key_unknown"
+    },
+    {
+      "name": "tampered after signing",
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "ro6QMSEEiciMPCTe+ARYmlb4Ydt2aINaOi7GVE2yMxZ1lxFE0IFOsLWdf3eZanGt8+akIOowMkdHoDkU6boEAQ==",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793577600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "now": 1793491260,
+      "issue": "signature_invalid"
+    },
+    {
+      "name": "pinned key id, signature of another key",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "iZMnf5UOAv0Sm8SNXb6gHFwi0RvrNc+7nCZMp8+2d1l+UVG2HYfixgHd46F3FGDvppfK8orpwIJdIQsiXWIvDA==",
+      "now": 1793491260,
+      "issue": "signature_invalid"
+    },
+    {
+      "name": "thread scope without a session",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": null,
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ]
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "odHmtZElC4Qc/VUWDOydd/h0loMvfnFDuvFW6pi0UVaxNDcTXSSB7Gx7liLK93yP+vsWRNnrUriuIWKFruaWAQ==",
+      "now": 1793491260,
+      "issue": "scope_mismatch"
+    },
+    {
+      "name": "a default protection dropped",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials"
+        ]
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "Vso7xFevp46OjtFWJDcjJXOGKivpTWOfzq3xbKqL0IqBfuBl9W0D7sYlqmrdMv7TnAaS2rPfReB1UQfn39NODw==",
+      "now": 1793491260,
+      "issue": "protect_incomplete"
+    },
+    {
+      "name": "an unknown field",
+      "keyId": "56475aa75463474c0285df5dbf2bcab7",
+      "signature": "ro6QMSEEiciMPCTe+ARYmlb4Ydt2aINaOi7GVE2yMxZ1lxFE0IFOsLWdf3eZanGt8+akIOowMkdHoDkU6boEAQ==",
+      "lease": {
+        "v": 1,
+        "leaseId": "5d0c7f3e-9a41-4b7e-8c2d-3f6a1b0e9d01",
+        "organizationId": "0b1f5a8e-3c2d-4e6f-9a7b-1c2d3e4f5a6b",
+        "runtimeId": "8f3b2c1d-1111-4222-8333-444455556666",
+        "scope": "thread",
+        "profile": "designer",
+        "sessionKey": "08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279",
+        "issuedAt": 1793491200,
+        "notBefore": 1793491200,
+        "expiresAt": 1793505600,
+        "grantedBy": "7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d",
+        "deny": {
+          "commands": [
+            "git push --force"
+          ],
+          "tools": [
+            "send_message"
+          ],
+          "paths": [
+            ".aws"
+          ]
+        },
+        "protect": [
+          "git_config",
+          "git_hooks",
+          "ssh",
+          "env",
+          "id_rsa",
+          "credentials",
+          "keychain"
+        ],
+        "extra": 1
+      },
+      "now": 1793491260,
+      "issue": "shape"
+    }
+  ]
+}

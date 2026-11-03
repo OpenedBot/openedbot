@@ -1,0 +1,246 @@
+/*
+  What every sign-in template shares: the fonts, and the BEHAVIOUR of the
+  page (which block shows in which state, the eye and theme icons, the
+  waiting matrix). Templates (src/renderer/templates/*.css) own everything
+  visual: layout, colours, type, decoration, for both themes and every
+  window size. Keep looks out of this file.
+*/
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("assets/fonts/inter.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Source Serif 4 Variable";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("assets/fonts/source-serif-4.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Source Serif 4 Variable";
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("assets/fonts/source-serif-4-italic.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("assets/fonts/jetbrains-mono.woff2") format("woff2-variations");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] img[src$="/ohb-icon.webp"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Nothing shows until the template stylesheet is in: an unstyled flash of
+   this markup would look broken. The preload sets data-ready on load, or
+   after a short timeout so a missing file never leaves a blank window. */
+html:not([data-ready]) body {
+  visibility: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ─── Title bar (macOS and Windows) ──────────────────────────────────────── */
+
+/* The window has no title bar (window.ts, titleBarStyle "hidden"), so the
+   top 46 px of the page stand in for it, the height of the console's top bar:
+   - macOS: the traffic lights float at x 16-76, y 16-30 (14 pt buttons at
+     trafficLightPosition {16, 16}). Templates keep their elements out of the
+     corner x < 88, y < 46.
+   - Windows: Electron draws min / max / close over the top right corner
+     (titleBarOverlay, 46 px high, see-through on this page). Their width is
+     --caption-buttons-width, from the Window Controls Overlay variables
+     (3 x 46 px when they are absent). Templates keep their elements out of
+     the corner x > 100vw - var(--caption-buttons-width) - 12px, y < 46.
+   This strip is what drags the window. z-index -1 and first in the document:
+   Chromium applies app regions in order, so every control painted after it
+   can cut itself out (no-drag). pointer-events: none, the native drag does
+   not need web hit testing and must not steal clicks from what lies under
+   the strip. README.md has the template side of the contract. */
+html[data-platform="win32"] {
+  --caption-buttons-width: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))
+  );
+}
+
+.titlebar {
+  display: none;
+}
+
+html:is([data-platform="darwin"], [data-platform="win32"]) .titlebar {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 46px;
+  pointer-events: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+html:is([data-platform="darwin"], [data-platform="win32"]) :is(a, button, input, label, select, textarea, [role="switch"]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ─── States ─────────────────────────────────────────────────────────────── */
+
+/* Google pending: the browser holds the next step, so both doors close (two
+   sign-ins in flight would steal each other's session). */
+.waiting {
+  display: none;
+}
+
+body[data-state="waiting"] .waiting {
+  display: flex;
+}
+
+body[data-state="waiting"] #google-button,
+body[data-state="waiting"] #google-disabled,
+body[data-state="waiting"] .password {
+  display: none;
+}
+
+/* No e-mail and password here (production, signin-context.ts): Google only. */
+body[data-password="off"] .password {
+  display: none;
+}
+
+/* Google unavailable on this deployment: the button stays, greyed, with the
+   reason under it, like the console's tooltip. */
+body[data-google="off"] #google-button {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ─── Small parts every template reuses ─────────────────────────────────── */
+
+.eye-closed,
+.eye[aria-pressed="true"] .eye-open {
+  display: none;
+}
+
+.eye[aria-pressed="true"] .eye-closed {
+  display: block;
+}
+
+html[data-theme="dark"] .theme-sun,
+html[data-theme="light"] .theme-moon {
+  display: none;
+}
+
+.field-icon,
+.eye svg,
+.theme-toggle svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.google-mark {
+  flex: none;
+}
+
+/* The console's 3x3 matrix: dots light up in turn while Google is open. */
+.matrix {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 4px);
+  gap: 3px;
+  flex: none;
+}
+
+.matrix > span {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.2;
+  animation: matrix 1.2s ease-in-out infinite;
+}
+
+.matrix > span:nth-child(2) { animation-delay: 90ms; }
+.matrix > span:nth-child(3) { animation-delay: 180ms; }
+.matrix > span:nth-child(4) { animation-delay: 270ms; }
+.matrix > span:nth-child(5) { animation-delay: 360ms; }
+.matrix > span:nth-child(6) { animation-delay: 450ms; }
+.matrix > span:nth-child(7) { animation-delay: 540ms; }
+.matrix > span:nth-child(8) { animation-delay: 630ms; }
+.matrix > span:nth-child(9) { animation-delay: 720ms; }
+
+@keyframes matrix {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matrix > span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* The footnote's message carries its own line break, before « openedbot ». */
+.footnote {
+  white-space: pre-line;
+}

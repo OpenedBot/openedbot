@@ -1,0 +1,162 @@
+---
+title: Relier une machine par le tunnel géré
+description: Reliez votre machine par le tunnel géré par openedbot, sans edge-setup et sans domaine à vous.
+icon: Cloud
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="En cours de développement">
+Cette voie n’est pas encore ouverte à tous. Cette page n’est publiée que dans
+la documentation de développement ; la voie prise en charge est
+[edge-setup](/fr/docs/machine).
+</Aside>
+
+Cette voie remplace `edge-setup`. Vous installez Hermes vous-même, la console
+vous donne une adresse sous un domaine openedbot, et vous collez quelques
+commandes sur la machine. Avant de la choisir, lisez
+[ce que vous perdez](/fr/docs/direct-access) par rapport à `edge-setup`.
+
+Vous n'ouvrez aucun port sur la machine ni sur votre routeur.
+
+## Avant de commencer
+
+- Une machine Debian 12 ou plus récent, ou Ubuntu 24.04 ou plus récent, avec
+  `sudo`.
+- Dans la console, la carte **Tunnel géré par openedbot** doit être cliquable. Si
+  elle indique « Pas encore ouverte sur ce déploiement », cette voie n'est
+  pas activée sur votre instance : écrivez au [support](/fr/docs/support).
+- Le réglage produit `connector_only_enrollment` doit être désactivé sur
+  l'instance. Il est actif par défaut : tant qu'il l'est, **Ajouter** est
+  refusé au moment de déclarer le runtime, même si la carte est cliquable (voir
+  [Accès direct](/fr/docs/direct-access#ouvrir-les-voies-sur-un-déploiement)).
+
+## Étape 0 : préparer Hermes sur la machine
+
+Sans `edge-setup`, c'est à vous d'installer Hermes et de le lancer : suivez
+[Préparer Hermes sur la machine](/fr/docs/direct-access#préparer-hermes-sur-la-machine), puis revenez ici. La clé
+`API_SERVER_KEY` posée là vous sera demandée à l'étape 3.
+
+## Étape 1 : publier depuis la console
+
+Ouvrez **Réglages › Installation › Edge**, puis **Ajouter un runtime**.
+Pendant l'accueil, le même écran s'ouvre à l'étape **Relier ma machine**.
+
+```text
+.------------------------------------------------------------.
+| Ajouter un runtime                                         |
+| Comment openedbot joint ce runtime ?                           |
+|   ( ) Lien openedbot (recommandé)     (o) Accès direct         |
+|                                                            |
+| Comment publier le gateway ?                               |
+|   (o) Tunnel géré par openedbot (recommandé)                   |
+|   ( ) Tailscale Funnel                                     |
+|                                                            |
+|                               [ Annuler ]  [ Continuer ]   |
+'------------------------------------------------------------'
+```
+
+1. Dans **Comment openedbot joint ce runtime ?**, choisissez **Accès direct**.
+   Sur un espace agence, ce choix n'est pas proposé.
+2. Dans **Comment publier le gateway ?**, choisissez **Tunnel géré par
+   openedbot**, puis **Continuer**.
+3. L'écran **Étape 1 : Publier** n'a rien à remplir : openedbot choisit
+   lui-même l'adresse. Cliquez sur **Publier**.
+
+Vous n'avez aucun compte à ouvrir ailleurs.
+
+## Étape 2 : installer cloudflared sur la machine
+
+```text
+.------------------------------------------------------------.
+| Étape 2 : Installer sur l'hôte                             |
+| Hostname publié   ohb-xxxxxxxx.rt.openedbot.app            |
+| Publication       [ En attente de l'hôte ]                 |
+|                                                            |
+|  1. Ajouter la clé du dépôt Cloudflare        [ Copier ]   |
+|  2. Déclarer le dépôt apt                     [ Copier ]   |
+|  3. Installer cloudflared                     [ Copier ]   |
+|  4. Installer le service avec le jeton        [ Copier ]   |
+|  5. Vérifier que le service tourne            [ Copier ]   |
+|                                                            |
+| openedbot sonde le hostname toutes les cinq secondes.          |
+|                  [ Annuler ] [ Précédent ] [ Continuer ]   |
+'------------------------------------------------------------'
+```
+
+Copiez les cinq commandes une par une, dans l'ordre, sur la machine. Les trois
+premières installent `cloudflared` depuis son dépôt officiel. La quatrième a
+cette forme :
+
+```bash
+sudo cloudflared service install <JETON>
+```
+
+<Aside type="caution" title="La commande 4 n'est affichée qu'une fois">
+Elle porte un jeton secret. Si vous fermez la fenêtre avant de l'avoir
+jouée, openedbot ne peut plus vous la rendre. La publication reste listée sous
+**Publications en cours** : cliquez sur **Révoquer**, puis recommencez à
+l'étape 1.
+</Aside>
+
+La cinquième commande, `systemctl status cloudflared --no-pager`, doit
+afficher `active (running)`. Dans la console, le badge passe à **Joignable**
+en quelques secondes, et **Continuer** se débloque.
+
+## Étape 3 : déclarer et tester
+
+```text
+.--------------------------------------------------------------.
+| Étape 3 : Déclarer et tester                                 |
+| Nom                      [ mon-vps                     ]     |
+| URL Hermes               https://ohb-xxxxxxxx.rt....         |
+| Bearer API_SERVER_KEY    [ ************************    ]     |
+|                                                              |
+| Bord joignable              Vérifié                          |
+| Authentification valide     Vérifié                          |
+| Contrat toolsets            Vérifié                          |
+|                        [ Précédent ] [ Tester ] [ Ajouter ]  |
+'--------------------------------------------------------------'
+```
+
+1. Donnez un **Nom** au runtime.
+2. Collez dans **Bearer API_SERVER_KEY** la clé de l'étape 0.
+3. Cliquez sur **Tester**. Les trois preuves doivent être **Vérifié** pour
+   que **Ajouter** s'active.
+4. Cliquez sur **Ajouter**. Si aucun runtime ne servait, celui-ci sert les runs
+   aussitôt. Sinon, la fenêtre **Runtime ajouté** propose **Remplacer maintenant** :
+   le runtime actuel sert les runs jusqu’à ce que vous confirmiez le remplacement.
+
+Vous n'avez rien d'autre à copier.
+
+## Si un test échoue
+
+```text
++---------------------------+--------------------------------------------------+
+| Message dans la console   | Ce qu'il faut faire                              |
++---------------------------+--------------------------------------------------+
+| Le tunnel n'est pas       | Sur la machine : systemctl status cloudflared    |
+| connecté.                 | --no-pager, puis sudo systemctl restart          |
+|                           | cloudflared.                                     |
+| Le hostname n'existe pas  | Attendez une minute, le DNS se propage, puis     |
+| encore.                   | retestez.                                        |
+| API_SERVER_KEY incorrect. | Recopiez la valeur exacte : grep API_SERVER_KEY  |
+|                           | ~/.hermes/.env.                                  |
+| Gateway trop ancien ou    | Vérifiez API_SERVER_ENABLED=true dans            |
+| api_server désactivé.     | ~/.hermes/.env, puis sudo "$(command -v hermes)" |
+|                           | gateway restart --system.                        |
+| Ce n'est pas un gateway   | Un autre service répond à la place d'Hermes :    |
+| Hermes.                   | arrêtez-le et relancez Hermes.                   |
+| Désactivez les toolsets   | Rejouez la boucle hermes tools disable de        |
+| interdits sur l'hôte.     | l'étape 0, puis redémarrez Hermes.               |
++---------------------------+--------------------------------------------------+
+```
+
+## Retirer cette publication
+
+Supprimer le runtime dans **Réglages › Installation › Edge** retire aussi son
+adresse publique. Sur la machine, retirez ensuite le service :
+
+```bash
+sudo cloudflared service uninstall
+```

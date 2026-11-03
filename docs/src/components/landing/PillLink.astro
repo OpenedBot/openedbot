@@ -1,0 +1,25 @@
+---
+/**
+ * The console's disc button (`.pw-slide`, apps/console): a capsule, a blue
+ * disc on the left with the dotted arrow, then the label. `dark` is the main
+ * call, `light` the secondary one.
+ */
+type Props = {
+  href: string;
+  tone?: 'dark' | 'light';
+  external?: boolean;
+};
+
+const { href, tone = 'dark', external = false } = Astro.props;
+---
+
+<a
+  href={href}
+  class:list={['pill', `pill-${tone}`]}
+  {...(external ? { rel: 'noreferrer noopener' } : {})}
+>
+  <span class="pill-disc" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5h2v2H8zM11 8h2v2h-2zM14 11h2v2h-2zM11 14h2v2h-2zM8 17h2v2H8z"></path></svg>
+  </span>
+  <span class="pill-label"><slot /></span>
+</a>

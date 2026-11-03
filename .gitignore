@@ -1,0 +1,79 @@
+# Filet de sécurité du dépôt : ce qui ne doit jamais entrer dans l'historique.
+# Un seul fichier depuis que app/ n'existe plus ; les règles de l'ancien
+# app/.gitignore sont ici, réenracinées.
+
+# Secrets et état local. Deux d'entre eux seraient des fuites : la base porte
+# les tokens de runtime en clair, et `policy.key` signe le journal des décisions.
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.local
+*.key
+policy.key
+*.pem
+credentials.json
+keys-tmp.txt
+*.db
+*.db-shm
+*.db-wal
+
+# Les applications n'ont plus de fichier d'environnement : un seul à la
+# racine (ENV_DIR_OF_SCOPE). La règle reste, pour qu'un fichier oublié dans
+# une application ne parte jamais dans un commit.
+apps/*/.env
+apps/*/.env.*
+
+# Réglages make propres au poste (LINK_DEV_HOST...). Le Makefile racine reste
+# suivi : une règle d'ignore ne retire pas un fichier déjà versionné.
+/Makefile
+/Makefile.local
+
+# Checkout des plug-ins externes, cloné ou lié en ./plugins (voir le Makefile,
+# plugins_dir) : jamais versionné ici.
+/plugins
+
+# Dépendances et artefacts.
+node_modules/
+dist/
+apps/console/dev-dist/
+.data/
+.run/
+tmp/
+__pycache__/
+*.py[cod]
+
+# Journaux locaux de l'API (var/logs/*.log). Le dossier reste via .gitkeep.
+apps/api/var/logs/*.log
+
+# Preuves locales de rejeu des recettes réelles, jamais versionnées.
+docs/reports/*-replay-evidence/
+
+# Consignes, réglages et état locaux d'agents (Claude, Codex, Grok, MCP) :
+# jamais versionnés, à tous les niveaux du dépôt. Chacun garde sa copie locale.
+# Les worktrees jetables se retirent par `git worktree remove`, jamais par un
+# effacement du dossier.
+CLAUDE.md
+AGENTS.md
+.claude/
+.grok/
+.mcp.json
+.playwright-mcp/
+
+# OS.
+.DS_Store
+Thumbs.db
+
+# Worktrees des chantiers (make wt-new)
+.worktrees/
+
+# Briefs d’assignation KonohaOS : fichiers de travail, jamais de l’historique.
+.konoha/
+.ctx/
+
+# Sibling repositories checked out by CI (edge-setup), never versioned here.
+.siblings/
+
+# Fichiers locaux d'outillage, à tous les niveaux du dépôt.
+buildServer.json
+roadmap-live.md

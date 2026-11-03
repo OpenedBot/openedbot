@@ -1,0 +1,653 @@
+/*
+ * Landing of the docs (`/` in English, `/fr/` in French), in the identity of
+ * the console's public page (`apps/console/src/styles/screens/public/
+ * landing-open.css`, `.pw`): Figtree 500, background #f2f5fa, ink #1a1a1c,
+ * orange #ff7800 only as a mark (the prompt, the caret, the halos), never text;
+ * the disc of the action buttons is Apple's informative blue (systemBlue),
+ * panels at 24 px, cards at 20 px, the white header pill and the dark capsule
+ * with its blue disc. One strong element: the dark panel of the three
+ * commands. Light in both themes, like the console's page.
+ */
+
+:root {
+  --lp-bg: #f2f5fa;
+  --lp-fg: #1a1a1c;
+  --lp-surface: #ffffff;
+  --lp-primary: #ff7800;
+  /* Apple systemBlue (light): the "this does something" color of the buttons. */
+  --lp-action: #007aff;
+  --lp-border: #d7dde5;
+  --lp-muted: #5f6672;
+  --lp-inverse: #1a1a1c;
+  --lp-panel: 24px;
+  --lp-card: 20px;
+  --lp-shadow-card: 0 1px 2px rgb(26 26 28 / 0.06);
+  --lp-shadow-raised: 0 1px 2px rgb(26 26 28 / 0.04), 0 8px 24px -12px rgb(26 26 28 / 0.12);
+  --lp-shadow-hero: 0 24px 80px -24px rgb(26 26 28 / 0.35);
+  --lp-ease: cubic-bezier(0.33, 1, 0.68, 1);
+  --lp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --lp-site: 1180px;
+  --lp-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+  font-family: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.landing {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.landing main {
+  flex: 1 0 auto;
+}
+
+/* Zero specificity: a component class (`.pill-dark`) sets its own color. */
+.landing :where(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.landing :where(h1, h2, h3, p, figure, ol, ul) {
+  margin: 0;
+}
+
+.landing :where(ol, ul) {
+  padding: 0;
+  list-style: none;
+}
+
+.landing :focus-visible {
+  outline: 2px solid var(--lp-fg);
+  outline-offset: 3px;
+}
+
+.shell {
+  width: 100%;
+  max-width: var(--lp-site);
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+/* ---- Header pill --------------------------------------------------------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 8px 20px 0;
+}
+
+.site-nav {
+  display: flex;
+  max-width: var(--lp-site);
+  height: 56px;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 4px 0 20px;
+  border-radius: 999px;
+  background: var(--lp-surface);
+  box-shadow: var(--lp-shadow-raised);
+}
+
+.brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand img {
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.brand span {
+  font-size: 1.375rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.site-nav-links {
+  display: none;
+  gap: 32px;
+}
+
+.site-nav-links a {
+  transition: opacity 0.2s;
+}
+
+.site-nav-links a:hover {
+  opacity: 0.65;
+}
+
+.site-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (min-width: 760px) {
+  .site-nav-links {
+    display: flex;
+  }
+}
+
+/* ---- Buttons ------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pill-dark {
+  background: var(--lp-inverse);
+  color: #ffffff;
+}
+
+.pill-light {
+  background: var(--lp-surface);
+  box-shadow: var(--lp-shadow-card);
+}
+
+.pill-disc {
+  display: flex;
+  width: 56px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--lp-action);
+  color: #ffffff;
+  transition: transform 0.7s var(--lp-ease-in-out);
+}
+
+.pill-disc svg {
+  width: 24px;
+  height: 24px;
+}
+
+.pill-label {
+  padding-right: 20px;
+  transition: transform 0.7s var(--lp-ease-in-out);
+}
+
+.outline {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  padding: 0 24px;
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+}
+
+.outline:hover {
+  background: var(--lp-surface);
+}
+
+/* ---- Hero ---------------------------------------------------------------- */
+
+/* The console's warm halos, drifting slowly behind the commands. */
+.hero-wrap {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* The halos fade out before the edge of the hero, never a cut line. */
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: 0.32;
+  animation: lp-drift 18s ease-in-out infinite alternate;
+}
+
+.hero-orb-a {
+  top: 18%;
+  right: -4%;
+  width: 40vw;
+  height: 26vw;
+  background: radial-gradient(closest-side, #ff7800, #ff4232 70%, transparent);
+}
+
+.hero-orb-b {
+  right: 22%;
+  bottom: 4%;
+  width: 30vw;
+  height: 20vw;
+  background: radial-gradient(closest-side, #ff8c32, #ff6b35 70%, transparent);
+  animation-delay: -6s;
+}
+
+.hero-orb-c {
+  bottom: -14%;
+  left: -8%;
+  width: 44vw;
+  height: 18vw;
+  background: radial-gradient(closest-side, #ffcb90, #ffa040 70%, transparent);
+  opacity: 0.22;
+  animation-delay: -12s;
+}
+
+@keyframes lp-drift {
+  from {
+    transform: translate3d(-4%, 2%, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(5%, -4%, 0) scale(1.12);
+  }
+}
+
+.hero {
+  display: grid;
+  gap: 40px;
+  padding-top: 72px;
+  padding-bottom: 88px;
+  align-items: center;
+}
+
+.hero h1 {
+  max-width: 15ch;
+  font-size: clamp(2.5rem, 5.4vw, 4rem);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.lede {
+  max-width: 34rem;
+  margin-top: 20px;
+  color: var(--lp-muted);
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+@media (min-width: 960px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 56px;
+  }
+}
+
+/* The strong element: the three real commands, dark, like the console's
+   product panel. Each command says what it does under it. */
+.commands {
+  overflow: hidden;
+  border-radius: var(--lp-panel);
+  background: var(--lp-inverse);
+  box-shadow: var(--lp-shadow-hero);
+  color: #f4f4f5;
+}
+
+.commands-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 14px 24px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  color: #a1a1aa;
+  font-size: 0.9rem;
+}
+
+.copy {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+.copy[data-copied='true'] {
+  background: var(--lp-primary);
+  color: var(--lp-inverse);
+}
+
+.commands-lines {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.commands-lines li {
+  display: grid;
+  gap: 4px;
+}
+
+.commands-lines code {
+  /* A long command wraps instead of scrolling sideways; wrapped lines hang
+     after the prompt so the `$` stays alone in its column. */
+  display: block;
+  padding-left: 1.2em;
+  text-indent: -1.2em;
+  font-family: var(--lp-mono);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prompt {
+  color: var(--lp-primary);
+}
+
+.note {
+  padding-left: 1.4em;
+  color: #a1a1aa;
+  font-size: 0.9rem;
+}
+
+.commands-foot {
+  padding: 14px 24px 18px;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  color: #a1a1aa;
+  font-size: 0.85rem;
+}
+
+/* ---- Sections ------------------------------------------------------------ */
+
+.path,
+.stuck {
+  padding-bottom: 88px;
+}
+
+.section-head h2 {
+  font-size: clamp(1.75rem, 3.2vw, 2.5rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.section-head p {
+  margin-top: 10px;
+  color: var(--lp-muted);
+  font-size: 1.05rem;
+}
+
+/* A real sequence: numbered, in order. */
+.steps {
+  display: grid;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+@media (min-width: 640px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1040px) {
+  .steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.step {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  border-radius: var(--lp-card);
+  background: var(--lp-surface);
+  box-shadow: var(--lp-shadow-card);
+  transition: box-shadow 0.2s var(--lp-ease);
+}
+
+.step:hover {
+  box-shadow: var(--lp-shadow-raised);
+}
+
+.step-number {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.step-title {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.step-body {
+  color: var(--lp-muted);
+  font-size: 0.95rem;
+}
+
+.stuck {
+  display: grid;
+  gap: 32px;
+}
+
+@media (min-width: 960px) {
+  .stuck {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 56px;
+    align-items: start;
+  }
+}
+
+.stuck-list {
+  overflow: hidden;
+  border-radius: var(--lp-card);
+  background: var(--lp-surface);
+  box-shadow: var(--lp-shadow-card);
+}
+
+.stuck-list li + li {
+  border-top: 1px solid #e8ecf1;
+}
+
+.stuck-list a {
+  display: block;
+  padding: 18px 24px;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.stuck-list a:hover {
+  background: #f7f9fc;
+}
+
+/* ---- Footer -------------------------------------------------------------- */
+
+.site-footer {
+  padding: 28px 0 36px;
+  border-top: 1px solid #e3e8ee;
+  color: var(--lp-muted);
+  font-size: 0.9rem;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.site-footer .brand {
+  color: var(--lp-fg);
+}
+
+.site-footer .brand span {
+  font-size: 1.1rem;
+}
+
+/* ---- 404 ----------------------------------------------------------------- */
+
+.not-found {
+  padding-top: 120px;
+  padding-bottom: 120px;
+}
+
+.not-found-code {
+  color: var(--lp-muted);
+  font-family: var(--lp-mono);
+}
+
+.not-found h1 {
+  margin-top: 12px;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing *,
+  .landing *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---- Motion (`components/landing/Motion.astro`) ------------------------ */
+
+/* A heading line slides out of the mask of its words. */
+.lp-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  margin-block: -0.12em;
+  padding-block: 0.12em;
+}
+
+.lp-word-inner {
+  display: inline-block;
+}
+
+/* Set before the first paint by `Landing.astro`, only when the script can run. */
+[data-motion='on'] [data-reveal]:not([data-revealed]),
+[data-motion='on'] [data-lines]:not([data-revealed]) .lp-word-inner,
+[data-motion='on'] [data-type]:not([data-revealed]) .note {
+  opacity: 0;
+}
+
+[data-motion='on'] [data-type]:not([data-revealed]) code {
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Once typed, a caret waits at the end of the last command. */
+.commands[data-typed] .commands-lines li:last-child code::after {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 4px;
+  background: var(--lp-primary);
+  content: '';
+  opacity: 0;
+  vertical-align: -0.2em;
+  animation: lp-caret 1.1s linear infinite;
+  animation-delay: var(--lp-caret-delay, 0ms);
+}
+
+@keyframes lp-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- Small screens ------------------------------------------------------- */
+
+@media (max-width: 480px) {
+  .site-header {
+    padding-inline: 10px;
+  }
+
+  .site-nav {
+    gap: 12px;
+    padding-left: 14px;
+  }
+
+  /* The first screen already offers "Open the console": the pill keeps the
+     language switch only. */
+  .site-nav .pill {
+    display: none;
+  }
+
+  .site-nav {
+    padding-right: 10px;
+  }
+}
+
+/* A command cut at the edge is a command copied wrong: wrap it instead. */
+@media (max-width: 640px) {
+  .commands-lines {
+    padding: 20px;
+  }
+}

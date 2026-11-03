@@ -1,0 +1,220 @@
+#!/bin/sh
+# edge-setup installer. Every statement lives in a function and main runs on
+# the last line, so a truncated download executes nothing.
+#
+# Usage: curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh
+#        ... | sh -s -- --dry-run          show every step, change nothing
+#        ... | sh -s -- --version vX.Y.Z   another release than the pinned one
+#
+# Trust: SHA256SUMS must carry a Sigstore signature from the edge-setup
+# release workflow of OpenedBot/openedbot, run on the tag of that very
+# version (one exact certificate identity, never a prefix or a pattern); the
+# binary must match SHA256SUMS. The signature is checked with a pinned cosign
+# whose SHA-256 is in this file. Any failure installs nothing.
+set -eu
+# POSIX 2024 pipefail where the shell has it (probed in a subshell first, so
+# an older dash goes on without it); no statement below uses a pipe.
+# shellcheck disable=SC3040
+if (set -o pipefail) 2>/dev/null; then set -o pipefail; fi
+
+# The release this installer was cut with. `--version latest` is explicit.
+PINNED_VERSION="v0.0.5"
+RELEASES="https://releases.openedbot.app/edge-setup"
+SIGNER_ISSUER="https://token.actions.githubusercontent.com"
+SIGNER_PREFIX="https://github.com/OpenedBot/openedbot/.github/workflows/edge-setup-release.yml@refs/tags/edge-setup/"
+COSIGN_VERSION="v3.1.4"
+COSIGN_SHA256_AMD64="424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa"
+COSIGN_SHA256_ARM64="ade83b7aac62e131cacfe96d958948b2150cc9efec46a570a2649b8e27dedad2"
+COSIGN_RELEASES="https://github.com/sigstore/cosign/releases/download"
+
+die() {
+  echo "edge-setup installer: $*; nothing was installed" >&2
+  exit 1
+}
+
+say() {
+  echo "edge-setup installer: $*"
+}
+
+usage() {
+  echo "usage: sh install [--dry-run] [--version vX.Y.Z|latest]"
+  echo "env:   EDGE_SETUP_VERSION, EDGE_SETUP_DEST (absolute path),"
+  echo "       EDGE_SETUP_COSIGN (a cosign you already trust, instead of the pinned download)"
+}
+
+fetch() {
+  curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL -o "$1" "$2"
+}
+
+digest() {
+  if [ "$HASH_TOOL" = sha256sum ]; then
+    out="$(sha256sum "$1")"
+  else
+    out="$(shasum -a 256 "$1")"
+  fi
+  echo "${out%% *}"
+}
+
+parse_args() {
+  DRY_RUN=0
+  VERSION="${EDGE_SETUP_VERSION:-${HERMES_SETUP_VERSION:-}}"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --dry-run) DRY_RUN=1; shift ;;
+      --version)
+        [ "$#" -ge 2 ] || die "--version needs a value"
+        VERSION="$2"; shift 2 ;;
+      --version=*) VERSION="${1#--version=}"; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) usage >&2; die "unknown argument: $1" ;;
+    esac
+  done
+  VERSION="${VERSION:-$PINNED_VERSION}"
+  DEST="${EDGE_SETUP_DEST:-${HERMES_SETUP_DEST:-}}"
+}
+
+check_platform() {
+  OS="$(uname -s)"
+  case "$OS" in
+    Linux) DEST="${DEST:-/usr/local/sbin/edge-setup}" ;;
+    *) die "unsupported operating system: $OS; edge-setup runs on Debian 12 or later, or Ubuntu 24.04 or later" ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) ARCH=amd64; COSIGN_SHA256="$COSIGN_SHA256_AMD64" ;;
+    aarch64|arm64) ARCH=arm64; COSIGN_SHA256="$COSIGN_SHA256_ARM64" ;;
+    *) die "unsupported architecture: $(uname -m)" ;;
+  esac
+  case "$DEST" in
+    /*) ;;
+    *) die "EDGE_SETUP_DEST must be an absolute path" ;;
+  esac
+  for command_name in curl uname mktemp awk install id rm mkdir chmod; do
+    command -v "$command_name" >/dev/null 2>&1 || die "required command not found: $command_name"
+  done
+  if command -v sha256sum >/dev/null 2>&1; then
+    HASH_TOOL=sha256sum
+  elif command -v shasum >/dev/null 2>&1; then
+    HASH_TOOL=shasum
+  else
+    die "required command not found: sha256sum or shasum"
+  fi
+}
+
+# valid_version accepts a published tag only: v, then three decimal numbers
+# without a leading zero, separated by dots. Checked in the shell itself (no
+# awk -v, which would expand backslash escapes first), so a glob, a path, a
+# newline or any other character never reaches a URL or the identity.
+valid_version() {
+  case "$1" in
+    v*) ;;
+    *) return 1 ;;
+  esac
+  numbers="${1#v}"
+  case "$numbers" in
+    ""|*[!0-9.]*) return 1 ;;
+  esac
+  major="${numbers%%.*}"
+  rest="${numbers#*.}"
+  [ "$rest" != "$numbers" ] || return 1
+  minor="${rest%%.*}"
+  patch="${rest#*.}"
+  [ "$patch" != "$rest" ] || return 1
+  for part in "$major" "$minor" "$patch"; do
+    case "$part" in
+      ""|*.*|0?*) return 1 ;;
+    esac
+  done
+  [ "${#1}" -le 32 ] || return 1
+}
+
+resolve_version() {
+  if [ "$VERSION" = latest ]; then
+    fetch "$WORK_DIR/LATEST" "$RELEASES/LATEST" || die "the latest release could not be resolved from $RELEASES"
+    VERSION="$(awk 'NR == 1 { print $1 }' "$WORK_DIR/LATEST")"
+  fi
+  valid_version "$VERSION" || die "invalid version: $VERSION (want vX.Y.Z or latest)"
+  BASE="$RELEASES/$VERSION"
+  ASSET="edge-setup_linux_$ARCH"
+  # The one identity accepted: the release workflow run on this exact tag.
+  SIGNER_IDENTITY="$SIGNER_PREFIX$VERSION"
+}
+
+# The cosign that checks the signature is itself checked first: either the
+# operator's own (EDGE_SETUP_COSIGN), or the pinned release whose SHA-256 is
+# written above.
+prepare_cosign() {
+  if [ -n "${EDGE_SETUP_COSIGN:-}" ]; then
+    [ -x "$EDGE_SETUP_COSIGN" ] || die "EDGE_SETUP_COSIGN is not an executable: $EDGE_SETUP_COSIGN"
+    COSIGN="$EDGE_SETUP_COSIGN"
+    say "signature check with $COSIGN (EDGE_SETUP_COSIGN)"
+    return
+  fi
+  COSIGN="$WORK_DIR/cosign"
+  say "fetching cosign $COSIGN_VERSION to check the signature"
+  fetch "$COSIGN" "$COSIGN_RELEASES/$COSIGN_VERSION/cosign-linux-$ARCH" || die "could not download cosign $COSIGN_VERSION"
+  [ "$(digest "$COSIGN")" = "$COSIGN_SHA256" ] || die "SHA-256 mismatch for cosign $COSIGN_VERSION"
+  chmod 0700 "$COSIGN"
+}
+
+verify_release() {
+  fetch "$WORK_DIR/SHA256SUMS" "$BASE/SHA256SUMS" || die "no release $VERSION could be fetched from $RELEASES"
+  fetch "$WORK_DIR/SHA256SUMS.sigstore.json" "$BASE/SHA256SUMS.sigstore.json" ||
+    die "release $VERSION carries no signature (SHA256SUMS.sigstore.json)"
+  prepare_cosign
+  # TUF_ROOT keeps cosign's trust cache in the work directory: nothing outlives the run.
+  TUF_ROOT="$WORK_DIR/tuf" "$COSIGN" verify-blob \
+    --bundle "$WORK_DIR/SHA256SUMS.sigstore.json" \
+    --certificate-identity "$SIGNER_IDENTITY" \
+    --certificate-oidc-issuer "$SIGNER_ISSUER" \
+    "$WORK_DIR/SHA256SUMS" >"$WORK_DIR/cosign.log" 2>&1 ||
+    die "the signature of SHA256SUMS does not verify for $SIGNER_IDENTITY ($(awk 'END { print }' "$WORK_DIR/cosign.log"))"
+  say "signature verified: $SIGNER_IDENTITY"
+
+  EXPECTED="$(awk -v asset="$ASSET" '$2 == asset || $2 == "*" asset { print tolower($1) }' "$WORK_DIR/SHA256SUMS")"
+  case "$EXPECTED" in
+    ""|*[!0-9a-f]*) die "SHA256SUMS has no valid digest for $ASSET" ;;
+  esac
+  [ "${#EXPECTED}" -eq 64 ] || die "SHA256SUMS has no valid digest for $ASSET"
+  fetch "$WORK_DIR/$ASSET" "$BASE/$ASSET" || die "could not download $ASSET from $BASE"
+  [ "$(digest "$WORK_DIR/$ASSET")" = "$EXPECTED" ] || die "SHA-256 mismatch for $ASSET"
+  say "SHA-256 verified: $ASSET $EXPECTED"
+}
+
+install_binary() {
+  if [ "$(id -u)" -eq 0 ]; then
+    PRIVILEGE=""
+  else
+    command -v sudo >/dev/null 2>&1 || die "sudo is required to install $DEST"
+    PRIVILEGE="sudo "
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    say "dry run: would run: ${PRIVILEGE}install -m 0755 $ASSET $DEST"
+    say "dry run: would run: $DEST version"
+    say "dry run: nothing was written outside a temporary directory, now removed"
+    return
+  fi
+  if [ -n "$PRIVILEGE" ]; then
+    sudo install -m 0755 "$WORK_DIR/$ASSET" "$DEST"
+  else
+    install -m 0755 "$WORK_DIR/$ASSET" "$DEST"
+  fi
+  "$DEST" version
+  echo "installed $DEST"
+  echo "next: sudo edge-setup detect"
+}
+
+main() {
+  parse_args "$@"
+  check_platform
+  WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/edge-setup.XXXXXX")"
+  trap 'rm -rf "$WORK_DIR"' 0
+  trap 'exit 1' HUP INT TERM
+  resolve_version
+  if [ "$DRY_RUN" -eq 1 ]; then
+    say "dry run: release $VERSION, $ASSET, destination $DEST"
+  fi
+  verify_release
+  install_binary
+}
+
+main "$@"

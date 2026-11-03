@@ -1,0 +1,20 @@
+[Unit]
+Description=Hermes automatic host-access rollback
+After=network.target ssh.service
+ConditionPathExists={{ .ActiveMarker }}
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+# The rollback reads markers and backups only, never the tool's JSON state.
+ExecStart={{ .ToolPath }} internal rollback-access
+Restart=on-failure
+RestartSec=10s
+NoNewPrivileges=true
+PrivateTmp=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true

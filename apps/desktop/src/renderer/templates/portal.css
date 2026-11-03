@@ -1,0 +1,702 @@
+/*
+  portal: a porthole into the bots' world. The page is one calm, solid
+  colour; the only opening in it is a round window onto the painted crew,
+  edged by a thin glowing ring and a second, fainter ring where a single
+  glint travels slowly around. Serif title, centred form under the window.
+  In short windows the porthole moves beside the form.
+*/
+html[data-theme="dark"] {
+  --bg: #100e1d;
+  --text: #f0eff9;
+  --muted: #a9a5c4;
+  --line: rgb(255 255 255 / 10%);
+  --field: rgb(255 255 255 / 4%);
+  --field-border: rgb(255 255 255 / 13%);
+  --soft: rgb(255 255 255 / 6%);
+  --soft-hover: rgb(255 255 255 / 10%);
+  --primary: #eceaff;
+  --primary-hover: #ffffff;
+  --primary-text: #15122b;
+  --focus: #9fcbff;
+  --danger: #ff9089;
+  --warning: #f4ca70;
+  --ring: #9fcbff;
+  --ring-glow: rgb(120 180 255 / 45%);
+  --ring-faint: rgb(159 203 255 / 20%);
+  --porthole-shade: rgb(4 4 16 / 70%);
+  --art: url("../assets/signin-galaxy.webp");
+  --art-bg: #050812;
+}
+
+html[data-theme="light"] {
+  --bg: #eceef5;
+  --text: #17152a;
+  --muted: #514e6c;
+  --line: rgb(23 21 42 / 11%);
+  --field: #ffffff;
+  --field-border: rgb(23 21 42 / 15%);
+  --soft: #ffffff;
+  --soft-hover: #f8f8fc;
+  --primary: #1c1a33;
+  --primary-hover: #2b2847;
+  --primary-text: #ffffff;
+  --focus: #3d63d6;
+  --danger: #b3261e;
+  --warning: #7a4f00;
+  --ring: #5b7fe6;
+  --ring-glow: rgb(91 127 230 / 35%);
+  --ring-faint: rgb(61 99 214 / 22%);
+  --porthole-shade: rgb(40 60 120 / 30%);
+  --art: url("../assets/signin-galaxy-light.webp");
+  --art-bg: #dce6f8;
+}
+
+body {
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── Layout: window above, form below ──────────────────────────────────── */
+
+.shell {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px clamp(24px, 4vw, 48px) 20px;
+}
+
+.main {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+/* The brand stays out of the axis: top left, small, like a ship's plate. */
+.brand {
+  position: absolute;
+  top: 22px;
+  left: clamp(24px, 4vw, 48px);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.brand-mark {
+  width: 26px;
+  height: 26px;
+}
+
+/* ─── The porthole ───────────────────────────────────────────────────────── */
+
+.art {
+  --d: clamp(140px, 22vh, 240px);
+  position: relative;
+  flex: none;
+  width: var(--d);
+  aspect-ratio: 1;
+  margin: 22px 0 46px;
+  border-radius: 50%;
+  background: var(--art-bg);
+}
+
+/* Zoomed well past cover so the round window frames the crew, not the
+   empty sky; the inner shade gives the glass its depth. */
+.art-image {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--art) 50% 43% / auto 165% no-repeat;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 12%),
+    inset 0 10px 28px var(--porthole-shade);
+}
+
+/* The near ring: thin, lit, with its glow both outside and in. */
+.art::before {
+  position: absolute;
+  inset: -8px;
+  content: "";
+  border: 1.5px solid var(--ring);
+  border-radius: 50%;
+  box-shadow:
+    0 0 18px var(--ring-glow),
+    inset 0 0 12px var(--ring-glow);
+}
+
+/* The far ring: faint, with one slow glint going round, the page's only
+   motion. The mask keeps the conic glint to the ring's edge. */
+.art::after {
+  position: absolute;
+  inset: -24px;
+  content: "";
+  border: 1px solid var(--ring-faint);
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 78%, var(--ring) 92%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: orbit 36s linear infinite;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.deco,
+.art-mascot {
+  display: none;
+}
+
+/* ─── Form ───────────────────────────────────────────────────────────────── */
+
+.content {
+  width: 100%;
+  max-width: 22.5rem;
+}
+
+.copy {
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-family: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.lead {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.note {
+  margin-top: 22px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  border: 1px solid var(--field-border);
+  background: var(--soft);
+  color: var(--text);
+}
+
+.btn-google:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ring) 55%, var(--field-border));
+  background: var(--soft-hover);
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-text {
+  align-self: center;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-family: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--line);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  position: absolute;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--focus);
+}
+
+.control input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 39px;
+  border: 1px solid var(--field-border);
+  border-radius: 11px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.control-secret input {
+  padding-right: 46px;
+}
+
+.control input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
+}
+
+.eye {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pending .matrix {
+  color: var(--ring);
+}
+
+.note[data-tone="warning"],
+.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 42%, transparent);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 8px 12px;
+  border: 1px solid;
+  border-radius: 11px;
+  background: var(--soft);
+  text-align: left;
+}
+
+/* Seeded accounts, development only: dashed, clearly not the real door. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px;
+  border: 1px dashed color-mix(in srgb, var(--ring) 50%, transparent);
+  border-radius: 12px;
+}
+
+.dev-title {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 3px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+
+.dev-role {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dev-actions > * {
+  flex: 1 1 130px;
+}
+
+.dev-submit {
+  min-height: 34px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: auto;
+}
+
+.footnote {
+  max-width: 22rem;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--text);
+}
+
+.controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.locale {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.locale-option {
+  min-width: 32px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.locale-option:hover {
+  color: var(--text);
+}
+
+/* The pressed language wears the ring's colour, a small echo of the window. */
+.locale-option[aria-pressed="true"] {
+  background: var(--soft-hover);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ─── Short windows: the porthole moves beside the form ─────────────────── */
+
+@media (max-height: 800px) {
+  .shell {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    gap: clamp(64px, 9vw, 140px);
+    padding: 0 clamp(32px, 5vw, 64px);
+  }
+
+  .art {
+    --d: clamp(150px, 38vh, 250px);
+    /* Centred on the first screen, not on the page: a long message that
+       makes the page scroll must not drag the window down with it. */
+    align-self: flex-start;
+    margin: max(40px, calc(50vh - var(--d) / 2)) 24px 0;
+  }
+
+  .btn-text {
+    align-self: flex-start;
+  }
+
+  .main {
+    flex: 0 1 380px;
+    min-height: 100vh;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 24px 0 18px;
+  }
+
+  .brand {
+    position: static;
+    align-self: flex-start;
+  }
+
+  .copy {
+    text-align: left;
+  }
+
+  .content {
+    max-width: none;
+  }
+
+  .footer {
+    margin-top: 0;
+  }
+}
+
+/* Very short: a tighter rhythm and no footnote, so the form and the
+   switches fit without scrolling. */
+@media (max-height: 640px) {
+  .main {
+    gap: 14px;
+    padding-top: 20px;
+    padding-bottom: 14px;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .lead {
+    margin-top: 6px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .note {
+    margin-top: 14px;
+  }
+
+  .actions {
+    gap: 11px;
+    margin-top: 18px;
+  }
+
+  .password {
+    gap: 10px;
+  }
+
+  .field {
+    gap: 5px;
+  }
+
+  .btn {
+    min-height: 38px;
+  }
+
+  .control input {
+    height: 38px;
+  }
+
+  .eye {
+    width: 28px;
+    height: 28px;
+  }
+
+  .footnote {
+    display: none;
+  }
+
+  .legal-links {
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art::after {
+    animation: none;
+  }
+
+  .btn,
+  .control input {
+    transition: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-inline-start: 57px;
+}

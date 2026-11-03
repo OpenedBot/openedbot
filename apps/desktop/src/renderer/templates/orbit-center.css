@@ -1,0 +1,668 @@
+/*
+  orbit-center: the painted crew fills the window and the form floats under
+  it in a single frosted glass card, like a porthole set just below the
+  orbit. The crew always keeps its own band above the card; in short windows
+  the card slides to the right so the crew keeps the left side instead.
+  The glass card is the one bold element: everything else stays quiet.
+*/
+html[data-theme="dark"] {
+  --sky: radial-gradient(ellipse 80% 70% at 50% 30%, #0d1838 0%, #070c1d 55%, #04060e 100%);
+  --art: url("../assets/signin-galaxy.webp");
+  --text: #eef3ff;
+  --muted: #aebad6;
+  --on-sky: #dfe7fb;
+  --on-sky-muted: #9fadcc;
+  --glass: rgb(10 17 40 / 52%);
+  --glass-shadow: 0 30px 80px -30px rgb(0 0 0 / 70%);
+  --edge-hi: rgb(176 208 255 / 62%);
+  --edge-lo: rgb(176 208 255 / 8%);
+  --field: rgb(3 7 20 / 46%);
+  --field-border: rgb(190 210 255 / 18%);
+  --field-hover: rgb(190 210 255 / 32%);
+  --ghost: rgb(255 255 255 / 7%);
+  --ghost-hover: rgb(255 255 255 / 12%);
+  --ghost-border: rgb(190 210 255 / 22%);
+  --rule: rgb(190 210 255 / 16%);
+  --primary: #2a5ff0;
+  --primary-hover: #3a6dff;
+  --primary-text: #ffffff;
+  --focus: #9cc0ff;
+  --danger: #ff9196;
+  --warning: #f5c977;
+  --pill: rgb(8 14 32 / 55%);
+  --legible: 0 1px 10px rgb(2 4 12 / 90%), 0 0 2px rgb(2 4 12 / 80%);
+}
+
+html[data-theme="light"] {
+  --sky: radial-gradient(ellipse 80% 70% at 50% 30%, #f3f7ff 0%, #e2ebfa 55%, #d3dff3 100%);
+  --art: url("../assets/signin-galaxy-light.webp");
+  --text: #0e1a33;
+  --muted: #45526c;
+  --on-sky: #14213d;
+  --on-sky-muted: #3c4966;
+  --glass: rgb(255 255 255 / 58%);
+  --glass-shadow: 0 30px 70px -34px rgb(40 70 140 / 45%);
+  --edge-hi: rgb(255 255 255 / 100%);
+  --edge-lo: rgb(120 150 210 / 30%);
+  --field: rgb(255 255 255 / 72%);
+  --field-border: rgb(30 50 100 / 20%);
+  --field-hover: rgb(30 50 100 / 34%);
+  --ghost: rgb(255 255 255 / 70%);
+  --ghost-hover: rgb(255 255 255 / 92%);
+  --ghost-border: rgb(30 50 100 / 18%);
+  --rule: rgb(30 50 100 / 16%);
+  --primary: #1f4fd6;
+  --primary-hover: #1a45bd;
+  --primary-text: #ffffff;
+  --focus: #1f4fd6;
+  --danger: #b0222a;
+  --warning: #85500a;
+  --pill: rgb(255 255 255 / 60%);
+  --legible: 0 0 10px rgb(240 245 255 / 95%), 0 0 2px rgb(240 245 255 / 90%);
+}
+
+/* The crew band: the height kept free above the card for the painted
+   crew. It shrinks with the window so the card and the footer always fit
+   under it at 700 px and taller. */
+:root {
+  --band: clamp(150px, min(34vh, 100vh - 560px), 440px);
+  --art-h: calc(var(--band) * 2.2);
+  --crew-x: 50%;
+  --crew-y: calc(var(--band) * 0.5);
+}
+
+body {
+  color: var(--text);
+  background: #04060e;
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── The painting ───────────────────────────────────────────────────────── */
+
+.art {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--sky);
+}
+
+/* The painting is sized from the crew band, not "cover": with cover the
+   crew would always sit in the middle of the window, right where the card
+   goes. Its edges dissolve into a sky of the same tone, so the window still
+   reads as one painted scene. The crew's centre is at 50 % / 45.5 % of the
+   picture, hence the translate. */
+.art-image {
+  position: absolute;
+  left: var(--crew-x);
+  top: var(--crew-y);
+  width: calc(var(--art-h) * 1.5);
+  height: var(--art-h);
+  transform: translate(-50%, -45.5%);
+  background: var(--art) center / 100% 100% no-repeat;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 47%, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 47%, #000 58%, transparent 100%);
+  animation: hover 16s ease-in-out infinite alternate;
+}
+
+/* The page's only unprompted motion: the crew bobs a few pixels, as if in
+   orbit. The individual `translate` property leaves `transform` alone. */
+@keyframes hover {
+  to {
+    translate: 0 -8px;
+  }
+}
+
+.deco,
+.art-mascot {
+  display: none;
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  padding: 0 24px 16px;
+}
+
+.brand {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--on-sky);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  width: 26px;
+  height: 26px;
+}
+
+/* ─── The glass card ─────────────────────────────────────────────────────── */
+
+.content {
+  position: relative;
+  width: min(400px, 100%);
+  margin: var(--band) auto 20px;
+  padding: 24px 28px 28px;
+  border-radius: 22px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
+}
+
+/* The luminous hairline: a gradient ring, brightest where the light from
+   the crew above would catch the glass, drawn with a mask so the glass fill
+   stays see-through. */
+.content::before {
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  content: "";
+  background: linear-gradient(170deg, var(--edge-hi), var(--edge-lo) 42%, var(--edge-lo) 70%, var(--edge-hi));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.lead {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.note {
+  margin-top: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  border: 1px solid var(--ghost-border);
+  background: var(--ghost);
+  color: var(--text);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--ghost-hover);
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--ghost);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--rule);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  position: absolute;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--text);
+}
+
+.control input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 38px;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.control input:hover {
+  border-color: var(--field-hover);
+}
+
+.control-secret input {
+  padding-right: 44px;
+}
+
+.control input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 28%, transparent);
+}
+
+.eye {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--field);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pending .matrix {
+  color: var(--focus);
+}
+
+.note[data-tone="warning"],
+.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 8px 12px;
+  border: 1px solid;
+  border-radius: 12px;
+  background: var(--field);
+}
+
+/* Seeded accounts, development only: a dashed tray, visibly apart from the
+   real way in. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--focus) 45%, transparent);
+  border-radius: 12px;
+  background: var(--field);
+}
+
+.dev-title,
+.dev-role {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--rule);
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dev-actions > * {
+  flex: 1 1 140px;
+}
+
+.dev-fill {
+  align-self: stretch;
+}
+
+/* The role name makes this label long: let it wrap rather than overflow
+   a fixed height. */
+.btn.dev-submit {
+  height: auto;
+  min-height: 36px;
+  padding-block: 8px;
+  line-height: 1.3;
+}
+
+/* ─── Footer: floats on the painting ─────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: auto;
+  color: var(--on-sky);
+  /* The footer sits on the painting, sometimes on the planet's bright
+     rim: a soft halo keeps the small text readable over it. */
+  text-shadow: var(--legible);
+}
+
+.footnote {
+  max-width: 20rem;
+  color: var(--on-sky-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--on-sky);
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* The switches ride in one small glass pill, a quiet echo of the card. */
+.controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--ghost-border);
+  border-radius: 999px;
+  background: var(--pill);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.locale {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.locale-option {
+  min-width: 34px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-sky-muted);
+  font-size: 12px;
+  font-weight: 550;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.locale-option:hover {
+  color: var(--on-sky);
+}
+
+.locale-option[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--on-sky-muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--on-sky);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ─── Short windows: the card steps to the right ────────────────────────── */
+
+/* Under 700 px there is no room for a crew band above a full card, so the
+   crew takes the left side and the card floats on the right, still glass. */
+@media (max-height: 699px) {
+  :root {
+    --art-h: min(115vh, (100vw - 440px) * 1.5);
+    --crew-x: calc((100vw - 420px) / 2);
+    --crew-y: 50vh;
+  }
+
+  .content {
+    width: min(380px, 100%);
+    margin: auto 0 auto auto;
+    padding: 20px 24px 22px;
+  }
+
+  .main {
+    padding-top: 16px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .lead {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .actions {
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .password {
+    gap: 10px;
+  }
+
+  .field {
+    gap: 4px;
+  }
+
+  .control input,
+  .btn {
+    min-height: 38px;
+    height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-image {
+    animation: none;
+  }
+
+  .btn,
+  .control input {
+    transition: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-inline-start: 69px;
+}

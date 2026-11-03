@@ -1,0 +1,12 @@
+[Unit]
+Description=Rollback uncommitted Hermes host hardening
+ConditionPathExists=/var/lib/hermes-host-hardening/active
+
+[Timer]
+OnActiveSec=600s
+AccuracySec=1s
+RemainAfterElapse=false
+Unit=hermes-hardening-rollback.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,96 @@
+/* Dev-only perf HUD (OHB-88). Fixed, collapsible, own stacking context so it
+   never competes with the thread's find/anchor logic ([data-thread-messages]
+   never sees this subtree). Safe-area aware for the mobile shell. */
+
+.ohb-thread-perf-hud {
+  /* Placed by `useHudPlacement` (top right under the header, or where it was
+     dragged): bottom right covered the composer and its Send button. */
+  position: fixed;
+  cursor: grab;
+  touch-action: none;
+  z-index: 9999;
+  max-width: min(360px, calc(100vw - 16px));
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #e5e7eb;
+  background: rgba(17, 17, 17, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.ohb-thread-perf-hud * {
+  box-sizing: border-box;
+}
+
+.ohb-thread-perf-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  user-select: none;
+}
+
+.ohb-thread-perf-hud-summary {
+  color: #9ca3af;
+}
+
+.ohb-thread-perf-hud-body {
+  padding: 6px 8px;
+  /* Stops above the composer zone when the panel sits at the top. */
+  max-height: min(60vh, calc(100vh - 240px));
+  overflow-y: auto;
+}
+
+.ohb-thread-perf-hud-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ohb-thread-perf-hud-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.ohb-thread-perf-hud-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.ohb-thread-perf-hud-title {
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
+.ohb-thread-perf-hud-pass {
+  color: #4ade80;
+}
+
+.ohb-thread-perf-hud-warn {
+  color: #facc15;
+}
+
+.ohb-thread-perf-hud-fail {
+  color: #f87171;
+}
+
+.ohb-thread-perf-hud-muted {
+  color: #6b7280;
+}
+
+.ohb-thread-perf-hud-script {
+  margin-top: 2px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+  word-break: break-word;
+}

@@ -1,0 +1,3 @@
+{{ if .NoPasswd }}{{ .AdminUser }} ALL=(ALL:ALL) NOPASSWD: ALL
+{{ else }}{{ .AdminUser }} ALL=(ALL:ALL) ALL
+{{ end }}

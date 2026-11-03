@@ -1,0 +1,732 @@
+/*
+  night-sky: the painted sky is the page. The art fills the whole window,
+  shifted right so the crew floats in the open half; the left edge of the
+  sky is darkened (or, in light, washed pale) by a soft scrim and the form
+  sits straight on it, no card and no border. A large, light serif title
+  is the one loud thing; inputs and buttons are quiet glass. The sky
+  breathes very slowly, the page's only motion.
+*/
+html[data-theme="dark"] {
+  --space: #070b11;
+  --text: #f2f5fb;
+  --muted: #a9b4c7;
+  --scrim: 7 11 17;
+  --field: rgb(255 255 255 / 6%);
+  --field-hover: rgb(255 255 255 / 10%);
+  --line: rgb(255 255 255 / 18%);
+  --line-strong: rgb(255 255 255 / 42%);
+  /* Starlight: the pale blue of the mascot's eyes, dark ink on top. */
+  --accent: #b9d3ff;
+  --accent-hover: #d3e3ff;
+  --accent-text: #08142e;
+  --focus: #9cc2ff;
+  --danger: #ff9b9b;
+  --warning: #f3cf7a;
+  --art: url("../assets/signin-galaxy-alt.webp");
+  /* Where the crew lands inside the art box (alt: crew left of centre). */
+  --art-pos: 30% 50%;
+}
+
+html[data-theme="light"] {
+  --space: #eef3fd;
+  --text: #0e1a33;
+  --muted: #45536d;
+  --scrim: 238 243 253;
+  --field: rgb(255 255 255 / 62%);
+  --field-hover: rgb(255 255 255 / 85%);
+  --line: rgb(14 26 51 / 18%);
+  --line-strong: rgb(14 26 51 / 45%);
+  --accent: #1d3b86;
+  --accent-hover: #172f6c;
+  --accent-text: #ffffff;
+  --focus: #2456d6;
+  --danger: #b4232c;
+  --warning: #7c5200;
+  --art: url("../assets/signin-galaxy-light.webp");
+  --art-pos: 50% 45%;
+}
+
+html {
+  /* The form column; the art box starts a little before its right edge so
+     the sky's own dark (or pale) margin runs under the scrim. */
+  --column: clamp(380px, 40vw, 560px);
+}
+
+body {
+  background: var(--space);
+  color: var(--text);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── The sky ────────────────────────────────────────────────────────────── */
+
+/* Fixed, so a short window that scrolls keeps the sky still behind it. */
+.art {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--space);
+}
+
+/* The painting starts left of the window's middle and fades in from its
+   left edge: the crew ends up in the right half, the form on plain sky. */
+.art-image {
+  position: absolute;
+  top: -2%;
+  right: -2%;
+  bottom: -2%;
+  left: calc(var(--column) * 0.62);
+  background: var(--art) var(--art-pos) / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+  transform-origin: 70% 50%;
+  animation: breathe 60s ease-in-out infinite alternate;
+}
+
+/* The scrim: a vertical band of the sky's own colour behind the form. */
+.art::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    rgb(var(--scrim) / 96%) 0%,
+    rgb(var(--scrim) / 88%) calc(var(--column) * 0.7),
+    rgb(var(--scrim) / 0%) calc(var(--column) * 1.25)
+  );
+  pointer-events: none;
+}
+
+.deco,
+.art-mascot {
+  display: none;
+}
+
+@keyframes breathe {
+  to {
+    transform: scale(1.05);
+  }
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: var(--column);
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 36px 48px 28px 56px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+/* A white helmet on a pale sky needs an edge to read as a shape. */
+html[data-theme="light"] .brand-mark {
+  filter: drop-shadow(0 1px 2px rgb(14 26 51 / 35%));
+}
+
+.content {
+  width: 100%;
+  max-width: 23rem;
+}
+
+/* The bold element: big, light and serif, so it reads as a voice over the
+   sky rather than a heading on a form. */
+.title {
+  margin: 0;
+  font-family: "Source Serif 4 Variable", Georgia, serif;
+  font-size: 60px;
+  font-weight: 300;
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+}
+
+.lead {
+  max-width: 21rem;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.note {
+  margin-top: 22px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.btn-google:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--field-hover);
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--field);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+/* A thin line that fades out to the right, like a trail across the sky. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--muted);
+  font-family: "Source Serif 4 Variable", Georgia, serif;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+}
+
+.divider::before {
+  background: linear-gradient(90deg, transparent, var(--line));
+}
+
+.divider::after {
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Above the input: the input's backdrop blur would otherwise paint over
+   the icon that precedes it and smear it into a blot. */
+.field-icon {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--text);
+}
+
+.control input {
+  width: 100%;
+  height: 46px;
+  padding: 0 16px 0 42px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 14px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.control input:hover {
+  border-color: var(--line-strong);
+}
+
+.control-secret input {
+  padding-right: 46px;
+}
+
+.control input:focus-visible {
+  border-color: var(--focus);
+  background: var(--field-hover);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent);
+}
+
+.eye {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--field);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.pending .matrix {
+  color: var(--accent);
+}
+
+html[data-theme="light"] .pending .matrix {
+  color: var(--focus);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 8px 14px;
+  border: 1px solid;
+  border-radius: 14px;
+  background: var(--field);
+}
+
+/* Tones come after the boxes above, so the shorthand border there does not
+   reset their border colour to the text colour. */
+.note[data-tone="warning"],
+.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+
+/* Seeded accounts, development only: dashed, visibly not the real path. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  background: var(--field);
+}
+
+.dev-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.dev-role {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dev-fill {
+  flex: none;
+}
+
+.dev-submit {
+  min-height: 36px;
+  flex: 1 1 140px;
+}
+
+/* ─── Footer: switches first, at the bottom left ───────────────────────── */
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+}
+
+.controls {
+  order: -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legal {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.footnote {
+  max-width: 20rem;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 4px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--text);
+}
+
+.locale {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+}
+
+.locale-option {
+  min-width: 34px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.locale-option:hover {
+  color: var(--text);
+}
+
+.locale-option[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ─── Window sizes ──────────────────────────────────────────────────────── */
+
+@media (min-width: 1500px) and (min-height: 950px) {
+  .title {
+    font-size: 72px;
+  }
+
+  .main {
+    padding: 48px 64px 36px 80px;
+  }
+}
+
+/* Narrow windows: a fixed column, and the art box starts further right so
+   the crew is not pushed under the scrim. */
+@media (max-width: 999px) {
+  html {
+    --column: 400px;
+  }
+
+  html[data-theme="dark"] {
+    --art-pos: 38% 50%;
+  }
+
+  .main {
+    padding-left: 40px;
+    padding-right: 36px;
+  }
+
+  .art-image {
+    left: calc(var(--column) * 0.72);
+  }
+}
+
+/* Narrow and tall: at full height the painting would be scaled so large
+   that the crew spills off the right edge. A shorter box, faded at the
+   top and bottom as well, keeps the whole crew in the open strip. */
+@media (max-width: 999px) and (min-height: 800px) {
+  html[data-theme="dark"] {
+    --art-pos: 44% 50%;
+  }
+
+  html[data-theme="light"] {
+    --art-pos: 52% 50%;
+  }
+
+  .art-image {
+    top: 14%;
+    bottom: 20%;
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent 0%, #000 22%),
+      linear-gradient(180deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(90deg, transparent 0%, #000 22%),
+      linear-gradient(180deg, transparent 0%, #000 18%, #000 80%, transparent 100%);
+    mask-composite: intersect;
+  }
+}
+
+@media (max-height: 760px) {
+  .title {
+    font-size: 46px;
+  }
+}
+
+/* Short windows: a tighter rhythm so the form fits without scrolling. */
+@media (max-height: 700px) {
+  .main {
+    gap: 16px;
+    padding-top: 24px;
+    padding-bottom: 18px;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  .lead {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .actions,
+  .password {
+    gap: 10px;
+  }
+
+  .actions {
+    margin-top: 18px;
+  }
+
+  .field {
+    gap: 5px;
+  }
+
+  .control input,
+  .btn {
+    min-height: 40px;
+    height: 40px;
+  }
+
+  .divider {
+    margin: 0;
+  }
+}
+
+/* Very short: the footnote goes first, the switches and links stay. */
+@media (max-height: 640px) {
+  .footnote {
+    display: none;
+  }
+
+  .legal-links {
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-image {
+    animation: none;
+  }
+
+  .btn,
+  .control input {
+    transition: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-inline-start: 49px;
+}

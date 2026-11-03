@@ -1,0 +1,80 @@
+[Unit]
+Description=Hermes provider operator for the openedbot link
+After=network-online.target hermes-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Root (the systemd default, left implicit on purpose), because it is the
+# only process allowed to run `hermes auth add` as the service user. It
+# listens on a Unix socket readable by hermes only and serves the
+# named verbs of the Host routes in internal/connector/allowlist.go, nothing else.
+# Never write User=root here: with NoNewPrivileges= and the sandbox below,
+# systemd 257 drops CAP_SETUID from an explicit User= service's permitted set
+# (bounding set untouched), and `runuser -u hermes` then fails with
+# "cannot set user id".
+RuntimeDirectory=hermes-operator
+RuntimeDirectoryMode=0750
+StateDirectory=hermes-operator
+StateDirectoryMode=0700
+# The gateway "restart pending" marker lives in this directory and must survive
+# operator restarts (`upgrade` always restarts the operator). A reboot still
+# clears /run, and the gateway restarts then anyway.
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/local/lib/hermes-setup/edge-setup internal operator
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+# This is the only root service of the set. It needs SETUID/SETGID for
+# `runuser -u hermes` and CHOWN/FOWNER/DAC_OVERRIDE for the socket it creates
+# under RuntimeDirectory; everything else is dropped, including the
+# capabilities that would let it load modules or change the network.
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE
+AmbientCapabilities=
+# Each line below was added alone and proved on a lab host (every verb of the
+# socket, a toggle round trip, a gateway restart through the operator, the
+# connector instance still admitted by the peer check):
+# - Go and the Python probes need no namespace and no W+X memory.
+# - ProtectProc=invisible: the peer check still reads the connector's
+#   /proc/<pid>/cgroup (measured), and nothing else here reads another
+#   process's /proc entry.
+# Measured and left out:
+# - SystemCallFilter=~@resources: runuser's pam_limits calls setpriority and
+#   every probe then fails ("Could not set limit for PRIO_PROCESS").
+# - dropping CAP_DAC_OVERRIDE: /srv/hermes/data/runtime.env (hermes 0600) is
+#   no longer readable, the operator exits at start.
+# - dropping CAP_CHOWN: the socket directory can no longer be given to the
+#   connector group, the operator exits at start.
+# - dropping CAP_FOWNER: works today, but scores the same (DAC_OVERRIDE is
+#   in the same systemd-analyze check), so not worth the risk.
+# - ProcSubset=pid: hides /proc/net/tcp, which the A2A card check reads.
+# - UMask=0077: the probes write the data tree the rootless Docker sandbox
+#   reads; same reason as on the gateway.
+# - PrivateNetwork=, IPAddressAllow=localhost: the probes reach provider and
+#   MCP endpoints on the internet.
+RestrictNamespaces=true
+MemoryDenyWriteExecute=true
+ProtectProc=invisible
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/hermes/data
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+PrivateDevices=true
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectHostname=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=169.254.0.0/16
+IPAddressDeny=fd00:ec2::/64
+
+[Install]
+WantedBy=multi-user.target

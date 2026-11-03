@@ -1,0 +1,706 @@
+/*
+  window-chrome: a desktop inside the desktop. The painted crew is the
+  wallpaper filling the whole window, and the form lives in a small faux app
+  window floating on it: frosted glass, a title bar with three traffic-light
+  dots, the brand as the window title, the language and theme switches in the
+  title bar, legal text in a status bar. The one bold thing is the window's
+  depth; everything inside it stays system-quiet.
+*/
+html[data-theme="dark"] {
+  --desk: #060912;
+  --art: url("../assets/signin-galaxy.webp");
+  --glass: rgb(28 30 38 / 74%);
+  --titlebar: rgb(46 48 58 / 72%);
+  --statusbar: rgb(18 19 25 / 55%);
+  --hairline: rgb(255 255 255 / 9%);
+  --rim: rgb(255 255 255 / 16%);
+  --outline: rgb(0 0 0 / 70%);
+  --text: #f1f2f6;
+  --muted: #a9adba;
+  --field: rgb(0 0 0 / 26%);
+  --field-border: rgb(255 255 255 / 13%);
+  --soft: rgb(255 255 255 / 8%);
+  --soft-hover: rgb(255 255 255 / 13%);
+  --segment: rgb(255 255 255 / 16%);
+  --primary: #0a6cdc;
+  --primary-hover: #1a7bec;
+  --primary-text: #ffffff;
+  --ring: rgb(64 156 255 / 55%);
+  --focus: #5aa9ff;
+  --danger: #ff8a82;
+  --warning: #ffcf6b;
+  --shadow:
+    0 0 0 0.5px var(--outline),
+    0 2px 6px rgb(0 0 0 / 30%),
+    0 22px 44px -10px rgb(0 0 0 / 55%),
+    0 60px 120px -24px rgb(0 0 0 / 75%);
+}
+
+html[data-theme="light"] {
+  --desk: #dfe8f8;
+  --art: url("../assets/signin-galaxy-light.webp");
+  --glass: rgb(248 249 252 / 76%);
+  --titlebar: rgb(234 237 243 / 82%);
+  --statusbar: rgb(236 239 245 / 70%);
+  --hairline: rgb(20 30 60 / 10%);
+  --rim: rgb(255 255 255 / 80%);
+  --outline: rgb(20 30 70 / 18%);
+  --text: #1b1c22;
+  --muted: #565b69;
+  --field: rgb(255 255 255 / 85%);
+  --field-border: rgb(20 30 60 / 16%);
+  --soft: rgb(255 255 255 / 90%);
+  --soft-hover: #ffffff;
+  --segment: #ffffff;
+  --primary: #0062cc;
+  --primary-hover: #0a6fdc;
+  --primary-text: #ffffff;
+  --ring: rgb(0 110 230 / 40%);
+  --focus: #0062cc;
+  --danger: #b3261e;
+  --warning: #7a4f00;
+  --shadow:
+    0 0 0 0.5px var(--outline),
+    0 2px 6px rgb(30 50 100 / 10%),
+    0 22px 44px -12px rgb(30 50 110 / 28%),
+    0 60px 110px -30px rgb(30 50 110 / 45%);
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--desk);
+  color: var(--text);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+}
+
+/* ─── Wallpaper ──────────────────────────────────────────────────────────── */
+
+/* The wallpaper is fixed and wider than the window on purpose: the box
+   starts left of the viewport, so the crew (the middle of the painting)
+   lands in the left half and the app window on the right never hides it. */
+.art {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--desk);
+}
+
+.art-image {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: -38%;
+  background: var(--art) 50% 46% / cover no-repeat;
+}
+
+.deco,
+.art-mascot {
+  display: none;
+}
+
+/* ─── The app window ─────────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px clamp(24px, 8vw, 132px);
+}
+
+.main {
+  --bar: 38px;
+  --radius: 12px;
+  position: relative;
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  padding-top: var(--bar);
+  border-radius: var(--radius);
+  background: var(--glass);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(30px) saturate(170%);
+  backdrop-filter: blur(30px) saturate(170%);
+}
+
+/* The title bar, with a lit top rim like real window glass. */
+.main::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--bar);
+  content: "";
+  border-bottom: 1px solid var(--hairline);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--titlebar);
+  box-shadow: inset 0 1px 0 var(--rim);
+}
+
+/* The three traffic lights: one circle and two shadow copies. Decorative
+   only, they do nothing (a fake close button would be a trap). */
+.main::after {
+  position: absolute;
+  top: 13px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
+  content: "";
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow:
+    20px 0 0 #febc2e,
+    40px 0 0 #28c840;
+}
+
+/* The brand is the window title, centred in the bar. */
+.brand {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 50%;
+  display: inline-flex;
+  height: var(--bar);
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  transform: translateX(-50%);
+}
+
+.brand-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 36px 28px;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.lead {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.note {
+  margin-top: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.btn-google {
+  border: 1px solid var(--field-border);
+  background: var(--soft);
+  color: var(--text);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 8%);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: var(--soft-hover);
+}
+
+/* The default button of a dialog: filled, with a faint top highlight. */
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: var(--primary-text);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%), 0 1px 2px rgb(0 0 0 / 18%);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--hairline);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  position: absolute;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--text);
+}
+
+.control input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 33px;
+  border: 1px solid var(--field-border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 13.5px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.control-secret input {
+  padding-right: 40px;
+}
+
+/* The system focus ring: a soft halo outside the field. */
+.control input:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.eye {
+  position: absolute;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 11px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pending .matrix {
+  color: var(--focus);
+}
+
+.note[data-tone="warning"],
+.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 7px 11px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+/* Seeded accounts, development only: a dashed inset so it never passes for
+   the real path. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px;
+  border: 1px dashed color-mix(in srgb, var(--focus) 45%, transparent);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.dev-title {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 9px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hairline);
+}
+
+.dev-role {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dev-actions > * {
+  flex: 1 1 120px;
+}
+
+.dev-submit {
+  min-height: 32px;
+}
+
+/* ─── Status bar and title bar controls ──────────────────────────────────── */
+
+.footer {
+  padding: 9px 16px 10px;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--statusbar);
+}
+
+.legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.footnote {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--text);
+}
+
+/* The switches sit in the title bar, right side, like toolbar items. The
+   footer is not positioned, so they anchor on the window itself. */
+.controls {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 8px;
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+}
+
+.locale {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--field-border);
+}
+
+.locale-option {
+  min-width: 28px;
+  height: 22px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 550;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.locale-option[aria-pressed="true"] {
+  background: var(--segment);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ─── Narrow and short windows ──────────────────────────────────────────── */
+
+/* Mid widths: the wallpaper slides further left and the window hugs the
+   edge, so the window covers sky rather than the crew. */
+@media (max-width: 1199px) {
+  .shell {
+    padding-right: clamp(20px, 5vw, 60px);
+  }
+
+  .art-image {
+    left: -46%;
+  }
+
+  .main {
+    width: min(380px, 100%);
+  }
+}
+
+/* Narrow and tall: the window drops to the bottom, centred, and the
+   wallpaper becomes the top of the screen, fading into the desk so the
+   crew stays above the window instead of behind it. */
+@media (max-width: 999px) and (min-height: 760px) {
+  .shell {
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 48px;
+  }
+
+  .art-image {
+    left: 0;
+    bottom: auto;
+    height: 60vh;
+    background-position: 50% 50%;
+    -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent);
+    mask-image: linear-gradient(to bottom, #000 72%, transparent);
+  }
+}
+
+/* Short windows: a tighter rhythm so the window fits whole. */
+@media (max-height: 700px) {
+  .shell {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  .content {
+    padding: 22px 30px 20px;
+  }
+
+  .title {
+    font-size: 23px;
+  }
+
+  .lead {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .actions {
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .password {
+    gap: 9px;
+  }
+
+  .field {
+    gap: 4px;
+  }
+
+  .btn {
+    min-height: 34px;
+  }
+
+  .control input {
+    height: 34px;
+  }
+}
+
+/* Very short: the status bar keeps only the legal links. */
+@media (max-height: 600px) {
+  .footnote {
+    display: none;
+  }
+
+  .footer {
+    padding-top: 7px;
+    padding-bottom: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .control input {
+    transition: none;
+  }
+}
+
+/* Windows: the caption buttons own the top right corner (y < 46, see
+   signin-base.css). In a short window the card reaches the top edge and its
+   switches would sit under them: the card starts below the buttons. */
+html[data-platform="win32"] .shell {
+  padding-top: 56px;
+}

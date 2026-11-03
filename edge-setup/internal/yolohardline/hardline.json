@@ -1,0 +1,381 @@
+{
+  "version": 1,
+  "about": "YOLO lease: what is never auto-approved. hardline and protect are regular expressions in the RE2 / Python / JavaScript common subset, matched against a whole command or a whole path. Under a lease, a hardline hit or a protected hit is refused (block); protect lists every default id; a case expects hardline:<rule id>, protected:<protection id> or allowed, hardline checked first. Mirrored by modules/execution/src/domain/yolo-hardline.ts; to be checked against the upstream Hermes --yolo list (PR 3 spike), it may only grow.",
+  "hardline": {
+    "tools": [
+      "cronjob"
+    ],
+    "paths": [
+      {
+        "id": "soul",
+        "pattern": "(?:^|/)SOUL\\.md$"
+      },
+      {
+        "id": "hermes_config",
+        "pattern": "(?:^|/)\\.hermes/(?:profiles/[^/]+/)?config\\.yaml$"
+      },
+      {
+        "id": "approval_plugin",
+        "pattern": "(?:^|/)plugins/ohb_approval_policy(?:/|$)"
+      },
+      {
+        "id": "yolo_state",
+        "pattern": "(?:^|/)yolo(?:-[a-z]+)?\\.jsonl?$"
+      }
+    ],
+    "commands": [
+      {
+        "id": "rm_root_or_home",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*rm\\s+(?:[^\\s;&|]+\\s+)*['\"]?(?:/|/\\*|~|~/|~/\\*|\\$HOME|\\$\\{HOME\\}|\\$HOME/\\*|\\$\\{HOME\\}/\\*)['\"]?(?:\\s|[;&|)]|$)"
+      },
+      {
+        "id": "mkfs",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*mkfs(?:\\.[A-Za-z0-9]+)?(?:\\s|$)"
+      },
+      {
+        "id": "dd_device",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*dd\\s+(?:[^\\s;&|]+\\s+)*of=/dev/(?:sd|hd|vd|xvd|nvme|disk|rdisk|mmcblk)"
+      },
+      {
+        "id": "redirect_device",
+        "pattern": ">\\s*/dev/(?:sd|hd|vd|xvd|nvme|disk|rdisk|mmcblk)"
+      },
+      {
+        "id": "fork_bomb",
+        "pattern": ":\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:"
+      },
+      {
+        "id": "power",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*(?:shutdown|reboot|halt|poweroff|systemctl\\s+(?:poweroff|reboot|halt|kexec)|init\\s+[06])(?:\\s|[;&|)]|$)"
+      },
+      {
+        "id": "perms_root",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*(?:chmod|chown|chgrp)\\s+(?:[^\\s;&|]+\\s+)*['\"]?/['\"]?(?:\\s|[;&|)]|$)"
+      },
+      {
+        "id": "kill_all",
+        "pattern": "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*kill\\s+(?:[^\\s;&|]+\\s+)*-1\\s*(?:[;&|)]|$)"
+      }
+    ]
+  },
+  "protect": {
+    "git_config": {
+      "paths": [
+        "(?:^|/)\\.git/config$"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])\\.git/config(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "git_hooks": {
+      "paths": [
+        "(?:^|/)\\.git/hooks(?:/|$)"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])\\.git/hooks(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "ssh": {
+      "paths": [
+        "(?:^|/)\\.ssh(?:/|$)"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])\\.ssh(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "env": {
+      "paths": [
+        "(?:^|/)\\.env(?:\\.[A-Za-z0-9_.-]+)?$"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])\\.env(?:\\.[A-Za-z0-9_.-]+)?(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "id_rsa": {
+      "paths": [
+        "(?:^|/)id_rsa$"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])id_rsa(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "credentials": {
+      "paths": [
+        "(?:^|/)credentials(?:\\.json)?$"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])credentials(?:\\.json)?(?:[\\s'\"/;&|<>)]|$)"
+      ]
+    },
+    "keychain": {
+      "paths": [
+        "(?:^|/)Library/Keychains(?:/|$)"
+      ],
+      "commands": [
+        "(?:^|[\\s'\"=:<>/])Library/Keychains(?:[\\s'\"/;&|<>)]|$)",
+        "(?:^\\s*|[;&|(\\x60]\\s*|\\bsudo\\s+)(?:[A-Za-z_][A-Za-z0-9_]*=[^\\s;&|]*\\s+)*security\\s+(?:find-[a-z]+-password|dump-keychain|export)(?:\\s|[;&|)]|$)"
+      ]
+    }
+  },
+  "defaultProtect": [
+    "git_config",
+    "git_hooks",
+    "ssh",
+    "env",
+    "id_rsa",
+    "credentials",
+    "keychain"
+  ],
+  "cases": [
+    {
+      "kind": "command",
+      "input": "rm -rf /",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "sudo rm -rf --no-preserve-root /",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "rm -rf ~",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "cd /tmp && rm -rf $HOME",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "FOO=1 rm -fr '/'",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "rm -rf /*",
+      "expect": "hardline:rm_root_or_home"
+    },
+    {
+      "kind": "command",
+      "input": "rm -rf /tmp/build",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "rm -rf ./build",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "rm a; echo /",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "mkfs.ext4 /dev/sdb1",
+      "expect": "hardline:mkfs"
+    },
+    {
+      "kind": "command",
+      "input": "dd if=/dev/zero of=/dev/sda bs=1M",
+      "expect": "hardline:dd_device"
+    },
+    {
+      "kind": "command",
+      "input": "dd if=/dev/zero of=./disk.img bs=1M",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "cat image.iso > /dev/disk2",
+      "expect": "hardline:redirect_device"
+    },
+    {
+      "kind": "command",
+      "input": ":(){ :|:& };:",
+      "expect": "hardline:fork_bomb"
+    },
+    {
+      "kind": "command",
+      "input": "sudo shutdown -h now",
+      "expect": "hardline:power"
+    },
+    {
+      "kind": "command",
+      "input": "systemctl reboot",
+      "expect": "hardline:power"
+    },
+    {
+      "kind": "command",
+      "input": "echo shutdown",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "chmod -R 777 /",
+      "expect": "hardline:perms_root"
+    },
+    {
+      "kind": "command",
+      "input": "chown -R me /tmp/x",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "kill -9 -1",
+      "expect": "hardline:kill_all"
+    },
+    {
+      "kind": "command",
+      "input": "kill -1 1234",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "security find-generic-password -s github -w",
+      "expect": "protected:keychain"
+    },
+    {
+      "kind": "command",
+      "input": "security dump-keychain",
+      "expect": "protected:keychain"
+    },
+    {
+      "kind": "command",
+      "input": "security export -k login.keychain -o out.p12",
+      "expect": "protected:keychain"
+    },
+    {
+      "kind": "command",
+      "input": "ls ~/Library/Keychains/",
+      "expect": "protected:keychain"
+    },
+    {
+      "kind": "command",
+      "input": "cat ~/.ssh/id_ed25519",
+      "expect": "protected:ssh"
+    },
+    {
+      "kind": "command",
+      "input": "cp .env backup.txt",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "command",
+      "input": "cat .env.example",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "command",
+      "input": "source .env.production.local",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "command",
+      "input": "cat .envrc",
+      "expect": "allowed"
+    },
+    {
+      "kind": "command",
+      "input": "echo key >> repo/.git/hooks/pre-commit",
+      "expect": "protected:git_hooks"
+    },
+    {
+      "kind": "command",
+      "input": "git commit -m 'ship it'",
+      "expect": "allowed"
+    },
+    {
+      "kind": "path",
+      "input": "notes/SOUL.md",
+      "expect": "hardline:soul"
+    },
+    {
+      "kind": "path",
+      "input": "/home/hermes/.hermes/profiles/dev/config.yaml",
+      "expect": "hardline:hermes_config"
+    },
+    {
+      "kind": "path",
+      "input": "/home/hermes/.hermes/plugins/ohb_approval_policy/__init__.py",
+      "expect": "hardline:approval_plugin"
+    },
+    {
+      "kind": "path",
+      "input": "/var/lib/edge/yolo-leases.json",
+      "expect": "hardline:yolo_state"
+    },
+    {
+      "kind": "path",
+      "input": "/root/.ssh/authorized_keys",
+      "expect": "protected:ssh"
+    },
+    {
+      "kind": "path",
+      "input": "app/.env",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "path",
+      "input": "app/.env.local",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "path",
+      "input": "/srv/app/.env.staging",
+      "expect": "protected:env"
+    },
+    {
+      "kind": "path",
+      "input": "app/.environment.md",
+      "expect": "allowed"
+    },
+    {
+      "kind": "path",
+      "input": "repo/.git/hooks/pre-commit",
+      "expect": "protected:git_hooks"
+    },
+    {
+      "kind": "path",
+      "input": "repo/.git/config",
+      "expect": "protected:git_config"
+    },
+    {
+      "kind": "path",
+      "input": "~/.ssh/id_rsa",
+      "expect": "protected:ssh"
+    },
+    {
+      "kind": "path",
+      "input": "backup/id_rsa",
+      "expect": "protected:id_rsa"
+    },
+    {
+      "kind": "path",
+      "input": "~/.aws/credentials",
+      "expect": "protected:credentials"
+    },
+    {
+      "kind": "path",
+      "input": "/Users/me/Library/Keychains/login.keychain-db",
+      "expect": "protected:keychain"
+    },
+    {
+      "kind": "path",
+      "input": "src/app.ts",
+      "expect": "allowed"
+    },
+    {
+      "kind": "tool",
+      "input": "cronjob",
+      "expect": "hardline:tool:cronjob"
+    },
+    {
+      "kind": "tool",
+      "input": "write_file",
+      "expect": "allowed"
+    }
+  ]
+}

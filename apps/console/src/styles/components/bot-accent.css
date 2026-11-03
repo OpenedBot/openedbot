@@ -1,0 +1,69 @@
+/*
+ * L'accent d'une conversation suit la couleur du bot, comme Grok Bot
+ * (Réglages › Apparence › « Accent : Couleur du Bot »). L'écran de
+ * conversation pose `data-bot-accent`, `--bot-tint` et `--bot-tint-text` sur
+ * la colonne du fil (en-tête, fil, composer), seulement pour un visage
+ * coloré et si le réglage le veut (`lib/bots/bot-tint.ts`, `botAccentColor`).
+ *
+ * Les jetons dérivés (`--primary`, `--ring`, les dégradés…) sont résolus sur
+ * `:root` : redéfinir les seuls paliers ne les changerait pas. Ils sont donc
+ * repris ici, dans les deux jeux d'accent de la console : celui du kit
+ * (`--accent-*`, app.css) et celui de BoardUI (`--bui-accent-*`,
+ * boardui.css : bouton d'envoi, interrupteurs, anneau de focus).
+ *
+ * Le palier 600 est la couleur exacte du bot, celle de la bulle : le bouton
+ * principal et la bulle de l'utilisateur sont du même aplat.
+ */
+[data-bot-accent] {
+  --accent-100: color-mix(in oklab, var(--bot-tint) 14%, white);
+  --accent-200: color-mix(in oklab, var(--bot-tint) 28%, white);
+  --accent-300: color-mix(in oklab, var(--bot-tint) 52%, white);
+  --accent-400: color-mix(in oklab, var(--bot-tint) 76%, white);
+  --accent-500: color-mix(in oklab, var(--bot-tint) 90%, white);
+  --accent-600: var(--bot-tint);
+  --accent-700: color-mix(in oklab, var(--bot-tint) 78%, black);
+  --accent-contrast: var(--bot-tint-text);
+
+  --primary: var(--accent-600);
+  --primary-foreground: var(--accent-contrast);
+  --ring: var(--accent-500);
+  --sidebar-primary: var(--accent-600);
+  --sidebar-primary-foreground: var(--accent-contrast);
+
+  --gradient-primary: linear-gradient(180deg, var(--accent-500) 0%, var(--accent-600) 100%);
+  --gradient-primary-hover: linear-gradient(180deg, var(--accent-400) 0%, var(--accent-500) 100%);
+  --gradient-primary-active: linear-gradient(180deg, var(--accent-600) 0%, var(--accent-700) 100%);
+  --shadow-btn-primary: inset 0 1px 0 0 #ffffff40, 0 0 0 1px var(--accent-600), 0 1px 2px 0 #0000001a;
+
+  --button-ghost: var(--accent-100);
+  --button-ghost-fg: var(--accent-700);
+  --button-ghost-hover: var(--accent-200);
+  --button-ghost-active: var(--accent-300);
+  --button-ghost-disabled: color-mix(in srgb, var(--accent-100) 55%, white);
+  --button-ghost-disabled-fg: var(--accent-300);
+
+  --bui-accent-500: var(--accent-500);
+  --bui-accent-600: var(--accent-600);
+  --bui-accent-700: var(--accent-700);
+  --bui-gradient-primary: linear-gradient(180deg, var(--accent-500) 0%, var(--accent-600) 100%);
+  --bui-gradient-primary-hover: linear-gradient(180deg, var(--accent-400) 0%, var(--accent-500) 100%);
+}
+
+/* Sombre : même aplat que la bulle ; le bouton fantôme reprend le lavis
+   sombre d'app.css au lieu du pastel clair. */
+.dark [data-bot-accent] {
+  --gradient-primary: linear-gradient(180deg, var(--accent-400) 0%, var(--accent-600) 100%);
+  --shadow-btn-primary: inset 0 1px 0 0 #ffffff33, 0 0 0 1px var(--accent-600), 0 1px 2px 0 #0000001a;
+  --button-ghost: color-mix(in srgb, var(--accent-500) 18%, #171717);
+  --button-ghost-fg: var(--accent-300);
+  --button-ghost-hover: color-mix(in srgb, var(--accent-500) 28%, #171717);
+  --button-ghost-active: color-mix(in srgb, var(--accent-500) 38%, #171717);
+  --button-ghost-disabled: #262626;
+  --button-ghost-disabled-fg: #737373;
+}
+
+/* Le bouton d'envoi écrit `text-white` : sur l'ambre ou le vert, la flèche
+   tombait à 2:1. Hors couche, la règle passe devant l'utilitaire. */
+[data-bot-accent] .bg-button-primary {
+  color: var(--bot-tint-text);
+}

@@ -1,0 +1,114 @@
+---
+title: Prerequisites
+description: Debian 12+ or Ubuntu 24.04+ (optional protections on Debian 13), root or sudo, provider console access, outbound connector, amd64 and arm64 architectures, and what detect checks.
+---
+
+`edge-setup` runs **on the host** (VPS or homelab). It does not run on
+every VPS: the runtime and the connector require Debian 12 or later, or
+Ubuntu 24.04 or later, `amd64` or `arm64`, and systemd. The optional protections
+(`--sandbox`, firewall, SSH, PAM, etc.) remain limited to Debian 13. Cgroup
+v2 is mandatory only when `--sandbox` is selected.
+A Cloudflare tunnel started by hand in development, if any, runs on the side
+of the local openedbot application, never on this host. The
+[direct access](/docs/direct-access) attachment mode, on the other hand, does
+install a tunnel on the host, but it is outside the scope of this tool.
+
+## System
+
+| Requirement | Detail |
+|---|---|
+| Distribution | **Debian 12 or later**, or **Ubuntu 24.04 or later**, for the minimal runtime and the connector. The preflight refuses any other `ID`, as well as Ubuntu 22.04, whose systemd (249) cannot seal the connector key ("Debian 12 or later, or Ubuntu 24.04 or later, is required"). Every optional protection, sandbox included, requires **Debian 13** ("… require Debian 13 or later"). |
+| Architecture | `amd64` or `arm64`. Any other architecture is refused ("unsupported architecture"). |
+| cgroup v2 | Mandatory for the rootless Docker sandbox (`/sys/fs/cgroup/cgroup.controllers` present). |
+| systemd | The host is driven by systemd units and timers (gateway, connector, operator, rollback). |
+| Existing policies | Only the selected options are audited. A conflicting foreign configuration is refused and explained, never overwritten. An active UFW can be extended if it is default-deny and all its inbound openings are declared. |
+| Pending reboot | If `/var/run/reboot-required` exists, `up` stops **before** any access change; run the same command again after rebooting. |
+
+Minimum resources (vCPU, memory, disk): `detect` shows them, but the tool
+enforces no threshold today.
+
+## Privileges
+
+- The first `detect` and the first `up` run with `sudo` (or from a root
+  session).
+- `up` then creates `/usr/local/bin/edge-setup`: any command started as
+  non-root re-executes itself through `sudo` (stdin preserved). **Do not
+  prefix `edge-setup` with `sudo` after the first `up`.**
+- `version`, `help` and `self-verify` never require root.
+- `EDGE_SETUP_NO_SUDO=1` disables self-elevation; without `sudo`
+  installed, a privileged command exits with "must run as root"
+  (code 77).
+
+## Provider console access: required to change access
+
+The SSH, UFW, fail2ban and quarantine options are **guarded by a 600 s
+rollback**: without `verify-access` from a new SSH session within that
+window, a timer restores the previous access. This safety net does not
+replace an out-of-band console (the provider's KVM, VNC or serial console):
+
+- if the restore itself fails, only the console lets you regain control
+  (`journalctl -u hermes-hardening-rollback`, backups under
+  `/var/backups/hermes-access/`);
+- `up` requires `--console-confirmed` precisely for this reason;
+- a minimal path requires neither an out-of-band console nor an admin key: it
+  modifies none of these components.
+
+Prepare before `up`: an SSH public key for the admin account
+(`--admin-key /root/admin.pub`) and a **second** open terminal for
+`verify-access`.
+
+## Network
+
+### Outbound connector
+
+- **Outbound**: a WebSocket connection (`wss://`, port 443) to the
+  openedbot origin given to `--ohb`, the `edge-setup` binaries from
+  `https://releases.openedbot.app/edge-setup`, Hermes (pinned installer and
+  repository) and `uv` from GitHub, Node.js from `nodejs.org`, the
+  distribution repositories and the model providers. With `--sandbox`, the
+  Docker apt repository (`download.docker.com`) and the pinned sandbox images
+  are added.
+- **Inbound**: no HVS application port. If UFW is selected, only the declared
+  `--allow-inbound` rules are added; SSH 22 is never implicit.
+  No public IP, no domain, no certificate.
+- Egress to cloud metadata (`169.254/16`, `fd00:ec2::/64`) is refused by the
+  gateway, connector and operator units, and by UFW when that option is
+  selected.
+
+In production, `--ohb` receives `https://link.openedbot.app`, the link origin
+(a host paired on `https://openedbot.app`
+follows it on its own). In development, `--ohb`
+receives the VPS loopback set up by a reverse SSH tunnel; the HTTPS origin
+of a Cloudflare tunnel started by hand remains an advanced option.
+In every case, any tunnel is on the application side: the VPS gateway
+stays on `127.0.0.1:8642` and is never published.
+
+The details of the path are in [Getting started](/docs/getting-started).
+
+## What `detect` measures
+
+`detect` is read-only (`--json` for machine-readable output).
+
+| Line | Content |
+|---|---|
+| `host` | `ID`, `VERSION_ID` and code name from `/etc/os-release`, architecture, virtualization (`systemd-detect-virt`: `none`, `kvm`, `lxc`…), cgroup v2. |
+| `address` | Primary IP (route to `1.1.1.1`) and whether it is globally routable (not private, not CGNAT, not documentation). |
+| `resources` | vCPU and total memory (MB). |
+| `session` | Whether the command comes from an SSH session and from which address (`SSH_CONNECTION`). |
+| `reachability` | `connector (outbound only)`: loopback gateway and outbound link. |
+| `preflight` | Every gap in the baseline: root, distribution (Debian 12+ or Ubuntu 24.04+), architecture, systemd. `up` with an optional protection adds the Debian 13 requirement, and `--sandbox` the cgroup v2 check. |
+
+## LXC container (Proxmox VE)
+
+`edge-setup` also runs in an unprivileged LXC container. `detect` reports
+`virt=lxc` there, and two things change:
+
+- **Subuid**: `up` adapts the sandbox subuid range to `10000:55000` on its
+  own, which fits under the 65535 UID limit of an unprivileged container; a
+  range that would overflow is refused before `/etc/subuid` is written.
+- **Nesting**: without `features: nesting=1,keyctl=1` on the container,
+  rootless Docker does not start. Do not select `--sandbox` then: the tools
+  run as `hermes` with the runtime's systemd isolation, and the sandbox audit
+  check is `SKIP`. Never make the container privileged to get Docker working.
+
+Next step: [Getting started](/docs/getting-started).

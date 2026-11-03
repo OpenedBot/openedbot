@@ -1,0 +1,140 @@
+export type {
+  HermesApprovalPolicyMode,
+  HermesApprovalPolicyState,
+  A2APolicyView,
+  A2APolicyWriteStatus,
+  CreateHermesRunInput,
+  HermesCapabilityInventory,
+  HermesClientConfig,
+  HermesClientTimeouts,
+  HermesConnectorManagementProbe,
+  HermesEvent,
+  HermesGatewayRestartJob,
+  HermesGatewayStatus,
+  HermesCreatedHostProfile,
+  HermesHostProfile,
+  HermesHostProfileCreateOptions,
+  HermesHostToolsets,
+  HermesMcpCatalogEntry,
+  HermesMcpInventory,
+  HermesMcpOauthSession,
+  HermesMcpServer,
+  HermesMcpServerRequest,
+  HermesModelContext,
+  HermesModelOption,
+  HermesModelOptions,
+  HermesModelProvider,
+  HermesProfileAvatar,
+  HermesProfileInventory,
+  HermesProfileMemory,
+  HermesProfileMemoryWrite,
+  HermesProfileModelBatchEntry,
+  HermesProfileNamedFlag,
+  HermesProfileBundledSkillsState,
+  HermesProfileSkillsHubDelete,
+  HermesSkillsHubInspection,
+  HermesSkillsHubFinding,
+  HermesSkillsHubOperation,
+  HermesSkillsHubScan,
+  HermesSkillsHubSearchResult,
+  HermesSkillsHubTrustLevel,
+  HermesProviderSdk,
+  HermesProviderUsageDocument,
+  HermesRunDetails,
+  HermesRunImage,
+  HermesPromptCacheTtl,
+  HermesSessionCounters,
+  HermesSkill,
+  HermesToolset,
+  HermesToolsetAvailability,
+  HermesToolsetUnavailableReason,
+  HermesToolsetState,
+  HermesTransportClientConfig,
+  HermesProfileMcpServerRemoval,
+} from "./contracts";
+export { fitHermesRunImages, HermesClient, hermesRunRequestBody } from "./client";
+export { PROFILE_MODEL_BATCH_MAX, SESSION_MESSAGES_PAGE_LIMIT } from "./contracts";
+export {
+  SKILLS_HUB_IDENTIFIER_PATTERN,
+  SKILLS_HUB_OPERATION_ID_PATTERN,
+  SKILLS_HUB_PROFILE_PATTERN,
+} from "./contracts";
+export { validateA2APeerName, validateA2APeerToken } from "./a2a-policy";
+export { PROFILE_TOOLSETS_BATCH_FEATURE, PROFILE_TOOLSETS_BATCH_MAX, type HermesCreatedHostProfileResult, type HermesHostProfileCreateRequest } from "./client/profiles";
+export { WORKSPACE_FILE_NAME_PATTERN, type HermesWorkspaceFile } from "./client/workspace-files";
+export { hermesCapabilityWrite } from "./capability-writes";
+export type { HermesCapabilityWrite } from "./capability-writes";
+export {
+  HERMES_PREFLIGHT_TTL_MS,
+  HERMES_TOOLSET_INVENTORY_TTL_MS,
+  hermesToolsetFingerprint,
+  hermesToolsetInventoryWrite,
+  invalidateHermesPreflightCache,
+  noteHermesPreflightLink,
+  resetHermesPreflightCache,
+} from "./preflight-cache";
+export type { HermesPreflightScope, HermesToolsetInventoryScope } from "./preflight-cache";
+export {
+  parseApprovalPolicyState,
+  parseA2aAgentCard,
+  diagnosticReference,
+  hermesProviderAcceptsApiKey,
+  hermesProviderAcceptsOauth,
+  hermesSessionTitle,
+  normalizeHermesBrowserControlTransport,
+  normalizeHermesModelOptions,
+  normalizeHermesSessionCounters,
+  normalizeHermesSkills,
+  normalizeHermesToolsets,
+  parseGatewayRestartJob,
+  parseGatewayStatus,
+  parseHostProfileAvatar,
+  parseHostProfile,
+  parseHostProfileCreateResult,
+  parseHostProfileInventory,
+  parseHostProviderSdks,
+  parseHostToolsets,
+  parseMcpInventory,
+  parseMcpOauthSession,
+  parseMcpServer,
+  parseProviderCredentialResult,
+  parseProviderOauthSession,
+  parseModelContextDocument,
+  parseProviderUsageDocument,
+  parseProfileCredentialResult,
+  parseProfileMcpServerState,
+  parseProfileMcpServerRemoval,
+  parseProfileModelState,
+  parseProfileBundledSkillsState,
+  parseProfileSkillState,
+  parseProfileToolsetState,
+  parseProfileSkillsHubDelete,
+  parseSkillsHubInspection,
+  parseSkillsHubOperation,
+  parseSkillsHubScan,
+  parseSkillsHubSearch,
+  isSkillsHubIdentifier,
+  PROFILE_MODEL_TOKEN_PATTERN,
+  parseRetryAfter,
+  parseToolsetState,
+  upstreamDiagnostic,
+} from "./parsers";
+export { HermesEndpointError, normalizeHermesEndpoint } from "./endpoint";
+export { HermesClientError } from "./errors";
+export { readHermesMtlsIdentity } from "./mtls";
+export type { HermesMtlsIdentity } from "./mtls";
+export { decryptSecretFromKeyring, encryptSecret, secretEncryptionKey } from "./secrets";
+export { createDirectTransport } from "./transport/direct";
+export { createRelayTransport, RelayDialError } from "./transport/relay";
+export type { RelayDialer, RelayRequest } from "./transport/relay";
+export {
+  auditGenesis,
+  canonicalJson,
+  chainNext,
+  CREATION_AUDIT_MAX_EXPORT_BYTES,
+  CreationAuditError,
+  openCreationAudit,
+  parseCreationAuditHeader,
+  sealCreationAudit,
+} from "./creation-audit/index";
+export type { CreationAuditEvent, CreationAuditSnapshot } from "./creation-audit/index";

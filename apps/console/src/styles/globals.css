@@ -1,0 +1,56 @@
+@import "@openedbot/browser-ui-kit/styles/app.css";
+@import "@openedbot/browser-ui-kit/styles/mobile.css";
+@import "./components/thread-timeline.css";
+@import "./components/agent-activity.css";
+@import "./components/thread-motion.css";
+@import "./components/boardui.css";
+@import "./components/bot-accent.css";
+@import "./components/thread-theme.css";
+@import "./components/bot-create.css";
+@import "./components/bot-manage.css";
+@import "./components/native-titlebar.css";
+@import "./components/native-focus.css";
+@import "./components/pointer-focus.css";
+@import "./components/native-app.css";
+@import "./components/interactive-cursor.css";
+@import "./components/brand.css";
+@import "./screens/auth/login.css";
+@import "./screens/auth/signin.css";
+@import "./screens/home/overview.css";
+@import "./screens/public/landing.css";
+@import "./screens/public/legal.css";
+
+/* Le design system (browser/ui-kit) déclare ses propres sources ; celles de
+   la console sont ici, sous apps/console/src. Ce fichier vit dans src/styles/,
+   donc la source Tailwind est le parent. */
+@source "..";
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.35rem;
+  margin-block: 0.75rem;
+}
+
+/* Bloc de code Shiki : deux thèmes émis en variables CSS, le `.dark` choisit. */
+.ohb-code pre.shiki {
+  margin: 0;
+  background: transparent !important;
+}
+.ohb-code pre.shiki code {
+  font-family: inherit;
+}
+/* Gras, italique et soulignement du thème aussi (titres markdown) : une
+   variable absente laisse la valeur héritée. */
+.ohb-code .shiki span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+}
+.dark .ohb-code .shiki span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}

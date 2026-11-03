@@ -1,0 +1,161 @@
+---
+title: Link a machine through the managed tunnel
+description: Link your machine through the tunnel managed by openedbot, without edge-setup and without a domain of your own.
+icon: Cloud
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="In development">
+This path is not open to everyone yet. This page is only published in the
+development docs; the supported path is [edge-setup](/docs/machine).
+</Aside>
+
+This path replaces `edge-setup`. You install Hermes yourself, the console
+gives you an address under an openedbot domain, and you paste a few
+commands on the machine. Before you choose it, read
+[what you give up](/docs/direct-access) compared with `edge-setup`.
+
+You open no port on the machine or on your router.
+
+## Before you start
+
+- A Debian 12 or later, or Ubuntu 24.04 or later, machine with
+  `sudo`.
+- In the console, the **openedbot-managed tunnel** card must be clickable. If
+  it says "Not open yet on this deployment", this path is not
+  enabled on your instance: contact [support](/docs/support).
+- The `connector_only_enrollment` product setting must be off on the
+  instance. It is on by default: while it is on, **Add** is refused when you
+  declare the runtime, even if the card is clickable (see
+  [Direct access](/docs/direct-access#enabling-the-paths-on-a-deployment)).
+
+## Step 0: prepare Hermes on the machine
+
+Without `edge-setup`, installing and starting Hermes is up to you: follow
+[Prepare Hermes on the machine](/docs/direct-access#prepare-hermes-on-the-machine), then come back here. You will need
+the `API_SERVER_KEY` set there at step 3.
+
+## Step 1: publish from the console
+
+Open **Settings › Installation › Edge**, then **Add a runtime**.
+During onboarding, the same screen opens at the **Link my machine** step.
+
+```text
+.------------------------------------------------------------.
+| Add a runtime                                              |
+| How does openedbot reach this runtime?                         |
+|   ( ) openedbot link (recommended)    (o) Direct access        |
+|                                                            |
+| How should the gateway be published?                       |
+|   (o) openedbot-managed tunnel (recommended)                   |
+|   ( ) Tailscale Funnel                                     |
+|                                                            |
+|                                [ Cancel ]  [ Continue ]    |
+'------------------------------------------------------------'
+```
+
+1. Under **How does openedbot reach this runtime?**, choose **Direct access**.
+   This choice is not offered on an agency workspace.
+2. Under **How should the gateway be published?**, choose **openedbot-managed
+   tunnel**, then **Continue**.
+3. The **Step 1: Publish** screen has nothing to fill in: openedbot picks
+   the address itself. Click **Publish**.
+
+You have no account to open anywhere else.
+
+## Step 2: install cloudflared on the machine
+
+```text
+.------------------------------------------------------------.
+| Step 2: Install on the host                                |
+| Published hostname   ohb-xxxxxxxx.rt.openedbot.app         |
+| Publication          [ Waiting for the host ]              |
+|                                                            |
+|  1. Add the Cloudflare repository key         [ Copy ]     |
+|  2. Declare the apt repository                [ Copy ]     |
+|  3. Install cloudflared                       [ Copy ]     |
+|  4. Install the service with the token        [ Copy ]     |
+|  5. Check that the service is running         [ Copy ]     |
+|                                                            |
+| openedbot probes the hostname every five seconds.              |
+|                  [ Cancel ] [ Previous ] [ Continue ]      |
+'------------------------------------------------------------'
+```
+
+Copy the five commands one by one, in order, on the machine. The first
+three install `cloudflared` from its official repository. The fourth looks
+like this:
+
+```bash
+sudo cloudflared service install <TOKEN>
+```
+
+<Aside type="caution" title="Command 4 is shown only once">
+It carries a secret token. If you close the window before running
+it, openedbot cannot show it to you again. The publication stays listed under
+**Publications in progress**: click **Revoke**, then start again at
+step 1.
+</Aside>
+
+The fifth command, `systemctl status cloudflared --no-pager`, must
+show `active (running)`. In the console, the badge switches to **Reachable**
+within a few seconds, and **Continue** unlocks.
+
+## Step 3: register and test
+
+```text
+.--------------------------------------------------------------.
+| Step 3: Register and test                                    |
+| Name                     [ my-vps                      ]     |
+| Hermes URL               https://ohb-xxxxxxxx.rt....         |
+| API_SERVER_KEY bearer    [ ************************    ]     |
+|                                                              |
+| Edge reachable              Verified                         |
+| Authentication valid        Verified                         |
+| Toolset contract            Verified                         |
+|                         [ Previous ] [ Test ] [ Add ]        |
+'--------------------------------------------------------------'
+```
+
+1. Give the runtime a **Name**.
+2. Paste the key from step 0 into **API_SERVER_KEY bearer**.
+3. Click **Test**. All three checks must be **Verified** for
+   **Add** to become active.
+4. Click **Add**. If no runtime was serving, this one serves runs right away.
+   Otherwise the **Runtime added** window offers **Replace now**: the current
+   runtime keeps serving runs until you confirm the replacement.
+
+You have nothing else to copy.
+
+## If a test fails
+
+```text
++---------------------------+--------------------------------------------------+
+| Message in the console    | What to do                                       |
++---------------------------+--------------------------------------------------+
+| The tunnel is not         | On the machine: systemctl status cloudflared     |
+| connected.                | --no-pager, then sudo systemctl restart          |
+|                           | cloudflared.                                     |
+| The hostname does not     | Wait a minute for DNS to propagate, then test    |
+| exist yet.                | again.                                           |
+| Incorrect API_SERVER_KEY. | Copy the exact value again: grep API_SERVER_KEY  |
+|                           | ~/.hermes/.env.                                  |
+| The gateway is too old or | Check API_SERVER_ENABLED=true in                 |
+| api_server is disabled.   | ~/.hermes/.env, then sudo "$(command -v hermes)" |
+|                           | gateway restart --system.                        |
+| This is not a Hermes      | Another service answers instead of Hermes: stop  |
+| gateway.                  | it and restart Hermes.                           |
+| Disable the forbidden     | Run the hermes tools disable loop from step 0    |
+| toolsets on the host.     | again, then restart Hermes.                      |
++---------------------------+--------------------------------------------------+
+```
+
+## Remove this publication
+
+Deleting the runtime in **Settings › Installation › Edge** also removes its
+public address. Then remove the service on the machine:
+
+```bash
+sudo cloudflared service uninstall
+```

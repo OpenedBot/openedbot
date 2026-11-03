@@ -1,0 +1,376 @@
+/*
+  Foyer `/` : scène papier de bloub (`#etat=orbit&stop`).
+  Un accent : le bleu nuit d'interface. La saturation vit dans les anneaux
+  mesurés du galet, pas dans une palette de CTAs.
+*/
+
+.ohb-salon-shell,
+.ohb-salon {
+  --salon-paper: #f5f5f6;
+  --salon-hole: #f9f9f9;
+  --salon-ink: #17203a;
+  --salon-muted: #6e7382;
+  --salon-line: #e3e5ea;
+  --salon-accent: #17203a;
+  --salon-accent-ink: #f5f4ef;
+  --salon-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --salon-ease-io: cubic-bezier(0.4, 0, 0.2, 1);
+  --salon-dur-reveal: 600ms;
+  --salon-dur-hover: 240ms;
+  --salon-r-pill: 999px;
+  background: var(--salon-paper);
+  color: var(--salon-ink);
+}
+
+.dark .ohb-salon-shell,
+.dark .ohb-salon {
+  /* The main card's grey (OpenBot's canvas): the home is not a darker hole in it. */
+  --salon-paper: #1a1a1a;
+  --salon-hole: #f5f4ef;
+  --salon-ink: #f5f4ef;
+  --salon-muted: #a6a39a;
+  --salon-line: rgba(255, 255, 255, 0.08);
+  --salon-accent: #f5f4ef;
+  --salon-accent-ink: #11130a;
+}
+
+.ohb-salon-shell header,
+.ohb-salon-shell [data-mobile-header] {
+  background: var(--salon-paper);
+  border-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
+}
+
+/*
+  Téléphone : la barre de navigation iOS d'un écran racine. Elle est posée
+  SUR la scène (absolue dans la colonne, jamais `fixed`), opaque. Pas de
+  `backdrop-filter` : dès que la scène est une couche (glissade du tiroir)
+  sous la barre d'état `black-translucent`, WebKit peint le filtre sur la
+  barre elle-même. Au repos la scène n'est plus transformée. Le filet
+  n'existe que quand du contenu est passé sous la barre (`data-scrolled`,
+  posé par l'écran). Le rembourrage haut du scroller est de la course de
+  défilement : le galet part sous la barre, il ne naît pas dessous.
+*/
+[data-mobile-shell] .ohb-salon-shell [data-mobile-header] {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  z-index: 2;
+  border-bottom-color: transparent;
+  background: var(--salon-paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: border-color 180ms ease;
+}
+
+[data-mobile-shell] .ohb-salon-shell:has(.ohb-salon[data-scrolled]) [data-mobile-header] {
+  border-bottom-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
+}
+
+[data-mobile-shell] .ohb-salon-shell .ohb-salon {
+  padding-top: calc(var(--ohb-safe-top) + 2.75rem);
+}
+
+.ohb-salon {
+  position: relative;
+  isolation: isolate;
+  /* La page tient dans la fenêtre : rien à faire défiler, donc pas de barre. */
+  height: 100%;
+  overflow: hidden;
+}
+
+/*
+  Une colonne centrée, comme une app d'agent qui s'ouvre sur une conversation
+  vide : la fenêtre est déjà le produit, le salon n'est pas une page
+  d'accueil (ni cartes explicatives ni filigrane, repris du skin de la coque
+  openedbot-desktop le 2026-10-13).
+*/
+.ohb-salon-guide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 560px);
+  height: 100%;
+  min-height: 0;
+  margin-inline: auto;
+  padding: 2rem clamp(1.25rem, 4vw, 2.5rem) 3rem;
+  text-align: center;
+}
+
+/* La mascotte est une présence, pas un héros : petite, entière, au-dessus du titre. */
+.ohb-salon-blob {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 104px;
+  height: 104px;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+  Le SVG remplit sa boîte, et c'est le viewBox (`xMidYMid meet`) qui garde le
+  carré. Avec `height: 100%` + `aspect-ratio` sur un flex item, WebKit
+  retombait sur `auto` : le SVG prenait toute la largeur, débordait la boîte
+  de part et d'autre (centré), et le haut du galet passait sous l'en-tête,
+  invisible, puisque rien ne défile au-dessus de l'origine.
+*/
+.salon-orbit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ohb-salon-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ohb-salon-eyebrow {
+  --a: 0deg;
+  display: inline-flex;
+  align-items: center;
+  margin: 1.25rem 0 0;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--salon-r-pill);
+  background:
+    linear-gradient(var(--salon-paper), var(--salon-paper)) padding-box,
+    conic-gradient(from var(--a), var(--salon-ink), transparent 32%, var(--salon-ink)) border-box;
+  color: var(--salon-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: salon-spin 8s linear infinite;
+}
+
+@property --a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.ohb-salon-title {
+  margin: 0.75rem 0 0;
+  color: var(--salon-ink);
+  font-family: var(--font-sans);
+  font-size: clamp(26px, 4vh, 34px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.ohb-salon-lead {
+  margin: 0.6rem 0 0;
+  max-width: 34ch;
+  color: var(--salon-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.ohb-salon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.ohb-salon-cta,
+.ohb-salon-ghost {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.15rem;
+  border-radius: var(--salon-r-pill);
+  font-size: 0.9375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    transform var(--salon-dur-hover) var(--salon-ease-io),
+    background var(--salon-dur-hover) var(--salon-ease-io),
+    border-color var(--salon-dur-hover) var(--salon-ease-io);
+}
+
+.ohb-salon-cta {
+  border: 1px solid transparent;
+  background: var(--salon-accent);
+  color: var(--salon-accent-ink);
+}
+
+.ohb-salon-cta:hover {
+  transform: translateY(-2px);
+}
+
+.ohb-salon-cta:active {
+  transform: translateY(1px);
+}
+
+.ohb-salon-ghost {
+  border: 1px solid var(--salon-line);
+  background: transparent;
+  color: var(--salon-ink);
+}
+
+.ohb-salon-ghost:hover {
+  background: color-mix(in srgb, var(--salon-ink) 5%, transparent);
+  transform: translateY(-2px);
+}
+
+.ohb-salon-cta:focus-visible,
+.ohb-salon-ghost:focus-visible {
+  outline: 2px solid var(--salon-ink);
+  outline-offset: 3px;
+}
+
+/*
+  Au téléphone, une seule colonne qui défile. La coque mobile cache déjà ses
+  barres ; on la cache aussi ici pour le navigateur de bureau étroit.
+
+  La requête est CELLE de `useIsMobile` (`use-mobile.ts`) : largeur < 768, ou
+  doigt et hauteur < 768 (un iPhone en paysage, un iPad mini en portrait).
+  À 719 px la coque mobile s'ouvrait sur la scène bureau `overflow: hidden`,
+  et le bas du salon disparaissait sans défilement possible.
+*/
+@media (max-width: 767px), ((pointer: coarse) and (max-height: 767px)) {
+  .ohb-salon {
+    height: auto;
+    overflow-y: auto;
+    /* Le rubber-band reste dans la scène, jamais sur le document. */
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+  }
+
+  .ohb-salon::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+    `flex: none` sur les deux, et ce n'est pas décoratif. La scène bureau
+    pose `min-height: 0` sur le guide ET sur le galet : dans la colonne qui
+    défile, le guide rétrécissait à la hauteur du scroller au lieu de
+    déborder, et le galet (seul enfant qui accepte de descendre sous son
+    contenu) absorbait tout le rétrécissement : 0 px sur un iPhone 15 Pro
+    Max, un galet « rogné sous l'en-tête » sur un écran plus haut.
+  */
+  .ohb-salon-guide {
+    display: flex;
+    flex: none;
+    height: auto;
+    /* Le galet et sa phrase, centrés dans ce qui reste sous la barre. */
+    min-height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding-bottom: 3rem;
+    /* Les filets pointillés sont un repère de page : une app n'en a pas. */
+    border-left: 0;
+    border-right: 0;
+    text-align: center;
+  }
+
+  .ohb-salon-blob {
+    flex: none;
+    width: 100%;
+    height: min(70vw, 20rem);
+  }
+
+  .ohb-salon-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ohb-salon-title,
+  .ohb-salon-lead {
+    text-align: center;
+  }
+
+  /* Corps iOS : 17 pt, une phrase courte, pas un chapeau de page. */
+  .ohb-salon-lead {
+    margin: 0;
+    max-width: 28ch;
+    font-size: 17px;
+    line-height: 1.45;
+  }
+
+  .ohb-salon-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity var(--salon-dur-reveal) var(--salon-ease-out),
+    transform var(--salon-dur-reveal) var(--salon-ease-out);
+}
+
+[data-reveal].in {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes salon-spin {
+  to {
+    --a: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-salon-eyebrow,
+  .ohb-salon-cta,
+  .ohb-salon-ghost,
+  [data-reveal] {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Au doigt : pas de survol, un retour de pression (`pressed`), comme `.ohb-press`. */
+@media (pointer: coarse) {
+  .ohb-salon-cta:hover,
+  .ohb-salon-ghost:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .ohb-salon-cta,
+  .ohb-salon-ghost {
+    transition:
+      transform 120ms ease-out,
+      opacity 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+
+  .ohb-salon-cta:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+
+  .ohb-salon-ghost:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--salon-ink) 8%, transparent);
+  }
+}

@@ -1,0 +1,729 @@
+/*
+  aurora: the sky above a quiet sign-in. Four soft curtains of light (the
+  .deco spans, blurred radial gradients) hang in the upper half of the
+  window and sway very slowly; below them the sky settles to a plain,
+  readable dark (a deep teal and indigo night) or light (a pale morning).
+  The mascot hovers small above a serif title, the form sits in the calm
+  part of the sky. The curtains are the only colour; everything else is
+  near-white or near-black.
+*/
+html[data-theme="dark"] {
+  --sky-top: #041019;
+  --sky-bottom: #080b21;
+  --c1: rgb(38 214 168 / 52%);
+  --c2: rgb(46 118 255 / 46%);
+  --c3: rgb(118 82 255 / 40%);
+  --c4: rgb(70 240 170 / 26%);
+  --curtain-blend: screen;
+  --stars: rgb(220 235 255 / 55%);
+  --text: #eef4fb;
+  --muted: #a9b7c8;
+  --hairline: rgb(255 255 255 / 12%);
+  --field: rgb(3 9 20 / 58%);
+  --field-border: rgb(255 255 255 / 15%);
+  --field-hover: rgb(255 255 255 / 28%);
+  --google: rgb(255 255 255 / 6%);
+  --primary: #86e6d3;
+  --primary-hover: #a1eedf;
+  --primary-text: #03211c;
+  --ring: #86e6d3;
+  --mascot-glow: rgb(110 190 255 / 45%);
+  --surface: rgb(3 9 20 / 62%);
+  --danger: #ff8c8f;
+  --warning: #f4c96f;
+}
+
+html[data-theme="light"] {
+  --sky-top: #e6eefa;
+  --sky-bottom: #f6f5fb;
+  --c1: rgb(255 190 166 / 88%);
+  --c2: rgb(160 205 255 / 92%);
+  --c3: rgb(205 186 255 / 90%);
+  --c4: rgb(178 236 214 / 85%);
+  --curtain-blend: normal;
+  --stars: transparent;
+  --text: #0f1d36;
+  --muted: #4a5770;
+  --hairline: rgb(15 29 54 / 12%);
+  --field: rgb(255 255 255 / 78%);
+  --field-border: rgb(15 29 54 / 15%);
+  --field-hover: rgb(15 29 54 / 30%);
+  --google: rgb(255 255 255 / 78%);
+  --primary: #1f3f8f;
+  --primary-hover: #183475;
+  --primary-text: #ffffff;
+  --ring: #2f5fd0;
+  --mascot-glow: rgb(80 130 220 / 30%);
+  --surface: rgb(255 255 255 / 72%);
+  --danger: #bd1820;
+  --warning: #805300;
+}
+
+body {
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom)) fixed;
+  color: var(--text);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── The sky ────────────────────────────────────────────────────────────── */
+
+.art {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* A sparse field of stars in the dark sky, drawn with gradients so no
+   extra asset is needed; transparent by day. */
+.art-image {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, var(--stars), transparent),
+    radial-gradient(1px 1px at 27% 62%, var(--stars), transparent),
+    radial-gradient(1.5px 1.5px at 41% 9%, var(--stars), transparent),
+    radial-gradient(1px 1px at 58% 28%, var(--stars), transparent),
+    radial-gradient(1px 1px at 71% 71%, var(--stars), transparent),
+    radial-gradient(1.5px 1.5px at 84% 14%, var(--stars), transparent),
+    radial-gradient(1px 1px at 92% 47%, var(--stars), transparent),
+    radial-gradient(1px 1px at 6% 83%, var(--stars), transparent),
+    radial-gradient(1px 1px at 35% 88%, var(--stars), transparent),
+    radial-gradient(1px 1px at 66% 52%, var(--stars), transparent);
+}
+
+/* The curtains only live in the upper part of the sky: the mask fades them
+   out before the form, so text never sits on the brightest light. */
+.deco {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 72%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 72%);
+}
+
+.d {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  mix-blend-mode: var(--curtain-blend);
+  animation: sway 46s ease-in-out infinite alternate;
+}
+
+/* Tall, leaning ellipses read as curtains rather than blobs. Each uses
+   the one animation at its own pace, so they never move in step. */
+.d1 {
+  top: -22vh;
+  left: 8vw;
+  width: 24vw;
+  height: 96vh;
+  background: radial-gradient(closest-side, var(--c1), transparent);
+  rotate: -24deg;
+}
+
+.d2 {
+  top: -26vh;
+  left: 36vw;
+  width: 22vw;
+  height: 100vh;
+  background: radial-gradient(closest-side, var(--c2), transparent);
+  rotate: 14deg;
+  animation-duration: 58s;
+  animation-direction: alternate-reverse;
+}
+
+.d3 {
+  top: -20vh;
+  left: 62vw;
+  width: 26vw;
+  height: 94vh;
+  background: radial-gradient(closest-side, var(--c3), transparent);
+  rotate: -12deg;
+  animation-duration: 52s;
+}
+
+.d4 {
+  top: -8vh;
+  left: 18vw;
+  width: 62vw;
+  height: 40vh;
+  background: radial-gradient(closest-side, var(--c4), transparent);
+  rotate: -6deg;
+  animation-duration: 64s;
+  animation-direction: alternate-reverse;
+}
+
+.d5,
+.d6,
+.d7,
+.d8,
+.d9,
+.d10,
+.d11,
+.d12,
+.art-mascot {
+  display: none;
+}
+
+@keyframes sway {
+  to {
+    transform: translate3d(5vw, 3vh, 0) scale(1.12, 0.94);
+  }
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Auto margins above the mascot and above the footer split the free space,
+   so the group floats in the middle and the footer keeps the bottom. */
+.main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 32px 24px 20px;
+}
+
+.brand {
+  margin-top: auto;
+  margin-bottom: 18px;
+}
+
+.brand-mark {
+  display: block;
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 0 18px var(--mascot-glow));
+}
+
+/* The mascot speaks for the brand here; the word would only repeat it. */
+.brand-name {
+  display: none;
+}
+
+.content {
+  width: min(360px, 100%);
+}
+
+.copy {
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-family: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  font-size: 44px;
+  font-weight: 420;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  max-width: 32ch;
+  margin: 12px auto 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.note {
+  margin-top: 24px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+/* ─── Controls ───────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  border-color: var(--field-border);
+  background: var(--google);
+  color: var(--text);
+  backdrop-filter: blur(8px);
+}
+
+.btn-google:hover:not(:disabled) {
+  border-color: var(--field-hover);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-text {
+  align-self: center;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  color: var(--muted);
+  font-family: "Source Serif 4 Variable", ui-serif, Georgia, serif;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.divider::before,
+.divider::after {
+  height: 1px;
+  flex: 1;
+  content: "";
+  background: var(--hairline);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 530;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Above the input: its backdrop blur makes it a stacking context that
+   would otherwise paint over the icon placed before it. */
+.field-icon {
+  position: absolute;
+  z-index: 1;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--text);
+}
+
+/* Fields are tinted glass: a little of the sky shows through, but enough
+   fill and blur that typed text always sits on a calm surface. */
+.control input {
+  width: 100%;
+  height: 46px;
+  padding: 0 13px 0 40px;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  outline: none;
+  background: var(--field);
+  color: var(--text);
+  font-size: 14px;
+  backdrop-filter: blur(8px);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.control input:hover {
+  border-color: var(--field-hover);
+}
+
+.control-secret input {
+  padding-right: 46px;
+}
+
+.control input:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 26%, transparent);
+}
+
+.eye {
+  position: absolute;
+  z-index: 1;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--text);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.5;
+  backdrop-filter: blur(8px);
+}
+
+.pending .matrix {
+  color: var(--ring);
+}
+
+.note[data-tone="warning"],
+.hint.hint-warning {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.hint.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 9px 14px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+
+/* Seeded accounts, development only: dashed, plainly not the real path. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px dashed color-mix(in srgb, var(--ring) 45%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.dev-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 3px;
+  padding-top: 9px;
+  border-top: 1px solid var(--hairline);
+}
+
+.dev-role {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dev-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.dev-fill {
+  align-self: flex-start;
+  margin-left: -12px;
+}
+
+.dev-submit {
+  min-height: 36px;
+  padding-block: 7px;
+  line-height: 1.35;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+
+/* One centred line under the sky: links, then the switches. */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 28px;
+  margin-top: auto;
+  padding-top: 32px;
+}
+
+.legal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+/* The footnote is long: on small windows it would crowd the switches. */
+.footnote {
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.locale {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+}
+
+.locale-option {
+  min-width: 32px;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.locale-option:hover {
+  color: var(--text);
+}
+
+.locale-option[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 640;
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ─── Short windows ──────────────────────────────────────────────────────── */
+
+@media (max-height: 760px) {
+  .main {
+    padding-top: 20px;
+    padding-bottom: 14px;
+  }
+
+  .brand {
+    margin-bottom: 10px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .title {
+    font-size: 34px;
+  }
+
+  .lead {
+    margin-top: 6px;
+    font-size: 14px;
+  }
+
+  .note {
+    margin-top: 16px;
+  }
+
+  .actions {
+    gap: 11px;
+    margin-top: 18px;
+  }
+
+  .password {
+    gap: 11px;
+  }
+
+  .field {
+    gap: 5px;
+  }
+
+  .control input,
+  .btn {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .footer {
+    padding-top: 16px;
+  }
+
+  .footnote {
+    display: none;
+  }
+}
+
+/* Short and wide: the footer becomes one line, links left of switches. */
+@media (max-height: 760px) and (min-width: 900px) {
+  .legal {
+    flex-direction: row;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .d {
+    animation: none;
+  }
+
+  .btn,
+  .control input {
+    transition: none;
+  }
+}

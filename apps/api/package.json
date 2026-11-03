@@ -1,0 +1,42 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "OPENEDBOT_ENV=development bun ../../scripts/dev-watch.ts src/index.ts",
+    "start": "bun src/index.ts",
+    "start:alerting": "bun src/alerting/index.ts",
+    "seed": "bun scripts/seed.ts",
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
+    "@openedbot/contracts-errors": "workspace:*",
+    "@openedbot/contracts-events": "workspace:*",
+    "@openedbot/contracts-locale": "workspace:*",
+    "@openedbot/contracts-primitives": "workspace:*",
+    "@openedbot/conversation": "workspace:*",
+    "@openedbot/execution": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/identity": "workspace:*",
+    "@openedbot/notifications": "workspace:*",
+    "@openedbot/platform-config": "workspace:*",
+    "@openedbot/platform-db": "workspace:*",
+    "@openedbot/platform-integrations": "workspace:*",
+    "@openedbot/platform-observability": "workspace:*",
+    "@openedbot/platform-plugins": "workspace:*",
+    "@openedbot/portability": "workspace:*",
+    "@openedbot/roster": "workspace:*",
+    "@openedbot/runtime-link": "workspace:*",
+    "@openedbot/runtimes": "workspace:*",
+    "hono": "^4.10.4"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,252 @@
+{
+  "$migrations": {
+    "0139_permission_review.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Crée runtime_review_profiles (runtimes) et les colonnes de revue d'approval_requests (execution)."
+      }
+    },
+    "0146_staff_permission_unattended.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Redéfinit staff_permission_decisions (lecture backoffice, étape unattended)."
+      }
+    }
+  },
+  "account_preferences": "identity",
+  "agency_client_invitations": {
+    "owner": "identity",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Flotte (plug-in agency externe, qui déclare fleet.workspaces et fleet.billing) : depuis l'étape 11.2 ses routes HTTP et ses écrans sont dans le plug-in ; la table, ses migrations, sa RLS et le code d'accès (modules/identity agency-*) restent au cœur, en dette datée ; les valeurs stockées 'agency' (kind, role, clés product_features) ne sont pas migrées."
+    }
+  },
+  "agency_grants": {
+    "owner": "identity",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Flotte (plug-in agency externe, qui déclare fleet.workspaces et fleet.billing) : depuis l'étape 11.2 ses routes HTTP et ses écrans sont dans le plug-in ; la table, ses migrations, sa RLS et le code d'accès (modules/identity agency-*) restent au cœur, en dette datée ; les valeurs stockées 'agency' (kind, role, clés product_features) ne sont pas migrées."
+    }
+  },
+  "api_errors": "api",
+  "api_instances": "runtime-link",
+  "audit_chain": "runtime-link",
+  "audit_worm_orphans": "runtime-link",
+  "alert_channels": "notifications",
+  "alert_deliveries": "notifications",
+  "apns_deliveries": "notifications",
+  "apns_devices": "notifications",
+  "approval_requests": "execution",
+  "attachments": "conversation",
+  "bot_groups": "roster",
+  "bot_host_cleanups": "roster",
+  "bot_permission_grants": "roster",
+  "bot_permission_rules": "roster",
+  "bot_permission_tool_policies": "roster",
+  "bot_playbooks": "roster",
+  "bots": "roster",
+  "bot_profile_provisions": "roster",
+  "bot_setting_proposals": "roster",
+  "decisions": "execution",
+  "email_login_codes": "identity",
+  "email_outbox": {
+    "owner": "notifications",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "email_outbox_events": "notifications",
+  "group_member_read_positions": {
+    "owner": "conversation",
+    "writers": [
+      "execution"
+    ]
+  },
+  "group_members": "roster",
+  "marketplace_entries": "marketplace",
+  "membership_events": "identity",
+  "memberships": "identity",
+  "message_ingress": "conversation",
+  "message_reactions": "conversation",
+  "message_versions": "conversation",
+  "messages": "conversation",
+  "mobile_connect_tickets": "identity",
+  "native_auth_codes": "identity",
+  "oauth_attempts": "identity",
+  "operator_profiles": "identity",
+  "organization_agent_templates": "marketplace",
+  "organization_member_invitations": "identity",
+  "organization_permission_policies": "identity",
+  "organizations": {
+    "owner": "identity",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "permission_yolo_audit": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "permission_yolo_audit_quarantine": "runtime-link",
+  "permission_yolo_consents": "execution",
+  "permission_yolo_leases": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "playbooks": "roster",
+  "product_features": {
+    "owner": "staff",
+    "writers": [
+      "identity"
+    ],
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "profile_delete_jobs": "portability",
+  "profile_import_items": "portability",
+  "profile_import_jobs": "portability",
+  "push_deliveries": "notifications",
+  "push_outbox": "notifications",
+  "push_subscriptions": "notifications",
+  "routine_executions": "execution",
+  "routines": "execution",
+  "run_events": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "run_steering_attempts": "execution",
+  "runs": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "runtime_a2a_audit": "runtimes",
+  "runtime_audit_anchors": "runtime-link",
+  "runtime_audit_keys": "runtime-link",
+  "runtime_audit_verifications": "runtime-link",
+  "runtime_connector_notices": {
+    "owner": "runtime-link",
+    "writers": [
+      "notifications"
+    ]
+  },
+  "runtime_connector_release_seen": "runtime-link",
+  "runtime_direct_exposures": "runtimes",
+  "runtime_enrollments": "runtimes",
+  "runtime_link_alerts": "runtime-link",
+  "runtime_model_selection_proofs": "runtimes",
+  "runtime_permission_settings": "runtimes",
+  "runtime_model_proven": "runtimes",
+  "runtime_review_profiles": "runtimes",
+  "runtime_link_diagnostics": "runtime-link",
+  "runtime_link_dispatches": "runtime-link",
+  "runtime_link_events": "runtime-link",
+  "runtime_bot_settings_tools": "execution",
+  "runtime_read_snapshots": "runtimes",
+  "runtime_provider_incidents": {
+    "owner": "execution",
+    "writers": [
+      "runtimes"
+    ]
+  },
+  "runtime_routine_tools": "execution",
+  "runtimes": {
+    "owner": "runtimes",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "schema_migrations": "db",
+  "sections": "roster",
+  "service_instances": "runtime-link",
+  "sessions": "identity",
+  "staff_impersonation_claims": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_login_codes": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_sessions": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_users": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée. Le rôle ohb_staff reste aussi au cœur."
+    }
+  },
+  "stripe_events": {
+    "owner": "billing",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Billing (plug-in billing externe, @openedbot/pro-billing, depuis l'étape 8d, seul à déclarer billing.enforced) : la table, ses migrations et sa RLS restent au cœur, en dette datée. Le domaine (SQL, port, webhook, appels Stripe) est parti dans le plug-in à l'étape 11.4 (modules/billing supprimé) ; le cœur n'y touche que par SubscriptionPort. Depuis l'étape 11.5, les variables STRIPE_* (manifest.env) et le chemin du webhook (billing.webhookPath) sont déclarés par le plug-in : hors ces tables et leurs migrations, le cœur ne nomme plus le fournisseur (tests/scripts/payment-provider-contract.ts)."
+    }
+  },
+  "subscriptions": {
+    "owner": "billing",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Billing (plug-in billing externe, @openedbot/pro-billing, depuis l'étape 8d, seul à déclarer billing.enforced) : la table, ses migrations et sa RLS restent au cœur, en dette datée. Le domaine (SQL, port, webhook, appels Stripe) est parti dans le plug-in à l'étape 11.4 (modules/billing supprimé) ; le cœur n'y touche que par SubscriptionPort. Depuis l'étape 11.5, les variables STRIPE_* (manifest.env) et le chemin du webhook (billing.webhookPath) sont déclarés par le plug-in : hors ces tables et leurs migrations, le cœur ne nomme plus le fournisseur (tests/scripts/payment-provider-contract.ts)."
+    }
+  },
+  "support_attachments": "support",
+  "support_conversations": "support",
+  "support_events": "support",
+  "support_messages": "support",
+  "team_imports": "portability",
+  "tenant_blob_deletions": {
+    "owner": "identity",
+    "writers": [
+      "portability",
+      "support"
+    ]
+  },
+  "tenant_deletions": "identity",
+  "thread_compactions": "conversation",
+  "thread_hides": "conversation",
+  "thread_message_counters": "conversation",
+  "thread_reads": "conversation",
+  "threads": "conversation",
+  "tool_errors": "execution",
+  "users": "identity",
+  "waitlist_signups": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "webhook_deliveries": "webhooks",
+  "webhook_endpoints": "webhooks",
+  "webhook_management_operations": "webhooks",
+  "workflows": {
+    "owner": "execution",
+    "writers": [
+      "runtime-link"
+    ]
+  }
+}

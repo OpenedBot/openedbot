@@ -1,0 +1,741 @@
+/*
+  poster: a two-colour print. The left of the window is the poster: a
+  visible column grid, the title set huge in heavy Inter with tight
+  tracking, and the openedbot mascot blown up and cropped off the edge as a
+  graphic. The right is a solid block in the other colour, holding the
+  form on the same grid. Dark is ink black with an electric blue block;
+  light swaps them, a blue poster with a white block. Nothing moves.
+*/
+html[data-theme="dark"] {
+  --page: #07080d;
+  --ink: #f3f5ff;
+  --ink-soft: #b4bbd8;
+  --grid: rgb(243 245 255 / 7%);
+  --block: #2448f0;
+  --block-ink: #ffffff;
+  --block-muted: #dfe5ff;
+  --rule: rgb(255 255 255 / 28%);
+  --field: rgb(4 8 30 / 30%);
+  --field-border: rgb(255 255 255 / 38%);
+  --field-hover: rgb(255 255 255 / 70%);
+  --google: #ffffff;
+  --google-text: #07080d;
+  --google-border: #ffffff;
+  --primary: #07080d;
+  --primary-hover: #171a26;
+  --primary-text: #ffffff;
+  --ring: #ffffff;
+  --page-ring: #8ea4ff;
+  --tint: rgb(4 8 30 / 26%);
+  --danger: #ffd0d2;
+  --warning: #ffe4a6;
+}
+
+html[data-theme="light"] {
+  --page: #2448f0;
+  --ink: #ffffff;
+  --ink-soft: #dfe5ff;
+  --grid: rgb(255 255 255 / 12%);
+  --block: #ffffff;
+  --block-ink: #0a1240;
+  --block-muted: #4a5372;
+  --rule: #d5dbf0;
+  --field: #f2f4fd;
+  --field-border: #c3cbea;
+  --field-hover: #8e9bd0;
+  --google: #ffffff;
+  --google-text: #0a1240;
+  --google-border: #0a1240;
+  --primary: #2448f0;
+  --primary-hover: #1b3bd0;
+  --primary-text: #ffffff;
+  --ring: #2448f0;
+  --page-ring: #ffffff;
+  --tint: #f2f4fd;
+  --danger: #c4141c;
+  --warning: #855600;
+}
+
+html {
+  --block-w: clamp(380px, 36vw, 500px);
+  --pad: 48px;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ─── The poster (left) ──────────────────────────────────────────────────── */
+
+.shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* The art covers the poster side only, so the mascot is cropped by the
+   block's edge and the window's bottom, like a print trimmed to size. */
+.art {
+  position: absolute;
+  inset: 0 var(--block-w) 0 0;
+  overflow: hidden;
+  container-type: size;
+}
+
+/* The grid, drawn: six columns of hairlines, the structure the title and
+   the block line up on. */
+.art-image {
+  position: absolute;
+  inset: 0 0 0 var(--pad);
+  background: repeating-linear-gradient(
+    to right,
+    var(--grid) 0 1px,
+    transparent 1px calc((100% - 1px) / 6)
+  );
+}
+
+.deco {
+  display: none;
+}
+
+/* Sized on the poster area (container units): as large as possible while
+   its visible part, bottom right, stays clear of the title and lead. The
+   source is 256 px, so it stops at 560 px before it turns visibly soft. */
+.art-mascot {
+  --size: min(76cqh, 66cqw, 560px);
+  position: absolute;
+  right: calc(var(--size) * -0.26);
+  bottom: calc(var(--size) * -0.3);
+  width: var(--size);
+  height: var(--size);
+}
+
+/* ─── Grid ───────────────────────────────────────────────────────────────── */
+
+/* Column one is the poster, column two the block. The block colour is the
+   grid's own ::before, spanning every row, so it stays one solid slab
+   whatever is shown in it. Rows two and five are springs that centre the
+   note and the actions in the block; the row gap stays zero because
+   empty tracks would still collect it. Row one is at least as tall as
+   the switches pinned at the top of the block, so a note never rides up
+   under them. */
+.main {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--block-w);
+  grid-template-rows: minmax(100px, auto) 1fr auto auto 1fr auto;
+  min-height: 100vh;
+}
+
+.main::before {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  content: "";
+  background: var(--block);
+}
+
+.content {
+  display: contents;
+}
+
+.brand {
+  grid-column: 1;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  justify-self: start;
+  gap: 10px;
+  padding: 36px var(--pad) 0;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.copy {
+  grid-column: 1;
+  grid-row: 2 / -1;
+  align-self: start;
+  padding: clamp(28px, 7vh, 72px) var(--pad) 0;
+}
+
+/* One word per line, whatever the language: the poster's stack. */
+.title {
+  width: min-content;
+  margin: 0;
+  font-size: min(9vw, 16vh, 140px);
+  font-weight: 860;
+  line-height: 0.88;
+  letter-spacing: -0.055em;
+}
+
+.lead {
+  max-width: 24ch;
+  margin-top: clamp(16px, 3vh, 28px);
+  color: var(--ink-soft);
+  font-size: 17px;
+  font-weight: 450;
+  line-height: 1.45;
+}
+
+.note {
+  grid-column: 2;
+  grid-row: 3;
+  margin: 0 var(--pad) 20px;
+}
+
+.actions {
+  grid-column: 2;
+  grid-row: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 var(--pad);
+  color: var(--block-ink);
+}
+
+/* ─── Controls (in the block) ────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0 16px;
+  border: 2px solid transparent;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-google {
+  border-color: var(--google-border);
+  background: var(--google);
+  color: var(--google-text);
+}
+
+.btn-google:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--google) 90%, var(--block));
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-text {
+  align-self: flex-start;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--block-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  color: var(--block-ink);
+}
+
+.password {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+/* "or" as a ruled line across the block, the word flush left like a
+   caption on the grid. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: var(--block-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.divider::after {
+  height: 2px;
+  flex: 1;
+  content: "";
+  background: var(--rule);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-icon {
+  position: absolute;
+  left: 14px;
+  width: 16px;
+  height: 16px;
+  color: var(--block-muted);
+  pointer-events: none;
+}
+
+.control:focus-within .field-icon {
+  color: var(--block-ink);
+}
+
+/* Square fields with a heavy rule, as if printed on the block. */
+.control input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px 0 40px;
+  border: 2px solid var(--field-border);
+  border-radius: 0;
+  outline: none;
+  background: var(--field);
+  color: var(--block-ink);
+  font-size: 15px;
+  transition: border-color 120ms ease;
+}
+
+.control input:hover {
+  border-color: var(--field-hover);
+}
+
+.control-secret input {
+  padding-right: 46px;
+}
+
+.control input:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.eye {
+  position: absolute;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--block-muted);
+  cursor: pointer;
+}
+
+.eye:hover {
+  color: var(--block-ink);
+}
+
+.eye svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── Messages ───────────────────────────────────────────────────────────── */
+
+.waiting {
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Messages are bars with a heavy left rule: the tone is carried by the
+   rule and a tinted text colour that stays AA on the block. */
+.pending,
+.note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-left: 4px solid var(--block-ink);
+  background: var(--tint);
+  color: var(--block-ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pending .matrix {
+  color: var(--block-ink);
+}
+
+.note[data-tone="warning"],
+.hint.hint-warning {
+  border-left-color: var(--warning);
+  color: var(--warning);
+}
+
+.note[data-tone="danger"],
+.hint[data-tone="danger"] {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.hint {
+  color: var(--block-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hint.hint-warning,
+.hint[data-tone="danger"] {
+  padding: 9px 14px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  background: var(--tint);
+}
+
+/* Seeded accounts, development only: dashed, plainly not the real path. */
+.dev {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 2px dashed var(--rule);
+  background: var(--tint);
+}
+
+.dev-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dev-hint,
+.dev-account {
+  color: var(--block-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dev-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dev-choice {
+  display: grid;
+  gap: 3px;
+  padding-top: 9px;
+  border-top: 1px solid var(--rule);
+}
+
+.dev-role {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dev-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.dev-submit {
+  min-height: 38px;
+  padding-block: 7px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* ─── Footer (in the block) ──────────────────────────────────────────────── */
+
+.footer {
+  grid-column: 2;
+  grid-row: 6;
+  margin: 28px var(--pad) 0;
+  padding: 14px 0 22px;
+  border-top: 2px solid var(--rule);
+  color: var(--block-ink);
+}
+
+.footnote {
+  color: var(--block-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 6px;
+}
+
+.legal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--block-muted);
+  font-size: 12px;
+  font-weight: 550;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.legal-link:hover {
+  color: var(--block-ink);
+}
+
+/* The switches head the block, top right, opposite the brand: they cost
+   the form no height. */
+.controls {
+  position: absolute;
+  top: 36px;
+  right: var(--pad);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--block-ink);
+}
+
+.locale {
+  display: inline-flex;
+  border: 2px solid var(--rule);
+}
+
+.locale-option {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--block-muted);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.locale-option:hover {
+  color: var(--block-ink);
+}
+
+/* The active language is the block's ink, solid: a printed tab. */
+.locale-option[aria-pressed="true"] {
+  background: var(--block-ink);
+  color: var(--block);
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--rule);
+  background: transparent;
+  color: var(--block-ink);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--block-ink);
+}
+
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible,
+.eye:focus-visible,
+.legal-link:focus-visible,
+.locale-option:focus-visible,
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+/* ─── Short windows ──────────────────────────────────────────────────────── */
+
+@media (max-height: 760px) {
+  html {
+    --pad: 40px;
+  }
+
+  .brand {
+    padding-top: 26px;
+  }
+
+  .controls {
+    top: 26px;
+  }
+
+  .actions,
+  .password {
+    gap: 11px;
+  }
+
+  .note {
+    margin-bottom: 14px;
+  }
+
+  .control input,
+  .btn {
+    height: 42px;
+    min-height: 42px;
+  }
+
+  .footer {
+    margin-top: 18px;
+    padding: 10px 0 14px;
+  }
+
+  .footnote {
+    display: none;
+  }
+
+  .legal-links {
+    margin-top: 0;
+  }
+
+  /* The block must hold the switches above the form: room for them. */
+  .main {
+    grid-template-rows: 76px 1fr auto auto 1fr auto;
+  }
+}
+
+/* ─── Narrow, tall windows: the poster above, the block below ───────────── */
+
+@media (max-width: 899px) and (min-height: 700px) {
+  html {
+    --poster-h: clamp(300px, 40vh, 440px);
+    --pad: 40px;
+  }
+
+  .art {
+    inset: 0 0 auto;
+    height: var(--poster-h);
+  }
+
+  /* Cropped off the top right corner here, clear of the title below it. */
+  .art-mascot {
+    --size: min(92cqh, 52cqw, 560px);
+    top: calc(var(--size) * -0.18);
+    right: calc(var(--size) * -0.2);
+    bottom: auto;
+  }
+
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--poster-h) auto auto 1fr auto;
+  }
+
+  .main::before {
+    grid-column: 1;
+    grid-row: 2 / -1;
+  }
+
+  .brand {
+    grid-row: 1;
+  }
+
+  .copy {
+    grid-row: 1;
+    align-self: end;
+    padding-bottom: 32px;
+  }
+
+  .title {
+    font-size: min(13vw, 104px);
+  }
+
+  .lead {
+    max-width: 34ch;
+  }
+
+  .note {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 32px;
+    margin-bottom: 0;
+  }
+
+  .actions {
+    grid-column: 1;
+    grid-row: 3;
+    padding-top: 32px;
+  }
+
+  .footer {
+    grid-column: 1;
+    grid-row: 5;
+  }
+
+  /* The switches sit on the block's top edge, right, across from where the
+     form begins. */
+  .controls {
+    top: calc(var(--poster-h) + 24px);
+  }
+
+  .actions {
+    padding-top: 72px;
+  }
+
+  .note:not([hidden]) ~ .actions {
+    padding-top: 20px;
+  }
+
+  .note {
+    margin-top: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .control input {
+    transition: none;
+  }
+}
+
+/* macOS: the traffic lights own the top left corner (x < 88, y < 46, see
+   signin-base.css); the brand steps to their right. */
+html[data-platform="darwin"] .brand {
+  margin-inline-start: 49px;
+}
+
+/* Windows: the caption buttons own the top right corner (y < 46, see
+   signin-base.css), right where the switches head the block: they drop
+   below the buttons, still inside row one (at least 100 px). */
+html[data-platform="win32"] .controls {
+  top: 56px;
+}
