@@ -853,7 +853,7 @@ function readBooleanDefault(value: string | undefined, fallback: boolean, name =
 }
 
 /** L'ancre indépendante d'edge-setup (docs/specs/EDGE_SETUP_V2/03-SUPPLY-CHAIN.md). */
-export const DEFAULT_CONNECTOR_RELEASES_URL = "https://openedbot.app/.well-known/edge-setup.json";
+export const DEFAULT_CONNECTOR_RELEASES_URL = "https://releases.openedbot.app/edge-setup/edge-setup.json";
 
 function readConnectorReleasesUrl(value: string | undefined, environment: ApiEnvironment): string | null {
   const text = value?.trim() ?? "";

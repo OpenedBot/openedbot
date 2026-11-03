@@ -34,7 +34,7 @@ export type RuntimeHermesUpdateDto = {
 
 /**
  * La dernière release publique d'edge-setup, telle que l'API l'a lue (l'ancre
- * `openedbot.app/.well-known/edge-setup.json`, ou la release d'un miroir) :
+ * `releases.openedbot.app/edge-setup/edge-setup.json`, ou la release d'un miroir) :
  * ses notes sont la section du CHANGELOG, en markdown borné, sans HTML, ou
  * vides quand l'ancre n'en porte pas.
  */

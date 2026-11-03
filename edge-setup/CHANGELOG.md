@@ -10,6 +10,25 @@ La numérotation repart de v0.0.1 avec le dépôt autonome et la nouvelle origin
 de téléchargement. Les versions v0.2.0 à v1.4.0, publiées depuis l'ancien
 dépôt, restent listées plus bas pour l'historique.
 
+## v1.0.0 - 2026-11-03
+
+Première version stable d'edge-setup, publiée avec l'ouverture d'openedbot à tous. Elle reprend tout ce qu'apportait v0.0.5, sans changement de comportement.
+
+### Changé
+
+- Le numéro de version passe à 1.0.0. Une machine en v0.0.x voit cette version comme une mise à jour et peut la prendre avec `edge-setup upgrade`.
+- La console d'openedbot lit désormais la dernière version publiée directement à la source des téléchargements : « mise à jour disponible » apparaît dès qu'une nouvelle version sort, sans intervention de notre part.
+
+### Migration
+
+- Une machine encore équipée d'une version de l'ancien dépôt (v1.0.0 à v1.4.0) voit cette version comme identique ou plus ancienne, et la mise à jour automatique ne fait pas ce saut seule. Lancez une fois :
+
+```bash
+sudo edge-setup upgrade --yes --allow-downgrade --release-url https://releases.openedbot.app/edge-setup
+```
+
+Les mises à jour suivantes reprennent le geste habituel : `sudo edge-setup upgrade --yes`.
+
 ## v0.0.5 - 2026-11-03
 
 ### Sécurité
@@ -192,7 +211,7 @@ Mise à jour : `sudo edge-setup upgrade --yes`, puis `sudo edge-setup up --yes` 
 
 Mise à jour : `sudo edge-setup upgrade --yes`
 
-## v1.0.0 - 2026-10-17
+## v1.0.0 (ancien dépôt) - 2026-10-17
 
 ### Première version stable, alignée sur OHBot 1.0
 

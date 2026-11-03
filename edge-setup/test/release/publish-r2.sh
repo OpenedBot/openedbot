@@ -88,7 +88,13 @@ done
 puts="$(grep '^PUT ' "$tmp/run/log" | sed 's#.*/objects/##')"
 last_put="$(tail -n 1 <<<"$puts")"
 [[ "$last_put" == edge-setup/LATEST ]] || fail "LATEST is not written last (last: $last_put)"
-[[ "$(tail -n 2 <<<"$puts" | head -n 1)" == edge-setup/SHA256SUMS ]] || fail "the unversioned manifest is not written right before LATEST"
+[[ "$(tail -n 2 <<<"$puts" | head -n 1)" == edge-setup/edge-setup.json ]] || fail "the anchor is not written right before LATEST"
+[[ "$(tail -n 3 <<<"$puts" | head -n 1)" == edge-setup/SHA256SUMS ]] || fail "the unversioned manifest is not written right before the anchor"
+anchor="$tmp/run/store/edge-setup%edge-setup.json"
+[[ "$(jq -r '.tool.version' "$anchor")" == v0.0.1 ]] || fail "the anchor does not name v0.0.1"
+[[ "$(jq -r '.tool.sha256["edge-setup_linux_amd64"]' "$anchor")" == "$(awk '$2 == "edge-setup_linux_amd64" { print $1 }' "$tmp/run/dist/SHA256SUMS")" ]] || fail "the anchor digest differs from SHA256SUMS"
+[[ "$(jq '.tool.sha256 | length' "$anchor")" == "$(grep -c . "$tmp/run/dist/SHA256SUMS")" ]] || fail "the anchor does not list every file of SHA256SUMS"
+grep -q '^GET https://releases.example.test/edge-setup/edge-setup.json' "$tmp/run/log" || fail "no public read-back of the anchor"
 [[ "$(grep '^edge-setup/v0.0.1/' <<<"$puts" | tail -n 1)" == edge-setup/v0.0.1/SHA256SUMS ]] || fail "the versioned manifest is not the last versioned write"
 grep -q '^GET https://releases.example.test/edge-setup/LATEST' "$tmp/run/log" || fail "no public read-back of LATEST"
 first_latest="$(grep -n '^edge-setup/[^v]' <<<"$puts" | head -n 1 | cut -d: -f1)"
@@ -107,6 +113,7 @@ grep -q 'already published' "$tmp/run/out" || { cat "$tmp/run/out"; fail "no imm
 setup
 if FAKE_FAIL_KEY=edge-setup/v0.0.2/edge-setup_linux_arm64 run_publish v0.0.2 > "$tmp/run/out" 2>&1; then fail "a failed write was ignored"; fi
 ! stored edge-setup/SHA256SUMS || fail "latest manifest written after a failed versioned write"
+! stored edge-setup/edge-setup.json || fail "anchor written after a failed versioned write"
 ! stored edge-setup/LATEST || fail "LATEST written after a failed versioned write"
 
 # 3b. An unsigned dist is refused before any call.

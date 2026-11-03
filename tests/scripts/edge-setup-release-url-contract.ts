@@ -6,12 +6,12 @@
 // an anonymous download from it can only fail, and it is no longer the public
 // origin a host trusts. The public origin is
 // https://releases.openedbot.app/edge-setup, the console feed reads
-// https://openedbot.app/.well-known/edge-setup.json. The URL used to be
+// https://releases.openedbot.app/edge-setup/edge-setup.json. The URL used to be
 // copied into each file below; one of them drifting back would silently
 // restore a dead install or upgrade path.
 
 const ORIGIN = "https://releases.openedbot.app/edge-setup";
-const ANCHOR = "https://openedbot.app/.well-known/edge-setup.json";
+const ANCHOR = "https://releases.openedbot.app/edge-setup/edge-setup.json";
 
 // Every file of this repository that carries a default of the release path,
 // and the constant it must hold. The host side (selfupdate.go, its Makefile,

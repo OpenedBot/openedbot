@@ -8,8 +8,9 @@ import { logger } from "@openedbot/platform-observability";
  * `RUNTIME_CONNECTOR_LATEST_VERSION` était posée à la main dans le secret de
  * la prod, et restait en retard (v0.5.8 annoncée le jour où v0.5.9 sortait) :
  * aucun propriétaire ne voyait « mise à jour disponible ». Le flux lit l'ancre
- * indépendante `https://openedbot.app/.well-known/edge-setup.json`
- * (docs/specs/EDGE_SETUP_V2/03-SUPPLY-CHAIN.md), ou le JSON d'une release
+ * `https://releases.openedbot.app/edge-setup/edge-setup.json`, que la
+ * publication d'une release écrit juste avant `LATEST`
+ * (edge-setup/scripts/publish-r2.sh), ou le JSON d'une release
  * GitHub si l'URL configurée vise encore un miroir, relève la dernière version
  * dans l'objet vivant `config.connectorVersions` (lu à chaque requête par les
  * routes et par le gateway du lien) et garde ses notes pour la modale de la
