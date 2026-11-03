@@ -268,6 +268,10 @@ begin
   if tenant is null or tenant is distinct from p_organization_id then
     raise exception 'organization context mismatch' using errcode = '42501', hint = 'TENANT_MISMATCH';
   end if;
+  -- Un seul écrivain de baux YOLO à la fois par organisation, avant tout verrou de
+  -- ligne : fonctions SQL, ingestion `yolo.state` du lien et passe du worker
+  -- prennent ce même verrou, donc jamais de verrous de baux dans deux ordres.
+  perform pg_advisory_xact_lock(hashtextextended('permission_yolo:' || p_organization_id::text, 0));
   select true into organization_found
     from public.organizations o
    where o.id = p_organization_id and o.deleted_at is null
@@ -441,6 +445,10 @@ begin
   if tenant is null or tenant is distinct from p_organization_id then
     raise exception 'organization context mismatch' using errcode = '42501', hint = 'TENANT_MISMATCH';
   end if;
+  -- Un seul écrivain de baux YOLO à la fois par organisation, avant tout verrou de
+  -- ligne : fonctions SQL, ingestion `yolo.state` du lien et passe du worker
+  -- prennent ce même verrou, donc jamais de verrous de baux dans deux ordres.
+  perform pg_advisory_xact_lock(hashtextextended('permission_yolo:' || p_organization_id::text, 0));
   select true into organization_found
     from public.organizations o
    where o.id = p_organization_id and o.deleted_at is null

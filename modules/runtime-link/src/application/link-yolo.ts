@@ -163,6 +163,16 @@ async function revokeByHost(
   return rows.map((row) => row.leaseId);
 }
 
+/**
+ * Le verrou des écrivains de baux YOLO d'une organisation (le même que les
+ * fonctions SQL de 0165-0167 et la passe du worker), pris avant tout verrou de
+ * ligne : sans lui, « Couper YOLO partout » et un `yolo.state` de l'hôte
+ * verrouillaient les mêmes baux dans deux ordres (deadlock).
+ */
+export async function lockYoloLeases(tx: TransactionDb, organizationId: string): Promise<void> {
+  await tx`select pg_advisory_xact_lock(hashtextextended(${`permission_yolo:${organizationId}`}, 0))`;
+}
+
 export type LinkYoloPersistenceOptions = {
   /** Origine de la PWA, pour le lien de l'e-mail de quarantaine ; vide : pas de bouton. */
   webAppUrl?: string;
@@ -176,6 +186,7 @@ export function createLinkYoloPersistence(db: Db, options: LinkYoloPersistenceOp
   return {
     async yoloState(link, frame): Promise<YoloStateOutcome> {
       return withTenant(db, link.organizationId, async (tx) => {
+        await lockYoloLeases(tx, link.organizationId);
         await linkedRuntime(tx, link);
         const states = frame.leases;
         const listed = states.map((state) => state.leaseId);

@@ -83,6 +83,8 @@ paths = [
   '''^modules/execution/tests/fixtures/yolo-lease/lease-v1\.json$''',
   '''^edge-setup/test/golden/relay-frames/vectors\.json$''',
   '''^platform/hermes/tests/fixtures/relay-frames\.vectors\.json$''',
+  # Only in the history of the YOLO series (removed by PR 3/8), same sample.
+  '''^platform/hermes/tests/fixtures/relay-frames-yolo\.vectors\.json$''',
 ]
 regexes = ['''^08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279$''']
 

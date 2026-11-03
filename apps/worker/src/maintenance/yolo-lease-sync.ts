@@ -2,7 +2,7 @@ import type { SQL } from "bun";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { YOLO_SOLO_RENEW_BEFORE_SECONDS } from "@openedbot/execution/application/yolo-leases";
-import { yoloLeaseFrameOf, type YoloHostFrame } from "@openedbot/runtime-link/application/link-yolo";
+import { lockYoloLeases, yoloLeaseFrameOf, type YoloHostFrame } from "@openedbot/runtime-link/application/link-yolo";
 import { LINK_CONTROL_CALL_TIMEOUT_MS, type LinkControlOptions, type LinkFetch } from "@openedbot/runtime-link/application/runtime-links";
 
 /**
@@ -150,6 +150,7 @@ export async function syncYoloLeases(
     if (signal?.aborted) return pass;
     cursor = organizationId;
     const { due, soloDue } = await withTenant(db as unknown as Db, organizationId, async (tx) => {
+      await lockYoloLeases(tx, organizationId);
       const expired = await tx`
         update permission_yolo_leases
            set host_state = 'expired', host_state_reason = 'window_elapsed', host_state_at = now()
