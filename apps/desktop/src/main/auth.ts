@@ -1,6 +1,6 @@
 import { net, shell } from "electron";
 import { createHash, randomBytes } from "node:crypto";
-import type { PasswordCredentials, SigninState } from "../shared/bridge";
+import type { PasswordCredentials, SigninLocale, SigninState } from "../shared/bridge";
 import type { DesktopConfig } from "./config";
 import { trustedConsoleOrigins } from "./target";
 import { log } from "./log";
@@ -24,7 +24,7 @@ export type AuthEvents = {
 };
 
 /** What a token consumer other than the console (the hosted popup) gets: never the refresh token. */
-export type AccessGrant = { accessToken: string; accessTokenExpiresAt: string; organizationId: string };
+export type AccessGrant = { accessToken: string; accessTokenExpiresAt: string; organizationId: string | null };
 
 export type AuthService = {
   /** Loads the persisted session, if any. Call once after app ready (safeStorage needs it). */
@@ -42,9 +42,13 @@ export type AuthService = {
   readAccess(options: { force: boolean; servedToken?: string | null }): Promise<AccessGrant | null>;
   /** Fire and forget: progress is reported through events.onSigninState. */
   startSignIn(): void;
-  /** Email and password through POST /api/auth/native/authorize. Same reporting as startSignIn. */
+  /** Email and password through POST /api/auth/native/authorize. Same reporting as startSignIn. Local fallback page only. */
   signInWithPassword(credentials: PasswordCredentials): void;
-  /** Drops the attempt in progress (Google or password) and goes back to idle. */
+  /** Asks the API to e-mail a one-time code (POST /api/auth/login/code): sending, then code_sent or error. */
+  requestEmailCode(email: string, locale: SigninLocale): void;
+  /** Checks the code (POST /api/auth/native/code/verify, PKCE) and signs in: verifying, then error or onSignedIn. */
+  verifyEmailCode(email: string, code: string): void;
+  /** Drops the attempt in progress (Google, password or code) and goes back to idle. */
   cancelSignIn(): void;
   /** The browser step is over (deep link or loopback hit): poll now instead of waiting. */
   nudge(): void;
@@ -346,12 +350,44 @@ export function createAuthService(deps: AuthDeps): AuthService {
     }
   }
 
-  // The API checks the password and e-mail code before handing back the PKCE
-  // authorization code, exchanged like the Google one.
-  async function runPasswordSignIn(current: AbortController, credentials: PasswordCredentials): Promise<void> {
-    const { signal } = current;
-    const { codeVerifier, codeChallenge } = createPkce();
+  // One attempt at a time: a pending Google tab must not land a second
+  // session. The previous attempt is aborted before this one starts.
+  function beginAttempt(run: (current: AbortController) => Promise<void>): void {
+    cancelSignIn();
+    const current = new AbortController();
+    attempt = current;
+    void run(current);
+  }
+
+  // The non-Google doors: report a failure unless the attempt was dropped.
+  // ApiError messages carry the status and code only, never the body; nothing
+  // here logs the e-mail, the password or the code.
+  async function runAttempt(current: AbortController, label: string, work: (signal: AbortSignal) => Promise<void>): Promise<void> {
     try {
+      await work(current.signal);
+    } catch (error) {
+      if (current.signal.aborted) return;
+      log.error(`${label} failed`, error);
+      events.onSigninState({ status: "error", ...failure(error) });
+    } finally {
+      if (attempt === current) attempt = null;
+    }
+  }
+
+  // The PKCE authorization code an API door handed back, exchanged like the Google one.
+  async function completeSignIn(code: unknown, codeVerifier: string, signal: AbortSignal): Promise<void> {
+    if (typeof code !== "string") throw new SignInError("BAD_RESPONSE", "Réponse inattendue du serveur de connexion.");
+    const next = await exchangeTokens({ grantType: "authorization_code", code, codeVerifier, redirectUri }, signal);
+    if (signal.aborted) return;
+    setTokens(next);
+    events.onSignedIn();
+  }
+
+  // The API checks the password and e-mail code before handing back the PKCE
+  // authorization code.
+  function runPasswordSignIn(current: AbortController, credentials: PasswordCredentials): Promise<void> {
+    return runAttempt(current, "password sign-in", async (signal) => {
+      const { codeVerifier, codeChallenge } = createPkce();
       events.onSigninState({ status: "submitting" });
       const authorized = await postJson<{ status?: unknown; code?: unknown }>(
         "/api/auth/native/authorize",
@@ -369,22 +405,34 @@ export function createAuthService(deps: AuthDeps): AuthService {
         events.onSigninState({ status: "code_required" });
         return;
       }
-      if (typeof authorized?.code !== "string") throw new SignInError("BAD_RESPONSE", "Réponse inattendue du serveur de connexion.");
-      const next = await exchangeTokens(
-        { grantType: "authorization_code", code: authorized.code, codeVerifier, redirectUri },
+      await completeSignIn(authorized?.code, codeVerifier, signal);
+    });
+  }
+
+  // E-mail code, step one: the same request as the web /login, the code goes
+  // to the inbox. Nothing comes back but the acknowledgement.
+  function runEmailCodeRequest(current: AbortController, email: string, locale: SigninLocale): Promise<void> {
+    return runAttempt(current, "e-mail code request", async (signal) => {
+      events.onSigninState({ status: "sending" });
+      await postJson<unknown>("/api/auth/login/code", { email, locale }, signal);
+      if (signal.aborted) return;
+      events.onSigninState({ status: "code_sent", email });
+    });
+  }
+
+  // E-mail code, step two: the API checks the code and, instead of the web
+  // cookie, hands back a PKCE authorization code for this verifier.
+  function runEmailCodeVerify(current: AbortController, email: string, code: string): Promise<void> {
+    return runAttempt(current, "e-mail code sign-in", async (signal) => {
+      const { codeVerifier, codeChallenge } = createPkce();
+      events.onSigninState({ status: "verifying" });
+      const verified = await postJson<{ code?: unknown }>(
+        "/api/auth/native/code/verify",
+        { email, code, codeChallenge, redirectUri, clientId: config.clientId },
         signal,
       );
-      if (signal.aborted) return;
-      setTokens(next);
-      events.onSignedIn();
-    } catch (error) {
-      if (signal.aborted) return;
-      // ApiError messages carry the status and code only, never the body.
-      log.error("password sign-in failed", error);
-      events.onSigninState({ status: "error", ...failure(error) });
-    } finally {
-      if (attempt === current) attempt = null;
-    }
+      await completeSignIn(verified?.code, codeVerifier, signal);
+    });
   }
 
   function cancelSignIn(): void {
@@ -415,11 +463,15 @@ export function createAuthService(deps: AuthDeps): AuthService {
     },
 
     signInWithPassword(credentials: PasswordCredentials): void {
-      // One attempt at a time: a pending Google tab must not land a second session.
-      cancelSignIn();
-      const current = new AbortController();
-      attempt = current;
-      void runPasswordSignIn(current, credentials);
+      beginAttempt((current) => runPasswordSignIn(current, credentials));
+    },
+
+    requestEmailCode(email: string, locale: SigninLocale): void {
+      beginAttempt((current) => runEmailCodeRequest(current, email, locale));
+    },
+
+    verifyEmailCode(email: string, code: string): void {
+      beginAttempt((current) => runEmailCodeVerify(current, email, code));
     },
 
     cancelSignIn(): void {

@@ -2,13 +2,16 @@ import {
   RiAddFill,
   RiArrowLeftSLine,
   RiArrowRightSLine,
-  RiCustomerService2Line,
   RiHome5Line,
   RiInboxLine,
+  RiLogoutBoxRLine,
+  RiMoonLine,
   RiSearchLine,
   RiSettings3Line,
   RiSideBarLine,
+  RiSunLine,
 } from "@remixicon/react";
+import { IconServerBolt } from "@tabler/icons-react";
 import { Skeleton, SkeletonListRow, SkeletonRegion, useIsMobile } from "@openedbot/browser-ui-kit";
 import { Loader2 } from "lucide-react";
 import { activeOwnFleetHint } from "../../pro-console/slots";
@@ -21,6 +24,10 @@ import { isConversationPath, readBootSidebarShape, type BootSidebarShape } from 
 import { BAR_ICON_BUTTON, useBoardChrome } from "../boardui/board-chrome";
 import { useAccountLayout } from "../../lib/shell/account-layout";
 import { ConversationBodySkeleton, HeaderActionsSkeleton, HeaderTitleSkeleton } from "../thread-skeleton";
+import { RAIL_BUTTON, RAIL_DIVIDER } from "../boardui/board-rails";
+import { SettingsPage, SettingsPageSidebar } from "../boardui/settings-modal";
+import { isSettingsEntryActive, SETTINGS_GROUPS } from "../dashboard/settings-sidebar";
+import { settingsBodySkeletonFor } from "../../screens/settings/settings-skeletons";
 
 /**
  * Loading states of the app frame. Their geometry is the real one
@@ -88,12 +95,19 @@ const TOP_TOOL = "flex h-9 items-center justify-center rounded-full bg-backgroun
 const NAV_ROW = "flex h-8 items-center gap-2.5 px-2.5 text-[13px] leading-[18px] font-medium text-text-primary [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-foreground-icon-secondary";
 
 /**
- * Variante C (dev, `BoardIconRail` de board-rails.tsx) : le rail de 56 px,
- * logo à la hauteur de la barre du haut, Salon et À traiter en
- * haut ; Support, Réglages et l'avatar du compte (qui pulse) en bas.
+ * Variante C (`BoardIconRail` de board-rails.tsx) : le rail de 56 px, logo à
+ * la hauteur de la barre du haut, Salon et À traiter en haut ; en bas, ce que
+ * le rail porte toujours : le runtime (pastille neutre, comme pendant sa
+ * première lecture), le thème et la langue de l'appareil, Réglages et la
+ * déconnexion. Les quotas et le Support dépendent de données : ils
+ * apparaissent au-dessus, le bas du rail est ancré, rien ne bouge.
  */
 function RailSkeleton() {
-  const icon = "flex size-9 items-center justify-center text-foreground-icon-secondary [&>svg]:size-[18px]";
+  const { locale } = useT();
+  // La classe posée par `index.html` avant la première peinture : la même
+  // source que le thème, sans dépendre de son fournisseur.
+  const dark = globalThis.document?.documentElement.classList.contains("dark") ?? false;
+  const icon = `${RAIL_BUTTON} pointer-events-none`;
   return (
     <div aria-hidden data-board-icon-rail="" className={`flex h-full min-h-0 w-14 shrink-0 flex-col items-center pb-3 ${ON_SURFACE}`}>
       <div data-titlebar-rail-logo="" className="flex h-[46px] shrink-0 items-center justify-center">
@@ -105,9 +119,18 @@ function RailSkeleton() {
       </div>
       <div className="flex-1" />
       <div className="flex shrink-0 flex-col items-center gap-1.5">
-        <span className={icon}><RiCustomerService2Line /></span>
+        <span className={icon}>
+          <IconServerBolt />
+          <span className="absolute right-1 bottom-1 inline-flex size-2.5">
+            <span className="relative size-2.5 rounded-full bg-muted-foreground/30 ring-2 ring-background" />
+          </span>
+        </span>
+        <span className={RAIL_DIVIDER} />
+        <span className={icon}>{dark ? <RiSunLine /> : <RiMoonLine />}</span>
+        <span className={icon}><span className="text-[11px] leading-none font-semibold tracking-wide uppercase">{locale}</span></span>
+        <span className={RAIL_DIVIDER} />
         <span className={icon}><RiSettings3Line /></span>
-        <Skeleton className="mt-1.5 size-10 rounded-full" />
+        <span className={icon}><RiLogoutBoxRLine /></span>
       </div>
     </div>
   );
@@ -126,7 +149,7 @@ function SidebarSkeleton({ railShell }: { railShell: boolean }) {
               <RiSearchLine className="size-4 shrink-0" />
               <span className="truncate text-body-2-medium text-text-tertiary">{t("boardui.searchPlaceholder")}</span>
             </span>
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-button-primary text-text-white">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary">
               <RiAddFill className="size-[18px]" />
             </span>
           </div>
@@ -135,7 +158,7 @@ function SidebarSkeleton({ railShell }: { railShell: boolean }) {
           <div aria-hidden className="grid h-9 min-w-0 flex-1 grid-cols-3 gap-2">
             <span className={TOP_TOOL}><RiSearchLine className="size-5" /></span>
             <span />
-            <span className="flex h-9 items-center justify-center rounded-full bg-button-primary text-text-white">
+            <span className="flex h-9 items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary">
               <RiAddFill className="size-5" />
             </span>
           </div>
@@ -164,7 +187,12 @@ function SidebarSkeleton({ railShell }: { railShell: boolean }) {
  * on a conversation the breadcrumb (`Salon > face name`) and its actions.
  * With the sidebar folded, its search and `+` move up here.
  */
-function TopBarSkeleton({ conversation, organization }: { conversation: boolean; organization: boolean }) {
+function TopBarSkeleton({ conversation, organization, title }: {
+  conversation: boolean;
+  organization: boolean;
+  /** Le titre connu d'avance (une rubrique des réglages) : « Salon › titre », comme `BoardHeader`. */
+  title?: string | null;
+}) {
   const { t } = useT();
   const collapsed = useBoardChrome((state) => state.collapsed);
   const bootLabel = readBootIdentityLabel(readCloudSession()?.userId);
@@ -185,7 +213,7 @@ function TopBarSkeleton({ conversation, organization }: { conversation: boolean;
       {collapsed ? (
         <span aria-hidden className="flex items-center gap-1">
           <span className={BAR_ICON_BUTTON}><RiSearchLine className="size-[18px]" /></span>
-          <span className="ms-1 inline-flex size-[30px] items-center justify-center rounded-full bg-button-primary text-text-white">
+          <span className="ms-1 inline-flex size-[30px] items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary">
             <RiAddFill className="size-[18px]" />
           </span>
           <span className="ms-2 me-1 h-[18px] w-px bg-border-button-default" />
@@ -204,9 +232,23 @@ function TopBarSkeleton({ conversation, organization }: { conversation: boolean;
           </span>
           <HeaderActionsSkeleton />
         </span>
+      ) : title ? (
+        <span aria-hidden className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
+          <span className="shrink-0 px-1 text-body-2-medium whitespace-nowrap text-text-secondary">{t("overviewPlaceholder.nav")}</span>
+          <span className="shrink-0 text-text-tertiary">›</span>
+          <span className="flex h-[30px] min-w-0 items-center gap-2 px-1.5 text-body-2-medium font-semibold text-text-primary">
+            <span className="min-w-0 truncate">{title}</span>
+          </span>
+        </span>
       ) : null}
     </div>
   );
+}
+
+/** Le chemin interne d'une rubrique des réglages (`/settings/...`), ou `null` hors des réglages. */
+export function settingsPathOf(pathname: string): string | null {
+  const internal = pathname.replace(/^\/o\/[^/]+/, "").replace(/\/+$/, "") || "/";
+  return internal === "/settings" || internal.startsWith("/settings/") ? internal : null;
 }
 
 /**
@@ -272,6 +314,15 @@ export function AppFrameSkeleton() {
   const pathname = globalThis.location?.pathname ?? "";
   const conversation = isConversationPath(pathname);
   const railShell = useAccountLayout() === "c";
+  // Une rubrique des réglages est une page du cadre : son menu à la place de
+  // la barre des conversations, son titre dans la barre, son corps dans la carte.
+  const settingsPath = settingsPathOf(pathname);
+  const settingsItem = settingsPath
+    ? SETTINGS_GROUPS.flatMap((group) => group.items).find((item) =>
+      isSettingsEntryActive(settingsPath, item.url, item.exact)
+      || (item.also ?? []).some((url) => isSettingsEntryActive(settingsPath, url)))
+    : undefined;
+  const SettingsBody = settingsPath ? settingsBodySkeletonFor(settingsPath) : null;
   // A client address of an agency, the agency's own team and profile pages, or
   // a shared address (`/support`) while an agency is the active organization,
   // draw the agency frame, not the personal one.
@@ -291,12 +342,17 @@ export function AppFrameSkeleton() {
     >
       {railShell ? <RailSkeleton /> : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <TopBarSkeleton conversation={conversation} organization={!railShell} />
+        <TopBarSkeleton
+          conversation={conversation}
+          organization={!railShell}
+          title={settingsItem ? t(settingsItem.titleKey) : null}
+        />
         <div className="flex min-h-0 min-w-0 flex-1">
-          {collapsed ? null : <SidebarSkeleton railShell={railShell} />}
+          {settingsPath ? <SettingsPageSidebar signOut={false} /> : collapsed ? null : <SidebarSkeleton railShell={railShell} />}
           <div className="flex min-h-0 min-w-0 flex-1 px-3 pb-3">
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-clip rounded-3xl bg-background-secondary-default">
               {conversation ? <ConversationBodySkeleton /> : null}
+              {SettingsBody ? <SettingsPage><SettingsBody /></SettingsPage> : null}
             </div>
           </div>
         </div>

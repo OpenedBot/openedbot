@@ -30,8 +30,9 @@ export function workspaceRoutes(db: Db, options: WorkspaceRouteOptions): Hono<{ 
 
   /**
    * « Définir votre organisation » : la seule porte qui crée une organisation.
-   * Une session web encore sans organisation y est rattachée dans la foulée,
-   * pour que la requête suivante ouvre directement le nouvel espace.
+   * Une session encore sans organisation (web, ou native du desktop) y est
+   * rattachée dans la foulée, pour que la requête suivante ouvre directement
+   * le nouvel espace. Une session qui en a déjà une n'est pas touchée.
    */
   routes.post("/organizations", async (c) => {
     const auth = c.get("auth");
@@ -49,9 +50,7 @@ export function workspaceRoutes(db: Db, options: WorkspaceRouteOptions): Hono<{ 
     const created: CreatedOrganizationDto = await createOrganization(
       db, { kind: kind as OrganizationKind, name }, auth.userId, options.environment, options.billingEnforced,
     );
-    if (auth.kind === "web") {
-      await attachSessionOrganization(db, auth.credentialHash, auth.sessionId, created.organizationId);
-    }
+    await attachSessionOrganization(db, auth.credentialHash, auth.sessionId, created.organizationId);
     return c.json(created, 201);
   });
 

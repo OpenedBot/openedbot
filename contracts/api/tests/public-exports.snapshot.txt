@@ -71,6 +71,7 @@ type BotProfileCarried
 type BotProfileCredentialDto
 type BotProfileLost
 type BotProfileModelSyncDto
+type BotProfileProvisionProgress
 type BotProfileRepairDto
 type BotProfileRepairInput
 type BotProfileStatusDto
@@ -233,6 +234,7 @@ type RuntimeExposureStoredKind
 type RuntimeGatewayRestartDto
 type RuntimeGatewayStatusDto
 type RuntimeHealthStatus
+type RuntimeHermesUpdateDto
 type RuntimeHostProfileDto
 type RuntimeIntegrationInventoryDto
 type RuntimeIntegrationMcpCatalogEntryDto
@@ -275,6 +277,7 @@ type RuntimeReachability
 type RuntimeTestDto
 type SectionDto
 type SectionOrderInput
+type SectionsOrderInput
 type SendMessageAccepted
 type ShapeId
 type SupportAttachmentDto

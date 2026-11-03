@@ -57,7 +57,7 @@ func TestMCPOAuthLifecycleIsProvenByTheProgramNotByTheCallback(t *testing.T) {
 		},
 	}
 	srv := serve(t, s)
-	if got := s.features(); len(got) != 6 || got[5] != "mcp_oauth" {
+	if got := s.features(); len(got) != 7 || got[5] != "mcp_oauth" || got[6] != SkillsInventoryFeature {
 		t.Fatalf("features %v", got)
 	}
 
@@ -164,7 +164,7 @@ func TestMCPOAuthRefusals(t *testing.T) {
 	s := &Server{Probe: (&probeRecorder{}).probe()}
 	srv := serve(t, s)
 	// No program installed: not announced, and refused when asked anyway.
-	if got := s.features(); len(got) != 5 || got[2] != "mcp_management" || got[3] != "profile_inventory" || got[4] != "model_context" {
+	if got := s.features(); len(got) != 6 || got[2] != "mcp_management" || got[3] != "profile_inventory" || got[4] != "model_context" || got[5] != SkillsInventoryFeature {
 		t.Fatalf("features %v", got)
 	}
 	if st, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb"}`); st != 503 || errorCode(out) != "OAUTH_UNAVAILABLE" {

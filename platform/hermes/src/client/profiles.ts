@@ -41,6 +41,7 @@ import {
   parseProfileBundledSkillsState as parseProfileBundledSkillsStateResponse,
   parseProfileSkillState as parseProfileSkillStateResponse,
   parseProfileToolsetState as parseProfileToolsetStateResponse,
+  parseProfileToolsetsBatch,
   parseApprovalPolicyState as parseApprovalPolicyStateResponse,
   validBlockedTools,
   PROFILE_MODEL_TOKEN_PATTERN,
@@ -84,11 +85,22 @@ export async function hostProfileAvatar(ctx: HermesClientContext, slug: string):
   return parseHostProfileAvatarResponse(contentType, bytes);
 }
 
+/**
+ * `bundledSkills: false` turns the skills shipped with Hermes off in the probe
+ * that creates the profile, one interpreter less on a new bot (VM 240,
+ * 2026-11-02). A host that does not know the field ignores it (non-strict
+ * body) and answers without `bundledSkills`: the caller then writes them.
+ */
+export type HermesHostProfileCreateRequest = HermesHostProfileCreateOptions & { bundledSkills?: false };
+
+/** The created profile and, when asked and proven, its bundled-skills state. */
+export type HermesCreatedHostProfileResult = HermesCreatedHostProfile & { bundledSkills?: HermesProfileBundledSkillsState };
+
 export async function hostCreateProfile(
   ctx: HermesClientContext,
   name: string,
-  displayNameOrOptions?: string | HermesHostProfileCreateOptions,
-): Promise<HermesCreatedHostProfile> {
+  displayNameOrOptions?: string | HermesHostProfileCreateRequest,
+): Promise<HermesCreatedHostProfileResult> {
   if (!PROFILE_SLUG_PATTERN.test(name) || name === "default") {
     throw new HermesClientError("Le slug de profil Hermes est invalide.", 400, "PROFILE_INVALID");
   }
@@ -106,12 +118,14 @@ export async function hostCreateProfile(
   if (provider && (!PROFILE_MODEL_TOKEN_PATTERN.test(provider) || !PROFILE_MODEL_TOKEN_PATTERN.test(model!))) {
     throw new HermesClientError("Le fournisseur ou le modèle du profil Hermes est invalide.", 400, "BODY_INVALID");
   }
-  const body: Record<string, string> = { name };
+  const body: Record<string, string | boolean> = { name };
   if (options.displayName !== undefined) body.displayName = options.displayName;
   if (provider && model) {
     body.provider = provider;
     body.model = model;
   }
+  const bundledSkillsOff = "bundledSkills" in options && options.bundledSkills === false;
+  if (bundledSkillsOff) body.bundledSkills = false;
   const response = await ctx.hostRequest(
     "/hermes-setup/profiles",
     {
@@ -123,7 +137,20 @@ export async function hostCreateProfile(
     PROFILE_MUTATION_TIMEOUT_MS,
   );
   if (!response.ok) await ctx.throwProviderResponse(response);
-  return parseHostProfileCreateResultResponse(await ctx.providerJson(response));
+  const json = await ctx.providerJson(response);
+  const created: HermesCreatedHostProfileResult = parseHostProfileCreateResultResponse(json);
+  const answered = bundledSkillsOff && json && typeof json === "object" ? (json as Record<string, unknown>).bundledSkills : undefined;
+  if (answered !== undefined) {
+    // Anything but a coherent state for THIS profile, turned off, is no
+    // proof: the caller writes the bundled skills itself.
+    try {
+      const state = parseProfileBundledSkillsStateResponse(answered);
+      if (state.profile === name && state.requested === false) created.bundledSkills = state;
+    } catch {
+      // Unreadable: left out, as if the host had not answered it.
+    }
+  }
+  return created;
 }
 
 /**
@@ -223,6 +250,41 @@ export async function hostSetProfileToolset(ctx: HermesClientContext, profile: s
   );
   if (!response.ok) await ctx.throwProviderResponse(response);
   return parseProfileToolsetStateResponse(await ctx.providerJson(response));
+}
+
+/** `POST /hermes-setup/profiles/{slug}/toolsets`, annoncée par l'hôte sous ce nom. */
+export const PROFILE_TOOLSETS_BATCH_FEATURE = "profile_toolsets_batch";
+/** Twin of `maxProfileToolsetsBatch` (edge-setup/internal/operator/profile_toolsets_batch.go). */
+export const PROFILE_TOOLSETS_BATCH_MAX = 32;
+
+/**
+ * Plusieurs toolsets d'un profil en une écriture (`profile_toolsets_batch`) :
+ * un appel CLI par sens sur l'hôte au lieu d'un par toolset. Rend un état
+ * relu par nom, dans l'ordre des noms ; un lot refusé ne change rien.
+ */
+export async function hostSetProfileToolsets(
+  ctx: HermesClientContext,
+  profile: string,
+  toolsets: Readonly<Record<string, boolean>>,
+): Promise<HermesProfileToolsetState[]> {
+  if (!PROFILE_SLUG_PATTERN.test(profile) || profile === "default") {
+    throw new HermesClientError("Le slug de profil Hermes est invalide.", 400, "PROFILE_INVALID");
+  }
+  const names = Object.keys(toolsets).sort();
+  if (names.length === 0 || names.length > PROFILE_TOOLSETS_BATCH_MAX) {
+    throw new HermesClientError("Le lot de toolsets Hermes est vide ou trop long.", 400, "BODY_INVALID");
+  }
+  if (names.some((name) => !TOOLSET_KEY_PATTERN.test(name) || typeof toolsets[name] !== "boolean")) {
+    throw new HermesClientError("Le nom du toolset Hermes est invalide.", 400, "TOOLSET_INVALID");
+  }
+  const response = await ctx.hostRequest(
+    `/hermes-setup/profiles/${encodeURIComponent(profile)}/toolsets`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toolsets: Object.fromEntries(names.map((name) => [name, toolsets[name]])) }) },
+    "mutation",
+    PROFILE_MUTATION_TIMEOUT_MS,
+  );
+  if (!response.ok) await ctx.throwProviderResponse(response);
+  return parseProfileToolsetsBatch(await ctx.providerJson(response), profile, names);
 }
 
 export async function hostApprovalPolicy(ctx: HermesClientContext, slug: string): Promise<HermesApprovalPolicyState> {

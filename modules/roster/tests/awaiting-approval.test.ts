@@ -29,3 +29,14 @@ describe("awaitingApproval ignores a gate under automatic review", () => {
     expect(sql).toContain("and a.decision_state is distinct from 'reviewing') as \"awaitingApproval\"");
   });
 });
+
+// A run left `unknown` + `ambiguous` (« À vérifier ») waits on a human: the
+// roster must not show « Réflexion en cours… » for it forever.
+describe("running ignores a run waiting for review", () => {
+  test("bot rows", async () => {
+    const { tx, statements } = capture();
+    await readRosterBots(tx, "org-1", "user-1", true);
+    const sql = statements.find((statement) => statement.includes(") as running,"));
+    expect(sql).toContain("and not (active_run.status = 'unknown' and active_run.external_state = 'ambiguous') ) as running,");
+  });
+});

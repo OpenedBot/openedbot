@@ -49,7 +49,7 @@ par le lien ».
    │  ──► res/end
    │                                              insert runtimes (reachability=connector),
    │                                              ticket brûlé, org runtime_mode=external
-   │  ◄── link.context {environment, ohb, organization, owner, limits}   (affichage : alertes, status ; borne des features)
+   │  ◄── link.context {environment, ohb, organization, owner, limits, accepts}   (affichage : alertes, status ; borne des features ; trames facultatives acceptées)
    │  ◄── link.issued {runtimeId, linkToken}      (une seule fois, jamais en HTTP)
    └─ scelle la clé device (systemd-creds, TPM2 ou clé hôte) dans
       /etc/hermes/connector/device.key.cred, écrit link.json 0600
@@ -77,14 +77,15 @@ Trames **texte** (JSON, un objet par message) :
 
 | `t` | Sens | Champs | Notes |
 |---|---|---|---|
-| `hello` | hôte → openedbot | `protocol` (1), `agent` (`edge-setup/<ver>`), `hermesVersion?`, `features?`, `devicePublicKey?` (base64, 32 octets Ed25519) | obligatoire en premier ; toute autre première trame → fermeture 4401. `features` : tableau d'au plus 64 chaînes `^[a-z0-9_]{1,64}$` (la borne que l'API annonce dans `link.context`, 16 tant que l'hôte n'en connaît pas d'autre : voir « Borne des features »), inconnues ignorées ; `provider_management` annonce les routes d'identification hôte, `provider_usage` la sonde de quotas, `profile_inventory` la lecture nommée des profils déjà présents, `profile_management` la création/suppression, `profile_credentials` la clé fournisseur d'un profil, `profile_capabilities` les toolsets/MCP/skills et le modèle par profil, `profile_bundled_skills` l'activation groupée des skills Hermes fournies avec le runtime, et `sessions_inventory` la lecture bornée des identifiants de session par profil. `creation_audit_v2` est une feature du **lien**, annoncée dans `hello` seulement (jamais dans `capabilities` ni `/v1/capabilities`) : l'hôte tient un audit de création scellé et attend `audit.key` |
+| `hello` | hôte → openedbot | `protocol` (1), `agent` (`edge-setup/<ver>`), `hermesVersion?`, `features?`, `devicePublicKey?` (base64, 32 octets Ed25519) | obligatoire en premier ; toute autre première trame → fermeture 4401. `features` : tableau d'au plus 64 chaînes `^[a-z0-9_]{1,64}$` (la borne que l'API annonce dans `link.context`, 16 tant que l'hôte n'en connaît pas d'autre : voir « Borne des features »), inconnues ignorées ; `provider_management` annonce les routes d'identification hôte, `provider_usage` la sonde de quotas, `profile_inventory` la lecture nommée des profils déjà présents, `profile_management` la création/suppression, `profile_credentials` la clé fournisseur d'un profil, `profile_capabilities` les toolsets/MCP/skills et le modèle par profil, `profile_bundled_skills` l'activation groupée des skills Hermes fournies avec le runtime, `sessions_inventory` la lecture bornée des identifiants de session par profil, et `skills_inventory` la liste des skills de la racine lue par l'opérateur (repli de `/v1/skills`). `profile_toolsets_batch` l'écriture groupée des toolsets d'un profil (`POST /hermes-setup/profiles/{slug}/toolsets`) ; sans elle, openedbot écrit un toolset par requête. `creation_audit_v2` est une feature du **lien**, annoncée dans `hello` seulement (jamais dans `capabilities` ni `/v1/capabilities`) : l'hôte tient un audit de création scellé et attend `audit.key` |
 | `link.issued` | openedbot → hôte | `runtimeId`, `linkToken` | une fois, après commit |
-| `link.context` | openedbot → hôte | `environment` (`dev` \| `prod`), `ohb` (origine publique), `organization?` (`{id, name, slug}`), `owner?` (`{email, displayName?}`), `limits?` (`{features?}`) | optionnelle, juste après la liaison (après `audit.key`, avant `link.issued` à l'enrôlement) : quel openedbot et quel propriétaire sont derrière ce lien. Données d'affichage (alertes Discord, `status`), chaque texte ≤ 256 caractères, jamais un secret ; un hôte plus ancien ignore la trame (« ignoring frame: unknown frame type »). `limits` fait exception : `features` (entier ≥ 1, 64 aujourd'hui) est le nombre maximal de noms que l'API accepte dans `hello` et `capabilities`, que l'hôte retient et persiste (voir « Borne des features »). Un hôte plus ancien ignore ce champ, comme les seuils de version `latestVersion` et `minimumVersion` : `DecodeText` ne rejette pas les champs inconnus |
+| `link.context` | openedbot → hôte | `environment` (`dev` \| `prod`), `ohb` (origine publique), `organization?` (`{id, name, slug}`), `owner?` (`{email, displayName?}`), `limits?` (`{features?}`), `accepts?` (types de trame) | optionnelle, juste après la liaison (après `audit.key`, avant `link.issued` à l'enrôlement) : quel openedbot et quel propriétaire sont derrière ce lien. Données d'affichage (alertes Discord, `status`), chaque texte ≤ 256 caractères, jamais un secret ; un hôte plus ancien ignore la trame (« ignoring frame: unknown frame type »). `limits` fait exception : `features` (entier ≥ 1, 64 aujourd'hui) est le nombre maximal de noms que l'API accepte dans `hello` et `capabilities`, que l'hôte retient et persiste (voir « Borne des features »). Un hôte plus ancien ignore ce champ, comme les seuils de version `latestVersion` et `minimumVersion` : `DecodeText` ne rejette pas les champs inconnus. `accepts` (au plus 16 types `^[a-z][a-z0-9_.]{0,63}$`) nomme les trames facultatives hôte → openedbot que cette API comprend : une API plus ancienne ferme le lien sur un type inconnu, l'hôte n'envoie donc une telle trame (aujourd'hui `inventory.changed`) que si elle y figure |
 | `link.challenge` | openedbot → hôte | `nonce` (base64, 32 octets) | juste après `hello`, avant la liaison ; voir « Preuve de possession » |
 | `link.proof` | hôte → openedbot | `signature` (base64, 64 octets) | réponse immédiate au challenge ; une `req` reçue avant est refusée `err before_dispatch LINK_POP_PENDING` |
 | `audit.key` | openedbot → hôte | `runtimeId`, `keyId`, `key` (base64, 32 octets), `previous?` (≤ 2 `{keyId,key}`) | seulement si `hello.features` contient `creation_audit_v2` ; envoyée juste après la liaison, avant toute `req` ; jamais journalisée ; voir « Audit de création chiffré » |
 | `audit.anchor` | hôte → openedbot | `runtimeId`, `keyId`, `writeSeq`, `count`, `dropped`, `tail` (hex 64) | après chaque écriture de l'audit et en début de session ; une ancienne API l'ignore |
 | `capabilities` | hôte → openedbot | `features?` | même validation que `hello` (mêmes noms, même borne) ; remplace les capacités sur le lien existant, sans fermer les requêtes en cours ; absent ou vide retire les capacités |
+| `inventory.changed` | hôte → openedbot | aucun | seulement si le dernier `link.context` la nomme dans `accepts`. Une fois par session, puis chaque fois que l'empreinte d'inventaire de l'opérateur bouge (`GET /inventory/fingerprint` sur sa socket, sondé toutes les 5 s : noms, tailles, modes et dates de `config.yaml`, `.env`, `mcp-tokens/*` et des `SKILL.md`, à la racine de `HERMES_HOME` et dans chaque profil, plus la config gérée ; jamais le contenu d'un fichier). openedbot inscrit le signal (`runtimes.inventory_changed_at`) et relit l'inventaire en arrière-plan ; tant que le lien tient, l'instantané d'un hôte qui a signalé sur la connexion en cours reste servi sans relire l'hôte. Un opérateur sans la route (404) : le connecteur cesse de sonder, sans rien envoyer |
 | `diagnostic` | hôte → openedbot | `eventId`, `component`, `state`, `code`, `occurredAt`, `message`, `stack?` | incident borné, stocké sous le runtime authentifié ; aucune exécution du texte |
 | `diagnostic.ack` | openedbot → hôte | `eventId` | seulement après commit, y compris pour un doublon déjà enregistré |
 | `req` | openedbot → hôte | `id` (u32), `method`, `path`, `headers` (objet), `body` (`"none"` \| `"stream"`) | `path` inclut la query ; préfixe `/p/<slug>` accepté |
@@ -95,6 +96,8 @@ Trames **texte** (JSON, un objet par message) :
 | `ping` / `pong` | les deux | aucun | applicatif, en plus des pings WebSocket |
 
 Avant chaque session, le connecteur attend jusqu’à 15 s la réponse de l’opérateur à `GET /capabilities` (essais espacés de 500 ms, chaque réponse bornée à 5 s dans ce budget global), puis envoie un `hello` sans features si le délai expire. Dès que l’opérateur annonce ses features, il envoie `capabilities` sur le même WebSocket : aucune reconnexion, aucune interruption des requêtes en cours et aucun incident `link` provoqué par cette récupération. Un échec d’écriture est réessayé tant que la session reste ouverte ; la récupération des véritables pertes réseau reste assurée par la boucle de connexion.
+
+Pendant une session, le connecteur interroge aussi l’opérateur toutes les 5 s sur `GET /inventory/fingerprint` (socket locale, jamais relayée) : une empreinte des noms, tailles, modes et dates des fichiers qui font l’inventaire (`config.yaml`, `.env`, `mcp-tokens/*`, `SKILL.md`, racine et profils, plus la config gérée), calculée en Go sans lire aucun contenu ni démarrer d’interpréteur. Une empreinte qui bouge vide aussi le cache de lecture de l’opérateur : tout le cache si la part de la racine a bougé (son `HERMES_HOME` ou la config gérée), l’inventaire des profils seulement si seuls des profils ont bougé (la préparation d’un nouveau bot n’oblige plus à relire à froid les lectures de la racine). Le connecteur envoie ensuite `inventory.changed` si `link.context.accepts` la nomme. Un opérateur qui ne sert pas la route (404) arrête la sonde.
 
 Déployer le support de `capabilities` dans l’API openedbot avant le nouveau connecteur. Une ancienne API ignore cette trame : elle ne reçoit alors les capacités qu’au prochain `hello` lors d’une reconnexion naturelle. La trame ne change ni l’identité du lien, ni sa date de connexion, ni les événements de remplacement.
 
@@ -263,6 +266,7 @@ GET    /hermes-setup/providers/{provider}/oauth/{session}
 DELETE /hermes-setup/providers/{provider}/oauth/{session}
 GET    /hermes-setup/toolsets
 POST   /hermes-setup/toolsets/{toolset}
+GET    /hermes-setup/skills
 GET    /hermes-setup/mcp/servers
 POST   /hermes-setup/mcp/servers
 DELETE /hermes-setup/mcp/servers/{server}
@@ -278,6 +282,7 @@ GET    /hermes-setup/profiles
 POST   /hermes-setup/profiles
 DELETE /hermes-setup/profiles/{slug}
 POST   /hermes-setup/profiles/{slug}/toolsets/{toolset}
+POST   /hermes-setup/profiles/{slug}/toolsets
 GET    /hermes-setup/profiles/{slug}/memory
 POST   /hermes-setup/profiles/{slug}/memory
 POST   /hermes-setup/profiles/{slug}/model
@@ -298,6 +303,7 @@ GET    /hermes-setup/profiles/{slug}/skills/hub/operations/{a}-{b}-{c}-{d}-{e}
 DELETE /hermes-setup/profiles/{slug}/skills/{skill}
 GET    /hermes-setup/profiles/{slug}/avatar
 GET    /hermes-setup/sessions-inventory
+GET    /hermes-setup/workspace/files/{file}
 GET    /hermes-setup/a2a/agent-card
 GET    /hermes-setup/a2a/audit
 GET    /hermes-setup/a2a/peers
@@ -544,6 +550,41 @@ et `session_search` (`pins.ProfileRestrictedToolsets`) restent refusés sur
 propre `HERMES_HOME`. Les désactiver reste toujours possible. La scission est
 la jumelle de `runtime-contract.ts` côté openedbot.
 
+`POST /hermes-setup/profiles/{slug}/toolsets` (capacité
+`profile_toolsets_batch`) écrit plusieurs toolsets d'un même profil en une
+requête : `{"toolsets": {"web": true, "browser": false}}`, 1 à 32 noms. Les
+garde-fous de la route unitaire valent pour tout le lot avant toute écriture
+(un nom refusé refuse le lot). Les deux sens s'écrivent ensuite dans un seul
+processus Python lancé dans le dossier du profil (`profile_toolsets_apply.py`,
+`HERMES_HOME` posé avant l'import de Hermes), avec la fonction amont
+qu'appelle `hermes tools enable|disable`. Le programme refuse d'écrire si
+Hermes désigne un autre `config.yaml` que celui du profil : l'écriture amont
+irait sinon sur la racine. S'il échoue, on retombe sur un appel CLI par sens
+(`tools enable a b`, `tools disable c`), qui démarre chacun Hermes. L'inventaire
+du profil est relu une seule fois pour tout le lot ; un nom qui n'a pas bougé
+reçoit le repli de suppression de la route unitaire, puis une dernière
+relecture. La réponse donne un état par nom, `applied` compris. Chaque lot
+inscrit au journal la durée de ses étapes (liste réglable, écriture, relecture).
+
+Une écriture qui ne touche que le dossier d'un profil (`profile-create`,
+toolsets, skills, mémoire, modèle) n'invalide que l'inventaire des profils
+dans le cache de lecture de l'opérateur. Les lectures de la racine
+(`toolsets`, `skills`, `mcp-inventory`) restent en cache, même lancées avant
+l'écriture. `profile-delete` et `profile-oauth-adopt-root` vident tout.
+
+### Skills
+
+`GET /hermes-setup/skills` (capacité `skills_inventory`) rend la liste des
+skills de la racine au format de `/v1/skills` :
+`{"object":"list","data":[{name, description, category}]}`, bornée à 1024.
+C'est un repli : Hermes 0.21.3 à 0.22.6 répond 500 sur `/v1/skills` (il passe
+`include_editorial` à une fonction qui ne le prend pas), et l'opérateur lit la
+même liste par la sonde Python, sans cet argument. openedbot ne l'appelle que
+si `/v1/skills` a échoué et que l'hôte annonce la capacité ; si le repli échoue
+aussi, l'erreur d'origine reste affichée, jamais une liste vide. Lecture seule,
+mise en cache comme les autres lectures d'inventaire et vidée quand
+l'empreinte bouge.
+
 ### MCP
 
 `GET /hermes-setup/mcp/servers` rend les serveurs configurés et le catalogue
@@ -696,13 +737,14 @@ prouve une écriture est toujours neuve.
 
 | Route | Corps | Réponse / erreurs |
 |---|---|---|
-| `POST /hermes-setup/profiles` | `{"name", "displayName"?, "provider"?, "model"?}` | 201 `{"profile": <entrée relue>, "readBack"?: "profile"}` ; 400 `PROFILE_INVALID` ou `BODY_INVALID` ; 409 `PROFILE_EXISTS` ; 503 `MULTIPLEX_OFF` ; 502 `PROFILE_ENV_REFUSED`, `PROFILE_CONFIG_REFUSED` ou `PROFILE_UNVERIFIED`. `provider` et `model` optionnels, bornés `[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}`, écrits ensemble dans le `config.yaml` du profil (`model.provider` / `model.default`). `readBack: "profile"` dit que la sonde de création a relu elle-même le profil écrit (listé sous ce nom, modèle demandé présent) : cette relecture ciblée remplace alors l'inventaire complet, qui coûtait une sonde à froid de plus. Sans la marque (hôte plus ancien, relecture non concluante), l'entrée vient de l'inventaire complet et openedbot le relit comme avant |
+| `POST /hermes-setup/profiles` | `{"name", "displayName"?, "provider"?, "model"?, "bundledSkills"?: false}` | 201 `{"profile": <entrée relue>, "readBack"?: "profile", "bundledSkills"?: <état des skills livrées>}` ; 400 `PROFILE_INVALID` ou `BODY_INVALID` ; 409 `PROFILE_EXISTS` ; 503 `MULTIPLEX_OFF` ; 502 `PROFILE_ENV_REFUSED`, `PROFILE_CONFIG_REFUSED` ou `PROFILE_UNVERIFIED`. `provider` et `model` optionnels, bornés `[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}`, écrits ensemble dans le `config.yaml` du profil (`model.provider` / `model.default`). `readBack: "profile"` dit que la sonde de création a relu elle-même le profil écrit (listé sous ce nom, modèle demandé présent) : cette relecture ciblée remplace alors l'inventaire complet, qui coûtait une sonde à froid de plus. Sans la marque (hôte plus ancien, relecture non concluante), l'entrée vient de l'inventaire complet et openedbot le relit comme avant. `bundledSkills: false` désactive les skills livrées avec Hermes dans la même sonde que la création (un interpréteur de moins pour un nouveau bot) ; `true` est refusé (400 `BODY_INVALID`). L'état rendu a la forme de `POST …/bundled-skills` (`profile`, `requested`, `bundled`, `bundledEnabled`, `applied`) et n'apparaît que si la sonde l'a relu de façon cohérente pour ce profil : sans lui (désactivation en échec, hôte plus ancien qui ignore le champ), openedbot écrit les skills livrées par la route dédiée |
 | `DELETE /hermes-setup/profiles/{slug}` | aucun | 204 ; 400 `PROFILE_INVALID` ; 404 `PROFILE_NOT_FOUND` ; 502 `PROFILE_UNVERIFIED` |
 | `POST /hermes-setup/profiles/{slug}/model` | `{"provider", "model"}` | 200 `{"profile", "provider", "model"}` relus sur l'inventaire ; 400 `PROFILE_INVALID` ou `BODY_INVALID` ; 404 `PROFILE_NOT_FOUND` ; 502 `PROFILE_UNVERIFIED`. Annoncé sous `profile_capabilities`. Jumeau de `profiles.configure { model, provider }` : sous un profil multiplexé le gateway ignore le `provider` du run et lit `model.provider` dans le `config.yaml` du profil |
 | `POST /hermes-setup/profiles/models` | `{"provider", "model", "profiles": [slug, ...]}` (1 à 64 noms) | 200 `{"provider", "model", "profiles": [{"profile", "provider", "model", "applied", "code"?}]}` : une seule écriture pour tous les profils, puis une seule relecture de l'inventaire ; `applied` est lu sur cet inventaire. Un profil refusé (`PROFILE_NOT_FOUND`, `PROFILE_INVALID`, `PROFILE_CONFIG_REFUSED`) porte son `code`, les autres s'appliquent. 400 `BODY_INVALID` ou `PROFILE_INVALID` sur le corps ; 502 `PROFILE_UNVERIFIED`. Annoncé par `profile_model_batch`, dernier nom en priorité : sans lui, openedbot écrit profil par profil |
 | `GET /hermes-setup/profiles/{slug}/approval-policy` | aucun | 200 `{"mode", "pluginEnabled", "effective", "gateIdentity", "blockedTools"}` relus depuis le fichier fixe du plugin et la configuration du profil ; `effective` exige le plugin actif, le fichier valide et aucun redémarrage du gateway en attente. `gateIdentity` dit que le plugin installé sur ce profil est, octet pour octet, celui que porte le binaire, donc qu'il nomme et décrit chaque gate (voir « Identité des gates ») ; `blockedTools` liste les clés d'outil que le plugin bloque sans poser de gate. Un hôte plus ancien omet ces deux champs. `plugins.disabled` prévaut sur `plugins.enabled` ; 400 `PROFILE_INVALID` ; 502 `APPROVAL_POLICY_UNAVAILABLE`. Annoncé sous `approval_policy` seulement quand les deux verbes sont disponibles |
 | `PUT /hermes-setup/profiles/{slug}/approval-policy` | `{"mode":"ask_writes"|"block_writes"|"off","blockedTools"?:["<clé d'outil>"]}` | 200 avec le même état relu ; 400 `PROFILE_INVALID` ou `BODY_INVALID` ; 502 `APPROVAL_POLICY_UNVERIFIED`. Sans `blockedTools`, la liste en place est gardée ; avec, elle est remplacée (au plus 64 clés distinctes, `^([a-z][a-z0-9_]{0,63}|mcp:<serveur>:<outil>)$`) et prouvée par la relecture. Pose le marqueur « restart pending » avant toute modification des fichiers du plugin ou de son activation. Les changements suivants du mode et de la liste sont lus à chaque appel et ne demandent pas de redémarrage |
 | `POST /hermes-setup/profiles/{slug}/toolsets/{toolset}` | `{"enabled": bool}` | 200 `{"name", "profile", "platform", "enabled", "requested", "applied"}` ; 400 `PROFILE_INVALID`, `TOOLSET_INVALID` ou `BODY_INVALID` ; 403 `TOOLSET_FORBIDDEN` ; 404 `TOOLSET_NOT_SETTABLE` ; 409 `TOOLSET_IN_PROGRESS` ; 502 `CLI_REFUSED` ou `TOOLSET_UNVERIFIED` |
+| `POST /hermes-setup/profiles/{slug}/toolsets` | `{"toolsets": {"<toolset>": bool}}`, 1 à 32 noms (feature `profile_toolsets_batch`) | 200 `{"profile", "platform", "toolsets": [{"name", "profile", "platform", "enabled", "requested", "applied"}]}` dans l'ordre des noms ; 400 `PROFILE_INVALID`, `TOOLSET_INVALID` ou `BODY_INVALID` ; 403 `TOOLSET_FORBIDDEN` ou `A2A_POLICY_UNAVAILABLE` ; 404 `TOOLSET_NOT_SETTABLE` ; 409 `TOOLSET_IN_PROGRESS` ; 502 `CLI_REFUSED` ou `TOOLSET_UNVERIFIED` |
 | `POST /hermes-setup/profiles/{slug}/mcp/servers/{server}` | `{"enabled": bool}` | 200 `{"name", "profile", "platform", "enabled", "requested", "applied"}` ; 400 `PROFILE_INVALID`, `NAME_INVALID` ou `BODY_INVALID` ; 404 `PROFILE_NOT_FOUND` ou `MCP_SERVER_NOT_FOUND` ; 409 `MCP_IN_PROGRESS` ; 502 `PROFILE_CONFIG_REFUSED` ou `MCP_UNVERIFIED` |
 | `DELETE /hermes-setup/profiles/{slug}/mcp/servers/{server}` | aucun | 200 `{"profile", "name", "removed", "tokensRemoved"}` ; 400 `PROFILE_INVALID` ou `NAME_INVALID` ; 404 `PROFILE_NOT_FOUND` ; 409 `MCP_IN_PROGRESS` ; 502 `PROFILE_CONFIG_REFUSED`. Déconnecte un bot : retire le serveur du `mcp_servers` du profil et de sa plateforme `api_server`, puis supprime l'état OAuth du serveur dans le home du profil. L'entrée racine, modèle des autres connexions, reste. Idempotent : un profil qui ne porte pas le serveur répond `removed: false` et perd quand même un jeton ou un enregistrement de client laissé par une autorisation ratée. Feature `mcp_profile_disconnect`, annoncée par un hôte qui multiplexe les profils. |
 | `POST /hermes-setup/profiles/{slug}/skills/{skill}` | `{"enabled": bool}` | 200 `{"name", "profile", "platform", "enabled", "requested", "applied"}` ; `enabled` relu sur `profiles.skills[]` ; 400 `PROFILE_INVALID`, `SKILL_INVALID` ou `BODY_INVALID` ; 404 `PROFILE_NOT_FOUND` ou `SKILL_NOT_FOUND` ; 409 `SKILL_IN_PROGRESS` ; 502 `SKILL_UNVERIFIED`. La sonde écrit `disabled_skills` (et `skills.disabled`, la clé que hermes-agent lit) dans le `config.yaml` du profil. |
@@ -796,6 +838,25 @@ n'est ni relue, ni journalisée, ni rendue.
 
 Les erreurs d'exécution ou de preuve qui ne font pas partie de ce jeu fermé
 sont rendues comme indisponibilité hôte, sans traceback, chemin ni secret.
+
+### Les fichiers qu'un bot livre
+
+`GET /hermes-setup/workspace/files/{file}` rend UN fichier qu'un bot a
+fabriqué à la racine du `/workspace` de son bac à sable terminal
+(`/srv/hermes/data/workspaces` sur l'hôte) et désigné par une ligne
+`MEDIA:/workspace/<nom>`. Hermes n'intègre ces lignes que sur ses routes de
+chat, pas sur `/v1/runs` (mesuré sur la VM 240, 2026-11-03) : le worker lit le
+fichier ici pour le joindre au message.
+
+C'est un nom, jamais un chemin : `[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}` suivi de
+`.png`, `.jpg`, `.jpeg`, `.webp` ou `.pdf`, sans dossier, sans point initial,
+sans préfixe `/p/<slug>` ni query. Le bot possède ce dossier et peut y poser
+un lien symbolique ou une FIFO : la lecture passe par `os.Root` (aucune
+résolution hors de la racine), s'ouvre en `O_NONBLOCK`, n'accepte qu'un
+fichier ordinaire de 1 Mio au plus, et les octets doivent être une image ou un
+PDF (nombre magique), quoi que dise l'extension. Le `Content-Type` vient des
+octets. Aucune feature n'est annoncée : un hôte plus ancien refuse la route,
+et openedbot garde alors le nom du fichier dans le texte.
 
 ### L'inventaire des sessions
 
@@ -991,6 +1052,14 @@ propre, génération propre, aucun conflit de clôture entre brokers). Ce qui
 reste **partagé** : le bearer du gateway (`runtime.env`), donc la même
 surface gateway, les mêmes profils et les mêmes sessions pour les deux
 openedbot, et le socket de l'opérateur.
+
+Un gateway, une organisation. Deux instances sur la **même** origine
+donneraient ce gateway partagé à deux organisations d'un même openedbot, que
+rien n'isole sur l'hôte : `link` refuse donc, avant de dépenser le ticket,
+une origine qu'une autre instance relie déjà, et nomme cette instance et son
+runtime. Pour donner la machine à une autre organisation, on ré-enrôle
+l'instance existante. Ce n'est pas une frontière
+(root réécrit `link.json` à la main), c'est un garde-fou contre l'erreur.
 
 Sans `--name`, rien ne change pour un hôte déjà provisionné : mêmes chemins,
 même unité, pas de migration.

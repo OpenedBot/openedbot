@@ -13,11 +13,14 @@ import { ThemeProvider } from "@openedbot/browser-ui-kit/theme";
 import { I18nProvider } from "../../../src/lib/i18n";
 import { readCloudSession } from "../../../src/lib/session/cloud-session";
 import { LoginScreen } from "../../../src/screens/auth/login";
+import type { NativeAuthBridge, NativeSigninState } from "../../../src/lib/platform/native-bridge";
 
 const realFetch = globalThis.fetch;
 let reply: Response;
 let legalReply: Response;
-let passwordLoginReply: Response;
+let codeReply: Response;
+let verifyReply: Response;
+let calls: string[];
 
 function href(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -50,12 +53,16 @@ beforeEach(() => {
   window.localStorage.removeItem("ohb:cloud-session");
   reply = Response.json({ error: { code: "ALPHA_CLOSED", message: "Cette route n’est pas ouverte pendant l’alpha privée." } }, { status: 403 });
   legalReply = Response.json({ documents: [] });
-  passwordLoginReply = Response.json({ error: { code: "UNEXPECTED" } }, { status: 500 });
+  codeReply = Response.json({ sent: true });
+  verifyReply = Response.json({ error: { code: "EMAIL_LOGIN_CODE_INVALID" } }, { status: 401 });
+  calls = [];
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = href(input);
+    calls.push(new URL(url, "http://localhost").pathname);
     if (url.endsWith("/api/legal")) return legalReply;
     if (url.endsWith("/api/auth/providers")) return reply;
-    if (url.endsWith("/api/auth/login")) return passwordLoginReply;
+    if (url.endsWith("/api/auth/login/code")) return codeReply;
+    if (url.endsWith("/api/auth/login/code/verify")) return verifyReply;
     throw new Error(`Route inattendue : ${url}`);
   }) as typeof fetch;
 });
@@ -63,7 +70,59 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;
+  delete window.__OHB_NATIVE__;
 });
+
+const CODE_PROVIDERS = { google: { enabled: false, reason: "not_configured" }, password: { enabled: false }, emailCode: { enabled: true } };
+
+/** Une coque desktop simulée : chaque action pousse ses états, comme le main d'Electron. */
+function fakeShell(verifyOutcome: NativeSigninState) {
+  const listeners = new Set<(state: NativeSigninState) => void>();
+  let last: NativeSigninState = { status: "idle" };
+  const push = (state: NativeSigninState) => {
+    last = state;
+    for (const listener of listeners) listener(state);
+  };
+  const actions: string[] = [];
+  const auth: NativeAuthBridge = {
+    requestEmailCode: async (email) => {
+      actions.push(`code:${email}`);
+      queueMicrotask(() => {
+        push({ status: "sending" });
+        push({ status: "code_sent", email });
+      });
+    },
+    verifyEmailCode: async (email, code) => {
+      actions.push(`verify:${email}:${code}`);
+      queueMicrotask(() => {
+        push({ status: "verifying" });
+        push(verifyOutcome);
+      });
+    },
+    startGoogle: async () => {},
+    cancel: async () => {},
+    onState: (listener) => {
+      listeners.add(listener);
+      listener(last);
+      return () => listeners.delete(listener);
+    },
+  };
+  window.__OHB_NATIVE__ = {
+    readAccessToken: async () => null,
+    refresh: async () => null,
+    openExternal: async () => {},
+    signOut: async () => {},
+    shell: { platform: "windows", version: "test" },
+    auth,
+  };
+  return { actions, push };
+}
+
+async function typeCode(digits: string) {
+  for (const [index, digit] of [...digits].entries()) {
+    fireEvent.change(await screen.findByRole("textbox", { name: `${index + 1} / 6` }), { target: { value: digit } });
+  }
+}
 
 describe("LoginScreen", () => {
   test("affiche la fermeture de l’alpha et masque la connexion", async () => {
@@ -74,10 +133,12 @@ describe("LoginScreen", () => {
   });
 
   test("affiche le formulaire quand les fournisseurs répondent normalement", async () => {
-    reply = Response.json({ google: { enabled: false, reason: "not_configured" }, password: { enabled: true } });
+    reply = Response.json({ ...CODE_PROVIDERS, password: { enabled: true } });
     renderLogin();
-    // L'adresse d'abord : le mot de passe n'apparaît qu'à l'étape suivante.
+    // Un seul champ, l'adresse : plus de mot de passe à l'écran, même ouvert côté API.
     await waitFor(() => expect(screen.getByLabelText("Adresse e-mail")).toBeTruthy());
+    expect(screen.getByRole("heading", { level: 1, name: "Se connecter à openedbot" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Envoyer le code" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByLabelText("Mot de passe")).toBeNull();
     expect(screen.queryByRole("heading", { level: 2, name: "Connexion" })).toBeNull();
   });
@@ -85,8 +146,7 @@ describe("LoginScreen", () => {
   // Les comptes semés s'affichent dans le terminal de `make dev`, plus à l'écran.
   test("ne pré-remplit ni ne propose les comptes de développement", async () => {
     reply = Response.json({
-      google: { enabled: false, reason: "not_configured" },
-      password: { enabled: true },
+      ...CODE_PROVIDERS,
       devSignIn: { email: "dev@ohb.local", password: "owner-secret" },
       devSignIns: [
         { email: "dev@ohb.local", password: "owner-secret", role: "owner" },
@@ -103,7 +163,7 @@ describe("LoginScreen", () => {
   // En production aucune n'a de contenu, et la porte du produit ne doit pas
   // renvoyer vers une page vide.
   test("ne lie aucune page légale quand le catalogue n’en publie aucune", async () => {
-    reply = Response.json({ google: { enabled: false, reason: "not_configured" }, password: { enabled: true } });
+    reply = Response.json(CODE_PROVIDERS);
     renderLogin();
     await screen.findByLabelText("Adresse e-mail");
     expect(screen.queryByRole("link", { name: "Mentions légales" })).toBeNull();
@@ -111,7 +171,7 @@ describe("LoginScreen", () => {
   });
 
   test("lie les seules pages légales que le catalogue publie", async () => {
-    reply = Response.json({ google: { enabled: false, reason: "not_configured" }, password: { enabled: true } });
+    reply = Response.json(CODE_PROVIDERS);
     legalReply = Response.json({
       documents: [
         { slug: "mentions", available: true },
@@ -125,21 +185,67 @@ describe("LoginScreen", () => {
     expect(screen.getByRole("link", { name: "Conditions d’utilisation" })).toBeTruthy();
   });
 
-  test("le mot de passe ouvre l’étape du code sans enregistrer de session", async () => {
-    reply = Response.json({ google: { enabled: false, reason: "not_configured" }, password: { enabled: true }, emailCode: { enabled: true } });
-    passwordLoginReply = Response.json({ status: "code_required" }, { status: 202 });
+  test("l’adresse envoie un code, et le sixième chiffre le vérifie sans clic", async () => {
+    reply = Response.json(CODE_PROVIDERS);
     renderLogin();
 
-    const email = await screen.findByLabelText("Adresse e-mail");
-    fireEvent.change(email, { target: { value: "member@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    fireEvent.change(await screen.findByLabelText("Adresse e-mail"), { target: { value: " Member@Example.com " } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer le code" }));
 
-    const password = await screen.findByLabelText("Mot de passe");
-    fireEvent.change(password, { target: { value: "correct-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Consultez votre boîte de réception" })).toBeTruthy();
+    const codeNotice = screen.getByRole("status");
+    expect(codeNotice.textContent).toContain("Un code a été envoyé à member@example.com.");
+    expect(codeNotice.querySelector("br")?.nextSibling?.textContent).toBe("Il expire dans 10 minutes.");
+    await typeCode("123456");
 
-    expect(await screen.findByRole("textbox", { name: "1 / 6" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Vérifier et continuer" })).toBeTruthy();
+    expect(await screen.findByText("Code invalide ou expiré. Demandez un nouveau code.")).toBeTruthy();
+    expect(calls).toContain("/api/auth/login/code/verify");
+    expect(readCloudSession()).toBeNull();
+    // « Changer d’e-mail » ramène au formulaire, l’adresse conservée.
+    fireEvent.click(screen.getByRole("button", { name: "Changer d’e-mail" }));
+    expect(((await screen.findByLabelText("Adresse e-mail")) as HTMLInputElement).value).toBe("member@example.com");
+  });
+
+  test("dans la coque desktop, le code passe par le pont et jamais par l’API web", async () => {
+    reply = Response.json(CODE_PROVIDERS);
+    const shell = fakeShell({ status: "error", code: "EMAIL_LOGIN_CODE_INVALID", message: "Code invalide." });
+    renderLogin();
+
+    fireEvent.change(await screen.findByLabelText("Adresse e-mail"), { target: { value: "member@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer le code" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Consultez votre boîte de réception" })).toBeTruthy();
+    await typeCode("654321");
+
+    expect(await screen.findByText("Code invalide ou expiré. Demandez un nouveau code.")).toBeTruthy();
+    expect(shell.actions).toEqual(["code:member@example.com", "verify:member@example.com:654321"]);
+    expect(calls.filter((path) => path.startsWith("/api/auth/login"))).toEqual([]);
+    // Dans la coque, la marque ne mène nulle part.
+    expect(screen.queryByRole("link", { name: "openedbot" })).toBeNull();
+  });
+
+  test("un état d’erreur rejoué d’avant ne fait pas échouer la nouvelle demande", async () => {
+    reply = Response.json(CODE_PROVIDERS);
+    const shell = fakeShell({ status: "idle" });
+    shell.push({ status: "error", code: "RATE_LIMITED", message: "Trop de tentatives." });
+    renderLogin();
+
+    fireEvent.change(await screen.findByLabelText("Adresse e-mail"), { target: { value: "member@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer le code" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Consultez votre boîte de réception" })).toBeTruthy();
+    expect(screen.queryByText("Trop de tentatives : patientez une minute.")).toBeNull();
+  });
+
+  test("un compte natif sans organisation indique de terminer la création de l’espace sur le web", async () => {
+    reply = Response.json(CODE_PROVIDERS);
+    fakeShell({ status: "error", code: "AUTH_NOT_A_MEMBER", message: "Définissez d’abord votre organisation depuis l’application web." });
+    renderLogin();
+    fireEvent.change(await screen.findByLabelText("Adresse e-mail"), { target: { value: "member@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer le code" }));
+    await screen.findByRole("heading", { name: "Consultez votre boîte de réception" });
+    await typeCode("123456");
+
+    expect(await screen.findByText("Ce compte n’a pas encore d’organisation active : terminez la création de votre espace depuis l’application web, puis reconnectez-vous ici.")).toBeTruthy();
     expect(readCloudSession()).toBeNull();
   });
 });

@@ -195,7 +195,7 @@ export function BotCapabilitiesPanel({
         <p className="text-sm text-muted-foreground">{t("botCapabilities.intro")}</p>
         <p className="text-xs text-muted-foreground">
           {dto.scope === "profile"
-            ? t("botCapabilities.profileScopeNote", { slug: bot.slug })
+            ? [t("botCapabilities.profileScopeNote", { slug: bot.slug }), dto.writable ? t("botCapabilities.liveNote") : ""].join(" ").trim()
             : t("botCapabilities.scopeNote", {
                 runtime: dto.runtimeName ?? t("botSettingsDialog.hermesRuntimeFallback"),
                 slug: bot.slug,

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RiArrowDownSLine, RiSearchLine, RiSparkling2Fill } from "@remixicon/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -9,13 +9,13 @@ import type {
 import {
   DEFAULT_REASONING_EFFORT,
   HERMES_REASONING_EFFORT_LABELS,
-  HERMES_REASONING_EFFORTS,
   isHermesReasoningEffort,
   type HermesReasoningEffort,
 } from "@openedbot/contracts-api";
 import { catalogModelView, providerRail, resolveThreadModel, runtimeGlobalModel } from "@/lib/bots/model-catalog";
 import {
   cn,
+  Dialog,
   Drawer,
   DrawerContent,
   DrawerTitle,
@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@openedbot/browser-ui-kit";
 import { ProviderIcon, providerLabel } from "./provider-icon";
+import { ModelHeaderGlyph, ModelHeaderTooltip } from "./composer-model-header";
 import type { RunFallbackServed } from "../lib/run/run-fallback";
 import { BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./boardui/menu";
 import { api, ApiError, queryKeys, runtimesQueryOptions } from "../lib/api";
@@ -34,9 +35,9 @@ import { haptics } from "../lib/platform/haptics";
 import { useT } from "../lib/i18n";
 import { displayedRuntimeHealth } from "../lib/runtime/runtime-health";
 import { trackBotModelSave } from "../lib/bots/bot-model-saves";
-import { EffortFlame } from "./effort-flame";
 import { BUTTON } from "./settings/primitives";
 import { useOpenSettings } from "../lib/shell/settings-overlay";
+import { EffortSlider } from "./effort-slider";
 
 type ModelSelection = {
   model: string | null;
@@ -61,16 +62,6 @@ const selectionFromBot = (bot: BotDto): ModelSelection => ({
   effort: isHermesReasoningEffort(bot.reasoningEffort) ? bot.reasoningEffort : null,
 });
 
-function subscribeReducedMotion(onChange: () => void) {
-  if (typeof window === "undefined" || !window.matchMedia) return () => {};
-  const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function reducedMotionSnapshot() {
-  return typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-}
 
 function ModelRadio({
   label,
@@ -156,189 +147,6 @@ function ProviderHeading({ provider, name }: { provider: string; name: string })
     <p className="shrink-0 truncate px-2 pt-1 text-caption-1-regular text-text-tertiary">
       {providerLabel(provider, name)}
     </p>
-  );
-}
-
-/**
- * Le curseur ne propose que les valeurs réellement comprises par Hermes. Les
- * six crans sont donc des options, pas une approximation numérique de
- * `reasoning_effort`.
- */
-function EffortSlider({
-  value,
-  explicit,
-  disabled,
-  look = "sheet",
-  onChange,
-  onCommit,
-}: {
-  value: HermesReasoningEffort;
-  /** `false` signifie que le runtime décide encore de la valeur effective. */
-  explicit: boolean;
-  disabled: boolean;
-  /**
-   * `popover` : le panneau du bureau, au plus près du template (crans éteints
-   * après la valeur, anneau de focus sur le curseur, curseur sans glissement).
-   * `sheet` : la feuille mobile, inchangée.
-   */
-  look?: "popover" | "sheet";
-  onChange: (effort: HermesReasoningEffort) => void;
-  onCommit: (effort: HermesReasoningEffort) => void;
-}) {
-  const { t } = useT();
-  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => false);
-  const index = HERMES_REASONING_EFFORTS.indexOf(value);
-  const max = HERMES_REASONING_EFFORTS.length - 1;
-  const ratio = index / max;
-  const isMax = !reducedMotion && index === max;
-  const label = explicit
-    ? HERMES_REASONING_EFFORT_LABELS[value]
-    : t("composer.modelEffortDefault");
-
-  /** Les crans quittent la piste à l'allumage, avec une trajectoire neuve. */
-  const scatter = useMemo(
-    () => HERMES_REASONING_EFFORTS.map(() => ({
-      x: -(70 + 130 * Math.random()),
-      y: (Math.random() - 0.5) * 70,
-      rotate: (Math.random() - 0.5) * 720,
-      delay: 0.3 * Math.random(),
-    })),
-    [isMax],
-  );
-  const [burning, setBurning] = useState(isMax);
-
-  useEffect(() => {
-    if (isMax) {
-      setBurning(true);
-      return;
-    }
-    const timer = window.setTimeout(() => setBurning(false), 300);
-    return () => window.clearTimeout(timer);
-  }, [isMax]);
-
-  const effortAt = (raw: string) => HERMES_REASONING_EFFORTS[Number(raw)];
-  const interactionEffort = useRef(value);
-  // Un clic sur la piste peut donner le focus APRÈS avoir déplacé la valeur :
-  // pendant un appui, le point de départ est celui du pointerdown.
-  const pointerActive = useRef(false);
-  const commitEffort = (effort: HermesReasoningEffort | undefined) => {
-    if (effort && effort !== interactionEffort.current) {
-      onCommit(effort);
-      interactionEffort.current = effort;
-    }
-  };
-  const popoverLook = look === "popover";
-  // Le template n'anime le nom du cran qu'au changement de valeur, pas à l'ouverture du panneau.
-  const [openedLabel] = useState(label);
-
-  return (
-    // Le réglage d'effort de BoardUI (boardui.com/components/composer-attachments),
-    // en jetons de thème seulement : une couleur littérale tient dans un thème
-    // et casse l'autre. Piste secondary, remplissage tertiary-hover, crans
-    // icon-tertiary, curseur sur fond primary avec la bordure des boutons.
-    <div className={cn("flex w-full flex-col pt-1", disabled && "opacity-50")}>
-      <p className="-mb-0.5 ps-2 text-body-medium text-text-secondary">
-        {t("composer.modelEffort")} {" "}
-        <span key={label} className={cn("inline-block text-text-primary", (!popoverLook || label !== openedLabel) && "animate-effort-label")}>
-          {label}
-        </span>
-      </p>
-      <div className={cn("flex flex-col", popoverLook && "gap-1")}>
-      <div className="flex items-center justify-between px-2 pt-2 pb-[3px] text-body-2-medium text-text-secondary">
-        <span>{t("composer.modelFaster")}</span>
-        <span>{t("composer.modelSmarter")}</span>
-      </div>
-      <div className="px-2 pb-2">
-        <div className={cn("relative h-[27px] w-full overflow-hidden bg-background-secondary-default", popoverLook ? "rounded-[8px]" : "rounded-lg")}>
-          <div
-            aria-hidden
-            className={cn("absolute inset-y-0 start-0 bg-background-tertiary-hover transition-[width] duration-150 ease-out", popoverLook ? "rounded-[8px]" : "rounded-lg")}
-            style={{ width: `calc(${ratio} * (100% - 21px) + 21px)` }}
-          />
-          <div aria-hidden className="absolute inset-x-[9px] top-[7px] flex h-[13px] items-center justify-between">
-            {HERMES_REASONING_EFFORTS.map((effort, effortIndex) => (
-              <span
-                key={effort}
-                className="h-full w-[3px] rounded-[2px] bg-foreground-icon-tertiary"
-                style={isMax
-                  ? {
-                      transform: `translate(${scatter[effortIndex]!.x}px, ${scatter[effortIndex]!.y}px) rotate(${scatter[effortIndex]!.rotate}deg)`,
-                      opacity: 0,
-                      transition: `transform 1.6s cubic-bezier(0.22,0.5,0.5,1) ${scatter[effortIndex]!.delay}s, opacity 1.6s cubic-bezier(0.22,0.5,0.5,1) ${scatter[effortIndex]!.delay}s`,
-                    }
-                  : {
-                      transform: "none",
-                      // Panneau du bureau : les crans après la valeur s'éteignent
-                      // (0,3), sans fondu, comme le template.
-                      opacity: popoverLook && effortIndex > index ? 0.3 : 1,
-                      transition: popoverLook && !burning
-                        ? "transform 300ms ease-out"
-                        : "transform 300ms ease-out, opacity 300ms ease-out",
-                    }}
-              />
-            ))}
-          </div>
-          {burning ? (
-            <div
-              aria-hidden
-              className={cn(
-                "pointer-events-none absolute inset-0 duration-300 ease-out",
-                isMax ? "animate-in fade-in" : "animate-out fade-out fill-mode-forwards",
-              )}
-            >
-              <EffortFlame />
-            </div>
-          ) : null}
-          <div className="absolute inset-x-[10.5px] inset-y-0">
-            <input
-              data-composer-effort-slider=""
-              type="range"
-              min={0}
-              max={max}
-              step={1}
-              value={index}
-              disabled={disabled}
-              aria-label={t("composer.modelEffort")}
-              aria-valuetext={label}
-              onChange={(event) => {
-                const effort = effortAt(event.target.value);
-                if (effort) onChange(effort);
-              }}
-              onFocus={(event) => {
-                if (!pointerActive.current) interactionEffort.current = effortAt(event.currentTarget.value) ?? value;
-              }}
-              onPointerDown={(event) => {
-                pointerActive.current = true;
-                interactionEffort.current = effortAt(event.currentTarget.value) ?? value;
-              }}
-              onPointerUp={(event) => {
-                pointerActive.current = false;
-                commitEffort(effortAt(event.currentTarget.value));
-              }}
-              onPointerCancel={() => { pointerActive.current = false; }}
-              onKeyUp={(event) => {
-                commitEffort(effortAt(event.currentTarget.value));
-              }}
-              onBlur={(event) => {
-                commitEffort(effortAt(event.currentTarget.value));
-              }}
-              className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-            />
-            <div
-              aria-hidden
-              className={cn(
-                "pointer-events-none absolute top-1/2 h-[27px] w-[21px] -translate-x-1/2 -translate-y-1/2 rounded-[7px] border border-border-button-default bg-background-primary-default shadow-xs",
-                popoverLook
-                  ? "transition-shadow duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-border-focus-ring"
-                  : "transition-[left] duration-150 ease-out",
-              )}
-              style={{ left: `${ratio * 100}%` }}
-            />
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
   );
 }
 
@@ -443,6 +251,7 @@ export function ComposerModelPicker({
   const triggerLabel = fallback?.model ?? effectiveModel ?? t(
     error || emptyCatalog ? "composer.modelUnavailable" : unchosen ? "composer.modelChoose" : "composer.modelLoading",
   );
+  const triggerProvider = fallback?.provider ?? groups.find((group) => group.models.some((model) => model.id === effectiveModel))?.slug ?? null;
   const fallbackTitle = fallback
     ? t("composer.modelFallbackTitle", {
       provider: providerLabel(fallback.provider),
@@ -469,7 +278,6 @@ export function ComposerModelPicker({
   const selectedGroup = groups.find((group) => group.models.some((model) => model.id === (selectedModel ?? effectiveModel)))?.slug;
   const [providerTab, setProviderTab] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const [listScrolled, setListScrolled] = useState(false);
   const activeTab = providerTab ?? selectedGroup ?? groups[0]?.slug ?? null;
   const activeProvider = rail.find((entry) => entry.slug === activeTab);
   const activeProviderDisconnected = activeProvider?.connected === false;
@@ -508,7 +316,7 @@ export function ComposerModelPicker({
       {/* Le panneau de BoardUI : 266 px sous la puce, rounded-2xl, p-1. La
           ligne d'aide n'apparaît que si elle dit quelque chose (enregistrement,
           pas d'effort). */}
-      <BuiPopoverContent side="bottom" align="start" sideOffset={10} collisionPadding={12} className="bui-popover-ref w-[266px] rounded-[16px] p-1">
+      <BuiPopoverContent side="bottom" align="start" sideOffset={10} collisionPadding={12} className="bui-popover-ref z-[120] w-[266px] rounded-[16px] p-1">
         <EffortSlider
           look="popover"
           value={sliderValue}
@@ -689,62 +497,227 @@ export function ComposerModelPicker({
     );
   }
 
+  const closePanel = () => {
+    setOpen(false);
+    setSearching(false);
+    setQuery("");
+    setProviderTab(null);
+  };
+  const trigger = (
+    <button
+      data-composer-model-picker=""
+      data-variant={inline ? "inline" : header ? "header" : undefined}
+      type="button"
+      onClick={header ? () => setOpen(true) : undefined}
+      disabled={unavailable}
+      aria-label={pickerAria}
+      title={fallbackTitle}
+      className={inline
+        ? "ohb-press inline-flex min-w-0 max-w-[12rem] cursor-pointer items-center gap-0.5 rounded-md text-[13px] leading-4 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        : header
+        ? cn(
+            "flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-button-default bg-background-primary-default outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50",
+            open && "bg-background-primary-hover",
+          )
+        : cn(
+            "flex h-11 max-w-[11rem] shrink-0 cursor-pointer items-center justify-center gap-0.5 rounded-xl bg-background-primary-default py-1.5 ps-2 pe-1 outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:max-w-[15rem]",
+            open && "bg-background-primary-hover",
+          )}
+    >
+      {inline ? (
+        <>
+          <span className={cn("truncate whitespace-nowrap", (unchosen || fallback) && "text-warn-700")}>{triggerLabel}</span>
+          {fallbackBadge}
+        </>
+      ) : header ? (
+        <ModelHeaderGlyph provider={triggerProvider} warn={unchosen || !!fallback} fallback={!!fallback} />
+      ) : (
+        <>
+          <span className={cn("truncate px-0.5 text-body-medium whitespace-nowrap", unchosen || fallback ? "text-warn-700" : "text-text-secondary")}>{triggerLabel}</span>
+          {fallbackBadge}
+        </>
+      )}
+      {header ? null : (
+        <RiArrowDownSLine
+          aria-hidden
+          className={cn("shrink-0 text-foreground-icon-secondary transition-transform duration-200", inline ? "size-3.5" : "size-[18px]", open && "rotate-180")}
+        />
+      )}
+    </button>
+  );
+  const panel = (
+    <section
+      aria-label={t("composer.modelSettings")}
+      className={cn(
+        "relative max-w-full outline-none",
+        // Dans la modale, le panneau garde le cadre du popover (bordure, fond
+        // un cran plus clair) : sans lui, le rail se fond dans le fond sombre.
+        header
+          ? "h-[min(26rem,60dvh)] w-full overflow-clip rounded-[20px] border border-border-button-default bg-background-primary-default"
+          : "h-[280px] w-[339px]",
+      )}
+    >
+      <div
+        role="tablist"
+        aria-label={t("boardui.modelProviders")}
+        aria-orientation="vertical"
+        className="bui-scroll absolute start-0.5 top-0.5 bottom-0.5 w-[42px] overflow-y-auto rounded-[17px] bg-composer-panel-rail-background p-[3px]"
+      >
+        {/* Infobulle immédiate : le rail n'a que des icônes, et deux fournisseurs y partagent la marque OpenAI. */}
+        <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+          <div className="flex w-9 flex-col gap-1.5">
+            {rail.map((entry) => (
+              <Tooltip key={entry.slug}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!needle && entry.slug === activeTab}
+                    aria-disabled={entry.connected ? undefined : "true"}
+                    aria-label={providerLabel(entry.slug, entry.name)}
+                    onClick={() => { setQuery(""); setSearching(false); setProviderTab(entry.slug); }}
+                    className={cn(
+                      "flex h-[30px] w-9 shrink-0 cursor-pointer items-center justify-center rounded-[50px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+                      !needle && entry.slug === activeTab ? "bg-background-tertiary-default" : "hover:bg-background-tertiary-default/50",
+                    )}
+                  >
+                    <ProviderIcon
+                      provider={entry.slug}
+                      name={entry.name}
+                      decorative
+                      tagged
+                      withTitle={false}
+                      className={cn(
+                        PROVIDER_GLYPH,
+                        RAIL_GLYPH_18.has(entry.slug) ? "size-[18px] [&>svg]:size-[18px]" : "size-5 [&>svg]:size-5",
+                        !entry.connected && "opacity-40 grayscale",
+                      )}
+                    />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={10} className="z-[120]">
+                  {entry.connected
+                    ? providerLabel(entry.slug, entry.name)
+                    : t("composer.providerNotConnectedTooltip", { provider: providerLabel(entry.slug, entry.name) })}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
+      </div>
+      <div className="absolute start-[52px] end-2 top-2 bottom-0 flex flex-col">
+        <div className="flex h-8 items-center justify-between gap-2 px-0.5">
+          {searching ? (
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setSearching(false); setQuery(""); } }}
+              placeholder={t("boardui.quickSearch")}
+              aria-label={t("boardui.quickSearch")}
+              className="h-8 min-w-0 flex-1 rounded-full border border-border-button-default bg-[var(--btn-veil)] px-3 text-body-medium text-text-primary caret-accent-500 outline-none placeholder:text-text-tertiary"
+            />
+          ) : (
+            <span className="text-body-medium text-text-tertiary">
+              {t("composer.models", { count: String(modelCount) })}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => { setSearching((value) => !value); setQuery(""); }}
+            className={cn(
+              "flex cursor-pointer items-center gap-[5px] rounded-[4px] outline-none transition-opacity duration-150 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+              searching ? "opacity-100" : "opacity-50",
+            )}
+          >
+            {searching ? null : <span className="text-body-medium whitespace-nowrap text-text-secondary">{t("boardui.quickSearch")}</span>}
+            <RiSearchLine aria-hidden className="size-4 shrink-0 text-foreground-icon-secondary" />
+          </button>
+        </div>
+        <div className="relative mt-1 flex min-h-0 flex-1 flex-col">
+        <div
+          ref={listRef}
+          role={!needle && activeProviderDisconnected ? undefined : "radiogroup"}
+          aria-label={!needle && activeProviderDisconnected ? undefined : t("composer.model")}
+          className="bui-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-1"
+        >
+          {!needle && activeProviderDisconnected ? (
+            <ProviderNotConnectedPanel
+              provider={activeProvider.slug}
+              name={activeProvider.name}
+              onClose={() => setOpen(false)}
+            />
+          ) : (
+            <>
+              {needle ? null : (
+                <ModelRadio
+                  label={t("composer.modelGlobal")}
+                  detail={globalModel ?? t("composer.modelUnavailable")}
+                  checked={selectedModel === null}
+                  disabled={saving}
+                  onSelect={() => onModelChange(null)}
+                  trailing={selectedModel === null ? effortChip : undefined}
+                />
+              )}
+              {visibleGroups.map((group) => (
+                <Fragment key={group.slug}>
+                  <ProviderHeading provider={group.slug} name={group.name} />
+                  {group.models.map((model) => (
+                    <ModelRadio
+                      key={model.id}
+                      label={model.id}
+                      provider={group.slug}
+                      checked={selectedModel === model.id}
+                      disabled={saving}
+                      onSelect={() => onModelChange(model.id)}
+                      trailing={selectedModel === model.id ? effortChip : undefined}
+                    />
+                  ))}
+                </Fragment>
+              ))}
+              {needle && visibleGroups.length === 0 ? (
+                <p className="px-2 py-3 text-body-2-medium text-text-tertiary">{t("boardui.noModelMatch")}</p>
+              ) : null}
+            </>
+          )}
+        </div>
+        </div>
+      </div>
+    </section>
+  );
+
+  // La pilule de la barre du haut ouvre une modale : la liste a la place de
+  // respirer, au centre, plutôt qu'un panneau accroché à la pilule.
+  if (header) {
+    return (
+      <>
+        <ModelHeaderTooltip label={!fallback && effectiveModel && supportsEffort ? `${triggerLabel} · ${effortLabel}` : triggerLabel}>
+          {trigger}
+        </ModelHeaderTooltip>
+        <Dialog
+          open={open}
+          onClose={closePanel}
+          title={t("composer.modelSettings")}
+          closeLabel={t("common.close")}
+          className="sm:max-w-[560px]"
+          bodyClassName="px-2 pt-2 pb-2"
+        >
+          {panel}
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <BuiPopover
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          setSearching(false);
-          setQuery("");
-          setProviderTab(null);
-        }
+        if (next) setOpen(true);
+        else closePanel();
       }}
     >
       <BuiPopoverTrigger asChild>
-        <button
-          data-composer-model-picker=""
-          data-variant={inline ? "inline" : header ? "header" : undefined}
-          type="button"
-          disabled={unavailable}
-          aria-label={pickerAria}
-          title={fallbackTitle}
-          className={inline
-            ? "ohb-press inline-flex min-w-0 max-w-[12rem] cursor-pointer items-center gap-0.5 rounded-md text-[13px] leading-4 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            : header
-            ? cn(
-                "flex h-[30px] max-w-[18rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border-button-default bg-background-primary-default ps-2.5 pe-1.5 outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50",
-                open && "bg-background-primary-hover",
-              )
-            : cn(
-                "flex h-11 max-w-[11rem] shrink-0 cursor-pointer items-center justify-center gap-0.5 rounded-xl bg-background-primary-default py-1.5 ps-2 pe-1 outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:max-w-[15rem]",
-                open && "bg-background-primary-hover",
-              )}
-        >
-          {inline ? (
-            <>
-              <span className={cn("truncate whitespace-nowrap", (unchosen || fallback) && "text-warn-700")}>{triggerLabel}</span>
-              {fallbackBadge}
-            </>
-          ) : header ? (
-            <span className="flex min-w-0 items-center gap-1.5 text-body-2-medium whitespace-nowrap">
-              {/* Une étoile fixe : rien qui tourne à côté d'une jauge. */}
-              <RiSparkling2Fill aria-hidden className="size-3.5 shrink-0 text-foreground-icon-secondary" />
-              <span className={cn("truncate font-semibold", unchosen || fallback ? "text-warn-700" : "text-text-primary")}>{triggerLabel}</span>
-              {/* The effort belongs to the configured model, not to the fallback. */}
-              {fallbackBadge ?? (effectiveModel && supportsEffort ? <span className="shrink-0 text-text-tertiary">· {effortLabel}</span> : null)}
-            </span>
-          ) : (
-            <>
-              <span className={cn("truncate px-0.5 text-body-medium whitespace-nowrap", unchosen || fallback ? "text-warn-700" : "text-text-secondary")}>{triggerLabel}</span>
-              {fallbackBadge}
-            </>
-          )}
-          <RiArrowDownSLine
-            aria-hidden
-            className={cn("shrink-0 text-foreground-icon-secondary transition-transform duration-200", inline || header ? "size-3.5" : "size-[18px]", open && "rotate-180")}
-          />
-        </button>
+        {trigger}
       </BuiPopoverTrigger>
       <BuiPopoverContent
         side={inline || header ? "bottom" : "top"}
@@ -760,141 +733,7 @@ export function ComposerModelPicker({
           (list?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]') ?? list?.querySelector<HTMLElement>('[role="radio"]'))?.focus();
         }}
       >
-        <section aria-label={t("composer.modelSettings")} className="relative h-[280px] w-[339px] max-w-full outline-none">
-          <div
-            role="tablist"
-            aria-label={t("boardui.modelProviders")}
-            aria-orientation="vertical"
-            className="bui-scroll absolute start-0.5 top-0.5 h-[276px] w-[42px] overflow-y-auto rounded-[17px] bg-composer-panel-rail-background p-[3px]"
-          >
-            {/* Infobulle immédiate : le rail n'a que des icônes, et deux fournisseurs y partagent la marque OpenAI. */}
-            <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-              <div className="flex w-9 flex-col gap-1.5">
-                {rail.map((entry) => (
-                  <Tooltip key={entry.slug}>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={!needle && entry.slug === activeTab}
-                        aria-disabled={entry.connected ? undefined : "true"}
-                        aria-label={providerLabel(entry.slug, entry.name)}
-                        onClick={() => { setQuery(""); setSearching(false); setProviderTab(entry.slug); }}
-                        className={cn(
-                          "flex h-[30px] w-9 shrink-0 cursor-pointer items-center justify-center rounded-[50px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-                          !needle && entry.slug === activeTab ? "bg-background-tertiary-default" : "hover:bg-background-tertiary-default/50",
-                        )}
-                      >
-                        <ProviderIcon
-                          provider={entry.slug}
-                          name={entry.name}
-                          decorative
-                          tagged
-                          withTitle={false}
-                          className={cn(
-                            PROVIDER_GLYPH,
-                            RAIL_GLYPH_18.has(entry.slug) ? "size-[18px] [&>svg]:size-[18px]" : "size-5 [&>svg]:size-5",
-                            !entry.connected && "opacity-40 grayscale",
-                          )}
-                        />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" sideOffset={10}>
-                      {entry.connected
-                        ? providerLabel(entry.slug, entry.name)
-                        : t("composer.providerNotConnectedTooltip", { provider: providerLabel(entry.slug, entry.name) })}
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
-            </TooltipProvider>
-          </div>
-          <div className="absolute start-[52px] end-2 top-2 bottom-0 flex flex-col">
-            <div className="flex h-5 items-center justify-between gap-[5px] px-0.5">
-              {searching ? (
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setSearching(false); setQuery(""); } }}
-                  placeholder={t("boardui.quickSearch")}
-                  aria-label={t("boardui.quickSearch")}
-                  className="min-w-0 flex-1 bg-transparent text-body-medium text-text-primary caret-accent-500 outline-none placeholder:text-text-tertiary"
-                />
-              ) : (
-                <span className="text-body-medium text-text-tertiary">
-                  {t("composer.models", { count: String(modelCount) })}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => { setSearching((value) => !value); setQuery(""); }}
-                className={cn(
-                  "flex cursor-pointer items-center gap-[5px] rounded-[4px] outline-none transition-opacity duration-150 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-                  searching ? "opacity-100" : "opacity-50",
-                )}
-              >
-                {searching ? null : <span className="text-body-medium whitespace-nowrap text-text-secondary">{t("boardui.quickSearch")}</span>}
-                <RiSearchLine aria-hidden className="size-4 shrink-0 text-foreground-icon-secondary" />
-              </button>
-            </div>
-            <div className="relative mt-1 flex min-h-0 flex-1 flex-col">
-            <div aria-hidden className="bui-list-fade" data-visible={listScrolled}>
-              <div />
-              <div />
-              <div />
-              <div />
-            </div>
-            <div
-              ref={listRef}
-              role={!needle && activeProviderDisconnected ? undefined : "radiogroup"}
-              aria-label={!needle && activeProviderDisconnected ? undefined : t("composer.model")}
-              onScroll={(event) => setListScrolled(event.currentTarget.scrollTop > 0)}
-              className="bui-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-1"
-            >
-              {!needle && activeProviderDisconnected ? (
-                <ProviderNotConnectedPanel
-                  provider={activeProvider.slug}
-                  name={activeProvider.name}
-                  onClose={() => setOpen(false)}
-                />
-              ) : (
-                <>
-                  {needle ? null : (
-                    <ModelRadio
-                      label={t("composer.modelGlobal")}
-                      detail={globalModel ?? t("composer.modelUnavailable")}
-                      checked={selectedModel === null}
-                      disabled={saving}
-                      onSelect={() => onModelChange(null)}
-                      trailing={selectedModel === null ? effortChip : undefined}
-                    />
-                  )}
-                  {visibleGroups.map((group) => (
-                    <Fragment key={group.slug}>
-                      <ProviderHeading provider={group.slug} name={group.name} />
-                      {group.models.map((model) => (
-                        <ModelRadio
-                          key={model.id}
-                          label={model.id}
-                          provider={group.slug}
-                          checked={selectedModel === model.id}
-                          disabled={saving}
-                          onSelect={() => onModelChange(model.id)}
-                          trailing={selectedModel === model.id ? effortChip : undefined}
-                        />
-                      ))}
-                    </Fragment>
-                  ))}
-                  {needle && visibleGroups.length === 0 ? (
-                    <p className="px-2 py-3 text-body-2-medium text-text-tertiary">{t("boardui.noModelMatch")}</p>
-                  ) : null}
-                </>
-              )}
-            </div>
-            </div>
-          </div>
-        </section>
+        {panel}
       </BuiPopoverContent>
     </BuiPopover>
   );

@@ -1,9 +1,10 @@
-import "@openedbot/platform-config/env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback before any module reads the environment
+import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";
 import { authMiddleware, authRoutes, protectedAuthRoutes, type AppVariables } from "./routes/identity/auth";
 import { mobileConnectProtectedRoutes, mobileConnectRoutes } from "./routes/identity/mobile-connect-routes";
+import { nativeCodeLoginRoutes } from "./routes/identity/native-code-login-routes";
 import { createBlobStore } from "./infrastructure/blob-store";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { responseCompression } from "./interfaces/http/compression";
@@ -36,13 +37,15 @@ import {
   runtimeEnrollmentClaimRoutes,
 } from "./routes/runtimes/runtime-enrollment-routes";
 import { mcpOauthCallbackRoutes, runtimeIntegrationRoutes } from "./routes/runtimes/runtime-integration-routes";
+import { integrationRouteContext } from "./routes/runtimes/runtime-integration-context";
+import { createInventoryWarmer, internalInventoryRoutes } from "./routes/runtimes/runtime-inventory-warm";
 import { runtimeModelRoutes } from "./routes/runtimes/runtime-model-routes";
 import { runtimeAdminRoutes } from "./routes/runtimes/runtime-admin-routes";
 import { runtimeProviderUsageRoutes } from "./routes/runtimes/runtime-provider-usage-routes";
 import { runtimeModelContextRoutes } from "./routes/runtimes/runtime-model-context-routes";
 import { creationAuditRoutes, runtimeAuditRoutes } from "./routes/runtimes/runtime-audit-routes";
 import { createVerdictSigner } from "@openedbot/runtime-link/application/audit-verdict";
-import { botRoutes, personaDraftRoutes, sectionRoutes } from "./routes/roster/bot-routes";
+import { botRoutes, sectionRoutes } from "./routes/roster/bot-routes";
 import { botRoutineRoutes, groupRoutineRoutes, routineRoutes } from "./routes/execution/routine-routes";
 import { routineToolMcpRoutes } from "./routes/execution/routine-tool-routes";
 import { botRoutineToolRoutes } from "./routes/execution/routine-tool-install-routes";
@@ -71,9 +74,9 @@ import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-leas
 import { createLinkYoloPublisher, yoloLinkLeaseKeys } from "@openedbot/runtime-link/application/link-yolo";
 import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
-import { unhandledErrorBody } from "./interfaces/http/unhandled-error";
+import { createUnhandledErrorJournal, respondToUnhandledError, unhandledErrorJournalWriter } from "./interfaces/http/unhandled-error-journal";
 import { HermesEndpointError } from "@openedbot/hermes";
-import { accessLogMiddleware, logger, recordErrorCode, requestIdOf } from "@openedbot/platform-observability";
+import { accessLogMiddleware, logger, recordErrorCode } from "@openedbot/platform-observability";
 import { API_RATE_RULES, rateLimiter } from "./interfaces/http/rate-limit";
 import { apiSecurityHeaders } from "./interfaces/http/security-headers";
 import { legalRoutes } from "./routes/legal/legal-routes";
@@ -255,8 +258,17 @@ const auditWorm = createAuditWormStore(config.auditWorm);
 const anchorBlocking = (organizationId: string) => entitlements.has(PRO_ENTITLEMENTS.auditAnchor, { organizationId });
 // Le broker du lien connecteur vit dans le processus : une connexion par
 // runtime, tenue par CETTE instance. Les routes le joignent par `runtimeLinks()`.
+// `inventory.changed` : l'hôte dit que son inventaire a bougé ; on le relit
+// en arrière-plan pour que Réglages › Connecteurs s'ouvre déjà à jour. Le
+// broker embarqué l'appelle ici ; une passerelle séparée passe par
+// `/internal/runtime-inventory/changed`.
+const inventoryWarmer = createInventoryWarmer(integrationRouteContext(db, config, {}));
 const linkBroker = runtimeLinkConfig.mode === "embedded"
-  ? new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: auditWorm, anchorBlocking, webAppUrl: config.webUrl }) })
+  ? new RuntimeLinkBroker({
+    instanceId,
+    liveness: createLinkLivenessStore(db, { worm: auditWorm, anchorBlocking, webAppUrl: config.webUrl }),
+    onInventoryChanged: (link) => inventoryWarmer.warm(link.organizationId, link.runtimeId),
+  })
   : null;
 const yoloSigning = readYoloLeaseSigningConfig(process.env);
 const instanceRegistry = createApiInstanceRegistry(db, {
@@ -291,7 +303,7 @@ app.use("*", async (context, next) => {
     context.header("Vary", "Origin");
   }
   if (context.req.method === "OPTIONS") {
-    context.header("Access-Control-Allow-Headers", ["Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OHB-Organization", "X-OHB-Fleet", ...compatHeaderNames(), "X-OHB-Support-Token", "Last-Event-ID"].join(", "));
+    context.header("Access-Control-Allow-Headers", ["Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OpenedBot-Organization", "X-OpenedBot-Fleet", ...compatHeaderNames(), "X-OpenedBot-Support-Token", "Last-Event-ID"].join(", "));
     context.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     return context.body(null, 204);
   }
@@ -319,6 +331,8 @@ app.use("/api/*", rateLimiter(API_RATE_RULES, { trustProxy: config.trustProxy })
 app.route("/api/auth", authRoutes(db, config, entitlements, impersonation));
 // Échange d’un ticket Mobile Connect : sous `/api/auth/native/`, donc sans session.
 app.route("/api/auth/native/mobile-connect", mobileConnectRoutes(db, config));
+// Connexion native par code e-mail seul (desktop) : `/api/auth/native/code/verify`, sans session.
+app.route("/api/auth/native/code", nativeCodeLoginRoutes(db, config, entitlements));
 app.route("/api/invite/member", memberInvitationRoutes(db, config));
 // Le webhook de paiement, au chemin que déclare le plug-in `billing`
 // (`billing.webhookPath`, étape 11.5) et hors session ; le cœur ne fait que
@@ -334,6 +348,7 @@ app.route("/api/waitlist", waitlistRoutes(db, config));
 // lui, 404 `NOT_FOUND` sur tout le préfixe (solo).
 app.route("/", supportDeskRoutes(supportDesk, proContext, proMountWarning, { trustProxy: config.trustProxy }));
 app.route("/internal/events", internalEventRoutes(db, config, hub));
+app.route("/internal/runtime-inventory", internalInventoryRoutes(config, inventoryWarmer));
 // Relais du lien connecteur pour le worker : même bearer interne, flux dans
 // les deux sens, jamais compressé (hors `/api/*`, et exclu par chemin).
 app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(config, linkBroker, linkLocator));
@@ -397,7 +412,6 @@ app.route("/api/creation-audit", creationAuditRoutes(config, { signer: verdictSi
 // répond 404 elle-même.
 app.route("/api/runtimes", runtimeAdminRoutes(db, config));
 app.route("/api/bots", botRoutes(db, config));
-app.route("/api/persona-drafts", personaDraftRoutes(db, config));
 app.route("/api/bots", computerRoutes(db, computer));
 app.route("/api/team-imports", teamImportRoutes(db, config, { blobs }));
 app.route("/api/bots", botRoutineRoutes(db));
@@ -452,6 +466,10 @@ app.route("/api", miscRoutes(db, config));
 app.route("/api", searchRoutes(db));
 app.route("/api", inboxRoutes(db));
 
+// La référence d'un 500 désigne aussi une ligne d'`api_errors` (0161), écrite
+// après la réponse, au plus quelques-unes en vol (unhandled-error-journal.ts).
+const unhandledErrors = createUnhandledErrorJournal(unhandledErrorJournalWriter(db));
+
 app.onError((error, context) => {
   if (error instanceof HttpError) {
     if (error.status >= 500) runtimeMetrics.recordServerError();
@@ -482,26 +500,7 @@ app.onError((error, context) => {
     return context.json({ error: { code: error.code, message: error.message } }, 400);
   }
   runtimeMetrics.recordServerError();
-  // Le MÊME identifiant que la ligne d'access-log et que l'en-tête
-  // `X-Request-Id` : la référence lue par l'utilisateur désigne une ligne
-  // qu'un opérateur peut retrouver.
-  const requestId = requestIdOf(context.req.raw);
-  recordErrorCode(context.req.raw, "INTERNAL_ERROR");
-  // `String(error)` seul rendait la référence inexploitable : une erreur
-  // PostgreSQL se lit par son `code`, sa `constraint` et son `detail`.
-  const pg = error as Partial<{ code: string; constraint: string; detail: string; stack: string }>;
-  logger.error({
-    event: "api.unhandled_error",
-    requestId,
-    error: String(error),
-    stack: typeof pg.stack === "string" ? pg.stack : undefined,
-    pgCode: typeof pg.code === "string" ? pg.code : undefined,
-    constraint: typeof pg.constraint === "string" ? pg.constraint : undefined,
-    detail: typeof pg.detail === "string" ? pg.detail : undefined,
-  }, "unhandled error");
-  // Jamais « HTTP 500 » nu à l'écran : la cause, traduite, et la référence ;
-  // le texte brut en plus hors production (unhandled-error.ts).
-  return context.json({ error: unhandledErrorBody(error, requestId, config.environment) }, 500);
+  return respondToUnhandledError(context, error, { environment: config.environment, journal: unhandledErrors });
 });
 
 app.notFound((context) => context.json({ error: { code: "NOT_FOUND", message: "Route introuvable." } }, 404));

@@ -5,7 +5,7 @@ import {
   envUnusedForRuntimeMode,
   isDeprecatedEnvName,
 } from "../../platform/config/src/env-schema";
-import { foldEnvMerges, mergedEnvTarget, renamedEnvName } from "../../platform/config/src/env-aliases";
+import { foldEnvMerges, mergedEnvTarget, renamedEnvName } from "../../platform/config/src/legacy-env";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 
 /** Helpers shared by env-audit and env-template. Values are never printed. */
@@ -95,8 +95,8 @@ export function mergeEnvFiles(files: readonly EnvFile[]): {
 
 /**
  * The values with every old OHB_* name folded into its OPENEDBOT_* name
- * (when that one is absent), then the merged names converted (ENV_MERGES),
- * as the apps read them for one more release.
+ * (when that one is absent), then the merged names converted (ENV_MERGES):
+ * what the file holds once `env-audit --apply` has rewritten it.
  */
 export function withRenamedEnvValues(values: Readonly<Record<string, string>>, options: { merges?: boolean } = {}): Record<string, string> {
   const folded: Record<string, string> = { ...values };

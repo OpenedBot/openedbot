@@ -142,9 +142,7 @@ export const providerLimits = {
   resetUnknown: ":",
   unavailable: "n/a",
   providerUnavailable: "The runtime does not read this provider’s limits yet.",
-  providersUnavailable: "The runtime does not publish a reading for these providers yet.",
   providerUnsupported: "This provider exposes no account-usage API.",
-  providersUnsupported: "These providers expose no account-usage API.",
   providerKeyless: "{provider} is served anonymously, with no account or key: its quota is enforced per IP address on the provider’s side, so there is no reading to fetch.",
   unmeasured: "No reading",
   inService: "In service",
@@ -160,6 +158,16 @@ export const providerLimits = {
   botsLoading: "Reading bots…",
   estimated: "Currently resolved provider, not billing evidence.",
   noBots: "No bot uses this provider.",
+  apiKey: "API key",
+  apiKeyNote: "Billed per use, no plan quota. Tokens counted by openedbot from finished runs.",
+  usageDay: "24 h",
+  usageMonth: "30 days",
+  usageTokens: "{tokens} tokens",
+  usageSplit: "{input} input · {output} output",
+  usageRunsOne: "1 run",
+  usageRunsMany: "{count} runs",
+  usageLoading: "Reading consumption…",
+  usageFailed: "Consumption is unavailable right now.",
 } as const;
 
 export const runtimeAlerts = {
@@ -370,6 +378,11 @@ export const connectorUpgrade = {
   dialogDone: "I ran the command",
   upToDateTitle: "Runtime up to date",
   upToDate: "edge-setup {version} is installed on “{runtime}”.",
+  hermesTitle: "Hermes update available",
+  hermesVersions: "Hermes installed: {current} · with the latest edge-setup release: {latest}",
+  hermesHow: "Hermes is updated with edge-setup: run this command on the host. openedbot never updates your machine itself.",
+  hermesBadge: "Hermes update",
+  hermesBadgeAria: "Hermes {version} is available: open runtime settings",
 } as const;
 
 export const providerIncidents = {

@@ -2,7 +2,7 @@
 // a claim is exclusive, an expired lease is requeued then reclaimed with a
 // new generation, an exhausted run is never reclaimed but reaped, and a lease
 // lost during the Hermes create is settled as `unknown`, never retried, and
-// while a bot's profile is cloning only its greeting run may start.
+// while a bot's profile is cloning none of its runs start, greeting included.
 import { withDisposablePostgres } from "./disposable-postgres";
 import { claimRun, MAX_RUN_ATTEMPTS, reapPoisonRuns } from "../../modules/execution/src/application/queue";
 import type { WorkerConfig } from "../../apps/worker/src/config";
@@ -84,9 +84,9 @@ await withDisposablePostgres("ohb140_lease", async ({ owner, connect }) => {
   assert(ambiguous.status === "unknown" && ambiguous.externalState === "ambiguous" && ambiguous.errorCode === "HERMES_CREATE_OUTCOME_UNKNOWN",
     `a lease lost while creating settles as unknown (got ${ambiguous.status}/${ambiguous.externalState}/${ambiguous.errorCode})`);
 
-  // 5. A cloning profile holds every run of its bot except the greeting
-  // (DEV-OHB-244). An operator run has origin NULL: the gate must not let a
-  // NULL comparison through, or it reaches Hermes before the profile exists.
+  // 5. A cloning profile holds every run of its bot, the greeting included:
+  // it runs on the bot's own profile once ready. An operator run has origin
+  // NULL: the gate must not let it reach Hermes before the profile exists.
   const CLONING = id(6);
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${CLONING}, ${ORG}, ${id(4)}, 'Cloning', 'cloning', 1)`;
   await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
@@ -99,8 +99,12 @@ await withDisposablePostgres("ohb140_lease", async ({ owner, connect }) => {
   if (held) await owner`update runs set status = 'completed', ended_at = now(), lease_owner = null, lease_expires_at = null where id = ${held.id}`;
   await owner`delete from runs where id = ${id(30)}`;
   await owner`insert into runs (id, organization_id, thread_id, bot_id, input, origin) values (${id(31)}, ${ORG}, ${id(104)}, ${CLONING}, 'greeting', 'bot_greeting')`;
+  const heldGreeting = await claimRun(workerA, config("worker-a"));
+  assert(heldGreeting?.id !== id(31), `the greeting waits for the profile clone (claimed ${heldGreeting?.id})`);
+  if (heldGreeting) await owner`update runs set status = 'completed', ended_at = now(), lease_owner = null, lease_expires_at = null where id = ${heldGreeting.id}`;
+  await owner`update bot_profile_provisions set status = 'succeeded' where bot_id = ${CLONING}`;
   const greeting = await claimRun(workerA, config("worker-a"));
-  assert(greeting?.id === id(31), `the greeting run starts during the clone (claimed ${greeting?.id})`);
+  assert(greeting?.id === id(31), `the greeting starts once the profile is ready (claimed ${greeting?.id})`);
 
   console.info(JSON.stringify({ test: "worker-queue-lease", passed: true, exclusiveClaim: true, expiredLeaseReclaimed: true, poisonReaped: reaped, ambiguousCreateSettled: true, cloneHoldsOperatorRuns: true }));
 });

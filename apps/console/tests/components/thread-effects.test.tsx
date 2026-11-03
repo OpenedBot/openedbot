@@ -280,9 +280,10 @@ describe("Grok Bot's thread theme", () => {
   };
 
   test("the measured surfaces, light and dark", () => {
-    expect(block(":root")).toContain("--ohb-thread-page: #fcfcfc;");
+    expect(block(":root")).toContain("--ohb-thread-page: #f5f5f6;");
     expect(block(":root")).toContain("--ohb-bubble-agent: rgb(28 28 28 / 0.06);");
-    expect(block(".dark")).toContain("--ohb-thread-page: #121212;");
+    // OpenBot's canvas (restyle 2026-11-02), like the main card it sits in.
+    expect(block(".dark")).toContain("--ohb-thread-page: #1a1a1a;");
     expect(block(".dark")).toContain("--ohb-bubble-agent: rgb(245 245 245 / 0.04);");
     expect(block(".dark [data-thread-column]")).toContain("--bui-background-primary-default: #1f1f1f;");
   });

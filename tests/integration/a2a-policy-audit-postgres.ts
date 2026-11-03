@@ -129,7 +129,7 @@ async function ownerAdminUrl(): Promise<string> {
   // already names the loopback owner connection; the private local env file is
   // only the fallback of a developer machine.
   let raw = process.env.INTEGRATION_ADMIN_DATABASE_URL?.trim() || process.env.DEV_RESET_DATABASE_URL?.trim() || null;
-  if (!raw && process.env.OHB84_ENV_FILE) raw = envValue(await Bun.file(process.env.OHB84_ENV_FILE).text());
+  if (!raw && process.env.OPENEDBOT_TEST_84_ENV_FILE) raw = envValue(await Bun.file(process.env.OPENEDBOT_TEST_84_ENV_FILE).text());
   // `make test-integration` passes no setting: the same dev-infra container
   // discovery as every other integration script.
   if (!raw) raw = (await adminUrl()).toString();

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import {
   readCreateBotInput,
-  readCreationDraftRequest,
   readPersonaDraftHash,
   readUpdateBotInput,
 } from "@openedbot/roster/domain/bot-input";
@@ -14,7 +13,7 @@ import {
   readToolsetName,
   parseRuntimeMemoryWrite,
 } from "@openedbot/roster/domain/bot-capabilities";
-import { readSectionName, readSectionOrder, readSectionPatch } from "@openedbot/roster/domain/section-input";
+import { readSectionName, readSectionOrder, readSectionPatch, readSectionsOrder } from "@openedbot/roster/domain/section-input";
 import { readSectionId } from "@openedbot/roster/domain/section-id";
 import { readToolErrorCursor, readToolErrorLimit } from "@openedbot/roster/domain/tool-errors";
 import { createBot, deleteBot, listRoster, resolveBotDeps, updateBot, type BotRouteDeps } from "@openedbot/roster/application/bots";
@@ -33,11 +32,9 @@ import {
 import {
   confirmPersonaDraft,
   queuePersonaDraft,
-  readCreationPersonaDraft,
   readLatestPersonaDraft,
-  requestCreationPersonaDraft,
 } from "@openedbot/roster/application/persona-drafts";
-import { createSection, deleteSection, orderSection, patchSection } from "@openedbot/roster/application/sections";
+import { createSection, deleteSection, orderPins, orderSection, orderSections, patchSection } from "@openedbot/roster/application/sections";
 import { providerApiKey, providerSlug } from "@openedbot/runtimes/domain/runtime/provider-credentials";
 import type { Db } from "@openedbot/platform-db";
 import type { AppVariables } from "../identity/auth";
@@ -278,6 +275,21 @@ export function sectionRoutes(db: Db): Hono<{ Variables: AppVariables }> {
     const body = await jsonBody(context.req.raw);
     return context.json(await createSection(db, auth.organizationId, readSectionName(body)), 201);
   });
+  // Avant `/:sectionId/…` : « pinned » et « order » ne sont pas des sections.
+  routes.put("/order", async (context) => {
+    const auth = context.get("auth");
+    requireOperator(auth);
+    const body = await jsonBody(context.req.raw);
+    await orderSections(db, auth.organizationId, readSectionsOrder(body.order));
+    return context.body(null, 204);
+  });
+  routes.put("/pinned/order", async (context) => {
+    const auth = context.get("auth");
+    requireOperator(auth);
+    const body = await jsonBody(context.req.raw);
+    await orderPins(db, auth.organizationId, readSectionOrder(body.order));
+    return context.body(null, 204);
+  });
   routes.patch("/:sectionId", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
@@ -300,25 +312,5 @@ export function sectionRoutes(db: Db): Hono<{ Variables: AppVariables }> {
     await deleteSection(db, auth.organizationId, context.req.param("sectionId"));
     return context.body(null, 204);
   });
-  return routes;
-}
-
-export function personaDraftRoutes(db: Db, config: ApiConfig, routeDeps: BotRouteDeps = {}): Hono<{ Variables: AppVariables }> {
-  const routes = new Hono<{ Variables: AppVariables }>();
-  const deps = resolveBotDeps(config, routeDeps);
-
-  routes.post("/", async (context) => {
-    const auth = context.get("auth");
-    requireOperator(auth);
-    const created = await requestCreationPersonaDraft(db, deps, auth.organizationId, async () =>
-      readCreationDraftRequest(await jsonBody(context.req.raw)));
-    return context.json(created, 202);
-  });
-
-  routes.get("/:runId", async (context) => {
-    const auth = context.get("auth");
-    return context.json(await readCreationPersonaDraft(db, auth.organizationId, context.req.param("runId")));
-  });
-
   return routes;
 }

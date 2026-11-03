@@ -1,6 +1,6 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { HermesClientError, type HermesMcpOauthSession, type HermesMcpServer } from "@openedbot/hermes";
+import { HermesClientError, type HermesClientConfig, type HermesMcpOauthSession, type HermesMcpServer } from "@openedbot/hermes";
 import {
   MCP_OAUTH_PROFILE_FEATURE,
   MCP_PROFILE_DISCONNECT_FEATURE,
@@ -38,7 +38,7 @@ import {
   MCP_INVENTORY_TIMEOUT_MS,
   MCP_NAME_PATTERN,
 } from "./runtime-integration-constants";
-import { readThrough, wantsFreshRead } from "@openedbot/runtimes/application/runtime-read-snapshots";
+import { readThrough, wantsFreshRead, watchedReadPolicy } from "@openedbot/runtimes/application/runtime-read-snapshots";
 
 /**
  * Les serveurs MCP de l’hôte : inventaire, ajout, catalogue approuvé, retrait,
@@ -71,30 +71,13 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     const auth = context.get("auth");
     requireOperator(auth);
     const runtime = await readRuntime(db, config, auth.organizationId);
-    const unavailable: RuntimeIntegrationMcpDto = {
-      available: false,
-      capabilities: { oauth: false, gatewayRestart: false },
-      servers: [],
-      catalog: [],
-      error: null,
-    };
-    if (!runtime) return context.json<RuntimeIntegrationMcpDto>(unavailable);
-    const client = clientFactory(runtime.client);
+    if (!runtime) return context.json<RuntimeIntegrationMcpDto>(MCP_UNAVAILABLE);
     const dto = await readThrough(snapshots, {
       organizationId: auth.organizationId, runtimeId: runtime.id, kind: "mcp",
       fresh: wantsFreshRead(context.req.query("fresh")),
-      keep: (value: RuntimeIntegrationMcpDto) => value.available && value.error === null,
-      read: async () => {
-        let hostFeatures: string[] | null = null;
-        try { hostFeatures = await withDeadline(announcedFeatures(runtime, client), timeoutMs); } catch { hostFeatures = null; }
-        if (!hostFeatures?.includes(FEATURE_MCP)) return unavailable;
-        const result = await Promise.allSettled([withDeadline(client.mcpInventory(), MCP_INVENTORY_TIMEOUT_MS)]).then(([entry]) => entry!);
-        return publicMcp(
-          { oauth: hostFeatures.includes(FEATURE_MCP_OAUTH), gatewayRestart: hostFeatures.includes(FEATURE_GATEWAY_RESTART) },
-          result.status === "fulfilled" ? result.value : null,
-          result.status === "rejected" ? result.reason : null,
-        );
-      },
+      keep: keepMcp,
+      ...watchedReadPolicy(runtime.inventory),
+      read: liveMcpRead(ctx, runtime),
     });
     return context.json(dto);
   });
@@ -279,4 +262,39 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
   });
 
   return routes;
+}
+
+/** Un hôte sans administration MCP, ou sans runtime : rien à montrer, et rien d'erroné. */
+const MCP_UNAVAILABLE: RuntimeIntegrationMcpDto = {
+  available: false,
+  capabilities: { oauth: false, gatewayRestart: false },
+  servers: [],
+  catalog: [],
+  error: null,
+};
+
+/** Ce que garde l'instantané : un inventaire MCP disponible et lu sans erreur. */
+export const keepMcp = (value: RuntimeIntegrationMcpDto) => value.available && value.error === null;
+
+/**
+ * La lecture vivante de l'inventaire MCP (un interpréteur sur l'hôte). La route
+ * la sert à travers l'instantané ; le réchauffage la rejoue sur signal de l'hôte.
+ */
+export function liveMcpRead(
+  ctx: IntegrationRouteContext,
+  runtime: { client: HermesClientConfig; linkFeatures?: string[] },
+): () => Promise<RuntimeIntegrationMcpDto> {
+  const { clientFactory, timeoutMs, announcedFeatures } = ctx;
+  return async () => {
+    const client = clientFactory(runtime.client);
+    let hostFeatures: string[] | null = null;
+    try { hostFeatures = await withDeadline(announcedFeatures(runtime, client), timeoutMs); } catch { hostFeatures = null; }
+    if (!hostFeatures?.includes(FEATURE_MCP)) return MCP_UNAVAILABLE;
+    const result = await Promise.allSettled([withDeadline(client.mcpInventory(), MCP_INVENTORY_TIMEOUT_MS)]).then(([entry]) => entry!);
+    return publicMcp(
+      { oauth: hostFeatures.includes(FEATURE_MCP_OAUTH), gatewayRestart: hostFeatures.includes(FEATURE_GATEWAY_RESTART) },
+      result.status === "fulfilled" ? result.value : null,
+      result.status === "rejected" ? result.reason : null,
+    );
+  };
 }

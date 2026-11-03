@@ -6,12 +6,15 @@ import { pruneEmptySections } from "../sql/section-prune";
 import {
   deleteSectionMovingRows,
   insertSection,
+  lockSectionRow,
+  lockSections,
+  placeInPins,
   placeInSection,
   readSectionIdsInOrder,
   readSectionPosition,
-  sectionExists,
   swapSectionPosition,
   updateSection,
+  writeSectionsOrder,
   type SectionRow,
 } from "../sql/sections";
 
@@ -52,7 +55,9 @@ export async function orderSection(
   order: ReadonlyArray<{ kind: "bot" | "group"; id: string }>,
 ): Promise<void> {
   await withTenant(db, organizationId, async (tx) => {
-    if (!(await sectionExists(tx, organizationId, sectionId))) {
+    // Verrouillée comme pour une arrivée (`nextSectionRowPosition`) : un bot
+    // créé pendant la réécriture ne prend pas un rang qu'elle attribue.
+    if (!(await lockSectionRow(tx, organizationId, sectionId))) {
       throw new HttpError(404, "SECTION_NOT_FOUND", "Section introuvable.");
     }
     for (const [position, item] of order.entries()) {
@@ -61,6 +66,41 @@ export async function orderSection(
       }
     }
     await pruneEmptySections(tx, organizationId);
+  });
+}
+
+// L'ordre des sections éditables, tel qu'affiché de haut en bas. La section
+// par défaut (première par rang) n'y figure pas et garde sa place : c'est
+// elle qui reçoit les bots sans section. L'ordre doit citer exactement les
+// sections éditables : une liste périmée (section créée ou purgée entre la
+// lecture et le dépôt) est refusée plutôt qu'appliquée à moitié.
+export async function orderSections(db: Db, organizationId: string, order: ReadonlyArray<string>): Promise<void> {
+  await withTenant(db, organizationId, async (tx) => {
+    await lockSections(tx, organizationId);
+    const [defaultId, ...editable] = await readSectionIdsInOrder(tx, organizationId);
+    if (!defaultId) throw new HttpError(404, "SECTION_NOT_FOUND", "Section introuvable.");
+    const known = new Set(editable);
+    if (order.length !== editable.length || order.some((id) => !known.has(id))) {
+      throw new HttpError(409, "SECTIONS_ORDER_STALE", "Les sections ont changé entre-temps : rechargez et recommencez.");
+    }
+    await writeSectionsOrder(tx, organizationId, defaultId, order);
+  });
+}
+
+// L'ordre de la grille des épinglés, bots et salons entrelacés. Chaque ligne
+// citée est épinglée et prend son rang : épingler à un endroit et réordonner
+// sont la même écriture atomique. Sa section ne change pas.
+export async function orderPins(
+  db: Db,
+  organizationId: string,
+  order: ReadonlyArray<{ kind: "bot" | "group"; id: string }>,
+): Promise<void> {
+  await withTenant(db, organizationId, async (tx) => {
+    for (const [position, item] of order.entries()) {
+      if (!(await placeInPins(tx, organizationId, item.kind, item.id, position))) {
+        throw new HttpError(404, "SECTION_ORDER_ROW_NOT_FOUND", "Une ligne de l'ordre demandé n'existe pas.");
+      }
+    }
   });
 }
 

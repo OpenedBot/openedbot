@@ -48,7 +48,7 @@ describe("inter-instance dispatch certainty", () => {
   test("forwardProbe waits for the owner's verdict and never trusts an unknown shape", async () => {
     const posted: Array<{ url: string; body: unknown; hop: string | null }> = [];
     const relay = locator((async (input: string, init: RequestInit) => {
-      posted.push({ url: String(input), body: JSON.parse(String(init.body)), hop: new Headers(init.headers).get("X-OHB-Relay-Hop") });
+      posted.push({ url: String(input), body: JSON.parse(String(init.body)), hop: new Headers(init.headers).get("X-OpenedBot-Relay-Hop") });
       return Response.json({ outcome: "reconnect_requested", generation: "12" });
     }) as unknown as typeof fetch);
     expect(await relay.forwardProbe(runtimeId, "12")).toEqual({ outcome: "reconnect_requested", generation: "12" });

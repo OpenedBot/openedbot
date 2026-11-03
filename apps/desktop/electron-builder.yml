@@ -33,7 +33,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-win-${arch}.${ext}
-  # Rendered from build/icon.svg (1024 px); electron-builder derives the .ico.
+  # Derived from the official brand/bloub-batman.png; electron-builder derives the .ico.
   # With signAndEditExecutable off, openedbot.exe itself keeps the Electron icon in
   # Explorer: only the installer uses this one. The running window and taskbar
   # get it from BrowserWindow `icon` (src/main/window.ts).

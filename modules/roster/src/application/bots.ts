@@ -18,6 +18,7 @@ import { applyHostApprovalPolicy, applyTighteningPolicyBeforeMutation, approvalP
 import { publicBot, type BotRow } from "../domain/bot-dto";
 import { assertPermissionModeUnderCeiling } from "./permission-ceiling";
 import type { CreateBotInput, UpdateBotInput } from "../domain/bot-input";
+import { chooseBotSlug } from "./bot-slug";
 import {
   deleteBotRow,
   detachBotFromGroups,
@@ -47,7 +48,7 @@ import { insertProfileProvision } from "../sql/profile-provisions";
 import { insertBotHostCleanup } from "../sql/bot-host-cleanups";
 import { readBlockedToolsTx } from "../sql/tool-policies";
 import { lockBotHostCleanupForRestore } from "./bot-host-cleanups";
-import { assertBotProfileReady, assertProvisionRestorable, cancelProfileProvision, closeProvisionAfterRestore } from "./profile-provisions";
+import { assertBotProfileReady, assertBotProfileSettled, assertProvisionRestorable, cancelProfileProvision, closeProvisionAfterRestore } from "./profile-provisions";
 import {
   createManagedProfile,
   ensureHostProfileForRestore,
@@ -151,10 +152,10 @@ export async function createBot(
   } = {},
 ): Promise<CreatedBot> {
   const { readRuntime, clientFactory } = deps;
-  const { name, profile, slug } = input;
+  const { name, profile } = input;
+  let slug = input.slug;
   const requestDigest = input.clientRequestId && input.clientRequestKey ? creationRequestDigest(input.clientRequestKey) : null;
-  // A replay answers before anything else, even without a runtime: the bot
-  // exists, the operator only lost the first response.
+  // A replay answers first, even without a runtime: the operator only lost the first response.
   if (input.clientRequestId) {
     const replayed = await readCreationReplay(db, organizationId, input.clientRequestId, requestDigest);
     if (replayed) return replayed;
@@ -170,14 +171,13 @@ export async function createBot(
   if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de créer un bot.");
   const managedProfile = profile === null && runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE) === true;
   const provisionLater = managedProfile && (options.profileProvisioning ?? "async") === "async";
-  return withProfileNamesLock(db, organizationId, [slug, ...(profile ? [profile] : [])], async (db) => {
-  // The names lock serializes every creation of the organization: a request
-  // with the same id that raced the first one sees its row here, before any
-  // host call (no second profile, no 409 on the slug).
+  return withProfileNamesLock(db, organizationId, profile ? [profile] : [], async (db) => {
+  // The org-wide names lock: a racing replay sees its row here, before any host call.
   if (input.clientRequestId) {
     const replayed = await readCreationReplay(db, organizationId, input.clientRequestId, requestDigest);
     if (replayed) return replayed;
   }
+  slug = await chooseBotSlug(db, organizationId, input);
   if (profile !== null) {
     // On ne vérifie QUE ce que l'opérateur a demandé. `not_partitioned` n'est
     // pas une erreur : c'est la configuration par défaut d'un runtime, et
@@ -485,16 +485,11 @@ export async function assertBotDeletable(
   organizationId: string,
   botId: string,
 ): Promise<void> {
-  await assertBotQuiescent(
-    tx,
-    organizationId,
-    botId,
-    {
-      code: "CANCELLED_BY_DELETE",
-      message: "Passe de maintenance annulée : le bot est supprimé.",
-    },
-    "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.",
-  );
+  await assertBotProfileSettled(tx, organizationId, botId);
+  await assertBotQuiescent(tx, organizationId, botId, {
+    code: "CANCELLED_BY_DELETE",
+    message: "Passe de maintenance annulée : le bot est supprimé.",
+  }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.");
 }
 
 /**

@@ -235,7 +235,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
           "flex w-full flex-col overflow-hidden outline-none transition duration-150 ease-out",
           isMobile
             ? "ohb-inset-sheet max-h-[calc(100dvh-var(--ohb-safe-top)-2.5rem)] max-w-none pb-[var(--ohb-safe-bottom)] duration-250"
-            : "max-h-[calc(100dvh-4rem)] max-w-lg rounded-xl border border-border bg-card shadow-[var(--shadow-elevated)] dark:bg-surface",
+            : "max-h-[calc(100dvh-4rem)] max-w-[480px] rounded-xl border border-foreground/12 bg-card text-[13px] leading-[18px] shadow-[var(--shadow-elevated)] dark:bg-surface",
           shown ? "translate-y-0 scale-100 opacity-100" : isMobile ? "translate-y-10 scale-100 opacity-0" : "scale-95 opacity-0",
           className
         )}
@@ -245,14 +245,16 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
         ) : null}
         {contextLabel && <p className="shrink-0 border-b px-5 py-2 text-sm font-semibold" data-dialog-context>{contextLabel}</p>}
         {(title || description) && (
-          <div className={cn("flex items-start justify-between gap-3 px-5 py-4", !isMobile && "border-b border-border")}>
+          // Bureau : l'en-tête de Grok Bot (`ui-dialog-header`) : 12 / 16 px, sans
+          // filet ; collé au corps quand il y en a un.
+          <div className={cn("flex items-start justify-between gap-2", isMobile ? "px-5 py-4" : cn("px-4 pt-3", children ? "pb-0" : "pb-3"))}>
             <div className="min-w-0 flex-1">
               {title && (
                 <h2
                   id={titleId}
                   className={cn(
                     "font-semibold",
-                    isMobile ? "text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]" : "text-base text-foreground",
+                    isMobile ? "text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]" : "text-sm leading-5 font-medium text-foreground",
                   )}
                 >
                   {title}
@@ -263,7 +265,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
                   id={descriptionId}
                   className={cn(
                     "mt-0.5",
-                    isMobile ? "text-[15px] leading-5 text-[var(--ohb-grouped-caption)]" : "text-sm text-muted-foreground",
+                    isMobile ? "text-[15px] leading-5 text-[var(--ohb-grouped-caption)]" : "text-[13px] leading-[18px] text-muted-foreground",
                   )}
                 >
                   {description}
@@ -286,16 +288,16 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
                   type="button"
                   onClick={onClose}
                   aria-label={closeLabel}
-                  className="-mt-1 -mr-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                  className="-mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--btn-veil-hover)] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
-                  <XIcon className="size-4" />
+                  <XIcon className="size-3.5" />
                 </button>
               )
             ) : null}
           </div>
         )}
 
-        {children && <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-5 py-4 text-sm text-foreground/80", bodyClassName)}>{children}</div>}
+        {children && <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto text-foreground/80", isMobile ? "px-5 py-4 text-sm" : "px-4 pt-3 pb-4", bodyClassName)}>{children}</div>}
 
         {footer ? (
           <div
@@ -303,7 +305,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
             className={cn(
               isMobile
                 ? "flex min-h-11 shrink-0 flex-col gap-2 border-t-0 bg-[var(--ohb-grouped-canvas)] px-4 pt-2 pb-[max(0.75rem,var(--ohb-safe-bottom))]"
-                : "flex min-w-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3",
+                : "flex min-w-0 flex-wrap items-center justify-end gap-2 border-t border-foreground/8 p-2.5",
               footerClassName,
             )}
           >

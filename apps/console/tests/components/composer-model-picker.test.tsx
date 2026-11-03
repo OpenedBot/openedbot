@@ -308,10 +308,10 @@ test("the header names the model that served a re-routed last turn, marked as a 
   const servedBy = { runId: "run-9", from: "xai-oauth", provider: "anthropic", model: "claude-fable-5.1" };
   const { models } = renderPicker({ variant: "header", servedBy });
   const trigger = document.querySelector<HTMLElement>("[data-composer-model-picker]")!;
-  expect(trigger.textContent).toContain("claude-fable-5.1");
-  expect(trigger.textContent).toContain("repli");
+  // Icon only: the name lives in the aria-label and the tooltip.
+  expect(trigger.getAttribute("aria-label")).toContain("claude-fable-5.1");
   // The effort is the configured model's, not the fallback's.
-  expect(trigger.textContent).not.toContain("Medium");
+  expect(trigger.getAttribute("aria-label")).not.toContain("Medium");
   expect(trigger.querySelector("[data-model-fallback]")).not.toBeNull();
   expect(trigger.getAttribute("title")).toBe("Dernière réponse servie par Anthropic / claude-fable-5.1 (repli). Le modèle réglé reste gpt-5.6.");
   expect(trigger.getAttribute("aria-label")).toContain("claude-fable-5.1");
@@ -322,7 +322,7 @@ test("the header names the model that served a re-routed last turn, marked as a 
 
   renderPicker({ variant: "header" });
   const plain = document.querySelector<HTMLElement>("[data-composer-model-picker]")!;
-  expect(plain.textContent).toContain("gpt-5.6");
+  expect(plain.getAttribute("aria-label")).toContain("gpt-5.6");
   expect(plain.querySelector("[data-model-fallback]")).toBeNull();
   expect(plain.getAttribute("title")).toBeNull();
 });
@@ -421,7 +421,7 @@ test("a failed save restores the fallback mark along with the selection", async 
     releasePatch();
     await waitFor(() => expect(errorToast).toHaveBeenCalledWith("Modèle indisponible dans Hermes.", { id: "composer-model-bot-1" }));
     await waitFor(() => expect(document.querySelector("[data-model-fallback]")).not.toBeNull());
-    expect(document.querySelector("[data-composer-model-picker]")!.textContent).toContain("claude-fable-5.1");
+    expect(document.querySelector("[data-composer-model-picker]")!.getAttribute("aria-label")).toContain("claude-fable-5.1");
   } finally {
     errorToast.mockRestore();
   }

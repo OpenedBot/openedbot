@@ -2,13 +2,12 @@ import { ACCENTS, ACCENT_SWATCHES, THEME_MODES, useTheme, type AccentId } from "
 import { LOCALES } from "@openedbot/contracts-locale";
 import { useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
-import { ACTIONS, CardHeading, SectionHeading, SettingsCard } from "../../../components/settings/primitives";
+import { CardHeading, ListRow, ListSection, SectionHeading, SettingsCard } from "../../../components/settings/primitives";
+import { Segmented } from "../../../components/settings/segmented";
 import { AccountLayoutPicker } from "../../../components/settings/account-layout-picker";
 import { InsetGroupedRow, InsetGroupedSection } from "../../../components/mobile/inset-grouped";
 import { SettingsPane } from "../pane";
 import { TEXT_SIZES, setTextSize, useTextSize } from "../../../lib/shell/text-size";
-import { setSettingsDisplay, useSettingsDisplay, type SettingsDisplay } from "../../../lib/shell/settings-display";
-import { useSettingsModal, useSettingsPage } from "../../../lib/shell/settings-modal-context";
 import { BOT_ACCENT_MODES, setBotAccentMode, useBotAccentMode, type BotAccentMode } from "../../../lib/bots/bot-accent-preference";
 
 const THEME_LABEL_KEY = {
@@ -27,10 +26,6 @@ const BOT_ACCENT_LABEL_KEY: Record<BotAccentMode, MessageKey> = {
   app: "settings.appearance.botAccentApp",
 };
 
-const SETTINGS_DISPLAY_LABEL_KEY: Record<SettingsDisplay, MessageKey> = {
-  modal: "settingsSidebar.displayModal",
-  page: "settingsSidebar.displayPage",
-};
 
 const ACCENT_LABEL_KEY = Object.fromEntries(
   ACCENTS.map((accent) => [accent, `settings.appearance.accents.${accent}` as MessageKey]),
@@ -50,21 +45,9 @@ export function AppearanceSettings() {
   const isMobile = useIsMobile();
   const textSize = useTextSize();
   const botAccentMode = useBotAccentMode();
-  const settingsDisplay = useSettingsDisplay();
-  const settingsModal = useSettingsModal();
-  const settingsPage = useSettingsPage();
-  // Choisi depuis les réglages eux-mêmes, le mode s'applique tout de suite, par
-  // la même bascule que l'en-tête : changer seulement la préférence ferait
-  // disparaître la fenêtre ouverte sans rien ouvrir à sa place.
-  const chooseSettingsDisplay = (display: SettingsDisplay) => {
-    if (display === settingsDisplay) return;
-    if (display === "page" && settingsModal?.openAsPage) settingsModal.openAsPage();
-    else if (display === "modal" && settingsPage) settingsPage.openAsWindow();
-    else setSettingsDisplay(display);
-  };
 
   const accentSwatches = (
-    <div className={isMobile ? "flex flex-wrap gap-3 px-4 py-3" : "mt-4 flex flex-wrap justify-end gap-2.5"}>
+    <div className={isMobile ? "flex flex-wrap gap-3 px-4 py-3" : "flex flex-wrap justify-end gap-2"}>
       {ACCENTS.map((accent) => {
         const selected = theme.accent === accent;
         return (
@@ -133,6 +116,9 @@ export function AppearanceSettings() {
     );
   }
 
+  // Bureau : les réglages courts regroupés en deux listes, une ligne par
+  // réglage, le libellé à gauche et la commande à droite sur la même ligne
+  // (au lieu d'une carte par réglage, la commande seule sur sa rangée).
   return (
     <SettingsPane>
       <SectionHeading
@@ -140,138 +126,48 @@ export function AppearanceSettings() {
         description={t("settings.appearance.description")}
       />
 
-      <SettingsCard>
-        <CardHeading
-          title={t("settings.appearance.languageTitle")}
-          description={t("settings.appearance.languageDescription")}
-        />
-        <div className={`mt-4 ${ACTIONS}`}>
-          {LOCALES.map((candidate) => (
-            <button
-              key={candidate}
-              type="button"
-              aria-pressed={locale === candidate}
-              onClick={() => setLocale(candidate)}
-              className={`rounded-md border px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                locale === candidate
-                  ? "border-input bg-accent font-medium"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              {t(LOCALE_LABEL_KEY[candidate])}
-            </button>
-          ))}
-        </div>
-      </SettingsCard>
+      <ListSection title={t("settings.appearance.interfaceTitle")}>
+        <ListRow label={t("settings.appearance.languageTitle")} description={t("settings.appearance.languageDescription")}>
+          <Segmented
+            label={t("settings.appearance.languageTitle")}
+            options={LOCALES.map((candidate) => ({ id: candidate, label: t(LOCALE_LABEL_KEY[candidate]) }))}
+            value={locale}
+            onChange={setLocale}
+          />
+        </ListRow>
+        <ListRow label={t("settings.appearance.themeTitle")} description={t("settings.appearance.themeDescription")}>
+          <Segmented
+            label={t("settings.appearance.themeTitle")}
+            options={THEME_MODES.map((mode) => ({ id: mode, label: t(THEME_LABEL_KEY[mode]) }))}
+            value={theme.mode}
+            onChange={theme.setMode}
+          />
+        </ListRow>
+        {/* Bureau seulement : un téléphone garde la taille du texte du système. */}
+        <ListRow label={t("settings.appearance.textSizeTitle")} description={t("settings.appearance.textSizeDescription")}>
+          <Segmented
+            label={t("settings.appearance.textSizeTitle")}
+            options={TEXT_SIZES.map((size) => ({ id: size, label: t("settings.appearance.textSizeOption", { size }), data: { "data-text-size": size } }))}
+            value={textSize}
+            onChange={setTextSize}
+            numeric
+          />
+        </ListRow>
+      </ListSection>
 
-      <SettingsCard>
-        <CardHeading
-          title={t("settings.appearance.themeTitle")}
-          description={t("settings.appearance.themeDescription")}
-        />
-        <div className={`mt-4 ${ACTIONS}`}>
-          {THEME_MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={theme.mode === mode}
-              onClick={() => theme.setMode(mode)}
-              className={`rounded-md border px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                theme.mode === mode
-                  ? "border-input bg-accent font-medium"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              {t(THEME_LABEL_KEY[mode])}
-            </button>
-          ))}
-        </div>
-      </SettingsCard>
-
-      <SettingsCard>
-        <CardHeading
-          title={t("settings.appearance.accentTitle")}
-          description={t("settings.appearance.accentDescription")}
-        />
-        {accentSwatches}
-      </SettingsCard>
-
-      <SettingsCard>
-        <CardHeading
-          title={t("settings.appearance.botAccentTitle")}
-          description={t("settings.appearance.botAccentDescription")}
-        />
-        <div className={`mt-4 ${ACTIONS}`}>
-          {BOT_ACCENT_MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={botAccentMode === mode}
-              onClick={() => setBotAccentMode(mode)}
-              data-bot-accent-choice={mode}
-              className={`rounded-md border px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                botAccentMode === mode
-                  ? "border-input bg-accent font-medium"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              {t(BOT_ACCENT_LABEL_KEY[mode])}
-            </button>
-          ))}
-        </div>
-      </SettingsCard>
-
-      {/* Bureau seulement : un téléphone garde la taille du texte du système. */}
-      <SettingsCard>
-        <CardHeading
-          title={t("settings.appearance.textSizeTitle")}
-          description={t("settings.appearance.textSizeDescription")}
-        />
-        <div className={`mt-4 ${ACTIONS}`}>
-          {TEXT_SIZES.map((size) => (
-            <button
-              key={size}
-              type="button"
-              aria-pressed={textSize === size}
-              onClick={() => setTextSize(size)}
-              data-text-size={size}
-              className={`rounded-md border px-3 py-1.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                textSize === size
-                  ? "border-input bg-accent font-medium"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              {t("settings.appearance.textSizeOption", { size })}
-            </button>
-          ))}
-        </div>
-      </SettingsCard>
-
-      {/* Bureau seulement : sur téléphone, les réglages sont une pile d'écrans. */}
-      <SettingsCard>
-        <CardHeading
-          title={t("settingsSidebar.displayLabel")}
-          description={t("settingsSidebar.displayHint")}
-        />
-        <div className={`mt-4 ${ACTIONS}`}>
-          {(["modal", "page"] as const).map((display) => (
-            <button
-              key={display}
-              type="button"
-              aria-pressed={settingsDisplay === display}
-              onClick={() => chooseSettingsDisplay(display)}
-              data-settings-display={display}
-              className={`rounded-md border px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                settingsDisplay === display
-                  ? "border-input bg-accent font-medium"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              {t(SETTINGS_DISPLAY_LABEL_KEY[display])}
-            </button>
-          ))}
-        </div>
-      </SettingsCard>
+      <ListSection title={t("settings.appearance.colorsTitle")}>
+        <ListRow label={t("settings.appearance.accentTitle")} description={t("settings.appearance.accentDescription")}>
+          {accentSwatches}
+        </ListRow>
+        <ListRow label={t("settings.appearance.botAccentTitle")} description={t("settings.appearance.botAccentDescription")}>
+          <Segmented
+            label={t("settings.appearance.botAccentTitle")}
+            options={BOT_ACCENT_MODES.map((mode) => ({ id: mode, label: t(BOT_ACCENT_LABEL_KEY[mode]), data: { "data-bot-accent-choice": mode } }))}
+            value={botAccentMode}
+            onChange={setBotAccentMode}
+          />
+        </ListRow>
+      </ListSection>
 
       <SettingsCard>
         <CardHeading

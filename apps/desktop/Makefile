@@ -3,7 +3,7 @@
 
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
-include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/env-aliases.mk
+include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/legacy-env.mk
 .PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────

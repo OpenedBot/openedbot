@@ -85,3 +85,9 @@ paths = [
   '''^platform/hermes/tests/fixtures/relay-frames\.vectors\.json$''',
 ]
 regexes = ['''^08001f8fa6f5dbb9a20ddf1e8366af93a76815f84035cfd2e93233475c968279$''']
+
+[[rules.allowlists]]
+description = "API error journal test: a fake invitation token the journal must redact"
+condition = "AND"
+paths = ['''^apps/api/tests/unhandled-error-journal\.test\.ts$''']
+regexes = ['''^Zq3v9XlYk2Rr7TtUuPpWwAaBbCcDdEeFfGg_hh-ii$''']

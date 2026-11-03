@@ -1,3 +1,4 @@
+import { useParams } from "@tanstack/react-router";
 import { create } from "zustand";
 import type { BotFaceSpec } from "@openedbot/contracts-api";
 import { randomId } from "../random-id";
@@ -17,11 +18,20 @@ export type PendingBotCreation = {
   face: BotFaceSpec;
   error: string | null;
   retry: (() => void) | null;
+  /** Le vrai bot, dès la réponse de l'API et jusqu'à la fin de la navigation vers lui. */
+  createdBotId?: string;
 };
 
 const PENDING_PREFIX = "creating-";
 
-const usePendingBotCreationStore = create<{ entries: Readonly<Record<string, PendingBotCreation>> }>()(() => ({ entries: {} }));
+const usePendingBotCreationStore = create<{
+  entries: Readonly<Record<string, PendingBotCreation>>;
+  /** Bots created here a moment ago: their sidebar row enters once (`useJustCreatedBot`). */
+  justCreated: Readonly<Record<string, true>>;
+}>()(() => ({ entries: {}, justCreated: {} }));
+
+/** Longer than the row's entrance (280 ms), and than the roster's next render. */
+const JUST_CREATED_MS = 1_000;
 
 export function isPendingBotId(botId: string): boolean {
   return botId.startsWith(PENDING_PREFIX);
@@ -50,6 +60,43 @@ export function resumePendingBotCreation(id: string): void {
     const entry = state.entries[id];
     return entry ? { entries: { ...state.entries, [id]: { ...entry, error: null, retry: null } } } : state;
   });
+}
+
+/**
+ * The API answered: the provisional id now designates the real bot. Set
+ * BEFORE the bot enters the cached roster, so its sidebar row is selected
+ * and enters from its first frame (`useRouteBotParams`, `useJustCreatedBot`).
+ */
+export function linkPendingBotCreation(id: string, botId: string): void {
+  usePendingBotCreationStore.setState((state) => {
+    const entry = state.entries[id];
+    return entry
+      ? { entries: { ...state.entries, [id]: { ...entry, createdBotId: botId } }, justCreated: { ...state.justCreated, [botId]: true } }
+      : state;
+  });
+  // The cached roster renders on a later tick than this link, and the
+  // creation settles as soon as the navigation ends: the mark keeps its own clock.
+  setTimeout(() => usePendingBotCreationStore.setState((state) => {
+    if (!(botId in state.justCreated)) return state;
+    const { [botId]: _done, ...justCreated } = state.justCreated;
+    return { justCreated };
+  }), JUST_CREATED_MS);
+}
+
+/**
+ * The route's bot and group. On a provisional `/bot/<id>` whose bot the API
+ * has created, the real bot: the navigation to its address is asynchronous,
+ * and its row would otherwise appear unselected, then turn selected.
+ */
+export function useRouteBotParams(): { botId?: string; groupId?: string } {
+  const { botId, groupId } = useParams({ strict: false }) as { botId?: string; groupId?: string };
+  const created = usePendingBotCreationStore((state) => (botId ? state.entries[botId]?.createdBotId : undefined));
+  return { botId: created ?? botId, groupId };
+}
+
+/** Ce bot vient d'être créé ici : sa ligne entre au lieu de surgir. */
+export function useJustCreatedBot(botId: string): boolean {
+  return usePendingBotCreationStore((state) => botId in state.justCreated);
 }
 
 export function settlePendingBotCreation(id: string): void {

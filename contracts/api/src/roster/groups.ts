@@ -5,6 +5,9 @@ type SectionOrderItem = { kind: "bot" | "group"; id: string };
 
 export type SectionOrderInput = { order: SectionOrderItem[] };
 
+/** L'ordre des sections éditables, de haut en bas ; « Non assigné » n'y figure pas, il reste en place. */
+export type SectionsOrderInput = { order: string[] };
+
 export type SectionDto = {
   id: string;
   name: string;
@@ -50,6 +53,8 @@ export type GroupDto = {
   position: number;
   /** Optionnel pour rester compatible avec les cloud API antérieures à 0036. */
   pinned?: boolean;
+  /** Rang dans la grille des épinglés (voir `BotDto.pinPosition`). Absent avant 0159. */
+  pinPosition?: number | null;
   needsYou: boolean;
   awaitingApproval: boolean;
   /** Activité bot/runtime postérieure au dernier accusé de lecture de l’utilisateur courant. */

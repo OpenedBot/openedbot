@@ -40,22 +40,18 @@ export function botGreetingInput(input: {
 }
 
 /**
- * DEV-OHB-244 : l'accueil n'attend pas le clone du profil nommé (~7 s sur le
- * lab). Tant que le provisionnement court, il part sur le profil par défaut,
- * dans sa propre session : celle du fil reste vierge sur le profil par défaut
- * et le tour suivant la crée sur le profil du bot, avec l'historique qu'openedbot
- * envoie à chaque run. Le choix est collé au run par `execution_session_key`
- * : une reprise ne change jamais de profil en cours de route.
+ * DEV-OHB-244 faisait partir l'accueil sur le profil par défaut, dans sa
+ * propre session, tant que le profil du bot se clonait. L'accueil attend
+ * désormais ce profil comme tout autre run (queue.ts) ; reste le cas d'un
+ * accueil déjà collé à cette session (`execution_session_key`) par une version
+ * précédente : une reprise ne change jamais de profil en cours de route.
  */
 export function greetingRunsOnDefaultProfile(input: {
   origin: string | null;
   threadSessionId: string;
   executionSessionKey: string | null;
-  hermesRunId: string | null;
-  profileProvisionStatus: string | null;
 }): boolean {
-  if (input.origin !== "bot_greeting") return false;
-  if (input.executionSessionKey !== null) return input.executionSessionKey === greetingSessionKey(input.threadSessionId);
-  return input.hermesRunId === null
-    && (input.profileProvisionStatus === "queued" || input.profileProvisionStatus === "running");
+  return input.origin === "bot_greeting"
+    && input.executionSessionKey !== null
+    && input.executionSessionKey === greetingSessionKey(input.threadSessionId);
 }

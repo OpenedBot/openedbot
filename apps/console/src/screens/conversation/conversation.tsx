@@ -12,8 +12,7 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { conversationHref } from "../../lib/thread/conversation-href";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconSettings, IconShieldLock, IconX } from "@tabler/icons-react";
-import { Folder } from "lucide-react";
-import { AgentThinking, Button, Dialog, useIsMobile } from "@openedbot/browser-ui-kit";
+import { Button, Dialog, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, userFacingError, runtimesQueryOptions } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
@@ -33,6 +32,7 @@ import { ConversationAvailability } from "../../components/conversation-availabi
 import { useRunFailureAtOpen } from "../../lib/run/run-failure-at-open";
 import { RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
 import { BotProfileRepair, useBotProfileStatus } from "../../components/bot-profile-repair";
+import { ComposerArrival, ThreadArrival, ThreadStartStage, threadStartShown } from "../../components/thread-start-stage";
 import { ThreadTimeline } from "../../components/thread-timeline";
 import { ThreadTurnRail } from "../../components/thread-turn-rail";
 import { buildThreadRailTurns } from "../../lib/thread/thread-turn-rail";
@@ -143,7 +143,7 @@ export function ConversationScreen() {
   const roster = useQuery({
     queryKey: queryKeys.roster,
     queryFn: api.roster,
-    refetchInterval: (query) => query.state.data?.bots.some((candidate) => candidate.profileProvisionStatus === "preparing") ? 1500 : false,
+    refetchInterval: (query) => query.state.data?.bots.some((candidate) => candidate.profileProvisionStatus === "preparing") ? 600 : false,
   });
   const me = useQuery({ queryKey: queryKeys.authMe, queryFn: api.authMe });
   // Les plugins MCP branchés sur le runtime : écrire leur nom colore le mot
@@ -263,7 +263,6 @@ export function ConversationScreen() {
     offline: runtimeOffline,
     since: runtime?.link?.lastSeenAt,
     retrying,
-    tint: bubbleColor,
     onRetry: () => void retryConversation(),
     onOpenRuntime: openRuntimeSettings,
   });
@@ -782,8 +781,9 @@ export function ConversationScreen() {
   const planMode = planFirst && bot.permissionMode !== "plan";
   // Profil en préparation : l'API refuse tout changement de modèle (409
   // BOT_PROFILE_PREPARING) et le message suivant partirait sur l'ancien. Le
-  // sélecteur attend donc la fin de la préparation (le roster est relu à 1,5 s).
+  // sélecteur attend donc la fin de la préparation (le roster est relu toutes les 0,6 s).
   const provisioning = bot.profileProvisionStatus === "preparing";
+  const starting = threadStartShown({ provisioning, runs: timelineRuns });
   const threadView = thread.data?.id === activeThreadId ? thread.data : undefined;
   const threadMessages = threadView?.messages ?? [];
   const planAnchor = threadMessages.at(-1)?.id ?? null;
@@ -936,6 +936,19 @@ export function ConversationScreen() {
         }
       />
   );
+
+
+  // Anneau de contexte du dernier tour mesuré (rien tant que le fil n'a pas
+  // tourné) : dans l'en-tête au bureau, sous le composer au téléphone.
+  const contextMeter = bot && thread.data?.runs.length ? (
+    <ThreadContextTab
+      variant="status"
+      runs={thread.data.runs}
+      events={thread.data.events}
+      botModel={thread.data.effectiveModel?.trim() || bot.model}
+      hermesProfile={bot.hermesProfile}
+    />
+  ) : undefined;
 
   return (
     <AttachmentCanvasProvider>
@@ -1102,7 +1115,6 @@ export function ConversationScreen() {
                 <RuntimeOfflineBadge
                   since={runtime?.link?.lastSeenAt}
                   retrying={retrying}
-                  tint={bubbleColor}
                   onClick={openRuntimeSettings}
                 />
               ) : null}
@@ -1122,13 +1134,17 @@ export function ConversationScreen() {
                 </>
               )}
               model={standalone ? null : (
-                <ThreadModelPicker
-                  key={bot.id}
-                  bot={bot}
-                  variant="header"
-                  servedBy={lastTurnFallback}
-                  disabled={threadLoading || pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing || provisioning}
-                />
+                <>
+                  <ThreadModelPicker
+                    key={bot.id}
+                    bot={bot}
+                    variant="header"
+                    servedBy={lastTurnFallback}
+                    disabled={threadLoading || pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing || provisioning}
+                  />
+                  {/* Bureau : l'anneau de contexte suit le modèle, dans l'en-tête. */}
+                  {contextMeter}
+                </>
               )}
               onOpenSettings={openBotManage}
               onOpenFeatureLab={SHOW_FEATURE_LAB ? () => setFeatureLabOpen(true) : undefined}
@@ -1159,9 +1175,9 @@ export function ConversationScreen() {
                 {t("conversation.retry")}
               </button>
             </div>
-          ) : threadLoading ? (
+          ) : threadLoading && !starting ? (
             <ThreadSkeleton />
-          ) : <div
+          ) : <ThreadArrival bot={bot} status={bot.profileProvisionStatus}>{starting ? <ThreadStartStage bot={bot} /> : <div
             className="relative flex min-h-0 flex-1 flex-col"
             data-turn-rail={turnRailShown ? "" : undefined}
           >
@@ -1210,7 +1226,7 @@ export function ConversationScreen() {
             hiddenAssistantRunIds={hiddenAssistantRunIds}
           /></DevRenderProfiler>
           {isMobile ? null : <ThreadTurnRail turns={railTurns} />}
-          </div>}
+          </div>}</ThreadArrival>}
 
           {cancel.isError ? (
             <p
@@ -1233,15 +1249,6 @@ export function ConversationScreen() {
           />
 
           {bot.profileImportStatus ? <p role="status" data-thread-lane="" className="px-4 text-sm sm:px-6">{t(bot.profileImportStatus === "needs_attention" ? "profileImport.status.needs_attention" : "profileImport.status.running")}</p> : null}
-          {/* Le profil se prépare : le même indicateur que la réflexion d'un
-              tour, à la place du dock. Un message envoyé entre-temps attend en
-              file sans run réclamable : le dock n'aurait qu'« En attente… » à
-              dire, et deux indicateurs se suivraient. */}
-          {provisioning ? (
-            <div role="status" data-run-activity="provisioning" className={`flex min-h-7 w-full shrink-0 items-center ${turnRailShown ? "pl-14 pr-4 sm:pr-6" : "px-4 sm:px-6"}`}>
-              <AgentThinking label={`${bot.name}: ${t("botProfileProvision.preparing")}`} />
-            </div>
-          ) : null}
           {bot.profileProvisionStatus === "failed" ? (
             <div role="status" data-thread-lane="" className="flex items-center gap-3 px-4 text-sm sm:px-6">
               <p>{t("botProfileProvision.failed")}</p>
@@ -1250,6 +1257,9 @@ export function ConversationScreen() {
               </button>
             </div>
           ) : null}
+          {/* Profil en préparation : l'écran du centre le dit seul, sans fil
+              ni composer (ThreadArrival, ComposerArrival) ; le dock se tait
+              jusqu'à ce que le profil soit prêt. */}
           {provisioning ? null : <DevRenderProfiler id="run-activity-dock">
             <RunActivityDock
               runs={timelineRuns}
@@ -1272,7 +1282,7 @@ export function ConversationScreen() {
               onLaunch={launchPlan}
             />
           ) : null}
-          <DevRenderProfiler id="composer"><Composer
+          <ComposerArrival bot={bot} status={bot.profileProvisionStatus}><DevRenderProfiler id="composer"><Composer
             value={draft}
             onChange={(next) => {
               if (send.isError) send.reset();
@@ -1317,27 +1327,9 @@ export function ConversationScreen() {
             }}
             onVoice={() => setVoiceOpen(true)}
             voiceListening={voiceListening}
-            // La ligne sous la carte : le profil Hermes qui exécute le fil, et
-            // l'anneau de contexte du dernier tour mesuré (rien tant que le fil
+            // L'anneau de contexte du dernier tour mesuré (rien tant que le fil
             // n'a pas tourné). Le modèle reste dans l'en-tête.
-            statusLeft={bot.hermesProfile ? (
-              <span
-                className="flex min-w-0 items-center gap-1"
-                title={t("threadContext.profile", { profile: bot.hermesProfile })}
-              >
-                <Folder aria-hidden />
-                <span className="truncate">{bot.hermesProfile}</span>
-              </span>
-            ) : undefined}
-            contextMeter={thread.data?.runs.length ? (
-              <ThreadContextTab
-                variant="status"
-                runs={thread.data.runs}
-                events={thread.data.events}
-                botModel={thread.data.effectiveModel?.trim() || bot.model}
-                hermesProfile={bot.hermesProfile}
-              />
-            ) : undefined}
+            contextMeter={isMobile ? contextMeter : undefined}
             replyPreview={replyPreview}
             onCancelReply={clearReply}
             goal={goal}
@@ -1351,7 +1343,7 @@ export function ConversationScreen() {
             onManagePlugins={() => openSettings("/settings/connectors")}
             planPending={planDockOpen}
             onPlanLaunch={launchPlan}
-          /></DevRenderProfiler>
+          /></DevRenderProfiler></ComposerArrival>
           <GoalDialog
             open={goalOpen}
             initial={goal}

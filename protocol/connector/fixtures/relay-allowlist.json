@@ -271,6 +271,12 @@
   },
   {
     "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
     "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets/[a-z0-9][a-z0-9_]{0,63}$",
     "events": false,
     "host": true
@@ -314,6 +320,12 @@
   {
     "method": "GET",
     "path": "^/hermes-setup/sessions-inventory$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/skills$",
     "events": false,
     "host": true
   },

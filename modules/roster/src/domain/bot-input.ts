@@ -161,6 +161,8 @@ export type CreateBotInput = {
   /** Le profil Hermes explicite demandé, ou `null` (profil géré si l'hôte l'annonce). */
   profile: string | null;
   slug: string;
+  /** Slug tiré du nom (aucun `slug` dans le corps) : la création prend le premier libre (`chooseBotSlug`). */
+  slugFromName?: boolean;
   description: string | null;
   mission: string | null;
   instructions: string;
@@ -250,6 +252,7 @@ export function readCreateBotInput(body: Record<string, unknown>): CreateBotInpu
     name,
     profile,
     slug,
+    slugFromName: typeof body.slug !== "string",
     description,
     mission,
     instructions,
@@ -319,20 +322,6 @@ export function readUpdateBotInput(body: Record<string, unknown>): UpdateBotInpu
     pinned: typeof body.pinned === "boolean" ? body.pinned : null,
     face: Object.hasOwn(body, "face") ? (isFace(body.face) ? body.face : null) : undefined,
   };
-}
-
-/** Ce que l'assistant de création demande avant que le bot existe : de quoi composer une persona. */
-export type CreationDraftRequest = { name: string; role: string | null; mission: string | null };
-
-export function readCreationDraftRequest(body: Record<string, unknown>): CreationDraftRequest {
-  const name = assertString(body.name, "Le nom", { max: 80 });
-  const role = body.role === undefined || body.role === null
-    ? null
-    : assertString(body.role, "Le rôle", { max: 200 });
-  const mission = body.mission === undefined || body.mission === null
-    ? null
-    : assertString(body.mission, "La mission", { max: 1_000 });
-  return { name, role, mission };
 }
 
 /** Le hash du brouillon que l'opérateur a lu, en minuscules : la confirmation l'oppose aux octets proposés. */

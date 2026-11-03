@@ -106,6 +106,10 @@ type Server struct {
 	// fallback to Inventory keeps the handler easy to exercise in small tests;
 	// Host always wires the profile-specific reader.
 	ProfileInventory func(ctx context.Context, profile string) ([]byte, error)
+	// ProfileToolsets applies a profile toolset batch, both directions, in
+	// one process scoped to the profile's home (profile_toolsets_apply.go).
+	// nil, or an error, falls back on one `hermes tools` call per direction.
+	ProfileToolsets func(ctx context.Context, profile string, enable, disable []string) error
 	// ProfileCatalogue reads /p/<slug>/api/model/options so a per-profile
 	// credential is proven on that profile, never on the root catalogue.
 	ProfileCatalogue func(ctx context.Context, profile string) ([]byte, error)
@@ -166,6 +170,12 @@ type Server struct {
 	YoloDrained func(context.Context) error
 	Now         func() time.Time
 	Logf        func(string, ...any)
+	// InventoryRoots are the files GET /inventory/fingerprint watches. An
+	// empty RuntimeRoot answers 404: the connector then never signals.
+	InventoryRoots InventoryRoots
+	// WorkspaceRoot is the host side of the terminal sandbox's `/workspace`
+	// mount (workspace_files.go). Empty answers 404: no file crosses the link.
+	WorkspaceRoot string
 	// SkillsHubReady forces the skills hub on (tests). Otherwise the fixed
 	// probe runs once, lazily, the first time the features are listed: the
 	// host start keeps exactly one multiplex refresh and no extra Python call.
@@ -206,6 +216,16 @@ type Server struct {
 	// probeGeneration is bumped by every write. A read that started before a
 	// write must not cache the state it saw.
 	probeGeneration uint64
+	// profilesGeneration is bumped by a write to one profile's home only
+	// (profileScopedWriteVerbs): it voids a "profiles" read in flight, never a
+	// root read, which that write cannot have changed.
+	profilesGeneration uint64
+	// lastFingerprint is the last inventory fingerprint served; a different
+	// one drops the read cache (inventory_fingerprint.go).
+	lastFingerprint string
+	// lastRootFingerprint is the root's part of it: unchanged, a move dropped
+	// only the profile inventory.
+	lastRootFingerprint string
 }
 
 // errNoInventory is returned when the operator was built without a gateway
@@ -288,6 +308,8 @@ func (s *Server) Handler() http.Handler {
 	// La fenetre de contexte du modele configure. Lecture seule, aucun
 	// argument hors un slug de profil : le gateway ne la publie nulle part.
 	mux.HandleFunc("GET /model-context", s.modelContext)
+	mux.HandleFunc("GET /inventory/fingerprint", s.inventoryFingerprint)
+	mux.HandleFunc("GET /skills", s.skills)
 	mux.HandleFunc("GET /toolsets", s.toolsets)
 	mux.HandleFunc("POST /toolsets/{name}", s.setToolset)
 	mux.HandleFunc("GET /mcp/servers", s.mcpInventory)
@@ -314,6 +336,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /profiles", s.createProfile)
 	mux.HandleFunc("DELETE /profiles/{slug}", s.deleteProfile)
 	mux.HandleFunc("POST /profiles/{slug}/toolsets/{toolset}", s.setProfileToolset)
+	mux.HandleFunc("POST /profiles/{slug}/toolsets", s.setProfileToolsets)
 	mux.HandleFunc("GET /profiles/{slug}/memory", s.profileMemory)
 	mux.HandleFunc("POST /profiles/{slug}/memory", s.writeProfileMemory)
 	mux.HandleFunc("POST /profiles/{slug}/mcp/servers/{server}", s.setProfileMCP)
@@ -339,6 +362,7 @@ func (s *Server) Handler() http.Handler {
 	// The bounded session inventory: identifiers, owning profile and start
 	// time, so openedbot can spot a run created outside the link.
 	mux.HandleFunc("GET /sessions-inventory", s.sessionsInventory)
+	mux.HandleFunc("GET /workspace/files/{file}", s.workspaceFile)
 	mux.HandleFunc("GET /a2a/agent-card", s.a2aAgentCard)
 	mux.HandleFunc("GET /a2a/audit", newA2AAuditHandler(s.A2AAudit))
 	mux.HandleFunc("GET /a2a/peers", a2aPolicyListHandler(s.A2APeers))
@@ -413,7 +437,16 @@ func (s *Server) features() []string {
 	if s.RestartGateway != nil && s.GracefulRestart {
 		features = append(features, "gateway_graceful_restart")
 	}
-	// Newest: the plugin can enforce a YOLO lease from yolo.json, on a
+	// Newest: without it openedbot shows the gateway's skills failure as is.
+	if s.Probe != nil {
+		features = append(features, SkillsInventoryFeature)
+	}
+	// Newer than newest: without it openedbot writes a profile's toolsets
+	// one request at a time, which stays correct, only slower.
+	if s.Probe != nil && multiplex && s.Inventory != nil {
+		features = append(features, profileToolsetsBatchFeature)
+	}
+	// Newest of all: the plugin can enforce a YOLO lease from yolo.json, on a
 	// session too (its hook receives session_id). The connector drops both
 	// when it holds no lease store.
 	if s.YoloApply != nil && s.YoloDrain != nil && s.ApprovalPolicyWrite != nil {

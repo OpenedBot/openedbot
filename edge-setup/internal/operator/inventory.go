@@ -123,6 +123,7 @@ func hostProbeWithCommand(runner exec.Runner, command func(string) exec.Cmd) Pro
 
 var probeVerbs = map[string]bool{
 	"toolsets":                   true,
+	"skills":                     true,
 	"model-context":              true,
 	"mcp-inventory":              true,
 	"mcp-add":                    true,
@@ -157,13 +158,30 @@ var probeVerbs = map[string]bool{
 // cacheableVerbs are the pure reads. A write is never cached and never
 // deduplicated: two callers asking for the same change must both reach the
 // host, because the second one's outcome may legitimately differ.
-var cacheableVerbs = map[string]bool{"toolsets": true, "mcp-inventory": true, "profiles": true}
+var cacheableVerbs = map[string]bool{"toolsets": true, "skills": true, "mcp-inventory": true, "profiles": true}
 
 // parameterizedReadVerbs are reads that carry an argument. The read cache is
 // keyed by verb alone and always sends `{}`, so caching one of these would
 // serve one profile's answer for another. They are still reads: unlike a
 // write, they must not drop the cache of the reads above.
 var parameterizedReadVerbs = map[string]bool{"model-context": true}
+
+// profileScopedWriteVerbs write one named profile's own home (its
+// config.yaml, .env, skills) and nothing of the root's. They drop the cached
+// profile inventory only: the root reads ("toolsets", "skills",
+// "mcp-inventory") describe the root and stay true. Dropping them made the
+// next root read pay a cold interpreter (the settable list, 3.1 s on VM 240,
+// 2026-11-02) right inside a new bot's provisioning. A verb that may touch
+// the root (profile-oauth-adopt-root, profile-delete) is not listed.
+var profileScopedWriteVerbs = map[string]bool{
+	"profile-create":             true,
+	"profile-toolset-suppress":   true,
+	"profile-memory-set":         true,
+	"profile-bundled-skills-set": true,
+	"profile-skill-set":          true,
+	"profile-model-set":          true,
+	"profile-models-set":         true,
+}
 
 type probeCacheEntry struct {
 	document []byte
@@ -234,14 +252,14 @@ func (s *Server) startReadLocked(verb string) *probeFlight {
 	// the state BEFORE that write, is then served once and never cached.
 	// Without this, a read that started first and finished last would pin a
 	// stale inventory for a full TTL, right after the operator changed it.
-	generation := s.probeGeneration
+	generation, profilesGeneration := s.probeGeneration, s.profilesGeneration
 	go func() {
 		probeCtx, cancel := context.WithTimeout(context.Background(), probeTimeout(verb))
 		document, err := s.Probe(probeCtx, verb, []byte("{}"))
 		cancel()
 
 		s.mu.Lock()
-		if err == nil && generation == s.probeGeneration {
+		if err == nil && generation == s.probeGeneration && (verb != "profiles" || profilesGeneration == s.profilesGeneration) {
 			if s.probeCache == nil {
 				s.probeCache = map[string]*probeCacheEntry{}
 			}
@@ -270,9 +288,22 @@ func (s *Server) dropReadCache() {
 	s.mu.Unlock()
 }
 
+// dropProfileReadCache forgets the cached profile inventory after a write to
+// one profile's home. A "profiles" read in flight is served once and never
+// cached; a root read in flight is kept: the write did not change the root,
+// and voiding it made the next caller pay a cold interpreter again (the
+// settable list read ahead of a new bot's baseline, VM 240, 2026-11-02).
+func (s *Server) dropProfileReadCache() {
+	s.mu.Lock()
+	delete(s.probeCache, "profiles")
+	delete(s.probeFlights, "profiles")
+	s.profilesGeneration++
+	s.mu.Unlock()
+}
+
 func probeTimeout(verb string) time.Duration {
 	switch verb {
-	case "toolsets", "mcp-inventory", "model-context":
+	case "toolsets", "skills", "mcp-inventory", "model-context":
 		return 30 * time.Second
 	case "profiles":
 		return 60 * time.Second
@@ -310,6 +341,9 @@ func (s *Server) runProbe(ctx context.Context, verb string, request any, out any
 		probeCtx, cancel := context.WithTimeout(ctx, probeTimeout(verb))
 		raw, err = s.invokeProbe(probeCtx, verb, request)
 		cancel()
+	case profileScopedWriteVerbs[verb]:
+		defer s.dropProfileReadCache()
+		raw, err = s.invokeProbe(ctx, verb, request)
 	default:
 		defer s.dropReadCache()
 		raw, err = s.invokeProbe(ctx, verb, request)

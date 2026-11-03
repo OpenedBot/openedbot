@@ -1,16 +1,13 @@
 import { createHash } from "node:crypto";
 import type { PersonaDraftDto } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { insertCreationDraftThread } from "@openedbot/conversation/sql/threads";
 import { insertPersonaDraftRun } from "@openedbot/execution/sql/runs";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import type { CreationDraftRequest } from "../domain/bot-input";
-import { PERSONA_MAX_CHARS, formatCreatePersonaDraftInput } from "../domain/persona";
+import { PERSONA_MAX_CHARS } from "../domain/persona";
 import {
   PERSONA_DRAFT_HISTORY,
   formatPersonaDraftTranscript,
-  personaDraftCreateSessionKey,
   personaDraftSessionKey,
 } from "../domain/persona-draft";
 import {
@@ -18,7 +15,6 @@ import {
   ensurePersonaDraftThread,
   hasActivePersonaDraftRun,
   lockBotForPersonaDraft,
-  readCreationDraftRun,
   readLatestPersonaDraftRun,
   readPersonaDraftRun,
   readThreadHistory,
@@ -118,46 +114,4 @@ export async function confirmPersonaDraft(
   });
   if (rows.kind === "missing") throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
   return { status: "completed", runId, draft: rows.draft, hash: expectedHash } satisfies PersonaDraftDto;
-}
-
-/**
- * Un brouillon de persona avant que le bot existe. Le runtime est vérifié
- * AVANT de lire la demande : sans runtime, un corps invalide n'est jamais
- * regardé et l'opérateur apprend d'abord qu'il doit enregistrer Hermes.
- */
-export async function requestCreationPersonaDraft(
-  db: Db,
-  deps: BotDeps,
-  organizationId: string,
-  readRequest: () => Promise<CreationDraftRequest>,
-): Promise<{ runId: string }> {
-  const runtime = await deps.readRuntime(db, organizationId);
-  if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de proposer une persona.");
-  const { name, role, mission } = await readRequest();
-  const prompt = formatCreatePersonaDraftInput({ name, role, mission });
-  const runId = await withTenant(db, organizationId, async (tx) => {
-    const threadId = crypto.randomUUID();
-    const sessionId = personaDraftCreateSessionKey(organizationId, threadId);
-    await insertCreationDraftThread(tx, organizationId, threadId, name, sessionId);
-    return insertPersonaDraftRun(tx, {
-      organizationId,
-      threadId,
-      botId: null,
-      prompt,
-      sessionKey: sessionId,
-    });
-  });
-  return { runId };
-}
-
-/** L'état d'un brouillon demandé avant la création du bot. */
-export async function readCreationPersonaDraft(
-  db: Db,
-  organizationId: string,
-  runId: string,
-): Promise<{ status: string; draft: string | null }> {
-  const found = await withTenant(db, organizationId, (tx) => readCreationDraftRun(tx, organizationId, runId));
-  if (!found) throw new HttpError(404, "PERSONA_DRAFT_NOT_FOUND", "Brouillon introuvable.");
-  const draft = found.status === "completed" ? (found.output ?? "").trim() : null;
-  return { status: found.status, draft };
 }

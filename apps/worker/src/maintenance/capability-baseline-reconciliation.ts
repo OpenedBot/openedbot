@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
+import { HermesClientError, PROFILE_TOOLSETS_BATCH_FEATURE, type HermesProfileInventory } from "@openedbot/hermes";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
 import {
   BASELINE_REQUIRED_FEATURES,
@@ -43,15 +43,22 @@ function unverified(message: string): HermesClientError {
   return new HermesClientError(message, 502, "PROFILE_UNVERIFIED");
 }
 
-type BaselineClient = Pick<ReturnType<typeof createRuntimeClient>, "hostProfileInventory">;
+type BaselineClient = Pick<ReturnType<typeof createRuntimeClient>, "toolsets">;
 type BaselineApplyClient = Pick<ReturnType<typeof createRuntimeClient>,
-  "hostProfileInventory" | "probeProfileIsolation" | "hostSetProfileToolset" | "hostSetProfileBundledSkills">;
+  "toolsets" | "probeProfileIsolation" | "hostSetProfileToolset" | "hostSetProfileToolsets" | "hostSetProfileBundledSkills">;
 
-/** Les toolsets du profil, relus sur l'hôte ; un profil disparu est un échec, jamais un socle vide. */
-async function profileToolsets(client: BaselineClient, profile: string): Promise<HermesProfileInventory["profiles"][number]["toolsets"]> {
-  const row = (await client.hostProfileInventory()).profiles.find((candidate) => candidate.name === profile);
-  if (!row) throw new HermesClientError("The bot profile is missing from the host inventory.", 404, "PROFILE_NOT_FOUND");
-  return row.toolsets;
+/**
+ * Les toolsets du profil, lus sur le gateway qui le sert (`/p/<slug>/v1/toolsets`,
+ * le client est celui du profil) : la vue sur laquelle l'hôte prouve chaque
+ * écriture, et celle que voient les runs. L'inventaire de tous les profils
+ * (`hostProfileInventory`) repartait d'un interpréteur froid après chaque
+ * écriture de profil, ~1 s par lecture au provisionnement (VM 240, 2026-11-02).
+ * Un profil que le gateway ne sert pas est un échec, jamais un socle vide.
+ */
+async function profileToolsets(client: BaselineClient, profile: string): Promise<Array<{ name: string; enabled: boolean }>> {
+  const toolsets = await client.toolsets();
+  if (toolsets === null) throw new HermesClientError(`The gateway does not serve the bot profile ${profile}.`, 404, "PROFILE_NOT_FOUND");
+  return toolsets;
 }
 
 /**
@@ -77,9 +84,11 @@ export async function reconcileCapabilityBaselines(
     runtime_id: string;
     profile: string;
     host_holds_policy: boolean;
+    toolsets_batch: boolean;
   }>>`
     select b.id as bot_id, b.organization_id, rt.id as runtime_id, b.hermes_profile as profile,
-           rt.link_features @> array['approval_policy']::text[] as host_holds_policy
+           rt.link_features @> array['approval_policy']::text[] as host_holds_policy,
+           rt.link_features @> array[${PROFILE_TOOLSETS_BATCH_FEATURE}]::text[] as toolsets_batch
       from bots b
       join runtimes rt on rt.organization_id = b.organization_id and rt.is_active and rt.revoked_at is null
      where b.hermes_profile_managed
@@ -150,6 +159,7 @@ export async function reconcileCapabilityBaselines(
         botId: bot.bot_id,
         profile: bot.profile,
         hostHoldsPolicy: bot.host_holds_policy === true,
+        toolsetsBatch: bot.toolsets_batch === true,
       }, settable, now));
       if (applied?.pending) {
         // Not a failure: the approval policy reconciliation proves the gate,
@@ -194,7 +204,21 @@ export async function reconcileCapabilityBaselines(
   }
 }
 
-export type BaselineTarget = { organizationId: string; botId: string; profile: string; hostHoldsPolicy: boolean };
+export type BaselineTarget = {
+  organizationId: string;
+  botId: string;
+  profile: string;
+  hostHoldsPolicy: boolean;
+  /** L'hôte annonce `profile_toolsets_batch` : les écritures du socle partent en un lot. */
+  toolsetsBatch?: boolean;
+  /**
+   * La création du profil a déjà éteint les skills livrées, preuve de l'hôte
+   * à l'appui (`bundledSkills` de la réponse) : le socle ne les réécrit pas.
+   */
+  bundledSkillsOff?: boolean;
+  /** Les toolsets que le socle va activer, annoncés avant ses écritures (écran d'attente, 0164). */
+  onTools?(names: readonly string[]): Promise<void>;
+};
 
 export type BaselineOutcome =
   | null
@@ -261,11 +285,24 @@ export async function applyCapabilityBaseline(
   if (plan.required.length) {
     throw new HermesClientError("The host cannot set a toolset the capability baseline requires.", 409, "TOOLSET_NOT_SETTABLE");
   }
-  for (const write of plan.writes) {
-    const state = await client.hostSetProfileToolset(bot.profile, write.name, write.enabled);
-    if (state.enabled !== write.enabled) throw unverified("The capability baseline toolset write could not be verified.");
+  await bot.onTools?.(enabledSet.filter((name) => settable.has(name)));
+  // En lot quand l'hôte le sait : un appel CLI par sens au lieu d'un par
+  // toolset, l'essentiel du temps de provision d'un bot neuf. Chaque nom
+  // garde sa propre vérification.
+  if (bot.toolsetsBatch && plan.writes.length > 0) {
+    const states = await client.hostSetProfileToolsets(bot.profile, Object.fromEntries(plan.writes.map((write) => [write.name, write.enabled])));
+    for (const write of plan.writes) {
+      if (states.find((state) => state.name === write.name)?.enabled !== write.enabled) {
+        throw unverified("The capability baseline toolset write could not be verified.");
+      }
+    }
+  } else {
+    for (const write of plan.writes) {
+      const state = await client.hostSetProfileToolset(bot.profile, write.name, write.enabled);
+      if (state.enabled !== write.enabled) throw unverified("The capability baseline toolset write could not be verified.");
+    }
   }
-  const bundled = additive ? null : await client.hostSetProfileBundledSkills(bot.profile, false);
+  const bundled = additive || bot.bundledSkillsOff ? null : await client.hostSetProfileBundledSkills(bot.profile, false);
   if (bundled && !bundled.applied) throw unverified("The capability baseline bundled skills write could not be verified.");
   // La version n'est posée que sur un profil relu au socle, pas sur la
   // somme des réponses individuelles.
@@ -290,6 +327,13 @@ export async function applyCapabilityBaseline(
  * reconciliation pass: a connector runtime that announces the baseline verbs,
  * a managed profile, the profile lock. The pass skips a bot while its
  * provision runs, so the two never write the same profile at once.
+ *
+ * `prefetched.settable`: the host's settable toolsets, read at the start of
+ * the pass. Creating the profile dropped the operator's read cache, so the
+ * same read made here cost 3.5 s cold against 13 ms warm (VM 240,
+ * 2026-11-02). What a host can set does not depend on the new profile. `null`
+ * (failed read) falls back on a read here. `prefetched.bundledSkillsOff`: the
+ * creation proved the bundled skills off (BaselineTarget).
  */
 export async function provisionCapabilityBaseline(
   db: SQL,
@@ -299,10 +343,12 @@ export async function provisionCapabilityBaseline(
   lockProfile: <T>(organizationId: string, botId: string, run: () => Promise<T>) => Promise<T> =
     (organizationId, botId, run) => withBotProfileLock(db as unknown as Db, organizationId, botId, () => run()),
   now: () => number = Date.now,
+  prefetched: { settable?: Promise<ReadonlySet<string> | null>; bundledSkillsOff?: boolean; onTools?: BaselineTarget["onTools"] } = {},
 ): Promise<"applied" | "current" | "pending" | "unsupported"> {
-  const rows = await db<Array<{ profile: string; host_holds_policy: boolean }>>`
+  const rows = await db<Array<{ profile: string; host_holds_policy: boolean; toolsets_batch: boolean }>>`
     select b.hermes_profile as profile,
-           rt.link_features @> array['approval_policy']::text[] as host_holds_policy
+           rt.link_features @> array['approval_policy']::text[] as host_holds_policy,
+           rt.link_features @> array[${PROFILE_TOOLSETS_BATCH_FEATURE}]::text[] as toolsets_batch
       from bots b
       join runtimes rt on rt.organization_id = b.organization_id and rt.id = ${job.runtime_id}
                       and rt.is_active and rt.revoked_at is null
@@ -325,12 +371,15 @@ export async function provisionCapabilityBaseline(
     tokenKeyId: null,
     hermesProfile: bot.profile,
   }, config);
-  const settable = new Set((await client.hostToolsets()).settable);
+  const settable = (await prefetched.settable) ?? new Set((await client.hostToolsets()).settable);
   const applied = await lockProfile(job.organization_id, job.bot_id, () => applyCapabilityBaseline(db, client, {
     organizationId: job.organization_id,
     botId: job.bot_id,
     profile: bot.profile,
     hostHoldsPolicy: bot.host_holds_policy === true,
+    toolsetsBatch: bot.toolsets_batch === true,
+    bundledSkillsOff: prefetched.bundledSkillsOff === true,
+    onTools: prefetched.onTools,
   }, settable, now));
   if (!applied) return "current";
   if (applied.pending) return "pending";

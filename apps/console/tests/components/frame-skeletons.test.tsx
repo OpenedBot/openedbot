@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { I18nProvider } from "../../src/lib/i18n";
 import { AppFrameSkeleton, RosterSkeleton } from "../../src/components/skeletons/frame-skeletons";
 import { DEFAULT_ACCOUNT_LAYOUT, setAccountLayout } from "../../src/lib/shell/account-layout";
@@ -10,6 +11,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  window.location.href = "http://localhost/";
+  document.documentElement.classList.remove("dark");
   setAccountLayout(DEFAULT_ACCOUNT_LAYOUT);
   window.localStorage.clear();
 });
@@ -48,6 +51,47 @@ describe("silhouettes du cadre", () => {
   test("le cadre garde la rangée de la barre de titre native", () => {
     render(<I18nProvider><AppFrameSkeleton /></I18nProvider>);
     expect(document.querySelector("[data-titlebar-drag] [data-titlebar-lights]")).toBeTruthy();
+  });
+
+  // Le bas du rail est celui du vrai `BoardIconRail` : runtime, thème, langue,
+  // Réglages, déconnexion ; plus d'avatar ni de Support d'office.
+  test("le rail porte les boutons du vrai rail, sans avatar", () => {
+    setAccountLayout("c");
+    document.documentElement.classList.add("dark");
+    render(<I18nProvider><AppFrameSkeleton /></I18nProvider>);
+    const rail = document.querySelector("[data-board-icon-rail]")!;
+    expect(rail.textContent).toBe("fr");
+    expect(rail.querySelector(".tabler-icon-server-bolt")).toBeTruthy();
+    expect(rail.querySelectorAll("svg")).toHaveLength(6);
+    expect(rail.querySelector('[data-slot="skeleton"]')).toBeNull();
+  });
+
+  // Sur une rubrique des réglages : le menu des réglages remplace le roster,
+  // le fil d'Ariane nomme la rubrique, la carte porte le corps de la rubrique.
+  test("sur les réglages, le cadre dessine la page des réglages", async () => {
+    setAccountLayout("c");
+    window.location.href = "http://localhost/o/dev/settings/agents";
+    const root = createRootRoute({ component: AppFrameSkeleton });
+    const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/o/dev/settings/agents"] }) });
+    render(<I18nProvider><RouterProvider router={router as never} /></I18nProvider>);
+    expect(await screen.findByText("Quitter les réglages")).toBeTruthy();
+    expect(document.querySelectorAll('[data-slot="skeleton-list-row"]')).toHaveLength(0);
+    // L'import des agents est rangé sous Runtime, comme dans le menu.
+    expect(screen.getAllByText("Runtime").length).toBeGreaterThan(1);
+    expect(screen.getByText("Salon")).toBeTruthy();
+  });
+
+  // Activité : les quatre tuiles et les deux graphiques à leur place, comme
+  // le repli de la rubrique, pour que rien ne saute entre les deux étapes.
+  test("sur Activité, la carte porte les tuiles et les graphiques", async () => {
+    setAccountLayout("c");
+    window.location.href = "http://localhost/o/dev/settings";
+    const root = createRootRoute({ component: AppFrameSkeleton });
+    const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/o/dev/settings"] }) });
+    render(<I18nProvider><RouterProvider router={router as never} /></I18nProvider>);
+    await screen.findByText("Quitter les réglages");
+    expect(document.querySelectorAll('[data-settings-pane] [data-slot="card"]')).toHaveLength(6);
+    expect(screen.getAllByText("Activité").length).toBeGreaterThan(1);
   });
 
   test("le roster dessine le nombre de rangées demandé", () => {

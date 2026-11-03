@@ -38,7 +38,7 @@ export type HostToPopup =
  * All three values are null together. Without `error`, null means signed out;
  * with `error: "unavailable"` the session lives but the host could not get a
  * valid token right now (network, 5xx): the popup keeps its state and retries.
- * `organizationId` is the tenant the popup must send as `X-OHB-Organization`.
+ * `organizationId` is the tenant the popup must send as `X-OpenedBot-Organization`.
  */
 export type TokenReply = {
   type: "token";

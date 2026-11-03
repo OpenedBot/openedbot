@@ -100,11 +100,13 @@ refused() {
 release "$pinned"
 release v0.0.1
 release v0.0.4
-release v0.0.5 v0.0.4            # signed by the run on another tag
-release v0.0.6 v0.0.60           # signed by a tag that only shares a prefix
-release v0.0.7 v0.0.            # signed for the bare prefix
-mkdir -p "$tmp/origin/v0.0.8"    # signed by no one
-cp "$tmp/origin/v0.0.1/"edge-setup_linux_amd64 "$tmp/origin/v0.0.1/SHA256SUMS" "$tmp/origin/v0.0.8/"
+# The forged releases sit far above any real version, so the pinned one
+# never collides with them.
+release v0.9.5 v0.9.4            # signed by the run on another tag
+release v0.9.6 v0.9.60           # signed by a tag that only shares a prefix
+release v0.9.7 v0.9.            # signed for the bare prefix
+mkdir -p "$tmp/origin/v0.9.8"    # signed by no one
+cp "$tmp/origin/v0.0.1/"edge-setup_linux_amd64 "$tmp/origin/v0.0.1/SHA256SUMS" "$tmp/origin/v0.9.8/"
 
 run -- ;                                   installed "$pinned"
 run -- --version v0.0.1;                   installed v0.0.1
@@ -115,10 +117,10 @@ run EDGE_SETUP_VERSION=v0.0.4 -- --version v0.0.1; installed v0.0.1
 printf 'v0.0.4\n' > "$tmp/origin/LATEST"
 run -- --version latest;                   installed v0.0.4
 
-for v in v0.0.5 v0.0.6 v0.0.7 v0.0.8; do
+for v in v0.9.5 v0.9.6 v0.9.7 v0.9.8; do
   run -- --version "$v"; refused "$v"
   grep -qF "does not verify for $prefix$v" "$tmp/out" ||
-    [[ "$v" == v0.0.8 ]] || fail "$v: refused for another reason"
+    [[ "$v" == v0.9.8 ]] || fail "$v: refused for another reason"
 done
 
 # Not a vX.Y.Z: refused before any download and before cosign runs. The

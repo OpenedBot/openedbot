@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
@@ -10,12 +10,11 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { composePersona, resolveCreateInstructions } from "@openedbot/roster/domain/persona";
+import { resolveCreateInstructions } from "@openedbot/roster/domain/persona";
 import type { BotDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../../src/lib/i18n";
 import { api, queryKeys } from "../../../src/lib/api";
 import { CreateBotSheet } from "../../../src/components/bot-create/create-bot-sheet";
-import { CreatePersonaSection } from "../../../src/components/bot-create/persona-sheet";
 import { BotCreatingScreen } from "../../../src/components/bot-create/bot-creating-screen";
 import { BotDialogsHost } from "../../../src/components/bot-manage/bot-dialogs-host";
 import { isPendingBotId } from "../../../src/lib/bots/pending-bot-creations";
@@ -102,48 +101,12 @@ function renderApp(
   );
 }
 
-/** The job sheet lives in « Options avancées »: unfold it first. */
-function openAdvanced() {
-  const disclosure = screen.getByRole("button", { name: /Options avancées/ });
-  if (disclosure.getAttribute("aria-expanded") === "false") fireEvent.click(disclosure);
-}
-
-function personaField(): HTMLTextAreaElement {
-  openAdvanced();
-  if (!screen.queryByRole("textbox", { name: "Persona" })) {
-    const edit = screen.queryByRole("button", { name: "Modifier le texte" });
-    if (edit) fireEvent.click(edit);
-  }
-  return screen.getByRole("textbox", { name: "Persona" }) as HTMLTextAreaElement;
-}
-
-function renderPersonaSection(props: { displayed: string; onEdit: (next: string) => void }) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <CreatePersonaSection
-          id="persona-standalone"
-          displayed={props.displayed}
-          onEdit={props.onEdit}
-          runtimeConnected
-          name="Bot de recherche"
-        />
-      </I18nProvider>
-    </QueryClientProvider>,
-  );
-}
-
 function fillIdentity() {
   fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Bot de recherche" } });
   fireEvent.change(screen.getByLabelText("Rôle"), { target: { value: "Research" } });
   fireEvent.change(screen.getByLabelText("Mission"), {
     target: { value: "Cite sources and refuse unsourced claims." },
   });
-  openAdvanced();
-  fireEvent.click(screen.getByRole("button", { name: "Modifier le texte" }));
 }
 
 const createButton = () => screen.getByRole("button", { name: "Créer" });
@@ -190,7 +153,7 @@ afterEach(() => {
   useBotDialogs.setState({ createOpen: false, createSource: null, manageBotId: null, managePage: null, manageThreadId: null });
 });
 
-describe("feuille « Nouveau bot » : identité seule, persona repliée", () => {
+describe("feuille « Nouveau bot » : l'identité seule, sans options avancées", () => {
   test("à l'ouverture, le focus est dans le champ Nom", async () => {
     renderApp();
     const dialog = await screen.findByRole("dialog", { name: "Nouveau bot" });
@@ -201,16 +164,18 @@ describe("feuille « Nouveau bot » : identité seule, persona repliée", () => 
     await waitFor(() => expect(document.activeElement).toBe(name));
   });
 
-  test("la feuille ouvre directement l'identité, fiche repliée", async () => {
+  test("la feuille ouvre directement l'identité, et rien d'autre à régler", async () => {
     renderApp();
     await screen.findByRole("dialog", { name: "Nouveau bot" });
     expect(screen.queryByRole("list", { name: "Étapes" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Retour" })).toBeNull();
     expect(screen.getByLabelText("Rôle")).toBeTruthy();
     expect(screen.getByLabelText("Mission")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Laisser le runtime proposer une fiche" })).toBeNull();
-    openAdvanced();
-    expect(screen.getByRole("button", { name: "Laisser le runtime proposer une fiche" })).toBeTruthy();
+    // Persona, règles d'approbation, avis de fin : sur la page du bot, après.
+    expect(screen.queryByRole("button", { name: /Options avancées/ })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Persona" })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("radio")).toBeNull();
   });
 
   test("le nom est obligatoire : Créer reste désactivé tant qu'il est vide", async () => {
@@ -229,30 +194,13 @@ describe("feuille « Nouveau bot » : identité seule, persona repliée", () => 
     expect(screen.getByLabelText("Rôle").getAttribute("maxlength")).toBe("60");
   });
 
-  test("affiche le gabarit composePersona et le champ reste éditable", async () => {
-    renderApp();
-    await screen.findByRole("dialog", { name: "Nouveau bot" });
-    fillIdentity();
-    const expected = composePersona({
-      name: "Bot de recherche",
-      role: "Research",
-      mission: "Cite sources and refuse unsourced claims.",
-    });
-    expect(personaField().value).toBe(expected);
-    fireEvent.change(personaField(), { target: { value: "You cite sources." } });
-    fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Bot analyste" } });
-    expect(personaField().value).toBe("You cite sources.");
-  });
-
   test("une seule requête porte le bot ET ses réglages, avec un identifiant de demande", async () => {
     renderApp();
     await screen.findByRole("dialog", { name: "Nouveau bot" });
     fillIdentity();
-    const displayed = personaField().value;
     fireEvent.click(createButton());
     await waitFor(() => expect(createdBodies).toHaveLength(1));
     const body = createdBodies[0]!;
-    expect(body.instructions).toBe(displayed);
     expect(body.instructions).toBe(resolveCreateInstructions({
       name: "Bot de recherche",
       role: "Research",
@@ -263,7 +211,7 @@ describe("feuille « Nouveau bot » : identité seule, persona repliée", () => 
       description: "Research",
       label: "Research",
       permissionMode: "manual",
-      notifyOnFinish: false,
+      notifyOnFinish: true,
       greet: true,
       locale: "fr",
     });
@@ -271,32 +219,23 @@ describe("feuille « Nouveau bot » : identité seule, persona repliée", () => 
     expect(patched).toBe(false);
   });
 
-  test("une persona éditée part telle qu'affichée, sans recomposition", async () => {
+  test("sans options avancées, le mode par défaut de l'organisation part avec les défauts sûrs", async () => {
+    let configServed = false;
+    serve((url) => {
+      if (!url.endsWith("/api/runtime")) return null;
+      configServed = true;
+      return Response.json({ runtime: null, runtimeMode: "external", adminMode: "disabled", devDefaults: null, defaultPermissionMode: "auto" });
+    });
     renderApp();
     await screen.findByRole("dialog", { name: "Nouveau bot" });
-    fillIdentity();
-    fireEvent.change(personaField(), { target: { value: "You cite sources.\nStay terse." } });
-    fireEvent.change(screen.getByLabelText("Mission"), { target: { value: "Ignore this." } });
-    fireEvent.click(createButton());
-    await waitFor(() => expect(createdBodies).toHaveLength(1));
-    expect(createdBodies[0]!.instructions).toBe("You cite sources.\nStay terse.");
-  });
-
-  test("les options avancées sont repliées, résumées, et partent dans la même requête", async () => {
-    renderApp();
-    await screen.findByRole("dialog", { name: "Nouveau bot" });
-    const disclosure = screen.getByRole("button", { name: /Options avancées/ });
-    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
-    expect(disclosure.textContent).toContain("Demander · Se présente");
-    expect(screen.queryByRole("radio", { name: /^Revue auto/ })).toBeNull();
-    fireEvent.click(disclosure);
-    fireEvent.click(screen.getByRole("radio", { name: /^Revue auto/ }));
-    fireEvent.click(screen.getByLabelText("Me prévenir quand il a fini un tour"));
-    fireEvent.click(screen.getByLabelText("Le laisser se présenter et poser une première question"));
     fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Atlas" } });
+    // The request is frozen at the click: let the configuration land first.
+    await waitFor(() => expect(configServed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 20));
     fireEvent.click(createButton());
     await waitFor(() => expect(createdBodies).toHaveLength(1));
-    expect(createdBodies[0]).toMatchObject({ permissionMode: "auto", notifyOnFinish: true, greet: false });
+    expect(createdBodies[0]).toMatchObject({ permissionMode: "auto", notifyOnFinish: true, greet: true });
+    expect(createdBodies[0]!.hermesProfile).toBeUndefined();
   });
 
   test("Créer ouvre l'écran d'attente, et Réessayer rejoue la MÊME demande", async () => {
@@ -363,69 +302,6 @@ describe("feuille « Nouveau bot » : identité seule, persona repliée", () => 
     expect(shown).not.toContain("gone");
   });
 
-  test("Proposer une persona est désactivé sans runtime et n'est pas le CTA", async () => {
-    renderApp();
-    await screen.findByRole("dialog", { name: "Nouveau bot" });
-    openAdvanced();
-    const propose = screen.getByRole("button", { name: "Laisser le runtime proposer une fiche" });
-    expect(propose).toHaveProperty("disabled", true);
-    expect(screen.getByText(/Sans runtime connecté/)).toBeTruthy();
-  });
-
-  test("avec un runtime, la proposition pré-remplit après confirmation de l'alertdialog", async () => {
-    let draftRequested = false;
-    serve((url, method) => {
-      if (url.includes("/api/runtime") && !url.includes("/api/runtime/profiles")) {
-        return Response.json({
-          runtime: { id: "rt-1", name: "Hermes", configured: true, lastHealthStatus: "healthy", reachability: "direct", linkFeatures: [] },
-          runtimeMode: "external",
-          adminMode: "disabled",
-          devDefaults: null,
-        });
-      }
-      if (url.includes("/api/persona-drafts") && method === "POST") {
-        draftRequested = true;
-        return Response.json({ runId: "draft-1" }, { status: 202 });
-      }
-      if (url.includes("/api/persona-drafts/draft-1")) {
-        return Response.json({ status: "completed", draft: "# Bot de recherche\n**Role:** Research\n**Mission:** Cite sources." });
-      }
-      return null;
-    });
-    renderApp();
-    await screen.findByRole("dialog", { name: "Nouveau bot" });
-    fillIdentity();
-    const propose = await screen.findByRole("button", { name: "Laisser le runtime proposer une fiche" });
-    await waitFor(() => expect(propose).toHaveProperty("disabled", false));
-    expect(screen.getByText(/Il travaillera sur votre serveur Hermes/)).toBeTruthy();
-    fireEvent.click(propose);
-    const alert = await screen.findByRole("alertdialog", { name: "Remplacer la persona ?" });
-    expect(draftRequested).toBe(false);
-    fireEvent.click(within(alert).getByRole("button", { name: "Remplacer" }));
-    // La feuille se referme sur une transition de 150 ms (EXIT_MS, dialog.tsx).
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    await waitFor(() => expect(personaField().value).toContain("**Role:** Research"));
-    expect(draftRequested).toBe(true);
-  });
-
-  test("champ vide : pas de dialogue, la proposition part directement", async () => {
-    let draftRequested = false;
-    let edited: string | null = null;
-    serve((url, method) => {
-      if (url.includes("/api/persona-drafts") && method === "POST") {
-        draftRequested = true;
-        return Response.json({ runId: "draft-1" }, { status: 202 });
-      }
-      if (url.includes("/api/persona-drafts/draft-1")) return Response.json({ status: "completed", draft: "# Bot de recherche" });
-      return null;
-    });
-    renderPersonaSection({ displayed: "", onEdit: (next) => { edited = next; } });
-    fireEvent.click(screen.getByRole("button", { name: "Laisser le runtime proposer une fiche" }));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    await waitFor(() => expect(draftRequested).toBe(true));
-    await waitFor(() => expect(edited).toBe("# Bot de recherche"));
-  });
 });
 
 describe("dupliquer un bot", () => {
@@ -481,7 +357,8 @@ describe("dupliquer un bot", () => {
     await screen.findByRole("dialog", { name: "Dupliquer « Atlas »" });
     expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Atlas (copie)");
     expect((screen.getByLabelText("Rôle") as HTMLInputElement).value).toBe("Veille");
-    expect(personaField().value).toBe("# Atlas\n\nCite tes sources.");
+    // The source's persona goes out as is, without a field to edit it here.
+    expect(screen.queryByRole("textbox", { name: "Persona" })).toBeNull();
     expect(screen.queryByLabelText("Mission")).toBeNull();
     fireEvent.click(createButton());
     await waitFor(() => expect(createdBodies).toHaveLength(1));
@@ -530,10 +407,6 @@ describe("dupliquer un bot", () => {
     const promise = await screen.findByText(/Il travaillera sur votre serveur Hermes/);
     expect(promise.textContent).toContain("claude-sonnet-4");
     expect(promise.textContent).not.toContain("gpt-runtime");
-    fireEvent.click(screen.getByRole("button", { name: /Options avancées/ }));
-    const facts = document.querySelector(".ohb-new-bot-runtime-facts")!;
-    expect(facts.textContent).toContain("claude-sonnet-4");
-    expect(facts.textContent).not.toContain("gpt-runtime");
   });
 
   // The runner ignores a bot's model under global assignment: the copy runs the runtime's.
@@ -591,8 +464,8 @@ describe("dupliquer un bot", () => {
   });
 });
 
-describe("home roster gate", () => {
-  test("an empty roster keeps the salon with one call that opens the creation sheet", async () => {
+describe("the desktop home creates a bot on the page (OpenBot's home)", () => {
+  test("an empty roster titles the form « first bot »; a loaded one does not", async () => {
     const original = globalThis.fetch;
     let resolveRoster!: (response: Response) => void;
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
@@ -601,47 +474,85 @@ describe("home roster gate", () => {
       }
       return original(input, init);
     }) as typeof fetch;
-    // The call opens the sheet through the store; the app frame mounts its
-    // host (`BotDialogsHost`), so the home is rendered with it.
-    renderApp("host");
-    await screen.findByRole("heading", { name: "Le salon est calme." });
-    expect(screen.queryByRole("heading", { name: "Le salon attend son premier bot." })).toBeNull();
+    renderApp("home");
+    // Only a successful roster proves emptiness.
+    expect(await screen.findByRole("form", { name: "Créez un bot" })).toBeTruthy();
     await waitFor(() => expect(resolveRoster).toBeDefined());
     resolveRoster(Response.json({ bots: [], groups: [], sections: [] }));
-    await screen.findByRole("heading", { name: "Le salon attend son premier bot." });
-    expect(screen.queryByRole("link", { name: "Ouvrir l’inbox →" })).toBeNull();
-    // No inline form on the home: the one call opens the same sheet as « + ».
-    expect(screen.queryByLabelText("Nom")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Créer un bot" }));
-    expect(await screen.findByRole("dialog", { name: "Nouveau bot" })).toBeTruthy();
+    expect(await screen.findByRole("form", { name: "Créez votre premier bot" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Le salon est calme." })).toBeNull();
   });
 
-  test("keeps the existing home when a bot is hidden or the roster fails", async () => {
-    const original = globalThis.fetch;
-    let rosterRequest = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes("/api/bots") && !init?.method) {
-        rosterRequest += 1;
-        return Response.json({ bots: [{ ...createdBot, hidden: true }], groups: [], sections: [] });
-      }
-      return original(input, init);
-    }) as typeof fetch;
+  test("a color tints every face; the name is required", async () => {
     renderApp("home");
-    await waitFor(() => expect(rosterRequest).toBe(1));
-    await screen.findByRole("heading", { name: "Le salon est calme." });
-    expect(screen.queryByRole("heading", { name: "Le salon attend son premier bot." })).toBeNull();
-    cleanup();
-    let failed = false;
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes("/api/bots") && !init?.method) {
-        failed = true;
-        return Response.json({ error: "Unavailable" }, { status: 503 });
-      }
-      return original(input, init);
-    }) as typeof fetch;
+    const red = await screen.findByRole("button", { name: "Couleur du bot : rouge" });
+    expect(screen.getByRole("button", { name: "Couleur automatique du bot" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(red);
+    expect(red.getAttribute("aria-pressed")).toBe("true");
+    const create = screen.getByRole("button", { name: "Créer le bot" }) as HTMLButtonElement;
+    expect(create.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText(/^Nom/), { target: { value: "   " } });
+    expect(create.disabled).toBe(true);
+  });
+
+  test("a suggestion fills the form, and « Créer le bot » sends ONE request then opens the waiting screen", async () => {
     renderApp("home");
-    await waitFor(() => expect(failed).toBe(true));
-    await screen.findByRole("heading", { name: "Le salon est calme." });
-    expect(screen.queryByRole("heading", { name: "Le salon attend son premier bot." })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: /^Assistant e-mail\./ }));
+    expect((screen.getByLabelText(/^Nom/) as HTMLInputElement).value).toBe("Assistant e-mail");
+    expect((screen.getByLabelText("En quoi ce bot doit-il vous aider ?") as HTMLTextAreaElement).value)
+      .toContain("Rédiger des réponses claires");
+    expect(screen.getByRole("button", { name: "Couleur du bot : magenta" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Créer le bot" }));
+    await waitFor(() => expect(createdBodies).toHaveLength(1));
+    const body = createdBodies[0]!;
+    expect(body.name).toBe("Assistant e-mail");
+    expect(String(body.mission)).toContain("Rédiger des réponses claires");
+    expect(body.face).toEqual({ shape: "triangle", eyes: "mefiant", palette: "rose" });
+    expect(String(body.clientRequestId)).toMatch(UUID);
+    expect(body.greet).toBe(true);
+    // No model picked: the bot follows the runtime's model.
+    expect("model" in body).toBe(false);
+    await waitFor(() => expect(currentPath).toBe("/bot/bot-new"));
+  });
+
+  test("the home has no « Options avancées »: the safe defaults go out with the composed job sheet", async () => {
+    renderApp("home");
+    fireEvent.click(await screen.findByRole("button", { name: /^Assistant e-mail\./ }));
+    expect(screen.queryByRole("button", { name: /Options avancées/ })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Créer le bot" }));
+    await waitFor(() => expect(createdBodies).toHaveLength(1));
+    const body = createdBodies[0]!;
+    expect(body).toMatchObject({ permissionMode: "manual", notifyOnFinish: true, greet: true });
+    expect(body.instructions).toBe(resolveCreateInstructions({ name: "Assistant e-mail", mission: String(body.mission) }));
+    expect(body.hermesProfile).toBeUndefined();
+    // No first routine to open once the bot exists.
+    await waitFor(() => expect(currentPath).toBe("/bot/bot-new"));
+    expect(useBotDialogs.getState().routineBot).toBeFalsy();
+  });
+});
+
+describe("« + » on the desktop", () => {
+  test("goes to the home, like the rail's home button, instead of opening the sheet", async () => {
+    const { useNewBot } = await import("../../../src/lib/bots/use-new-bot");
+    function Plus() {
+      const openNew = useNewBot();
+      return <button type="button" onClick={openNew}>plus</button>;
+    }
+    const rootRoute = createRootRoute({ component: () => <><Plus /><Outlet /></> });
+    const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: () => <p>home</p> });
+    const botRoute = createRoute({ getParentRoute: () => rootRoute, path: "/bot/$botId", component: () => <p>bot</p> });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([indexRoute, botRoute]),
+      history: createMemoryHistory({ initialEntries: ["/bot/atlas"] }),
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <I18nProvider><RouterProvider router={router as never} /></I18nProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "plus" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    expect(useBotDialogs.getState().createOpen).toBe(false);
   });
 });

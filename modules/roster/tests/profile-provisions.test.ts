@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { claimProfileProvision, executeProfileProvision, type ProfileProvisionClient } from "../src/application/profile-provisions";
 import type { ProfileProvisionRow } from "../src/sql/profile-provisions";
-import { assertProvisionRestorable, cancelProfileProvision, retryBotProfileProvision } from "../src/application/profile-provisions";
+import { assertBotProfileSettled, assertProvisionRestorable, cancelProfileProvision, retryBotProfileProvision } from "../src/application/profile-provisions";
+import type { TransactionDb } from "@openedbot/platform-db";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { HermesClientError } from "@openedbot/hermes";
 
@@ -42,17 +43,19 @@ function scriptedDb(options: { leaseHeld?: boolean; finishOwned?: boolean; rowEx
   return { db, statements };
 }
 
-function scriptedClient(script: { inventory: Array<boolean | "error">; createError?: HermesClientErrorCode; features?: string[]; policyError?: boolean; readBack?: "profile" | "other-profile"; served?: Array<"isolated" | "missing" | "not_partitioned" | "error"> }) {
+function scriptedClient(script: { inventory: Array<boolean | "error">; createError?: HermesClientErrorCode; features?: string[]; featuresError?: boolean; bundledAnswer?: { profile: string; applied: boolean }; policyError?: boolean; readBack?: "profile" | "other-profile"; served?: Array<"isolated" | "missing" | "not_partitioned" | "error"> }) {
   const calls: string[] = [];
   let read = 0;
   let probes = 0;
   let approvalMode = "ask_writes";
   return {
     calls,
-    hostCreateProfile: async (slug: string, options: { displayName: string; provider?: string; model?: string }) => {
-      calls.push(`create:${slug}:${options.provider}:${options.model}`);
+    hostCreateProfile: async (slug: string, options: { displayName: string; provider?: string; model?: string; bundledSkills?: false }) => {
+      calls.push(`create:${slug}:${options.provider}:${options.model}${options.bundledSkills === false ? ":bundled-off" : ""}`);
       if (script.createError) throw new HermesClientError("exists", 409, script.createError);
-      if (script.readBack) return { name: script.readBack === "profile" ? slug : "someone-else", readBack: "profile" };
+      const bundledSkills = script.bundledAnswer ? { requested: false, bundled: 74, bundledEnabled: 3, ...script.bundledAnswer } : undefined;
+      if (script.readBack) return { name: script.readBack === "profile" ? slug : "someone-else", readBack: "profile", bundledSkills };
+      return bundledSkills ? { name: slug, bundledSkills } : undefined;
     },
     hostProfileInventory: async () => {
       calls.push("inventory");
@@ -61,7 +64,11 @@ function scriptedClient(script: { inventory: Array<boolean | "error">; createErr
       return { profiles: answer ? [{ name: "scout" }] : [] };
     },
     hostDeleteProfile: async (slug: string) => { calls.push(`delete:${slug}`); },
-    hostCapabilities: async () => { calls.push("capabilities"); return script.features ?? []; },
+    hostCapabilities: async () => {
+      calls.push("capabilities");
+      if (script.featuresError) throw new HermesClientError("down", 502, "HOST_UNAVAILABLE");
+      return script.features ?? [];
+    },
     hostSetApprovalPolicy: async (_slug: string, mode: string) => {
       calls.push(`approval:${mode}`);
       if (script.policyError) throw new HermesClientError("unverified", 502, "APPROVAL_POLICY_UNVERIFIED");
@@ -136,7 +143,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false, true] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1", "inventory", "capabilities", "served"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "inventory", "served"]);
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
     expect(statements.filter((statement) => statement.sql.includes("update bot_profile_provisions")).every((statement) => statement.sql.includes("lease_generation ="))).toBe(true);
   });
@@ -145,7 +152,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false], readBack: "profile" });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1", "capabilities", "served"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "served"]);
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
   });
 
@@ -153,7 +160,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false, true], readBack: "other-profile" });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1", "inventory", "capabilities", "served"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "inventory", "served"]);
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
   });
 
@@ -161,7 +168,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb({ permissionMode: "manual" });
     const client = scriptedClient({ inventory: [false, true], features: ["approval_policy"] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1", "inventory", "capabilities", "approval:ask_writes", "approval:readback", "served"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "inventory", "approval:ask_writes", "approval:readback", "served"]);
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
   });
 
@@ -176,6 +183,66 @@ describe("durable bot profile provisioning", () => {
     expect(client.calls.filter((call) => call === "served")).toHaveLength(3);
     expect(slept).toEqual([7, 7]);
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
+  });
+
+  test("a new bot with a baseline asks the creation to turn the bundled skills off, and passes only a proven answer on", async () => {
+    const required = ["approval_policy", "profile_capabilities", "profile_bundled_skills"];
+    for (const [bundledAnswer, expected] of [
+      [{ profile: "scout", applied: true }, true],
+      [{ profile: "scout", applied: false }, false],
+      [{ profile: "other", applied: true }, false],
+      [undefined, false],
+    ] as const) {
+      const { db } = scriptedDb();
+      const client = scriptedClient({ inventory: [false, true], features: required, bundledAnswer });
+      const seen: boolean[] = [];
+      await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, {
+        client: () => client,
+        baseline: async (_job, _timings, created) => { seen.push(created.bundledSkillsOff); return "applied"; },
+      });
+      expect(client.calls).toContain("create:scout:anthropic:model-1:bundled-off");
+      expect(seen).toEqual([expected]);
+    }
+  });
+
+  test("without the baseline verbs, or without a baseline, the creation leaves the bundled skills alone", async () => {
+    for (const [features, withBaseline] of [[["approval_policy"], true], [["approval_policy", "profile_capabilities", "profile_bundled_skills"], false]] as const) {
+      const { db } = scriptedDb();
+      const client = scriptedClient({ inventory: [false, true], features: [...features] });
+      await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, {
+        client: () => client,
+        ...(withBaseline ? { baseline: async () => "applied" } : {}),
+      });
+      expect(client.calls).toContain("create:scout:anthropic:model-1");
+    }
+  });
+
+  test("publishes its steps for the waiting screen, under its lease: space, rules, tools then their names (0164)", async () => {
+    const { db, statements } = scriptedDb();
+    const client = scriptedClient({ inventory: [false, true], features: ["approval_policy"] });
+    await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, {
+      client: () => client,
+      baseline: async (_job, _timings, created) => { await created.onTools(["web", "terminal", "skills"]); return "applied"; },
+    });
+    const writes = statements.filter((statement) => statement.sql.includes("set progress ="));
+    expect(writes.map((statement) => statement.values[0])).toEqual([
+      { step: "space" },
+      { step: "rules" },
+      { step: "tools" },
+      { step: "tools", tools: ["web", "terminal", "skills"] },
+    ]);
+    for (const write of writes) expect(write.sql).toContain("lease_owner =");
+    expect(statements.at(-1)!.values[0]).toBe("succeeded");
+  });
+
+  test("a progress write that fails never fails the profile", async () => {
+    const { db, statements } = scriptedDb();
+    const failing = ((parts: TemplateStringsArray, ...values: unknown[]) =>
+      [...parts].join(" ").includes("set progress =") ? Promise.reject(new Error("db down")) : (db as unknown as (p: TemplateStringsArray, ...v: unknown[]) => Promise<unknown>)(parts, ...values)) as unknown as SQL;
+    (failing as unknown as { begin: unknown }).begin = (db as unknown as { begin: unknown }).begin;
+    const client = scriptedClient({ inventory: [false, true], features: ["approval_policy"] });
+    await executeProfileProvision(failing, { ...baseJob, host_create_attempted: false }, { client: () => client });
+    expect(statements.at(-1)!.values[0]).toBe("succeeded");
   });
 
   test("applies the capability baseline once the profile is served, before success", async () => {
@@ -259,6 +326,14 @@ describe("durable bot profile provisioning", () => {
     expect(statements.at(-1)?.values[0]).toBe("queued");
   });
 
+  test("host features read during the creation and failed leave the policy unproven and retry, never served", async () => {
+    const { db, statements } = scriptedDb({ permissionMode: "plan" });
+    const client = scriptedClient({ inventory: [false, true], featuresError: true });
+    await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "inventory"]);
+    expect(statements.at(-1)?.values[0]).toBe("queued");
+  });
+
   test("retries with attempts and terminates on the third unproven attempt", async () => {
     const statuses: unknown[] = [];
     for (const attempts of [0, 1, 2]) {
@@ -274,7 +349,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [true] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory"]);
+    expect(client.calls).toEqual(["capabilities", "inventory"]);
     expect(statements.at(-1)?.values[0]).toBe("failed");
     expect(JSON.stringify(statements.at(-1)?.values)).toContain("PROFILE_SLUG_TAKEN");
   });
@@ -283,7 +358,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: ["error"] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory"]);
+    expect(client.calls).toEqual(["capabilities", "inventory"]);
     expect(statements.at(-1)?.values[0]).toBe("queued");
   });
 
@@ -291,7 +366,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false, true], createError: "PROFILE_EXISTS" });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1"]);
     expect(JSON.stringify(statements.at(-1)?.values)).toContain("PROFILE_SLUG_TAKEN");
   });
 
@@ -306,14 +381,14 @@ describe("durable bot profile provisioning", () => {
     const { db } = scriptedDb({ leaseHeld: false });
     const client = scriptedClient({ inventory: [false] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory"]);
+    expect(client.calls).toEqual(["capabilities", "inventory"]);
   });
 
   test("a provision cancelled during the call removes the profile it created", async () => {
     const { db } = scriptedDb({ finishOwned: false, rowExists: false });
     const client = scriptedClient({ inventory: [false, true] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1", "inventory", "capabilities", "served", "delete:scout"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1", "inventory", "served", "delete:scout"]);
   });
 
   test("cancellation waits for a live worker, keeps a tombstone, and never claims a foreign profile", async () => {
@@ -381,7 +456,7 @@ describe("durable bot profile provisioning", () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false], createError: "PROFILE_INVALID" as HermesClientErrorCode });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
-    expect(client.calls).toEqual(["inventory", "create:scout:anthropic:model-1"]);
+    expect(client.calls).toEqual(["capabilities", "inventory", "create:scout:anthropic:model-1"]);
     const last = statements.at(-1)!;
     expect(last.values[0]).toBe("failed");
     expect(JSON.stringify(last.values)).toContain("PROFILE_NAME_REFUSED");
@@ -393,5 +468,24 @@ describe("durable bot profile provisioning", () => {
     )) as unknown as SQL;
     (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin = async (callback) => callback(tx);
     expect(await assertProvisionRestorable(tx, "org-1", "bot-1")).toEqual({ cancelled: true, mustBeAbsent: true });
+  });
+});
+
+describe("assertBotProfileSettled", () => {
+  const txAnswering = (rows: Array<{ status: string }>) => {
+    const seen: string[] = [];
+    const tx = ((parts: TemplateStringsArray) => { seen.push([...parts].join(" ")); return Promise.resolve(rows); }) as unknown as TransactionDb;
+    return { tx, seen };
+  };
+
+  test("a bot whose profile is queued or being created cannot be deleted yet: 409, at once", async () => {
+    const { tx, seen } = txAnswering([{ status: "running" }]);
+    await expect(assertBotProfileSettled(tx, "org-1", "bot-1")).rejects.toMatchObject({ status: 409, code: "BOT_PROFILE_PREPARING" });
+    expect(seen[0]).toContain("status in ('queued', 'running')");
+  });
+
+  test("a ready, failed or provision-less bot can be deleted", async () => {
+    const { tx } = txAnswering([]);
+    await expect(assertBotProfileSettled(tx, "org-1", "bot-1")).resolves.toBeUndefined();
   });
 });

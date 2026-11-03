@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRefresh } from "@tabler/icons-react";
 import { cn, toast } from "@openedbot/browser-ui-kit";
 import { api, errorMessage, queryKeys } from "../../../../lib/api";
-import { connectorUpgradeLevel } from "../../../../lib/runtime/connector-upgrade";
+import { connectorUpgradeLevel, hermesUpdate } from "../../../../lib/runtime/connector-upgrade";
 import { useT } from "../../../../lib/i18n";
-import type { RuntimeEnrollmentTicketDto, RuntimeLinkVerifyDto, RuntimeConnectorDto, RuntimePublicDto } from "@openedbot/contracts-api";
+import type { RuntimeEnrollmentTicketDto, RuntimeLinkVerifyDto, RuntimeConnectorDto, RuntimeLinkDto, RuntimePublicDto } from "@openedbot/contracts-api";
 import { ACTIONS, BUTTON, CopyButton, Note } from "../../../../components/settings/primitives";
 import { RuntimeEnrollmentDialog } from "./cloud-enrollment";
 
@@ -215,6 +215,24 @@ export function ConnectorUpgradeNotice({ connector, connected }: { connector: Ru
         />
       </span>
       <span className="block">{t(connected ? "connectorUpgrade.selfServe" : "connectorUpgrade.selfServeClosed")}</span>
+    </Note>
+  );
+}
+
+/**
+ * A newer Hermes ships with the latest edge-setup release. Information only:
+ * Hermes is updated with edge-setup, on the host, and openedbot never runs it.
+ */
+export function HermesUpdateNotice({ link }: { link: RuntimeLinkDto | null | undefined }) {
+  const { t } = useT();
+  const update = hermesUpdate(link);
+  if (!update) return null;
+  return (
+    <Note tone="info" role="status" className="space-y-2">
+      <span className="block font-medium">{t("connectorUpgrade.hermesTitle")}</span>
+      <span className="block">{t("connectorUpgrade.hermesVersions", { current: update.current!, latest: update.latest! })}</span>
+      <CommandLine title={t("connectorUpgrade.dialogUpgrade")} command={update.upgradeCommand} />
+      <span className="block">{t("connectorUpgrade.hermesHow")}</span>
     </Note>
   );
 }

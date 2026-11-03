@@ -155,6 +155,7 @@ describe("mode de jonction sur le fil", () => {
     expect(published.baseUrl).toBeNull();
     expect(published.link).toEqual({
       connector: null,
+      hermesUpdate: null,
       connected: true,
       generation: null,
       connectedAt: "2026-09-01T08:00:00.000Z",
@@ -172,6 +173,7 @@ describe("mode de jonction sur le fil", () => {
     const published = publicRuntime({ ...connector, linkConnectedAt: null, linkLastSeenAt: null }, "disabled");
     expect(published.link).toEqual({
       connector: null,
+      hermesUpdate: null,
       connected: false,
       generation: null,
       connectedAt: null,

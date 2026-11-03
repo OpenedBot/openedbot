@@ -2,6 +2,7 @@ import { isUuid } from "@openedbot/contracts-primitives";
 import { RelayDialError, type RelayDialer, type RelayRequest } from "@openedbot/hermes";
 import {
   RELAY_STAGE_HEADER,
+  relayStageOf,
   type RelayLinkRotateFrame,
   type RelayYoloLeaseFrame,
   type RelayYoloRevokeFrame,
@@ -12,7 +13,14 @@ import { LINK_PROBE_TIMEOUT_MS, parseLinkProbeResult, type LinkProbeResult } fro
 /** Préfixe du relais interne ; les routes le réexportent. */
 export const RUNTIME_LINK_INTERNAL_PREFIX = "/internal/runtime-links";
 /** En-tête anti-boucle : une instance qui le reçoit et devrait encore forwarder répond 508. */
-export const RUNTIME_LINK_RELAY_HOP_HEADER = "X-OHB-Relay-Hop";
+export const RUNTIME_LINK_RELAY_HOP_HEADER = "X-OpenedBot-Relay-Hop";
+/** Its name before the openedbot rename: an instance not yet redeployed still sets it, and a hop must stay one hop. Read for one release. */
+export const LEGACY_RUNTIME_LINK_RELAY_HOP_HEADER = "X-OHB-Relay-Hop";
+
+/** Did this request already take its one hop (under either name)? */
+export function relayHopped(header: (name: string) => string | undefined): boolean {
+  return Boolean(header(RUNTIME_LINK_RELAY_HOP_HEADER) || header(LEGACY_RUNTIME_LINK_RELAY_HOP_HEADER));
+}
 /** En-tête posé sur une réponse qui décrit une panne du LIEN, pas une réponse gateway. */
 export const RUNTIME_LINK_RELAY_STAGE_HEADER = RELAY_STAGE_HEADER;
 
@@ -200,7 +208,7 @@ export function createRuntimeLinkLocator(
       } catch (error) {
         throw forwardingFailure(error);
       }
-      const stage = response.headers.get(RUNTIME_LINK_RELAY_STAGE_HEADER);
+      const stage = relayStageOf(response.headers);
       if (stage === "before_dispatch" || stage === "after_dispatch") {
         throw await dialFailureFromRelay(response, stage);
       }
@@ -326,7 +334,7 @@ async function hopFetch(fetchImpl: typeof fetch, target: string, request: Reques
   const headers = new Headers();
   request.headers.forEach((value, name) => {
     const lower = name.toLowerCase();
-    if (lower === "host" || lower === "connection" || lower === RUNTIME_LINK_RELAY_HOP_HEADER.toLowerCase()) return;
+    if (lower === "host" || lower === "connection" || lower === RUNTIME_LINK_RELAY_HOP_HEADER.toLowerCase() || lower === LEGACY_RUNTIME_LINK_RELAY_HOP_HEADER.toLowerCase()) return;
     headers.set(name, value);
   });
   headers.set(RUNTIME_LINK_RELAY_HOP_HEADER, "1");

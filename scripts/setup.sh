@@ -3,8 +3,8 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-# shellcheck source=lib/env-aliases.sh
-. "$root/scripts/lib/env-aliases.sh" # OHB_* -> OPENEDBOT_* fallback, one release
+# shellcheck source=lib/legacy-env.sh
+. "$root/scripts/lib/legacy-env.sh" # refuses a retired OHB_* variable
 
 env_file="${ENV_FILE:-.env.local}"
 

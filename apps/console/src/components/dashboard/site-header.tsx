@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import { MobileHeader } from "../mobile/mobile-header";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
-import { SettingsModalHeader, SettingsOpenAsWindowButton, useSettingsModal } from "../boardui/settings-modal";
-import { useSettingsPage } from "../../lib/shell/settings-modal-context";
 import { RuntimeHealthBadge } from "./runtime-health-badge";
 import { SupportHeaderButton } from "../support/support-header-button";
 import { BoardHeader } from "../boardui/board-chrome";
@@ -53,8 +51,6 @@ export function SiteHeader({
   // « Retour » à gauche, sans `SidebarTrigger` : il n'y a pas de barre à
   // replier, il y a un panneau à révéler.
   const drawer = useMobileDrawer();
-  const settingsModal = useSettingsModal();
-  const settingsPage = useSettingsPage();
   // La porte du guichet est l'action fixe de chaque en-tête, sur tous les
   // écrans de l'application : une place plutôt qu'une bulle flottante qui
   // se retirait des fils et recouvrait le reste. La bulle ne reste que là où
@@ -71,11 +67,7 @@ export function SiteHeader({
   if (drawer) {
     return <MobileHeader title={title} subtitle={subtitle} avatar={avatar} actions={headerActions} heading={heading} align={align} />;
   }
-  // Dans la modale des réglages, l'en-tête est celui de la modale.
-  if (settingsModal) return <SettingsModalHeader title={title} />;
   // Bureau : le fil d'Ariane et les actions de l'écran, posés dans la barre
   // du haut du cadre (`board-chrome.tsx`). Le sous-titre est mobile seulement.
-  // Réglages en page : la barre porte le retour en fenêtre.
-  const boardActions = settingsPage ? <>{actions}<SettingsOpenAsWindowButton /></> : actions;
-  return <BoardHeader title={title} avatar={avatar} actions={boardActions} heading={heading} root={root} />;
+  return <BoardHeader title={title} avatar={avatar} actions={actions} heading={heading} root={root} />;
 }

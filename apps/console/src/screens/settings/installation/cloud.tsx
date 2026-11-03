@@ -24,7 +24,7 @@ import { RUNTIME_DISCONNECTED_REFETCH_MS, RUNTIME_REFETCH_MS, type RuntimeSectio
 import { CopyableCommand } from "./cloud/cloud-token-help";
 import { RuntimeFormSkeleton, RuntimeOwnershipHelp, RuntimeSectionRail } from "./cloud/cloud-runtime-chrome";
 import { RuntimeLinkHero } from "./cloud/cloud-link-hero";
-import { ConnectorUpgradeNotice, RetiredLinkNotice, RuntimeLinkCheck } from "./cloud/cloud-link-check";
+import { ConnectorUpgradeNotice, HermesUpdateNotice, RetiredLinkNotice, RuntimeLinkCheck } from "./cloud/cloud-link-check";
 import { ConnectorReleaseNotesButton } from "../../../components/connector-update-dialog";
 import { linkHealthErrorText } from "../../../lib/runtime/link-health-error";
 import { RuntimeRemoval, RuntimeReplacement } from "./cloud/cloud-registry";
@@ -265,7 +265,10 @@ function RuntimeConnectionForm({
           {retired ? (
             <RetiredLinkNotice runtime={runtime} />
           ) : (
-            <ConnectorUpgradeNotice connector={runtime.link?.connector} connected={runtime.link?.connected === true} />
+            <>
+              <ConnectorUpgradeNotice connector={runtime.link?.connector} connected={runtime.link?.connected === true} />
+              <HermesUpdateNotice link={runtime.link} />
+            </>
           )}
           <RuntimeLinkCheck key={runtime.id} runtime={runtime} retiredOrigin={retired ? runtime.link?.origin ?? null : null} />
         </SettingsCard>

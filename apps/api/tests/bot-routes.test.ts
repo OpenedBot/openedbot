@@ -5,7 +5,7 @@ import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import type { ApiConfig } from "../src/infrastructure/config";
 import { personaDraftSessionKey } from "@openedbot/roster/domain/persona-draft";
 import { HermesClientError } from "@openedbot/hermes";
-import { botRoutes, personaDraftRoutes } from "../src/routes/roster/bot-routes";
+import { botRoutes } from "../src/routes/roster/bot-routes";
 import type { BotRouteDeps } from "@openedbot/roster/application/bots";
 import type { BotRow } from "@openedbot/roster/domain/bot-dto";
 import { HttpError } from "../src/interfaces/http/http-error";
@@ -21,6 +21,7 @@ const owner: AuthContext = {
 
 function mount(db: SQL, auth: AuthContext = owner, deps: BotRouteDeps = {}): Hono<{ Variables: AppVariables }> {
   Object.assign(db, { reserve: async () => Object.assign(db, { release: () => {}, close: async () => {} }) });
+  if (!("array" in db)) Object.assign(db, { array: (values: unknown[]) => values });
   const app = new Hono<{ Variables: AppVariables }>();
   app.use("*", async (context, next) => {
     context.set("auth", auth);
@@ -135,7 +136,7 @@ function patchSectionDb(calls: string[], sectionId: string | null): SQL {
     if (sql.includes("select id from sections")) {
       return Promise.resolve(sectionId ? [{ id: sectionId }] : []);
     }
-    if (sql.includes("coalesce(max(position)")) return Promise.resolve([{ next: 4 }]);
+    if (sql.includes("coalesce(greatest(")) return Promise.resolve([{ next: 4 }]);
     if (sql.includes("update bots set")) return Promise.resolve([{ id: "bot-1" }]);
     if (sql.includes('t.id as "threadId"')) {
       return Promise.resolve([{ ...storedBotRow, sectionId: sectionId ?? storedBotRow.sectionId, position: 4, archivedAt: null, deletedAt: null }]);
@@ -537,7 +538,12 @@ describe("PATCH bot sectionId", () => {
     expect(update).toContain("section_id = coalesce(");
     expect(update).toContain("position = coalesce(");
     expect(calls.some((sql) => sql.includes("select id from sections"))).toBe(true);
-    expect(calls.some((sql) => sql.includes("coalesce(max(position), -1) + 1"))).toBe(true);
+    // Bots et salons partagent l'ordre d'une section : le rang suivant se prend
+    // sur les deux tables, section verrouillée contre une arrivée simultanée.
+    const next = calls.find((sql) => sql.includes("coalesce(greatest("))!;
+    expect(next).toContain("from bots");
+    expect(next).toContain("from bot_groups");
+    expect(calls.some((sql) => sql.includes("from sections") && sql.includes("for update"))).toBe(true);
   });
 
   test("une section étrangère répond 404 SECTION_NOT_FOUND", async () => {
@@ -742,7 +748,7 @@ describe("profil Hermes optionnel (0031)", () => {
       const sql = [...strings].join(" ");
       calls.push(sql);
       if (sql.includes("select id from sections")) return Promise.resolve([{ id: "section-1" }]);
-      if (sql.includes("coalesce(max(position)")) return Promise.resolve([{ next: 0 }]);
+      if (sql.includes("coalesce(greatest(")) return Promise.resolve([{ next: 0 }]);
       return Promise.resolve([]);
     }) as unknown as SQL;
     (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
@@ -895,7 +901,7 @@ describe("profil Hermes géré par OHB (OHB-28)", () => {
       if (mode === "repair" && sql.includes('select name, hermes_profile as "profile", model')) return Promise.resolve([{ name: row.name, profile: row.hermesProfile, model: row.model }]);
       if (mode === "create" && sql.includes('select id, name, slug')) return Promise.resolve([{ id: row.id, name: row.name, slug: row.slug, profile: null, model: row.model }]);
       if (sql.includes("select id from sections")) return Promise.resolve(values.includes("ffffffff-ffff-4fff-8fff-ffffffffffff") ? [] : [{ id: row.sectionId }]);
-      if (sql.includes("coalesce(max(position)")) return Promise.resolve([{ next: 0 }]);
+      if (sql.includes("coalesce(greatest(")) return Promise.resolve([{ next: 0 }]);
       if (sql.includes("update bots")) return Promise.resolve([{ id: row.id }]);
       if (sql.includes('t.id as "threadId"')) return Promise.resolve([row]);
       if (mode === "capabilities" && sql.includes('hermes_profile as "hermesProfile"')) return Promise.resolve([{ hermesProfile: row.hermesProfile }]);
@@ -1505,66 +1511,6 @@ describe("brouillon de persona d'un bot", () => {
   });
 });
 
-describe("brouillon de persona sans bot", () => {
-  function mountDrafts(db: SQL, auth: AuthContext = owner, deps: BotRouteDeps = {}): Hono<{ Variables: AppVariables }> {
-    const app = new Hono<{ Variables: AppVariables }>();
-    app.use("*", async (context, next) => {
-      context.set("auth", auth);
-      await next();
-    });
-    app.onError((error, context) => error instanceof HttpError
-      ? context.json({ error: { code: error.code } }, error.status as 400)
-      : context.json({ error: { code: "UNEXPECTED" } }, 500));
-    app.route("/", personaDraftRoutes(db, {} as ApiConfig, deps));
-    return app;
-  }
-
-  test("insère un run persona_draft sur le runtime de l'organisation", async () => {
-    const sql: string[] = [];
-    const tx = ((strings: TemplateStringsArray) => {
-      sql.push([...strings].join(" "));
-      return Promise.resolve([]);
-    }) as unknown as SQL;
-    (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
-      async (callback: (inner: SQL) => unknown) => callback(tx);
-    const response = await mountDrafts(tx, owner, {
-      readRuntime: (async () => ({
-        id: "runtime-1",
-        name: "Hermes",
-        capacity: 4,
-        linkFeatures: [],
-        client: {} as never,
-        selectedProvider: null,
-        selectedModel: null,
-        reasoningEffort: null,
-      })) as BotRouteDeps["readRuntime"],
-    }).request("/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Ada", role: "Research" }),
-    });
-    expect(response.status).toBe(202);
-    expect((await response.json()).runId).toEqual(expect.any(String));
-    expect(sql.some((statement) => statement.includes("persona_draft"))).toBe(true);
-    expect(sql.some((statement) => statement.includes("insert into threads"))).toBe(true);
-  });
-
-  test("refuse sans runtime connecté", async () => {
-    const tx = ((() => Promise.resolve([])) as unknown as SQL);
-    (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
-      async (callback: (inner: SQL) => unknown) => callback(tx);
-    const response = await mountDrafts(tx, owner, {
-      readRuntime: (async () => null) as BotRouteDeps["readRuntime"],
-    }).request("/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Ada" }),
-    });
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: { code: "RUNTIME_REQUIRED" } });
-  });
-});
-
 describe("création atomique et rejouable (0135)", () => {
   const requestId = "3c3c3c3c-0000-4000-8000-000000000001";
 
@@ -1575,7 +1521,7 @@ describe("création atomique et rejouable (0135)", () => {
       values.push(params);
       if (sql.includes("creation_request_id =")) return Promise.resolve(replay ? [replay] : []);
       if (sql.includes("select id from sections")) return Promise.resolve([{ id: "section-1" }]);
-      if (sql.includes("coalesce(max(position)")) return Promise.resolve([{ next: 0 }]);
+      if (sql.includes("coalesce(greatest(")) return Promise.resolve([{ next: 0 }]);
       if (sql.includes('t.id as "threadId"')) {
         return Promise.resolve([{ ...storedBotRow, archivedAt: null, deletedAt: null, permissionMode: "auto", label: "Recherche" }]);
       }

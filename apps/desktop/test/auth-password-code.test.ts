@@ -33,6 +33,11 @@ mock.module("electron", () => ({
   },
   safeStorage: { isEncryptionAvailable: () => false },
   shell: {},
+  // Imported by window.ts (window-signin.test.ts).
+  BrowserWindow: class {},
+  clipboard: {},
+  Menu: {},
+  screen: {},
 }));
 
 const { createAuthService } = await import("../src/main/auth");

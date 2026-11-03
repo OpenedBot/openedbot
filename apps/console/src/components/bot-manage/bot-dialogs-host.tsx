@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { BotDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
 import { CreateBotSheet } from "../bot-create/create-bot-sheet";
+import { BotRoutinesDialog } from "../bot-routines-dialog";
 import { BotManageDialog } from "./bot-manage-dialog";
 
 /**
@@ -20,6 +22,9 @@ export function BotDialogsHost() {
   const managePage = useBotDialogs((state) => state.managePage);
   const manageThreadId = useBotDialogs((state) => state.manageThreadId);
   const closeManage = useBotDialogs((state) => state.closeManage);
+  const routineBot = useBotDialogs((state) => state.routineBot);
+  const closeRoutines = useBotDialogs((state) => state.closeRoutines);
+  const navigate = useNavigate();
   const createMounted = useOpenedOnce(createOpen);
   const roster = useQuery({ queryKey: queryKeys.roster, queryFn: api.roster, enabled: manageBotId !== null });
   // A bot deleted (or hidden) from its own page leaves the roster: the page closes.
@@ -38,6 +43,16 @@ export function BotDialogsHost() {
   return (
     <>
       {createMounted ? <CreateBotSheet open={createOpen} source={createSource} onClose={closeCreate} /> : null}
+      {routineBot ? (
+        <BotRoutinesDialog
+          bot={routineBot}
+          open
+          onClose={() => {
+            closeRoutines();
+            void navigate({ to: "/bot/$botId", params: { botId: routineBot.id } });
+          }}
+        />
+      ) : null}
       {shownBot ? (
         <BotManageDialog
           bot={shownBot}

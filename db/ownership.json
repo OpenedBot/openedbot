@@ -30,6 +30,7 @@
       "reason": "Flotte (plug-in agency externe, qui déclare fleet.workspaces et fleet.billing) : depuis l'étape 11.2 ses routes HTTP et ses écrans sont dans le plug-in ; la table, ses migrations, sa RLS et le code d'accès (modules/identity agency-*) restent au cœur, en dette datée ; les valeurs stockées 'agency' (kind, role, clés product_features) ne sont pas migrées."
     }
   },
+  "api_errors": "api",
   "api_instances": "runtime-link",
   "audit_chain": "runtime-link",
   "audit_worm_orphans": "runtime-link",

@@ -208,12 +208,14 @@ test("un quota au repos ne monte pas d’alerte", async () => {
   expect(screen.queryByRole("button", { name: /Voir les limites des fournisseurs/ })).toBeNull();
 });
 
-test("un fournisseur authentifié sans sonde affiche n/d et son explication", async () => {
+test("un fournisseur authentifié sans sonde dit pourquoi dans son bloc, sans « n/d »", async () => {
   includeUnavailableProvider = true;
   renderCard();
   await openLimitsDialog();
-  expect(await screen.findByText("Le runtime ne lit pas encore les limites de ce fournisseur.")).toBeTruthy();
-  expect(screen.getAllByText("n/d").length).toBeGreaterThan(0);
+  const notice = await screen.findByText("Le runtime ne lit pas encore les limites de ce fournisseur.");
+  // La phrase est dans le bloc du fournisseur concerné (modèle t3code), pas en note commune.
+  expect(within(notice.closest("section[data-provider-row]") as HTMLElement).getByText("Gemini")).toBeTruthy();
+  expect(screen.queryByText("n/d")).toBeNull();
 });
 
 test("un tier anonyme se range sous « Sans relevé », sans n/d à réessayer", async () => {
@@ -243,7 +245,7 @@ test("« Actualiser » affiche le relevé rendu par la sonde forcée, pas l'anci
   expect(screen.queryByText("97 %")).toBeNull();
 });
 
-test("lien fermé : affiche chaque fournisseur authentifié avec n/d, ses bots dépliés, et le bouton vers les réglages du lien", async () => {
+test("lien fermé : affiche chaque fournisseur authentifié, ses bots dépliés, et le bouton vers les réglages du lien", async () => {
   usageStatus = "disconnected";
   includeUnavailableProvider = true;
   renderCard();
@@ -254,13 +256,13 @@ test("lien fermé : affiche chaque fournisseur authentifié avec n/d, ses bots d
   expect(openLink.getAttribute("href")).toBe("/settings/runtime");
   expect(openLink.className).toContain("ohb-settings-action");
   expect(openLink.className).toContain("justify-center");
-  // Une ligne par fournisseur authentifié, chacune à n/d, chacune dépliée d'office.
+  // Un bloc par fournisseur authentifié, chacun déplié d'office.
   // Pas de jauge : un fournisseur sans relevé n'a pas de valeur à représenter,
   // et un `progressbar` vide annoncerait « zéro consommé ».
   expect(within(dialog).queryByRole("progressbar")).toBeNull();
   expect(within(dialog).getByText("Anthropic")).toBeTruthy();
   expect(within(dialog).getByText("Gemini")).toBeTruthy();
-  expect(within(dialog).getAllByText("n/d").length).toBe(2);
+  expect(within(dialog).queryByText("n/d")).toBeNull();
   const rows = within(dialog).getAllByRole("button", { name: /Bots sur ce fournisseur/ });
   expect(rows.length).toBe(2);
   expect(rows.every((row) => row.getAttribute("aria-expanded") === "true")).toBe(true);

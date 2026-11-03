@@ -17,7 +17,7 @@ import { pushLocalYolo, readYoloControlFrame } from "./link-yolo";
 import {
   loopResponse,
   RUNTIME_LINK_INTERNAL_PREFIX,
-  RUNTIME_LINK_RELAY_HOP_HEADER,
+  relayHopped,
   RUNTIME_LINK_RELAY_STAGE_HEADER,
   runtimeLinkLocator,
   unavailableResponse,
@@ -54,11 +54,11 @@ export type InternalRelayHandlers = {
  * Le relais interne : le worker pousse ici la requête gateway d'un runtime
  * `connector`, avec le même bearer que `/internal/events/publish`. Corps
  * relayé dans les deux sens, en flux ; une panne du LIEN est distinguée d'une
- * réponse du gateway par `X-OHB-Relay-Stage`, que le dialer du worker relit
+ * réponse du gateway par `X-OpenedBot-Relay-Stage`, que le dialer du worker relit
  * pour classer la certitude de livraison.
  *
  * Si le lien n'est pas ouvert ICI, la requête est forwardée à l'instance
- * propriétaire (`X-OHB-Relay-Hop: 1`). Un second hop est refusé 508.
+ * propriétaire (`X-OpenedBot-Relay-Hop: 1`). Un second hop est refusé 508.
  */
 export function runtimeLinkInternalRelay(
   config: ApiConfig,
@@ -87,7 +87,7 @@ export function runtimeLinkInternalRelay(
       && !(method === "POST" && /^(?:\/p\/[a-z0-9][a-z0-9_-]{0,62})?\/v1\/runs\/[A-Za-z0-9._~-]{1,128}\/(stop|approval)$/.test(path.split("?")[0]!))) {
       return relayFailure(503, "LINK_DRAINING", "La passerelle termine les travaux en cours.", "before_dispatch");
     }
-    const hopped = Boolean(context.req.header(RUNTIME_LINK_RELAY_HOP_HEADER));
+    const hopped = relayHopped((name) => context.req.header(name));
     if (!broker?.connected(runtimeId)) {
       if (hopped) return loopResponse();
       const location = await locator.locate(runtimeId);
@@ -134,7 +134,7 @@ export function runtimeLinkInternalRelay(
       throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     }
     const runtimeId = context.req.param("runtimeId");
-    const hopped = Boolean(context.req.header(RUNTIME_LINK_RELAY_HOP_HEADER));
+    const hopped = relayHopped((name) => context.req.header(name));
     const body = await jsonBody(context.req.raw);
     // Mode YOLO : un bail ou une révocation, poussé seulement à un hôte qui sait l'appliquer.
     const yolo = body.kind === "yolo" ? readYoloControlFrame(body.frame) : null;
@@ -190,7 +190,7 @@ export function runtimeLinkInternalRelay(
       throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     }
     const runtimeId = context.req.param("runtimeId");
-    const hopped = Boolean(context.req.header(RUNTIME_LINK_RELAY_HOP_HEADER));
+    const hopped = relayHopped((name) => context.req.header(name));
     const body = await jsonBody(context.req.raw);
     const expectedGeneration = parseProbeGeneration(body.generation);
     if (broker?.connected(runtimeId)) return context.json(await broker.probeLink(runtimeId, expectedGeneration));

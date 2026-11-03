@@ -312,6 +312,34 @@ func TestLinkTakeoverNamesWhatItReplaces(t *testing.T) {
 	}
 }
 
+// One gateway, one organization: a second instance may not dial an origin
+// another instance already links (it would share the gateway's profiles and
+// sessions with a second organization). Distinct origins (dev next to prod)
+// and the re-enrollment of the same instance stay allowed.
+func TestOriginTakenByFindsAnotherInstanceOnTheSameOrigin(t *testing.T) {
+	redirectConnectorRoot(t)
+	const prod, dev = "https://console.openedbot.app", "http://127.0.0.1:8790"
+
+	if other, lf := originTakenBy("dev", dev); lf != nil {
+		t.Fatalf("an unlinked host reported %q as taken by %q", dev, other)
+	}
+	writeLink(t, layout.DefaultConnectorInstance, prod, "rt-prod")
+	if _, lf := originTakenBy("dev", dev); lf != nil {
+		t.Fatal("a named instance on another origin (dev next to prod) was reported as taken")
+	}
+	if _, lf := originTakenBy(layout.DefaultConnectorInstance, prod); lf != nil {
+		t.Fatal("re-enrolling the instance that already holds the origin was reported as taken")
+	}
+	other, lf := originTakenBy("second", prod)
+	if lf == nil || other != layout.DefaultConnectorInstance || lf.RuntimeID != "rt-prod" {
+		t.Fatalf("a second instance on the production origin was not refused: other=%q link=%+v", other, lf)
+	}
+	writeLink(t, "dev", dev, "rt-dev")
+	if other, lf := originTakenBy(layout.DefaultConnectorInstance, dev); lf == nil || other != "dev" {
+		t.Fatalf("the default instance moving onto the dev instance's origin was not refused: other=%q link=%+v", other, lf)
+	}
+}
+
 func TestLinkRefusesAnInvalidInstanceName(t *testing.T) {
 	var out, errb bytes.Buffer
 	env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}

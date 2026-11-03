@@ -12,7 +12,7 @@ const MAX_REGISTRATION_BODY_BYTES = 4_096;
 
 /**
  * iOS push (DEV-308), mounted at `/api/push/apns` behind the session gate:
- * native Bearer + `X-OHB-Organization`, like every tenant route. The device
+ * native Bearer + `X-OpenedBot-Organization`, like every tenant route. The device
  * belongs to (organization, user, installationId); the token is never
  * returned or logged.
  */

@@ -14,6 +14,7 @@ import { I18nProvider } from "../../src/lib/i18n";
 import { OverviewScreen } from "../../src/screens/home/overview";
 
 const realFetch = globalThis.fetch;
+const realInnerWidth = window.innerWidth;
 
 function href(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -95,14 +96,27 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: realInnerWidth });
 });
 
 describe("accueil foyer", () => {
-  test("placeholder salon, sans dashboard", async () => {
+  // Au bureau, le foyer est la création d'un bot (`NewBotHome`) ; le salon
+  // calme ne vit plus que dans la coque mobile (`useIsMobile`, lu au rendu).
+  test("bureau : la création d'un bot, sans salon", async () => {
     renderHome();
 
-    expect(await screen.findByRole("heading", { name: "Le salon est calme." })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Ouvrir l.inbox/ }).getAttribute("href")).toBe("/inbox");
+    expect(await screen.findByRole("heading", { name: "Créez un bot" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Le salon est calme." })).toBeNull();
+  });
+
+  test("mobile : placeholder salon, sans dashboard", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 430 });
+    renderHome();
+
+    // Téléphone : la barre porte le titre et le « + », la scène une phrase.
+    expect(await screen.findByRole("heading", { name: "Salon" })).toBeTruthy();
+    expect(screen.getByText("Ouvre un fil dans la barre, ou mentionne un bot. Il te regarde.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Nouveau bot" })).toBeTruthy();
     expect(screen.queryByText("Aucun runtime")).toBeNull();
     expect(screen.queryByText("Un fil et une mémoire par bot")).toBeNull();
     expect(screen.queryByText(/Add Gateway|gateways/i)).toBeNull();

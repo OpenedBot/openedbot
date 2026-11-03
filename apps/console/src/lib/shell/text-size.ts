@@ -16,8 +16,7 @@ import { useSyncExternalStore } from "react";
  *   place des boutons du système, qui ne zooment pas).
  * - Navigateur : une page ne peut pas régler son propre zoom (le zoom du
  *   navigateur reste à l'utilisateur), et un `zoom` CSS sur la racine
- *   décalerait chaque menu positionné. Seule la modale des réglages suit
- *   (`settings-density.css`, sous `:root:not([data-native-zoom])`).
+ *   décalerait chaque menu positionné. La taille reste celle du navigateur.
  */
 export const TEXT_SIZES = [10, 11, 12, 13, 14] as const;
 export type TextSize = (typeof TEXT_SIZES)[number];

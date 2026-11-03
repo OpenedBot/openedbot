@@ -72,7 +72,7 @@ describe("le flux du guichet côté visiteur", () => {
     stream.close();
     expect(seenUrl).toContain("/api/support/conversations/conv-1/events?cursor=7");
     expect(seenUrl).not.toContain("jeton-secret");
-    expect(seenHeaders["X-OHB-Support-Token"]).toBe("jeton-secret-de-plus-de-seize-caracteres");
+    expect(seenHeaders["X-OpenedBot-Support-Token"]).toBe("jeton-secret-de-plus-de-seize-caracteres");
     expect(seenHeaders["Last-Event-ID"]).toBe("7");
   });
 
@@ -215,7 +215,7 @@ describe("le flux du guichet dans la coque desktop", () => {
       handlers: { onEvent: () => {} },
       fetchImpl: (async (_url: string, init: RequestInit) => {
         const headers = new Headers(init.headers);
-        seen.push({ authorization: headers.get("Authorization"), support: headers.get("X-OHB-Support-Token"), credentials: init.credentials });
+        seen.push({ authorization: headers.get("Authorization"), support: headers.get("X-OpenedBot-Support-Token"), credentials: init.credentials });
         attempts += 1;
         if (attempts === 1) throw new Error("réseau coupé");
         return sse();

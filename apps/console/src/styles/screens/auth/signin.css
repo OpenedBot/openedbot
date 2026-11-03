@@ -1,0 +1,468 @@
+/*
+  `/login` (screens/auth/login.tsx), the same screen in the browser and in the
+  desktop app: one centred column, the brand, a title, one field and one
+  primary action, then Google, and the promise under the form. It reads the
+  shared theme tokens, so light and dark stay the application's own. The
+  `lg-*` classes of login.css still dress /change-password and the not-found
+  page; nothing here leaks into them.
+*/
+.si {
+  --si-bg: var(--background, #fafafa);
+  --si-fg: var(--foreground, #171717);
+  --si-muted-fg: var(--muted-foreground, #737373);
+  --si-border: var(--border, #e5e5e5);
+  --si-input: var(--input, #d4d4d4);
+  --si-field: var(--card, #ffffff);
+  --si-hover: var(--muted, #f5f5f5);
+  --si-ring: var(--ring, #737373);
+  display: flex;
+  min-height: 100dvh;
+  width: 100%;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--si-bg);
+  color: var(--si-fg);
+  color-scheme: light;
+}
+
+.dark .si {
+  color-scheme: dark;
+}
+
+/* The desktop window has no title bar: its top edge drags the window, and the
+   traffic lights (macOS) or the caption buttons (Windows) sit over it. */
+:root[data-native-titlebar] .si-main {
+  -webkit-app-region: drag;
+}
+
+:root[data-native-titlebar] .si-card {
+  -webkit-app-region: no-drag;
+}
+
+.si-main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 24px;
+}
+
+.si-card {
+  display: flex;
+  width: 100%;
+  max-width: 380px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+  animation: si-enter 260ms ease-out both;
+}
+
+.si-brand {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  color: var(--si-fg);
+  text-decoration: none;
+  outline: none;
+}
+
+.si-brand:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 30%, transparent);
+}
+
+.si-brand-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+}
+
+.si-brand-mark img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.si-brand-name {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.si-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.si-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.si-lead {
+  margin: 0;
+  color: var(--si-muted-fg);
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.si-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.si-input {
+  height: 46px;
+  width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--si-input);
+  border-radius: 10px;
+  background: var(--si-field);
+  color: var(--si-fg);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.si-input::placeholder {
+  color: var(--si-muted-fg);
+}
+
+.si-input:focus-visible {
+  border-color: var(--si-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 22%, transparent);
+}
+
+.si-primary,
+.si-secondary,
+.si-google {
+  display: inline-flex;
+  height: 46px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+}
+
+/* The one strong action of the screen: the page's ink on its paper, inverted. */
+.si-primary {
+  border: 1px solid transparent;
+  background: var(--si-fg);
+  color: var(--si-bg);
+}
+
+.si-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.si-secondary,
+.si-google {
+  border: 1px solid var(--si-border);
+  background: transparent;
+  color: var(--si-fg);
+}
+
+.si-secondary:hover:not(:disabled),
+.si-google:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--si-hover);
+}
+
+.si-primary:active:not(:disabled),
+.si-secondary:active:not(:disabled),
+.si-google:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(1px);
+}
+
+.si-primary:disabled,
+.si-secondary:disabled,
+.si-google:disabled,
+.si-google[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.si-primary:focus-visible,
+.si-secondary:focus-visible,
+.si-google:focus-visible,
+.si-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 30%, transparent);
+}
+
+.si-google svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.si-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--si-muted-fg);
+  font-size: 12px;
+}
+
+.si-divider::before,
+.si-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--si-border);
+}
+
+.si-otp {
+  display: flex;
+  justify-content: center;
+}
+
+.si-otp-box {
+  width: 46px;
+  height: 52px;
+  border-color: var(--si-input);
+  border-radius: 10px;
+  background: var(--si-field);
+  color: var(--si-fg);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.si-otp-box:focus-visible {
+  border-color: var(--si-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--si-ring) 22%, transparent);
+}
+
+.si-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.si-link {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--si-muted-fg);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  align-self: center;
+}
+
+.si-link:hover:not(:disabled) {
+  color: var(--si-fg);
+}
+
+.si-link:disabled {
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: none;
+}
+
+.si-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--si-border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.si-note h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.si-note p {
+  margin: 0;
+}
+
+.si-note[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--warning, #d97706) 40%, var(--si-border));
+  background: color-mix(in srgb, var(--warning, #d97706) 8%, transparent);
+}
+
+.si-note[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--destructive, #dc2626) 40%, var(--si-border));
+  background: color-mix(in srgb, var(--destructive, #dc2626) 8%, transparent);
+}
+
+.si-pending {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--si-muted-fg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.si-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, 4px);
+  gap: 3px;
+  flex: none;
+}
+
+.si-matrix span {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--si-fg);
+  opacity: 0.2;
+  animation: si-matrix 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--k, 0) * 90ms);
+}
+
+/* The lock leads the first line and the text wraps under it, centred. */
+.si-reassurance {
+  margin: 4px 0 0;
+  color: var(--si-muted-fg);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* The message carries its own line break, before « openedbot ». */
+.si-reassurance span {
+  white-space: pre-line;
+}
+
+.si-reassurance svg {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+.si-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  color: var(--si-muted-fg);
+  font-size: 12px;
+}
+
+.si-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.si-legal a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.si-legal a:hover {
+  color: var(--si-fg);
+}
+
+.si-footer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.si-locale {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.si-locale button,
+.si-theme {
+  display: grid;
+  min-width: 30px;
+  height: 28px;
+  place-items: center;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.si-locale button[aria-pressed="true"],
+.si-locale button:hover,
+.si-theme:hover {
+  background: var(--si-hover);
+  color: var(--si-fg);
+}
+
+.si-theme svg {
+  width: 15px;
+  height: 15px;
+}
+
+.si-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes si-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes si-matrix {
+  0%,
+  60%,
+  100% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .si-card,
+  .si-matrix span {
+    animation: none;
+  }
+}

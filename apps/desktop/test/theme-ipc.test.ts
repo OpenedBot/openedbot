@@ -11,6 +11,11 @@ mock.module("electron", () => ({
   },
   nativeTheme: theme,
   shell: {},
+  // Imported by window.ts (window-signin.test.ts).
+  BrowserWindow: class {},
+  clipboard: {},
+  Menu: {},
+  screen: {},
   net: {},
   safeStorage: { isEncryptionAvailable: () => false },
 }));
@@ -25,6 +30,7 @@ beforeEach(() => {
     config: { consoleUrl: "https://console.example.com", apiOrigin: "https://api.example.com", clientId: "desktop", signinTemplate: "console-split" },
     signinUrl: "file:///app/signin.html",
     onBridgeUse: () => { bridgeCalls++; },
+    fallBackToLocalSignin: () => false,
     onTextZoom: () => {},
     initialTextZoom: () => 11 / 14,
   });
@@ -84,6 +90,7 @@ test("on production, the console and its former apex origin are both trusted sen
     config: { consoleUrl: "https://console.openedbot.app", apiOrigin: "https://api.openedbot.app", clientId: "desktop", signinTemplate: "console-split" },
     signinUrl: "file:///app/signin.html",
     onBridgeUse: () => {},
+    fallBackToLocalSignin: () => false,
     onTextZoom: () => {},
     initialTextZoom: () => 11 / 14,
   });

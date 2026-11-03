@@ -20,9 +20,9 @@ const SESSION_ID = `session-${crypto.randomUUID()}`;
 const USER_INPUT = "Replay identity fixture";
 const FINAL_OUTPUT = "Recovered output from the durable event journal.";
 const MAX_WAIT_MS = 6_000;
-const STATUS_FAILURE = process.env.OHB118_STATUS_RECOVERY === "failed";
-const STATUS_RECOVERY = process.env.OHB118_STATUS_RECOVERY === "1" || STATUS_FAILURE;
-const CLEAN_EOF = process.env.OHB118_CLEAN_EOF === "1";
+const STATUS_FAILURE = process.env.OPENEDBOT_TEST_118_STATUS_RECOVERY === "failed";
+const STATUS_RECOVERY = process.env.OPENEDBOT_TEST_118_STATUS_RECOVERY === "1" || STATUS_FAILURE;
+const CLEAN_EOF = process.env.OPENEDBOT_TEST_118_CLEAN_EOF === "1";
 let currentPhase = "startup";
 let claimProbe: Record<string, unknown> | undefined;
 

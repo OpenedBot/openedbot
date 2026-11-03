@@ -4,9 +4,8 @@ import { Checkbox } from "@openedbot/browser-ui-kit";
 import { BotFace } from "./bot-face";
 
 /**
- * La liste à cocher des membres d'un groupe : partagée par la création et
- * l'édition (`GroupDialog`) et par le formulaire de création intégré au menu
- * d'un bot (`BotGroupsDialog`).
+ * La liste à cocher des membres d'un groupe, dans l'édition d'un groupe
+ * (`GroupDialog`). La création passe par `/g/new` (« À : »).
  *
  * Un bot déjà archivé ne s'y propose pas : `bots` est déjà filtré par
  * l'appelant, ce composant ne fait que rendre la liste et le plafond.

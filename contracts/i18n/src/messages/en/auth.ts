@@ -58,22 +58,24 @@ export const legal = {
 } as const;
 
 export const login = {
-  emailCodeTitle: "Sign up or sign in by email",
-  emailCodeSent: "A code was sent to {email}. It expires in 10 minutes.",
+  codeTitle: "Check your inbox",
+  emailPlaceholder: "you@example.com",
+  sendCode: "Send code",
+  sendingCode: "Sending code…",
+  verifying: "Verifying…",
+  or: "or",
+  emailCodeSent: "A code was sent to {email}.",
+  emailCodeExpiry: "It expires in 10 minutes.",
   emailCodeLabel: "6-digit code",
   emailCodeVerify: "Verify and continue",
   emailCodeResend: "Send another code",
-  continue: "Continue",
-  signingInAs: "Signing in as {email}",
-  changeEmail: "Change",
-  emailCodeInstead: "Email me a code instead",
-  passwordInstead: "Use my password",
+  changeEmail: "Change email",
   emailCodeResendIn: "Send another code in {seconds} s",
-  emailCodeResent: "A new code was sent to {email}. It replaces the previous one and expires in 10 minutes.",
+  emailCodeResent: "A new code was sent to {email}. It replaces the previous one.",
   waitlistLink: "Join the waitlist",
 
-  title: "Welcome back.",
-  intro: "Sign in to get back to your bots and your conversations.",
+  title: "Sign in to openedbot",
+  intro: "Use your email to sign in or create an account. We will send you a one-time code.",
   sessionExpired: "Your session has expired : sign in again.",
   sessionRevoked: "This session was revoked (Settings → Security) : sign in again.",
   alphaClosed: {
@@ -86,15 +88,10 @@ export const login = {
   googleWaiting: "Waiting for the sign-in in the browser : this page updates by itself.",
   googleCancel: "Cancel",
   passwordEmail: "E-mail address",
-  passwordPassword: "Password",
   passwordShow: "Show password",
   passwordHide: "Hide password",
-  passwordSubmit: "Sign in",
-  passwordSubmitting: "Signing in…",
-  googleDisabledNotConfigured:
-    "Google SSO is not configured in this environment. Use your cloud account e-mail and password.",
-  googleDisabledOriginUnsupported:
-    "Google SSO cannot complete over this local-network address: Google refuses a private IP as a redirect URI, and the session would land on the API host instead. Sign in with your e-mail and password.",
+  googleDisabledNotConfigured: "Google SSO is not configured in this environment. Sign in with a code sent by email.",
+  googleDisabledOriginUnsupported: "Google SSO cannot complete over this local-network address: Google does not accept a private IP address as a redirect URI. Sign in with a code sent by email.",
   failed: {
     EMAIL_LOGIN_CODE_INVALID: "Invalid or expired code. Request a new code.",
     EMAIL_LOGIN_CODE_UNSENT: "The code could not be sent. Please try again.",
@@ -109,7 +106,7 @@ export const login = {
     AUTH_EMAIL_NOT_ALLOWED:
       "This address is not open on openedbot yet : join the waitlist, we will write to you when your access is approved.",
     AUTH_NOT_A_MEMBER:
-      "This account is recognised, but it does not belong to this organization : ask an administrator for an invitation.",
+      "This account has no active organization yet: finish creating your workspace in the web app, then sign in here again.",
     AUTH_SIGNUP_FAILED:
       "The account could not be created after Google : start again, and contact support if it happens twice.",
     MEMBER_QUOTA_REACHED:
@@ -143,11 +140,17 @@ export const login = {
     NOT_ENROLLED: "Cloud authentication is not configured.",
     UNAUTHORIZED: "This session is no longer valid : sign in again.",
     SERVICE_UNAVAILABLE: "The sign-in service is temporarily unavailable. Please try again in a moment.",
+    NETWORK: "Sign-in failed. Check your network, then try again.",
+    TIMEOUT: "Timed out: the sign-in did not complete within 5 minutes.",
+    GOOGLE_REFUSED: "The Google sign-in was refused or expired. Try again.",
+    LOOPBACK_BUSY: "Local port 47813 is in use: close the app using it, then try again.",
+    REDIRECT_URI_INVALID: "This version of the app is not allowed by the server: update it.",
+    BAD_RESPONSE: "Unexpected answer from the sign-in server. Try again.",
     UNKNOWN: "Sign-in failed. Try again, and tell support if it happens again.",
   },
   unavailableTitle: "Sign-in temporarily unavailable",
   unreachable: "We cannot load the sign-in options right now. Please try again in a moment.",
-  ledgerFootnote: "Your bots run on your machine. openedbot keeps your conversations and your settings.",
+  ledgerFootnote: "Your bots run on your machine.\nopenedbot keeps your conversations and your settings.",
 } as const;
 
 export const changePassword = {

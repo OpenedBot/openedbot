@@ -13,32 +13,43 @@ afterEach(() => installCompatAliases({}));
 
 function probe() {
   const app = new Hono();
-  app.get("/probe", (c) => c.json({ header: requestHeader(c, "X-OHB-New") ?? null, query: requestQuery(c, "newId") ?? null }));
+  app.get("/probe", (c) => c.json({ header: requestHeader(c, "X-OpenedBot-New") ?? null, query: requestQuery(c, "newId") ?? null }));
   return app;
 }
 
 describe("compat aliases", () => {
-  test("solo: none installed, an old header or query is simply unknown", async () => {
+  test("solo: no plug-in alias, an old header or query is simply unknown", async () => {
     expect(compatAliasesOf([])).toEqual({ headers: [], queries: [], paths: [], entitlements: [] });
-    expect(compatHeaderNames()).toEqual([]);
-    const response = await probe().request("/probe?oldId=1", { headers: { "X-OHB-Old": "a" } });
+    expect(compatHeaderNames()).toEqual(["X-OHB-Organization", "X-OHB-Fleet", "X-OHB-Support-Token"]);
+    const response = await probe().request("/probe?oldId=1", { headers: { "X-OpenedBot-Old": "a" } });
     expect(await response.json()).toEqual({ header: null, query: null });
   });
 
   test("solo: the names published before 11.2 mean nothing to the core", async () => {
     const app = new Hono();
-    app.get("/fleet", (c) => c.json({ header: requestHeader(c, "X-OHB-Fleet") ?? null, query: requestQuery(c, "fleetId") ?? null }));
+    app.get("/fleet", (c) => c.json({ header: requestHeader(c, "X-OpenedBot-Fleet") ?? null, query: requestQuery(c, "fleetId") ?? null }));
     const response = await app.request("/fleet?agencyId=1", { headers: { "X-OHB-Agency": "a" } });
     expect(await response.json()).toEqual({ header: null, query: null });
   });
 
   test("installed: the old header and query answer for the new ones, the new ones win", async () => {
-    installCompatAliases({ headers: [{ from: "X-OHB-Old", to: "X-OHB-New" }], queries: [{ from: "oldId", to: "newId" }] });
-    expect(compatHeaderNames()).toEqual(["X-OHB-Old"]);
-    const old = await probe().request("/probe?oldId=1", { headers: { "x-ohb-old": "a" } });
+    installCompatAliases({ headers: [{ from: "X-OpenedBot-Old", to: "X-OpenedBot-New" }], queries: [{ from: "oldId", to: "newId" }] });
+    expect(compatHeaderNames()).toEqual(["X-OHB-Organization", "X-OHB-Fleet", "X-OHB-Support-Token", "X-OpenedBot-Old"]);
+    const old = await probe().request("/probe?oldId=1", { headers: { "x-openedbot-old": "a" } });
     expect(await old.json()).toEqual({ header: "a", query: "1" });
-    const both = await probe().request("/probe?oldId=1&newId=2", { headers: { "X-OHB-Old": "a", "X-OHB-New": "b" } });
+    const both = await probe().request("/probe?oldId=1&newId=2", { headers: { "X-OpenedBot-Old": "a", "X-OpenedBot-New": "b" } });
     expect(await both.json()).toEqual({ header: "b", query: "2" });
+  });
+
+  test("the core's X-OHB-* request headers still answer for one release, the new name wins", async () => {
+    installCompatAliases({});
+    const app = new Hono();
+    app.get("/org", (c) => c.json({ organization: requestHeader(c, "X-OpenedBot-Organization") ?? null, support: requestHeader(c, "X-OpenedBot-Support-Token") ?? null }));
+    const old = await app.request("/org", { headers: { "X-OHB-Organization": "o1", "x-ohb-support-token": "t1" } });
+    expect(await old.json()).toEqual({ organization: "o1", support: "t1" });
+    const both = await app.request("/org", { headers: { "X-OHB-Organization": "o1", "X-OpenedBot-Organization": "o2" } });
+    expect(await both.json()).toEqual({ organization: "o2", support: null });
+    expect(compatHeaderNames()).toEqual(["X-OHB-Organization", "X-OHB-Fleet", "X-OHB-Support-Token"]);
   });
 
   test("an old path answers 308 to the new one, rest and query kept, never cached", async () => {

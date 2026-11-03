@@ -1,4 +1,4 @@
-import type { CreateGroupInput, GroupDto, SectionDto, SectionOrderInput, UpdateGroupInput } from "@openedbot/contracts-api";
+import type { CreateGroupInput, GroupDto, SectionDto, SectionOrderInput, SectionsOrderInput, UpdateGroupInput } from "@openedbot/contracts-api";
 import { request } from "./http";
 
 export const groupsApi = {
@@ -28,4 +28,10 @@ export const groupsApi = {
   /** L'ordre complet d'une section ; chaque ligne citée y est rangée à son index. */
   orderSection: (sectionId: string, input: SectionOrderInput) =>
     request<void>(`/api/sections/${sectionId}/order`, { method: "PUT", body: JSON.stringify(input) }),
+  /** L'ordre de la grille des épinglés ; chaque ligne citée y est épinglée à son index. */
+  orderPins: (input: SectionOrderInput) =>
+    request<void>("/api/sections/pinned/order", { method: "PUT", body: JSON.stringify(input) }),
+  /** L'ordre des sections éditables, de haut en bas (« Non assigné » reste en place). */
+  orderSections: (input: SectionsOrderInput) =>
+    request<void>("/api/sections/order", { method: "PUT", body: JSON.stringify(input) }),
 };

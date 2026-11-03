@@ -4,12 +4,14 @@ import { IconPlus } from "@tabler/icons-react";
 import { ChartAreaInteractive } from "../../components/dashboard/chart-area-interactive";
 import { TokensChart } from "../../components/dashboard/tokens-chart";
 import { SectionCards } from "../../components/dashboard/section-cards";
+import { ChartCardSkeleton, SectionCardsSkeleton } from "../../components/dashboard/overview-skeleton";
 import { BotsTable } from "../../components/dashboard/bots-table";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { ChromeIconButton } from "../../components/mobile/mobile-header";
 import { useT } from "../../lib/i18n";
 import { cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { SalonOrbit } from "../../components/salon-orbit";
+import { NewBotHome } from "./new-bot-home";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "../../lib/api";
@@ -22,20 +24,22 @@ import { api, queryKeys } from "../../lib/api";
  * `stage` : combien de blocs rendre, dans l'ordre (cartes, activité, jetons,
  * table). Les réglages les montent un par un, une peinture entre chaque,
  * plutôt qu'en une frame de plusieurs centaines de millisecondes. Un bloc pas
- * encore monté garde sa place.
+ * encore monté montre sa silhouette (`overview-skeleton.tsx`), à sa taille.
  */
 export function OverviewDashboard({ flush = false, stage = 4 }: { flush?: boolean; stage?: number }) {
+  const { t } = useT();
+  const loading = t("common.loading");
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
-      {stage >= 1 ? <SectionCards flush={flush} /> : <div aria-hidden className="min-h-32" />}
+      {stage >= 1 ? <SectionCards flush={flush} /> : <SectionCardsSkeleton label={loading} flush={flush} />}
       <div
         className={cn(
           "grid grid-cols-1 gap-4 md:gap-6 @5xl/main:grid-cols-2",
           !flush && "px-4 lg:px-6",
         )}
       >
-        {stage >= 2 ? <ChartAreaInteractive /> : <div aria-hidden className="min-h-[22rem]" />}
-        {stage >= 3 ? <TokensChart /> : <div aria-hidden className="min-h-[22rem]" />}
+        {stage >= 2 ? <ChartAreaInteractive /> : <ChartCardSkeleton label={loading} />}
+        {stage >= 3 ? <TokensChart /> : <ChartCardSkeleton label={loading} totalLine />}
       </div>
       {stage >= 4 ? <BotsTable flush={flush} /> : null}
     </div>
@@ -43,7 +47,8 @@ export function OverviewDashboard({ flush = false, stage = 4 }: { flush?: boolea
 }
 
 /**
- * Foyer `/` : la scène papier de bloub (`#etat=orbit&stop`), pas un dashboard.
+ * Foyer `/`. Au bureau : la création d'un bot sur la page (`NewBotHome`).
+ * Sur téléphone : la scène papier de bloub (`#etat=orbit&stop`), pas un dashboard.
  * Le galet joue l'orbite une fois puis tient. Aucun chiffre ici : les
  * compteurs vivent sur la Vue d'ensemble des réglages (`/settings`).
  *
@@ -70,6 +75,10 @@ export function OverviewScreen() {
   // même feuille que « + ». Pas de formulaire ici, il ferait doublon avec elle.
   const empty = roster.isSuccess && roster.data.bots.length === 0;
   useSalonReveal(empty);
+
+  // Au bureau, l'accueil crée un bot sur la page même (comme l'accueil
+  // d'OpenBot) ; le téléphone garde le salon et sa feuille « Nouveau bot ».
+  if (!isMobile) return <NewBotHome empty={empty} />;
 
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
     const next = event.currentTarget.scrollTop > 2;

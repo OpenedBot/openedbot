@@ -1,5 +1,5 @@
 /**
- * Mode YOLO (PR 2/8) against a disposable PostgreSQL database (0158): only a
+ * Mode YOLO (PR 2/8) against a disposable PostgreSQL database (0165): only a
  * live owner or admin grants, through the definer function and inside its
  * own tenant; the API never inserts, deletes nor un-revokes a lease; the
  * columns are derived from the signed payload and a lease lasts 24 h at

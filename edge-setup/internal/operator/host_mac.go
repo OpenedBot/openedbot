@@ -86,7 +86,7 @@ func MacHost(runner exec.Runner, token string, cfg MacHostConfig, logf func(stri
 		ProfileCatalogue: func(ctx context.Context, profile string) ([]byte, error) {
 			return gateway.Loopback(token).ProfileModelOptions(ctx, profile)
 		},
-		GatewayToken: cfg.Token, Logf: logf, RestartGateway: cfg.RestartGateway,
+		GatewayToken: cfg.Token, Logf: logf, RestartGateway: cfg.RestartGateway, InventoryRoots: InventoryRoots{RuntimeRoot: p.RuntimeRoot},
 		GatewayHealthy:     func(ctx context.Context) error { return gateway.Loopback(token).WaitHealthy(ctx, HealthTimeout) },
 		RestartMarker:      p.RestartMarker,
 		SkillsOperationDir: filepath.Join(p.StateRoot, "skills-hub-operations"),
@@ -140,6 +140,7 @@ func MacHost(runner exec.Runner, token string, cfg MacHostConfig, logf func(stri
 		markPending:    server.markGatewayRestartPending,
 		restartPending: func() bool { return restartMarkerPending(server.RestartMarker) },
 	}
+	server.ProfileToolsets = profileToolsetsApplier(runner, p.RuntimeRoot, approvalPolicy.python)
 	server.ApprovalPolicyRead = approvalPolicy.state
 	server.ApprovalPolicyWrite = approvalPolicy.write
 	server.GatewayRestarted = approvalPolicy.gatewayRestarted

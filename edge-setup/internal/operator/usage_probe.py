@@ -80,7 +80,31 @@ def runtime_credential(provider):
         return None
 
 
+def anthropic_serves_api_key():
+    """True when the Anthropic credential the gateway serves with is an API key.
+
+    The key lives in the credential pool (``auth.json`` ``credential_pool``),
+    where ``fetch_account_usage`` alone never looks, and upstream only reads
+    account limits for OAuth-backed Claude accounts anyway.  An API key is
+    billed per use: it has no plan quota, and that is not a probe failure.
+    """
+    try:
+        from agent.anthropic_credentials import _is_oauth_token
+        from agent.credential_pool import load_pool
+
+        pool = load_pool("anthropic")
+        entry = pool.peek() if pool is not None else None
+        if entry is None:
+            return False
+        key = str(getattr(entry, "runtime_api_key", "") or "").strip()
+        return bool(key) and not _is_oauth_token(key)
+    except Exception:
+        return False
+
+
 def probe(provider):
+    if provider == "anthropic" and anthropic_serves_api_key():
+        return {"provider": provider, "credential": "api_key"}
     try:
         credential = runtime_credential(provider)
         usage = (

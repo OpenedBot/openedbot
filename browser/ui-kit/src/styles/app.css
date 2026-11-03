@@ -696,6 +696,22 @@
 
   /* BoardUI danger, vertical red gradient */
   --gradient-danger: linear-gradient(180deg, #ff6467 0%, #e7000b 100%);
+  /* Les boutons de Grok Bot (sand-kit-button) : une pilule, trois tons.
+     Neutre = la couleur du texte (noir en clair, blanc en sombre), le geste
+     principal ; voile = 6 % du texte ; accent = bleu ; danger = rouge. */
+  --btn-neutral: #1c1c1c;
+  --btn-neutral-hover: #363636;
+  --btn-neutral-fg: #fcfcfc;
+  --btn-neutral-disabled: rgb(28 28 28 / 15%);
+  --btn-veil: rgb(28 28 28 / 6%);
+  --btn-veil-hover: rgb(28 28 28 / 10%);
+  --btn-accent: #1680f3;
+  --btn-accent-hover: #126fd4;
+  --btn-danger: #e72e3b;
+  --btn-danger-hover: #c82532;
+  --btn-danger-veil: rgb(251 43 62 / 9%);
+  --btn-danger-veil-hover: rgb(251 43 62 / 14%);
+  --btn-danger-fg: #cd2834;
   --gradient-danger-hover: linear-gradient(180deg, #ff8a8c 0%, #ff6467 100%);
   --gradient-danger-active: linear-gradient(180deg, #e7000b 0%, #c10007 100%);
   --gradient-danger-disabled: linear-gradient(180deg, #ffe4e6 0%, #fecdd3 100%);
@@ -879,6 +895,19 @@
   --button-ghost-disabled-fg: #737373;
 
   --gradient-danger: linear-gradient(180deg, #ff6467 0%, #e7000b 100%);
+  --btn-neutral: #f5f5f5;
+  --btn-neutral-hover: #dbdbdb;
+  --btn-neutral-fg: #121212;
+  --btn-neutral-disabled: rgb(245 245 245 / 13%);
+  --btn-veil: rgb(245 245 245 / 4%);
+  --btn-veil-hover: rgb(245 245 245 / 8%);
+  --btn-accent: #116dd2;
+  --btn-accent-hover: #1784fb;
+  --btn-danger: #cf2b35;
+  --btn-danger-hover: #f73643;
+  --btn-danger-veil: rgb(252 44 62 / 7%);
+  --btn-danger-veil-hover: rgb(252 44 62 / 12%);
+  --btn-danger-fg: #ff6463;
   --gradient-danger-hover: linear-gradient(180deg, #ff8a8c 0%, #ff6467 100%);
   --gradient-danger-active: linear-gradient(180deg, #e7000b 0%, #c10007 100%);
   --gradient-danger-disabled: linear-gradient(180deg, #4d0218 0%, #3b0214 100%);

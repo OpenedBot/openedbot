@@ -282,6 +282,30 @@ describe("connecteurs : bureau, catalogue en lignes", () => {
     expect(document.querySelector("[data-mobile-action-footer]")).toBeNull();
   });
 
+  // Le squelette annonçait trois grandes cartes vides : une autre page que
+  // celle qui arrive. Il reprend désormais la charpente du catalogue.
+  test("pendant la première lecture, le squelette a la charpente du catalogue", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const loaded = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/api/runtime/integrations")) await gate;
+      return loaded(input, init);
+    }) as typeof fetch;
+    renderConnectors();
+    const skeleton = await waitFor(() => {
+      const node = document.querySelector("[data-connectors-layout='desktop-skeleton']");
+      expect(node).toBeTruthy();
+      return node!;
+    });
+    expect(skeleton.getAttribute("role")).toBe("status");
+    expect(skeleton.querySelectorAll("ul").length).toBeGreaterThan(0);
+    expect(skeleton.querySelectorAll("li").length).toBeGreaterThan(0);
+    release();
+    await waitFor(() => expect(document.querySelector("[data-connectors-layout='desktop-catalog']")).toBeTruthy());
+    expect(document.querySelector("[data-connectors-layout='desktop-skeleton']")).toBeNull();
+  });
+
   test("la recherche filtre les lignes de toutes les sections, et dit quand rien ne reste", async () => {
     renderConnectors();
     const search = await screen.findByRole("searchbox", { name: "Rechercher dans cette rubrique" });
@@ -311,6 +335,10 @@ describe("connecteurs : bureau, catalogue en lignes", () => {
     renderConnectors();
     fireEvent.click(await screen.findByRole("tab", { name: "Outils" }));
     expect(screen.queryByText("Notion")).toBeNull();
+    // Un groupe « Actifs » avec son nombre ; « Configuration requise » reste seule pastille.
+    expect(screen.getByRole("heading", { name: "Actifs 3" })).toBeTruthy();
+    expect(screen.queryByText("Prêt")).toBeNull();
+    expect(screen.getByText("Configuration requise")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: /GitHub/i }));
     expect(screen.getByRole("dialog", { name: "GitHub" })).toBeTruthy();
     expect(screen.getAllByText("Issues et PRs").length).toBeGreaterThan(0);
@@ -318,8 +346,32 @@ describe("connecteurs : bureau, catalogue en lignes", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Compétences" }));
     expect(screen.queryByText("GitHub")).toBeNull();
+    // Un slug de catégorie inconnu se lit comme un titre, suivi du nombre de skills.
+    expect(screen.getByRole("heading", { name: "Writing 1" })).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: /research/ }));
     expect(screen.getByRole("dialog", { name: "research" })).toBeTruthy();
+  });
+
+  test("Outils : l'interrupteur d'une ligne bascule le toolset sur la racine, seulement s'il est réglable", async () => {
+    stubFetch(writableInventory);
+    const base = globalThis.fetch;
+    const writes: Array<{ url: string; body: unknown }> = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/api/runtime/integrations/toolsets/") && init?.method === "POST") {
+        writes.push({ url, body: JSON.parse(String(init.body)) });
+        return Response.json({ name: "browser", platform: "api_server", enabled: false, requested: false, applied: true });
+      }
+      return base(input, init);
+    }) as typeof fetch;
+    renderConnectors();
+    fireEvent.click(await screen.findByRole("tab", { name: "Outils" }));
+    // GitHub n'est pas réglable sur api_server : pas d'interrupteur.
+    expect(screen.queryByRole("switch", { name: /GitHub/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("switch", { name: "Désactiver Browser" }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0]!.url).toContain("/api/runtime/integrations/toolsets/browser");
+    expect(writes[0]!.body).toEqual({ enabled: false });
   });
 
   test("« Nouveau connecteur » ouvre la boîte d'ajout, grisé sans administration MCP", async () => {

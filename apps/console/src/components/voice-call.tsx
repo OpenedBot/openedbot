@@ -30,13 +30,6 @@ type CallPhase = "idle" | "approval" | "listening" | "sending" | "working" | "sp
 const RUN_OBSERVATION_GRACE_MS = 30_000;
 const LISTEN_START_TIMEOUT_MS = 30_000;
 
-/** La sortie d'un run n'est jamais une bulle : seule la ligne persistée parle. */
-export function latestAssistantVoiceResponse(
-  messages: readonly ThreadMessageDto[],
-): VoiceCallResponse | null {
-  return assistantVoiceResponses(messages).at(-1) ?? null;
-}
-
 export function assistantVoiceResponses(
   messages: readonly ThreadMessageDto[],
 ): VoiceCallResponse[] {

@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   PERSONA_MAX_CHARS,
   composePersona,
-  formatCreatePersonaDraftInput,
   displayedCreatePersona,
   personaMetrics,
   resolveCreateInstructions,
@@ -87,16 +86,6 @@ describe("displayedCreatePersona", () => {
       edited: true,
       editedText: "",
     })).toBe("");
-  });
-});
-
-describe("formatCreatePersonaDraftInput", () => {
-  test("porte le nom, le rôle et la mission d'un bot pas encore créé", () => {
-    expect(formatCreatePersonaDraftInput({
-      name: "Ada",
-      role: "Research",
-      mission: "Cite sources.",
-    })).toBe("New bot (not yet created).\nName: Ada\nRole: Research\nMission: Cite sources.");
   });
 });
 

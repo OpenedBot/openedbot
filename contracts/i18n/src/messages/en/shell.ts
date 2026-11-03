@@ -1,28 +1,5 @@
 /** English strings, one file per domain: `messages.en.ts` assembles them. */
 
-export const pwaInstall = {
-  regionLabel: "Install the application",
-  titleIos: "On the home screen",
-  titleAndroid: "Install openedbot",
-  descriptionIos:
-    "In Safari, open Share then “Add to Home Screen”. Conversations stay online; nothing is cached outside the shell.",
-  descriptionAndroid:
-    "Add openedbot to the home screen. The API and streams stay on the network.",
-  titleDesktop: "Install openedbot",
-  descriptionDesktop:
-    "In the browser menu, choose “Install app” or “Add to Home Screen”. The API and streams stay on the network.",
-  install: "Install",
-  later: "Later",
-  rowSubtitleIos: "Share, then “Add to Home Screen”",
-  rowSubtitleInstall: "Add to the home screen",
-  fabTitle: "openedbot as a mobile app",
-  fabPrompt:
-    "openedbot is a PWA: once installed it opens full screen from the home screen, like a native app. On a phone, open this address in the browser then “Add to Home Screen”.",
-  fabManual:
-    "openedbot is a PWA: it installs from the browser, then opens full screen like a native app. On a phone, open this address then “Add to Home Screen”; here, “Install app” in the browser menu.",
-  rowDismiss: "Hide",
-} as const;
-
 export const overviewPlaceholder = {
   nav: "Salon",
   eyebrow: "orbit · stop",
@@ -96,13 +73,18 @@ export const appSidebar = {
   running: "Run in progress",
   awaitingApproval: "Authorization required",
   offDefaultRuntime: "Runtime: {runtime}",
-  unassigned: "No section",
+  unassigned: "Unassigned",
   newSection: "New section",
   newSectionName: "New section",
   sectionNameLabel: "Section name",
   sectionMenuLabel: "Section actions",
   dropToPin: "Drag to pin",
   dropToUnpin: "Drop here to unpin",
+  dragAnnouncePinned: "Pinned {name}",
+  dragAnnounceMoved: "Moved {name} to “{section}”",
+  dragAnnounceUnpinned: "Unpinned {name}, moved to “{section}”",
+  dragAnnounceCanceled: "Canceled dragging {name}",
+  dragAnnounceSection: "Moved section “{name}”",
   collapseSection: "Collapse section",
   expandSection: "Expand section",
   emptySection: "No chats",
@@ -158,6 +140,7 @@ export const navUser = {
   newGroup: "New group",
   lightTheme: "Light theme",
   darkTheme: "Dark theme",
+  switchLanguage: "Switch to {language}",
   installApp: "Install the app",
   signOut: "Sign out",
   impersonationReadOnly: "Assistance mode · read only",
@@ -218,7 +201,7 @@ export const boardui = {
   conversationOptions: "Conversation options",
   inThisConversation: "In this conversation",
   editNamed: "Edit {name}",
-  startGroupChat: "Start a group chat",
+  startGroupChat: "New group chat",
   goal: "Goal",
   goalHint: "Set a goal for faster results",
   clearGoal: "Clear the goal",
@@ -295,6 +278,7 @@ export const boardui = {
   autoDetect: "Auto-detect",
   language: "Language",
   agentLanguage: "Agent language",
+  notifyOnFinish: "Notify me when it finishes",
   systemVoice: "System voice",
   voice: "Voice",
   agentVoice: "Agent voice",
@@ -303,7 +287,6 @@ export const boardui = {
   voicePreviewText: "Hi, I am {name}.",
   playbackSpeed: "Playback speed",
   settingsSections: "Settings sections",
-  closeSettings: "Close settings",
   noEffort: "No effort",
 } as const;
 

@@ -1,4 +1,4 @@
-import "./env-aliases-apply"; // first: OHB_* -> OPENEDBOT_* fallback
+import "./legacy-env-guard"; // first: refuses a retired OHB_* variable
 import { app, dialog, Menu, net, powerMonitor } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -128,6 +128,8 @@ function start(): void {
     handleCommandLine = (argv) => deepLink.handleCommandLine(argv);
     stopLoopback = () => deepLink.stopLoopback();
 
+    // The local sign-in page: now only the fallback for a console that
+    // predates the shared /login (window.ts, localSigninFallback).
     const signinPath = path.join(app.getAppPath(), "src", "renderer", "signin.html");
     const iconPath = path.join(app.getAppPath(), "src", "renderer", "icon.png");
     // Windows takes the window icon; an unpackaged run on a Mac dev box would
@@ -193,9 +195,10 @@ function start(): void {
       onVisibilityChange: (visible) => syncDock(visible),
       onConsoleWithoutBridge: () => {
         // Keep the session: the tokens are fine, the console is not. Showing
-        // its landing would lead to a web login that ends in the browser.
+        // its landing would lead to a web login that ends in the browser, and
+        // its /login cannot sign in through the shell either: the local page.
         log.warn("console never called the bridge: it predates native support");
-        window.showSignin();
+        window.showLocalSignin();
         const host = new URL(config.consoleUrl).host;
         window.sendSigninState({
           status: "error",
@@ -285,6 +288,7 @@ function start(): void {
       config,
       signinUrl: pathToFileURL(signinPath).href,
       onBridgeUse: () => window.noteBridgeUse(),
+      fallBackToLocalSignin: () => window.fallBackToLocalSignin(),
       onTextZoom: (factor) => window.setTextZoom(factor),
       initialTextZoom: () => window.initialTextZoom(),
     });

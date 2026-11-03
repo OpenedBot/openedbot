@@ -50,7 +50,8 @@ export type NativeSessionLineage = { familyId: string; createdAt: Date };
 
 export async function createNativeSession(
   db: Db,
-  organizationId: string,
+  /** `null` : compte sans organisation, qui va la définir dans l'onboarding (0158). */
+  organizationId: string | null,
   userId: string,
   device: SessionDevice = { userAgent: null, ip: null },
   lineage: NativeSessionLineage | null = null,
@@ -62,7 +63,12 @@ export async function createNativeSession(
   // openedbot-desktop) : une première ouverture en pose une, chaque rotation la reprend.
   const familyId = lineage?.familyId ?? crypto.randomUUID();
   const createdAt = lineage?.createdAt ?? new Date();
-  await withTenant(db, organizationId, async (tx) => {
+  // Même règle que `createWebSession` : sans organisation, la policy
+  // `sessions_credential` accepte l'insertion par son propre jeton d'accès.
+  const open = <T>(callback: (tx: TransactionDb) => Promise<T>) => organizationId
+    ? withTenant(db, organizationId, callback)
+    : withCredential(db, hashCredential(accessToken), callback);
+  await open(async (tx) => {
     await tx`
       insert into sessions (
         id, organization_id, user_id, kind, access_token_hash, refresh_token_hash,
@@ -80,7 +86,7 @@ export async function createNativeSession(
 /** Une session vivante telle que la porte d'authentification la lit. */
 export type LiveSessionRow = {
   id: string;
-  /** `null` : session web d'un compte qui n'a pas encore défini son organisation (0086). */
+  /** `null` : session d'un compte qui n'a pas encore défini son organisation (web 0086, native 0158). */
   organizationId: string | null;
   userId: string;
   kind: "web" | "native";
@@ -126,7 +132,11 @@ export async function revokeSessionOnLogout(db: Db, credentialHash: string, sess
   });
 }
 
-/** Rattache une session web encore sans organisation à celle que le compte vient de définir. */
+/**
+ * Rattache une session encore sans organisation, web ou native, à celle que
+ * le compte vient de définir. Pour une session native, la ligne porte aussi le
+ * refresh token : la rotation suivante reprend donc l'organisation.
+ */
 export async function attachSessionOrganization(
   db: Db,
   credentialHash: string,
@@ -135,14 +145,14 @@ export async function attachSessionOrganization(
 ): Promise<void> {
   await withCredential(db, credentialHash, (tx) => tx`
     update sessions set organization_id = ${organizationId}
-     where id = ${sessionId} and kind = 'web' and organization_id is null
+     where id = ${sessionId} and organization_id is null
   `);
 }
 
 /** Ce qu'une rotation reprend de la session qu'elle remplace. */
 export type RotatedNativeSession = {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   userId: string;
   /** `null` pour une session antérieure à la famille (0019) : la suivante en ouvre une. */
   familyId: string | null;

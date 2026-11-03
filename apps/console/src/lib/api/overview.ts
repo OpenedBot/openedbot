@@ -7,7 +7,7 @@ export const overviewApi = {
   /** Les quatre séries d'usage de jetons (jour/semaine/mois/année), zero-fill. */
   usage: () => request<UsageDto>("/api/usage"),
   /** Ventilation des runs achevés par modèle, 90 derniers jours. */
-  usageModels: () => request<ModelUsageDto>("/api/usage/models"),
+  usageModels: (days?: number) => request<ModelUsageDto>(days === undefined ? "/api/usage/models" : `/api/usage/models?days=${encodeURIComponent(String(days))}`),
   /** Consommation openedbot exacte par bot ; le fournisseur affiché est déduit côté client. */
   usageBots: (days = 7) => request<BotUsageDto>(`/api/usage/bots?days=${encodeURIComponent(String(days))}`),
   decisions: (filters: { botId?: string; choice?: "once" | "deny"; origin?: "human" | "policy" } = {}) => {

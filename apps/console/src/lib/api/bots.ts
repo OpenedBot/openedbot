@@ -62,13 +62,6 @@ export const botsApi = {
     request<BotComputerCaptureDto>(`/api/bots/${botId}/computer/capture`, { method: "POST", body: "{}" }),
   stopBotComputer: (botId: string) =>
     request<BotComputerDto>(`/api/bots/${botId}/computer/stop`, { method: "POST", body: "{}" }),
-  createPersonaDraft: (input: { name: string; role?: string | null; mission?: string | null }) =>
-    request<{ runId: string }>("/api/persona-drafts", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-  readPersonaDraft: (runId: string) =>
-    request<{ status: string; draft: string | null }>(`/api/persona-drafts/${encodeURIComponent(runId)}`),
   /**
    * Brouillon de persona pour un bot déjà créé
    * (`POST /api/bots/:botId/persona-drafts`).

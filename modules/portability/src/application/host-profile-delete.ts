@@ -2,6 +2,7 @@ import type { SQL, TransactionSQL } from "bun";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { RuntimeProfileDeleteDto } from "@openedbot/contracts-api";
 import { compactionSessionKey } from "@openedbot/conversation/domain/thread-compaction";
+import { threadSessionKeys } from "@openedbot/conversation/domain/thread-session";
 import { cancelMaintenanceRunsTx, isMaintenanceStepKind } from "@openedbot/execution/application/run-cancellation";
 import { HermesClientError, type HermesClient, type HermesProfileInventory } from "@openedbot/hermes";
 import { withTenant } from "@openedbot/platform-db";
@@ -64,8 +65,8 @@ export async function deleteHostProfile(
   if (botId) {
     const scope = await withTenant(db, organizationId, async (tx) => {
       await assertLinkedBotDeletable(tx, organizationId, botId);
-      const threads = await tx<Array<{ sessionId: string; threadId: string }>>`
-        select hermes_session_id as "sessionId", id as "threadId" from threads
+      const threads = await tx<Array<{ sessionId: string; threadId: string; sessionGeneration: number }>>`
+        select hermes_session_id as "sessionId", id as "threadId", hermes_session_generation as "sessionGeneration" from threads
          where organization_id = ${organizationId} and bot_id = ${botId}
       `;
       const workflows = await tx<Array<{ workflowId: string }>>`
@@ -145,13 +146,13 @@ function botRuntimeSessionIds(
   organizationId: string,
   botId: string,
   scope: {
-    threads: ReadonlyArray<{ sessionId: string; threadId: string }>;
+    threads: ReadonlyArray<{ sessionId: string; threadId: string; sessionGeneration?: number | null }>;
     workflows: ReadonlyArray<{ workflowId: string }>;
   },
 ): string[] {
   const ids = new Set<string>();
   for (const thread of scope.threads) {
-    ids.add(thread.sessionId);
+    for (const key of threadSessionKeys(thread.sessionId, Number(thread.sessionGeneration ?? 0))) ids.add(key);
     ids.add(compactionSessionKey(organizationId, thread.threadId));
   }
   for (const workflow of scope.workflows) {

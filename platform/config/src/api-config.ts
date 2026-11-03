@@ -404,7 +404,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
   ]);
   // Aucun canal d'administration sortant (OHB-15) : plus de shell vers un
   // runtime client, quel que soit l'environnement. L'ancienne variable qui le
-  // réglait n'est plus lue (env-aliases.ts l'annonce ignorée).
+  // réglait n'est plus lue (legacy-env.ts refuse de démarrer tant qu'elle est posée).
   const runtimeAdminChannels: RuntimeAdminChannels = { local: false };
   const base = {
     environment,

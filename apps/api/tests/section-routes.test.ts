@@ -179,3 +179,104 @@ describe("sections : réordonner", () => {
     expect(calls.some((call) => call.sql.includes("update sections set position"))).toBe(false);
   });
 });
+
+describe("sections : ordre global", () => {
+  const DEF = "11111111-2222-4333-8444-5555555555d0";
+  const A = "11111111-2222-4333-8444-5555555555a1";
+  const B = "11111111-2222-4333-8444-5555555555b2";
+
+  function orderDb(calls: Array<{ sql: string; values: unknown[] }>): SQL {
+    const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = [...strings].join("?");
+      calls.push({ sql, values });
+      if (sql.includes("select id from sections")) return Promise.resolve([{ id: DEF }, { id: A }, { id: B }]);
+      if (sql.includes("select position from sections")) return Promise.resolve([{ position: 0 }]);
+      return Promise.resolve([]);
+    }) as unknown as SQL;
+    (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
+      async (callback: (inner: SQL) => unknown) => callback(tx);
+    return tx;
+  }
+  const put = (db: SQL, order: unknown) => mount(db).request("/order", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ order }),
+  });
+
+  test("les sections éditables prennent les rangs qui suivent la section par défaut, via des rangs négatifs", async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const response = await put(orderDb(calls), [B, A]);
+
+    expect(response.status).toBe(204);
+    const lock = calls.findIndex((call) => call.sql.includes("pg_advisory_xact_lock"));
+    const park = calls.findIndex((call) => call.sql.includes("set position = -1 - position"));
+    const read = calls.findIndex((call) => call.sql.includes("select id from sections"));
+    expect(lock).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(lock);
+    expect(park).toBeGreaterThan(read);
+    // La section par défaut n'est jamais déplacée : elle reste la première.
+    expect(calls[park]?.values).toEqual([`org-1`, DEF]);
+    const finals = calls.slice(park + 1).filter((call) => call.sql.includes("update sections set position"));
+    expect(finals.map((call) => call.values)).toEqual([[1, "org-1", B], [2, "org-1", A]]);
+  });
+
+  test("un ordre périmé (section manquante, en trop ou par défaut) est refusé sans écriture", async () => {
+    for (const order of [[A], [A, B, DEF], [B, "11111111-2222-4333-8444-5555555555c3"]]) {
+      const calls: Array<{ sql: string; values: unknown[] }> = [];
+      const response = await put(orderDb(calls), order);
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: { code: "SECTIONS_ORDER_STALE" } });
+      expect(calls.some((call) => call.sql.includes("update sections"))).toBe(false);
+    }
+  });
+
+  test("un ordre sans uuid ou avec doublon est refusé", async () => {
+    for (const order of [["nope"], [A, A], "A"]) {
+      const response = await put(orderDb([]), order);
+      expect(response.status).toBe(400);
+    }
+  });
+});
+
+describe("épinglés : ordre", () => {
+  const BOT = "11111111-2222-4333-8444-555555555561";
+  const GROUP = "11111111-2222-4333-8444-555555555562";
+
+  test("chaque ligne citée est épinglée à son rang, bots et salons entrelacés, sans toucher à sa section", async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const sql = [...strings].join("?");
+      calls.push({ sql, values });
+      if (sql.includes("returning id")) return Promise.resolve([{ id: values.at(-1) }]);
+      return Promise.resolve([]);
+    }) as unknown as SQL;
+    (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
+      async (callback: (inner: SQL) => unknown) => callback(tx);
+
+    const response = await mount(tx).request("/pinned/order", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ order: [{ kind: "bot", id: BOT }, { kind: "group", id: GROUP }] }),
+    });
+    expect(response.status).toBe(204);
+    const updates = calls.filter((call) => call.sql.includes("pin_position"));
+    expect(updates.map((call) => [call.sql.includes("update bot_groups") ? "group" : "bot", ...call.values])).toEqual([
+      ["bot", 0, "org-1", BOT],
+      ["group", 1, "org-1", GROUP],
+    ]);
+    expect(updates.every((call) => call.sql.includes("pinned = true") && !call.sql.includes("section_id"))).toBe(true);
+  });
+
+  test("une ligne inconnue annule l'ordre (404)", async () => {
+    const tx = (() => Promise.resolve([])) as unknown as SQL;
+    (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
+      async (callback: (inner: SQL) => unknown) => callback(tx);
+    const response = await mount(tx).request("/pinned/order", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ order: [{ kind: "bot", id: BOT }] }),
+    });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: { code: "SECTION_ORDER_ROW_NOT_FOUND" } });
+  });
+});

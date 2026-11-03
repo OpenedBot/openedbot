@@ -4,7 +4,7 @@ import { parseEventStream } from "./api-client";
  * Boucle de lecture du flux du guichet, commune au backoffice et à la console.
  *
  * `fetch` streamé plutôt qu'`EventSource`, parce qu'`EventSource` ne sait poser
- * ni en-tête (`X-OHB-Support-Token`, `Last-Event-ID`) ni `AbortSignal`. Le
+ * ni en-tête (`X-OpenedBot-Support-Token`, `Last-Event-ID`) ni `AbortSignal`. Le
  * parseur de trames est `parseEventStream`. L'URL et les en-têtes viennent de
  * l'appelant : cette boucle ne connaît aucune route.
  *

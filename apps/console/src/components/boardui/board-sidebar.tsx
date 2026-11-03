@@ -1,9 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useJustCreatedBot, useRouteBotParams } from "../../lib/bots/pending-bot-creations";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   RiAddFill,
-  RiArrowRightSLine,
   RiCheckLine,
   RiExpandUpDownLine,
   RiHome5Line,
@@ -23,9 +23,8 @@ import { useT } from "../../lib/i18n";
 import { BotContextMenu } from "../bot-context-menu";
 import { BotFace } from "../bot-face";
 import { GroupContextMenu } from "../group-context-menu";
-import { GroupDialog } from "../group-dialog";
 import { GroupFaceStack } from "../group-face-stack";
-import { useBotDialogs } from "../../lib/bots/bot-dialogs";
+import { useNewBot } from "../../lib/bots/use-new-bot";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { ConnectorUpgradeSidebarLink } from "../dashboard/connector-upgrade-badge";
 import { useOperatorIdentity } from "../../lib/session/operator-identity";
@@ -33,10 +32,13 @@ import { useWorkspaceSwitch } from "../workspace/workspace-navigation";
 import { AccountMenu } from "./account-menu";
 import { BUI_PANEL_ITEM, BuiCloseGlyph, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import { COLLAPSE_MOTION, CreateMenu, useBoardChrome } from "./board-chrome";
-import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
 import { useRosterSections } from "../dashboard/use-roster-sections";
-import { PINNED_DROP_ID, RosterDragProvider, rosterRowAttributes, useRosterDrag, type RosterDragRow, type RosterDropSlot } from "../dashboard/roster-drag";
+import { PINNED_DROP_ID, RosterDragProvider, isPinnedRow, rosterRowAttributes, useRosterDrag, useRosterDragHandles, useRosterDragPhase, type RosterDragRow, type RosterDropSlot } from "../dashboard/roster-drag";
+import { BoardPinDropZone, BoardUnpinDropZone, PinRail, PinnedTile, comparePinned } from "./board-pins";
 import { RosterInsertionLine } from "../dashboard/roster-section";
+import { BoardSectionHeader, SECTION_LABEL_DENSE } from "./board-section-header";
+
+export { SECTION_LABEL_DENSE };
 import { RosterSkeleton } from "../skeletons/frame-skeletons";
 import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
 import { rememberBootSidebarShape } from "../../lib/session/boot-shape";
@@ -103,7 +105,7 @@ export const FOOTER_BUTTON =
  * chez Grok Bot, ils quittent la liste et s'affichent en tuiles (visage
  * en grand, nom dessous, pastille au coin bas droit) centrées sous la
  * rangée du haut. Le reste se range dans les sections du roster (Fly,
- * puis « Sans section » en dernier). Tant qu'il n'y a que la section par
+ * puis « Non assignés » en dernier). Tant qu’il n’y a que la section par
  * défaut, la liste reste plate.
  *
  * À la souris, une ligne se prend et se dépose : dans une section (réordre
@@ -113,7 +115,7 @@ export const FOOTER_BUTTON =
 export function BoardSidebar({ className }: { className?: string }) {
   const { t } = useT();
   const navigate = useNavigate();
-  const { botId: routeBotId, groupId } = useParams({ strict: false }) as { botId?: string; groupId?: string };
+  const { botId: routeBotId, groupId } = useRouteBotParams();
   const mobileDrawer = useMobileDrawer();
   // Bureau : la barre de la maquette. Le tiroir mobile garde la sienne.
   const dense = !mobileDrawer;
@@ -144,13 +146,9 @@ export function BoardSidebar({ className }: { className?: string }) {
   const sectionActions = useRosterSections();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const openCreateBot = useBotDialogs((state) => state.openCreate);
-  const [creatingGroup, setCreatingGroup] = useState(false);
+  const openCreateBot = useNewBot();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
-  // Closed dialogs still run their hooks (`GroupDialog` observes the roster):
-  // they mount on first open only.
-  const creatingGroupMounted = useOpenedOnce(creatingGroup);
 
   const allBots = roster.data?.bots ?? [];
   const bots = useMemo(
@@ -173,7 +171,7 @@ export function BoardSidebar({ className }: { className?: string }) {
       (pinned ? pinnedRows : listRows).push(row);
     }
     const byActivity = (a: RosterRow, b: RosterRow) => activityOf(b).localeCompare(activityOf(a));
-    pinnedRows.sort(byActivity);
+    pinnedRows.sort(comparePinned);
     listRows.sort(byActivity);
     return { pinnedRows, listRows };
   }, [bots, groups, query]);
@@ -190,6 +188,19 @@ export function BoardSidebar({ className }: { className?: string }) {
     [sections, listRows],
   );
   const showSections = !hasQuery && !projection.flat;
+  // La liste plate (« Non assignés ») se replie aussi : dans la section lue si
+  // elle existe (état conservé), sinon le temps de la session.
+  const flatSection = projection.sections[0] ?? null;
+  const [flatLocalCollapsed, setFlatLocalCollapsed] = useState(false);
+  const flatCollapsed = flatSection ? flatSection.collapsed : flatLocalCollapsed;
+  const toggleFlat = () => {
+    if (flatSection) void sectionActions.setCollapsed(flatSection.id, !flatSection.collapsed);
+    else setFlatLocalCollapsed((value) => !value);
+  };
+  // La liste plate suit le rang manuel (`position`), celui que le glisser-
+  // déposer écrit : triée par activité, un dépôt n'aurait rien changé à
+  // l'écran. Une recherche garde l'ordre d'activité, et ne se glisse pas.
+  const flatRows = hasQuery ? listRows : projection.sections[0]?.rows ?? listRows;
 
   // The next refresh draws its loading states with this roster's shape
   // (`lib/session/boot-shape.ts`): pinned tiles, section labels and row counts.
@@ -215,7 +226,11 @@ export function BoardSidebar({ className }: { className?: string }) {
     if (!request) return;
     if (request.kind === "search") setSearchOpen(true);
     if (request.kind === "createBot") openCreateBot();
-    if (request.kind === "createGroup") setCreatingGroup(true);
+    // Le groupe se compose comme dans Grok Bot : « À : » et des pastilles (`/g/new`).
+    if (request.kind === "createGroup") {
+      void navigate({ to: "/g/new" });
+      closeDrawer();
+    }
   }, [request]);
   // La barre est montée sur tous les écrans (bureau et tiroir) : c'est elle
   // qui tient à jour la vitesse de lecture par bot pour tous les fils.
@@ -235,10 +250,23 @@ export function BoardSidebar({ className }: { className?: string }) {
 
   const onRosterDrop = useCallback((row: RosterDragRow, target: string, slot: RosterDropSlot | null) => {
     void sectionActions.dropRow(row, target, slot, (sectionId) => {
+      if (sectionId === PINNED_DROP_ID) return pinnedRows;
       if (showSections) return projection.sections.find((section) => section.id === sectionId)?.rows ?? [];
-      return listRows;
+      return flatRows;
     });
-  }, [listRows, projection.sections, sectionActions, showSections]);
+    const name = row.kind === "bot" ? row.bot.name : row.group.name;
+    if (target === PINNED_DROP_ID) return t("appSidebar.dragAnnouncePinned", { name });
+    const section = projection.sections.find((candidate) => candidate.id === target);
+    const label = !section || section.locked ? t("appSidebar.unassigned") : section.name;
+    return t(isPinnedRow(row) ? "appSidebar.dragAnnounceUnpinned" : "appSidebar.dragAnnounceMoved", { name, section: label });
+  }, [flatRows, pinnedRows, projection.sections, sectionActions, showSections, t]);
+  const editableSectionIds = useMemo(
+    () => projection.sections.filter((section) => !section.locked).map((section) => section.id),
+    [projection.sections],
+  );
+  const onSectionDrop = useCallback((sectionId: string, index: number) => {
+    void sectionActions.reorderSection(sectionId, index, editableSectionIds);
+  }, [editableSectionIds, sectionActions]);
 
   const onSearchKey = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") closeSearch();
@@ -253,7 +281,7 @@ export function BoardSidebar({ className }: { className?: string }) {
 
 
   return (
-    <RosterDragProvider enabled={!hasQuery} onDrop={onRosterDrop}>
+    <RosterDragProvider enabled={!hasQuery} onDrop={onRosterDrop} onSectionDrop={showSections ? onSectionDrop : undefined}>
     <aside
       aria-label={t("appSidebar.navigationLabel")}
       className={cn(
@@ -302,14 +330,14 @@ export function BoardSidebar({ className }: { className?: string }) {
               </button>
             ) : null}
           </label>
-          {/* Variante C : le « + » ouvre directement la création d'un bot,
+          {/* Variante C : le « + » mène à la création d'un bot (`useNewBot`),
               sans le menu bot / chat de groupe. */}
           <button
             type="button"
             aria-label={t("boardui.createBot")}
             title={t("boardui.createBot")}
             onClick={() => openCreateBot()}
-            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-button-primary text-text-white outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary hover:bg-background-tertiary-hover hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
           >
             <RiAddFill className="size-[18px]" />
           </button>
@@ -334,7 +362,7 @@ export function BoardSidebar({ className }: { className?: string }) {
                   aria-label={t("boardui.create")}
                   title={t("boardui.create")}
                   tabIndex={searchOpen ? -1 : 0}
-                  className="flex w-full min-w-0 cursor-pointer items-center justify-center rounded-full bg-button-primary text-text-white outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+                  className="flex w-full min-w-0 cursor-pointer items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary hover:bg-background-tertiary-hover hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
                 >
                   <RiAddFill className="size-5" />
                 </button>
@@ -411,6 +439,7 @@ export function BoardSidebar({ className }: { className?: string }) {
       <div className={cn("relative min-h-0 flex-1", dense ? "mt-1" : "mt-3")}>
         <nav
           aria-label={t("boardui.chatList")}
+          data-roster-scroll=""
           className={cn("bui-scroll flex h-full flex-col overflow-y-auto overscroll-contain outline-none", dense ? "gap-1" : "gap-2")}
         >
           {roster.isPending ? <RosterSkeleton label={t("common.loading")} dense={dense} /> : null}
@@ -423,19 +452,20 @@ export function BoardSidebar({ className }: { className?: string }) {
             </div>
           ) : null}
           {pinnedRows.length > 0 ? (
-            <PinRail>
-              {pinnedRows.map((row) => (
+            <PinRail
+              rows={pinnedRows}
+              renderTile={(row) => (row.kind === "bot" && renamingId === row.bot.id ? (
+                // Un épinglé se renomme dans une ligne : la tuile n'a pas la place d'un champ.
+                <li className="basis-full"><RenameRow bot={row.bot} onDone={stopRenaming} /></li>
+              ) : (
                 <PinnedTile
-                  key={row.kind === "bot" ? row.bot.id : row.group.id}
                   row={row}
                   active={row.kind === "bot" ? row.bot.id === routeBotId : row.group.id === groupId}
-                  renaming={row.kind === "bot" && renamingId === row.bot.id}
                   onRename={setRenamingId}
-                  onRenameDone={stopRenaming}
                   onNavigate={closeDrawer}
                 />
               ))}
-            </PinRail>
+            />
           ) : (
             <BoardPinDropZone />
           )}
@@ -444,6 +474,8 @@ export function BoardSidebar({ className }: { className?: string }) {
               <BoardSectionBlock
                 key={section.id}
                 section={section}
+                editableIndex={section.locked ? null : editableSectionIds.indexOf(section.id)}
+                editableCount={editableSectionIds.length}
                 label={section.locked ? t("appSidebar.unassigned") : section.name}
                 onToggle={() => { void sectionActions.setCollapsed(section.id, !section.collapsed); }}
                 routeBotId={routeBotId}
@@ -462,21 +494,38 @@ export function BoardSidebar({ className }: { className?: string }) {
                 className={cn("flex flex-col", dense ? "gap-0.5" : "gap-2")}
               >
                 {/* Bureau : la liste plate garde son intitulé, comme « Fils »
-                    dans la maquette, sous les liens de navigation. */}
-                {dense && !hasQuery && listRows.length > 0 ? (
-                  <p className={SECTION_LABEL_DENSE}>{t("appSidebar.conversationsGroup")}</p>
+                    dans la maquette, sous les liens de navigation : ce sont
+                    les fils rangés dans aucune section. */}
+                {dense && !hasQuery && flatRows.length > 0 ? (
+                  <BoardSectionHeader
+                    label={t("appSidebar.unassigned")}
+                    collapsed={flatCollapsed}
+                    count={flatRows.length}
+                    onToggle={toggleFlat}
+                    dense
+                  />
                 ) : null}
-                {listRows.map((row) => renderChatRow(row, {
-                  routeBotId,
-                  groupId,
-                  operator,
-                  renamingId,
-                  onRename: setRenamingId,
-                  onRenameDone: stopRenaming,
-                  onNavigate: closeDrawer,
-                  dense,
-                }))}
-                {listRows.length === 0 && projection.defaultSectionId
+                {flatRows.length > 0 && !(flatCollapsed && dense && !hasQuery) ? (
+                  <div className="bui-section-open">
+                    <RosterRowList
+                      // Sans section lue, pas de créneau : un dépôt n'aurait
+                      // aucune section à écrire.
+                      sectionId={hasQuery ? null : projection.defaultSectionId}
+                      rows={flatRows}
+                      ctx={{
+                        routeBotId,
+                        groupId,
+                        operator,
+                        renamingId,
+                        onRename: setRenamingId,
+                        onRenameDone: stopRenaming,
+                        onNavigate: closeDrawer,
+                        dense,
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {flatRows.length === 0 && projection.defaultSectionId
                   ? <BoardUnpinDropZone sectionId={projection.defaultSectionId} />
                   : null}
               </div>
@@ -499,7 +548,6 @@ export function BoardSidebar({ className }: { className?: string }) {
       </footer>
       </div>
 
-      {creatingGroupMounted ? <GroupDialog open={creatingGroup} onClose={() => setCreatingGroup(false)} /> : null}
     </aside>
     </RosterDragProvider>
   );
@@ -609,7 +657,9 @@ function renderChatRow(row: RosterRow, ctx: ChatRowContext) {
         onRename={ctx.onRename}
         onRenameDone={ctx.onRenameDone}
         onNavigate={ctx.onNavigate}
-        slot={ctx.slot}
+        slotSection={ctx.slot?.sectionId}
+        slotIndex={ctx.slot?.index}
+        slotQuiet={ctx.slot?.quiet}
         dense={ctx.dense}
       />
     );
@@ -621,78 +671,47 @@ function renderChatRow(row: RosterRow, ctx: ChatRowContext) {
       active={row.group.id === ctx.groupId}
       operator={ctx.operator}
       onNavigate={ctx.onNavigate}
-      slot={ctx.slot}
+      slotSection={ctx.slot?.sectionId}
+      slotIndex={ctx.slot?.index}
+      slotQuiet={ctx.slot?.quiet}
       dense={ctx.dense}
     />
   );
 }
 
 /**
- * La zone « Désépingler », visible seulement pendant le drag d'un épinglé quand
- * la liste plate est vide : sans elle, la liste (seule cible, 0 px de haut)
- * n'offrait aucun endroit où lâcher la tuile pour la remettre dans la liste.
+ * Les lignes d'une section, chacune un créneau de dépôt (`data-roster-index`),
+ * plus le trait de fin : la même liste sous un en-tête de section et dans la
+ * liste plate. `sectionId === null` (recherche) : des lignes sans créneau.
  */
-function BoardUnpinDropZone({ sectionId }: { sectionId: string }) {
-  const { t } = useT();
+function RosterRowList({ sectionId, rows, ctx }: {
+  sectionId: string | null;
+  rows: ReadonlyArray<RosterRow>;
+  ctx: Omit<ChatRowContext, "slot">;
+}) {
   const { dragging } = useRosterDrag();
-  const pinnedDrag = dragging
-    ? (dragging.row.kind === "bot" ? dragging.row.bot.pinned : dragging.row.group.pinned === true)
-    : false;
-  if (!dragging || !pinnedDrag) return null;
-  const over = dragging.over === sectionId;
+  const draggedIndex = dragging && sectionId !== null
+    ? rows.findIndex((row) => row.kind === dragging.row.kind && (row.kind === "bot" ? row.bot.id : row.group.id) === (dragging.row.kind === "bot" ? dragging.row.bot.id : dragging.row.group.id))
+    : -1;
+  const pinnedDrag = dragging ? isPinnedRow(dragging.row) : false;
+  // Reposer la ligne à sa place ne déplace rien : ses deux traits se taisent.
+  const quietAt = (index: number) => !pinnedDrag && draggedIndex !== -1 && (index === draggedIndex || index === draggedIndex + 1);
   return (
-    <div
-      data-drop-section={sectionId}
-      className={cn(
-        "flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border-button-white px-3 text-center text-body-2-medium text-text-tertiary",
-        over && "border-text-secondary bg-background-tertiary-hover text-text-primary",
-      )}
-    >
-      {t("appSidebar.dropToUnpin")}
+    <div className={cn("flex flex-col", ctx.dense ? "gap-0.5" : "gap-2")}>
+      {rows.map((row, index) => renderChatRow(row, sectionId === null ? ctx : { ...ctx, slot: { sectionId, index, quiet: quietAt(index) } }))}
+      {sectionId !== null ? (
+        <div aria-hidden className="relative h-0">
+          <RosterInsertionLine sectionId={sectionId} index={rows.length} quiet={quietAt(rows.length)} />
+        </div>
+      ) : null}
     </div>
-  );
-}
-
-/** La zone « Épingler », visible seulement pendant un drag, quand le rail est vide. */
-function BoardPinDropZone() {
-  const { t } = useT();
-  const { dragging } = useRosterDrag();
-  if (!dragging) return null;
-  const over = dragging.over === PINNED_DROP_ID;
-  return (
-    <div
-      data-drop-section={PINNED_DROP_ID}
-      className={cn(
-        "flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border-button-white px-3 text-center text-body-2-medium text-text-tertiary",
-        over && "border-text-secondary bg-background-tertiary-hover text-text-primary",
-      )}
-    >
-      {t("appSidebar.dropToPin")}
-    </div>
-  );
-}
-
-/** Le rail d'épingles est lui-même la cible quand il est peuplé. */
-function PinRail({ children }: { children: React.ReactNode }) {
-  const { t } = useT();
-  const { dragging } = useRosterDrag();
-  const over = dragging?.over === PINNED_DROP_ID;
-  return (
-    <ul
-      aria-label={t("appSidebar.pinnedGroup")}
-      data-drop-section={PINNED_DROP_ID}
-      className={cn(
-        "flex shrink-0 flex-wrap justify-center gap-x-3 gap-y-3 rounded-xl px-1 pt-2 pb-3",
-        over && "bg-background-tertiary-hover",
-      )}
-    >
-      {children}
-    </ul>
   );
 }
 
 function BoardSectionBlock({
   section,
+  editableIndex,
+  editableCount,
   label,
   onToggle,
   routeBotId,
@@ -705,6 +724,9 @@ function BoardSectionBlock({
   dense = false,
 }: {
   section: RosterSectionProjection<RosterRow>;
+  /** Son rang parmi les sections qu'on peut glisser ; `null` pour « Non assigné ». */
+  editableIndex: number | null;
+  editableCount: number;
   label: string;
   onToggle: () => void;
   routeBotId: string | undefined;
@@ -717,91 +739,43 @@ function BoardSectionBlock({
   dense?: boolean;
 }) {
   const { t } = useT();
-  const { dragging } = useRosterDrag();
+  const { dragging, sectionDrag, sectionPointerDownFor } = useRosterDrag();
   const over = dragging?.over === section.id;
-  const draggedId = dragging
-    ? (dragging.row.kind === "bot" ? dragging.row.bot.id : dragging.row.group.id)
-    : null;
-  const draggedIndex = draggedId === null
-    ? -1
-    : section.rows.findIndex((row) => (row.kind === "bot" ? row.bot.id : row.group.id) === draggedId && row.kind === dragging?.row.kind);
-  const pinnedDrag = dragging
-    ? (dragging.row.kind === "bot" ? dragging.row.bot.pinned : dragging.row.group.pinned === true)
-    : false;
-  const quietAt = (index: number) => !pinnedDrag && draggedIndex !== -1 && (index === draggedIndex || index === draggedIndex + 1);
+  // Le trait de dépôt d'une section glissée (`drop-line` de Grok) : avant
+  // cette section, ou après elle si c'est la dernière éditable. Muet sur
+  // la place actuelle de la section portée.
+  const sectionLineAt = (index: number) => sectionDrag !== null && sectionDrag.index === index
+    && index !== sectionDrag.from && index !== sectionDrag.from + 1;
+  const lineBefore = editableIndex !== null && sectionLineAt(editableIndex);
+  const lineAfter = editableIndex !== null && editableIndex === editableCount - 1 && sectionLineAt(editableCount);
   const ctx = { routeBotId, groupId, operator, renamingId, onRename, onRenameDone, onNavigate, dense };
   return (
-    <div data-drop-section={section.id} className={cn("flex flex-col rounded-xl", dense ? "gap-0.5" : "gap-1", over && "bg-background-tertiary-default")}>
-      <BoardSectionHeader label={label} collapsed={section.collapsed} count={section.rows.length} onToggle={onToggle} dense={dense} />
+    <div
+      data-drop-section={section.id}
+      data-section-block={editableIndex === null ? undefined : ""}
+      className={cn(
+        "relative flex flex-col rounded-xl transition-colors duration-150",
+        dense ? "gap-0.5" : "gap-1",
+        over && "bg-background-tertiary-default",
+        sectionDrag?.sectionId === section.id && "opacity-40",
+      )}
+    >
+      {lineBefore ? <span aria-hidden className="pointer-events-none absolute inset-x-2 -top-[3px] z-10 h-0.5 rounded-full bg-primary" /> : null}
+      {lineAfter ? <span aria-hidden className="pointer-events-none absolute inset-x-2 -bottom-[3px] z-10 h-0.5 rounded-full bg-primary" /> : null}
+      <BoardSectionHeader
+        label={label}
+        collapsed={section.collapsed}
+        count={section.rows.length}
+        onToggle={onToggle}
+        onPointerDown={editableIndex === null ? undefined : sectionPointerDownFor?.({ id: section.id, label, from: editableIndex })}
+        dense={dense}
+      />
       {section.collapsed ? null : section.rows.length === 0 ? (
         <p className={cn(dense ? "px-2.5 py-1.5 text-[12px] text-text-tertiary" : "px-2 py-2 text-body-2-medium text-text-tertiary", dragging && "min-h-12")}>{t("appSidebar.emptySection")}</p>
       ) : (
-        <div className={cn("flex flex-col", dense ? "gap-0.5" : "gap-2")}>
-          {section.rows.map((row, index) => renderChatRow(row, { ...ctx, slot: { sectionId: section.id, index, quiet: quietAt(index) } }))}
-          <div aria-hidden className="relative h-0">
-            <RosterInsertionLine sectionId={section.id} index={section.rows.length} quiet={quietAt(section.rows.length)} />
-          </div>
-        </div>
+        <div className="bui-section-open"><RosterRowList sectionId={section.id} rows={section.rows} ctx={ctx} /></div>
       )}
     </div>
-  );
-}
-
-/**
- * L'intitulé d'une liste au bureau, l'en-tête de section de Grok Bot
- * (`sectionHeader`) : 30 px, marges 8 / 8 / 6, texte 13/18 gris, graisse
- * normale, aligné sur le texte des lignes (8 px).
- */
-export const SECTION_LABEL_DENSE = "flex h-[30px] shrink-0 items-center px-2 pt-2 pb-1.5 text-[13px] leading-[18px] font-normal text-text-section-label";
-
-/** En-tête de dossier : clic pour replier. Le hover souris est le même cran que les tuiles. */
-function BoardSectionHeader({
-  label,
-  collapsed,
-  count,
-  onToggle,
-  dense = false,
-}: {
-  label: string;
-  collapsed: boolean;
-  count: number;
-  onToggle: () => void;
-  dense?: boolean;
-}) {
-  if (dense) {
-    // Bureau : l'intitulé de la maquette, toujours repliable. Le chevron suit
-    // le nom au lieu de le précéder, pour que le nom reste aligné sur les
-    // lignes ; il ne paraît qu'au survol, au focus ou replié.
-    return (
-      <button
-        type="button"
-        aria-expanded={!collapsed}
-        onClick={onToggle}
-        className={cn(SECTION_LABEL_DENSE, "group w-full min-w-0 cursor-pointer gap-0.5 rounded-lg outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring")}
-      >
-        <span className="min-w-0 truncate text-left">{label}</span>
-        <RiArrowRightSLine
-          aria-hidden
-          className={cn(
-            "size-3.5 shrink-0 transition-[transform,opacity]",
-            collapsed ? "opacity-100" : "rotate-90 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
-          )}
-        />
-        {collapsed ? <span className="ms-auto tabular-nums">{count}</span> : null}
-      </button>
-    );
-  }
-  return (
-    <button
-      type="button"
-      aria-expanded={!collapsed}
-      onClick={onToggle}
-      className="flex h-8 w-full min-w-0 cursor-pointer items-center gap-1 rounded-xl px-2 text-body-2-medium text-text-tertiary outline-none hover:bg-background-tertiary-hover hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
-    >
-      <RiArrowRightSLine className={cn("size-4 shrink-0 transition-transform", !collapsed && "rotate-90")} />
-      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-      {collapsed ? <span className="tabular-nums">{count}</span> : null}
-    </button>
   );
 }
 
@@ -820,120 +794,6 @@ function rowSurface(dense: boolean, active: boolean): string {
   if (dense) return active ? "bg-board-row-active" : "hover:bg-board-row-hover";
   return active ? "bg-background-tertiary-default" : "hover:bg-background-secondary-hover";
 }
-
-const PIN_TILE =
-  "flex w-full flex-col items-center gap-1.5 rounded-2xl px-1 py-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring";
-
-/**
- * Pastille d'état sur le coin bas droit du visage, comme le rail d'épingles
- * de Grok Bot : le point bleu (non lu) mord le bord de la forme.
- */
-function PinStatus({ running, unread, awaiting }: { running?: boolean; unread?: boolean; awaiting?: boolean }) {
-  const { t } = useT();
-  if (!running && !unread && !awaiting) return null;
-  return (
-    <span className="absolute -right-0.5 -bottom-0.5 flex">
-      {running ? (
-        <span role="status" aria-label={t("appSidebar.running")} className="bui-breathing-dot size-2.5 rounded-full bg-accent-500 ring-2 ring-background-secondary-default" />
-      ) : unread ? (
-        <span role="status" aria-label={t("appSidebar.unread")} className="size-2.5 rounded-full bg-accent-500 ring-2 ring-background-secondary-default" />
-      ) : null}
-      {awaiting ? (
-        <span role="status" aria-label={t("appSidebar.awaitingApproval")} className="size-2.5 rounded-full bg-warn-700 ring-2 ring-background-secondary-default" />
-      ) : null}
-    </span>
-  );
-}
-
-/**
- * Un épinglé : visage en grand, nom dessous, plus de ligne dans la liste.
- * Le menu contextuel est celui de la ligne (désépingler compris).
- */
-const PinnedTile = memo(function PinnedTile({
-  row,
-  active,
-  renaming,
-  onRename,
-  onRenameDone,
-  onNavigate,
-}: {
-  row: RosterRow;
-  active: boolean;
-  renaming: boolean;
-  onRename: (botId: string) => void;
-  onRenameDone: () => void;
-  onNavigate: () => void;
-}) {
-  const { dragging, pointerDownFor } = useRosterDrag();
-  if (row.kind === "bot" && renaming) {
-    // Un épinglé se renomme dans la ligne de la liste du tiroir : la tuile n'a
-    // pas la place d'un champ.
-    return (
-      <li className="basis-full">
-        <RenameRow bot={row.bot} onDone={onRenameDone} />
-      </li>
-    );
-  }
-  const lifted = dragging !== null && dragging.row.kind === row.kind
-    && (dragging.row.kind === "bot" ? dragging.row.bot.id : dragging.row.group.id) === (row.kind === "bot" ? row.bot.id : row.group.id);
-  const className = cn(
-    PIN_TILE,
-    active && "bg-background-tertiary-default",
-    "hover:bg-background-tertiary-hover",
-    lifted && "opacity-40",
-  );
-  const onPointerDown = pointerDownFor?.(row);
-  if (row.kind === "bot") {
-    const bot = row.bot;
-    return (
-      <li className="w-[7.25rem]">
-        <BotContextMenu bot={bot} onRename={() => onRename(bot.id)}>
-          <Link
-            to="/bot/$botId"
-            params={{ botId: bot.id }}
-            draggable={false}
-            title={bot.name}
-            aria-current={active ? "page" : undefined}
-            aria-haspopup="menu"
-            onPointerDown={onPointerDown}
-            onClick={onNavigate}
-            className={className}
-          >
-            <span className="relative">
-              <BotFace name={bot.name} seed={bot.id} face={bot.face} className="size-16" />
-              <PinStatus running={bot.running} unread={bot.unread} awaiting={bot.awaitingApproval} />
-            </span>
-            <span className="w-full truncate text-body-2-medium text-text-primary">{bot.name}</span>
-          </Link>
-        </BotContextMenu>
-      </li>
-    );
-  }
-  const group = row.group;
-  return (
-    <li className="w-[7.25rem]">
-      <GroupContextMenu group={group}>
-        <Link
-          to="/g/$groupId"
-          params={{ groupId: group.id }}
-          draggable={false}
-          title={group.name}
-          aria-current={active ? "page" : undefined}
-          aria-haspopup="menu"
-          onPointerDown={onPointerDown}
-          onClick={onNavigate}
-          className={className}
-        >
-          <span className="relative">
-            <GroupFaceStack members={group.members} size="size-8" className="size-16 justify-center" />
-            <PinStatus running={group.running} unread={group.unread} awaiting={group.awaitingApproval || group.needsYou} />
-          </span>
-          <span className="w-full truncate text-body-2-medium text-text-primary">{group.name}</span>
-        </Link>
-      </GroupContextMenu>
-    </li>
-  );
-});
 
 /**
  * Bureau : la colonne droite d'une ligne, l'heure de la dernière activité en
@@ -976,7 +836,9 @@ const BotListRow = memo(function BotListRow({
   onRename,
   onRenameDone,
   onNavigate,
-  slot,
+  slotSection,
+  slotIndex,
+  slotQuiet,
   dense = false,
 }: {
   bot: BotDto;
@@ -986,20 +848,23 @@ const BotListRow = memo(function BotListRow({
   onRename: (botId: string) => void;
   onRenameDone: () => void;
   onNavigate: () => void;
-  slot?: ChatRowSlot;
+  /** Le créneau de la ligne dans sa section, en primitives : le `memo` tient pendant un glisser. */
+  slotSection?: string;
+  slotIndex?: number;
+  slotQuiet?: boolean;
   dense?: boolean;
 }) {
   const { t } = useT();
-  const { pointerDownFor } = useRosterDrag();
-  const preview = bot.running
-    ? t("boardui.thinkingTogether")
-    : bot.preview
-      ? stripHandlePrefix(bot.preview, operator)
-      : t("appSidebar.noPreview");
+  const { pointerDownFor } = useRosterDragHandles();
+  const phase = useRosterDragPhase(`bot:${bot.id}`);
+  const preview = bot.profileProvisionStatus === "preparing" ? t("botProfileProvision.preparingShort")
+    : bot.running ? t("boardui.thinkingTogether")
+    : bot.preview ? stripHandlePrefix(bot.preview, operator) : t("appSidebar.noPreview");
+  const justCreated = useJustCreatedBot(bot.id);
   if (renaming) return <RenameRow bot={bot} onDone={onRenameDone} dense={dense} />;
   return (
-    <div className="relative" {...(slot ? rosterRowAttributes(slot.sectionId, slot.index) : {})}>
-      {slot ? <RosterInsertionLine sectionId={slot.sectionId} index={slot.index} quiet={slot.quiet} /> : null}
+    <div className={cn("relative", justCreated && "bui-row-enter")} {...(slotSection !== undefined && slotIndex !== undefined ? rosterRowAttributes(slotSection, slotIndex) : {})}>
+      {slotSection !== undefined && slotIndex !== undefined ? <RosterInsertionLine sectionId={slotSection} index={slotIndex} quiet={slotQuiet} /> : null}
     <BotContextMenu bot={bot} onRename={() => onRename(bot.id)}>
       <Link
         to="/bot/$botId"
@@ -1009,7 +874,7 @@ const BotListRow = memo(function BotListRow({
         aria-haspopup="menu"
         onPointerDown={pointerDownFor?.({ kind: "bot", bot })}
         onClick={onNavigate}
-        className={cn(dense ? ROW_DENSE : ROW_CLASS, rowSurface(dense, active))}
+        className={cn(dense ? ROW_DENSE : ROW_CLASS, rowSurface(dense, active), phase === "lifted" && "opacity-40", phase === "landing" && "opacity-0")}
       >
         <BotFace name={bot.name} seed={bot.id} face={bot.face} className={dense ? "size-9" : "size-10"} />
         {dense ? (
@@ -1037,26 +902,32 @@ const GroupListRow = memo(function GroupListRow({
   active,
   operator,
   onNavigate,
-  slot,
+  slotSection,
+  slotIndex,
+  slotQuiet,
   dense = false,
 }: {
   group: GroupDto;
   active: boolean;
   operator: OperatorProfileDto | null;
   onNavigate: () => void;
-  slot?: ChatRowSlot;
+  /** Le créneau de la ligne dans sa section, en primitives : le `memo` tient pendant un glisser. */
+  slotSection?: string;
+  slotIndex?: number;
+  slotQuiet?: boolean;
   dense?: boolean;
 }) {
   const { t } = useT();
-  const { pointerDownFor } = useRosterDrag();
+  const { pointerDownFor } = useRosterDragHandles();
+  const phase = useRosterDragPhase(`group:${group.id}`);
   const preview = group.running
     ? t("boardui.thinkingTogether")
     : group.preview
       ? stripHandlePrefix(group.preview, operator)
       : t("appSidebar.noPreview");
   return (
-    <div className="relative" {...(slot ? rosterRowAttributes(slot.sectionId, slot.index) : {})}>
-      {slot ? <RosterInsertionLine sectionId={slot.sectionId} index={slot.index} quiet={slot.quiet} /> : null}
+    <div className="relative" {...(slotSection !== undefined && slotIndex !== undefined ? rosterRowAttributes(slotSection, slotIndex) : {})}>
+      {slotSection !== undefined && slotIndex !== undefined ? <RosterInsertionLine sectionId={slotSection} index={slotIndex} quiet={slotQuiet} /> : null}
     <GroupContextMenu group={group}>
       <Link
         to="/g/$groupId"
@@ -1066,7 +937,7 @@ const GroupListRow = memo(function GroupListRow({
         aria-haspopup="menu"
         onPointerDown={pointerDownFor?.({ kind: "group", group })}
         onClick={onNavigate}
-        className={cn(dense ? ROW_DENSE : ROW_CLASS, rowSurface(dense, active))}
+        className={cn(dense ? ROW_DENSE : ROW_CLASS, rowSurface(dense, active), phase === "lifted" && "opacity-40", phase === "landing" && "opacity-0")}
       >
         {dense ? (
           <>

@@ -76,17 +76,17 @@ describe("usageByModel", () => {
   test("coerce les bigint et mappe le modèle vide vers null", async () => {
     const lastAt = new Date("2026-08-31T12:00:00.000Z");
     const rows = [
-      { model: "gpt-5.6-luna", runs: "12", tokens: "48000", lastAt },
-      { model: "", runs: "3", tokens: "0", lastAt },
-      { model: null, runs: 1, tokens: null, lastAt: "2026-08-20T10:00:00.000Z" },
+      { model: "gpt-5.6-luna", runs: "12", inputTokens: "40000", outputTokens: "8000", tokens: "48000", lastAt },
+      { model: "", runs: "3", inputTokens: "0", outputTokens: "0", tokens: "0", lastAt },
+      { model: null, runs: 1, inputTokens: null, outputTokens: null, tokens: null, lastAt: "2026-08-20T10:00:00.000Z" },
     ];
     const usage = await usageByModel(fakeTx(rows, [], []), "org-1");
     expect(usage).toEqual({
       windowDays: 90,
       models: [
-        { model: "gpt-5.6-luna", runs: 12, tokens: 48000, lastAt: "2026-08-31T12:00:00.000Z" },
-        { model: null, runs: 3, tokens: 0, lastAt: "2026-08-31T12:00:00.000Z" },
-        { model: null, runs: 1, tokens: 0, lastAt: "2026-08-20T10:00:00.000Z" },
+        { model: "gpt-5.6-luna", runs: 12, inputTokens: 40000, outputTokens: 8000, tokens: 48000, lastAt: "2026-08-31T12:00:00.000Z" },
+        { model: null, runs: 3, inputTokens: 0, outputTokens: 0, tokens: 0, lastAt: "2026-08-31T12:00:00.000Z" },
+        { model: null, runs: 1, inputTokens: 0, outputTokens: 0, tokens: 0, lastAt: "2026-08-20T10:00:00.000Z" },
       ],
     });
   });
@@ -229,6 +229,27 @@ describe("GET /usage/bots", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: { code: "ROLE_REQUIRED" } });
     expect(statements).toEqual([]);
+  });
+});
+
+describe("GET /usage/models", () => {
+  test("sans `days`, garde la fenêtre historique de 90 jours", async () => {
+    const { app } = mountUsageBots("owner");
+    const response = await app.request("/usage/models");
+    expect(response.status).toBe(200);
+    expect((await response.json()).windowDays).toBe(90);
+  });
+
+  test("prend une fenêtre de 1 à 90 jours et refuse le reste sans ouvrir de transaction", async () => {
+    const { app } = mountUsageBots("owner");
+    expect((await (await app.request("/usage/models?days=1")).json()).windowDays).toBe(1);
+    for (const days of ["0", "91", "abc", "1.5", ""]) {
+      const refused = mountUsageBots("owner");
+      const response = await refused.app.request(`/usage/models?days=${days}`);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: { code: "USAGE_DAYS_INVALID" } });
+      expect(refused.statements).toEqual([]);
+    }
   });
 });
 

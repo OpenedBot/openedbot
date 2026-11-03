@@ -14,7 +14,7 @@ import {
   type RefObject,
   type SyntheticEvent,
 } from "react";
-import { Reply, Square, X } from "lucide-react";
+import { Square } from "lucide-react";
 import {
   RiAddFill,
   RiApps2AddLine,
@@ -48,6 +48,7 @@ import {
   shouldSendComposerOnPointerDown,
   shouldSubmitComposerOnEnter,
 } from "../lib/composer/composer-keyboard";
+import { ComposerReplyTab } from "./composer-reply-tab";
 import { nextComposerExpanded } from "../lib/composer/composer-pill";
 import { animateComposerExpand } from "../lib/thread/thread-motion";
 import { focusComposerField } from "../lib/composer/composer-desktop-focus";
@@ -84,7 +85,6 @@ import { draftAttachmentCanvasItem, useAttachmentCanvas } from "./attachment-can
 import { haptics } from "../lib/platform/haptics";
 import { useT } from "../lib/i18n";
 import { BUTTON } from "./settings/primitives";
-import { ComposerLoader } from "./composer-loader";
 
 /**
  * Le composer en pilule.
@@ -744,6 +744,7 @@ export function Composer({
             {notice}
           </div>
         ) : null}
+        {replyPreview ? <ComposerReplyTab preview={replyPreview} onCancel={onCancelReply} /> : null}
         <div
           ref={shell}
           data-composer-shell=""
@@ -764,8 +765,8 @@ export function Composer({
             void addFiles([...event.dataTransfer.files]);
           }}
           className={cn(
-            // Mesuré sur streaming-ui.pulseview.app (composer Mention,
-            // `ComposerLoader`) : carte blanche, rayon 22, liseré 1 px
+            // Mesuré sur streaming-ui.pulseview.app (composer Mention) :
+            // carte blanche, rayon 22, liseré 1 px
             // (#ebebeb), `shadow-xs`, rembourrage 8 (7 au bureau : la pilule de
             // Grok Bot fait 44 px, actions de 28 px comprises). Au focus-within le
             // liseré prend la bordure de survol et l'ombre passe à `shadow-sm`,
@@ -785,34 +786,6 @@ export function Composer({
             dragDepth > 0 && "bg-primary/10",
           )}
         >
-          <ComposerLoader active={running} />
-          {replyPreview ? (
-            <div
-              data-composer-reply=""
-              className="flex min-w-0 items-center gap-2 px-2 pt-1"
-            >
-              <Reply className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <p
-                className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
-                title={replyPreview.text}
-              >
-                <span className="sr-only">{t("composer.replyingTo", { name: replyPreview.author })} </span>
-                {replyPreview.text || "…"}
-              </p>
-              {onCancelReply ? (
-                <button
-                  type="button"
-                  onPointerDown={keepSoftKeyboard}
-                  onClick={onCancelReply}
-                  aria-label={t("composer.cancelReply")}
-                  title={t("composer.cancelReply")}
-                  className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <X className="size-3.5" aria-hidden />
-                </button>
-              ) : null}
-            </div>
-          ) : null}
           {goal ? (
             <div data-composer-goal="" className="flex min-w-0 items-center gap-2 px-1.5 pt-1">
               <RiFocus3Line className="size-4 shrink-0 text-foreground-icon-secondary" aria-hidden />

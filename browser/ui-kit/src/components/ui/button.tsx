@@ -7,24 +7,33 @@ import { Slot } from "radix-ui"
 import { cn } from "../../lib/utils"
 
 /**
- * BoardUI Button : matches https://www.boardui.com/components/button
+ * Le bouton de Grok Bot (`sand-kit-button`) : une pilule, un ton par nature
+ * de geste, sans dégradé ni ombre.
  *
- * Variants: primary | secondary | ghost | soft | danger
- * Sizes:    md (36px) | sm (32px) | xs (24px)
- * Icons:    leadingIcon / trailingIcon (component refs), iconOnly for square hits
- *
- * Un écart assumé avec BoardUI : `ghost` suit la sémantique de shadcn
- * (transparent au repos), et l'aplat teinté de BoardUI s'appelle `soft`. Voir
- * le commentaire sur la variante.
+ * Variantes : primary (neutre plein : noir en clair, blanc en sombre, le
+ * geste principal) | secondary (voile neutre) | ghost (transparent, voile au
+ * survol) | accent (bleu plein) | soft (voile bleu) | danger (rouge plein) |
+ * danger-soft (voile rouge). Les alias shadcn (`default`, `outline`,
+ * `destructive`) suivent.
+ * Tailles : md (32 px) | sm (28 px) | xs (24 px) | lg (36 px).
  */
 
 type IconComponent = React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
 
+const NEUTRAL =
+  "bg-[var(--btn-neutral)] text-[var(--btn-neutral-fg)] hover:bg-[var(--btn-neutral-hover)] aria-expanded:bg-[var(--btn-neutral-hover)] disabled:bg-[var(--btn-neutral-disabled)] disabled:text-foreground/30 aria-disabled:bg-[var(--btn-neutral-disabled)] aria-disabled:text-foreground/30"
+const VEIL =
+  "bg-[var(--btn-veil)] text-foreground hover:bg-[var(--btn-veil-hover)] aria-expanded:bg-[var(--btn-veil-hover)] disabled:bg-[var(--btn-veil)] disabled:text-foreground/30 aria-disabled:text-foreground/30"
+const CLEAR =
+  "bg-transparent text-foreground hover:bg-[var(--btn-veil)] aria-expanded:bg-[var(--btn-veil)] disabled:bg-transparent disabled:text-foreground/30 aria-disabled:text-foreground/30"
+const DANGER =
+  "bg-[var(--btn-danger)] text-white hover:bg-[var(--btn-danger-hover)] disabled:opacity-40 aria-disabled:opacity-40"
+
 const buttonVariants = cva(
   [
-    "inline-flex items-center justify-center gap-0.5 overflow-hidden whitespace-nowrap",
-    "font-sans text-sm font-medium select-none cursor-pointer",
-    "transition-[background-color,background-image,border-color,box-shadow,color] duration-150 ease-out",
+    "inline-flex items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-full",
+    "font-sans font-medium select-none cursor-pointer",
+    "transition-[background-color,color] duration-[120ms] ease-out",
     "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "disabled:cursor-not-allowed aria-disabled:cursor-not-allowed",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -32,50 +41,33 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary:
-          "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-primary-hover)] active:bg-[image:var(--gradient-primary-active)] disabled:bg-[image:var(--gradient-primary-disabled)] disabled:text-muted-foreground disabled:shadow-none aria-disabled:bg-[image:var(--gradient-primary-disabled)] aria-disabled:text-muted-foreground aria-disabled:shadow-none",
-        secondary:
-          "border border-input bg-card text-foreground shadow-[var(--shadow-xs)] hover:bg-surface-hover hover:border-border active:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none aria-disabled:bg-muted aria-disabled:text-muted-foreground aria-disabled:shadow-none",
-        /**
-         * `ghost` au sens de shadcn : transparent au repos, fond NEUTRE au
-         * survol.
-         *
-         * BoardUI appelle « ghost » autre chose : un aplat teinté de la couleur
-         * de marque, au repos (`--button-ghost` = `--accent-100`, texte en
-         * `--accent-700`). Fidèle à leur catalogue, mais faux pour ce à quoi
-         * cette variante sert ici : les cinq appels sont des affordances de
-         * faible emphase : replier la barre, fermer un panneau, trier une
-         * colonne, relancer un tirage, ajouter un bot. Peintes en bleu plein,
-         * elles criaient plus fort que le contenu qu'elles servent.
-         *
-         * L'aplat teinté n'est pas perdu : il vit sous `soft`, avec ses tokens.
-         */
-        ghost:
-          "bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent disabled:bg-transparent disabled:text-muted-foreground aria-disabled:bg-transparent aria-disabled:text-muted-foreground",
+        primary: NEUTRAL,
+        secondary: VEIL,
+        ghost: CLEAR,
+        accent:
+          "bg-[var(--btn-accent)] text-white hover:bg-[var(--btn-accent-hover)] disabled:opacity-40 aria-disabled:opacity-40",
         soft:
-          "bg-[var(--button-ghost)] text-[var(--button-ghost-fg)] hover:bg-[var(--button-ghost-hover)] active:bg-[var(--button-ghost-active)] disabled:bg-[var(--button-ghost-disabled)] disabled:text-[var(--button-ghost-disabled-fg)] disabled:shadow-none aria-disabled:bg-[var(--button-ghost-disabled)] aria-disabled:text-[var(--button-ghost-disabled-fg)]",
-        danger:
-          "bg-[image:var(--gradient-danger)] text-white shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-danger-hover)] active:bg-[image:var(--gradient-danger-active)] disabled:bg-[image:var(--gradient-danger-disabled)] disabled:text-neg-700 disabled:shadow-none aria-disabled:bg-[image:var(--gradient-danger-disabled)] aria-disabled:text-neg-700 aria-disabled:shadow-none",
+          "bg-[var(--btn-accent)]/10 text-[var(--btn-accent)] hover:bg-[var(--btn-accent)]/15 disabled:opacity-40 aria-disabled:opacity-40",
+        danger: DANGER,
+        "danger-soft":
+          "bg-[var(--btn-danger-veil)] text-[var(--btn-danger-fg)] hover:bg-[var(--btn-danger-veil-hover)] disabled:opacity-40 aria-disabled:opacity-40",
         /* shadcn aliases */
-        default:
-          "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-primary-hover)] active:bg-[image:var(--gradient-primary-active)] disabled:bg-[image:var(--gradient-primary-disabled)] disabled:text-muted-foreground disabled:shadow-none",
-        outline:
-          "border border-input bg-card text-foreground shadow-[var(--shadow-xs)] hover:bg-surface-hover hover:border-border active:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none",
-        destructive:
-          "bg-[image:var(--gradient-danger)] text-white shadow-[var(--shadow-xs)] hover:bg-[image:var(--gradient-danger-hover)] active:bg-[image:var(--gradient-danger-active)] disabled:bg-[image:var(--gradient-danger-disabled)] disabled:text-neg-700 disabled:shadow-none",
-        link: "text-primary underline-offset-4 hover:underline shadow-none",
+        default: NEUTRAL,
+        outline: VEIL,
+        destructive: DANGER,
+        link: "rounded-none bg-transparent text-primary underline-offset-4 hover:underline",
       },
       size: {
-        md: "h-9 rounded-[10px] p-2",
-        sm: "h-8 rounded-lg px-2 py-1.5",
-        xs: "h-6 rounded-sm px-2 text-xs font-semibold",
+        md: "h-8 px-3 text-sm",
+        sm: "h-7 px-2.5 text-[13px]",
+        xs: "h-6 px-2 text-xs",
+        lg: "h-9 px-4 text-sm",
         /* shadcn aliases */
-        default: "h-9 rounded-[10px] p-2",
-        lg: "h-9 rounded-[10px] p-2",
-        icon: "size-9 rounded-[10px] p-0",
-        "icon-sm": "size-8 rounded-lg p-0",
-        "icon-xs": "size-6 rounded-sm p-0",
-        "icon-lg": "size-9 rounded-[10px] p-0",
+        default: "h-8 px-3 text-sm",
+        icon: "size-8 p-0",
+        "icon-sm": "size-7 p-0",
+        "icon-xs": "size-6 p-0",
+        "icon-lg": "size-9 p-0",
       },
       iconOnly: {
         true: "",
@@ -83,10 +75,10 @@ const buttonVariants = cva(
       },
     },
     compoundVariants: [
-      { iconOnly: true, size: "md", class: "size-9 p-0" },
-      { iconOnly: true, size: "default", class: "size-9 p-0" },
+      { iconOnly: true, size: "md", class: "size-8 p-0" },
+      { iconOnly: true, size: "default", class: "size-8 p-0" },
       { iconOnly: true, size: "lg", class: "size-9 p-0" },
-      { iconOnly: true, size: "sm", class: "size-8 p-0" },
+      { iconOnly: true, size: "sm", class: "size-7 p-0" },
       { iconOnly: true, size: "xs", class: "size-6 p-0" },
     ],
     defaultVariants: {
@@ -98,15 +90,15 @@ const buttonVariants = cva(
 )
 
 const iconSize: Record<string, string> = {
-  md: "size-5",
-  default: "size-5",
-  lg: "size-5",
-  sm: "size-[18px]",
-  xs: "size-3.5",
-  icon: "size-5",
-  "icon-sm": "size-[18px]",
-  "icon-xs": "size-3.5",
-  "icon-lg": "size-5",
+  md: "size-4",
+  default: "size-4",
+  lg: "size-[18px]",
+  sm: "size-3.5",
+  xs: "size-3",
+  icon: "size-4",
+  "icon-sm": "size-3.5",
+  "icon-xs": "size-3",
+  "icon-lg": "size-[18px]",
 }
 
 function Button({
@@ -170,7 +162,7 @@ function Button({
       {iconOnly ? (
         children
       ) : children != null && children !== false ? (
-        <span className="inline-flex shrink-0 items-center justify-center px-1">{children}</span>
+        <span className="inline-flex min-w-0 items-center justify-center truncate">{children}</span>
       ) : null}
       {TrailingIcon ? <TrailingIcon aria-hidden className={ico} /> : null}
     </button>

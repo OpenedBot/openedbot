@@ -31,21 +31,17 @@ describe("bot greeting input", () => {
   });
 });
 
-describe("greetingRunsOnDefaultProfile (DEV-OHB-244)", () => {
+describe("greetingRunsOnDefaultProfile", () => {
   const thread = "ohb:org:thread";
-  const base = { origin: "bot_greeting", threadSessionId: thread, executionSessionKey: null, hermesRunId: null };
+  const base = { origin: "bot_greeting", threadSessionId: thread, executionSessionKey: null };
 
-  test("a greeting does not wait for its profile while provisioning runs", () => {
-    expect(greetingRunsOnDefaultProfile({ ...base, profileProvisionStatus: "queued" })).toBe(true);
-    expect(greetingRunsOnDefaultProfile({ ...base, profileProvisionStatus: "running" })).toBe(true);
-    expect(greetingRunsOnDefaultProfile({ ...base, profileProvisionStatus: "succeeded" })).toBe(false);
-    expect(greetingRunsOnDefaultProfile({ ...base, profileProvisionStatus: null })).toBe(false);
-    expect(greetingRunsOnDefaultProfile({ ...base, origin: null, profileProvisionStatus: "running" })).toBe(false);
+  test("a new greeting waits for the bot's profile and runs on it", () => {
+    expect(greetingRunsOnDefaultProfile(base)).toBe(false);
+    expect(greetingRunsOnDefaultProfile({ ...base, executionSessionKey: "ohb:org:thread:g1" })).toBe(false);
   });
 
-  test("the pinned greeting session keeps the choice once the profile is ready", () => {
-    const pinned = { ...base, executionSessionKey: greetingSessionKey(thread), hermesRunId: "run-1" };
-    expect(greetingRunsOnDefaultProfile({ ...pinned, profileProvisionStatus: "succeeded" })).toBe(true);
-    expect(greetingRunsOnDefaultProfile({ ...base, hermesRunId: "run-1", profileProvisionStatus: "running" })).toBe(false);
+  test("a greeting pinned to its own session by an earlier version stays on the default profile", () => {
+    expect(greetingRunsOnDefaultProfile({ ...base, executionSessionKey: greetingSessionKey(thread) })).toBe(true);
+    expect(greetingRunsOnDefaultProfile({ ...base, origin: null, executionSessionKey: greetingSessionKey(thread) })).toBe(false);
   });
 });

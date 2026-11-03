@@ -35,6 +35,7 @@ var wildcardGrammar = map[string]*regexp.Regexp{
 	"job":      sessionRe,
 	"uuid":     skillOperationRe,
 	"peer":     a2aPolicyPeerNameRe,
+	"file":     workspaceFileRe,
 }
 
 // wildcardRefusal keeps the status and code each handler already returns
@@ -53,6 +54,7 @@ var wildcardRefusal = map[string]struct {
 	"job":      {http.StatusNotFound, "GATEWAY_RESTART_NOT_FOUND", "this restart no longer exists"},
 	"uuid":     {http.StatusNotFound, "SKILL_OPERATION_NOT_FOUND", "this skill operation no longer exists"},
 	"peer":     {http.StatusBadRequest, "PEER_INVALID", "the peer name is invalid"},
+	"file":     {http.StatusBadRequest, "WORKSPACE_FILE_INVALID", "the file name is invalid"},
 }
 
 func strictPath(next http.Handler) http.Handler {

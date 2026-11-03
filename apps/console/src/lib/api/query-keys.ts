@@ -49,6 +49,7 @@ export const queryKeys = {
   get overview() { return workspaceQueryKey(activeOrganizationId(), "overview"); },
   get usage() { return workspaceQueryKey(activeOrganizationId(), "usage"); },
   get usageModels() { return workspaceQueryKey(activeOrganizationId(), "usage-models"); },
+  usageModelsWindow: (days: number) => workspaceQueryKey(activeOrganizationId(), "usage-models", days),
   usageBots: (days: number) => workspaceQueryKey(activeOrganizationId(), "usage-bots", days),
   routines: (botId: string) => workspaceQueryKey(activeOrganizationId(), "routines", botId),
   groupRoutines: (groupId: string) => workspaceQueryKey(activeOrganizationId(), "group-routines", groupId),

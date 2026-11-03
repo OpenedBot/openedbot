@@ -4,7 +4,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import Markdown from "react-markdown";
@@ -22,6 +25,8 @@ import { api } from "../lib/api";
 import { releaseComposerKeyboard } from "../lib/composer/composer-keyboard";
 import { useT } from "../lib/i18n";
 import { documentMarkdownComponents } from "./thread-markdown";
+import { CANVAS_MIN_WIDTH, useCanvasResize } from "./attachment-canvas-width";
+export { CANVAS_MIN_WIDTH, CANVAS_THREAD_MIN_WIDTH, clampCanvasWidth, readCanvasWidth, writeCanvasWidth } from "./attachment-canvas-width";
 
 /** La part « pièce jointe » d'un message, telle que le cloud API la persiste. */
 export type MessageAttachmentChip = Extract<MessageContent[number], { type: "attachment" }>;
@@ -139,6 +144,14 @@ const CLOSE_MS = 200;
  * document ou une image, pas une conversation dont les lignes cassent trop
  * tôt.
  */
+/**
+ * La carte du canevas au bureau : la surface de la carte de la barre latérale
+ * (`BOARD_SIDEBAR_CARD`), même fond et même bord. Elle se pose sur le fond du
+ * fil (`CANVAS_GUTTER`), comme la barre latérale sur la page : transparente,
+ * la gouttière laissait voir le gris de `main` sous la carte, en rectangle.
+ */
+const CANVAS_CARD = "overflow-hidden rounded-3xl border border-border-button-white bg-background-secondary-default shadow-sm";
+const CANVAS_GUTTER = "bg-background";
 const ATTACHMENT_CANVAS_WIDTH = "w-[min(42rem,38vw)] min-w-80";
 
 /**
@@ -278,6 +291,9 @@ export function AttachmentCanvas() {
     };
   }, [displayed, shownId, shownKind]);
 
+  const mounted = Boolean(close);
+  const { asideRef, resizing, shownWidth, maxWidth, resetWidth, startResize, moveResize, endResize, keyResize } = useCanvasResize(isMobile, mounted);
+
   // Hors fournisseur seulement. Le panneau reste MONTÉ même vide : une
   // transition CSS ne joue que sur un élément qui existait déjà à la frame
   // précédente : le monter au moment de l'ouverture le ferait apparaître
@@ -285,8 +301,12 @@ export function AttachmentCanvas() {
   if (!close) return null;
 
   const open = active;
+  // L'intérieur garde la largeur réglée, même pendant le repli (voir plus bas).
+  const innerWidth = shownWidth !== null ? { width: shownWidth } : undefined;
   return (
     <aside
+      ref={asideRef}
+      style={open && shownWidth !== null ? { width: shownWidth } : undefined}
       aria-label={shownPanel ? shownPanel.label : t("attachmentCanvas.label", { name: displayed?.name ?? "" })}
       aria-hidden={!open}
       // Refermé, le panneau ne doit pas rester dans l'ordre de tabulation le
@@ -325,27 +345,54 @@ export function AttachmentCanvas() {
               "absolute inset-0 bg-background transition-[transform,opacity]",
               open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0",
             ]
-          // Bureau : le MÊME traitement de carte que le canva du guichet
-          // (`support-panel.tsx`) : `rounded-3xl shadow-sm`, gouttière de
-          // 8 px. La transition porte sur la largeur du CONTENEUR ; la carte
-          // intérieure garde sa taille finale dans un parent qui coupe, sinon
-          // le texte se recomposerait à chaque frame. La marge n'est PAS sur
-          // le conteneur : un `m-2` survivrait au `w-0` et laisserait une
-          // bande vide une fois le panneau refermé.
+          // Bureau : une carte (`CANVAS_CARD`) dans une gouttière de 8 px au
+          // fond du fil (`CANVAS_GUTTER`). La transition porte sur la largeur
+          // du CONTENEUR ; la carte intérieure garde sa taille finale dans un
+          // parent qui coupe, sinon le texte se recomposerait à chaque frame.
+          // La marge n'est PAS sur le conteneur : un `m-2` survivrait au
+          // `w-0` et laisserait une bande vide une fois le panneau refermé.
           : [
-              "relative transition-[width,opacity]",
+              // Au glisser, la largeur suit le pointeur : pas d'animation qui traîne derrière.
+              "relative",
+              resizing ? "transition-none select-none" : "transition-[width,opacity]",
+              CANVAS_GUTTER,
               open ? cn(ATTACHMENT_CANVAS_WIDTH, "opacity-100") : "pointer-events-none w-0 opacity-0",
             ],
       )}
     >
+      {/* La poignée occupe la gouttière côté fil (8 px) : on la trouve au bord
+          de la carte sans qu'elle mange le contenu. Aucun trait dessiné :
+          seul le curseur de redimensionnement la signale. Bureau seulement :
+          au téléphone le panneau prend tout l'écran. */}
+      {!isMobile && open ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("attachmentCanvas.resize")}
+          title={t("attachmentCanvas.resize")}
+          aria-valuemin={CANVAS_MIN_WIDTH}
+          aria-valuemax={maxWidth}
+          aria-valuenow={shownWidth ?? undefined}
+          tabIndex={0}
+          data-canvas-resize=""
+          onPointerDown={startResize}
+          onPointerMove={moveResize}
+          onPointerUp={endResize}
+          onPointerCancel={endResize}
+          onLostPointerCapture={endResize}
+          onDoubleClick={resetWidth}
+          onKeyDown={keyResize}
+          className="absolute inset-y-0 start-0 z-10 w-2 cursor-col-resize touch-none outline-none"
+        />
+      ) : null}
       {shownPanel ? (
-        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"))}>
+        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"))} style={innerWidth}>
           <div
             ref={panelSlotRef}
             data-canvas-panel=""
             className={cn(
               "flex min-h-0 flex-1 flex-col",
-              !isMobile && "overflow-hidden rounded-3xl bg-background shadow-sm",
+              !isMobile && CANVAS_CARD,
             )}
           />
         </div>
@@ -359,11 +406,12 @@ export function AttachmentCanvas() {
             // avec le panneau.
             isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"),
           )}
+          style={innerWidth}
         >
           <div
             className={cn(
               "flex min-h-0 flex-1 flex-col",
-              !isMobile && "overflow-hidden rounded-3xl bg-background shadow-sm",
+              !isMobile && CANVAS_CARD,
             )}
           >
             <header

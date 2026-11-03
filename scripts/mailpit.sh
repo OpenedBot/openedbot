@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# shellcheck source=lib/env-aliases.sh
-. "$(dirname "$0")/lib/env-aliases.sh" # OHB_* -> OPENEDBOT_* fallback, one release
+# shellcheck source=lib/legacy-env.sh
+. "$(dirname "$0")/lib/legacy-env.sh" # refuses a retired OHB_* variable
 
 # Mailpit is the SMTP of DEVELOPMENT, and nothing else: it accepts every
 # message and delivers none. The worker points at it through

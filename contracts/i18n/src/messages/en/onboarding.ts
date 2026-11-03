@@ -67,7 +67,6 @@ export const onboarding = {
       status_done: "Done",
     },
   },
-  option_card: { other_label: "Other" },
   // ── Workspace ──
   step_workspace: {
     headline: "Your workspace",

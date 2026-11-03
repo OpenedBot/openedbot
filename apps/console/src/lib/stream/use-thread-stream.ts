@@ -339,7 +339,7 @@ export function useThreadStream(threadId: string | undefined) {
     const start = async () => {
       // A valid cookie can outlive the small local session mirror (cleared
       // storage, HMR, another tab). Re-read `/auth/me` once so the SSE client
-      // has the organization it must put in `X-OHB-Organization`.
+      // has the organization it must put in `X-OpenedBot-Organization`.
       if (!activeOrganizationId()) {
         try {
           await api.authMe();

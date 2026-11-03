@@ -29,12 +29,12 @@ const ERR_ABORTED = -3;
 // without native support (an older deploy): it would show its public landing
 // and web login, whose Google step ends in the system browser, not here.
 const BRIDGE_PROBE_MS = 10_000;
-// The console's frame surface (BoardUI `--bui-background-full`: light #ffffff,
-// dark #121212), the colour of its top bar, around the grey cards of BoardUI's
+// The console's frame surface (BoardUI `--bui-background-full`, OpenBot's frame: light #e8e8eb,
+// dark #0d0d0d), the colour of its top bar, around the grey cards of BoardUI's
 // "Chat Starter" template (sidebar and main card). Painted before the first frame so a launch never flashes white in dark
 // mode (OpenBot does the same), and behind the Windows caption buttons so they
 // melt into the console's top bar.
-const FRAME_RGB = { light: [255, 255, 255], dark: [18, 18, 18] } as const;
+const FRAME_RGB = { light: [232, 232, 235], dark: [13, 13, 13] } as const;
 // The caption glyphs: the console's primary text on that surface.
 const CAPTION_SYMBOL = { light: "#18181b", dark: "#ececec" } as const;
 // The console's top bar (../.. board-chrome.tsx, 46 px): the macOS traffic
@@ -79,14 +79,19 @@ export type ShellWindow = {
   loadConsole(url?: string): void;
   /** The console called the bridge: it supports the shell. */
   noteBridgeUse(): void;
+  /** See IpcDeps.fallBackToLocalSignin: true when the window switched to the local page. */
+  fallBackToLocalSignin(): boolean;
   /** The console's text size, as a page zoom factor (validated by ipc.ts). */
   setTextZoom(factor: number): void;
   /** The zoom the console's next page starts with (its last text size, kept across launches). */
   initialTextZoom(): number;
   /** View › Actual Size: back to the text size's zoom, not to 100 %. */
   resetZoom(): void;
+  /** The sign-in screen: the console's /login, or the local page once the fallback is on. */
   showSignin(): void;
-  /** Unloads the console and clears its cached account data on sign-out. */
+  /** The local sign-in page, for the rest of this app session (a console that cannot sign in through the shell). */
+  showLocalSignin(): void;
+  /** Unloads the console, clears its cached account data, then shows the sign-in screen. */
   showSigninAndClearStorage(): Promise<void>;
   sendSigninState(state: SigninState): void;
   isAlwaysOnTop(): boolean;
@@ -201,10 +206,23 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
   if (template !== config.signinTemplate) log.warn(`sign-in template "${config.signinTemplate}" not found, using ${template}`);
   const isSigninUrl = (url: string): boolean => url.split(/[?#]/)[0] === signinUrl;
   const appUrl = `${config.consoleUrl}/`;
+  // Signed out, the window shows the console's own /login, the one screen the
+  // browser shows too, driven through NativeAuthBridge (preload).
+  const loginUrl = `${config.consoleUrl}/login`;
+  const loginPath = new URL(loginUrl).pathname;
   const preferences = loadPreferences();
 
   let closeForReal = false;
-  let view: "console" | "signin" = "console";
+  // "console": signed in; "login": the console's /login, signed out;
+  // "signin": the local fallback page (signin.html).
+  let view: "console" | "login" | "signin" = "console";
+  // The console in production may predate the shared /login (until its next
+  // deploy): it hands sign-in back with signOut() and the local page takes
+  // over, for the rest of this app session. TODO: remove this fallback, with
+  // signin.html, its templates, the auth:password / auth:context /
+  // auth:open-legal channels and design-lab, one release after every deployed
+  // console serves the shared /login (NativeAuthBridge).
+  let localSigninFallback = false;
   let lastSigninState: SigninState = { status: "idle" };
   let reloadTimer: NodeJS.Timeout | null = null;
   let bridgeUsed = false;
@@ -303,6 +321,15 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       return false;
     }
   };
+  // /login and its sub-routes, query and fragment aside.
+  const isConsoleLoginUrl = (raw: string): boolean => {
+    try {
+      const url = new URL(raw);
+      return trustedOrigins.includes(url.origin) && (url.pathname === loginPath || url.pathname.startsWith(`${loginPath}/`));
+    } catch {
+      return false;
+    }
+  };
   contents.session.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     callback(CONSOLE_PERMISSIONS.has(permission) && isConsoleOrigin(details.requestingUrl));
   });
@@ -324,13 +351,27 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
   const guardNavigation = (event: Electron.Event, url: string): void => {
     if (isSigninUrl(url) || isConsoleOrigin(url)) return;
     event.preventDefault();
-    if (view === "console") openInSystemBrowser(url);
+    if (view !== "signin") openInSystemBrowser(url);
   };
   contents.on("will-navigate", (event, url) => guardNavigation(event, url));
   contents.on("will-redirect", (event, url) => guardNavigation(event, url));
 
+  // The sign-in state goes to whichever sign-in screen is on, never to the
+  // signed-in console. Replayed on every load (the preload keeps the last one
+  // for NativeAuthBridge.onState): a state that changed mid-load is not lost.
+  const signinScreenShown = (): boolean => {
+    if (contents.isDestroyed()) return false;
+    const url = contents.getURL();
+    return view === "signin" ? isSigninUrl(url) : view === "login" && isConsoleLoginUrl(url);
+  };
+  const pushSigninState = (): void => {
+    if (signinScreenShown()) contents.send("auth:state", lastSigninState);
+  };
+  contents.on("dom-ready", pushSigninState);
+
   contents.on("did-finish-load", () => {
-    if (view === "signin") contents.send("auth:state", lastSigninState);
+    pushSigninState();
+    // Armed on the signed-in console only: /login has no token to ask for.
     if (view !== "console" || bridgeUsed) return;
     clearBridgeProbe();
     bridgeProbe = setTimeout(() => {
@@ -343,12 +384,13 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
   // through "ohb:theme") and the view (solid on the console, see-through on
   // the sign-in page).
   // Réglages › Apparence › Taille du texte of the console, sent by the
-  // preload ("ohb:text-zoom"). The sign-in page keeps 100 %.
+  // preload ("ohb:text-zoom"); /login is the console and zooms too. The local
+  // sign-in page keeps 100 %.
   let textZoom = preferences.textZoom;
-  const viewZoom = (): number => (view === "console" ? textZoom : 1);
+  const viewZoom = (): number => (view === "signin" ? 1 : textZoom);
   const repaintCaptionButtons = (): void => {
     if (win.isDestroyed()) return;
-    if (isWindows) win.setTitleBarOverlay(titleBarOverlay(view, viewZoom()));
+    if (isWindows) win.setTitleBarOverlay(titleBarOverlay(view === "signin" ? "signin" : "console", viewZoom()));
     if (process.platform === "darwin") win.setWindowButtonPosition(trafficLightPosition(viewZoom()));
   };
   const repaintBackground = (): void => {
@@ -360,6 +402,8 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
   win.on("closed", () => nativeTheme.off("updated", repaintBackground));
 
   let signedOutStorageCleared: Promise<void> = Promise.resolve();
+  // The local fallback page (see localSigninFallback). Kept as it was: no
+  // longer the default sign-in screen.
   const loadSignin = async (): Promise<void> => {
     view = "signin";
     clearBridgeProbe();
@@ -373,7 +417,28 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       log.warn(`could not load the sign-in page (${error instanceof Error ? error.message : "error"})`);
     }
   };
+  // The console's /login. After the launch's service-worker purge, like the
+  // console itself: a stale precached build would predate this screen.
+  const loadLogin = async (): Promise<void> => {
+    view = "login";
+    clearBridgeProbe();
+    repaintCaptionButtons();
+    await storageCleared;
+    if (view !== "login" || win.isDestroyed()) return;
+    try {
+      await contents.loadURL(loginUrl);
+    } catch (error) {
+      // A failed load is retried by the did-fail-load handler below.
+      log.warn(`could not load the console sign-in (${error instanceof Error ? error.message : "error"})`);
+    }
+  };
+  const showSigninScreen = (): Promise<void> => (localSigninFallback ? loadSignin() : loadLogin());
+
   const showSigninAndClearStorage = (): Promise<void> => {
+    // Now, not after the first await: a sign-in that lands meanwhile
+    // (loadConsole) must win over this sign-out.
+    view = localSigninFallback ? "signin" : "login";
+    clearBridgeProbe();
     signedOutStorageCleared = (async () => {
       // Electron's storage API has no per-key localStorage deletion. Remove
       // only this account-derived shape while the console origin is loaded.
@@ -386,26 +451,36 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       } else {
         log.warn("boot sidebar cleanup skipped: console origin is not ready");
       }
-      // Unload the old persister before deletion so it cannot repopulate the
-      // database. A subsequent sign-in waits for this cleanup in loadConsole.
-      await loadSignin();
+      // Unload the console before deletion so its persister cannot repopulate
+      // the database. /login is the console too: it only loads once the
+      // database is gone. A subsequent sign-in waits for this in loadConsole.
+      try {
+        if (!contents.isDestroyed()) await contents.loadURL("about:blank");
+      } catch (error) {
+        log.warn(`could not unload the console (${error instanceof Error ? error.message : "error"})`);
+      }
       try {
         for (const origin of trustedOrigins) await contents.session.clearStorageData({ origin, storages: ["indexdb"] });
       } catch (error) {
         log.warn(`could not clear the console query cache (${error instanceof Error ? error.message : "error"})`);
       }
     })();
-    return signedOutStorageCleared;
+    const cleared = signedOutStorageCleared;
+    // Then the sign-in screen, unless a sign-in already moved on (loadConsole).
+    return cleared.then(() => (view === "console" || win.isDestroyed() ? undefined : showSigninScreen()));
   };
 
   // Offline at launch or a deploy in progress: keep retrying instead of
   // leaving a blank window with no way to recover but quitting.
   contents.on("did-fail-load", (_event, errorCode, _description, validatedUrl, isMainFrame) => {
-    if (!isMainFrame || errorCode === ERR_ABORTED || view !== "console" || !isConsoleOrigin(validatedUrl)) return;
+    if (!isMainFrame || errorCode === ERR_ABORTED || view === "signin" || !isConsoleOrigin(validatedUrl)) return;
     if (reloadTimer) clearTimeout(reloadTimer);
+    const failedView = view;
     reloadTimer = setTimeout(() => {
       reloadTimer = null;
-      if (view === "console" && !win.isDestroyed()) void contents.loadURL(appUrl);
+      if (view !== failedView || win.isDestroyed()) return;
+      if (view === "console") void contents.loadURL(appUrl);
+      else void loadLogin();
     }, RELOAD_DELAY_MS);
   });
 
@@ -450,7 +525,20 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       clearBridgeProbe();
     },
 
+    fallBackToLocalSignin(): boolean {
+      if (view !== "login" || contents.isDestroyed() || !isConsoleLoginUrl(contents.getURL())) return false;
+      log.warn("the console's /login handed sign-in back: it predates the shared sign-in screen, using the local page");
+      localSigninFallback = true;
+      void loadSignin();
+      return true;
+    },
+
     showSignin(): void {
+      void showSigninScreen();
+    },
+
+    showLocalSignin(): void {
+      localSigninFallback = true;
       void loadSignin();
     },
 
@@ -458,7 +546,7 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
 
     sendSigninState(state: SigninState): void {
       lastSigninState = state;
-      if (view === "signin" && !contents.isLoading()) contents.send("auth:state", state);
+      pushSigninState();
     },
 
     isAlwaysOnTop: () => win.isAlwaysOnTop(),
@@ -481,7 +569,7 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       }
       textZoom = factor;
       if (win.isDestroyed()) return;
-      if (view === "console") contents.setZoomFactor(factor);
+      if (view !== "signin") contents.setZoomFactor(factor);
       repaintCaptionButtons();
     },
 

@@ -115,7 +115,9 @@ test("Skills montre les outils du profil, pas les serveurs MCP", async () => {
   const requests: string[] = [];
   renderCapabilities(profileCapabilities, requests);
 
-  await waitFor(() => expect(screen.getByText("Ces capacités valent seulement pour @scout.")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/^Ces capacités valent seulement pour @scout\./)).toBeTruthy());
+  // Profil inscriptible : la note dit qu'une bascule vaut dès le prochain message (0163).
+  expect(screen.getByText(/vaut dès son prochain message, y compris dans une conversation déjà commencée/)).toBeTruthy();
   expect(screen.getByText("Mémoire propre à ce profil, sur le runtime.")).toBeTruthy();
   expect(screen.getByRole("switch", { name: "Activer research" })).toBeTruthy();
   expect(screen.queryByText("Serveurs MCP")).toBeNull();

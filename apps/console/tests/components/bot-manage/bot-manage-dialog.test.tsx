@@ -209,7 +209,7 @@ describe("la page du bot : des rangées qui disent leur réponse", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Supprimer" }));
     const confirm = await screen.findByRole("alertdialog", { name: "Supprimer « Cahier2 » ?" });
     expect(deleted).toBe(false);
-    expect(confirm.textContent).toContain("ses sessions et son profil sont effacés");
+    expect(confirm.textContent).toContain("son profil est effacé sur votre machine");
     fireEvent.click(within(confirm).getByRole("button", { name: "Supprimer" }));
     await waitFor(() => expect(deleted).toBe(true));
     await waitFor(() => expect(closed).toBeGreaterThan(0));

@@ -333,6 +333,15 @@ describe("HermesClient.providerUsage: GET /hermes-setup/usage", () => {
     expect(sent).toEqual([expect.objectContaining({ path: "/hermes-setup/usage", method: "GET", kind: "safe", body: null })]);
   });
 
+  test("une clé API facturée à l'usage est un état connu, pas une panne", async () => {
+    const metered: HermesProviderUsageDocument = {
+      fetchedAt: usage.fetchedAt,
+      providers: [{ provider: "anthropic", source: "api_key", plan: null, windows: [], details: [], unavailableReason: null }],
+    };
+    const { client } = fakeTransport(() => Response.json(metered));
+    await expect(client.providerUsage()).resolves.toEqual(metered);
+  });
+
   test("« Actualiser » demande une sonde neuve à l'hôte par cache-control", async () => {
     const { client, sent } = fakeTransport(() => Response.json(usage));
     await expect(client.providerUsage({ refresh: true })).resolves.toEqual(usage);

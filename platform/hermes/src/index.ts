@@ -60,6 +60,10 @@ export {
   SKILLS_HUB_PROFILE_PATTERN,
 } from "./contracts";
 export { validateA2APeerName, validateA2APeerToken } from "./a2a-policy";
+export { PROFILE_TOOLSETS_BATCH_FEATURE, PROFILE_TOOLSETS_BATCH_MAX, type HermesCreatedHostProfileResult, type HermesHostProfileCreateRequest } from "./client/profiles";
+export { WORKSPACE_FILE_NAME_PATTERN, type HermesWorkspaceFile } from "./client/workspace-files";
+export { hermesCapabilityWrite } from "./capability-writes";
+export type { HermesCapabilityWrite } from "./capability-writes";
 export {
   HERMES_PREFLIGHT_TTL_MS,
   HERMES_TOOLSET_INVENTORY_TTL_MS,

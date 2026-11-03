@@ -10,7 +10,8 @@ import { createNativeSession, rotateNativeRefreshToken, type SessionDevice } fro
  * Le code en clair n'existe qu'ici et dans la réponse : la base ne garde que son hachage.
  */
 export async function issueNativeAuthCode(db: Db, input: {
-  organizationId: string;
+  /** `null` : le compte définira son organisation dans l'onboarding du desktop. */
+  organizationId: string | null;
   userId: string;
   codeChallenge: string;
   redirectUri: string;

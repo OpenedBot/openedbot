@@ -34,7 +34,7 @@ function app(options: { enabled?: boolean; kind?: "web" | "native"; staff?: bool
 
 function request(path = "/api/bots", method = "GET") {
   return new Request(`http://localhost${path}`, { method, headers: {
-    Cookie: "ohb_session=test", "X-OHB-Organization": B, "X-CSRF-Token": "csrf",
+    Cookie: "ohb_session=test", "X-OpenedBot-Organization": B, "X-CSRF-Token": "csrf",
   } });
 }
 
@@ -47,7 +47,7 @@ describe("agency tenant boundary", () => {
   test("another tab retains its own tenant", async () => {
     const server = app();
     const second = request();
-    second.headers.set("X-OHB-Organization", A);
+    second.headers.set("X-OpenedBot-Organization", A);
     expect((await (await server.request(second)).json()).organizationId).toBe(A);
     expect((await (await server.request(request())).json()).organizationId).toBe(B);
   });
@@ -75,7 +75,7 @@ describe("agency tenant boundary", () => {
   });
   test("download links select an authorized tenant without trusting conflicting contexts", async () => {
     const download = request(`/api/decisions/export?organizationId=${B}`);
-    download.headers.delete("X-OHB-Organization");
+    download.headers.delete("X-OpenedBot-Organization");
     expect((await (await app().request(download)).json()).organizationId).toBe(B);
     const conflicting = request(`/api/decisions/export?organizationId=${A}`);
     expect((await app().request(conflicting)).status).toBe(403);
@@ -87,27 +87,27 @@ describe("agency tenant boundary", () => {
   });
   test("an explicit agency mandate uses agency rights even for a personal owner", async () => {
     const server = app({ targetRole: "owner", grants: [AG, OTHER_AG] });
-    const selected = request(); selected.headers.set("X-OHB-Fleet", AG);
+    const selected = request(); selected.headers.set("X-OpenedBot-Fleet", AG);
     expect(await (await server.request(selected)).json()).toEqual({ organizationId: B, role: "agency", actingFleetId: AG });
     expect(await (await server.request(request())).json()).toEqual({ organizationId: B, role: "owner" });
     for (const path of ["/api/organization/members", "/api/billing", "/api/pro/billing/subscription", "/api/team-exports"]) {
-      const denied = request(path); denied.headers.set("X-OHB-Fleet", AG);
+      const denied = request(path); denied.headers.set("X-OpenedBot-Fleet", AG);
       expect((await server.request(denied)).status).toBe(403);
       expect((await server.request(request(path))).status).toBe(200);
     }
   });
   test("another live mandate and personal ownership cannot replace the selected revoked mandate", async () => {
     const server = app({ targetRole: "owner", grants: [OTHER_AG] });
-    const selected = request(); selected.headers.set("X-OHB-Fleet", AG);
+    const selected = request(); selected.headers.set("X-OpenedBot-Fleet", AG);
     const denied = await server.request(selected);
     expect(denied.status).toBe(403);
     expect((await denied.json()).code).toBe("WORKSPACE_ACCESS_REVOKED");
-    selected.headers.set("X-OHB-Fleet", OTHER_AG);
+    selected.headers.set("X-OpenedBot-Fleet", OTHER_AG);
     expect((await server.request(selected)).status).toBe(200);
   });
   test("agency contexts are refused for pinned sessions and disabled deployments", async () => {
     for (const options of [{ kind: "native" as const }, { staff: true }, { enabled: false }]) {
-      const selected = request(); selected.headers.set("X-OHB-Fleet", AG);
+      const selected = request(); selected.headers.set("X-OpenedBot-Fleet", AG);
       expect((await app({ ...options, targetRole: "owner" }).request(selected)).status).toBe(403);
     }
   });
@@ -115,9 +115,9 @@ describe("agency tenant boundary", () => {
     const server = app({ targetRole: "owner" });
     const download = request(`/api/decisions/export?organizationId=${B}&fleetId=${AG}`);
     expect((await (await server.request(download)).json()).actingFleetId).toBe(AG);
-    download.headers.set("X-OHB-Fleet", OTHER_AG);
+    download.headers.set("X-OpenedBot-Fleet", OTHER_AG);
     expect((await server.request(download)).status).toBe(403);
-    const invalid = request(); invalid.headers.set("X-OHB-Fleet", "studio");
+    const invalid = request(); invalid.headers.set("X-OpenedBot-Fleet", "studio");
     expect((await server.request(invalid)).status).toBe(400);
   });
   test("an agency action journals actor, client and selected agency without request secrets", async () => {
@@ -125,7 +125,7 @@ describe("agency tenant boundary", () => {
     const log = spyOn(logger, "info").mockImplementation(((entry: unknown) => { entries.push(entry); }) as never);
     try {
       const selected = request("/api/bots/fixture-sensitive-segment", "POST");
-      selected.headers.set("X-OHB-Fleet", AG);
+      selected.headers.set("X-OpenedBot-Fleet", AG);
       expect((await app({ targetRole: "owner" }).request(selected)).status).toBe(200);
       expect(entries).toEqual([expect.objectContaining({ event: "fleet.action", actorUserId: "u", organizationId: B,
         actingFleetId: AG, method: "POST", path: "/*", status: 200 })]);

@@ -58,7 +58,8 @@ export type AuthContext = {
 export type AppVariables = { auth: AuthContext };
 
 /** The request header naming the fleet organization acting for the client (a mandate). */
-export const FLEET_HEADER = "X-OHB-Fleet";
+export const FLEET_HEADER = "X-OpenedBot-Fleet";
+export const ORGANIZATION_HEADER = "X-OpenedBot-Organization";
 /** Its query form, for a GET that cannot set a header (a download link). */
 export const FLEET_QUERY = "fleetId";
 
@@ -163,15 +164,14 @@ export function authMiddleware(
     const credential = bearer || cookie;
     if (!credential) throw new HttpError(401, "AUTH_REQUIRED", "Authentification requise.");
     const credentialHash = hashCredential(credential);
-    const headerOrganization = context.req.header("X-OHB-Organization");
+    const headerOrganization = requestHeader(context, ORGANIZATION_HEADER);
     const downloadOrganization = context.req.method === "GET" ? context.req.query("organizationId") : undefined;
     if (headerOrganization && downloadOrganization && headerOrganization !== downloadOrganization) {
       throw new HttpError(403, "TENANT_MISMATCH", "Les contextes d’espace ne correspondent pas.");
     }
     const requestedOrganization = headerOrganization || downloadOrganization;
     if (requestedOrganization) assertWorkspaceId(requestedOrganization);
-    // `X-OHB-Fleet` / `?fleetId=` (step 11.2); an old name is read only
-    // where a loaded plug-in declares it as an alias (`requestHeader`).
+    // `X-OpenedBot-Fleet` / `?fleetId=` (step 11.2); an old name only through an alias (`requestHeader`).
     const headerFleet = requestHeader(context, FLEET_HEADER);
     const queryFleet = context.req.method === "GET" ? requestQuery(context, FLEET_QUERY) : undefined;
     if (headerFleet && queryFleet && headerFleet !== queryFleet) {
@@ -189,6 +189,9 @@ export function authMiddleware(
       const agencyAvailable = await fleetWorkspacesEnabled(agencyEnabled, found);
       if (actingFleetId && !agencyAvailable) throw new HttpError(403, "WORKSPACE_ACCESS_REVOKED", "Le contexte agence n’est plus disponible.");
       const pinned = found.kind !== "web" || Boolean(found.impersonatedByStaffUserId);
+      // Native sans organisation (0158) : routes de compte comme le web, pour
+      // la définir ; elle reste épinglée, aucun en-tête n'ouvre un autre espace.
+      const accountReachable = !pinned || (found.kind === "native" && !found.organizationId);
       if (actingFleetId && pinned) {
         throw new HttpError(403, "TENANT_MISMATCH", "Cette session ne peut pas agir pour une agence.");
       }
@@ -211,7 +214,7 @@ export function authMiddleware(
       const role = actingFleetId ? "agency" : access?.role ?? null;
       if (!access || !role || !agencyAccessAllowed(access, agencyAvailable)) {
         const selectedDisabledAgency = !agencyAvailable && access?.kind === "agency";
-        if (accountPath && !pinned && (
+        if (accountPath && accountReachable && (
           (context.req.path !== "/api/auth/me" || !requestedOrganization) || selectedDisabledAgency
         )) return { ...found, organizationId: EMPTY_WORKSPACE_ID, role: "member" as const };
         throw new HttpError(403, "WORKSPACE_ACCESS_REVOKED", "Vous n’avez plus accès à cet espace.");
@@ -331,12 +334,9 @@ export function authRoutes(
         return context.html(callbackPage(true));
       }
       if (result.native) {
+        // Sans organisation, le desktop l'ouvre dans l'onboarding (0158).
         const member = await resolveGoogleIdentity(db, result.identity, { waitlistRequired });
-        // Un code natif est lié à une organisation : le compte la définit d'abord sur le web.
-        if (!member.organizationId) {
-          throw new HttpError(403, "AUTH_NOT_A_MEMBER", "Définissez d’abord votre organisation depuis l’application web.");
-        }
-        await google.completeNative(result.attemptId, { ...member, organizationId: member.organizationId });
+        await google.completeNative(result.attemptId, member);
       } else {
         const member = await resolveGoogleIdentity(db, result.identity, { waitlistRequired });
         await google.completeWeb(result.attemptId, member.user);
@@ -715,7 +715,7 @@ export function writeWebSessionCookies(
   });
 }
 
-function loginEmail(value: unknown): string {
+export function loginEmail(value: unknown): string {
   const email = normalizeEmail(assertString(value, "L’adresse email", { max: 320 }));
   if (!isEmailSyntaxValid(email)) throw new HttpError(400, "EMAIL_INVALID", "Adresse email invalide.");
   return email;

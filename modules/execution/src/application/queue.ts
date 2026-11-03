@@ -334,12 +334,9 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
              select 1 from bot_profile_provisions pp
               where pp.organization_id = r.organization_id and pp.bot_id = r.bot_id
                 and pp.status <> 'succeeded'
-                -- L'accueil n'attend pas le clone du profil (DEV-OHB-244) :
-                -- il part sur le profil par défaut (runner/context.ts).
-                -- "is not distinct from": an operator run has origin NULL, and a
-                -- plain "=" made this whole clause NULL, which let it through
-                -- while the profile was still cloning (HERMES_PROFILE_MISSING).
-                and not (r.origin is not distinct from 'bot_greeting' and pp.status in ('queued', 'running'))
+                -- L'accueil attend lui aussi le profil du bot (~9 s) : il
+                -- s'écrit en direct, avec sa vraie persona, une fois le fil
+                -- et le composer arrivés (DESIGN.md, « Démarrage d'un bot neuf »).
            )
            and (r.next_attempt_at is null or r.next_attempt_at <= now())
            and (

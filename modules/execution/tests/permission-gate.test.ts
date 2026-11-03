@@ -366,7 +366,7 @@ describe("a plan-only turn (0155)", () => {
   });
 });
 
-describe("resolveGateTx under a YOLO lease (0158)", () => {
+describe("resolveGateTx under a YOLO lease (0165)", () => {
   const LEASE_ID = "7a000000-0000-4000-8000-000000000001";
   const RUN = { ...CONTEXT, runtimeId: "7a000000-0000-4000-8000-0000000000aa", threadId: "7a000000-0000-4000-8000-0000000000bb" };
   const payload = (deny: string[] = []) => ({

@@ -7,6 +7,30 @@ uses [semantic versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+### Added
+- `inventory.changed` (host → openedbot, no field): the host's inventory files
+  moved, or a session starts. Sent only when `link.context.accepts` names it.
+- `link.context.accepts`: the optional host frames this openedbot understands
+  (at most 16 frame types). Older hosts ignore the field.
+- Vectors for both.
+- Host feature `skills_inventory` and host route `GET /hermes-setup/skills`:
+  the root skills read by the host operator, same shape as `/v1/skills`. A
+  fallback for Hermes builds whose `/v1/skills` fails.
+- Host feature `profile_toolsets_batch` and host route
+  `POST /hermes-setup/profiles/{slug}/toolsets`: several toolsets of one
+  profile in one write (one process for both directions on the host), one
+  read-back state per name. Without it openedbot writes them one request at
+  a time.
+- `POST /hermes-setup/profiles` accepts `bundledSkills: false` and answers the
+  bundled-skills state when the creation turned them off. A host that ignores
+  the field answers without it; openedbot then writes them through
+  `POST /hermes-setup/profiles/{slug}/bundled-skills`.
+
+### Changed
+- `RELAY_STAGE_HEADER` is now `X-OpenedBot-Relay-Stage`. `relayStageOf`
+  still reads the former `X-OHB-Relay-Stage` (`LEGACY_RELAY_STAGE_HEADER`)
+  for one release. Hosts never read or set this header.
+
 ## [1.0.0] - 2026-10-28
 
 First versioned release of the specification. Wire protocol `1`.

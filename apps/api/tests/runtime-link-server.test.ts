@@ -137,7 +137,7 @@ test("drain authenticates callers, refuses new writes and admits existing-run re
   expect((await app.request(`${origin}/v1/runs`, { method: "POST" })).status).toBe(401);
   const blocked = await app.request(`${origin}/v1/runs`, { method: "POST", headers: { authorization: "Bearer test" } });
   expect(blocked.status).toBe(503);
-  expect(blocked.headers.get("X-OHB-Relay-Stage")).toBe("before_dispatch");
+  expect(blocked.headers.get("X-OpenedBot-Relay-Stage")).toBe("before_dispatch");
   expect(forwarded).toHaveLength(0);
   for (const [method, path] of [["GET", "/v1/runs/run-1"], ["POST", "/v1/runs/run-1/stop"], ["POST", "/p/bot-1/v1/runs/run-1/stop"]]) {
     expect((await app.request(`${origin}${path}`, { method, headers: { authorization: "Bearer test" } })).status).toBe(200);
