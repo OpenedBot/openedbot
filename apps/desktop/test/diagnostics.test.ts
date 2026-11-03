@@ -17,7 +17,10 @@ let file: string;
 
 function rows(): Array<{ level: string; source: string; message: string; detail: string | null }> {
   closeDiagnostics();
-  const db = new DatabaseSync(file, { readOnly: true });
+  // Read-write on purpose: closing the journal removes its -wal and -shm
+  // files, and on macOS Bun 1.4.4's node:sqlite cannot read a WAL database
+  // opened readOnly without its -shm ("unable to open database file").
+  const db = new DatabaseSync(file);
   const result = db.prepare("select level, source, message, detail from events order by id").all() as Array<{
     level: string;
     source: string;

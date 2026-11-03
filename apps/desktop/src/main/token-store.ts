@@ -4,6 +4,7 @@ import path from "node:path";
 import { getConfig } from "./config";
 import { log } from "./log";
 import { tokensFileName } from "./target";
+import { hasRealVault } from "./vault";
 
 // Shape of POST /api/auth/native/token responses.
 export type NativeTokens = {
@@ -34,14 +35,20 @@ export function isNativeTokens(value: unknown): value is NativeTokens {
 
 let warnedUnavailable = false;
 
+function vaultAvailable(): boolean {
+  return hasRealVault(process.platform, safeStorage.isEncryptionAvailable(), () =>
+    safeStorage.getSelectedStorageBackend(),
+  );
+}
+
 /**
- * Persists the tokens encrypted with the OS keystore (DPAPI on Windows).
- * Without encryption we keep the session in memory only: a plaintext refresh
- * token on disk would outlive the session and is worse than asking the user to
- * sign in again.
+ * Persists the tokens encrypted with the OS keystore (DPAPI on Windows,
+ * Keychain on macOS, libsecret or KWallet on Linux). Without a real vault we
+ * keep the session in memory only: a plaintext refresh token on disk would
+ * outlive the session and is worse than asking the user to sign in again.
  */
 export function saveTokens(tokens: NativeTokens): void {
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!vaultAvailable()) {
     if (!warnedUnavailable) {
       warnedUnavailable = true;
       log.warn("safeStorage encryption unavailable: session kept in memory only, nothing persisted");
@@ -60,7 +67,7 @@ export function saveTokens(tokens: NativeTokens): void {
 export function loadTokens(): NativeTokens | null {
   const file = tokensFile();
   if (!existsSync(file)) return null;
-  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (!vaultAvailable()) return null;
   try {
     const parsed: unknown = JSON.parse(safeStorage.decryptString(readFileSync(file)));
     if (isNativeTokens(parsed)) return parsed;

@@ -4,7 +4,7 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
 include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/legacy-env.mk
-.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac clean
+.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac package-linux clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 # Defined once, reused by `make help` and by every [make] message below.
@@ -151,12 +151,20 @@ popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, wher
 	@ditto "$(POPUP_APP)" "$(POPUP_STAGE)"
 	@printf "$(C_OK)[make] popup staged: $(POPUP_STAGE)$(C_RESET)\n"
 
-package-mac: popup-stage defaults ## Unsigned macOS arm64 build (dmg + zip) into release/, popup embedded; run it on a Mac
+package-mac: popup-stage defaults ## macOS arm64 build (dmg + zip) into release/, signed ad hoc, popup embedded; run it on a Mac
 	@[ "$$(uname -s)" = "Darwin" ] || { printf "$(C_ERR)[make] package-mac runs on macOS only (the .dmg is built with hdiutil)$(C_RESET)\n"; exit 1; }
-	@printf "$(C_WARN)[make] building an UNSIGNED, non-notarized macOS app (Gatekeeper blocks the first launch)$(C_RESET)\n"
+	@printf "$(C_WARN)[make] building a macOS app signed AD HOC, not notarized (Gatekeeper blocks the first launch of a downloaded copy)$(C_RESET)\n"
 	@bun run package:mac
 	@ls -1 release/*.dmg >/dev/null 2>&1 || { printf "$(C_ERR)[make] no .dmg produced in release/$(C_RESET)\n"; exit 1; }
 	@for f in release/*.dmg release/*-mac-*.zip; do if [ -f "$$f" ]; then printf "$(C_OK)[make] %s  (%s, sha256 %s)$(C_RESET)\n" "$$f" "$$(du -h "$$f" | cut -f1)" "$$(shasum -a 256 "$$f" | cut -d' ' -f1)"; fi; done
+
+# Linux x64, from Linux (the CI) or macOS: electron-builder fetches its own
+# AppImage and fpm tools. No popup: it is macOS only.
+package-linux: defaults ## Unsigned Linux x64 build (AppImage + deb) into release/
+	@printf "$(C_WARN)[make] building an UNSIGNED Linux app (AppImage + deb, sideload only)$(C_RESET)\n"
+	@bun run package:linux
+	@ls -1 release/*.AppImage release/*.deb >/dev/null 2>&1 || { printf "$(C_ERR)[make] no .AppImage or .deb produced in release/$(C_RESET)\n"; exit 1; }
+	@for f in release/*.AppImage release/*.deb; do printf "$(C_OK)[make] %s  (%s, sha256 %s)$(C_RESET)\n" "$$f" "$$(du -h "$$f" | cut -f1)" "$$( (sha256sum "$$f" 2>/dev/null || shasum -a 256 "$$f") | cut -d' ' -f1)"; done
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 
