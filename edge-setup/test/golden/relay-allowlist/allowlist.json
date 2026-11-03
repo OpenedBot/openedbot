@@ -361,7 +361,7 @@
   },
   {
     "method": "GET",
-    "path": "^/hermes-setup/workspace/files/[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(png|jpg|jpeg|webp|pdf)$",
+    "path": "^/hermes-setup/workspace/files/(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|jpg|jpeg|webp|pdf))$",
     "events": false,
     "host": true
   },
