@@ -329,7 +329,7 @@ export function runtimeModelRoutes(db: Db, config: ApiConfig, dependencies: { sn
             token_tag as "tokenTag", token_key_id as "tokenKeyId", edge_auth_ciphertext as "edgeAuthCiphertext",
             edge_auth_nonce as "edgeAuthNonce", edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId",
             link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt", link_generation::text as "linkGeneration",
-            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_origin as "linkOrigin",
+            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion", link_origin as "linkOrigin",
             link_features as "linkFeatures", link_token_rotated_at as "linkRotatedAt",
             (select max(e.occurred_at) from runtime_link_events e where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'replaced') as "linkLastReplacedAt",
             (select max(e.occurred_at) from runtime_link_events e where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'hijack_suspected') as "linkHijackSuspectedAt",

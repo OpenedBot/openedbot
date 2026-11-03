@@ -211,7 +211,8 @@ export function BotManageDialog({
     { id: "hide", icon: bot.hidden ? IconEye : IconEyeOff, label: t(bot.hidden ? "botContextMenu.show" : "botContextMenu.hide"), onSelect: () => actions.toggleHidden.mutate(), pending: actions.toggleHidden.isPending },
     { id: "duplicate", icon: IconCopy, label: t("botManage.duplicate"), onSelect: duplicate },
     { id: "archive", icon: IconArchive, label: t(actions.archived ? "botContextMenu.unarchive" : "botContextMenu.archive"), onSelect: () => actions.toggleArchive.mutate(undefined, { onSuccess: () => { if (!actions.archived) onClose(); } }), pending: actions.toggleArchive.isPending },
-    { id: "delete", icon: IconTrash, label: t("botContextMenu.delete"), onSelect: () => setConfirmingDelete(true), destructive: true },
+    // Pas tant que son profil se prépare : l'API le refuse aussi (409 BOT_PROFILE_PREPARING).
+    { id: "delete", icon: IconTrash, label: t("botContextMenu.delete"), onSelect: () => setConfirmingDelete(true), destructive: true, pending: bot.profileProvisionStatus === "preparing" },
   ];
 
   const header = (
@@ -239,12 +240,12 @@ export function BotManageDialog({
   );
 
   const indexDesktop = (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {header}
       {BOT_MANAGE_GROUPS.map((group) => (
         <section key={group.labelKey} aria-label={t(group.labelKey)}>
-          <h3 className="px-3 pb-1 text-xs font-medium text-text-tertiary">{t(group.labelKey)}</h3>
-          <ul className="rounded-2xl bg-background-secondary-default p-1">
+          <h3 className="ohb-manage-caption pb-2">{t(group.labelKey)}</h3>
+          <ul className="ohb-manage-group">
             {group.pages.filter(shown).map((id) => {
               const entry = PAGES[id];
               const RowIcon = entry.icon;
@@ -256,14 +257,14 @@ export function BotManageDialog({
                     onClick={() => go(id)}
                     disabled={entry.disabled}
                     aria-disabled={entry.disabled || undefined}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left outline-none ohb-row hover:bg-background-tertiary-default focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                    className="ohb-row ohb-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <RowIcon aria-hidden className="size-4 shrink-0 text-foreground-icon-secondary" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-text-primary">{t(entry.labelKey)}</span>
-                      {description(id) ? <span className="block truncate text-xs text-text-tertiary">{description(id)}</span> : null}
+                      <span className="ohb-manage-title block truncate">{t(entry.labelKey)}</span>
+                      {description(id) ? <span className="ohb-manage-muted block truncate">{description(id)}</span> : null}
                     </span>
-                    {value(id) ? <span className="max-w-[45%] truncate text-sm text-text-tertiary">{value(id)}</span> : null}
+                    {value(id) ? <span className="ohb-manage-muted max-w-[45%] truncate">{value(id)}</span> : null}
                     <IconChevronRight aria-hidden className="size-4 shrink-0 text-foreground-icon-tertiary" />
                   </button>
                 </li>
@@ -273,8 +274,8 @@ export function BotManageDialog({
         </section>
       ))}
       <section aria-label={t("botManage.group.manage")}>
-        <h3 className="px-3 pb-1 text-xs font-medium text-text-tertiary">{t("botManage.group.manage")}</h3>
-        <ul className="rounded-2xl bg-background-secondary-default p-1">
+        <h3 className="ohb-manage-caption pb-2">{t("botManage.group.manage")}</h3>
+        <ul className="ohb-manage-group">
           {manageRows.map((row) => {
             const RowIcon = row.icon;
             return (
@@ -284,12 +285,12 @@ export function BotManageDialog({
                   onClick={row.onSelect}
                   disabled={row.pending}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm outline-none ohb-row hover:bg-background-tertiary-default focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50",
-                    row.destructive ? "text-destructive-text" : "text-text-primary",
+                    "ohb-row ohb-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:opacity-50",
                   )}
                 >
                   <RowIcon aria-hidden className={cn("size-4 shrink-0", row.destructive ? "text-destructive-text" : "text-foreground-icon-secondary")} />
-                  <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                  {/* Same type as the rows above; « Supprimer » keeps its red. */}
+                  <span className={cn("ohb-manage-title min-w-0 flex-1 truncate", row.destructive && "!text-destructive-text")}>{row.label}</span>
                 </button>
               </li>
             );
@@ -457,7 +458,7 @@ export function BotManageDialog({
         closeLabel={t("common.close")}
         showHandle={!isMobile}
         className={cn(
-          !isMobile && "h-[min(48rem,calc(100dvh-6rem))] max-h-[min(48rem,calc(100dvh-6rem))] max-w-[min(48rem,calc(100vw-2rem))]",
+          !isMobile && "ohb-manage h-[min(48rem,calc(100dvh-6rem))] max-h-[min(48rem,calc(100dvh-6rem))] max-w-[min(48rem,calc(100vw-2rem))]",
           !isMobile && runtimePane && "max-w-[min(80rem,calc(100vw-2rem))]",
           isMobile &&
             "ohb-inset-sheet h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)] max-h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)] max-sm:max-h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)]",
@@ -468,7 +469,7 @@ export function BotManageDialog({
           pushed={page !== null}
           onPop={back}
           index={isMobile ? indexMobile : (
-            <div data-bot-manage-index="" className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-6">{indexDesktop}</div>
+            <div data-bot-manage-index="" className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-8">{indexDesktop}</div>
           )}
         >
           {detail}

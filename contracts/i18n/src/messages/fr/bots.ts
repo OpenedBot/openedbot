@@ -84,6 +84,7 @@ export const botCapabilities = {
   scopeNote:
     "L’inventaire décrit le runtime {runtime} : il est identique pour tous les bots de l’espace, et le profil d’un bot ne le restreint pas. Seuls les appels ci-dessous appartiennent à @{slug}.",
   profileScopeNote: "Ces capacités valent seulement pour @{slug}.",
+  liveNote: "Une bascule vaut dès son prochain message, y compris dans une conversation déjà commencée : elle y ouvre une session Hermes neuve, l’historique suit.",
   summary: "{tools} outils appelables · {skills} skills installées",
   unconfiguredWarning_one: "{count} outil actif n’aboutira pas : sa configuration manque au runtime.",
   unconfiguredWarning_other: "{count} outils actifs n’aboutiront pas : leur configuration manque au runtime.",
@@ -141,48 +142,6 @@ export const botCapabilities = {
   errorsOpenRun: "Ouvrir dans le fil",
   errorsLoadFailed: "Les erreurs d’outils n’ont pas pu être lues.",
   errorsMore: "Charger plus",
-} as const;
-
-export const computerPanel = {
-  title: "Ordinateur",
-  agentControlUnavailableTitle: "Accès opérateur uniquement",
-  agentControlUnavailable:
-    "Ce bureau Box n’est pas relié aux outils du runtime. Le bot ne peut ni voir ni piloter cet écran.",
-  loading: "Lecture de l’ordinateur…",
-  loadFailed: "Impossible de lire l’état de l’ordinateur.",
-  readOnly: "Vous pouvez consulter cet ordinateur, mais seuls les propriétaires et administrateurs peuvent le démarrer, l’ouvrir, le capturer ou l’arrêter.",
-  stop: "Mettre en veille",
-  stopFailed: "L’arrêt de l’ordinateur n’a pas pu être confirmé. Actualisez son état avant de réessayer.",
-  previewAlt: "Capture réelle de l’ordinateur de {name}",
-  capturedAt: "Capture du {date}",
-  popupBlocked: "L’onglet a été bloqué. Ouvrir le bureau avec ce lien.",
-  openLink: "Ouvrir le lien du bureau",
-  groupSelect: "Ordinateur de",
-  status: {
-    unsupported: "Ordinateur non pris en charge",
-    off: "Ordinateur éteint",
-    provisioning: "Démarrage de l’ordinateur…",
-    ready: "Ordinateur prêt",
-    capturing: "Capture en cours…",
-    error: "Ordinateur indisponible",
-  },
-  reason: {
-    capabilityNotReported: "Ce runtime n’annonce aucune capacité Computer. Aucun aperçu ni bureau ne peut être affiché.",
-    capabilityUnsupported: "Ce backend indique explicitement qu’il ne prend pas en charge Computer.",
-    off: "L’ordinateur est actuellement éteint.",
-    backendError: "Le backend Computer a renvoyé une erreur.",
-    provisioningFailed: "L’ordinateur n’a pas pu démarrer.",
-    captureFailed: "La capture a échoué.",
-    openFailed: "L’ouverture du bureau a échoué.",
-    refreshFailed: "L’actualisation de l’état Computer a échoué.",
-  },
-  noPreview: "Aucun aperçu n’est fabriqué : une vraie capture du backend est nécessaire.",
-  callbackFailed: "L’action Computer a échoué. Réessayez ou actualisez son état.",
-  open: "Ouvrir le bureau",
-  capture: "Actualiser la capture",
-  retry: "Réessayer",
-  refresh: "Actualiser",
-  configureRuntime: "Configurer le runtime",
 } as const;
 
 export const botMemory = {

@@ -262,6 +262,10 @@ type rawUsageProbe struct {
 		Provider          string          `json:"provider"`
 		Usage             json.RawMessage `json:"usage"`
 		UnavailableReason string          `json:"unavailableReason"`
+		// "api_key": the gateway serves this provider with a plain API key.
+		// Such an account is billed per use and has no plan quota to read:
+		// that is a fact about the account, not a failed probe.
+		Credential string `json:"credential"`
 	} `json:"providers"`
 }
 
@@ -295,6 +299,10 @@ func normaliseUsageProbe(raw []byte, requested []string, now time.Time) (UsageDo
 		if !known[rawProvider.Provider] || got[rawProvider.Provider].Provider != "" {
 			return UsageDocument{}, errors.New("account usage response has an unexpected provider")
 		}
+		if rawProvider.Credential == "api_key" {
+			got[rawProvider.Provider] = apiKeyUsage(rawProvider.Provider)
+			continue
+		}
 		if rawProvider.UnavailableReason != "" {
 			// The Python probe only emits fixed reasons, but this is still an
 			// untrusted process boundary: never relay a string supplied in its
@@ -313,6 +321,12 @@ func normaliseUsageProbe(raw []byte, requested []string, now time.Time) (UsageDo
 		}
 	}
 	return document, nil
+}
+
+// apiKeyUsage is a provider served with a metered API key: no windows, no
+// plan, and no unavailable reason, because nothing failed.
+func apiKeyUsage(provider string) ProviderUsage {
+	return ProviderUsage{Provider: provider, Source: "api_key", Windows: []UsageWindow{}, Details: []string{}}
 }
 
 func unavailableUsage(provider, reason string) ProviderUsage {

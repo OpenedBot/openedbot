@@ -1,29 +1,22 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { IconBrush, IconDice5, IconX } from "@tabler/icons-react";
-import type { BotDto, BotFaceSpec, RosterDto, RuntimeModelSelectionStateDto } from "@openedbot/contracts-api";
+import type { BotDto, BotFaceSpec, RuntimeModelSelectionStateDto } from "@openedbot/contracts-api";
 import { displayedCreatePersona } from "@openedbot/roster/domain/persona";
 import { BotCloneDraftError, botCreationDraftFromClone, type PortableBotCreationDraft } from "@openedbot/roster/domain/bot-clone";
 import { Dialog, Input, Label, useIsMobile } from "@openedbot/browser-ui-kit";
 import { randomFace } from "@openedbot/browser-face/presets";
 import { randomBotArtwork } from "@openedbot/browser-face/artworks";
-import { ApiError, api, queryKeys, runtimesQueryOptions } from "../../lib/api";
+import { api, queryKeys, runtimesQueryOptions } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { creationAttempts } from "../../lib/bots/creation-attempts";
-import {
-  failPendingBotCreation,
-  resumePendingBotCreation,
-  settlePendingBotCreation,
-  startPendingBotCreation,
-} from "../../lib/bots/pending-bot-creations";
 import { BotFace } from "../bot-face";
 import { FaceFields } from "../face-fields";
 import { BUTTON } from "../settings/primitives";
-import { BotRoutinesDialog } from "../bot-routines-dialog";
-import { CreatePersonaSection } from "./persona-sheet";
-import { CreationOptions, RuntimePromiseLine, isRuntimeLinked, type CreationOptionsValue } from "./creation-options";
-import { sendBotCreation, type BotCreationRequest } from "./creation-request";
+import { HermesProfileField } from "../hermes-profile-field";
+import { DEFAULT_CREATION_OPTIONS, RuntimePromiseLine, type CreationOptionsValue } from "./creation-options";
+import type { BotCreationRequest } from "./creation-request";
+import { useBotCreationLaunch } from "./use-bot-launch";
 
 /** The `bots.label` bound (0099): the role is the label shown under the name. */
 export const BOT_ROLE_MAX_CHARS = 60;
@@ -65,6 +58,7 @@ type Draft = {
   name: string;
   role: string;
   mission: string;
+  /** A duplicate carries its source's persona as is; a new bot's is composed. */
   personaTouched: boolean;
   personaText: string;
   face: BotFaceSpec;
@@ -80,14 +74,6 @@ type Draft = {
   cloneError: MessageKey | null;
 };
 
-const DEFAULT_OPTIONS: CreationOptionsValue = {
-  profile: "",
-  permissionMode: "manual",
-  notifyOnFinish: false,
-  firstRoutine: false,
-  greet: true,
-};
-
 function blankDraft(): Draft {
   return {
     name: "",
@@ -96,7 +82,7 @@ function blankDraft(): Draft {
     personaTouched: false,
     personaText: "",
     face: randomArtworkFace(),
-    options: DEFAULT_OPTIONS,
+    options: DEFAULT_CREATION_OPTIONS,
     permissionModeChosen: false,
     copied: null,
     presetLabel: null,
@@ -126,7 +112,7 @@ function duplicateDraft(source: BotDto, copyLabel: string): Draft {
     personaTouched: true,
     personaText: instructions,
     face: face ?? randomArtworkFace(),
-    options: { ...DEFAULT_OPTIONS, notifyOnFinish: draft.notifyOnFinish ?? false, greet: false },
+    options: { ...DEFAULT_CREATION_OPTIONS, notifyOnFinish: draft.notifyOnFinish ?? DEFAULT_CREATION_OPTIONS.notifyOnFinish, greet: false },
     permissionModeChosen: true,
     copied,
     presetLabel: null,
@@ -140,10 +126,11 @@ function duplicateDraft(source: BotDto, copyLabel: string): Draft {
  * d'abord le point de départ (un modèle officiel ou « Sur mesure », un clic
  * choisit et avance), puis l'identité (nom, rôle, mission).
  *
- * La fiche de poste (persona) reste exactement le texte envoyé, éditable, mais
- * repliée avec le reste (règles d'approbation, avis de fin, accueil, profil
- * explicite) dans « Options avancées », avec des défauts sûrs, et part dans la
- * MÊME requête que le bot (création atomique, 0135). « Créer » ferme la
+ * Rien d'autre à régler ici (plus d'« Options avancées », 2026-11-02) : la
+ * fiche de poste est composée depuis le nom, le rôle et la mission, le bot
+ * part avec les défauts sûrs (`DEFAULT_CREATION_OPTIONS`, le mode par défaut
+ * de l'organisation), et tout se change ensuite sur sa page. Le tout part dans
+ * la MÊME requête que le bot (création atomique, 0135). « Créer » ferme la
  * feuille et ouvre l'écran d'attente du bot ; la demande garde un
  * `clientRequestId` que « Réessayer » rejoue sans risque de doublon.
  *
@@ -155,9 +142,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   source?: BotDto | null;
 }) {
   const { t, locale } = useT();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const router = useRouter();
+  const launch = useBotCreationLaunch();
   const idPrefix = useId();
   const isMobile = useIsMobile();
   const runtimeQuery = useQuery({ ...runtimesQueryOptions(), enabled: open });
@@ -175,8 +160,6 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   const [draft, setDraft] = useState<Draft>(() => source ? duplicateDraft(source, t("botCloneDialog.copyLabel")) : blankDraft());
   const attempts = useRef(creationAttempts());
   const [faceEditing, setFaceEditing] = useState(false);
-  const [personaProposing, setPersonaProposing] = useState(false);
-  const [routineBot, setRoutineBot] = useState<BotDto | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const update = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
@@ -218,7 +201,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   // new one is proven (and promoted), that is still the previous model.
   const proof = assignment.data?.runtime?.id === runtime?.id ? assignment.data?.runtime?.modelSelection ?? null : null;
   const pendingModel = !ownModel && modelProofPending(proof) ? proof?.model ?? null : null;
-  const canCreate = trimmedName.length > 0 && !personaProposing && draft.cloneError === null
+  const canCreate = trimmedName.length > 0 && draft.cloneError === null
     && !cloneRuntimePending && profileError === null;
 
   const close = () => {
@@ -247,48 +230,11 @@ export function CreateBotSheet({ open, onClose, source = null }: {
     return { clientRequestId: attempts.current.idFor(content), ...content };
   };
 
-  const errorMessage = (error: unknown) => error instanceof ApiError ? error.message : t("newBotDialog.createFailed");
-
-  /**
-   * The roster knows the bot BEFORE any screen looks for it: the answered bot
-   * goes into the cached roster, then the roster is read again. Opening
-   * `/bot/<id>` first would show « ce bot n'existe plus » while a slow
-   * refetch is still under way (the query is not pending, it has data).
-   */
-  const rememberCreated = async (bot: BotDto) => {
-    queryClient.setQueryData<RosterDto>(queryKeys.roster, (current) => current && !current.bots.some((entry) => entry.id === bot.id)
-      ? { ...current, bots: [...current.bots, bot] }
-      : current);
-    await queryClient.invalidateQueries({ queryKey: queryKeys.roster });
-  };
-
-  /** The waiting screen owns the attempt: it can replay it, with the same id. */
-  const launch = (request: BotCreationRequest, pendingId: string, openRoutine: boolean) => {
-    sendBotCreation(request).then(async (bot) => {
-      await rememberCreated(bot);
-      settlePendingBotCreation(pendingId);
-      // Toujours sur l'écran de création : il devient la conversation du bot.
-      // Parti ailleurs entre-temps : le bot attend dans la liste.
-      if (router.state.location.pathname.endsWith(`/bot/${pendingId}`)) {
-        void navigate({ to: "/bot/$botId", params: { botId: bot.id }, replace: true });
-      }
-      if (openRoutine) setRoutineBot(bot);
-    }, (error: unknown) => {
-      failPendingBotCreation(pendingId, errorMessage(error), () => {
-        resumePendingBotCreation(pendingId);
-        launch(request, pendingId, openRoutine);
-      });
-    });
-  };
-
   const submit = () => {
     if (!canCreate) return;
     const request = freeze();
-    const openRoutine = draft.options.firstRoutine;
-    const pendingId = startPendingBotCreation({ name: request.name, face: request.face });
-    launch(request, pendingId, openRoutine);
     close();
-    void navigate({ to: "/bot/$botId", params: { botId: pendingId } });
+    launch(request);
   };
 
   const preview = (
@@ -391,41 +337,24 @@ export function CreateBotSheet({ open, onClose, source = null }: {
     </div>
   );
 
-  // La fiche de poste reste exactement le texte envoyé, mais repliée avec le
-  // reste : un nom et une mission suffisent pour créer.
-  const options = (
-    <CreationOptions
-      id={idPrefix}
-      runtime={runtime}
-      profileManagement={profileManagement}
-      profileRequired={profileRequired}
-      profileError={profileError ? t(profileError) : null}
-      model={ownModel}
-      value={creationOptions}
-      onChange={(next) => update({
-        options: next,
-        permissionModeChosen: draft.permissionModeChosen || next.permissionMode !== creationOptions.permissionMode,
-      })}
-    >
-      <CreatePersonaSection
-        id={`${idPrefix}-persona`}
-        displayed={displayedPersona}
-        onEdit={(next) => update({ personaTouched: true, personaText: next })}
-        onPendingChange={setPersonaProposing}
-        runtimeConnected={isRuntimeLinked(runtime)}
-        name={previewName}
-        role={draft.role}
-        mission={draft.mission}
-      />
-    </CreationOptions>
-  );
+  // A duplicate on a host without `profile_management` cannot be created
+  // without its own profile: the only field left besides the identity.
+  const profileField = profileRequired ? (
+    <HermesProfileField
+      id={`${idPrefix}-profile`}
+      value={draft.options.profile}
+      onChange={(profile) => update({ options: { ...draft.options, profile } })}
+      required
+      error={profileError ? t(profileError) : null}
+    />
+  ) : null;
 
   const error = draft.cloneError ? <p role="alert" className="text-sm text-destructive-text">{t(draft.cloneError)}</p> : null;
   const content = faceEditing ? faceStudio : (
     <div className="space-y-5">
       {error}
       {fields}
-      {options}
+      {profileField}
     </div>
   );
 
@@ -485,17 +414,6 @@ export function CreateBotSheet({ open, onClose, source = null }: {
           </div>
         </div>
       </Dialog>
-      {routineBot ? (
-        <BotRoutinesDialog
-          bot={routineBot}
-          open
-          onClose={() => {
-            const bot = routineBot;
-            setRoutineBot(null);
-            void navigate({ to: "/bot/$botId", params: { botId: bot.id } });
-          }}
-        />
-      ) : null}
     </>
   );
 }

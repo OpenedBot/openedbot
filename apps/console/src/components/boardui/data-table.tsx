@@ -2,17 +2,18 @@ import { cn } from "@openedbot/browser-ui-kit";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
 /**
- * Class constants of the table card: a muted shell carrying the title row and
- * the footer, the content raised in a white panel (`body`) with a grey column
- * band and flat rows separated by a hairline, as the settings cards
- * (`SETTINGS_SHELL`). Spread them on native elements like `BUTTON`.
+ * Class constants of the table card: ONE card (`bg-card`, white in light,
+ * #262626 in dark) carrying the title row, the content under a hairline
+ * (`body`) with a column band and flat rows separated by a hairline, and the
+ * footer, as the settings cards (`SETTINGS_SHELL`). Spread them on native
+ * elements like `BUTTON`.
  */
 export const DATA_TABLE = {
-  card: "min-w-0 overflow-hidden rounded-2xl border border-border/60 bg-background-secondary-default p-1",
-  header: "flex flex-wrap items-center justify-between gap-3 px-3 pt-2.5 pb-2",
-  body: "min-w-0 overflow-hidden rounded-xl border border-border/60 bg-background-full shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
+  card: "min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
+  header: "flex flex-wrap items-center justify-between gap-3 px-4 pt-3.5 pb-3",
+  body: "min-w-0 overflow-hidden border-t border-border/60",
   tabs: "mx-3 my-2 max-w-[calc(100%-1.5rem)] self-start overflow-x-auto overflow-y-hidden",
-  headRow: "h-[46px] border-b border-border-table bg-background-secondary-default text-left text-sm font-medium text-text-tertiary",
+  headRow: "h-[46px] border-b border-border-table bg-background-secondary-default text-left text-sm font-medium text-text-tertiary dark:bg-white/5",
   headCell: "py-2 pl-3 pr-3 font-medium",
   bodyRows: "[&>tr]:border-b [&>tr]:border-border-table [&>tr:last-child]:border-b-0",
   row: "h-[59px] align-middle",
@@ -20,7 +21,7 @@ export const DATA_TABLE = {
   list: "[&>li]:border-b [&>li]:border-border-table [&>li:last-child]:border-b-0",
   listRow: "flex min-h-[59px] flex-wrap items-center justify-between gap-3 py-2 pl-3 pr-3",
   empty: "px-4 py-8 text-center text-sm text-text-tertiary",
-  footer: "flex flex-wrap items-center justify-between gap-3 px-3 pt-2.5 pb-1.5",
+  footer: "flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5",
 } as const;
 
 /** Rows a dashboard table shows at once before paginating. */

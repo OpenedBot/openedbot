@@ -31,7 +31,8 @@ export type ProviderUsageWindowDto = {
 /** Le snapshot d'un fournisseur ; les credentials ne quittent jamais l'hôte. */
 export type ProviderUsageSnapshotDto = {
   provider: string;
-  source: "oauth_usage_api" | "usage_api" | "credits_api" | "unsupported" | "unavailable";
+  /** `api_key` : une clé API facturée à l'usage, sans quota de forfait à lire. */
+  source: "oauth_usage_api" | "usage_api" | "credits_api" | "api_key" | "unsupported" | "unavailable";
   plan: string | null;
   windows: ProviderUsageWindowDto[];
   details: string[];

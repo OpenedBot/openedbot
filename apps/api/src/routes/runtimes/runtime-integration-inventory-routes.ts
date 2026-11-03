@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import {
   type HermesCapabilityInventory,
+  type HermesClientConfig,
   type HermesConnectorManagementProbe,
   type HermesHostToolsets,
   type HermesToolsetState,
@@ -14,6 +15,7 @@ import {
   invalidateSnapshots,
   readThrough,
   wantsFreshRead,
+  watchedReadPolicy,
 } from "@openedbot/runtimes/application/runtime-read-snapshots";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import {
@@ -22,7 +24,7 @@ import {
   runtimeIntegrationInventory,
   withDeadline,
 } from "./runtime-integration-public";
-import { FEATURE_TOOLSETS, TOOLSET_NAME_PATTERN } from "./runtime-integration-constants";
+import { FEATURE_SKILLS_INVENTORY, FEATURE_TOOLSETS, TOOLSET_NAME_PATTERN } from "./runtime-integration-constants";
 
 /** L’inventaire global du runtime et la bascule de ses toolsets. */
 export function runtimeInventoryRoutes(ctx: IntegrationRouteContext): Hono<{ Variables: AppVariables }> {
@@ -68,45 +70,9 @@ export function runtimeInventoryRoutes(ctx: IntegrationRouteContext): Hono<{ Var
       runtimeId: runtime.id,
       kind: "integrations",
       fresh: wantsFreshRead(context.req.query("fresh")),
-      keep: (value: RuntimeIntegrationInventoryDto) => value.inventoryError === null,
-      read: async () => {
-    let inventory: HermesCapabilityInventory | null = null;
-    let failure: unknown = null;
-    let managementProbe: HermesConnectorManagementProbe | null = null;
-    let hostFeatures: string[] | null = null;
-    const client = clientFactory(runtime.client);
-    const [inventoryResult, managementResult, featuresResult] = await Promise.allSettled([
-      withDeadline(client.capabilityInventory(), timeoutMs),
-      withDeadline(client.connectorManagementProbe(), timeoutMs),
-      withDeadline(announcedFeatures(runtime, client), timeoutMs),
-    ]);
-    if (inventoryResult.status === "fulfilled") inventory = inventoryResult.value;
-    else failure = inventoryResult.reason;
-    if (managementResult.status === "fulfilled") managementProbe = managementResult.value;
-    if (featuresResult.status === "fulfilled") hostFeatures = featuresResult.value;
-
-    // La liste des toolsets réglables ne part QUE si l'hôte a annoncé la
-    // capacité : un hôte sans opérateur répondrait `HERMES_OPERATOR_UNAVAILABLE`
-    // à chaque ouverture de la page, ce qui coûte un aller pour rien et remplit
-    // son journal d'un refus qui n'apprend rien. L'inventaire MCP, lui, n'est
-    // pas ici du tout : il a sa route, lue quand son panneau s'ouvre.
-    let hostToolsets: HermesHostToolsets | null = null;
-    if (hostFeatures?.includes(FEATURE_TOOLSETS)) {
-      const toolsetsResult = await Promise.allSettled([withDeadline(client.hostToolsets(), timeoutMs)]);
-      if (toolsetsResult[0].status === "fulfilled") hostToolsets = toolsetsResult[0].value;
-    }
-
-    return runtimeIntegrationInventory({
-      runtime: { id: runtime.id, name: runtime.name },
-      inventory,
-      failure,
-      observedAt,
-      canConfigure: true,
-      managementProbe,
-      hostFeatures,
-      hostToolsets,
-    });
-      },
+      keep: keepIntegrations,
+      ...watchedReadPolicy(runtime.inventory),
+      read: liveIntegrationsRead(ctx, runtime),
     });
     return context.json<RuntimeIntegrationInventoryDto>(dto);
   });
@@ -152,4 +118,68 @@ export function runtimeInventoryRoutes(ctx: IntegrationRouteContext): Hono<{ Var
   });
 
   return routes;
+}
+
+/** Ce que garde l'instantané : un inventaire que l'hôte a rendu sans erreur. */
+export const keepIntegrations = (value: RuntimeIntegrationInventoryDto) => value.inventoryError === null;
+
+/**
+ * La lecture vivante de l'inventaire : les sondes de l'hôte, composées en DTO
+ * public. La route la sert à travers l'instantané ; le réchauffage
+ * (`runtime-inventory-warm.ts`) la rejoue quand l'hôte signale un changement.
+ */
+export function liveIntegrationsRead(
+  ctx: IntegrationRouteContext,
+  runtime: { id: string; name: string; client: HermesClientConfig; linkFeatures?: string[] },
+): () => Promise<RuntimeIntegrationInventoryDto> {
+  const { clientFactory, timeoutMs, now, announcedFeatures } = ctx;
+  return async () => {
+    const observedAt = now().toISOString();
+    let inventory: HermesCapabilityInventory | null = null;
+    let failure: unknown = null;
+    let managementProbe: HermesConnectorManagementProbe | null = null;
+    let hostFeatures: string[] | null = null;
+    const client = clientFactory(runtime.client);
+    const [inventoryResult, managementResult, featuresResult] = await Promise.allSettled([
+      withDeadline(client.capabilityInventory(), timeoutMs),
+      withDeadline(client.connectorManagementProbe(), timeoutMs),
+      withDeadline(announcedFeatures(runtime, client), timeoutMs),
+    ]);
+    if (inventoryResult.status === "fulfilled") inventory = inventoryResult.value;
+    else failure = inventoryResult.reason;
+    if (managementResult.status === "fulfilled") managementProbe = managementResult.value;
+    if (featuresResult.status === "fulfilled") hostFeatures = featuresResult.value;
+
+    // `/v1/skills` répond 500 sur Hermes 0.21.3 à 0.22.6 (amont #142575) :
+    // l'opérateur de l'hôte lit la même liste sans l'argument fautif. Son
+    // échec laisse l'erreur d'origine affichée, jamais une liste vide.
+    if (inventory?.skillsFailed && hostFeatures?.includes(FEATURE_SKILLS_INVENTORY)) {
+      const [skillsResult] = await Promise.allSettled([withDeadline(client.hostSkills(), timeoutMs)]);
+      if (skillsResult.status === "fulfilled" && skillsResult.value !== null) {
+        inventory = { ...inventory, skills: skillsResult.value, skillsFailed: false };
+      }
+    }
+
+    // La liste des toolsets réglables ne part QUE si l'hôte a annoncé la
+    // capacité : un hôte sans opérateur répondrait `HERMES_OPERATOR_UNAVAILABLE`
+    // à chaque ouverture de la page, ce qui coûte un aller pour rien et remplit
+    // son journal d'un refus qui n'apprend rien. L'inventaire MCP, lui, n'est
+    // pas ici du tout : il a sa route, lue quand son panneau s'ouvre.
+    let hostToolsets: HermesHostToolsets | null = null;
+    if (hostFeatures?.includes(FEATURE_TOOLSETS)) {
+      const toolsetsResult = await Promise.allSettled([withDeadline(client.hostToolsets(), timeoutMs)]);
+      if (toolsetsResult[0].status === "fulfilled") hostToolsets = toolsetsResult[0].value;
+    }
+
+    return runtimeIntegrationInventory({
+      runtime: { id: runtime.id, name: runtime.name },
+      inventory,
+      failure,
+      observedAt,
+      canConfigure: true,
+      managementProbe,
+      hostFeatures,
+      hostToolsets,
+    });
+  };
 }

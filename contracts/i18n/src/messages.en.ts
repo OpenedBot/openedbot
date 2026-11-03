@@ -5,8 +5,8 @@
  * completeness test in `index.test.ts`. See `docs/cloud/DEVELOPMENT.md`.
  */
 import { changePassword, legal, login, memberInvitation } from "./messages/en/auth";
-import { botCloneDialog, botContextMenu, botManage, botsTable, newBotDialog, voicePanel } from "./messages/en/bot-lifecycle";
-import { botCapabilities, botMemory, botRoutinesDialog, botSettingsDialog, computerPanel, settingProposal } from "./messages/en/bots";
+import { botCloneDialog, botContextMenu, botManage, botsTable, homeNewBot, newBotDialog, voicePanel } from "./messages/en/bot-lifecycle";
+import { botCapabilities, botMemory, botRoutinesDialog, botSettingsDialog, settingProposal } from "./messages/en/bots";
 import { agentActivity, attachmentCanvas, composer, gateCard, groups, mobileComposer, planCard, workflowOverview } from "./messages/en/composer";
 import { connectorsPage, connectorsSettings, mcpCatalog, webhookPanel } from "./messages/en/connectors";
 import { decisions, inbox, orgPermissionPolicy, settingsPolicies } from "./messages/en/control";
@@ -15,10 +15,9 @@ import { modelsSettings } from "./messages/en/models";
 import { onboarding, tailscaleGuide } from "./messages/en/onboarding";
 import { cloudRuntimeSettings, connectorUpgrade, providerIncidents, providerLimits, runtimeAlerts, runtimeDirect, runtimeHealth, runtimeOffline, runtimeRail } from "./messages/en/runtime";
 import { botHostCleanup, botProfileProvision, botProfileRepair, profileImport } from "./messages/en/runtime-profiles";
-import { mobileSettingsHints, mobileSettingsRuntimes, operatorSettingsDialog, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/en/settings";
-import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder, pwaInstall } from "./messages/en/shell";
+import { mobileSettingsHints, mobileSettingsRuntimes, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/en/settings";
+import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/en/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/en/thread";
-import { waitlist } from "./messages/en/waitlist";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/en/workspace";
 
 export const en = {
@@ -28,7 +27,6 @@ export const en = {
   relativeTime,
   units,
   common,
-  pwaInstall,
   providerLimits,
   settings,
   overviewPlaceholder,
@@ -38,14 +36,12 @@ export const en = {
   notFound,
   connectorsSettings,
   botSettingsDialog,
-  operatorSettingsDialog,
   webhookPanel,
   botProfileRepair,
   botProfileProvision,
   mcpCatalog,
   connectorsPage,
   botCapabilities,
-  computerPanel,
   voicePanel,
   botMemory,
   threadContext,
@@ -98,7 +94,6 @@ export const en = {
   profileImport,
   onboarding,
   legal,
-  waitlist,
   login,
   runtimeHealth,
   runtimeRail,
@@ -107,6 +102,7 @@ export const en = {
   modelsSettings,
   decisions,
   newBotDialog,
+  homeNewBot,
   botManage,
   face,
   format,

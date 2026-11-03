@@ -39,6 +39,11 @@ export type BotDto = {
   sectionId: string;
   position: number;
   pinned: boolean;
+  /**
+   * Rang dans la grille des épinglés, commun aux bots et aux salons (0159).
+   * `null` : épinglé sans rang (rangé après, par activité). Absent avant 0159.
+   */
+  pinPosition?: number | null;
   face: BotFaceSpec | null;
   /** Identifiant public de synthèse vocale ; `null` reprend la voix par défaut du client. */
   voiceId: string | null;
@@ -54,6 +59,8 @@ export type BotDto = {
   hermesProfileManaged?: boolean;
   profileImportStatus?: "configuring" | "needs_attention" | null;
   profileProvisionStatus?: "preparing" | "failed" | null;
+  /** L'étape en cours tant que `profileProvisionStatus` vaut `preparing` (0164), `null` avant la première. */
+  profileProvisionProgress?: BotProfileProvisionProgress | null;
   hostCleanupStatus?: "pending" | "verifying" | "failed" | null;
   /**
    * PERM2-2: whether the host plugin is proven to enforce the bot's mode.
@@ -100,4 +107,14 @@ export type BotDto = {
    * `BOT_CREATION_REQUEST_REUSED` (0136).
    */
   creationReplayed?: true;
+};
+
+/**
+ * Où en est la préparation du profil d'un bot neuf : son espace sur le
+ * serveur, ses règles d'approbation, puis ses outils (`tools` : les toolsets
+ * Hermes qu'il active, connus au début de l'étape).
+ */
+export type BotProfileProvisionProgress = {
+  step: "space" | "rules" | "tools";
+  tools?: string[];
 };

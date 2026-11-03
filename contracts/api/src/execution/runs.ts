@@ -48,6 +48,8 @@ export type RunDto = {
     reasoningTokens: number | null;
     toolCallCount: number | null;
   } | null;
+  /** `bot_greeting` pour l'accueil d'un bot neuf, absent sinon (les autres origines restent internes). */
+  origin?: string | null;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;

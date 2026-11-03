@@ -1,4 +1,5 @@
-import { AuditAnchorError } from "./audit-anchor";
+import { recordAuditAnchorFrame } from "./audit-anchor-frame";
+import { InventorySignal } from "./inventory-signal";
 import { RelayDialError, type RelayRequest } from "@openedbot/hermes";
 import {
   decodeBinaryFrame,
@@ -85,6 +86,7 @@ export class LinkConnection {
   claimInFlight: Promise<void> | null = null;
 
   private readonly diagnosticsInFlight = new Set<string>();
+  private readonly inventorySignal: InventorySignal;
   private retiring = false;
   private nextRequestId = 1;
   private readonly inFlight = new Map<number, PendingRequest>();
@@ -126,6 +128,7 @@ export class LinkConnection {
     private readonly onClosed: (connection: LinkConnection, code: number, reason: string) => void = () => {},
   ) {
     this.openedAt = options.now();
+    this.inventorySignal = new InventorySignal({ ...options, isClosed: () => this.closed });
     this.pingTimer = setInterval(() => {
       if (!this.closed) this.sendFrame({ t: "ping" });
     }, options.pingIntervalMs);
@@ -337,6 +340,9 @@ export class LinkConnection {
         });
         return;
       }
+      case "inventory.changed":
+        if (this.identity && this.admitted && !this.closed) this.inventorySignal.receive(this.identity);
+        return;
       case "capabilities":
         if (!this.closed) {
           this.features = [...(frame.features ?? [])];
@@ -350,28 +356,9 @@ export class LinkConnection {
       case "pong":
         this.touchSeen();
         return;
-      case "audit.anchor": {
-        const identity = this.identity;
-        const persist = this.options.liveness.auditAnchor;
-        if (!identity || !this.admitted || this.closed || !persist || frame.runtimeId !== identity.runtimeId) return;
-        void persist(identity, frame).then((outcome) => {
-          if (outcome === "recorded") return;
-          // Une position en recul ou une clé jamais remise : l'hôte rejoue un
-          // fichier restauré, ou deux copies du runtime se disputent le lien.
-          this.options.log("runtime_link.audit_anchor_refused", { runtimeId: identity.runtimeId, outcome, keyId: frame.keyId, writeSeq: frame.writeSeq });
-          const event = this.options.liveness.event;
-          if (event) void event.call(this.options.liveness, identity, "clock_skew", { reason: `anchor_${outcome}`, keyId: frame.keyId, writeSeq: frame.writeSeq, instanceId: this.options.instanceId, generation: identity.generation ?? null }).catch(() => {});
-        }).catch((error) => {
-          // `audit.anchor` : l'ancrage externe a échoué, l'ancre n'est pas
-          // enregistrée (transaction annulée) ; la suivante la rattrapera.
-          if (error instanceof AuditAnchorError) {
-            this.options.log("runtime_link.audit_anchor_failed", { runtimeId: identity.runtimeId, keyId: frame.keyId, writeSeq: frame.writeSeq, anchor: error.anchorId, error: error.reason });
-            return;
-          }
-          this.options.log("runtime_link.liveness_failed", { runtimeId: identity.runtimeId, write: "audit_anchor", error: String(error) });
-        });
+      case "audit.anchor":
+        if (this.identity && this.admitted && !this.closed) recordAuditAnchorFrame(this.identity, frame, this.options);
         return;
-      }
       case "res":
         this.handleResponse(frame.id, frame.status, frame.headers ?? {});
         return;

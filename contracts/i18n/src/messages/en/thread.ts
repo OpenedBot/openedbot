@@ -24,13 +24,9 @@ export const threadContext = {
   planLimits: "Plan usage limits · {plan}",
   planLimitsAll: "Plan usage limits",
   planLimitsOpen: "See quota detail",
-  preambleMeasured:
-    "Context is estimated at four characters per token, like upstream. The Hermes preamble (identity, memory, skills, tool schemas) is measured on the host; MCP tools are not counted.",
   turnCost: "Last turn: {tokens} tokens billed, tool iterations included.",
-  occupancyEstimated: "Context is estimated at four characters per token, like upstream, and excludes the preamble the runtime adds itself: it is a floor.",
   tabContext: "Context",
   tabQuotas: "Quotas",
-  modelLine: "Model: {model}.",
   open: "See context and account limits",
   title: "Context and limits",
   description:
@@ -46,12 +42,6 @@ export const threadContext = {
   free: "Free",
   expand: "Show window detail",
   collapse: "Hide window detail",
-  windowFromTable:
-    "The window size comes from Hermes's model table: this runtime does not publish it.",
-  windowFromDefault:
-    "This model is missing from Hermes's table: the window shown is the default ceiling it applies in that case.",
-  windowUnknown:
-    "The window size is unknown for this model: only the tokens spent are shown.",
   groupOpen: "See each member's context and model",
   groupTitle: "Crew context",
   groupDescription: "Each member runs in its own session, with its own model and its own context window.",

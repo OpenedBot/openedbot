@@ -421,6 +421,27 @@ func TestProviderUsageNeverReturnsUpstreamDiagnosticText(t *testing.T) {
 	}
 }
 
+func TestProviderUsageReportsAnAPIKeyAccountAsMeteredNotUnavailable(t *testing.T) {
+	document, err := normaliseUsageProbe(
+		[]byte(`{"fetchedAt":"2026-11-02T15:00:00Z","providers":[{"provider":"anthropic","credential":"api_key"},{"provider":"openrouter","unavailableReason":"x"}]}`),
+		[]string{"anthropic", "openrouter"},
+		time.Date(2026, 11, 2, 15, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	anthropic := document.Providers[0]
+	if anthropic.Source != "api_key" || anthropic.UnavailableReason != nil || anthropic.Plan != nil {
+		t.Fatalf("api key account = %+v", anthropic)
+	}
+	if anthropic.Windows == nil || len(anthropic.Windows) != 0 || anthropic.Details == nil {
+		t.Fatalf("api key account must carry empty, non-null lists: %+v", anthropic)
+	}
+	if document.Providers[1].Source != "unavailable" {
+		t.Fatalf("other providers keep their own state: %+v", document.Providers[1])
+	}
+}
+
 func TestProviderUsageCachesAndSingleFlights(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})

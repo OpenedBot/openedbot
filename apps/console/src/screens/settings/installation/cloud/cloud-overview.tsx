@@ -23,39 +23,12 @@ const DASHBOARD_STAGES = 4;
  * et recolle les commits de 100 ms. Une frame laisse le navigateur respirer.
  */
 const STAGE_GAP_MS = 32;
-/** Le fondu du voile (`animate-in`). Filet si `animationend` ne part pas. */
-const MODAL_ENTER_MS = 200;
 
 export function CloudSettingsOverview() {
   const { t } = useT();
-  // Les graphes ne montent pas pendant le fondu : un commit Recharts de
-  // ~100 ms gelait `fade-in`. On attend la fin de l'animation du voile, puis
-  // un bloc par frame peinte. Hors modale (page pleine, test), on démarre
-  // tout de suite.
-  const [dashboardStage, setDashboardStage] = useState(0);
-  useEffect(() => {
-    const backdrop = document.querySelector("[data-settings-backdrop]");
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!backdrop || reduced) {
-      setDashboardStage(1);
-      return;
-    }
-    let started = false;
-    const start = () => {
-      if (started) return;
-      started = true;
-      setDashboardStage(1);
-    };
-    const onEnd = (event: Event) => {
-      if (event.target === backdrop) start();
-    };
-    backdrop.addEventListener("animationend", onEnd);
-    const fallback = window.setTimeout(start, MODAL_ENTER_MS);
-    return () => {
-      backdrop.removeEventListener("animationend", onEnd);
-      window.clearTimeout(fallback);
-    };
-  }, []);
+  // Un bloc par frame peinte : un commit Recharts de ~100 ms par graphe
+  // gelait la page quand tous montaient ensemble.
+  const [dashboardStage, setDashboardStage] = useState(1);
   useEffect(() => {
     if (dashboardStage < 1 || dashboardStage >= DASHBOARD_STAGES) return;
     const timer = window.setTimeout(() => setDashboardStage((stage) => stage + 1), STAGE_GAP_MS);
@@ -113,7 +86,7 @@ function SettingsNavCard({
   const overlay = useSettingsOverlay();
   const router = useRouter();
   const className =
-    "group flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-surface";
+    "group flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
   const body = (
     <>
       <span className="min-w-0 flex-1">

@@ -6,6 +6,27 @@ export type RuntimeReadKind = "mcp" | "models" | "profiles" | "integrations";
 export const SNAPSHOT_FRESH_MS = 60_000;
 /** Up to this age a snapshot answers at once while a shared read replaces it. */
 export const SNAPSHOT_STALE_MS = 10 * 60_000;
+/**
+ * A host whose connector watches its inventory (0160) says when it changes:
+ * until then its snapshot is right, and re-reading it on every visit only
+ * starts interpreters on the host. The hour bounds a lost signal; the day is
+ * how long a snapshot of a watched host may still answer at once.
+ */
+export const WATCHED_SNAPSHOT_FRESH_MS = 60 * 60_000;
+export const WATCHED_SNAPSHOT_STALE_MS = 24 * 60 * 60_000;
+
+/**
+ * The read policy of a kind the host connector watches (`integrations`,
+ * `mcp`): its last signal makes an older snapshot stale, and a watched host
+ * keeps its snapshot longer.
+ */
+export function watchedReadPolicy(inventory: { changedAt: Date | null; watched: boolean } | undefined): Pick<ReadInput<unknown>, "changedAt" | "freshMs" | "staleMs"> {
+  if (!inventory) return {};
+  return {
+    changedAt: inventory.changedAt,
+    ...(inventory.watched ? { freshMs: WATCHED_SNAPSHOT_FRESH_MS, staleMs: WATCHED_SNAPSHOT_STALE_MS } : {}),
+  };
+}
 
 export function wantsFreshRead(query: string | undefined): boolean {
   return query === "1" || query === "true";
@@ -25,7 +46,7 @@ export type SnapshotStore = {
 
 export { postgresSnapshotStore };
 
-type ReadInput<T> = {
+export type ReadInput<T> = {
   organizationId: string;
   runtimeId: string;
   kind: RuntimeReadKind;
@@ -42,6 +63,15 @@ type ReadInput<T> = {
    * a table it has no access to).
    */
   notOlderThan?: Date | null;
+  /**
+   * The host said this kind changed at this instant (`inventory.changed`): a
+   * snapshot observed before it still answers at once, but is never fresh,
+   * so a shared read replaces it.
+   */
+  changedAt?: Date | null;
+  /** Override `SNAPSHOT_FRESH_MS` / `SNAPSHOT_STALE_MS` (see `watchedReadPolicy`). */
+  freshMs?: number;
+  staleMs?: number;
   now?: () => number;
 };
 
@@ -100,8 +130,9 @@ export async function readThrough<T>(store: SnapshotStore, input: ReadInput<T>):
   }
   if (!snapshot || snapshot.observedAt.getTime() < floor) return runLive();
   const age = Math.max(0, now() - snapshot.observedAt.getTime());
-  if (age < SNAPSHOT_FRESH_MS) return snapshot.document as T;
-  if (age < SNAPSHOT_STALE_MS) {
+  const changed = input.changedAt != null && snapshot.observedAt.getTime() < input.changedAt.getTime();
+  if (age < (input.freshMs ?? SNAPSHOT_FRESH_MS) && !changed) return snapshot.document as T;
+  if (age < (input.staleMs ?? SNAPSHOT_STALE_MS)) {
     runLive().then(
       () => undefined,
       (error: unknown) => {

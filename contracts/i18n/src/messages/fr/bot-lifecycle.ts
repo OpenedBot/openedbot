@@ -134,7 +134,7 @@ export const botContextMenu = {
   deleteBot: "Supprimer le bot",
   delete: "Supprimer",
   deleteTitle: "Supprimer « {name} » ?",
-  deleteDescription: "Le bot part à la corbeille chez openedbot, et ses sessions et son profil sont effacés sur votre machine Hermes. Vous pourrez le restaurer depuis Réglages → Archives : un profil vide sera recréé. La suppression définitive (fils et historique openedbot) reste dans Archives.",
+  deleteDescription: "Le bot part à la corbeille et son profil est effacé sur votre machine. Vous pourrez le restaurer depuis Réglages → Archives.",
   cancel: "Annuler",
   deleting: "Suppression…",
   deleteError: "Suppression impossible : {message}",
@@ -162,24 +162,10 @@ export const newBotDialog = {
   rolePlaceholder: "ex. Recherche et sources",
   missionLabel: "Mission",
   missionPlaceholder: "Ce que ce bot doit faire à chaque tour.",
-  profileAdvanced: "Options avancées",
   profileLabel: "Profil Hermes (facultatif)",
   profilePlaceholder: "laisser vide dans presque tous les cas",
   profileHint:
     "Ne sert que si ton runtime a des profils Hermes et que `gateway.multiplex_profiles` est activé. Sans l’annonce profile_management de l’hôte, laisse ce champ vide.",
-  profileManagedHint: "Un profil Hermes sera créé pour ce bot.",
-  personaSection: "Persona",
-  proposePersona: "Proposer une persona",
-  proposePersonaHint:
-    "Run réel sur le runtime, facturé. Si le champ n’est pas vide, une confirmation est demandée avant de le remplacer.",
-  proposePersonaNeedsRuntime:
-    "Sans runtime connecté. Le brouillon est un run réel, facturé.",
-  proposePersonaConfirmTitle: "Remplacer la persona ?",
-  proposePersonaConfirm:
-    "Remplacer la persona actuelle par le brouillon proposé ?",
-  proposePersonaOverwrite: "Remplacer",
-  proposingPersona: "Proposition en cours…",
-  proposePersonaFailed: "Le brouillon n’a pas pu être produit.",
   artworkLabel: "Apparence",
   artworkCustom: "Visage personnalisé",
   colorLabel: "Couleur",
@@ -197,24 +183,8 @@ export const newBotDialog = {
   },
   promiseUnlinked: "Il attendra que votre serveur soit relié pour travailler.",
   promiseModelPending: "{pending} est encore en vérification : d’ici là, il répondra avec {current}.",
-  sheetTitle: "Fiche de poste",
-  sheetEdit: "Modifier le texte",
-  sheetPreview: "Aperçu",
-  sheetPropose: "Laisser le runtime proposer une fiche",
-  rulesServer: "Serveur",
   rulesServerFallback: "Runtime connecté",
-  rulesServerWaiting: "Choisi à la connexion",
-  rulesModel: "Modèle",
   rulesModelRuntime: "Modèle par défaut du runtime",
-  rulesModelLater: "Changer plus tard",
-  rulesBeforeActing: "Avant d’agir",
-  rulesAskNotEnforced: "Sur ce serveur, seul le bot s’y engage : mettez edge-setup à jour pour que l’hôte l’impose.",
-  rulesNotify: "Me prévenir quand il a fini un tour",
-  rulesFirstRoutine: "Lui proposer une première routine après la création",
-  rulesGreet: "Le laisser se présenter et poser une première question",
-  profileManualHint: "Choisis un profil Hermes si ton runtime prend en charge les profils.",
-  summaryGreet: "Se présente",
-  summaryNotify: "Prévient à la fin",
   retry: "Réessayer",
   retryHint: "Réessayer renvoie la même demande : si le bot a bien été créé, il s’ouvre, sans doublon.",
   createFailed: "La création a échoué.",
@@ -309,4 +279,67 @@ export const botManage = {
   grantRevoke: "Retirer",
   grantRevoked: "« {tool} » demandera de nouveau votre autorisation.",
   grantRevokeFailed: "Le retrait a échoué. Réessayez.",
+} as const;
+
+/**
+ * L'accueil `/` au bureau : la création d'un bot en une page (comme
+ * l'accueil d'OpenBot), sous une rangée de suggestions qui remplissent le
+ * formulaire.
+ */
+export const homeNewBot = {
+  heading: "Créez un bot",
+  headingFirst: "Créez votre premier bot",
+  colorLegend: "Couleur du bot",
+  colorAuto: "Couleur automatique du bot",
+  color: "Couleur du bot : {color}",
+  colors: {
+    rouge: "rouge",
+    orange: "orange",
+    ambre: "jaune",
+    vert: "vert",
+    turquoise: "cyan",
+    bleu: "bleu",
+    violet: "violet",
+    rose: "magenta",
+  },
+  faceLegend: "Visage du bot",
+  face: "Visage du bot {index}",
+  nameLabel: "Nom",
+  missionLabel: "En quoi ce bot doit-il vous aider ?",
+  missionPlaceholder: "Préparer des campagnes, analyser des données ou aider au quotidien.",
+  modelLabel: "Modèle",
+  create: "Créer le bot",
+  suggestions: "Suggestions",
+  suggestion: {
+    writer: {
+      name: "Rédaction",
+      hint: "Rédige articles, posts et newsletters dans votre ton.",
+      mission: "Rédiger mes articles, posts et newsletters dans mon ton, proposer des titres et relire avant publication.",
+    },
+    research: {
+      name: "Recherche",
+      hint: "Cherche, recoupe les sources et résume l’essentiel.",
+      mission: "Chercher des informations fiables, recouper les sources et me résumer l’essentiel avec les liens.",
+    },
+    support: {
+      name: "Support client",
+      hint: "Répond aux clients et prépare les escalades.",
+      mission: "Répondre aux questions des clients avec clarté, et préparer un résumé quand il faut escalader.",
+    },
+    mail: {
+      name: "Assistant e-mail",
+      hint: "Rédige des réponses et n’oublie aucune relance.",
+      mission: "Rédiger des réponses claires à mes e-mails, résumer les longs fils et suivre les relances.",
+    },
+    watch: {
+      name: "Veille",
+      hint: "Suit concurrents et marché, signale ce qui bouge.",
+      mission: "Suivre mes concurrents et mon marché, et me signaler chaque semaine ce qui a changé.",
+    },
+    data: {
+      name: "Analyste",
+      hint: "Lit vos tableaux et en tire des chiffres clairs.",
+      mission: "Lire mes tableaux et exports, calculer les indicateurs utiles et expliquer les tendances.",
+    },
+  },
 } as const;

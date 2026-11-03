@@ -109,6 +109,10 @@ type profileCreateBody struct {
 	DisplayName *string `json:"displayName"`
 	Provider    *string `json:"provider"`
 	Model       *string `json:"model"`
+	// BundledSkills false turns the skills shipped with Hermes off in the
+	// same probe that creates the profile. true is refused: a new profile
+	// already has them on.
+	BundledSkills *bool `json:"bundledSkills"`
 }
 
 type profileModelBody struct {
@@ -133,6 +137,10 @@ func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if body.BundledSkills != nil && *body.BundledSkills {
+		writeError(w, http.StatusBadRequest, "BODY_INVALID", "bundledSkills can only be false")
+		return
+	}
 	getToken := s.GatewayToken
 	if getToken == nil {
 		getToken = hermes.Token
@@ -150,6 +158,9 @@ func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
 		request["provider"] = provider
 		request["model"] = model
 	}
+	if body.BundledSkills != nil {
+		request["bundledSkills"] = false
+	}
 	var created profileCreateResult
 	if err := s.runProbe(r.Context(), "profile-create", request, &created); err != nil {
 		s.writeProbeFailure(w, "profile-create", err)
@@ -160,8 +171,13 @@ func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
 	// created_profile_verified): the same proof as the full inventory, without
 	// cold-starting every profile's view again. Anything less than a positive,
 	// matching answer takes the full read-back below.
+	bundled := createdBundledSkills(created.BundledSkills, body.Name)
 	if created.Verified && created.Profile.Name == body.Name && modelMatches(created.Profile.Model, provider, model) {
-		writeJSON(w, http.StatusCreated, map[string]any{"profile": created.Profile, "readBack": readBackProfile})
+		answer := map[string]any{"profile": created.Profile, "readBack": readBackProfile}
+		if bundled != nil {
+			answer["bundledSkills"] = bundled
+		}
+		writeJSON(w, http.StatusCreated, answer)
 		return
 	}
 	doc, err := s.profileDocument(r.Context())
@@ -174,7 +190,26 @@ func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "PROFILE_UNVERIFIED", "the profile was created but was not present in the inventory")
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"profile": profile})
+	answer := map[string]any{"profile": profile}
+	if bundled != nil {
+		answer["bundledSkills"] = bundled
+	}
+	writeJSON(w, http.StatusCreated, answer)
+}
+
+// createdBundledSkills is the bundled-skills answer of a creation that asked
+// for them off, in the shape of POST /profiles/{slug}/bundled-skills. nil
+// (absent from the answer) when the probe did not report a coherent state:
+// openedbot then writes them through that route.
+func createdBundledSkills(state *profileBundledSkillsState, name string) map[string]any {
+	if state == nil || state.Profile != name || state.Enabled || state.Bundled < 0 || state.BundledEnabled < 0 ||
+		state.Essential < 0 || state.Essential > state.Bundled || state.BundledEnabled > state.Bundled {
+		return nil
+	}
+	return map[string]any{
+		"profile": name, "requested": false, "bundled": state.Bundled,
+		"bundledEnabled": state.BundledEnabled, "applied": state.BundledEnabled == state.Essential,
+	}
 }
 
 // readBackProfile marks a creation answer proven by the targeted read-back of
@@ -183,8 +218,9 @@ func (s *Server) createProfile(w http.ResponseWriter, r *http.Request) {
 const readBackProfile = "profile"
 
 type profileCreateResult struct {
-	Profile  HostProfile `json:"profile"`
-	Verified bool        `json:"verified"`
+	Profile       HostProfile                `json:"profile"`
+	Verified      bool                       `json:"verified"`
+	BundledSkills *profileBundledSkillsState `json:"bundledSkills"`
 }
 
 func modelMatches(got ProfileModel, provider, model string) bool {

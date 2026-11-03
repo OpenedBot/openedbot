@@ -115,19 +115,6 @@ export function displayedCreatePersona(input: {
   });
 }
 
-/** Prompt sent to a `persona_draft` run before a bot exists. */
-export function formatCreatePersonaDraftInput(input: ComposePersonaInput): string {
-  const name = input.name.trim() || "Bot";
-  const role = input.role?.trim().slice(0, PERSONA_ROLE_MAX_CHARS);
-  const mission = input.mission?.trim().slice(0, PERSONA_MISSION_MAX_CHARS);
-  return [
-    "New bot (not yet created).",
-    `Name: ${name}`,
-    role ? `Role: ${role}` : null,
-    mission ? `Mission: ${mission}` : null,
-  ].filter((line): line is string => Boolean(line)).join("\n");
-}
-
 export function composePersona(input: ComposePersonaInput): string {
   const name = input.name.trim() || "Bot";
   const role = input.role?.trim().slice(0, PERSONA_ROLE_MAX_CHARS) || name;

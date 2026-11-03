@@ -47,4 +47,15 @@ describe("botRuntimeSessionIds", () => {
       "ohb:org-1:persona-draft:bot:bot-1",
     ]);
   });
+
+  test("un fil passé à d'autres générations de session (0163) les efface toutes", () => {
+    const rotated = botRuntimeSessionIds("org-1", "bot-1", {
+      threads: [{ sessionId: "ohb:org-1:thread-1", threadId: "thread-1", sessionGeneration: 2 }],
+      workflows: [],
+    });
+    expect(rotated).toContain("ohb:org-1:thread-1");
+    expect(rotated).toContain("ohb:org-1:thread-1:gen1");
+    expect(rotated).toContain("ohb:org-1:thread-1:gen2");
+    expect(rotated).not.toContain("ohb:org-1:thread-1:gen3");
+  });
 });

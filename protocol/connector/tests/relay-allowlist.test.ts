@@ -212,11 +212,11 @@ function split(entry: string): [string, string] {
 }
 
 describe("relay allowlist: identical to internal/connector/allowlist.go", () => {
-  test("is frozen at 15 gateway routes plus 51 host routes", () => {
-    expect(RELAY_ALLOWLIST.length).toBe(66);
+  test("is frozen at 15 gateway routes plus 53 host routes", () => {
+    expect(RELAY_ALLOWLIST.length).toBe(68);
     expect(Object.isFrozen(RELAY_ALLOWLIST)).toBe(true);
     expect(RELAY_ALLOWLIST.filter((route) => route.events).length).toBe(1);
-    expect(RELAY_ALLOWLIST.filter((route) => route.host).length).toBe(51);
+    expect(RELAY_ALLOWLIST.filter((route) => route.host).length).toBe(53);
     expect(RELAY_ALLOWLIST.filter((route) => !route.host).length).toBe(15);
   });
 
@@ -348,6 +348,7 @@ describe("relay allowlist: identical to internal/connector/allowlist.go", () => 
       "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/[a-z0-9][a-z0-9_-]{0,63}$",
       "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/hub/install$",
       "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/hub/scan$",
+      "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets$",
       "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets/[a-z0-9][a-z0-9_]{0,63}$",
       "^/hermes-setup/profiles/models$",
       "^/hermes-setup/providers/[a-z0-9][a-z0-9_-]{0,63}/credentials$",

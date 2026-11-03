@@ -18,7 +18,9 @@
  * `code`+`state` revient), et redémarrer le gateway. Chacune ne nomme qu'un
  * slug fournisseur, une clé de toolset, un nom de serveur ou un identifiant de
  * session ; aucun shell, aucun chemin de fichier, aucune commande, aucun verbe
- * exec/update ne transite par le lien, dans aucun sens.
+ * exec/update ne transite par le lien, dans aucun sens. La seule lecture de
+ * fichier est un NOM borné à la racine du `/workspace` des bots (une image ou
+ * un PDF qu'un bot a fabriqué), jamais un chemin.
  *
  * Le redémarrage du gateway est le SEUL redémarrage que le lien porte : route
  * fixe, unité fixe sur l'hôte (`hermes-gateway`), aucun argument, prouvé sur
@@ -57,6 +59,8 @@ const PROFILE_SEGMENT = "[a-z0-9][a-z0-9_-]{0,62}";
 const SKILL_SEGMENT = "[a-z0-9][a-z0-9_-]{0,63}";
 const UUID_SEGMENT = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
 const A2A_PEER_SEGMENT = "[a-z0-9][a-z0-9._-]{0,63}";
+/** Un nom de fichier à la racine du `/workspace` des bots : ni `/`, ni point initial. */
+const WORKSPACE_FILE_SEGMENT = "(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|jpg|jpeg|webp|pdf))";
 /**
  * Identifiant de session Hermes : la grammaire d'un run, PLUS le deux-points.
  *
@@ -158,6 +162,8 @@ export const RELAY_ALLOWLIST: ReadonlyArray<RelayRoute> = Object.freeze([
   route("POST", "^/hermes-setup/profiles$", { host: true }),
   route("DELETE", `^/hermes-setup/profiles/${PROFILE_SEGMENT}$`, { host: true }),
   route("POST", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/toolsets/${TOOLSET_SEGMENT}$`, { host: true }),
+  // Several toolsets of one profile (feature profile_toolsets_batch); the names travel in the body.
+  route("POST", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/toolsets$`, { host: true }),
   // La mémoire du profil (MEMORY.md / USER.md) par le magasin amont : une
   // lecture, et une écriture nommée par action (add / replace / remove).
   route("GET", `^/hermes-setup/profiles/${PROFILE_SEGMENT}/memory$`, { host: true }),
@@ -185,6 +191,14 @@ export const RELAY_ALLOWLIST: ReadonlyArray<RelayRoute> = Object.freeze([
   // début), que le worker recoupe avec ses propres dispatches pour repérer un
   // run créé hors du lien. Jamais un message, jamais un chemin.
   route("GET", "^/hermes-setup/sessions-inventory$", { host: true }),
+  // Route hôte : UN fichier qu'un bot a fabriqué, lu à la racine du
+  // `/workspace` de son bac à sable, pour joindre ce qu'une ligne `MEDIA:`
+  // désigne. Un nom borné, jamais un chemin ; l'opérateur prouve en plus que
+  // les octets sont une image ou un PDF. Lecture seule, racine, sans query.
+  route("GET", `^/hermes-setup/workspace/files/${WORKSPACE_FILE_SEGMENT}$`, { host: true, rootOnly: true, noQuery: true }),
+  // Route hôte : les skills installées à la racine, lues par l'opérateur ; le
+  // repli quand le `/v1/skills` du gateway échoue (amont #142575).
+  route("GET", "^/hermes-setup/skills$", { host: true }),
   // Read only the pinned A2A Agent Card through the host operator. The host
   // always targets its fixed loopback listener; no URL or path crosses the link.
   route("GET", "^/hermes-setup/a2a/agent-card$", { host: true }),

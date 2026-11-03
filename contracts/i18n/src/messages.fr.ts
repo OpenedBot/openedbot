@@ -7,8 +7,8 @@
  * un `{paramètre}` diffère entre les deux fichiers.
  */
 import { changePassword, legal, login, memberInvitation } from "./messages/fr/auth";
-import { botCloneDialog, botContextMenu, botManage, botsTable, newBotDialog, voicePanel } from "./messages/fr/bot-lifecycle";
-import { botCapabilities, botMemory, botRoutinesDialog, botSettingsDialog, computerPanel, settingProposal } from "./messages/fr/bots";
+import { botCloneDialog, botContextMenu, botManage, botsTable, homeNewBot, newBotDialog, voicePanel } from "./messages/fr/bot-lifecycle";
+import { botCapabilities, botMemory, botRoutinesDialog, botSettingsDialog, settingProposal } from "./messages/fr/bots";
 import { agentActivity, attachmentCanvas, composer, gateCard, groups, mobileComposer, planCard, workflowOverview } from "./messages/fr/composer";
 import { connectorsPage, connectorsSettings, mcpCatalog, webhookPanel } from "./messages/fr/connectors";
 import { decisions, inbox, orgPermissionPolicy, settingsPolicies } from "./messages/fr/control";
@@ -17,10 +17,9 @@ import { modelsSettings } from "./messages/fr/models";
 import { onboarding, tailscaleGuide } from "./messages/fr/onboarding";
 import { cloudRuntimeSettings, connectorUpgrade, providerIncidents, providerLimits, runtimeAlerts, runtimeDirect, runtimeHealth, runtimeOffline, runtimeRail } from "./messages/fr/runtime";
 import { botHostCleanup, botProfileProvision, botProfileRepair, profileImport } from "./messages/fr/runtime-profiles";
-import { mobileSettingsHints, mobileSettingsRuntimes, operatorSettingsDialog, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/fr/settings";
-import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder, pwaInstall } from "./messages/fr/shell";
+import { mobileSettingsHints, mobileSettingsRuntimes, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/fr/settings";
+import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/fr/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/fr/thread";
-import { waitlist } from "./messages/fr/waitlist";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/fr/workspace";
 
 export const fr = {
@@ -30,7 +29,6 @@ export const fr = {
   relativeTime,
   units,
   common,
-  pwaInstall,
   providerLimits,
   settings,
   overviewPlaceholder,
@@ -40,14 +38,12 @@ export const fr = {
   notFound,
   connectorsSettings,
   botSettingsDialog,
-  operatorSettingsDialog,
   webhookPanel,
   botProfileRepair,
   botProfileProvision,
   mcpCatalog,
   connectorsPage,
   botCapabilities,
-  computerPanel,
   voicePanel,
   botMemory,
   threadContext,
@@ -100,7 +96,6 @@ export const fr = {
   profileImport,
   onboarding,
   legal,
-  waitlist,
   login,
   runtimeHealth,
   runtimeRail,
@@ -109,6 +104,7 @@ export const fr = {
   modelsSettings,
   decisions,
   newBotDialog,
+  homeNewBot,
   botManage,
   face,
   format,

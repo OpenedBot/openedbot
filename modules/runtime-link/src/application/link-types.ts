@@ -147,6 +147,18 @@ export type LinkLivenessStore = {
    */
   toolsetsWritten?(link: LinkIdentity): Promise<void>;
   /**
+   * 0163 : une écriture relayée a changé les capacités d'un profil (`profile`)
+   * ou de la racine (`null`). Marque le runtime ; le fil dont la session
+   * Hermes est plus ancienne passe à une session neuve au message suivant.
+   */
+  capabilitiesWritten?(link: LinkIdentity, profile: string | null): Promise<void>;
+  /**
+   * `inventory.changed` : l'hôte dit que les fichiers derrière son inventaire
+   * ont bougé (ou la session commence). Marque `runtimes.inventory_changed_at` ;
+   * `true` quand la ligne de ce jeton existe encore.
+   */
+  inventoryChanged?(link: LinkIdentity): Promise<boolean>;
+  /**
    * Rotation d'urgence automatique : deux sockets valides d'adresses
    * différentes en dix minutes. Le nouveau hash n'est remis à personne ; le
    * lien se relie par un nouvel enrôlement.
@@ -169,9 +181,16 @@ export type RuntimeLinkBrokerOptions = {
   /** Écriture de `link_last_seen_at` au plus une fois par fenêtre (défaut 10 s). */
   seenDebounceMs?: number;
   log?: LinkLogger;
+  /**
+   * Après qu'un `inventory.changed` a été inscrit : l'application relit
+   * l'inventaire de ce runtime en arrière-plan (l'API dans son processus, la
+   * passerelle séparée par un signal à l'API).
+   */
+  onInventoryChanged?: (link: LinkIdentity) => void;
 };
 
-export type ConnectionOptions = Required<Omit<RuntimeLinkBrokerOptions, "liveness" | "instanceId">> & {
+export type ConnectionOptions = Required<Omit<RuntimeLinkBrokerOptions, "liveness" | "instanceId" | "onInventoryChanged">> & {
   liveness: LinkLivenessStore;
   instanceId: string;
+  onInventoryChanged?: (link: LinkIdentity) => void;
 };

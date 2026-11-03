@@ -26,6 +26,8 @@ import {
   CardSkeleton,
   FIELD,
   Note,
+  ListRow,
+  ListSection,
   SectionHeading,
   SettingsCard,
   StatusGrid,
@@ -164,65 +166,46 @@ export function CloudSecuritySettings() {
   );
 
   /**
-   * « Qui est connecté, et comment » : la session et sa méthode de connexion.
-   * Deux cartes de quelques faits courts : côte à côte et en tuiles, elles se
-   * lisent d'un regard au lieu de six lignes pleine largeur.
-   *
-   * `contents` sur mobile : l'enveloppe disparaît de la mise en page et les
-   * cartes redeviennent des enfants directs du panneau, donc elles gardent
-   * l'espacement des listes groupées au lieu d'hériter d'une grille à une
-   * colonne.
+   * « Qui est connecté, et comment ». Bureau : une seule liste, une ligne par
+   * fait (`DESIGN.md` › Bureau), la méthode de connexion en dernière ligne ;
+   * la déconnexion vit en bas du menu des Réglages et dans Mon compte. Le
+   * téléphone garde ses deux groupes et sa déconnexion en pied (`contents` :
+   * les cartes restent enfants directs du panneau).
    */
-  const sessionSection = data ? (
-    <div className={isMobile ? "contents" : "grid items-start gap-4 lg:grid-cols-2"}>
+  const sessionSection = !data ? null : isMobile ? (
+    <div className="contents">
       <SettingsCard className="flex flex-col gap-3">
         <CardHeading
           title={t("settingsSecurity.currentSessionTitle")}
           action={<ToneBadge tone="info">{t("settingsSecurity.currentBadge")}</ToneBadge>}
         />
         <StatusGrid>
-          <StatusTile
-            label={t("settingsSecurity.deviceLabel")}
-            icon={<IconDeviceLaptop aria-hidden />}
-            value={describeDevice(current, t)}
-          />
-          <StatusTile
-            label={t("settingsSecurity.ipLabel")}
-            icon={<IconWorld aria-hidden />}
-            mono={Boolean(current?.ip)}
-            value={current?.ip ?? t("settingsSecurity.unknownValue")}
-          />
-          <StatusTile
-            label={t("settingsSecurity.openedLabel")}
-            icon={<IconClock aria-hidden />}
-            value={current ? formatDate(current.createdAt, locale) : t("settingsSecurity.unknownValue")}
-          />
-          <StatusTile
-            label={t("settingsSecurity.lastSeenLabel")}
-            icon={<IconHistory aria-hidden />}
-            value={current ? formatDate(current.lastSeenAt, locale) : t("settingsSecurity.unknownValue")}
-          />
+          <StatusTile label={t("settingsSecurity.deviceLabel")} icon={<IconDeviceLaptop aria-hidden />} value={describeDevice(current, t)} />
+          <StatusTile label={t("settingsSecurity.ipLabel")} icon={<IconWorld aria-hidden />} mono={Boolean(current?.ip)} value={current?.ip ?? t("settingsSecurity.unknownValue")} />
+          <StatusTile label={t("settingsSecurity.openedLabel")} icon={<IconClock aria-hidden />} value={current ? formatDate(current.createdAt, locale) : t("settingsSecurity.unknownValue")} />
+          <StatusTile label={t("settingsSecurity.lastSeenLabel")} icon={<IconHistory aria-hidden />} value={current ? formatDate(current.lastSeenAt, locale) : t("settingsSecurity.unknownValue")} />
         </StatusGrid>
-        {isMobile ? null : <div className={`mt-auto ${ACTIONS}`}>{signOutButton}</div>}
       </SettingsCard>
-
       <SettingsCard className="flex flex-col gap-3">
         <CardHeading title={t("settingsSecurity.methodTitle")} />
         <StatusGrid>
-          <StatusTile
-            label={t("settingsSecurity.methodEmailLabel")}
-            icon={<IconMail aria-hidden />}
-            value={data.method.email}
-          />
-          <StatusTile
-            label={t("settingsSecurity.methodLabel")}
-            icon={<IconShieldLock aria-hidden />}
-            value={methodLabel(data.method, t)}
-          />
+          <StatusTile label={t("settingsSecurity.methodEmailLabel")} icon={<IconMail aria-hidden />} value={data.method.email} />
+          <StatusTile label={t("settingsSecurity.methodLabel")} icon={<IconShieldLock aria-hidden />} value={methodLabel(data.method, t)} />
         </StatusGrid>
       </SettingsCard>
     </div>
-  ) : null;
+  ) : (
+    <ListSection
+      title={t("settingsSecurity.currentSessionTitle")}
+      action={<ToneBadge tone="info">{t("settingsSecurity.currentBadge")}</ToneBadge>}
+    >
+      <ListRow label={t("settingsSecurity.deviceLabel")} value={describeDevice(current, t)} />
+      <ListRow label={t("settingsSecurity.ipLabel")} mono={Boolean(current?.ip)} value={current?.ip ?? t("settingsSecurity.unknownValue")} />
+      <ListRow label={t("settingsSecurity.openedLabel")} value={current ? formatDate(current.createdAt, locale) : t("settingsSecurity.unknownValue")} />
+      <ListRow label={t("settingsSecurity.lastSeenLabel")} value={current ? formatDate(current.lastSeenAt, locale) : t("settingsSecurity.unknownValue")} />
+      <ListRow label={t("settingsSecurity.methodTitle")} description={data.method.email} value={methodLabel(data.method, t)} />
+    </ListSection>
+  );
 
   /**
    * Les appareils du compte : CELUI-CI compris, en tête et marqué.

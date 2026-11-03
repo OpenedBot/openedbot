@@ -22,10 +22,6 @@ export const ONBOARDING_STEP_ORDER: readonly RailStep[] = [
   "runtime",
 ] as const;
 
-export function isRailStep(step: OnboardingStep): step is RailStep {
-  return (ONBOARDING_STEP_ORDER as readonly string[]).includes(step);
-}
-
 /** L'étape qui suit `from` dans le rail, `null` après la dernière (ou hors rail). */
 export function nextStep(from: OnboardingStep): RailStep | null {
   if (from === "welcome") return ONBOARDING_STEP_ORDER[0]!;
@@ -44,29 +40,4 @@ export function prevStep(from: OnboardingStep): OnboardingStep | null {
 /** Le rang (0-based) d'une étape dans le rail ; `welcome` vaut 0. */
 export function railIndex(step: OnboardingStep): number {
   return Math.max(0, ONBOARDING_STEP_ORDER.indexOf(step as RailStep));
-}
-
-// ── Espace de travail ────────────────────────────────────────────────────────
-
-/**
- * Les identités « au hasard » du bouton dés, célestes chez Multica, célestes
- * ici aussi : des noms courts, lisibles dans les deux langues.
- */
-export const RANDOM_WORKSPACE_NAMES: readonly string[] = [
-  "Andromède",
-  "Cassiopée",
-  "Orion",
-  "Véga",
-  "Altaïr",
-  "Sirius",
-  "Lyra",
-  "Nova",
-  "Pulsar",
-  "Quasar",
-  "Zénith",
-  "Aurore",
-] as const;
-
-export function randomWorkspaceName(random = Math.random): string {
-  return RANDOM_WORKSPACE_NAMES[Math.floor(random() * RANDOM_WORKSPACE_NAMES.length)] ?? "Nova";
 }

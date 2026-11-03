@@ -136,34 +136,6 @@
   app-region: no-drag;
 }
 
-/*
-  La modale des réglages (`settings-modal.tsx`) ne passe jamais sous les
-  boutons du système (feux à gauche, réduire / fermer à droite) : elle
-  commence sous la barre du haut (46 px) au lieu de 16, et sa hauteur
-  maximale suit. Au-dessus, une bande pleine largeur sert de poignée de la
-  fenêtre (le fond assombri n'en est pas une : un clic dessus ferme la
-  modale).
-*/
-[data-settings-drag-strip] {
-  display: none;
-}
-
-:root[data-native-titlebar] [data-settings-drag-strip] {
-  display: block;
-  position: fixed;
-  inset: 0 0 auto;
-  z-index: 50;
-  height: var(--ohb-titlebar-height);
-}
-
-:root[data-native-titlebar] [data-settings-modal-frame] {
-  padding-top: var(--ohb-titlebar-height);
-}
-
-:root[data-native-titlebar] [data-settings-modal] {
-  max-height: calc(100dvh - var(--ohb-titlebar-height) - 16px);
-}
-
 /* Rail d'icônes du cadre personnel, macOS : les feux (x 16 à 76) recouvrent
    la rangée du logo du rail (56 px de large). Le logo est masqué, sans copie
    dans la barre du haut (choix de l'opérateur, 2026-10-26), et la rangée vide

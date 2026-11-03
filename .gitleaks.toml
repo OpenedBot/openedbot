@@ -72,3 +72,9 @@ description = "Password generator alphabet constant (no secret: the alphabet its
 condition = "AND"
 paths = ['''^edge-setup/internal/commands/admin_password\.go$''']
 regexes = ['''^ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789$''']
+
+[[rules.allowlists]]
+description = "API error journal test: a fake invitation token the journal must redact"
+condition = "AND"
+paths = ['''^apps/api/tests/unhandled-error-journal\.test\.ts$''']
+regexes = ['''^Zq3v9XlYk2Rr7TtUuPpWwAaBbCcDdEeFfGg_hh-ii$''']

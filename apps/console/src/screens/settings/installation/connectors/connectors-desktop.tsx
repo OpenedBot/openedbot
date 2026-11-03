@@ -3,15 +3,13 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tan
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { Input, cn } from "@openedbot/browser-ui-kit";
 import type {
-  BotSkillDto,
   RuntimeIntegrationInventoryDto,
   RuntimeIntegrationMcpDto,
-  RuntimeIntegrationToolsetDto,
 } from "@openedbot/contracts-api";
 import { MCP_CONNECTOR_CATALOG, type McpConnectorEntry } from "@openedbot/runtimes/domain/mcp-connector-catalog";
 import { api, errorMessage, queryKeys } from "../../../../lib/api";
 import { useT } from "../../../../lib/i18n";
-import { BUTTON, Note, SETTINGS_PANEL, SectionHeading, ToneBadge } from "../../../../components/settings/primitives";
+import { BUTTON, Note, SETTINGS_PANEL, SectionHeading } from "../../../../components/settings/primitives";
 import {
   CONNECTOR_PILL,
   McpConnectorLogo,
@@ -33,7 +31,9 @@ import {
   connectorDescriptionKey,
   matchesQuery,
 } from "./connectors-catalog-model";
-import { InventoryAlerts, McpDialog, SkillDialog, ToolsetDialog, groupSkills, toolsetStatusMap } from "./connectors-parts";
+import { InventoryAlerts, McpDialog } from "./connectors-parts";
+import { SkillsTab } from "./connectors-skills";
+import { ToolsTab } from "./connectors-tools";
 
 type Tab = "connectors" | "skills" | "tools";
 const TABS: readonly Tab[] = ["connectors", "skills", "tools"];
@@ -462,86 +462,6 @@ function ConnectedSection({
           )}
       </McpConnectorSection>
       <McpOauthDialog server={oauthServer} onClose={() => setOauthServer(null)} onConnected={invalidate} />
-    </>
-  );
-}
-
-function SkillsTab({ data, query }: { data: RuntimeIntegrationInventoryDto; query: string }) {
-  const { t } = useT();
-  const [selected, setSelected] = useState<BotSkillDto | null>(null);
-  if (data.skills === null) {
-    return (
-      <Note tone={data.skillsError ? "danger" : "neutral"}>
-        {t(data.skillsError ? "connectorsSettings.skillsFailed" : "connectorsSettings.skillsUnavailable")}
-      </Note>
-    );
-  }
-  const kept = data.skills.filter((skill) => matchesQuery(skill, query));
-  const groups = groupSkills(kept);
-  return (
-    <>
-      {data.skills.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("connectorsSettings.skillsEmpty")}</p>
-      ) : groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("connectorsPage.noMatch", { query: query.trim() })}</p>
-      ) : (
-        groups.map(([category, entries]) => (
-          <McpConnectorSection
-            key={category || "uncategorized"}
-            id={`connectors-skills-${category || "uncategorized"}`}
-            title={category || t("connectorsSettings.uncategorized")}
-          >
-            {entries.map((skill) => (
-              <McpConnectorRow
-                key={skill.name}
-                logo={<McpConnectorLogo id={`skill:${skill.name}`} name={skill.name} />}
-                name={skill.name}
-                description={skill.description ?? undefined}
-                onOpen={() => setSelected(skill)}
-              />
-            ))}
-          </McpConnectorSection>
-        ))
-      )}
-      <SkillDialog skill={selected} onClose={() => setSelected(null)} />
-    </>
-  );
-}
-
-function ToolsTab({ data, query }: { data: RuntimeIntegrationInventoryDto; query: string }) {
-  const { t } = useT();
-  const [selected, setSelected] = useState<RuntimeIntegrationToolsetDto | null>(null);
-  const status = toolsetStatusMap(t);
-  const toolsets = data.toolsets ?? [];
-  const kept = toolsets.filter((toolset) =>
-    matchesQuery({ name: toolset.label, description: `${toolset.name} ${toolset.description ?? ""}` }, query));
-  return (
-    <>
-      {toolsets.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {data.toolsets === null ? t("connectorsPage.toolsEmpty") : t("connectorsSettings.runtimeEmpty")}
-        </p>
-      ) : kept.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("connectorsPage.noMatch", { query: query.trim() })}</p>
-      ) : (
-        <McpConnectorSection
-          id="connectors-tools"
-          title={t("connectorsSettings.runtimeTitle")}
-          description={t("connectorsSettings.runtimeDescription")}
-        >
-          {kept.map((toolset) => (
-            <McpConnectorRow
-              key={toolset.name}
-              logo={<McpConnectorLogo id={`toolset:${toolset.name}`} name={toolset.label} />}
-              name={toolset.label}
-              description={toolset.description || toolset.name}
-              onOpen={() => setSelected(toolset)}
-              action={<ToneBadge tone={status[toolset.status].tone}>{status[toolset.status].label}</ToneBadge>}
-            />
-          ))}
-        </McpConnectorSection>
-      )}
-      <ToolsetDialog toolset={selected} onClose={() => setSelected(null)} canManage={data.management.capabilities.toolsets} />
     </>
   );
 }

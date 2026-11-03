@@ -5,10 +5,6 @@ export function personaDraftSessionKey(organizationId: string, botId: string): s
   return `ohb:${organizationId}:persona-draft:bot:${botId}`;
 }
 
-export function personaDraftCreateSessionKey(organizationId: string, threadId: string): string {
-  return `ohb:${organizationId}:persona-draft:${threadId}`;
-}
-
 export function buildPersonaDraftInstructions(name: string): string {
   return [
     "## Persona draft",

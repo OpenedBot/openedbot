@@ -10,6 +10,7 @@ export type InventoryClient = Pick<
   | "connectorManagementProbe"
   | "hostCapabilities"
   | "hostToolsets"
+  | "hostSkills"
   | "hostProfileInventory"
   | "hostDeleteProfile"
   | "deleteSession"
@@ -48,6 +49,8 @@ export const MAX_MCP_URL = 2_048;
 
 /** Ce que l'hôte doit annoncer pour que l'écriture correspondante existe. */
 export const FEATURE_TOOLSETS = "toolset_management";
+/** `GET /hermes-setup/skills` : les skills de la racine lues par l'opérateur (repli de `/v1/skills`). */
+export const FEATURE_SKILLS_INVENTORY = "skills_inventory";
 export const FEATURE_MCP = "mcp_management";
 export const FEATURE_MCP_OAUTH = "mcp_oauth";
 export const FEATURE_GATEWAY_RESTART = "gateway_restart";

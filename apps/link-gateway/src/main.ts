@@ -28,7 +28,28 @@ const locator = createRuntimeLinkLocator(db, instanceConfig);
 // AuditAnchor : chaîne locale, puis le bucket WORM (OHB-57, installation
 // legacy). Aucun plug-in n'est chargé ici : un ancrage externe en échec n'y
 // est jamais bloquant, il se journalise (`worm_write_failed`).
-const broker = new RuntimeLinkBroker({ instanceId, liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm) }), log });
+// `inventory.changed` : la composition de l'inventaire vit dans l'API ; la
+// passerelle lui transmet le runtime à relire (même bearer que les autres
+// appels internes). Un signal perdu n'est pas grave : la page relit l'hôte
+// quand l'instantané est périmé, et la prochaine connexion en renvoie un.
+const signalInventoryChanged = (link: { organizationId: string; runtimeId: string }) => {
+  void fetch(`${config.apiInternalUrl}/internal/runtime-inventory/changed`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${config.workerInternalToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ organizationId: link.organizationId, runtimeId: link.runtimeId }),
+    signal: AbortSignal.timeout(5_000),
+  }).then((response) => {
+    if (!response.ok) log("runtime_link.inventory_signal_refused", { runtimeId: link.runtimeId, status: response.status });
+  }, (error: unknown) => {
+    log("runtime_link.inventory_signal_failed", { runtimeId: link.runtimeId, error: String(error) });
+  });
+};
+const broker = new RuntimeLinkBroker({
+  instanceId,
+  liveness: createLinkLivenessStore(db, { worm: createAuditWormStore(config.auditWorm) }),
+  log,
+  onInventoryChanged: signalInventoryChanged,
+});
 // `link.context` annonce la dernière version d'edge-setup : la même source que l'API.
 createConnectorReleaseFeed({ url: config.connectorReleasesUrl, versions: config.connectorVersions }).start();
 const gateway = createRuntimeLinkGateway({ db, config, broker, log });

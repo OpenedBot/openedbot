@@ -15,14 +15,11 @@ function Card({
         // Géométrie du registre shadcn (new-york-v4), mesurée sur
         // ui.shadcn.com/view/new-york-v4/dashboard-01 : bord 1px + shadow-sm
         // (et non un ring), py/gap/px à 24px, footer sans fond ni filet.
-        // `bg-card dark:bg-surface` et non `bg-card` seul : en clair `--card`
-        // vaut #ffffff, ce qu'attend le registre (carte blanche sur panneau
-        // blanc, séparée par le filet). En sombre BoardUI réaffecte `--card` à
-        // #262626 : « buttons, inputs, chips only » dit son propre commentaire
-        // de tokens : alors que la couleur de carte documentée est #171717,
-        // celle du rail. C'est aussi le rapport qu'on mesure sur le bloc :
-        // carte = couleur du rail, un cran au-dessus du panneau.
-        "group/card flex flex-col gap-(--card-spacing) rounded-xl border bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm dark:bg-surface [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        // `bg-card` seul, dans les deux thèmes (décision opérateur du
+        // 02-11-2026) : blanc #ffffff en clair, gris #262626 en sombre. La
+        // carte se détache du fond (#121212) comme la blanche du fond clair ;
+        // l'ancien `dark:bg-surface` (#171717) la fondait dans la page.
+        "group/card flex flex-col gap-(--card-spacing) rounded-xl border bg-card py-(--card-spacing) text-sm text-card-foreground shadow-sm [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         className
       )}
       {...props}

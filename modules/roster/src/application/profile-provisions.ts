@@ -1,7 +1,7 @@
 import type { SQL } from "bun";
 import { HermesClientError, type HermesClient } from "@openedbot/hermes";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import type { Db } from "@openedbot/platform-db";
+import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { applyHostApprovalPolicyWithClient } from "./approval-policy";
 import { permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
@@ -9,6 +9,8 @@ import { publicBot } from "../domain/bot-dto";
 import { readBotRows, writeBotApprovalPolicyProof } from "../sql/bots";
 import { readBlockedToolsTx } from "../sql/tool-policies";
 import type { ProfileProvisionRow } from "../sql/profile-provisions";
+import { BASELINE_REQUIRED_FEATURES } from "../domain/capability-baseline";
+import type { BotProfileProvisionProgress } from "@openedbot/contracts-api";
 
 /**
  * Plus long que tout ce qu'un passage fait sous un même bail : la création
@@ -28,19 +30,43 @@ export type ProfileProvisionDependencies = {
    * Without it the worker's reconciliation turned tools on seconds after the
    * first turns: each change of the tool list missed the prompt cache.
    * Best effort: a failure leaves the version, and the reconciliation retries.
+   * `timings` is this pass's record: the baseline may add its own steps.
+   * `bundledSkillsOff`: the host proved, at creation, the bundled skills off.
+   * `onTools`: the toolsets it is about to enable, for the console (0164).
    */
-  baseline?(job: ProfileProvisionRow): Promise<string>;
+  baseline?(job: ProfileProvisionRow, timings: Record<string, number>, created: {
+    bundledSkillsOff: boolean;
+    onTools(names: readonly string[]): Promise<void>;
+  }): Promise<string>;
 };
+
+export type ProfileProvisionStep = BotProfileProvisionProgress["step"];
 
 /**
  * The inventory lists a new profile as soon as its directory exists, but the
  * multiplexed gateway serves `/p/<slug>/` only after its served-profile
  * reconcile (immediate on `hermes profile create`, about 3 s on the lab;
  * every 30 s as a safety net). A run claimed in that gap gets a 404 and fails
- * as HERMES_PROFILE_MISSING (DEV-OHB-244: the greeting now ends before the
- * clone, so the operator's first answer lands right there).
+ * as HERMES_PROFILE_MISSING (the greeting, held until the provision
+ * succeeds, is claimed about a second later and would land right there).
  */
 export const PROFILE_SERVE_WAIT = { timeoutMs: 45_000, pollMs: 500, sleep: (ms: number) => Bun.sleep(ms) };
+
+/**
+ * Un bot dont le profil se prépare (en file ou en cours) ne se supprime pas :
+ * refus net, avant tout effet. Attendre la fin de la passe faisait patienter
+ * la demande jusqu'à 20 s, puis supprimait un bot que l'écran montrait
+ * encore en train d'arriver. Un profil en échec, lui, se supprime.
+ */
+export async function assertBotProfileSettled(tx: TransactionDb, organizationId: string, botId: string): Promise<void> {
+  const rows = await tx<Array<{ status: string }>>`
+    select status from bot_profile_provisions
+     where organization_id = ${organizationId} and bot_id = ${botId} and status in ('queued', 'running')
+  `;
+  if (rows.length) {
+    throw new HttpError(409, "BOT_PROFILE_PREPARING", "Ce bot se prépare encore sur votre serveur. Vous pourrez le supprimer dès qu’il sera prêt.");
+  }
+}
 
 /**
  * Les écritures sur le profil hôte d'un bot (toolsets, MCP, skills, modèle,
@@ -173,6 +199,23 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
     }
     return rows.length > 0;
   };
+  /**
+   * The step the console shows on the bot's waiting screen (0164). Best
+   * effort, under this pass's lease: a failed write costs a log line, never
+   * the profile, and a lost lease writes nothing.
+   */
+  const progress = async (step: ProfileProvisionStep, tools?: readonly string[]): Promise<void> => {
+    const value: BotProfileProvisionProgress = tools ? { step, tools: [...tools] } : { step };
+    try {
+      await db`
+        update bot_profile_provisions set progress = ${value}::jsonb
+         where bot_id = ${job.bot_id} and status = 'running' and lease_owner = ${job.lease_owner}
+           and lease_generation = ${job.lease_generation}
+      `;
+    } catch {
+      console.info(JSON.stringify({ event: "profile_provision.progress_unwritten", botId: job.bot_id, organizationId: job.organization_id, step }));
+    }
+  };
   const listed = async (): Promise<boolean | null> => {
     try { return (await client.hostProfileInventory()).profiles.some((profile) => profile.name === job.slug); }
     catch (error) {
@@ -200,6 +243,14 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
 
   const resumed = job.host_create_attempted;
   const startedAt = Date.now();
+  await progress("space");
+  // The host's features do not depend on the profile: read them while the
+  // profile is created (~1 s saved, VM 240). The outcome is held, never
+  // thrown here: a failure is the approval step's, as when it read them.
+  const hostFeatures = client.hostCapabilities().then(
+    (features) => ({ features, error: null }),
+    (error: unknown) => ({ features: null, error }),
+  );
   if (!resumed) {
     const present = await listed();
     if (present === null) { await finish("retry", null); return; }
@@ -209,15 +260,23 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
   // tombe, l'essai suivant sait que le profil trouvé peut être le sien.
   if (!(await holdLease({ markAttempted: true }))) return;
 
+  // A new bot's baseline turns the bundled skills off: when it will run, the
+  // creation does it in the same host process (one interpreter less). A host
+  // that ignores the field answers without proof, and the baseline writes.
+  const { features: knownFeatures } = await hostFeatures;
+  const bundledAtCreation = Boolean(deps.baseline) && BASELINE_REQUIRED_FEATURES.every((name) => knownFeatures?.includes(name));
   const createStartedAt = Date.now();
   let created = false;
   let readBackByHost = false;
+  let bundledSkillsOff = false;
   try {
     const result = await client.hostCreateProfile(job.slug, {
       displayName: job.display_name,
       ...(job.provider && job.model ? { provider: job.provider, model: job.model } : {}),
+      ...(bundledAtCreation ? { bundledSkills: false as const } : {}),
     });
     created = true;
+    bundledSkillsOff = bundledAtCreation && result?.bundledSkills?.applied === true && result.bundledSkills.profile === job.slug;
     // The host re-read the profile it wrote (listed under this name, requested
     // model present): the same proof as the inventory, one probe cheaper. A
     // host that does not say so (older edge-setup) is proven below as before.
@@ -263,6 +322,7 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
   timings.proofMs = Date.now() - createdAt;
   const approvalStartedAt = Date.now();
   if (proven) {
+    await progress("rules");
     try {
       const botRows = await withTenant(db as unknown as Db, job.organization_id, (tx) => tx<Array<{ permission_mode: "manual" | "plan" | "auto" | "bypass"; permission_pipeline: string }>>`
         select b.permission_mode, o.permission_pipeline
@@ -271,7 +331,8 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
       `);
       const bot = botRows[0];
       if (!bot) throw new Error("profile owner is unavailable");
-      const features = await client.hostCapabilities();
+      const { features, error: featuresError } = await hostFeatures;
+      if (featuresError) throw featuresError;
       if (features?.includes("approval_policy")) {
         const blocked = await withTenant(db as unknown as Db, job.organization_id, (tx) => readBlockedToolsTx(tx, job.organization_id, job.bot_id));
         const policy = await applyHostApprovalPolicyWithClient(client, job.slug, bot.permission_mode, permissionPipelineOf(bot.permission_pipeline), blocked);
@@ -294,7 +355,8 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
   if (usable && deps.baseline && (await holdLease({ markAttempted: false }))) {
     const baselineStartedAt = Date.now();
     try {
-      const outcome = await deps.baseline(job);
+      await progress("tools");
+      const outcome = await deps.baseline(job, timings, { bundledSkillsOff, onTools: (names) => progress("tools", names) });
       if (outcome !== "applied") console.info(JSON.stringify({ event: "profile_provision.baseline_deferred", botId: job.bot_id, organizationId: job.organization_id, outcome }));
     } catch (error) {
       console.info(JSON.stringify({ event: "profile_provision.baseline_deferred", botId: job.bot_id, organizationId: job.organization_id, outcome: "failed", code: error instanceof HermesClientError ? error.code : "UNEXPECTED" }));
@@ -331,7 +393,7 @@ export async function cancelProfileProvision(
   botId: string,
   wait: { timeoutMs: number; pollMs: number; sleep(ms: number): Promise<unknown> } = PROVISION_SETTLE_WAIT,
 ): Promise<{ hostProfileOwned: boolean }> {
-  // The greeting now answers before the clone ends (DEV-OHB-244), so an
+  // The bot's page opens while its profile is still being created, so an
   // operator can delete a bot while a worker is creating its profile. That
   // creation decides who owns the host profile: wait for it to settle (a few
   // seconds), then decide on the settled row, rather than refusing at once.

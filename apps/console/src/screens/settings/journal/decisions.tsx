@@ -18,7 +18,6 @@ import { useT } from "../../../lib/i18n";
 import { api, queryKeys } from "../../../lib/api";
 import { InsetGroupedSection, MobileSegmented } from "../../../components/mobile/inset-grouped";
 import { BUTTON } from "../../../components/settings/primitives";
-import { useSettingsModal } from "../../../lib/shell/settings-modal-context";
 import { SettingsPane } from "../pane";
 import { DecisionTrace } from "./decision-trace";
 
@@ -49,7 +48,6 @@ const ORIGIN_FILTERS: OriginFilter[] = ["all", "human", "policy"];
 export function DecisionsSettings() {
   const { t, formatDate } = useT();
   // Dans la modale, son en-tête porte déjà le titre : celui-ci reste aux lecteurs d'écran.
-  const inModal = useSettingsModal() !== null;
   const isMobile = useIsMobile();
   // In an agency client frame the log becomes the first tab of the client audit.
   const fleetAudit = useFleetAuditScope() !== null;
@@ -212,7 +210,7 @@ export function DecisionsSettings() {
     <SettingsPane>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className={inModal ? "sr-only" : "text-base font-semibold tracking-tight"}>{t("decisions.title")}</h1>
+          <h1 className="text-base font-semibold tracking-tight">{t("decisions.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("decisions.description")}</p>
         </div>
         {filtersBar}

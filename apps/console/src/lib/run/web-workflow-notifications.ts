@@ -171,15 +171,6 @@ export function markWebWorkflowNotificationSeen(
 }
 
 /**
- * Conservé pour les lectures hors écran. La console n'inscrit plus de Web
- * Push (PWA retirée le 2026-10-27) : les notifications hors page passeront
- * par la coque native (openedbot-desktop) et APNs.
- */
-export function webPushConfigured(): boolean {
-  return false;
-}
-
-/**
  * Traduit un événement SSE en notification locale de PAGE. La SPA doit rester
  * chargée ; ce code n'est pas un service worker et ne prétend pas réveiller un
  * navigateur fermé.

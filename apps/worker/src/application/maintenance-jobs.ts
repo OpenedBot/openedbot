@@ -19,6 +19,7 @@ import { processProfileDelete, purgeOldProfileDeletes } from "../maintenance/pro
 import { processProfileProvision } from "../maintenance/profile-provisions";
 import { processRuntimeModelSelection } from "../maintenance/runtime-model-selection";
 import { processBotHostCleanup } from "../maintenance/bot-host-cleanups";
+import { purgeOldApiErrors } from "../maintenance/api-errors";
 import { reconcileHostApprovalPolicies } from "../maintenance/approval-policy-reconciliation";
 import { reconcileCapabilityBaselines } from "../maintenance/capability-baseline-reconciliation";
 import { processReviewProfiles } from "../maintenance/review-profiles";
@@ -249,6 +250,7 @@ export function maintenanceJobs(
         await purgeStaleRuntimeEnrollments(db);
         await purgeOldSupportEvents(db, config.supportEventsRetentionDays);
         await purgeClosedSupportConversations(db, config.supportRetentionDays);
+        await purgeOldApiErrors(db);
       },
     },
   ];

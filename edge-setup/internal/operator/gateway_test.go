@@ -32,7 +32,7 @@ func TestAnMCPWriteMarksTheGatewayRestartPendingUntilItRestarts(t *testing.T) {
 		GatewayHealthy: func(context.Context) error { healths++; return nil },
 	}
 	srv := serve(t, s)
-	if got := s.features(); len(got) != 6 || got[5] != "gateway_restart" {
+	if got := s.features(); len(got) != 7 || got[5] != "gateway_restart" || got[6] != SkillsInventoryFeature {
 		t.Fatalf("features %v", got)
 	}
 	if _, out := call(t, srv, "GET", "/gateway", ""); out["restartPending"] != false || out["job"] != nil {

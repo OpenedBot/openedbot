@@ -1,8 +1,10 @@
-import type { RuntimeConnectorDto } from "./connector";
+import type { RuntimeConnectorDto, RuntimeHermesUpdateDto } from "./connector";
 
 export type RuntimeLinkDto = {
   /** Identité du connecteur déclaré ; null avant la première déclaration d'agent. */
   connector?: RuntimeConnectorDto | null;
+  /** Hermes de l'hôte face à la dernière release d'edge-setup ; absent des serveurs antérieurs. */
+  hermesUpdate?: RuntimeHermesUpdateDto | null;
   /** Un WebSocket de lien est ouvert en ce moment. */
   connected: boolean;
   /** Bail de la connexion courante (entier décimal) ; change à chaque reconnexion. `null` sans lien. */

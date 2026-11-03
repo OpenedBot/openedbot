@@ -135,6 +135,14 @@ export type RelayDiagnosticFrame = {
 };
 export type RelayDiagnosticAckFrame = { t: "diagnostic.ack"; eventId: string };
 export type RelayCapabilitiesFrame = { t: "capabilities"; features?: string[] };
+/**
+ * Hôte → openedbot : l'inventaire de l'hôte (toolsets, MCP, skills) a bougé, ou
+ * la session commence. Aucun champ ; envoyée seulement si `link.context.accepts`
+ * la nomme.
+ */
+export type RelayInventoryChangedFrame = { t: "inventory.changed" };
+/** Les trames facultatives de l'hôte que cette API comprend (`link.context.accepts`). */
+export const RELAY_ACCEPTED_HOST_FRAMES = ["inventory.changed"] as const;
 export type RelayLinkIssuedFrame = { t: "link.issued"; runtimeId: string; linkToken: string };
 /**
  * Rotation du jeton de lien, poussée par openedbot sur un lien ouvert :
@@ -181,6 +189,8 @@ export type RelayLinkContextFrame = {
    * inconnus, alors qu'une trame de plus aurait fini en « unknown frame type ».
    */
   limits?: RelayLinkContextLimits;
+  /** Les trames facultatives de l'hôte que cette API comprend (une API plus ancienne ferme le lien sur un type inconnu). */
+  accepts?: string[];
 };
 export type RelayReqFrame = {
   t: "req";
@@ -204,6 +214,7 @@ export type RelayTextFrame =
   | RelayAuditKeyFrame
   | RelayAuditAnchorFrame
   | RelayCapabilitiesFrame
+  | RelayInventoryChangedFrame
   | RelayDiagnosticFrame
   | RelayDiagnosticAckFrame
   | RelayLinkIssuedFrame
@@ -350,6 +361,7 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
       return { t, runtimeId, linkToken };
     }
     case "link.retire":
+    case "inventory.changed":
       return { t };
     case "link.retired": {
       const runtimeId = optionalString(frame, "runtimeId");
@@ -373,6 +385,7 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
         ...withOptional("latestVersion", optionalString(frame, "latestVersion")),
         ...withOptional("minimumVersion", optionalString(frame, "minimumVersion")),
         ...withOptional("limits", optionalLinkContextLimits(frame)),
+        ...withOptional("accepts", optionalAccepts(frame)),
       };
     }
     case "req": {
@@ -529,6 +542,27 @@ function optionalFeatures(frame: Record<string, unknown>): string[] | undefined 
     features.push(entry);
   }
   return features;
+}
+
+/** Au plus seize types de trame, de la grammaire des types (comme côté hôte). */
+const RELAY_MAX_LINK_CONTEXT_ACCEPTS = 16;
+const FRAME_TYPE_PATTERN = /^[a-z][a-z0-9_.]{0,63}$/;
+
+function optionalAccepts(frame: Record<string, unknown>): string[] | undefined {
+  const value = frame.accepts;
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) throw new RelayFrameError("field accepts must be an array");
+  if (value.length > RELAY_MAX_LINK_CONTEXT_ACCEPTS) {
+    throw new RelayFrameError(`field accepts lists ${value.length} entries, more than ${RELAY_MAX_LINK_CONTEXT_ACCEPTS}`);
+  }
+  const accepts: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string" || !FRAME_TYPE_PATTERN.test(entry)) {
+      throw new RelayFrameError("field accepts contains a malformed frame type");
+    }
+    accepts.push(entry);
+  }
+  return accepts;
 }
 
 /** `audit.key.previous` : absent, ou au plus deux `{keyId,key}` bien formés. */

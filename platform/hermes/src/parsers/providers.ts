@@ -16,7 +16,7 @@ import {
 } from "./shared";
 
 const PROVIDER_USAGE_SOURCES: ReadonlySet<string> = new Set<HermesProviderUsageSnapshot["source"]>([
-  "oauth_usage_api", "usage_api", "credits_api", "unsupported", "unavailable",
+  "oauth_usage_api", "usage_api", "credits_api", "api_key", "unsupported", "unavailable",
 ]);
 
 export function parseProviderCredentialResult(body: unknown): HermesProviderCredentialResult {

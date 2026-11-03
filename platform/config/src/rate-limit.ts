@@ -123,6 +123,9 @@ export const AUTH_RATE_RULES: Record<string, RateRule> = {
   "POST /api/pro/staff/login": { windowMs: 60_000, max: 10 },
   "POST /api/pro/staff/login/code": { windowMs: 60_000, max: 5 },
   "POST /api/auth/native/authorize": { windowMs: 60_000, max: 20, shared: AUTH_EMAIL_CODE_BUDGET },
+  // The desktop's passwordless door checks a code like the web one: same
+  // ceiling, and no shared budget since it issues no code.
+  "POST /api/auth/native/code/verify": { windowMs: 60_000, max: 10 },
   "POST /api/auth/google/start": { windowMs: 60_000, max: 20 },
   "POST /api/auth/native/google/start": { windowMs: 60_000, max: 20 },
   // Liste d'attente de la page publique : une adresse par personne, pas une

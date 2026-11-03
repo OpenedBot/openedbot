@@ -24,6 +24,7 @@ Dedicate to `edge-setup` a machine that hosts no other services. The hardened pr
 - Links the machine to your openedbot workspace (`link`) with a single-use ticket.
 - Can set up, **if you ask for it**, a rootless sandbox, UFW, fail2ban, SSH hardening, a persistent journal, unattended-upgrades, a password policy, a sudo log, and LLMNR shutdown.
 - Updates the binary (`upgrade`) after verifying the release signature, then the binary's SHA-256 against `SHA256SUMS`.
+- Lets openedbot read, on request, **one** image or **one** PDF a bot saved at the root of its work folder (`/workspace`), to attach it to its answer. A plain file name, never a path; 1 MB at most; the content must really be an image (PNG, JPEG, WebP) or a PDF. Nothing else on the machine can be read this way.
 
 ## What the tool does not do
 
@@ -32,6 +33,7 @@ Dedicate to `edge-setup` a machine that hosts no other services. The hardened pr
 - It does not encrypt the disk. A provider snapshot is a plaintext copy of everything on the machine, keys included.
 - It does not filter the bot's outbound Internet traffic, except for the cloud provider's metadata addresses.
 - It does not isolate two openedbot workspaces linked to the same machine: they see the same data.
+- It does not yet isolate one bot's work folder from the other bots on the same machine.
 
 Every change requires `--yes`. An option that can close access also requires `--console-confirmed`. No flag accepts a secret: use stdin or a `0600` file.
 

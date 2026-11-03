@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Folder, X } from "lucide-react";
 import type { ContextPreambleDto, RunDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
-import { fallbackContextWindow, isDefaultContextWindow } from "@openedbot/runtimes/domain/runtime/model-context-window";
+import { fallbackContextWindow } from "@openedbot/runtimes/domain/runtime/model-context-window";
 import {
   contextUsageBreakdown,
   contextUsageTools,
@@ -132,7 +132,7 @@ export function contextBudget({
   reading: ThreadContextReading;
   preamble: ContextPreambleDto | null;
   t: Translate;
-}): { segments: AgentBudgetSegment[]; groups: AgentBudgetGroup[]; preambleMeasured: boolean } {
+}): { segments: AgentBudgetSegment[]; groups: AgentBudgetGroup[] } {
   const segments: AgentBudgetSegment[] = [];
   const groups: AgentBudgetGroup[] = [];
   const breakdown = occupancy ? contextUsageBreakdown(occupancy) : null;
@@ -182,7 +182,7 @@ export function contextBudget({
     // L'hôte ne mesure pas encore son préambule : il existe, on le dit, et la
     // barre n'en invente pas la taille.
     segments.push({ label: t("threadContext.segmentPreambleUnknown"), value: null, deferred: true });
-    return { segments, groups, preambleMeasured: false };
+    return { segments, groups };
   }
 
   const bucket = (key: ContextPreambleDto["buckets"][number]["key"]) =>
@@ -210,7 +210,7 @@ export function contextBudget({
   preambleSegment("identity", t("threadContext.segmentIdentity"), t("threadContext.segmentIdentity"), null);
   preambleSegment("memory", t("threadContext.segmentMemory"), t("threadContext.segmentMemory"), t("threadContext.groupMemory"));
   preambleSegment("mcp", t("threadContext.segmentMcp"), t("threadContext.segmentMcp"), t("threadContext.groupMcp"));
-  return { segments, groups, preambleMeasured: true };
+  return { segments, groups };
 }
 
 /**
@@ -247,21 +247,13 @@ export function planLimits(limits: ProviderLimits, t: Translate): { label: strin
 }
 
 /**
- * La fenêtre de contexte d'un modèle, et d'où elle vient. Le runtime prime
- * (lui seul connaît l'override de config de son hôte), puis la table de
- * l'amont, puis le plafond dur que l'amont applique à un modèle inconnu.
- * Partagé par le fil d'un bot et par chaque membre d'un crew.
+ * La fenêtre de contexte d'un modèle. Le runtime prime (lui seul connaît
+ * l'override de config de son hôte), puis la table de l'amont, puis le
+ * plafond dur que l'amont applique à un modèle inconnu. Partagé par le fil
+ * d'un bot et par chaque membre d'un crew.
  */
-export function resolveContextWindow(
-  runtimeWindow: number,
-  model: string | null,
-): { window: number; fromTable: boolean; fromDefault: boolean } {
-  const window = runtimeWindow > 0 ? runtimeWindow : (fallbackContextWindow(model) ?? 0);
-  return {
-    window,
-    fromTable: runtimeWindow <= 0 && window > 0 && !isDefaultContextWindow(model),
-    fromDefault: runtimeWindow <= 0 && window > 0 && isDefaultContextWindow(model),
-  };
+export function resolveContextWindow(runtimeWindow: number, model: string | null): number {
+  return runtimeWindow > 0 ? runtimeWindow : (fallbackContextWindow(model) ?? 0);
 }
 
 /**
@@ -319,7 +311,7 @@ export function botContextReading({
   if (!reading) return null;
   const runIds = new Set(botRuns.map((run) => run.id));
   const occupancy = lastContextUsage(events.filter((event) => runIds.has(event.runId)));
-  const { window } = resolveContextWindow(runtimeWindow, reading.model ?? nonEmpty(configuredModel));
+  const window = resolveContextWindow(runtimeWindow, reading.model ?? nonEmpty(configuredModel));
   const budget = contextBudget({ occupancy, reading, preamble, t });
   const used = budget.segments.reduce((sum, segment) => sum + (segment.deferred ? 0 : segment.value ?? 0), 0);
   return { reading, model: reading.model, window, used, percent: window > 0 ? Math.min(100, (used / window) * 100) : null };
@@ -397,10 +389,7 @@ export function ThreadContextTab({
   // vide, sinon un `""` de l'hôte gagnait contre un nom parfaitement connu.
   const model = reading?.model ?? nonEmpty(botModel) ?? nonEmpty(context.data?.model);
   const runtimeWindow = context.data?.status === "ok" ? context.data.contextWindow : 0;
-  // Trois provenances, et la barre ne dit pas la même chose selon laquelle :
-  // le runtime lui-même, la table de l'amont, ou le plafond dur que l'amont
-  // applique quand il ne reconnaît pas le modèle.
-  const { window, fromTable, fromDefault } = resolveContextWindow(runtimeWindow, model);
+  const window = resolveContextWindow(runtimeWindow, model);
   /*
     Deux grandeurs, et une seule remplit la fenêtre.
 
@@ -489,15 +478,6 @@ export function ThreadContextTab({
           de la fenêtre, c'est ce que l'appel a facturé. */}
       <p className="mt-3 text-xs leading-snug text-muted-foreground">
         {t("threadContext.turnCost", { tokens: formatNumber(turnCost) })}
-      </p>
-      <p className="mt-1 text-xs leading-snug text-muted-foreground">
-        {model ? t("threadContext.modelLine", { model }) : null}{" "}
-        {fromTable ? t("threadContext.windowFromTable") : null}
-        {fromDefault ? t("threadContext.windowFromDefault") : null}
-        {window <= 0 ? t("threadContext.windowUnknown") : null}
-        {occupancy
-          ? ` ${t(budget.preambleMeasured ? "threadContext.preambleMeasured" : "threadContext.occupancyEstimated")}`
-          : null}
       </p>
     </>
   );

@@ -47,7 +47,7 @@ export function memberInvitationRoutes(
         userId: auth.userId,
         accept: action === "accept",
       });
-      if (response.status === "accepted" && response.organizationId && auth.kind === "web") {
+      if (response.status === "accepted" && response.organizationId) {
         await attachSessionOrganization(db, auth.credentialHash, auth.sessionId, response.organizationId);
       }
       return context.json(response);

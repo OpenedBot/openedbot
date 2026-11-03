@@ -1,5 +1,5 @@
 import type { ConnectorReleaseDto } from "@openedbot/contracts-api";
-import { connectorVersionBelow, parseConnectorVersion, type ConnectorVersions } from "@openedbot/platform-config/connector-version";
+import { connectorVersionBelow, parseConnectorVersion, parseHermesVersion, type ConnectorVersions } from "@openedbot/platform-config/connector-version";
 import { logger } from "@openedbot/platform-observability";
 
 /**
@@ -15,6 +15,11 @@ import { logger } from "@openedbot/platform-observability";
  * routes et par le gateway du lien) et garde ses notes pour la modale de la
  * console. La variable d'environnement reste le plancher et le repli : une
  * lecture ratée ne fait jamais redescendre la version annoncée.
+ *
+ * L'ancre peut aussi dire quel Hermes cette release épingle
+ * (`tool.hermesVersion`) : relevé dans `config.connectorVersions.hermesVersion`
+ * à chaque lecture réussie, remis à null (le Hermes épinglé par ce dépôt)
+ * quand elle ne le dit pas, ou pas sous une forme stable.
  */
 
 /** Une heure : la publication passe déjà par une tâche planifiée toutes les 10 min. */
@@ -30,7 +35,8 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 /**
  * Deux formes, réduites à ce que la console affiche. L'ancre
  * (`{ tool: { version, sha256 } }`) n'est crue qu'avec une version stable et
- * des empreintes SHA-256 bien formées. Le JSON de
+ * des empreintes SHA-256 bien formées ; un `hermesVersion` canary ou illisible
+ * est ignoré sans refuser l'ancre. Le JSON de
  * `GET /repos/{repo}/releases/latest` (un miroir) : une version non stable,
  * une URL hors `https://` ou un brouillon rendent null.
  */
@@ -46,17 +52,20 @@ export function parseConnectorRelease(json: unknown): ConnectorReleaseDto | null
   const publishedAt = typeof release.published_at === "string" && !Number.isNaN(Date.parse(release.published_at))
     ? new Date(release.published_at).toISOString()
     : null;
-  return { version, publishedAt, notes: releaseNotes(typeof release.body === "string" ? release.body : "", version), url };
+  return { version, publishedAt, notes: releaseNotes(typeof release.body === "string" ? release.body : "", version), url, hermesVersion: null };
 }
 
 function parseAnchor(tool: unknown): ConnectorReleaseDto | null {
   if (!tool || typeof tool !== "object") return null;
-  const { version: raw, sha256 } = tool as Record<string, unknown>;
+  const { version: raw, sha256, hermesVersion } = tool as Record<string, unknown>;
   const version = parseConnectorVersion(typeof raw === "string" ? raw : null);
   if (!version || !sha256 || typeof sha256 !== "object") return null;
   const digests = Object.values(sha256);
   if (digests.length === 0 || !digests.every((value) => typeof value === "string" && SHA256_HEX.test(value))) return null;
-  return { version, publishedAt: null, notes: "", url: CONNECTOR_RELEASE_PAGE_URL };
+  return {
+    version, publishedAt: null, notes: "", url: CONNECTOR_RELEASE_PAGE_URL,
+    hermesVersion: parseHermesVersion(typeof hermesVersion === "string" ? hermesVersion : null),
+  };
 }
 
 /**
@@ -116,6 +125,11 @@ export function createConnectorReleaseFeed(deps: {
       if (deps.versions.latestVersion !== latest) {
         deps.versions.latestVersion = latest;
         logger.info({ latestVersion: latest }, "connector.release.latest");
+      }
+      const hermes = next.hermesVersion ?? null;
+      if ((deps.versions.hermesVersion ?? null) !== hermes) {
+        deps.versions.hermesVersion = hermes;
+        logger.info({ hermesVersion: hermes }, "connector.release.hermes");
       }
     } catch (error) {
       logger.warn({ code: "CONNECTOR_RELEASE_FETCH", error: error instanceof Error ? error.name : "unknown" }, "connector.release.refresh_failed");

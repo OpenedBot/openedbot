@@ -1,28 +1,5 @@
 /** Chaînes françaises, un fichier par domaine : `messages.fr.ts` les assemble. */
 
-export const pwaInstall = {
-  regionLabel: "Installer l’application",
-  titleIos: "Sur l’écran d’accueil",
-  titleAndroid: "Installer openedbot",
-  descriptionIos:
-    "Dans Safari, ouvrez Partager puis « Sur l’écran d’accueil ». Les conversations restent en ligne ; rien n’est mis en cache hors du shell.",
-  descriptionAndroid:
-    "Ajoutez openedbot à l’écran d’accueil. L’API et les flux restent réseau.",
-  titleDesktop: "Installer openedbot",
-  descriptionDesktop:
-    "Dans le menu du navigateur, choisissez « Installer l’application » ou « Ajouter à l’écran d’accueil ». L’API et les flux restent réseau.",
-  install: "Installer",
-  later: "Plus tard",
-  rowSubtitleIos: "Partager, puis « Sur l’écran d’accueil »",
-  rowSubtitleInstall: "Ajouter à l’écran d’accueil",
-  fabTitle: "openedbot en app mobile",
-  fabPrompt:
-    "openedbot est une PWA : une fois installée, elle s’ouvre en plein écran depuis l’écran d’accueil, comme une app native. Sur téléphone, ouvrez cette adresse dans le navigateur puis « Ajouter à l’écran d’accueil ».",
-  fabManual:
-    "openedbot est une PWA : elle s’installe depuis le navigateur, puis s’ouvre en plein écran comme une app native. Sur téléphone, ouvrez cette adresse puis « Ajouter à l’écran d’accueil » ; ici, « Installer l’application » dans le menu du navigateur.",
-  rowDismiss: "Masquer",
-} as const;
-
 export const overviewPlaceholder = {
   nav: "Salon",
   eyebrow: "orbit · stop",
@@ -96,13 +73,18 @@ export const appSidebar = {
   running: "Exécution en cours",
   awaitingApproval: "Autorisation requise",
   offDefaultRuntime: "Runtime : {runtime}",
-  unassigned: "Sans section",
+  unassigned: "Non assignés",
   newSection: "Nouvelle section",
   newSectionName: "Nouvelle section",
   sectionNameLabel: "Nom de la section",
   sectionMenuLabel: "Actions de la section",
   dropToPin: "Faire glisser pour épingler",
   dropToUnpin: "Déposer ici pour désépingler",
+  dragAnnouncePinned: "{name} épinglé",
+  dragAnnounceMoved: "{name} rangé dans « {section} »",
+  dragAnnounceUnpinned: "{name} désépinglé, rangé dans « {section} »",
+  dragAnnounceCanceled: "Déplacement de {name} annulé",
+  dragAnnounceSection: "Section « {name} » déplacée",
   collapseSection: "Replier la section",
   expandSection: "Déplier la section",
   emptySection: "Aucune conversation",
@@ -158,6 +140,8 @@ export const navUser = {
   newGroup: "Nouveau groupe",
   lightTheme: "Thème clair",
   darkTheme: "Thème sombre",
+  /** Le bouton de langue du rail : il dit la langue vers laquelle il bascule. */
+  switchLanguage: "Passer en {language}",
   installApp: "Installer l’application",
   signOut: "Se déconnecter",
   impersonationReadOnly: "Mode assistance · lecture seule",
@@ -218,7 +202,7 @@ export const boardui = {
   conversationOptions: "Options de la conversation",
   inThisConversation: "Dans cette conversation",
   editNamed: "Modifier {name}",
-  startGroupChat: "Démarrer un chat de groupe",
+  startGroupChat: "Nouvelle conversation de groupe",
   goal: "Objectif",
   goalHint: "Fixez un objectif pour aller plus vite",
   clearGoal: "Retirer l’objectif",
@@ -295,6 +279,7 @@ export const boardui = {
   autoDetect: "Détection auto",
   language: "Langue",
   agentLanguage: "Langue de l’agent",
+  notifyOnFinish: "Me prévenir quand il a fini",
   systemVoice: "Voix système",
   voice: "Voix",
   agentVoice: "Voix de l’agent",
@@ -303,7 +288,6 @@ export const boardui = {
   voicePreviewText: "Bonjour, je suis {name}.",
   playbackSpeed: "Vitesse de lecture",
   settingsSections: "Rubriques des réglages",
-  closeSettings: "Fermer les réglages",
   noEffort: "Sans effort",
 } as const;
 

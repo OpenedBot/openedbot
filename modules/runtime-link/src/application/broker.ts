@@ -1,4 +1,4 @@
-import { hermesToolsetInventoryWrite, RelayDialError, type RelayDialer } from "@openedbot/hermes";
+import { hermesCapabilityWrite, hermesToolsetInventoryWrite, RelayDialError, type RelayDialer } from "@openedbot/hermes";
 import {
   RELAY_CLOSE_RECONNECT,
   RELAY_CLOSE_REPLACED,
@@ -115,6 +115,7 @@ export class RuntimeLinkBroker {
       pingIntervalMs: options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS,
       seenDebounceMs: options.seenDebounceMs ?? DEFAULT_SEEN_DEBOUNCE_MS,
       log: options.log ?? logEvent,
+      ...(options.onInventoryChanged ? { onInventoryChanged: options.onInventoryChanged } : {}),
     };
   }
 
@@ -380,13 +381,30 @@ export class RuntimeLinkBroker {
       }
       const dispatched = connection.dispatch(request, signal);
       const link = connection.link;
-      if (!link || !hermesToolsetInventoryWrite(request.method, request.path)) return dispatched;
+      if (!link) return dispatched;
+      const toolsets = hermesToolsetInventoryWrite(request.method, request.path);
+      const capability = hermesCapabilityWrite(request.method, request.path);
+      if (!toolsets && !capability) return dispatched;
       // Every path to the host (API routes, the worker's relay, a forwarded
       // hop) ends here, so this is the one place that sees each inventory
       // write. Bumped AFTER the host answered: a worker that reads the new
-      // epoch then reads the inventory live sees the write applied.
-      return dispatched.finally(() => this.noteToolsetWrite(link));
+      // epoch then reads the inventory live sees the write applied, and a
+      // message sent once the switch has flipped finds the capability mark
+      // (0163) already there.
+      return dispatched.finally(async () => {
+        if (toolsets) await this.noteToolsetWrite(link);
+        if (capability) await this.noteCapabilityWrite(link, capability.profile);
+      });
     };
+  }
+
+  private async noteCapabilityWrite(link: LinkIdentity, profile: string | null): Promise<void> {
+    try {
+      await this.options.liveness.capabilitiesWritten?.(link, profile);
+    } catch (error) {
+      // A missed mark leaves open threads on their frozen tools until the next change.
+      this.options.log("runtime_link.capabilities_mark_failed", { runtimeId: link.runtimeId, profile, error: String(error) });
+    }
   }
 
   private async noteToolsetWrite(link: LinkIdentity): Promise<void> {

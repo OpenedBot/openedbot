@@ -68,10 +68,6 @@ export function isStaffReply(event: SupportEventDto): boolean {
   return event.type === "support.message" && event.payload.author === "staff";
 }
 
-export function supportUnreadCount(): number {
-  return unread;
-}
-
 /** Le compteur, pour la bulle et pour le bouton d'en-tête. */
 export function useSupportUnread(): number {
   const [value, setValue] = useState(unread);

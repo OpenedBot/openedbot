@@ -25,6 +25,8 @@ describe("link.context remis à la liaison", () => {
       organization: { id: LINK_ORGANIZATION_ID, name: "Acme", slug: "acme" },
       owner: { email: "owner@example.com", displayName: "Owner" },
       limits: { features: RELAY_MAX_FEATURES },
+      // Ce que ce broker sait recevoir : l'hôte ne signale son inventaire qu'à lui.
+      accepts: ["inventory.changed"],
     });
     // La liaison précède la trame, et la clé d'audit la précède sur le fil.
     expect(session.shared.liveness.some((entry) => entry.write === "connected")).toBe(true);

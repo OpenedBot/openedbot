@@ -74,7 +74,8 @@ func (s *Server) setProfileToolset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.toolsetBusy.Unlock()
-	defer s.dropReadCache()
+	// A profile toolset write changes that profile only (inventory.go).
+	defer s.dropProfileReadCache()
 
 	verb := "disable"
 	if wanted {
@@ -101,20 +102,7 @@ func (s *Server) setProfileToolset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	enabled, err := s.profileToolsetEnabled(ctx, profile, name)
-	if err == nil && enabled != wanted {
-		// The platform list did not move the toolset: upstream turns
-		// `x_search` back on under an empty list when xAI credentials exist.
-		// The profile's `agent.disabled_toolsets` decides last; the root's
-		// suppression is never lifted from here (inventory_probe.py).
-		// A refused suppression keeps the honest answer: `applied` false.
-		request := map[string]any{"name": profile, "toolset": name, "suppressed": !wanted}
-		if probeErr := s.runProbe(ctx, "profile-toolset-suppress", request, nil); probeErr != nil {
-			s.logf("profile toolset %s %s suppression refused", profile, name)
-		} else {
-			enabled, err = s.profileToolsetEnabled(ctx, profile, name)
-		}
-	}
+	enabled, err := s.readBackProfileToolset(ctx, profile, name, wanted)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "TOOLSET_UNVERIFIED",
 			"the change was written but the profile inventory could not be read back")
@@ -126,15 +114,43 @@ func (s *Server) setProfileToolset(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) profileToolsetEnabled(ctx context.Context, profile, name string) (bool, error) {
-	if s.ProfileInventory != nil {
-		body, err := s.ProfileInventory(ctx, profile)
-		if err != nil {
-			return false, err
+// readBackProfileToolset reads one toolset of the profile after its write.
+// When the platform list did not move it, upstream turns `x_search` back on
+// under an empty list when xAI credentials exist: the profile's
+// `agent.disabled_toolsets` decides last, and the root's suppression is never
+// lifted from here (inventory_probe.py). A refused suppression keeps the
+// honest answer: `applied` false.
+func (s *Server) readBackProfileToolset(ctx context.Context, profile, name string, wanted bool) (bool, error) {
+	enabled, err := s.profileToolsetEnabled(ctx, profile, name)
+	if err == nil && enabled != wanted {
+		request := map[string]any{"name": profile, "toolset": name, "suppressed": !wanted}
+		if probeErr := s.runProbe(ctx, "profile-toolset-suppress", request, nil); probeErr != nil {
+			s.logf("profile toolset %s %s suppression refused", profile, name)
+		} else {
+			enabled, err = s.profileToolsetEnabled(ctx, profile, name)
 		}
-		return gateway.ToolsetEnabled(body, name)
 	}
-	return s.toolsetEnabled(ctx, name)
+	return enabled, err
+}
+
+func (s *Server) profileToolsetEnabled(ctx context.Context, profile, name string) (bool, error) {
+	body, err := s.profileToolsetDocument(ctx, profile)
+	if err != nil {
+		return false, err
+	}
+	return gateway.ToolsetEnabled(body, name)
+}
+
+// profileToolsetDocument is the gateway's toolset inventory of the profile,
+// or of the root on a host without per-profile reads.
+func (s *Server) profileToolsetDocument(ctx context.Context, profile string) ([]byte, error) {
+	if s.ProfileInventory != nil {
+		return s.ProfileInventory(ctx, profile)
+	}
+	if s.Inventory == nil {
+		return nil, errNoInventory
+	}
+	return s.Inventory(ctx)
 }
 
 // ProfileMemory is the profile's MEMORY.md / USER.md as the upstream store

@@ -8,11 +8,12 @@ import {
   buildPlanTurnBlock,
   hostApprovalPolicyProven,
 } from "@openedbot/roster/domain/editor-directives";
-import { greetingRunsOnDefaultProfile, greetingSessionKey } from "../../domain/bot-greeting";
+import { greetingRunsOnDefaultProfile } from "../../domain/bot-greeting";
 import { promptCacheTierForRun } from "../../domain/prompt-cache-tier";
 import type { WorkerConfig } from "../worker-config";
 import type { ClaimedRun } from "../queue";
 import { applyRuntimeModelSelection } from "./provider-recovery";
+import { pinThreadSession, type ThreadSessionRow } from "./thread-session";
 import type { RunContext } from "./types";
 
 export async function readContext(db: SQL, config: WorkerConfig, claimed: ClaimedRun): Promise<RunContext | null> {
@@ -34,10 +35,9 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
     origin: string | null;
     executionSessionKey: string | null;
     threadSessionId: string;
-    profileProvisionStatus: string | null;
     workflowKind: string | null;
     capabilityBaselineVersion: number | null;
-  };
+  } & Omit<ThreadSessionRow, "organizationId" | "threadId" | "threadSessionId">;
   const rows = await db<StoredRunContext[]>`
     select r.id, r.organization_id as "organizationId", r.thread_id as "threadId", r.input, r.attempts,
            r.hermes_run_id as "hermesRunId", r.last_hermes_sequence as "lastHermesSequence",
@@ -64,7 +64,9 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
            coalesce(w.deadline_at, r.deadline_at) as "workflowDeadlineAt",
            coalesce(r.execution_session_key, t.hermes_session_id) as "sessionId",
            r.origin, r.execution_session_key as "executionSessionKey", t.hermes_session_id as "threadSessionId",
-           pp.status as "profileProvisionStatus",
+           t.hermes_session_generation as "threadSessionGeneration", t.hermes_session_opened_at as "threadSessionOpenedAt",
+           t.created_at as "threadCreatedAt", rt.capabilities_changed_at as "rootCapabilitiesChangedAt",
+           rt.profile_capabilities_changed_at ->> b.hermes_profile as "profileCapabilitiesChangedAt",
            t.group_id as "groupId", t.title as "threadTitle",
            s.context as "sectionContext",
            rt.id as "runtimeId", rt.reachability, rt.link_last_seen_at as "linkLastSeenAt",
@@ -95,7 +97,6 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
       left join workflows w on w.organization_id = r.organization_id and w.id = r.workflow_id
       left join runtime_routine_tools rrt on rrt.organization_id = r.organization_id and rrt.runtime_id = rt.id
       left join runtime_bot_settings_tools rbts on rbts.organization_id = r.organization_id and rbts.runtime_id = rt.id
-      left join bot_profile_provisions pp on pp.organization_id = r.organization_id and pp.bot_id = r.bot_id
      where r.id = ${claimed.id} and r.organization_id = ${claimed.organizationId}
        and r.lease_owner = ${config.workerId} and r.lease_generation = ${claimed.leaseGeneration}
        and r.status = 'starting'
@@ -103,17 +104,15 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
   `;
   const row = rows[0];
   if (!row) return null;
+  // Un accueil collé au profil par défaut par une version précédente y reste.
   const greetingOnDefaultProfile = greetingRunsOnDefaultProfile(row);
-  if (greetingOnDefaultProfile && row.executionSessionKey === null) {
-    const pinned = await db<{ id: string }[]>`
-      update runs set execution_session_key = ${greetingSessionKey(row.threadSessionId)}, updated_at = now()
-       where id = ${claimed.id} and organization_id = ${claimed.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${claimed.leaseGeneration}
-         and execution_session_key is null and hermes_run_id is null
-      returning id
-    `;
-    if (!pinned[0]) return null;
-    row.sessionId = greetingSessionKey(row.threadSessionId);
+  // Une capacité changée depuis l'ouverture de la session du fil : le fil
+  // passe à une session neuve (0163). Un run déjà créé chez Hermes, ou qui
+  // porte déjà sa propre clé (ancien accueil, workflow), garde la sienne.
+  if (row.executionSessionKey === null && row.hermesRunId == null) {
+    const sessionId = await pinThreadSession(db, claimed, config.workerId, row);
+    if (sessionId === null) return null;
+    row.sessionId = sessionId;
   }
   // La mémoire s'attache à la PERSONA et non au bloc bot-mode : elle rejoint
   // ainsi le préfixe stable du prompt, mis en cache par le fournisseur, et

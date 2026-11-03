@@ -80,7 +80,7 @@ const userData = mkdtempSync(path.join(tmpdir(), "ohb-config-"));
 // Every named export a transitively imported main module reads must exist on
 // the mock: bun keeps one electron mock across files, and a missing name (net)
 // fails the link of the next file that imports it.
-mock.module("electron", () => ({ app: { isPackaged: false, getPath: () => userData }, net: {}, shell: {}, ipcMain: { handle() {}, on() {} }, nativeTheme: {}, safeStorage: { isEncryptionAvailable: () => false } }));
+mock.module("electron", () => ({ app: { isPackaged: false, getPath: () => userData }, net: {}, shell: {}, ipcMain: { handle() {}, on() {} }, nativeTheme: {}, safeStorage: { isEncryptionAvailable: () => false }, BrowserWindow: class {}, clipboard: {}, Menu: {}, screen: {} }));
 const ENV_NAMES = ["OPENEDBOT_TARGET", "OPENEDBOT_CONSOLE_URL", "OPENEDBOT_API_ORIGIN", "OPENEDBOT_SIGNIN_TEMPLATE", "NODE_ENV_ELECTRON_VITE"];
 let imports = 0;
 

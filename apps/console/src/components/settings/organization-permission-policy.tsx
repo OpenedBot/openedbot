@@ -12,6 +12,7 @@ import { api, userFacingError } from "../../lib/api";
 import { activeFleetId, activeOrganizationId } from "../../lib/session/cloud-session";
 import { useT } from "../../lib/i18n";
 import { ACTIONS, BUTTON, CardHeading, FIELD, Note, SettingsCard, StatusList, StatusRow } from "./primitives";
+import { FieldsetRow, SegmentedRadio } from "./segmented";
 
 /**
  * PERM2-8 (DEV-OHB-259): the organization's permission policy on the
@@ -204,23 +205,14 @@ function ScopedPolicy({
           aria-labelledby="organization-permission-policy-title"
           onSubmit={(event) => { event.preventDefault(); void save(); }}
         >
-          <fieldset className="space-y-2" disabled={saving}>
-            <legend className="text-sm font-medium">{t("orgPermissionPolicy.ceilingLabel")}</legend>
-            <p className="text-xs text-muted-foreground">{t("orgPermissionPolicy.ceilingHint")}</p>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {CEILING_OPTIONS.map((option) => (
-                <label key={option.value ?? "none"} className="inline-flex items-center gap-2 py-1 text-sm">
-                  <input
-                    type="radio"
-                    name="organization-permission-ceiling"
-                    checked={draft.maxMode === option.value}
-                    onChange={() => setDraft({ ...draft, maxMode: option.value })}
-                  />
-                  {t(option.key)}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <FieldsetRow legend={t("orgPermissionPolicy.ceilingLabel")} hint={t("orgPermissionPolicy.ceilingHint")} disabled={saving}>
+            <SegmentedRadio
+              name="organization-permission-ceiling"
+              options={CEILING_OPTIONS.map((option) => ({ value: option.value, label: t(option.key) }))}
+              value={draft.maxMode}
+              onChange={(maxMode) => setDraft({ ...draft, maxMode })}
+            />
+          </FieldsetRow>
 
           <div className="space-y-2">
             <label htmlFor="organization-permission-blocklist" className="block text-sm font-medium">
@@ -263,23 +255,17 @@ function ScopedPolicy({
                 </label>
               </fieldset>
 
-              <fieldset className="space-y-2" disabled={saving}>
-                <legend className="text-sm font-medium">{t("orgPermissionPolicy.rulesModeLabel")}</legend>
-                <p className="text-xs text-muted-foreground">{t("orgPermissionPolicy.rulesModeHint")}</p>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {(["adds", "replaces"] as const).map((value) => (
-                    <label key={value} className="inline-flex items-center gap-2 py-1 text-sm">
-                      <input
-                        type="radio"
-                        name="organization-permission-rules-mode"
-                        checked={draft.rulesMode === value}
-                        onChange={() => setDraft({ ...draft, rulesMode: value })}
-                      />
-                      {t(value === "adds" ? "orgPermissionPolicy.rulesModeAdds" : "orgPermissionPolicy.rulesModeReplaces")}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
+              <FieldsetRow legend={t("orgPermissionPolicy.rulesModeLabel")} hint={t("orgPermissionPolicy.rulesModeHint")} disabled={saving}>
+                <SegmentedRadio
+                  name="organization-permission-rules-mode"
+                  options={(["adds", "replaces"] as const).map((value) => ({
+                    value,
+                    label: t(value === "adds" ? "orgPermissionPolicy.rulesModeAdds" : "orgPermissionPolicy.rulesModeReplaces"),
+                  }))}
+                  value={draft.rulesMode}
+                  onChange={(rulesMode) => setDraft({ ...draft, rulesMode })}
+                />
+              </FieldsetRow>
             </div>
           </details>
 

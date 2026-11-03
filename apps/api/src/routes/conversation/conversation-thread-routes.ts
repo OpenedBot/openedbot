@@ -214,6 +214,8 @@ export function conversationThreadRoutes(db: Db): Hono<{ Variables: AppVariables
           delete publicRun.origin;
           return {
             ...dateFields(publicRun),
+            // Seul l'accueil est nommé : son chrono part de son démarrage (runClockStart).
+            ...(run.origin === "bot_greeting" ? { origin: "bot_greeting" } : {}),
             status: publicRunStatus(run.status),
             model: typeof run.model === "string" && run.model.trim() ? run.model : null,
             runtimeSession: null,

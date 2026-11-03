@@ -162,7 +162,7 @@ export type HermesProviderUsageWindow = {
 
 export type HermesProviderUsageSnapshot = {
   provider: string;
-  source: "oauth_usage_api" | "usage_api" | "credits_api" | "unsupported" | "unavailable";
+  source: "oauth_usage_api" | "usage_api" | "credits_api" | "api_key" /* clé à l'usage, sans forfait */ | "unsupported" | "unavailable";
   plan: string | null;
   windows: HermesProviderUsageWindow[];
   details: string[];

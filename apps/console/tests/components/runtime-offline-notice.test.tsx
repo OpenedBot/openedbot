@@ -98,22 +98,30 @@ test("badge names the outage and opens the runtime settings", () => {
   expect(opened).toBe(1);
 });
 
-test("the tab and the badge wear the bot's bubble colour, white on it; grey without one", () => {
+test("offline: the tab and the badge wear the destructive red of the delete button, white on it", () => {
   window.localStorage.setItem("ohb:locale", "fr");
-  const { container } = render(view({ tint: "#ef4444" }));
-  const tab = container.querySelector<HTMLElement>("[data-runtime-notice]")!;
-  expect(tab.style.backgroundColor).toBe("#ef4444");
-  expect(tab.className).not.toContain("bg-background-tertiary-default");
-  expect(tab.querySelector(".text-white")).not.toBeNull();
+  const { container } = render(view());
+  const tab = container.querySelector<HTMLElement>('[data-runtime-notice="offline"]')!;
+  expect(tab.className).toContain("bg-[var(--btn-danger)]");
+  expect(tab.className).toContain("text-white");
   cleanup();
   render(
     <I18nProvider>
-      <RuntimeOfflineBadge since={null} retrying={false} tint="#ef4444" onClick={() => {}} />
+      <RuntimeOfflineBadge since={null} retrying={false} onClick={() => {}} />
     </I18nProvider>,
   );
-  expect(screen.getByRole("button", { name: "Runtime hors ligne" }).style.backgroundColor).toBe("#ef4444");
-  cleanup();
-  const grey = render(view({ tint: null })).container.querySelector<HTMLElement>("[data-runtime-notice]")!;
-  expect(grey.style.backgroundColor).toBe("");
-  expect(grey.className).toContain("bg-background-tertiary-default");
+  const badge = screen.getByRole("button", { name: "Runtime hors ligne" });
+  expect(badge.className).toContain("bg-[var(--btn-danger)]");
+  expect(badge.className).toContain("text-white");
+});
+
+test("back online: the restored tab is Apple's system blue in both themes, white on it", () => {
+  window.localStorage.setItem("ohb:locale", "fr");
+  const { container, rerender } = render(view());
+  rerender(view({ offline: false }));
+  const tab = container.querySelector<HTMLElement>('[data-runtime-notice="restored"]')!;
+  expect(tab.textContent).toContain("Runtime rétabli");
+  expect(tab.className).toContain("bg-[#007aff]");
+  expect(tab.className).toContain("dark:bg-[#0a84ff]");
+  expect(tab.className).toContain("text-white");
 });

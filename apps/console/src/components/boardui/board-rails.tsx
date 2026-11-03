@@ -16,17 +16,23 @@ import { useSupportDeskAvailable } from "../../lib/support/support-desk-availabi
 import { useSupportUnread } from "../../lib/support/support-watch";
 import { useRuntimeHealth } from "../../lib/runtime/use-runtime-health";
 import { SupportUnreadDot } from "../support/support-unread-dot";
-import { AccountMenu } from "./account-menu";
+import { useFleetFrameContext } from "../../pro-console/slots";
+import packageJson from "../../../package.json";
+import { RailLanguageToggle, RailThemeToggle } from "./rail-account";
 import { RailRuntimeHealth } from "./rail-runtime-health";
 
 /**
  * Variante C (`lib/shell/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
- * d'OpenBot. Un rail d'icônes posé sur le fond du cadre : Accueil, À traiter
- * en haut ; l'état du runtime, Support, Réglages et le compte en bas.
+ * d'OpenBot, dans la console comme dans le desktop. Un rail d'icônes posé sur
+ * le fond du cadre : Accueil, À traiter en haut ; en bas, tout ce que portait
+ * le menu du compte, à plat (`rail-account.tsx`) : runtime, Support,
+ * thème, langue et Réglages. Aucun popover, aucun avatar.
  */
 
 /** 36 px, icône de 18 px, pas de 42 px entre deux boutons (gap 6). */
-const RAIL_BUTTON =
+export const RAIL_DIVIDER = "my-0.5 h-px w-5 shrink-0 bg-border-button-default";
+
+export const RAIL_BUTTON =
   "relative inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-icon-secondary outline-none transition-colors duration-150 hover:bg-board-row-hover hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-[current=page]:bg-background-secondary-default aria-[current=page]:text-foreground-icon-primary motion-reduce:transition-none [&>svg]:size-[18px]";
 
 function RailTip({ label, children }: { label: string; children: ReactNode }) {
@@ -42,6 +48,8 @@ export function BoardIconRail() {
   const { t, plural } = useT();
   const navigate = useNavigate();
   const openSettings = useOpenSettings();
+  // Over an agency fleet the workspace has no account page of its own: the profile.
+  const fleetHome = useFleetFrameContext()?.client === null;
   const supportUnread = useSupportUnread();
   const deskAvailable = useSupportDeskAvailable();
   const secondaryReady = useSecondaryReadsReady();
@@ -70,7 +78,9 @@ export function BoardIconRail() {
           coque macOS, les feux la recouvrent : le logo passe dans la barre du
           haut (`native-titlebar.css`). */}
       <div data-titlebar-rail-logo="" className="flex h-[46px] shrink-0 items-center justify-center">
-        <img src="/brand/ohb-icon.webp" alt="openedbot" className="size-7 shrink-0 object-contain" />
+        <RailTip label={`openedbot v${packageJson.version}`}>
+          <img src="/brand/ohb-icon.webp" alt={`openedbot v${packageJson.version}`} className="size-7 shrink-0 object-contain" />
+        </RailTip>
       </div>
       <nav className="flex shrink-0 flex-col items-center gap-1.5">
         <RailTip label={t("overviewPlaceholder.nav")}>
@@ -102,14 +112,15 @@ export function BoardIconRail() {
             </button>
           </RailTip>
         ) : null}
+        <div aria-hidden className={RAIL_DIVIDER} />
+        <RailThemeToggle buttonClassName={RAIL_BUTTON} />
+        <RailLanguageToggle buttonClassName={RAIL_BUTTON} />
+        <div aria-hidden className={RAIL_DIVIDER} />
         <RailTip label={t("navUser.settings")}>
-          <button type="button" aria-label={t("navUser.settings")} className={RAIL_BUTTON} onClick={() => openSettings()}>
+          <button type="button" aria-label={t("navUser.settings")} className={RAIL_BUTTON} onClick={() => openSettings(fleetHome ? "/settings/profile" : "/settings")}>
             <RiSettings3Line aria-hidden />
           </button>
         </RailTip>
-        <div className="mt-1.5">
-          <AccountMenu variant="rail" side="right" align="end" />
-        </div>
       </nav>
     </aside>
   );

@@ -4,7 +4,7 @@ import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/runtime-link/application/broker";
 import type { RuntimeAdminMode, RuntimeProviderIncidentDto, RuntimePublicDto } from "@openedbot/contracts-api";
-import { runtimeConnector, type ConnectorVersions } from "@openedbot/platform-config/connector-version";
+import { runtimeConnector, runtimeHermesUpdate, type ConnectorVersions } from "@openedbot/platform-config/connector-version";
 import { acceptedLinkOrigins, isRetiredLinkOrigin } from "@openedbot/runtime-link/application/link-pop";
 import { connectorLinkCommand, connectorLinkPublicOrigin } from "./runtime-enrollment-routes";
 import { type RuntimeExposureSummary } from "@openedbot/runtimes/sql/runtime-exposures";
@@ -142,6 +142,8 @@ export function publicRuntime(
     link: row.reachability === "connector"
       ? {
           connector: runtimeConnector(row.linkAgent, toIso(row.linkAgentSeenAt ?? null), connectorVersions),
+          // Rien d'annoncé, rien à comparer : pas de bloc plutôt qu'une alerte muette.
+          hermesUpdate: row.linkHermesVersion ? runtimeHermesUpdate(row.linkHermesVersion, connectorVersions) : null,
           connected: row.linkConnectedAt !== null,
           generation: row.linkConnectedAt !== null ? row.linkGeneration ?? null : null,
           connectedAt: toIso(row.linkConnectedAt),

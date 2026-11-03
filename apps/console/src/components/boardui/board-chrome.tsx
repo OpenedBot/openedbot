@@ -305,7 +305,7 @@ export function BoardTopBar({
               type="button"
               aria-label={t("boardui.create")}
               title={t("boardui.create")}
-              className="ms-1 inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-button-primary text-text-white outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+              className="ms-1 inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-secondary hover:bg-background-tertiary-hover hover:text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
             >
               <RiAddFill className="size-[18px]" aria-hidden />
             </button>

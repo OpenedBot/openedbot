@@ -27,6 +27,7 @@ describe("parseConnectorRelease", () => {
       publishedAt: "2026-10-12T00:27:03.000Z",
       url: release.html_url,
       notes: "### Le marqueur survit\n\n- `RuntimeDirectoryPreserve=yes` x",
+      hermesVersion: null,
     });
   });
 
@@ -71,8 +72,21 @@ describe("parseConnectorRelease, independent anchor", () => {
       publishedAt: null,
       notes: "",
       url: CONNECTOR_RELEASE_PAGE_URL,
+      hermesVersion: null,
     });
     expect(CONNECTOR_RELEASE_PAGE_URL.startsWith("https://")).toBe(true);
+  });
+
+  test("reads the Hermes pinned by the release, never a canary or a malformed value", () => {
+    const withHermes = (hermesVersion: unknown) => parseConnectorRelease({ ...anchor, tool: { ...anchor.tool, hermesVersion } });
+    expect(withHermes("0.22.6")?.hermesVersion).toBe("0.22.6");
+    expect(withHermes("v0.22.6")?.hermesVersion).toBe("0.22.6");
+    for (const ignored of ["v0.22.5+canary.20261101", "0.23.0-rc.1", "0.22", "latest", 22, null]) {
+      const parsed = withHermes(ignored);
+      // The tool version is still read: only the Hermes field is dropped.
+      expect(parsed?.version).toBe("v0.0.1");
+      expect(parsed?.hermesVersion).toBeNull();
+    }
   });
 
   test("an anchor without well-formed digests or with an unstable version is refused", () => {
@@ -112,6 +126,17 @@ describe("createConnectorReleaseFeed", () => {
     await feed.refresh();
     expect(kept.latestVersion).toBe("v0.5.8");
     expect(feed.current()).toBeNull();
+  });
+
+  test("relays the anchor's Hermes, and clears it when the next anchor says nothing", async () => {
+    const versions: ConnectorVersions = {};
+    const url = "https://openedbot.test/.well-known/edge-setup.json";
+    await createConnectorReleaseFeed({ url, versions, fetch: respond({ ...anchor, tool: { ...anchor.tool, hermesVersion: "0.22.6" } }) }).refresh();
+    expect(versions.hermesVersion).toBe("0.22.6");
+    await createConnectorReleaseFeed({ url, versions, fetch: respond({}, 503) }).refresh();
+    expect(versions.hermesVersion).toBe("0.22.6");
+    await createConnectorReleaseFeed({ url, versions, fetch: respond(anchor) }).refresh();
+    expect(versions.hermesVersion).toBeNull();
   });
 
   test("no URL, no network", async () => {

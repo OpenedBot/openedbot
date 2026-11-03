@@ -61,9 +61,12 @@ func fullOperator(multiplex, policyObserved bool) *Server {
 // mcp_live_reload: an API that drops it keeps asking for a gateway restart
 // after an MCP change, which stays correct. The ninth is
 // gateway_graceful_restart: an API that drops it warns that a restart
-// interrupts the running turns, which is only pessimistic. The API in this
+// interrupts the running turns, which is only pessimistic. The tenth is
+// skills_inventory: an API that drops it shows the gateway's /v1/skills
+// failure as is. The eleventh is profile_toolsets_batch: an API that drops it
+// writes a profile's toolsets one by one, as before. The API in this
 // repository announces a bound of 64.
-const beyondDefaultAcknowledged = 9
+const beyondDefaultAcknowledged = 11
 
 // The guard behind the incident where the next operator feature would have made
 // every updated host's hello 17 names long. It reads the REAL operator, in every

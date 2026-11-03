@@ -24,6 +24,7 @@ Réservez à `edge-setup` une machine qui n’héberge pas d’autres services. 
 - Relie la machine à votre espace openedbot (`link`) avec un ticket à usage unique.
 - Peut poser, **si vous le demandez**, sandbox rootless, UFW, fail2ban, durcissement SSH, journal persistant, unattended-upgrades, politique de mot de passe, journal sudo, coupure LLMNR.
 - Met à jour le binaire (`upgrade`) après avoir vérifié la signature de la release, puis le SHA-256 du binaire contre `SHA256SUMS`.
+- Laisse openedbot lire, sur demande, **une** image ou **un** PDF qu’un bot a enregistré à la racine de son dossier de travail (`/workspace`), pour le joindre à sa réponse. Un nom de fichier simple, jamais un chemin ; 1 Mo au plus ; le contenu doit vraiment être une image (PNG, JPEG, WebP) ou un PDF. Rien d’autre de la machine n’est lisible ainsi.
 
 ## Ce que l’outil ne fait pas
 
@@ -32,6 +33,7 @@ Réservez à `edge-setup` une machine qui n’héberge pas d’autres services. 
 - Il ne chiffre pas le disque. Un instantané fournisseur est une copie en clair de tout ce que contient la machine, clés comprises.
 - Il ne filtre pas la sortie Internet du bot, hors les adresses de métadonnées du fournisseur cloud.
 - Il n’isole pas deux espaces openedbot reliés à la même machine : ils voient les mêmes données.
+- Il n’isole pas encore le dossier de travail d’un bot de celui des autres bots de la même machine.
 
 Chaque modification exige `--yes`. Une option qui peut fermer l’accès exige aussi `--console-confirmed`. Aucun flag n’accepte un secret : stdin ou fichier `0600`.
 

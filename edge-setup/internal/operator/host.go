@@ -39,7 +39,9 @@ import (
 // the program must never make openedbot render a toggle.
 func Host(runner exec.Runner, token string, logf func(string, ...any)) *Server {
 	server := &Server{
-		Runner: runner,
+		Runner:         runner,
+		InventoryRoots: InventoryRoots{RuntimeRoot: layout.RuntimeRoot, ManagedConfig: layout.ManagedConfig},
+		WorkspaceRoot:  layout.WorkspaceRoot,
 		Catalogue: func(ctx context.Context) ([]byte, error) {
 			return gateway.Loopback(token).ModelOptions(ctx)
 		},
@@ -100,6 +102,7 @@ func Host(runner exec.Runner, token string, logf func(string, ...any)) *Server {
 		markPending:    server.markGatewayRestartPending,
 		restartPending: func() bool { return restartMarkerPending(server.RestartMarker) },
 	}
+	server.ProfileToolsets = profileToolsetsApplier(runner, layout.RuntimeRoot, approvalPolicy.python)
 	server.ApprovalPolicyRead = approvalPolicy.state
 	server.ApprovalPolicyWrite = approvalPolicy.write
 	server.GatewayRestarted = approvalPolicy.gatewayRestarted

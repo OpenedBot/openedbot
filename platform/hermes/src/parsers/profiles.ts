@@ -185,6 +185,28 @@ export function parseProfileToolsetState(body: unknown): HermesProfileToolsetSta
   return { ...state, profile };
 }
 
+/**
+ * The batch answer (`profile_toolsets_batch`): one state per requested
+ * toolset, of the requested profile. A missing name, an extra one or another
+ * profile is an invalid answer, never a silently partial write.
+ */
+export function parseProfileToolsetsBatch(body: unknown, profile: string, requested: readonly string[]): HermesProfileToolsetState[] {
+  const bodyRecord = record(body);
+  if (!bodyRecord || bodyRecord.profile !== profile || !Array.isArray(bodyRecord.toolsets)) throw invalidProviderResponse();
+  const answered = new Map<string, HermesProfileToolsetState>();
+  for (const raw of bodyRecord.toolsets) {
+    const state = parseProfileToolsetState(raw);
+    if (state.profile !== profile || answered.has(state.name)) throw invalidProviderResponse();
+    answered.set(state.name, state);
+  }
+  if (answered.size !== requested.length) throw invalidProviderResponse();
+  return requested.map((name) => {
+    const state = answered.get(name);
+    if (!state) throw invalidProviderResponse();
+    return state;
+  });
+}
+
 /** Twin of `approvalPolicyToolKeyRe` (`edge-setup/internal/operator/approval_policy.go`). */
 export const APPROVAL_POLICY_TOOL_KEY = /^([a-z][a-z0-9_]{0,63}|mcp:[A-Za-z0-9_.-]{1,64}:[A-Za-z0-9_.-]{1,128})$/;
 export const APPROVAL_POLICY_MAX_BLOCKED_TOOLS = 64;

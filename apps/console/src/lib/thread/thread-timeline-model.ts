@@ -22,6 +22,7 @@ import {
 } from "@openedbot/conversation/domain/thread-tools";
 import { isAgentPlan, type AgentPlan } from "@openedbot/execution/domain/agent-plan";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
+import { withoutMediaLines } from "@openedbot/execution/domain/output-media-text";
 import { isWebSearchTrail, type WebSearchQuery, type WebSearchTrail } from "@openedbot/execution/domain/agent-web-search";
 import { pairWebSearchCalls } from "../run/tool-web-search";
 import { splitAskUser } from "@openedbot/roster/domain/ask-user";
@@ -665,12 +666,11 @@ function mergeTimelineEntries(entries: readonly Entry[], ctx: MergeContext): Ent
     }
     merged.push(entry);
   }
-  // Les puces du tour vivent sur le message persisté, pas dans le SSE. On les
-  // pose sur la DERNIÈRE bulle du run : le texte d'avant un outil n'a pas
-  // encore le fichier, et deux bulles ne doivent pas montrer la même puce.
   const lastAssistant = new Map<string, Extract<Entry, { kind: "assistant" }>>();
-  for (const entry of merged) {
-    if (entry.kind === "assistant") lastAssistant.set(entry.runId, entry);
+  for (const entry of merged) if (entry.kind === "assistant") { // puces sur la DERNIÈRE bulle, `MEDIA:` joints hors du texte
+    const persisted = ctx.assistantMessageByRun.get(entry.runId), names = persisted?.content.flatMap((part) => part.type === "attachment" ? [part.name] : []);
+    entry.text = withoutMediaLines(entry.text, names ? new Set(names) : null);
+    lastAssistant.set(entry.runId, entry);
   }
   for (const [runId, entry] of lastAssistant) {
     const attachments = (ctx.assistantMessageByRun.get(runId)?.content ?? [])

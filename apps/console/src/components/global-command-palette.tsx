@@ -98,6 +98,19 @@ export function GlobalCommandPalette() {
     return () => window.removeEventListener("keydown", toggle, { capture: true });
   }, []);
 
+  // ⌘⇧N / Ctrl+Shift+N : une nouvelle conversation de groupe, le raccourci de Grok Bot.
+  useEffect(() => {
+    const newGroupChat = (event: KeyboardEvent) => {
+      if (event.isComposing || event.repeat || event.altKey || !event.shiftKey || (!event.metaKey && !event.ctrlKey)) return;
+      if (event.key.toLocaleLowerCase() !== "n") return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      event.preventDefault();
+      void navigate({ to: "/g/new" });
+    };
+    window.addEventListener("keydown", newGroupChat);
+    return () => window.removeEventListener("keydown", newGroupChat);
+  }, [navigate]);
+
   const bots = useMemo(
     () => visibleRosterItems(roster.data?.bots ?? []).filter((bot) => !bot.archivedAt),
     [roster.data?.bots],
@@ -134,6 +147,12 @@ export function GlobalCommandPalette() {
   };
 
   const navigation: Array<{ value: string; label: string; icon: CommandIcon; run: () => void }> = [
+    {
+      value: "new group chat room bots nouvelle conversation groupe",
+      label: t("groups.newChat.title"),
+      icon: IconUsersGroup,
+      run: () => void navigate({ to: "/g/new" }),
+    },
     {
       value: "overview dashboard",
       label: t("commandPalette.overview"),

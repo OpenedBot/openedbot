@@ -48,7 +48,7 @@ export default defineConfig({
       description:
         'Your AI assistants, on a machine you own. Create an account, link your server, talk to your bots from the console.',
       logo: { src: './src/assets/ohb-icon.webp', alt: '' },
-      favicon: '/favicon.ico',
+      favicon: '/favicon.svg',
       // English is the default, at the root; French under /fr/ (docs-scope.ts).
       defaultLocale: 'root',
       locales: {

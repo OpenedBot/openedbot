@@ -1,0 +1,6 @@
+/* One transparent master keeps the mascot's silhouette identical in both
+   themes. Inversion gives the dark theme an ice-blue face and dark eyes;
+   the hue rotation keeps the outline blue rather than orange. */
+.dark img[src$="/brand/ohb-icon.webp"] {
+  filter: invert(1) hue-rotate(180deg);
+}

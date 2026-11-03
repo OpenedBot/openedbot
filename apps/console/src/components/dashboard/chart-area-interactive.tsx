@@ -13,7 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
   ToggleGroup,
   ToggleGroupItem,
   useIsMobile,
@@ -27,6 +26,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@openedbot/browser-ui-kit/components/ui/chart";
+import { ChartPlotSkeleton } from "./overview-skeleton";
 import type { ActivityPoint } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
@@ -45,24 +45,6 @@ const RANGE_VALUES = [
   { value: "30d", days: 30 },
   { value: "7d", days: 7 },
 ] as const;
-
-/**
- * La silhouette du graphique pendant le chargement : le rectangle de tracé à
- * sa hauteur définitive (250 px) et la rangée de graduations dessous. La
- * carte garde sa taille, seul le tracé manque.
- */
-function ChartAreaSkeleton({ label }: { label: string }) {
-  return (
-    <div role="status" aria-label={label} className="flex h-[250px] w-full flex-col gap-2">
-      <Skeleton className="min-h-0 w-full flex-1 motion-reduce:animate-none" />
-      <div className="flex justify-between px-2">
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <Skeleton key={index} className="h-3 w-10 motion-reduce:animate-none" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function ChartAreaInteractive() {
   const { t, formatDate, locale } = useT();
@@ -139,7 +121,7 @@ export function ChartAreaInteractive() {
 
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         {overview.isPending ? (
-          <ChartAreaSkeleton label={t("common.loading")} />
+          <ChartPlotSkeleton label={t("common.loading")} />
         ) : !hasData ? (
           <div className="flex min-h-40 flex-wrap items-center justify-center gap-3 text-sm" role="alert">
             <span>{t("dashboardMetrics.unavailable")}</span>

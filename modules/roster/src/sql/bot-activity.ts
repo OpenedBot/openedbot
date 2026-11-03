@@ -204,21 +204,6 @@ export async function readPersonaDraftRun(
   return run ?? null;
 }
 
-/** Un brouillon demandé avant la création du bot (`bot_id is null`). */
-export async function readCreationDraftRun(
-  tx: TransactionDb,
-  organizationId: string,
-  runId: string,
-): Promise<{ id: string; status: string; output: string | null } | null> {
-  const rows = await tx<Array<{ id: string; status: string; output: string | null }>>`
-    select id, status, output from runs
-     where organization_id = ${organizationId} and id = ${runId}
-       and step_kind = 'persona_draft' and bot_id is null
-     limit 1
-  `;
-  return rows[0] ?? null;
-}
-
 /** Applique la persona confirmée ; `false` si le bot a disparu. */
 export async function setBotInstructions(
   tx: TransactionDb,

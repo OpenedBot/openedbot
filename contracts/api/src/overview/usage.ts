@@ -21,6 +21,8 @@ export type UsageDto = { day: UsagePoint[]; week: UsagePoint[]; month: UsagePoin
 type ModelUsageRowDto = {
   model: string | null;
   runs: number;
+  inputTokens: number;
+  outputTokens: number;
   tokens: number;
   lastAt: string;
 };

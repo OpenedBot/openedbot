@@ -1,5 +1,15 @@
 <!doctype html>
 <html lang="fr" data-theme="dark">
+  <!--
+    Fallback only. Signed out, the shell shows the console's own /login (the
+    screen the browser shows too, driven through __OHB_NATIVE__.auth). This
+    page stays for a console that predates that screen: it hands sign-in back
+    with signOut() and the shell loads this page instead (window.ts,
+    localSigninFallback). Remove it, with templates/, signin-base.css,
+    src/preload/signin-page.ts, the auth:password / auth:context /
+    auth:open-legal channels and design-lab, one release after every deployed
+    console serves the shared /login.
+  -->
   <head>
     <meta charset="utf-8" />
     <!-- No script here on purpose: the preload wires every control, picks the
@@ -116,7 +126,8 @@
 
         <footer class="footer">
           <div class="legal">
-            <p class="footnote" data-i18n="ledgerFootnote">Vos bots tournent sur votre machine. openedbot garde vos conversations et vos réglages.</p>
+            <p class="footnote" data-i18n="ledgerFootnote">Vos bots tournent sur votre machine.
+openedbot garde vos conversations et vos réglages.</p>
             <nav id="legal-links" class="legal-links" data-i18n-label="legalNav" aria-label="Documents légaux" hidden></nav>
           </div>
           <div class="controls">

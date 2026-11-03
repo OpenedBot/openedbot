@@ -13,13 +13,7 @@ import {
 } from "@openedbot/identity/sql/onboarding";
 import { Hono } from "hono";
 import { SQL } from "bun";
-import type {
-  BotUsageDto,
-  DecisionDto,
-  ModelUsageDto,
-  OnboardingResetScope,
-  UsagePoint,
-} from "@openedbot/contracts-api";
+import type { DecisionDto, OnboardingResetScope, UsagePoint } from "@openedbot/contracts-api";
 import { ONBOARDING_RESET_SCOPES } from "@openedbot/contracts-api";
 import { assertDevResetAllowed, performDevDataReset } from "../../application/dev-reset";
 import type { AppVariables } from "../identity/auth";
@@ -76,7 +70,11 @@ export function miscRoutes(db: Db, options: MiscRoutesOptions): Hono<{ Variables
 
   routes.get("/usage/models", async (context) => {
     const auth = context.get("auth");
-    const usage = await withTenant(db, auth.organizationId, (tx) => usageByModel(tx, auth.organizationId));
+    // Sans `days`, la fenêtre historique de 90 jours : les appelants existants
+    // ne changent pas. La carte des quotas lit 1 et 30 jours.
+    const rawDays = context.req.query("days");
+    const days = rawDays === undefined ? USAGE_MODELS_WINDOW_DAYS : usageWindowDays(rawDays);
+    const usage = await withTenant(db, auth.organizationId, (tx) => usageByModel(tx, auth.organizationId, days));
     return context.json(usage);
   });
 
@@ -88,14 +86,7 @@ export function miscRoutes(db: Db, options: MiscRoutesOptions): Hono<{ Variables
   routes.get("/usage/bots", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
-    const rawDays = context.req.query("days") ?? "7";
-    if (!/^[0-9]{1,2}$/.test(rawDays)) {
-      throw new HttpError(400, "USAGE_DAYS_INVALID", "La fenêtre d’usage doit être un nombre de jours entre 1 et 90.");
-    }
-    const days = Number(rawDays);
-    if (!Number.isSafeInteger(days) || days < 1 || days > 90) {
-      throw new HttpError(400, "USAGE_DAYS_INVALID", "La fenêtre d’usage doit être un nombre de jours entre 1 et 90.");
-    }
+    const days = usageWindowDays(context.req.query("days") ?? "7");
     const usage = await withTenant(db, auth.organizationId, (tx) => usageByBot(tx, auth.organizationId, days));
     return context.json(usage);
   });
@@ -231,100 +222,8 @@ export async function usageSeries(
   return readUsageSeries(tx, organizationId, unit, buckets);
 }
 
-export const USAGE_MODELS_WINDOW_DAYS = 90;
-
-/**
- * Ventilation des runs achevés par modèle persisté, même horodatage et
- * même index que `usageSeries` (`coalesce(ended_at, created_at)`).
- * `model` nul = runs d'avant la persistance, ou Hermes sans sélection.
- */
-export async function usageByModel(
-  tx: Bun.TransactionSQL,
-  organizationId: string,
-  windowDays = USAGE_MODELS_WINDOW_DAYS,
-): Promise<ModelUsageDto> {
-  const rows = await tx<Array<{
-    model: string | null;
-    runs: string | number;
-    tokens: string | number;
-    lastAt: Date | string;
-  }>>`
-    select nullif(coalesce(model, ''), '') as model,
-           count(*) as runs,
-           coalesce(sum((usage->>'totalTokens')::bigint), 0) as tokens,
-           max(coalesce(ended_at, created_at)) as "lastAt"
-      from runs
-     where organization_id = ${organizationId}
-       and coalesce(ended_at, created_at) >= now() - (${windowDays} * interval '1 day')
-       and status in ('completed', 'failed')
-     group by 1
-     order by tokens desc, runs desc
-  `;
-  return {
-    windowDays,
-    models: rows.map((row) => ({
-      model: row.model && row.model.trim() ? row.model : null,
-      runs: Number(row.runs ?? 0),
-      tokens: Number(row.tokens ?? 0),
-      lastAt: isoInstant(row.lastAt),
-    })),
-  };
-}
-
-/**
- * Même prédicat temporel que `usageByModel`, mais en partant de `bots` afin de
- * conserver ceux qui n'ont encore aucun run. `lastModel` est réellement le
- * dernier modèle exécuté, et non un `max(model)` arbitraire.
- */
-export async function usageByBot(
-  tx: Bun.TransactionSQL,
-  organizationId: string,
-  windowDays: number,
-): Promise<BotUsageDto> {
-  const rows = await tx<Array<{
-    botId: string;
-    name: string;
-    slug: string;
-    model: string | null;
-    lastModel: string | null;
-    runs: string | number;
-    inputTokens: string | number;
-    outputTokens: string | number;
-    tokens: string | number;
-    lastAt: Date | string | null;
-  }>>`
-    select b.id as "botId", b.name, b.slug, nullif(b.model, '') as model,
-           (array_agg(nullif(r.model, '') order by coalesce(r.ended_at, r.created_at) desc)
-              filter (where nullif(r.model, '') is not null))[1] as "lastModel",
-           count(r.id) as runs,
-           coalesce(sum((r.usage->>'inputTokens')::bigint), 0) as "inputTokens",
-           coalesce(sum((r.usage->>'outputTokens')::bigint), 0) as "outputTokens",
-           coalesce(sum((r.usage->>'totalTokens')::bigint), 0) as tokens,
-           max(coalesce(r.ended_at, r.created_at)) as "lastAt"
-      from bots b
-      left join runs r on r.organization_id = b.organization_id and r.bot_id = b.id
-           and r.status in ('completed', 'failed')
-           and coalesce(r.ended_at, r.created_at) >= now() - (${windowDays} * interval '1 day')
-     where b.organization_id = ${organizationId} and b.archived_at is null
-     group by b.id, b.name, b.slug, b.model
-     order by tokens desc, runs desc, b.name asc
-  `;
-  return {
-    windowDays,
-    bots: rows.map((row) => ({
-      botId: row.botId,
-      name: row.name,
-      slug: row.slug,
-      model: row.model,
-      lastModel: row.lastModel,
-      runs: Number(row.runs ?? 0),
-      inputTokens: Number(row.inputTokens ?? 0),
-      outputTokens: Number(row.outputTokens ?? 0),
-      tokens: Number(row.tokens ?? 0),
-      lastAt: row.lastAt ? isoInstant(row.lastAt) : null,
-    })),
-  };
-}
+export { USAGE_MODELS_WINDOW_DAYS, usageByBot, usageByModel, usageWindowDays } from "./usage-queries";
+import { USAGE_MODELS_WINDOW_DAYS, usageByBot, usageByModel, usageWindowDays } from "./usage-queries";
 
 /** `OperatorProfileDto` de l'organisation, `null` tant qu'aucun handle n'est choisi. */
 export async function readOperatorProfile(

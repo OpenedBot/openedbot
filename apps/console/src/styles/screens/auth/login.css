@@ -1,9 +1,9 @@
 /*
-  `/login` follows the OpenTrack auth shell: a full-height form column and a
-  themed illustration in the right panel
-  (`public/assets/login/theme_{light,dark}_login.webp`). The page consumes the
-  shared neutral theme tokens so light and dark mode remain part of the
-  application, not a separate palette.
+  The `lg-*` auth shell: a full-height form column and a themed illustration
+  in the right panel (`public/assets/login/theme_{light,dark}_login.webp`),
+  worn by /change-password and the not-found page. /login itself moved to its
+  own centred screen (`signin.css`, `si-*`). The page consumes the shared
+  neutral theme tokens so light and dark mode remain part of the application.
 
   The iOS standalone flags live on the shell wrapper (`shell.tsx`), an
   ancestor of every `.lg` page: a plain descendant selector reads them, no
@@ -129,7 +129,6 @@
   margin-top: 32px;
 }
 
-.lg-google,
 .lg-submit,
 .lg-ghost,
 .lg-theme-toggle,
@@ -137,47 +136,9 @@
   font-family: inherit;
 }
 
-.lg-google {
-  position: relative;
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  padding: 0 14px;
-  border: 1px solid var(--lg-border);
-  border-radius: 9px;
-  background: var(--lg-card);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  color: var(--lg-card-fg);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
-}
-
-.lg-google:hover:not(:disabled):not([aria-disabled="true"]) {
-  border-color: color-mix(in srgb, var(--lg-primary) 34%, var(--lg-border));
-  background: var(--lg-muted);
-  transform: translateY(-1px);
-}
-
-.lg-google:active:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(0);
-}
-
-.lg-google:disabled,
-.lg-google[aria-disabled="true"],
 .lg-submit:disabled {
   cursor: default;
   opacity: 0.5;
-}
-
-.lg-google svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
 }
 
 .lg-password {
@@ -185,26 +146,6 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
-}
-
-.lg-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 2px 0;
-  color: var(--lg-muted-fg);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.lg-divider::before,
-.lg-divider::after {
-  height: 1px;
-  flex: 1;
-  content: "";
-  background: var(--lg-border);
 }
 
 .lg-field {
@@ -327,28 +268,6 @@
   line-height: 1.5;
 }
 
-.lg-recovery {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.lg-recovery .lg-note {
-  display: grid;
-  gap: 4px;
-  overflow-wrap: anywhere;
-}
-
-.lg-recovery h2 {
-  font-size: inherit;
-  font-weight: 600;
-}
-
-.lg-recovery > button {
-  justify-self: start;
-  min-height: 44px;
-}
-
 .lg-note[data-tone="warning"] {
   border-color: color-mix(in srgb, #b7791f 30%, var(--lg-border));
   background: color-mix(in srgb, #f6ad55 12%, var(--lg-muted));
@@ -390,84 +309,7 @@
   color: var(--lg-fg);
 }
 
-.lg-waiting {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.lg-pending {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--lg-border);
-  border-radius: 9px;
-  background: var(--lg-muted);
-  color: var(--lg-fg);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.lg-matrix {
-  display: grid;
-  grid-template-columns: repeat(3, 4px);
-  gap: 3px;
-  flex: none;
-}
-
-.lg-matrix span {
-  width: 4px;
-  height: 4px;
-  border-radius: 1px;
-  background: var(--lg-primary);
-  opacity: 0.2;
-  animation: lg-matrix 1.2s ease-in-out infinite;
-  animation-delay: calc(var(--k, 0) * 90ms);
-}
-
 /* Step two: the address chosen at step one, with the way back to it. */
-.lg-identity {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--lg-border);
-  border-radius: 10px;
-  background: var(--lg-card);
-  color: var(--lg-card-fg);
-  font-size: 14px;
-}
-
-.lg-identity-email {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lg-identity-change {
-  flex: none;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--lg-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.lg-identity-change:hover {
-  background: var(--lg-muted);
-}
-
-.lg-identity-change:focus-visible {
-  outline: 2px solid var(--lg-ring);
-  outline-offset: 2px;
-}
 
 .lg-ghost {
   align-self: flex-start;
@@ -483,12 +325,6 @@
 .lg-ghost:hover {
   background: var(--lg-muted);
   color: var(--lg-fg);
-}
-
-.lg-link {
-  color: var(--lg-primary);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .lg-footer {
@@ -511,24 +347,6 @@
 
 .lg-legal p {
   margin: 0;
-}
-
-.lg-legal-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-top: 8px;
-}
-
-.lg-legal-links a {
-  color: var(--lg-fg);
-  text-decoration: underline;
-  text-decoration-color: var(--lg-border);
-  text-underline-offset: 3px;
-}
-
-.lg-legal-links a:hover {
-  text-decoration-color: currentColor;
 }
 
 .lg-footer-controls {
@@ -696,7 +514,6 @@ a.lg-submit {
 }
 
 .lg-brand:focus-visible,
-.lg-google:focus-visible,
 .lg-secondary:focus-visible,
 .lg-submit:focus-visible,
 .lg-ghost:focus-visible,
@@ -704,17 +521,6 @@ a.lg-submit {
 .lg-theme-toggle:focus-visible {
   outline: 2px solid var(--lg-ring);
   outline-offset: 2px;
-}
-
-@keyframes lg-matrix {
-  0%,
-  60%,
-  100% {
-    opacity: 0.2;
-  }
-  20% {
-    opacity: 1;
-  }
 }
 
 @media (min-width: 640px) {
@@ -766,8 +572,6 @@ a.lg-submit {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lg-matrix span,
-  .lg-google,
   .lg-secondary,
   .lg-submit,
   .lg-field-control input {
@@ -776,13 +580,3 @@ a.lg-submit {
   }
 }
 
-.lg-otp-box {
-  border-color: var(--lg-input);
-  border-radius: 9px;
-  color: var(--lg-fg);
-}
-
-.lg-otp-box:focus-visible {
-  border-color: var(--lg-ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lg-ring) 22%, transparent);
-}

@@ -1,11 +1,12 @@
-import type { Db } from "@openedbot/platform-db";
+import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withCredential, withTenant } from "@openedbot/platform-db";
 
 /** Un code d'autorisation natif vit cinq minutes : le temps d'aller chercher le jeton, pas davantage. */
 export const AUTH_CODE_TTL_MS = 5 * 60 * 1_000;
 
 export type NativeAuthCodeInsert = {
-  organizationId: string;
+  /** `null` : compte qui n'a pas encore défini son organisation (0158). */
+  organizationId: string | null;
   userId: string;
   codeHash: string;
   codeChallenge: string;
@@ -15,14 +16,19 @@ export type NativeAuthCodeInsert = {
 
 export type NativeAuthCodeRow = {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   userId: string;
   codeChallenge: string;
   redirectUri: string;
 };
 
 export async function insertNativeAuthCode(db: Db, code: NativeAuthCodeInsert): Promise<void> {
-  await withTenant(db, code.organizationId, async (tx) => {
+  // Sans organisation, aucun tenant à poser : la policy accepte la ligne
+  // insérée sous son propre hachage, comme `consumeNativeAuthCode` la relit.
+  const open = <T>(callback: (tx: TransactionDb) => Promise<T>) => code.organizationId
+    ? withTenant(db, code.organizationId, callback)
+    : withCredential(db, code.codeHash, callback);
+  await open(async (tx) => {
     await tx`
       insert into native_auth_codes (
         id, organization_id, user_id, code_hash, code_challenge, redirect_uri, client_id, expires_at

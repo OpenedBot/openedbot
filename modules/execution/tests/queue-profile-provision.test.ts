@@ -16,7 +16,7 @@ test("claimRun excludes runs while their bot profile provision is unfinished", a
   expect(claim).toContain("pp.status <> 'succeeded'");
 });
 
-test("claimRun lets a bot greeting start while its profile is still provisioning (DEV-OHB-244)", async () => {
+test("claimRun holds the bot greeting too until its profile is ready", async () => {
   const statements: string[] = [];
   const db = ((parts: TemplateStringsArray) => {
     statements.push([...parts].join(" "));
@@ -26,5 +26,6 @@ test("claimRun lets a bot greeting start while its profile is still provisioning
     async (callback) => callback(db);
   await claimRun(db, { workerId: "worker-1", billingEnforced: false, leaseSeconds: 30 } as never);
   const claim = statements.find((sql) => sql.includes("with candidate_run")) ?? "";
-  expect(claim).toContain("and not (r.origin is not distinct from 'bot_greeting' and pp.status in ('queued', 'running'))");
+  expect(claim).toContain("pp.status <> 'succeeded'");
+  expect(claim).not.toContain("bot_greeting");
 });

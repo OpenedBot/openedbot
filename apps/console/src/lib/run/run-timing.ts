@@ -15,9 +15,7 @@ export type RunTiming = {
   chunks: number;
 };
 
-type TimedRun = {
-  id: string;
-  createdAt?: string;
+type TimedRun = ClockedRun & {
   endedAt?: string | null;
   usage?: { outputTokens?: number } | null;
 };
@@ -29,6 +27,39 @@ type TimedEvent = {
 };
 
 const at = (value: Date | string): number => new Date(value).getTime();
+
+type ClockedRun = {
+  id: string;
+  status?: string;
+  origin?: string | null;
+  createdAt?: string;
+  startedAt?: string | null;
+};
+
+const greetingSeenAt = new Map<string, number>();
+
+/**
+ * L'origine des chronos d'un tour (« Réfléchit… 3 s », durée sous la bulle) :
+ * la création du run, l'instant où l'API a accepté le message. Sauf pour
+ * l'accueil d'un bot neuf : personne ne l'a envoyé, et il attend en file la
+ * fin de la préparation du profil, que l'écran du centre a déjà montrée ;
+ * compté depuis sa création, il arrivait à « Réfléchit… 11 s ». Il part de la
+ * première fois que ce client le voit en cours (le fil arrive à ce moment-là),
+ * ou, rechargé une fois fini, de son démarrage réel. Pas du `startedAt` du
+ * cache en direct : il est posé à la RÉCEPTION du premier événement et
+ * ferait repartir le chrono à zéro quand le texte arrive (DEV-OHB-245).
+ */
+export function runClockStart(run: ClockedRun): number {
+  const created = run.createdAt ? at(run.createdAt) : Number.NaN;
+  if (run.origin !== "bot_greeting") return created;
+  const seen = greetingSeenAt.get(run.id);
+  if (seen !== undefined) return Math.max(created, seen);
+  const settled = run.status === "completed" || run.status === "failed" || run.status === "cancelled";
+  if (settled) return run.startedAt ? Math.max(created, at(run.startedAt)) : created;
+  const now = Date.now();
+  greetingSeenAt.set(run.id, now);
+  return Math.max(created, now);
+}
 
 /** Les runs terminés seulement : un run en cours n'a pas encore de durée. */
 export function runTimings(
@@ -60,7 +91,7 @@ export function runTimings(
   const timings = new Map<string, RunTiming>();
   const addRunTiming = (run: TimedRun) => {
     if (!run.createdAt || !run.endedAt) return;
-    const start = at(run.createdAt);
+    const start = runClockStart(run);
     const end = at(run.endedAt);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return;
     const first = firstText.get(run.id);

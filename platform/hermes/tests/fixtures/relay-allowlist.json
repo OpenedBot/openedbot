@@ -271,6 +271,12 @@
   },
   {
     "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
     "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets/[a-z0-9][a-z0-9_]{0,63}$",
     "events": false,
     "host": true
@@ -318,6 +324,12 @@
     "host": true
   },
   {
+    "method": "GET",
+    "path": "^/hermes-setup/skills$",
+    "events": false,
+    "host": true
+  },
+  {
     "method": "POST",
     "path": "^/hermes-setup/skills/hub/inspect$",
     "events": false,
@@ -344,6 +356,12 @@
   {
     "method": "GET",
     "path": "^/hermes-setup/usage$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/workspace/files/(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|jpg|jpeg|webp|pdf))$",
     "events": false,
     "host": true
   },

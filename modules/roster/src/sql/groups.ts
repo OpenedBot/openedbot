@@ -2,6 +2,7 @@ import type { GroupDto } from "@openedbot/contracts-api";
 import { insertGroupThread } from "@openedbot/conversation/sql/threads";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { groupDtos, type GroupRow, type MemberRow } from "../domain/groups";
+import { nextSectionRowPosition } from "./sections";
 
 export async function readGroups(
   tx: TransactionDb,
@@ -12,7 +13,7 @@ export async function readGroups(
 ): Promise<GroupDto[]> {
   const rows = await tx<GroupRow[]>`
     select g.id, g.name, g.instructions, g.default_responder as "defaultResponder", g.answer_mode as "answerMode",
-           t.id as "threadId", g.section_id as "sectionId", g.position, g.pinned,
+           t.id as "threadId", g.section_id as "sectionId", g.position, g.pinned, g.pin_position as "pinPosition",
            g.needs_you as "needsYou",
            exists(select 1 from approval_requests a where a.organization_id = g.organization_id and a.thread_id = t.id and a.status = 'pending'
              -- A gate under automatic review (PERM2-7) waits on no human.
@@ -93,11 +94,7 @@ export async function nextGroupPosition(
   organizationId: string,
   sectionId: string,
 ): Promise<number> {
-  const positions = await tx<Array<{ next: number }>>`
-    select coalesce(max(position), -1) + 1 as next from bot_groups
-     where organization_id = ${organizationId} and section_id = ${sectionId}
-  `;
-  return Number(positions[0]?.next ?? 0);
+  return nextSectionRowPosition(tx, organizationId, sectionId);
 }
 
 /** Le prochain rang dans la section visée par un déplacement : le salon déplacé ne compte pas. */
@@ -107,12 +104,7 @@ export async function nextGroupPositionExcluding(
   sectionId: string,
   groupId: string,
 ): Promise<number> {
-  const positions = await tx<Array<{ next: number }>>`
-    select coalesce(max(position), -1) + 1 as next from bot_groups
-     where organization_id = ${organizationId} and section_id = ${sectionId}
-       and id <> ${groupId}
-  `;
-  return Number(positions[0]?.next ?? 0);
+  return nextSectionRowPosition(tx, organizationId, sectionId, { kind: "group", id: groupId });
 }
 
 export async function insertGroup(
@@ -260,7 +252,8 @@ export async function updateGroupRow(
       answer_mode = coalesce(${patch.answerMode}, answer_mode),
       section_id = coalesce(${patch.sectionId}, section_id),
       position = coalesce(${patch.position}, position),
-      pinned = coalesce(${patch.pinned}, pinned), updated_at = now()
+      pinned = coalesce(${patch.pinned}, pinned),
+      pin_position = case when ${patch.pinned}::boolean is false then null else pin_position end, updated_at = now()
      where organization_id = ${organizationId} and id = ${groupId} returning id
   `;
   return Boolean(updated[0]);

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   RiArchiveLine,
@@ -20,7 +20,6 @@ import {
 import { toast } from "@openedbot/browser-ui-kit";
 import type { BotDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../lib/api";
-import { BotGroupsDialog } from "./bot-groups-dialog";
 import { MoveToSectionDialog } from "./move-to-section-dialog";
 import { useT } from "../lib/i18n";
 import { useAgentEditor } from "../lib/bots/agent-editor";
@@ -67,10 +66,9 @@ export function BotContextMenu({
   const canWrite = me.data?.kind === "session" && me.data.session.canWrite === true;
   const { botId: routeBotId } = useParams({ strict: false }) as { botId?: string };
   const [confirming, setConfirming] = useState(false);
-  const [managingGroups, setManagingGroups] = useState(false);
+  const navigate = useNavigate();
   const [movingToSection, setMovingToSection] = useState(false);
   // Each sidebar row carries this menu: its dialogs mount on first open only.
-  const groupsMounted = useOpenedOnce(managingGroups);
   const sectionMounted = useOpenedOnce(movingToSection);
   const deleteMounted = useOpenedOnce(confirming);
   const actions = useBotActions(bot);
@@ -116,7 +114,7 @@ export function BotContextMenu({
           <BuiContextSub>
             <BuiContextSubTrigger icon={RiMoreFill}>{t("boardui.more")}</BuiContextSubTrigger>
             <BuiContextSubContent>
-              <BuiContextMenuItem icon={RiGroupLine} onSelect={() => setManagingGroups(true)}>
+              <BuiContextMenuItem icon={RiGroupLine} onSelect={() => void navigate({ to: "/g/new", search: { with: bot.id } })}>
                 {t("groups.manageForBot")}
               </BuiContextMenuItem>
               {canWrite ? (
@@ -143,7 +141,14 @@ export function BotContextMenu({
               </BuiContextMenuItem>
             </BuiContextSubContent>
           </BuiContextSub>
-          <BuiContextMenuItem icon={RiDeleteBinLine} destructive onSelect={() => setConfirming(true)}>
+          {/* Pas tant que son profil se prépare : l'API le refuse aussi (409 BOT_PROFILE_PREPARING). */}
+          <BuiContextMenuItem
+            icon={RiDeleteBinLine}
+            destructive
+            disabled={bot.profileProvisionStatus === "preparing"}
+            title={bot.profileProvisionStatus === "preparing" ? t("botProfileProvision.deleteWhenReady") : undefined}
+            onSelect={() => setConfirming(true)}
+          >
             {t("botContextMenu.deleteBot")}
           </BuiContextMenuItem>
         </BuiContextMenuContent>
@@ -152,7 +157,6 @@ export function BotContextMenu({
       {deleteMounted ? (
         <BotDeleteDialog bot={bot} open={confirming} onClose={() => setConfirming(false)} remove={actions.remove} />
       ) : null}
-      {groupsMounted ? <BotGroupsDialog bot={bot} open={managingGroups} onClose={() => setManagingGroups(false)} /> : null}
       {sectionMounted ? <MoveToSectionDialog row={{ kind: "bot", bot }} open={movingToSection} onClose={() => setMovingToSection(false)} /> : null}
     </>
   );

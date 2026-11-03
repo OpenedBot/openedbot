@@ -113,7 +113,3 @@ export function PendingPlanDock({
     </div>
   );
 }
-
-export function focusPlanComposer(): void {
-  document.querySelector<HTMLTextAreaElement>("textarea[data-composer]")?.focus();
-}

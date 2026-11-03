@@ -4,6 +4,7 @@ import type { ApprovalRequestDto } from "@openedbot/contracts-api";
 import { readAttachment, readToolOutcome, runToolTerminalStates, toolCallKey } from "@openedbot/conversation/domain/thread-tools";
 import { HANDOFF_NOTICE_KIND, handoffNoticeTarget } from "@openedbot/roster/domain/bot-mode";
 import { isExecutingThreadRun, isWaitingThreadRun } from "./current-thread-run";
+import { runClockStart } from "../run/run-timing";
 
 export type ActivityToolState = "running" | "completed" | "failed" | "interrupted" | "result_missing";
 
@@ -114,8 +115,9 @@ export function deriveRunActivity(
   // Le chrono part de l'envoi du tour (`createdAt`, daté par le serveur dès la
   // 202), jamais de `startedAt` : le cache le pose à l'heure de RÉCEPTION du
   // premier événement, et le chrono repartait à 0 quand le texte arrivait
-  // (DEV-OHB-245).
-  const base = { runId: run.id, startedAt: run.createdAt ?? run.startedAt ?? null };
+  // (DEV-OHB-245). L'accueil d'un bot neuf a sa propre origine (runClockStart).
+  const clock = runClockStart(run);
+  const base = { runId: run.id, startedAt: Number.isFinite(clock) ? new Date(clock).toISOString() : run.startedAt ?? null };
   const runEvents = events.filter((event) => event.runId === run.id && !SILENT_EVENT_TYPES.has(event.type));
   if (isWaitingThreadRun(run) && runEvents.every((event) => event.type === "system.notice")) {
     return { ...base, kind: "queued" };
