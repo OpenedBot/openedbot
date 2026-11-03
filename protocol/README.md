@@ -1,4 +1,4 @@
-# openedbot-protocol
+# openedbot protocol
 
 **The versioned wire contract between openedbot and the connector that runs next to your agents.**
 
@@ -10,7 +10,7 @@
 ## Overview
 
 [openedbot](https://openedbot.app) is the cloud console that drives AI agents running on your own
-servers. This repository specifies how a host links to that cloud over **one outbound
+servers. This directory specifies how a host links to that cloud over **one outbound
 WebSocket**, which frames may cross the link, and exactly which gateway routes the cloud may
 reach on your host. Anything outside the allowlist is refused on the host, before it reaches the
 agent runtime.
@@ -22,10 +22,10 @@ agent or gateway can link to openedbot by implementing this specification.
 
 | Component | Role |
 |---|---|
-| **openedbot-protocol** (this repo) | Specification, reference TypeScript codec and normative test vectors |
-| edge-setup | Host-side implementation (Go): installer and connector |
-| openedbot-main | Cloud-side implementation (TypeScript): API and link gateway |
-| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype for openedbot |
+| **`protocol/`** (this directory) | Specification, reference TypeScript codec and normative test vectors |
+| [`edge-setup/`](../edge-setup/README.md) | Host-side implementation (Go): installer and connector |
+| [`apps/api`, `apps/link-gateway`](../README.md) | Cloud-side implementation (TypeScript): API and link gateway |
+| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype for openedbot (its own repository) |
 
 ## Features
 
@@ -76,7 +76,7 @@ technical identifiers kept for wire compatibility.
 | `bun run typecheck` | `tsc --noEmit -p connector/tsconfig.json` |
 | `bun run test` | `bun test connector/tests`: every vector, every allowlist case, fixture schemas, spec consistency |
 | `bun run check` | Both of the above |
-| `bun run sync` | Refresh the spec and fixtures from the two reference implementations checked out next to this repo |
+| `bun run sync` | Refresh the spec and fixtures from the two reference implementations of this monorepo (the root and `edge-setup/`) |
 
 ## Project structure
 
@@ -92,7 +92,7 @@ scripts/              sync from the reference implementations
 
 ## Status
 
-The two reference implementations are still where the contract is developed; this repository is
+The two reference implementations are still where the contract is developed; this directory is
 refreshed from them with `bun run sync` and versioned on its own. Making it the single source both
 sides import is planned.
 

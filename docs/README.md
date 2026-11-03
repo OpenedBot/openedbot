@@ -19,11 +19,11 @@ fully static site (`dist/`), bilingual: English by default under `/docs/`, Frenc
 
 | Component | Role |
 |---|---|
-| **openedbot-docs** (this repo) | Documentation site and the `/install` script |
-| openedbot-main | Console and API (Apache-2.0 open core) |
-| edge-setup | Binary installed on your server (Apache-2.0); its `make check-docs` reads this repo |
-| openedbot-protocol | Public connector protocol (Apache-2.0) |
-| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype |
+| **`docs/`** (this directory) | Documentation site and the `/install` script |
+| [`apps/`](../README.md) | Console and API (Apache-2.0 open core) |
+| [`edge-setup/`](../edge-setup/README.md) | Binary installed on your server (Apache-2.0); its `make check-docs` reads this site |
+| [`protocol/`](../protocol/README.md) | Public connector protocol (Apache-2.0) |
+| [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | macOS notch UI prototype (its own repository) |
 
 ## Features
 
@@ -90,8 +90,9 @@ next to it, and never names `github.com`. `public/_headers` sets its headers
 
 ## Contract with edge-setup
 
-edge-setup's `internal/docs` test (`make check-docs`) reads the French pages of this repository
-(by default `../openedbot-docs/src/content/docs/fr/docs`, otherwise `OPENEDBOT_DOCS_DIR`):
+edge-setup's `internal/docs` test (`make check-docs`) reads the French pages of this site,
+`src/content/docs/fr/docs` (the site is `docs/` at the monorepo root by default,
+`OPENEDBOT_DOCS_DIR` otherwise):
 
 - `operations.mdx` and `reset.mdx` reproduce edge-setup's `docs/OPERATIONS.md` and
   `docs/RESET.md`: every fenced code block is compared byte for byte after whitespace
