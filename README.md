@@ -6,7 +6,7 @@
 
 **Persistent AI teammates on your own server, driven from one console.**
 
-[Website](https://openedbot.app) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md)
+[Website](https://openedbot.app) · [Documentation](https://docs.openedbot.app) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![core-ci](https://github.com/OpenedBot/openedbot/actions/workflows/core-ci.yml/badge.svg)](https://github.com/OpenedBot/openedbot/actions/workflows/core-ci.yml)
@@ -54,6 +54,13 @@ The wire contract (relay frames, the route allowlist, operator verbs) is specifi
 [`protocol/SPEC.md`](protocol/SPEC.md). [`edge-setup`](edge-setup/README.md) is its host-side
 reference implementation, with a pinned [Hermes](https://github.com/NousResearch/hermes-agent)
 runtime.
+
+To install it on your host, follow [the guide](https://docs.openedbot.app/docs/edge-setup/). The
+install script verifies the signed release before it writes anything:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh
+```
 
 ## Repository layout
 
