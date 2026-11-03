@@ -508,6 +508,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/organization-permission-policy.ts
 	bun tests/integration/yolo-leases.ts
 	bun tests/integration/yolo-link-ingest.ts
+	bun tests/integration/yolo-solo-local.ts
 	bun tests/integration/tool-policies.ts
 	bun tests/integration/permission-rules.ts
 	bun tests/integration/permission-grants.ts

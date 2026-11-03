@@ -66,7 +66,7 @@ import { miscRoutes } from "./routes/overview/misc-routes";
 import { groupRoutes } from "./routes/roster/group-routes";
 import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
-import { yoloRoutes } from "./routes/identity/yolo-routes";
+import { yoloInternalRoutes, yoloRoutes } from "./routes/identity/yolo-routes";
 import { readYoloLeaseSigningConfig } from "@openedbot/platform-config/yolo-lease-signing";
 import { createLinkYoloPublisher, yoloLinkLeaseKeys } from "@openedbot/runtime-link/application/link-yolo";
 import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
@@ -434,7 +434,10 @@ app.route("/api/alert-channels", alertChannelRoutes(db, config));
 app.route("/api/organization/permissions", permissionPolicyRoutes(db));
 // Mode YOLO : sans clé de signature, l'API démarre et refuse l'octroi (503).
 // La poussée `yolo.lease` / `yolo.revoke` : le lien d'ici, sinon l'instance qui le tient ; le worker repousse le reste.
-app.route("/api/organization/yolo", yoloRoutes(db, { signing: yoloSigning, publisher: createLinkYoloPublisher(linkBroker, linkLocator) }));
+const yoloRouteDeps = { signing: yoloSigning, publisher: createLinkYoloPublisher(linkBroker, linkLocator), webAppUrl: config.webUrl };
+app.route("/api/organization/yolo", yoloRoutes(db, yoloRouteDeps));
+// Le renouvellement du YOLO solo local, demandé par le worker (bearer interne) : la clé ne quitte pas l'API.
+app.route("/internal/yolo", yoloInternalRoutes(db, config.workerInternalToken, yoloRouteDeps));
 app.route("/api/organization", memberRoutes(db, config));
 // Montages `session` des plug-ins pro, sous `/api/pro/<id>` : derrière la
 // session ; sans l'entitlement déclaré par le montage, la route n'existe pas (404).

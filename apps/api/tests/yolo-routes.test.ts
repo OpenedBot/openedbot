@@ -6,7 +6,7 @@ import type { YoloLease } from "@openedbot/contracts-api";
 import { verifyYoloLeaseSignature } from "@openedbot/execution/domain/yolo-lease";
 import type { YoloLeasePublisher } from "@openedbot/execution/application/yolo-leases";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
-import { yoloRoutes } from "../src/routes/identity/yolo-routes";
+import { yoloInternalRoutes, yoloRoutes } from "../src/routes/identity/yolo-routes";
 import { HttpError } from "../src/interfaces/http/http-error";
 
 const ORG = "7b000000-0000-4000-8000-000000000001";
@@ -28,6 +28,12 @@ type State = {
   grantStatus?: string;
   botProfile?: string | null;
   consent?: boolean;
+  /** Mode solo local : `permission_yolo_is_solo`, les membres vivants, le consentement solo, les runtimes dus. */
+  solo?: boolean;
+  members?: Array<{ userId: string; role: string }>;
+  soloConsent?: boolean;
+  soloDue?: string[];
+  soloGrantStatus?: string;
 };
 
 type Call = { sql: string; parameters: unknown[] };
@@ -38,6 +44,31 @@ function fakeDb(state: State, calls: Call[]): SQL {
     const sql = strings.join("?").replace(/\s+/g, " ").trim();
     calls.push({ sql, parameters });
     if (sql.includes("set_config")) return Promise.resolve([{}]);
+    if (sql.includes("permission_yolo_is_solo")) return Promise.resolve([{ solo: state.solo === true }]);
+    if (sql.includes("from memberships where")) return Promise.resolve(state.members ?? [{ userId: OWNER, role: "owner" }]);
+    if (sql.includes("from memberships m join users")) {
+      return Promise.resolve([{ userId: OWNER, email: "owner@example.com", organizationSlug: "acme", organizationName: "Acme" }]);
+    }
+    if (sql.includes("select user_id as \"userId\" from permission_yolo_consents")) return Promise.resolve(state.soloConsent ? [{ userId: OWNER }] : []);
+    if (sql.includes("select r.id from runtimes r")) return Promise.resolve((state.soloDue ?? []).map((id) => ({ id })));
+    if (sql.includes("insert into email_outbox")) return Promise.resolve(Object.assign([], { count: 1 }));
+    if (sql.includes("grant_permission_yolo_solo_lease")) {
+      const status = state.soloGrantStatus ?? "granted";
+      if (status === "granted") {
+        const lease = JSON.parse(String(parameters[4])) as YoloLease;
+        leases.set(lease.leaseId, {
+          id: lease.leaseId, scope: "runtime", runtimeId: lease.runtimeId, botId: null, threadId: null, grantedByUserId: lease.grantedBy,
+          issuedAt: new Date(lease.issuedAt * 1000), expiresAt: new Date(lease.expiresAt * 1000), revokedAt: null, hostState: "pending",
+          deliveredAt: null, soloDefault: true,
+        });
+      }
+      return Promise.resolve([{ status, superseded: [] }]);
+    }
+    if (sql.includes("end_permission_yolo_solo_default")) {
+      const solo = [...leases.values()].filter((row) => row.soloDefault === true && row.revokedAt === null);
+      for (const row of solo) row.revokedAt = new Date(NOW);
+      return Promise.resolve([{ status: "ended", leaseIds: solo.map((row) => row.id), runtimeIds: solo.map((row) => row.runtimeId) }]);
+    }
     if (sql.includes("from organization_permission_policies")) {
       return Promise.resolve(state.policy ? [{ ...state.policy, rulesMode: "adds", version: 1, updatedAt: new Date(0) }] : []);
     }
@@ -54,7 +85,7 @@ function fakeDb(state: State, calls: Call[]): SQL {
         leases.set(lease.leaseId, {
           id: lease.leaseId, scope: lease.scope, runtimeId: lease.runtimeId, botId: parameters[2], threadId: parameters[3],
           grantedByUserId: lease.grantedBy, issuedAt: new Date(lease.issuedAt * 1000), expiresAt: new Date(lease.expiresAt * 1000),
-          revokedAt: null, hostState: "pending", deliveredAt: null,
+          revokedAt: null, hostState: "pending", deliveredAt: null, soloDefault: false,
         });
       }
       return Promise.resolve([{ status, superseded: status === "granted" ? [LEASE] : [] }]);
@@ -106,8 +137,15 @@ function mount(state: State, auth: AuthContext, options: { seed?: Uint8Array | n
     ? context.json({ error: { code: error.code, ...(error.details ? { details: error.details } : {}) } }, error.status as 400)
     : context.json({ error: { code: "UNEXPECTED", message: String(error) } }, 500));
   const seed = options.seed === undefined ? TEST_SEED : options.seed;
-  app.route("/", yoloRoutes(fakeDb(state, calls), { signing: { seed, previousSeeds: [] }, publisher, now: () => NOW }));
-  return { app, calls, pushed };
+  const db = fakeDb(state, calls);
+  const routeDeps = { signing: { seed, previousSeeds: [] }, publisher, now: () => NOW, webAppUrl: "https://app.example.test/" };
+  app.route("/", yoloRoutes(db, routeDeps));
+  const internal = new Hono();
+  internal.onError((error, context) => error instanceof HttpError
+    ? context.json({ error: { code: error.code } }, error.status as 400)
+    : context.json({ error: { code: "UNEXPECTED", message: String(error) } }, 500));
+  internal.route("/", yoloInternalRoutes(db, "internal-token", routeDeps));
+  return { app, internal, calls, pushed };
 }
 
 const json = (body: unknown) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -292,13 +330,119 @@ describe("reads, consent and audit", () => {
     expect((await mount({}, base).app.request("/audit?cursor=abc")).status).toBe(400);
   });
 
-  test("consent: read by anyone, given explicitly, solo default for owners and admins only", async () => {
-    expect(await (await mount({}, { ...base, role: "member" }).app.request("/consent")).json()).toEqual({ acknowledgedAt: null, soloDefault: false });
-    const put = (auth: AuthContext, body: unknown) => mount({}, auth).app.request("/consent", { ...json(body), method: "PUT" });
+  test("consent: read by anyone, given explicitly; solo default eligible to the owner of a one-member organization", async () => {
+    expect(await (await mount({ solo: true }, { ...base, role: "member" }).app.request("/consent")).json())
+      .toEqual({ acknowledgedAt: null, soloDefault: false, soloEligible: false });
+    expect(await (await mount({ solo: true }, base).app.request("/consent")).json()).toEqual({ acknowledgedAt: null, soloDefault: false, soloEligible: true });
+    expect((await (await mount({ solo: false }, base).app.request("/consent")).json() as { soloEligible: boolean }).soloEligible).toBe(false);
+    const put = (auth: AuthContext, body: unknown, state: State = { solo: true }) => mount(state, auth).app.request("/consent", { ...json(body), method: "PUT" });
     expect((await put({ ...base, role: "member" }, { acknowledged: true })).status).toBe(200);
     expect((await put({ ...base, role: "member" }, { acknowledged: true, soloDefault: true })).status).toBe(403);
     expect((await put(base, { acknowledged: false })).status).toBe(400);
+    expect((await put(base, { acknowledged: true, soloDefault: "yes" })).status).toBe(400);
     expect((await put({ ...base, kind: "bot" } as unknown as AuthContext,{ acknowledged: true })).status).toBe(403);
-    expect(await (await put(base, { acknowledged: true, soloDefault: true })).json()).toEqual({ acknowledgedAt: new Date(NOW).toISOString(), soloDefault: true });
+  });
+});
+
+describe("mode solo local: YOLO par défaut", () => {
+  const putSolo = (target: ReturnType<typeof mount>, soloDefault: boolean) =>
+    target.app.request("/consent", { ...json({ acknowledged: true, soloDefault }), method: "PUT" });
+  const leasesPushed = (target: ReturnType<typeof mount>) => target.pushed.filter((entry) => entry.kind === "lease");
+
+  test("only the owner turns it on, only in a one-member organization, and only with a signing key", async () => {
+    const admin = mount({ solo: true }, { ...base, role: "admin" });
+    expect((await putSolo(admin, true)).status).toBe(403);
+    const crowded = mount({ solo: false }, base);
+    const refusal = await putSolo(crowded, true);
+    expect(refusal.status).toBe(409);
+    expect(await refusal.json()).toEqual({ error: { code: "YOLO_SOLO_NOT_ELIGIBLE", details: { reason: "members" } } });
+    expect(crowded.calls.some((call) => call.sql.includes("insert into permission_yolo_consents"))).toBe(false);
+    const unsigned = mount({ solo: true }, base, { seed: null });
+    expect((await putSolo(unsigned, true)).status).toBe(503);
+    expect(unsigned.calls).toEqual([]);
+    for (const target of [admin, crowded, unsigned]) expect(target.pushed).toEqual([]);
+  });
+
+  test("turned on, the first solo lease leaves at once: runtime scope, 24 h, for the owner, .ssh, .env and the keychain protected", async () => {
+    const target = mount({ solo: true, soloConsent: true, soloDue: [RUNTIME] }, base);
+    const response = await putSolo(target, true);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ acknowledgedAt: new Date(NOW).toISOString(), soloDefault: true, soloEligible: true });
+    const pushed = leasesPushed(target);
+    expect(pushed).toHaveLength(1);
+    const frame = pushed[0]!.frame as { lease: YoloLease; keyId: string; signature: string };
+    expect(frame.lease).toMatchObject({
+      scope: "runtime", runtimeId: RUNTIME, profile: null, sessionKey: null, grantedBy: OWNER,
+      issuedAt: NOW / 1000, notBefore: NOW / 1000, expiresAt: NOW / 1000 + 86_400,
+    });
+    expect(frame.lease.protect).toEqual(expect.arrayContaining(["ssh", "env", "keychain"]));
+    const { keys } = await (await target.app.request("/keys")).json() as { keys: Array<{ keyId: string; publicKey: string; current: boolean }> };
+    expect(verifyYoloLeaseSignature(frame.lease, frame.keyId, frame.signature, keys)).toEqual({ ok: true });
+    const call = target.calls.find((entry) => entry.sql.includes("grant_permission_yolo_solo_lease"))!;
+    expect(call.parameters[1]).toBe(OWNER);
+    expect(call.parameters[5]).toBe(6 * 3600);
+  });
+
+  test("a solo lease that is not due is not signed again: one live solo lease per runtime", async () => {
+    const target = mount({ solo: true, soloConsent: true, soloDue: [RUNTIME], soloGrantStatus: "not_due" }, base);
+    expect((await putSolo(target, true)).status).toBe(200);
+    expect(leasesPushed(target)).toEqual([]);
+    const idle = mount({ solo: true, soloConsent: true, soloDue: [] }, base);
+    expect((await putSolo(idle, true)).status).toBe(200);
+    expect(idle.calls.some((entry) => entry.sql.includes("grant_permission_yolo_solo_lease"))).toBe(false);
+  });
+
+  test("turned off by an owner or an admin: the solo leases are revoked and the host is told", async () => {
+    const target = mount({ solo: true, soloConsent: true, soloDue: [RUNTIME] }, base);
+    await putSolo(target, true);
+    const leaseId = (leasesPushed(target)[0]!.frame as { lease: YoloLease }).lease.leaseId;
+    const off = await putSolo(target, false);
+    expect(off.status).toBe(200);
+    const end = target.calls.find((entry) => entry.sql.includes("end_permission_yolo_solo_default"))!;
+    expect(end.parameters).toEqual([ORG, OWNER]);
+    expect(target.pushed.at(-1)).toEqual({ kind: "revoke", runtimeId: RUNTIME, frame: { t: "yolo.revoke", leaseId, revokedAt: NOW / 1000 } });
+  });
+
+  test("revoking the solo lease by hand turns the solo default off: it does not come back at the next pass", async () => {
+    const target = mount({ solo: true, soloConsent: true, soloDue: [RUNTIME] }, base);
+    await putSolo(target, true);
+    const leaseId = (leasesPushed(target)[0]!.frame as { lease: YoloLease }).lease.leaseId;
+    expect((await target.app.request(`/leases/${leaseId}`, { method: "DELETE" })).status).toBe(200);
+    expect(target.calls.find((entry) => entry.sql.includes("end_permission_yolo_solo_default"))?.parameters).toEqual([ORG, OWNER]);
+  });
+
+  test("the internal route is for the worker's bearer only", async () => {
+    const target = mount({ solo: true, soloConsent: true, soloDue: [RUNTIME] }, base);
+    const path = `/solo-default/${ORG}/reconcile`;
+    expect((await target.internal.request(path, { method: "POST" })).status).toBe(401);
+    expect((await target.internal.request(path, { method: "POST", headers: { Authorization: "Bearer nope" } })).status).toBe(401);
+    expect((await target.internal.request("/solo-default/nope/reconcile", { method: "POST", headers: { Authorization: "Bearer internal-token" } })).status).toBe(400);
+    expect(target.calls).toEqual([]);
+    const renewed = await target.internal.request(path, { method: "POST", headers: { Authorization: "Bearer internal-token" } });
+    expect(await renewed.json()).toEqual({ renewed: 1, ended: false, skipped: [] });
+    expect(leasesPushed(target)).toHaveLength(1);
+  });
+
+  test("a second member: the system ends the solo default (superseded), tells the host and e-mails the owner", async () => {
+    const state: State = { solo: true, soloConsent: true, soloDue: [RUNTIME] };
+    const target = mount(state, base);
+    await putSolo(target, true);
+    const leaseId = (leasesPushed(target)[0]!.frame as { lease: YoloLease }).lease.leaseId;
+    // The same database, now with two live members.
+    state.solo = false;
+    state.members = [{ userId: OWNER, role: "owner" }, { userId: BOT, role: "member" }];
+    const before = target.calls.length;
+    const response = await target.internal.request(`/solo-default/${ORG}/reconcile`, { method: "POST", headers: { Authorization: "Bearer internal-token" } });
+    expect(await response.json()).toEqual({ renewed: 0, ended: true, skipped: [] });
+    const calls = target.calls.slice(before);
+    expect(calls.find((entry) => entry.sql.includes("end_permission_yolo_solo_default"))!.parameters).toEqual([ORG, null]);
+    expect(calls.some((entry) => entry.sql.includes("grant_permission_yolo_solo_lease"))).toBe(false);
+    expect(target.pushed.at(-1)).toEqual({ kind: "revoke", runtimeId: RUNTIME, frame: { t: "yolo.revoke", leaseId, revokedAt: NOW / 1000 } });
+    const email = calls.find((entry) => entry.sql.includes("insert into email_outbox"))!;
+    expect(email.parameters[1]).toBe("yolo_solo_default_ended");
+    expect(email.parameters[3]).toBe("owner@example.com");
+    expect(email.parameters[5]).toEqual({
+      organizationName: "Acme", reason: "members", settingsUrl: "https://app.example.test/o/acme/settings/runtime", webAppUrl: "https://app.example.test",
+    });
   });
 });

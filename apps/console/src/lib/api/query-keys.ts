@@ -91,6 +91,8 @@ export const queryKeys = {
     workspaceQueryKey(activeOrganizationId(), "bot-permission-grants", botId),
   runtimePermissionSettings: (runtimeId: string) =>
     workspaceQueryKey(activeOrganizationId(), "runtime-permission-settings", runtimeId),
+  /** Mode solo local : le consentement, lu pour l'interrupteur « YOLO par défaut (solo) ». */
+  get yoloSoloConsent() { return workspaceQueryKey(activeOrganizationId(), "yolo-solo-consent"); },
   botRuntimeMemory: (botId: string) =>
     workspaceQueryKey(activeOrganizationId(), "bot-runtime-memory", botId),
   personaDraft: (botId: string) =>

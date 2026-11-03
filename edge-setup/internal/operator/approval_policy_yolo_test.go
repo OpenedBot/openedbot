@@ -100,6 +100,8 @@ func TestApprovalPolicyPluginYoloMode(t *testing.T) {
 	now := time.Now().Unix()
 	deny := yolohardline.Deny{Commands: []string{"git push --force"}, Tools: []string{"send_message"}, Paths: []string{".aws"}}
 	bot := yoloDoc("bot", "designer", nil, now-60, now+3600, deny)
+	// The solo local default: a 24 h runtime lease, no organization deny-list.
+	solo := yoloDoc("runtime", nil, nil, now-60, now+86400-60, yolohardline.Deny{Commands: []string{}, Tools: []string{}, Paths: []string{}})
 	write := map[string]any{"path": "/tmp/build/out.txt", "content": "x"}
 	cases := []yoloPluginCase{
 		{Name: "no lease asks", Tool: "write_file", Args: write, want: "ask"},
@@ -125,6 +127,17 @@ func TestApprovalPolicyPluginYoloMode(t *testing.T) {
 		{Name: "terminal plain", Tool: "terminal", Args: map[string]any{"command": "ls -la"}, Yolo: bot, want: "pass"},
 		{Name: "terminal without lease", Tool: "terminal", Args: map[string]any{"command": "rm -rf /"}, want: "pass"},
 		{Name: "code reading a key", Tool: "execute_code", Args: map[string]any{"code": "open('/root/.ssh/id_ed25519').read()"}, Yolo: bot, want: "block"},
+		// Solo local: everything passes but .ssh, .env (and .env.*) and the keychain.
+		{Name: "solo passes a write", Tool: "write_file", Args: write, Yolo: solo, want: "pass"},
+		{Name: "solo terminal plain", Tool: "terminal", Args: map[string]any{"command": "npm run build"}, Yolo: solo, want: "pass"},
+		{Name: "solo ssh write", Tool: "write_file", Args: map[string]any{"path": "/Users/me/.ssh/config", "content": "Host *"}, Yolo: solo, want: "block"},
+		{Name: "solo ssh read", Tool: "terminal", Args: map[string]any{"command": "cat ~/.ssh/id_ed25519"}, Yolo: solo, want: "block"},
+		{Name: "solo env write", Tool: "write_file", Args: map[string]any{"path": "app/.env", "content": "K=v"}, Yolo: solo, want: "block"},
+		{Name: "solo env variant write", Tool: "write_file", Args: map[string]any{"path": "app/.env.local", "content": "K=v"}, Yolo: solo, want: "block"},
+		{Name: "solo env variant read", Tool: "terminal", Args: map[string]any{"command": "cat .env.production"}, Yolo: solo, want: "block"},
+		{Name: "solo envrc is not .env", Tool: "write_file", Args: map[string]any{"path": "app/.envrc", "content": "x"}, Yolo: solo, want: "pass"},
+		{Name: "solo keychain file", Tool: "write_file", Args: map[string]any{"path": "/Users/me/Library/Keychains/login.keychain-db", "content": "x"}, Yolo: solo, want: "block"},
+		{Name: "solo keychain command", Tool: "terminal", Args: map[string]any{"command": "security find-generic-password -s github -w"}, Yolo: solo, want: "block"},
 	}
 	// Parity: the Python verdicts are the Go ones (internal/yolohardline).
 	type parityCase struct {

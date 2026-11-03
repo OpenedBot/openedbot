@@ -366,6 +366,13 @@ everything within 2 s and reports it to openedbot on the next link. Every lease
 issued before that moment stays refused, even after `on`, which only lifts the
 local refusal of the next ones. Without `--yes`, nothing is changed.
 
+In solo local mode (a workspace whose owner is its only member, with "Default
+YOLO (solo)" turned on), openedbot renews a 24 h runtime lease on the owner's
+behalf. `.ssh`, `.env` (and `.env.*`) and the keychain always stay protected.
+The renewal stops as soon as a second member joins the workspace, and `off`
+stops it too: openedbot turns the setting off when it learns of it, and renews
+nothing until it is turned on again.
+
 ## Backup and destruction
 
 What is worth backing up fits in `/srv/hermes/data`

@@ -104,4 +104,10 @@ export const TRANSACTIONAL_EMAIL_SAMPLE_DATA: Record<
     settingsUrl: "https://openedbot.app/o/atelier/settings/runtime",
     webAppUrl: "https://openedbot.app",
   },
+  yolo_solo_default_ended: {
+    organizationName: "Atelier",
+    reason: "members",
+    settingsUrl: "https://openedbot.app/o/atelier/settings/runtime",
+    webAppUrl: "https://openedbot.app",
+  },
 };

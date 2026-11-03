@@ -21,6 +21,7 @@ export type YoloLeaseRow = {
   revokedAt: Date | null;
   hostState: YoloLeaseHostState;
   deliveredAt: Date | null;
+  soloDefault: boolean;
 };
 
 /** Ce que la charge d'un bail cible : le runtime, le profil du bot, la session du thread. */
@@ -119,7 +120,7 @@ export async function readYoloLeaseTx(tx: TransactionDb, organizationId: string,
   const rows = await tx<YoloLeaseRow[]>`
     select id, scope, runtime_id as "runtimeId", bot_id as "botId", thread_id as "threadId",
            granted_by_user_id as "grantedByUserId", issued_at as "issuedAt", expires_at as "expiresAt",
-           revoked_at as "revokedAt", host_state as "hostState", delivered_at as "deliveredAt"
+           revoked_at as "revokedAt", host_state as "hostState", delivered_at as "deliveredAt", solo_default as "soloDefault"
       from permission_yolo_leases where organization_id = ${organizationId} and id = ${leaseId}
   `;
   return rows[0] ?? null;
@@ -137,7 +138,7 @@ export async function readLiveYoloLeasesTx(
   return tx<YoloLeaseRow[]>`
     select id, scope, runtime_id as "runtimeId", bot_id as "botId", thread_id as "threadId",
            granted_by_user_id as "grantedByUserId", issued_at as "issuedAt", expires_at as "expiresAt",
-           revoked_at as "revokedAt", host_state as "hostState", delivered_at as "deliveredAt"
+           revoked_at as "revokedAt", host_state as "hostState", delivered_at as "deliveredAt", solo_default as "soloDefault"
       from permission_yolo_leases
      where organization_id = ${organizationId} and revoked_at is null and expires_at > now()
        and (${runtimeId}::uuid is null or runtime_id = ${runtimeId}::uuid)
@@ -252,5 +253,112 @@ export async function readYoloAuditTx(
        and (${query.before}::bigint is null or id < ${query.before}::bigint)
      order by id desc
      limit ${query.limit}
+  `;
+}
+
+/**
+ * Mode solo local (migration 0160) : ce que le renouvellement lit sous le
+ * tenant. `soloOwnerId` : l'unique membre vivant s'il est owner, sinon
+ * `null` (l'organisation n'est pas, ou plus, solo). `dueRuntimeIds` : les
+ * runtimes qui annoncent `yolo_lease` sans bail runtime vivant au-delà de la
+ * marge. La fonction d'octroi revérifie tout sous le verrou.
+ */
+export type YoloSoloStateRow = {
+  soloOwnerId: string | null;
+  consentUserIds: string[];
+  dueRuntimeIds: string[];
+};
+
+export async function readYoloSoloStateTx(
+  tx: TransactionDb,
+  organizationId: string,
+  renewBeforeSeconds: number,
+): Promise<YoloSoloStateRow> {
+  const members = await tx<Array<{ userId: string; role: string }>>`
+    select user_id as "userId", role from memberships
+     where organization_id = ${organizationId} and revoked_at is null
+     limit 2
+  `;
+  const consents = await tx<Array<{ userId: string }>>`
+    select user_id as "userId" from permission_yolo_consents
+     where organization_id = ${organizationId} and solo_default
+  `;
+  const due = await tx<Array<{ id: string }>>`
+    select r.id from runtimes r
+     where r.organization_id = ${organizationId} and r.revoked_at is null
+       and r.link_features @> array['yolo_lease']::text[]
+       and not exists (
+         select 1 from permission_yolo_leases l
+          where l.organization_id = r.organization_id and l.runtime_id = r.id and l.scope = 'runtime'
+            and l.revoked_at is null and l.expires_at > now() + make_interval(secs => ${renewBeforeSeconds}))
+     order by r.id
+  `;
+  const sole = members.length === 1 && members[0]!.role === "owner" ? members[0]!.userId : null;
+  return { soloOwnerId: sole, consentUserIds: consents.map((row) => row.userId), dueRuntimeIds: due.map((row) => row.id) };
+}
+
+/** L'organisation n'a qu'un membre vivant, et c'est cet owner. */
+export async function isYoloSoloTx(tx: TransactionDb, organizationId: string, userId: string): Promise<boolean> {
+  const rows = await tx<Array<{ solo: boolean }>>`select permission_yolo_is_solo(${organizationId}::uuid, ${userId}::uuid) as solo`;
+  return rows[0]?.solo === true;
+}
+
+export type YoloSoloGrantStatus =
+  | "granted"
+  | "not_due"
+  | "not_solo"
+  | "consent_off"
+  | "blocked_ceiling"
+  | "blocked_enforce_review"
+  | "policy_changed"
+  | "runtime_not_found"
+  | "host_unsupported";
+
+export async function grantYoloSoloLeaseTx(
+  tx: TransactionDb,
+  input: { organizationId: string; ownerUserId: string; keyId: string; signature: string; lease: YoloLease; renewBeforeSeconds: number },
+): Promise<{ status: YoloSoloGrantStatus; superseded: string[] }> {
+  const rows = await tx<Array<{ status: YoloSoloGrantStatus; superseded: string[] | null }>>`
+    select status, superseded::text[] as superseded from grant_permission_yolo_solo_lease(
+      ${input.organizationId}::uuid, ${input.ownerUserId}::uuid, ${input.keyId}, ${input.signature},
+      ${JSON.stringify(input.lease)}::text::jsonb, ${input.renewBeforeSeconds}::integer
+    )
+  `;
+  const row = rows[0];
+  if (!row) throw new Error("grant_permission_yolo_solo_lease returned no row");
+  return { status: row.status, superseded: row.superseded ?? [] };
+}
+
+/**
+ * Coupe le YOLO par défaut : `actorUserId` (owner ou admin, `manual`) ou
+ * `null` (le système, seulement si l'organisation n'est plus solo,
+ * `superseded`). Rend les baux solo révoqués à l'instant, avec leur runtime.
+ */
+export async function endYoloSoloDefaultTx(
+  tx: TransactionDb,
+  input: { organizationId: string; actorUserId: string | null },
+): Promise<{ status: "ended" | "unchanged" | "still_solo"; revoked: Array<{ leaseId: string; runtimeId: string }> }> {
+  const rows = await tx<Array<{ status: "ended" | "unchanged" | "still_solo"; leaseIds: string[] | null; runtimeIds: string[] | null }>>`
+    select status, lease_ids::text[] as "leaseIds", runtime_ids::text[] as "runtimeIds"
+      from end_permission_yolo_solo_default(${input.organizationId}::uuid, ${input.actorUserId}::uuid)
+  `;
+  const row = rows[0];
+  if (!row) throw new Error("end_permission_yolo_solo_default returned no row");
+  const runtimeIds = row.runtimeIds ?? [];
+  return { status: row.status, revoked: (row.leaseIds ?? []).map((leaseId, index) => ({ leaseId, runtimeId: runtimeIds[index]! })) };
+}
+
+/** Les owners vivants à prévenir que le YOLO par défaut est coupé, et le slug de l'espace pour le lien. */
+export async function readYoloSoloRecipientsTx(
+  tx: TransactionDb,
+  organizationId: string,
+): Promise<Array<{ userId: string; email: string; organizationSlug: string; organizationName: string }>> {
+  return tx<Array<{ userId: string; email: string; organizationSlug: string; organizationName: string }>>`
+    select u.id as "userId", u.email, o.slug as "organizationSlug", o.name as "organizationName"
+      from memberships m
+      join users u on u.id = m.user_id
+      join organizations o on o.id = m.organization_id
+     where m.organization_id = ${organizationId} and m.role = 'owner' and m.revoked_at is null
+       and u.email is not null
   `;
 }

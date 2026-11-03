@@ -21,6 +21,7 @@ import { mobileSettingsHints, mobileSettingsRuntimes, operatorSettingsDialog, pu
 import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder, pwaInstall } from "./messages/fr/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/fr/thread";
 import { waitlist } from "./messages/fr/waitlist";
+import { yoloSolo } from "./messages/fr/yolo-solo";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/fr/workspace";
 
 export const fr = {
@@ -57,6 +58,7 @@ export const fr = {
   settingsPolicies,
   orgPermissionPolicy,
   runtimeAlerts,
+  yoloSolo,
   settingsNotifications,
   pushNotifications,
   memberInvitation,

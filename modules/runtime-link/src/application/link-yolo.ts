@@ -194,7 +194,8 @@ export function createLinkYoloPersistence(db: Db, options: LinkYoloPersistenceOp
         if (rejected.length > 0) revokedByHost += (await revokeByHost(tx, link, { leaseIds: rejected, issuedUntil: null, reason: "host_rejected" })).length;
         if (frame.killedAt !== undefined) {
           // `edge-setup yolo off` : tout bail émis jusque-là est mort pour l'hôte,
-          // qu'il le cite ou non ; un bail émis après reste valable pour lui.
+          // qu'il le cite ou non ; un bail émis après reste valable pour lui, sauf
+          // un bail solo : le YOLO par défaut est coupé avec ses baux (0160).
           const killed = await revokeByHost(tx, link, { leaseIds: null, issuedUntil: frame.killedAt, reason: "host_cli" });
           const unlisted = killed.filter((leaseId) => !listed.includes(leaseId));
           if (unlisted.length > 0) {
