@@ -33,7 +33,9 @@ import type { AppVariables } from "../identity/auth";
 import type { BlobStore } from "../../infrastructure/blob-store";
 import { objectKey } from "../../infrastructure/blob-store";
 import type { Db } from "@openedbot/platform-db";
-import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
+import { isUniqueViolation } from "@openedbot/platform-db";
+import { claimReservedBlobsTx } from "@openedbot/conversation/sql/uncommitted-blobs";
+import { admitWithStoredBlobs } from "./message-blob-admission";
 import { RunTrace } from "@openedbot/platform-observability/run-trace";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import type { ApiConfig } from "../../infrastructure/config";
@@ -96,12 +98,11 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
     const ids = reservation?.attachments.map((item) => item.id) ?? attachments.map(() => crypto.randomUUID());
     const keys = reservation?.attachments.map((item) => item.key) ?? ids.map((id) => objectKey(auth.organizationId, id));
     try {
-      await Promise.all(attachments.map(async (attachment, index) => {
-        const payload = attachmentPayload(attachment);
-        await blobs.put(keys[index]!, payload.data, payload.contentType);
-      }));
-      if (attachments.length > 0) trace.mark("api.blobs_stored");
-      const result = await withTenant(db, auth.organizationId, async (tx) => {
+      const result = await admitWithStoredBlobs({
+        db, blobs, organizationId: auth.organizationId, legacy: !reservation,
+        objects: attachments.map((attachment, index) => ({ key: keys[index]!, ...attachmentPayload(attachment) })),
+        onStored: () => trace.mark("api.blobs_stored"),
+      }, async (tx) => {
         const plan = await subscriptionPort().readForUpdate(tx, auth.organizationId);
         const subscription = plan ? { status: plan.status, quota: plan.attachmentQuotaBytes } : undefined;
         const deletionRows = await tx<Array<{ pending: boolean }>>`
@@ -533,6 +534,7 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
             )
           `;
         }
+        if (!reservation) await claimReservedBlobsTx(tx, auth.organizationId, keys);
         await tx`
           update threads set updated_at = now()
            where organization_id = ${auth.organizationId} and id = ${context.req.param("threadId")}
@@ -603,10 +605,6 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
       logRunAdmission(result.runId, auth.organizationId, trace);
       return context.json(result, 202);
     } catch (error) {
-      // Les objets d'une soumission idempotente sont déterministes et restent
-      // disponibles pour sa reprise après expiration du bail. Le chemin legacy
-      // conserve son nettoyage immédiat.
-      if (!reservation) await Promise.allSettled(keys.map((key) => blobs.delete(key)));
       if (isUniqueViolation(error)) {
         throw new HttpError(409, "THREAD_BUSY", "Cette conversation a déjà un run en attente ou en cours.");
       }

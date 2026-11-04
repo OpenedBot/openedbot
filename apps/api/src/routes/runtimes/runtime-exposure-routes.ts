@@ -5,6 +5,7 @@ import type {
   RuntimeExposureCreatedDto,
   RuntimeExposureKind,
   RuntimeExposureListDto,
+  RuntimeExposureRevokedDto,
   RuntimeProbeDiagnosticCode,
 } from "@openedbot/contracts-api";
 import type { ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
@@ -22,12 +23,17 @@ import {
 import {
   defaultCloudflareClientFactory,
   defaultTailscaleClientFactory,
-  revokeExposure,
+  cleanupRevokedExposure,
+  markExposureRevoked,
   type CloudflareClientFactory,
   type TailscaleClientFactory,
 } from "@openedbot/runtimes/application/direct-exposure-lifecycle";
-import { provisionDirectExposure } from "@openedbot/runtimes/application/direct-exposure-provisioning";
-import { provisionTailscaleExposure, tailscaleInstallCommand } from "@openedbot/runtimes/application/tailscale-exposure-provisioning";
+import { deprovisionDirectExposure, provisionDirectExposure } from "@openedbot/runtimes/application/direct-exposure-provisioning";
+import {
+  deprovisionTailscaleExposure,
+  provisionTailscaleExposure,
+  tailscaleInstallCommand,
+} from "@openedbot/runtimes/application/tailscale-exposure-provisioning";
 import type { AppVariables } from "../identity/auth";
 import { requireRole } from "../identity/auth";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
@@ -96,6 +102,11 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
     const install = draft.installToken ? encryptSecret(draft.installToken, config.tokenEncryption.current.value) : null;
     const edge = draft.edgeAuth ? encryptSecret(JSON.stringify(draft.edgeAuth), config.tokenEncryption.current.value) : null;
     const id = crypto.randomUUID();
+    // Les ressources existent déjà chez le fournisseur : si la ligne qui les
+    // retrouve n'est pas écrite, elles sont retirées, mais seulement quand le
+    // rollback est certain (échec avant le COMMIT). Au-delà, la ligne existe
+    // peut-être : on ne détruit rien et l'événement nomme les ressources.
+    let commitSent = false;
     const row = await withTenant(db, auth.organizationId, async (tx) => {
       const rows = await tx<RuntimeExposureRow[]>`
         insert into runtime_direct_exposures (
@@ -118,7 +129,12 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
                   edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId",
                   status, last_tunnel_status as "lastTunnelStatus", last_checked_at as "lastCheckedAt", error_code as "errorCode",
                   created_at as "createdAt", revoked_at as "revokedAt"`;
-      return rows[0]!;
+      const inserted = rows[0]!;
+      commitSent = true;
+      return inserted;
+    }).catch(async (error: unknown) => {
+      await releaseUnrecordedExposure(kind, draft, body, config, { cloudflare, tailscale }, commitSent, auth.organizationId);
+      throw error;
     });
     const response: RuntimeExposureCreatedDto = {
       exposure: publicExposure(row),
@@ -257,20 +273,30 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
     requireRole(auth, ["owner", "admin"]);
     const id = assertString(context.req.param("id"), "L’identifiant de la publication", { max: 64 });
     const credentials = await readOptionalTailscaleCredentials(context.req.raw);
-    const result = await withTenant(db, auth.organizationId, async (tx) => {
+    // La révocation est commitée seule, puis le fournisseur est nettoyé hors
+    // transaction : un retrait distant à moitié fait ne ressuscite plus une
+    // publication en base. Un nettoyage `pending` se reprend par ce même DELETE.
+    const revoked = await withTenant(db, auth.organizationId, async (tx) => {
       const row = (await readExposureById(tx, auth.organizationId, id))[0];
       if (!row) throw new HttpError(404, "EXPOSURE_NOT_FOUND", "Cette publication n’existe pas.");
-      if (row.status === "revoked") return { ok: true as const, cloudflareCleanup: "none" as const };
+      if (row.status === "revoked") return { row, cleanup: row.cleanupStatus === "pending" ? "pending" as const : "none" as const };
       if (row.runtimeId) {
         const live = await tx<Array<{ id: string }>>`select id from runtimes where organization_id = ${auth.organizationId} and id = ${row.runtimeId} and revoked_at is null`;
         if (live.length) throw new HttpError(409, "EXPOSURE_RUNTIME_DECLARED", "Retirez d’abord le runtime qui utilise cette publication.");
       }
-      try {
-        return await revokeExposure(tx, config, row, credentials, { cloudflare, tailscale });
-      } catch (error) {
-        throw mapProviderError(error);
-      }
+      return { row, cleanup: await markExposureRevoked(tx, config, row, credentials) };
     });
+    if (revoked.cleanup !== "pending") {
+      const result: RuntimeExposureRevokedDto = { ok: true, cloudflareCleanup: revoked.cleanup };
+      return context.json(result);
+    }
+    let cloudflareCleanup: "done" | "manual";
+    try {
+      cloudflareCleanup = await cleanupRevokedExposure(db, config, revoked.row, credentials, { cloudflare, tailscale });
+    } catch (error) {
+      throw mapProviderError(error);
+    }
+    const result: RuntimeExposureRevokedDto = { ok: true, cloudflareCleanup };
     return context.json(result);
   });
 
@@ -400,6 +426,48 @@ async function managedDraft(body: Record<string, unknown>, config: ApiConfig, cl
     };
   } catch (error) {
     throw mapProviderError(error);
+  }
+}
+
+/**
+ * Une publication provisionnée chez le fournisseur dont la ligne n'a pas été
+ * écrite. Rollback certain : ses ressources sont retirées (suppressions
+ * idempotentes). Issue du COMMIT inconnue : rien n'est détruit, la ligne peut
+ * exister et servir. Dans les deux cas d'échec, l'événement nomme les
+ * identifiants (aucun secret) pour un retrait à la main.
+ */
+async function releaseUnrecordedExposure(
+  kind: RuntimeExposureKind,
+  draft: ExposureDraft,
+  body: Record<string, unknown>,
+  config: ApiConfig,
+  factories: { cloudflare: CloudflareClientFactory; tailscale: TailscaleClientFactory },
+  commitSent: boolean,
+  organizationId: string,
+): Promise<void> {
+  const resources = {
+    organizationId, kind, hostname: draft.hostname, tunnelId: draft.tunnelId, dnsRecordId: draft.dnsRecordId,
+    accessAppId: draft.accessAppId, serviceTokenId: draft.serviceTokenId, tailscaleAuthKeyId: draft.tailscaleAuthKeyId,
+  };
+  if (commitSent) {
+    console.error(JSON.stringify({ event: "api.exposure_record_uncertain", ...resources }));
+    return;
+  }
+  try {
+    if (kind === "tailscale_funnel") {
+      await deprovisionTailscaleExposure(factories.tailscale(readTailscaleCredentials(body)), {
+        hostname: draft.hostname, authKeyId: draft.tailscaleAuthKeyId,
+      });
+    } else if (config.managedTunnel && draft.accountId && draft.zoneId) {
+      await deprovisionDirectExposure(factories.cloudflare(config.managedTunnel.apiToken), {
+        accountId: draft.accountId, zoneId: draft.zoneId, tunnelId: draft.tunnelId, dnsRecordId: draft.dnsRecordId,
+        accessAppId: draft.accessAppId, serviceTokenId: draft.serviceTokenId,
+      });
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "api.exposure_release_failed", ...resources, error: error instanceof Error ? error.name : "unknown",
+    }));
   }
 }
 

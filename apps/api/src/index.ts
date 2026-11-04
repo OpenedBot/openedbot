@@ -6,6 +6,7 @@ import { authMiddleware, authRoutes, protectedAuthRoutes, type AppVariables } fr
 import { mobileConnectProtectedRoutes, mobileConnectRoutes } from "./routes/identity/mobile-connect-routes";
 import { nativeCodeLoginRoutes } from "./routes/identity/native-code-login-routes";
 import { createBlobStore } from "./infrastructure/blob-store";
+import { fileBlobRoot, otherBlobBackend } from "@openedbot/platform-config/blob-driver";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { responseCompression } from "./interfaces/http/compression";
 import { assertProductionConfig, readApiConfig } from "./infrastructure/config";
@@ -137,7 +138,10 @@ await initializeProductFeatures(db, isExplicitDevelopmentEnvironment());
 const productFeatures = await readProductFeatures(db);
 // Features basculées depuis le backoffice : relues à chaud, jamais figées au boot.
 const liveFeatures = liveProductFeatures(db);
-const blobs = createBlobStore(baseConfig.blob);
+// L'autre magasin relit et supprime les objets écrits avant une bascule de driver.
+const blobs = createBlobStore(baseConfig.blob, otherBlobBackend(
+  process.env, baseConfig.blob.driver, fileBlobRoot(process.env, baseConfig.environment === "production"),
+));
 // Plug-ins pro : `OPENEDBOT_PLUGINS` vide ou absent = mode solo, et
 // aucune route n'est ajoutée. Un plug-in absent, invalide ou refusé est ignoré
 // avec un avertissement : l'API démarre quand même.

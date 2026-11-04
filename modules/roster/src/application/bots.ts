@@ -21,7 +21,6 @@ import type { CreateBotInput, UpdateBotInput } from "../domain/bot-input";
 import { chooseBotSlug } from "./bot-slug";
 import {
   deleteBotRow,
-  detachBotFromGroups,
   hasPendingBotIngress,
   insertBotWithThread,
   isBotInGroup,
@@ -41,6 +40,7 @@ import {
   updateBotRow,
   writeBotApprovalPolicyProof,
 } from "../sql/bots";
+import { detachBotFromGroups } from "../sql/bot-purge";
 import { readGroups } from "../sql/groups";
 import { pruneEmptySections } from "../sql/section-prune";
 import { insertDefaultSection, readDefaultSectionId, readSections, sectionExists } from "../sql/sections";
@@ -478,18 +478,20 @@ export async function updateBot(
  * réseau vers le runtime, largement de quoi qu'un run démarre.
  *
  * Ne dit rien du bot inexistant : l'appelant le distingue par le nombre de
- * lignes que sa propre requête renvoie.
+ * lignes que sa propre requête renvoie. `detachGroups` : la purge forcée détache
+ * ses salons dans la même transaction ; leurs missions, lues avant, restent gardées.
  */
 export async function assertBotDeletable(
   tx: TransactionDb,
   organizationId: string,
   botId: string,
+  options: { detachGroups?: boolean } = {},
 ): Promise<void> {
   await assertBotProfileSettled(tx, organizationId, botId);
   await assertBotQuiescent(tx, organizationId, botId, {
     code: "CANCELLED_BY_DELETE",
     message: "Passe de maintenance annulée : le bot est supprimé.",
-  }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.");
+  }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.", options.detachGroups === true);
 }
 
 /**
@@ -524,6 +526,7 @@ async function assertBotQuiescent(
   botId: string,
   maintenanceReason: { code: string; message: string },
   busyMessage: string,
+  allowGroups = false,
 ): Promise<boolean> {
   const active = await lockActiveBotRuns(tx, organizationId, botId);
   if (!(await lockBotRow(tx, organizationId, botId))) return false;
@@ -544,7 +547,7 @@ async function assertBotQuiescent(
       { runId: blocking.id, stepKind: blocking.stepKind ?? null },
     );
   }
-  await assertBotNotInGroup(tx, organizationId, botId);
+  if (!allowGroups) await assertBotNotInGroup(tx, organizationId, botId);
   if (await hasPendingBotIngress(tx, organizationId, botId)) {
     throw new HttpError(409, "BOT_SUBMISSION_IN_PROGRESS", "Un message idempotent est encore en cours ou en quarantaine.");
   }
@@ -623,23 +626,19 @@ export async function deleteBot(
       return publicBot({ ...rows[0], hostCleanupStatus: runtime && (sessions.length > 0 || slug) ? "pending" : null });
     }
 
-    // `force=1` sur une purge détache d'abord le bot de ses salons : mesuré au
+    // `force=1` sur une purge détache le bot de ses salons : mesuré au
     // navigateur le 04-09, le pilote d'un salon à deux membres était
     // inarchivable ET impurgeable (`BOT_IN_GROUP`), et le salon ne pouvait pas
-    // perdre un membre sans passer sous `GROUP_MEMBERS_MIN`. La purge est déjà
-    // le geste destructif explicite : elle retire le bot de chaque salon et
-    // supprime le salon qui tomberait sous le minimum (fil et routines en
-    // cascade). La corbeille, elle, reste refusée avec son message.
-    const groupsDetached = force
-      ? await withTenant(db, organizationId, (tx) => detachBotFromGroups(tx, organizationId, botId))
-      : null;
-
+    // perdre un membre sans passer sous `GROUP_MEMBERS_MIN`. La purge retire le
+    // bot de chaque salon et supprime celui qui tomberait sous le minimum, dans
+    // la transaction qui supprime le bot : un refus ne coûte aucun salon. La
+    // corbeille, elle, reste refusée avec son message.
     // Les identifiants de session sont lus AVANT toute suppression, dans une
     // transaction qui a déjà verrouillé le bot : un fil créé après cette
     // lecture ne pourrait naître que d'un run, et un run actif a déjà fait
     // échouer `assertBotDeletable`.
     const scope = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId);
+      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
       return readBotDeletionScope(tx, organizationId, botId);
     });
     if (!scope) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
@@ -655,7 +654,8 @@ export async function deleteBot(
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la suppression de profils.");
     }
     const result = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId);
+      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
+      const groupsDetached = force ? await detachBotFromGroups(tx, organizationId, botId) : null;
       const existing = await tx<Array<{ status: string }>>`select status from bot_host_cleanups
         where organization_id = ${organizationId} and bot_id = ${botId}
           and bot_deleted_at = ${scope.deletedAt}
@@ -674,13 +674,13 @@ export async function deleteBot(
       }
       const gone = await deleteBotRow(tx, organizationId, botId);
       if (gone) await pruneEmptySections(tx, organizationId);
-      return { gone, hostCleanup };
+      return { gone, hostCleanup, groupsDetached };
     });
     if (!result.gone) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
     return {
       id: botId,
       hostCleanup: result.hostCleanup,
-      groupsDetached,
+      groupsDetached: result.groupsDetached,
     };
   });
 }

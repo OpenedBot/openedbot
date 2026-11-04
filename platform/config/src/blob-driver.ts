@@ -68,3 +68,27 @@ export function resolveBlobDriver(env: Env, production: boolean): BlobDriverChoi
 export function fileBlobRoot(env: Env, production: boolean): string {
   return env.BLOB_FILE_ROOT?.trim() || (production ? PRODUCTION_FILE_BLOB_ROOT : ".data/blobs");
 }
+
+/** Les accès R2 sans la diffusion CDN : de quoi relire et supprimer un objet. */
+export type R2BlobCredentials = { bucket: string; endpoint: string; accessKeyId: string; secretAccessKey: string };
+
+/**
+ * L'AUTRE magasin, celui qui n'écrit plus : chaque objet est lu et supprimé
+ * par le driver que sa ligne a persisté, pas par celui du jour. Le disque est
+ * toujours connu (son dossier se dérive) ; R2 seulement si ses quatre valeurs
+ * sont réelles. `null` : un objet de cet autre magasin est injoignable, et
+ * toute lecture ou suppression qui le vise échoue au lieu de viser le mauvais.
+ */
+export type BlobOtherBackend = ({ driver: "file"; root: string } | ({ driver: "r2" } & R2BlobCredentials)) | null;
+
+export function otherBlobBackend(env: Env, current: "file" | "r2", fileRoot: string): BlobOtherBackend {
+  if (current === "r2") return { driver: "file", root: fileRoot };
+  if (r2ConfigurationProblems(env).length > 0) return null;
+  return {
+    driver: "r2",
+    bucket: env.R2_BUCKET!.trim(),
+    endpoint: env.R2_ENDPOINT!.trim(),
+    accessKeyId: env.R2_ACCESS_KEY_ID!.trim(),
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(),
+  };
+}

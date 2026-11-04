@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fileBlobRoot, r2ConfigurationProblems, resolveBlobDriver } from "../src/blob-driver";
+import { fileBlobRoot, otherBlobBackend, r2ConfigurationProblems, resolveBlobDriver } from "../src/blob-driver";
 
 const r2 = {
   R2_BUCKET: "ohb-files",
@@ -38,5 +38,20 @@ describe("resolveBlobDriver", () => {
     expect(fileBlobRoot({}, true)).toBe("/var/lib/ohb/blobs");
     expect(fileBlobRoot({}, false)).toBe(".data/blobs");
     expect(fileBlobRoot({ BLOB_FILE_ROOT: " /mnt/blobs " }, true)).toBe("/mnt/blobs");
+  });
+});
+
+describe("otherBlobBackend", () => {
+  test("R2 qui écrit garde le disque pour les objets d'avant la bascule", () => {
+    expect(otherBlobBackend(r2, "r2", "/var/lib/ohb/blobs")).toEqual({ driver: "file", root: "/var/lib/ohb/blobs" });
+  });
+
+  test("le disque qui écrit ne relit R2 que si ses quatre valeurs sont réelles", () => {
+    expect(otherBlobBackend(r2, "file", "/x")).toEqual({ driver: "r2", ...{
+      bucket: "ohb-files", endpoint: "https://account.r2.cloudflarestorage.com", accessKeyId: "key-id", secretAccessKey: "secret",
+    } });
+    // Repli sur valeurs neutralisées : les objets R2 sont injoignables, pas supposés absents.
+    expect(otherBlobBackend({ ...r2, R2_BUCKET: "alpha-r2-not-provisioned" }, "file", "/x")).toBeNull();
+    expect(otherBlobBackend({}, "file", "/x")).toBeNull();
   });
 });

@@ -7,7 +7,8 @@ import { effectiveAdminMode, readOrganizationRuntimeModeIn } from "@openedbot/ru
 import { requireOperator } from "../identity/auth";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { updateRuntimeHealthForFailure } from "@openedbot/runtimes/application/runtime-health";
-import { revokeExposureForRuntime } from "@openedbot/runtimes/application/direct-exposure-lifecycle";
+import { cleanupRevokedExposuresAfterCommit, revokeExposureForRuntime } from "@openedbot/runtimes/application/direct-exposure-lifecycle";
+import type { RuntimeExposureRow } from "@openedbot/runtimes/sql/runtime-exposures";
 import { mapHermesError, probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtime-probe";
 import { readAllRuntimeRows, readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
 import { assertLinkReachable, runtimeClientConfig } from "@openedbot/runtimes/application/runtime-access";
@@ -113,6 +114,8 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       throw mapped;
     }
 
+    // Les tunnels gérés des runtimes remplacés partent APRÈS le commit.
+    const exposureCleanups: RuntimeExposureRow[] = [];
     const { runtime, retired, mode } = await withTenant(db, auth.organizationId, async (tx) => {
       if (target.reachability === "direct") {
         await tx`select id from runtimes where organization_id = ${auth.organizationId} and id = ${runtimeId} for update`;
@@ -136,7 +139,10 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       `;
       for (const row of previous) {
         if (row.reachability === "connector") await insertRuntimeLinkEvent(tx, auth.organizationId, row.id, "revoked");
-        if (row.reachability === "direct") await revokeExposureForRuntime(tx, config, auth.organizationId, row.id);
+        if (row.reachability === "direct") {
+          const pending = await revokeExposureForRuntime(tx, config, auth.organizationId, row.id);
+          if (pending) exposureCleanups.push(pending);
+        }
       }
       const rows = await tx<RuntimeRow[]>`
         update runtimes
@@ -172,6 +178,7 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
         mode: await readOrganizationRuntimeModeIn(tx, config, auth.organizationId),
       };
     });
+    await cleanupRevokedExposuresAfterCommit(db, config, exposureCleanups);
     // Comme pour `DELETE` : le lien de l'ancien se ferme sur-le-champ (4004),
     // relayé à l'instance propriétaire s'il ne vit pas dans ce processus.
     for (const row of retired) {
@@ -198,6 +205,7 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
     requireOperator(auth);
     const runtimeId = assertString(context.req.param("runtimeId"), "L’identifiant du runtime", { max: 64 });
     const confirmed = await readDeleteConfirmation(context.req.raw);
+    const exposureCleanups: RuntimeExposureRow[] = [];
     const removed = await withTenant(db, auth.organizationId, async (tx) => {
       const declared = await readAllRuntimeRows(tx, auth.organizationId);
       const target = declared.find((row) => row.id === runtimeId) ?? null;
@@ -224,10 +232,12 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       // OHB-75 : un tunnel géré part avec son runtime ; une publication sur
       // le compte du client est révoquée ici et nettoyée par lui.
       if (target.reachability === "direct") {
-        await revokeExposureForRuntime(tx, config, auth.organizationId, target.id);
+        const pending = await revokeExposureForRuntime(tx, config, auth.organizationId, target.id);
+        if (pending) exposureCleanups.push(pending);
       }
       return target;
     });
+    await cleanupRevokedExposuresAfterCommit(db, config, exposureCleanups);
     if (!removed) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Ce runtime n’existe pas.");
     // Un runtime `connector` révoqué perd son lien sur-le-champ (4004) : le
     // jeton n'ouvre plus rien, et l'hôte l'apprend sans attendre un timeout.

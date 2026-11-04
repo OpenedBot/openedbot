@@ -523,9 +523,9 @@ async function loadSourceAttachments(
     objectKey: string;
     name: string;
     contentType: string;
-    kind: "image" | "document";
+    kind: "image" | "document"; driver: "file" | "r2";
   }>>`
-    select id, object_key as "objectKey", name, content_type as "contentType", kind
+    select id, object_key as "objectKey", name, content_type as "contentType", kind, driver
       from attachments
      where organization_id = ${organizationId} and id in ${tx(ids)} and deleted_at is null
   `;
@@ -540,7 +540,7 @@ async function loadSourceAttachments(
   try {
     return await Promise.all(parts.map(async (part) => {
       const row = byId.get(part.id!)!;
-      const blob = await blobs.get(row.objectKey);
+      const blob = await blobs.get(row.objectKey, row.driver);
       if (row.kind === "document") {
         return documentAttachment(row.name, row.contentType, await blob.text());
       }

@@ -11,7 +11,7 @@ import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
 import { deployEnvironment, readRuntimeEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
-import { fileBlobRoot, resolveBlobDriver } from "@openedbot/platform-config/blob-driver";
+import { fileBlobRoot, otherBlobBackend, resolveBlobDriver, type BlobOtherBackend } from "@openedbot/platform-config/blob-driver";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
 import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrations/vapid";
@@ -95,6 +95,8 @@ export type WorkerConfig = {
   blob:
     | { driver: "file"; root: string; fallbackReason?: string | null }
     | { driver: "r2"; bucket: string; endpoint: string; accessKeyId: string; secretAccessKey: string };
+  /** Le magasin qui n'écrit plus, pour les objets écrits avant une bascule de driver (`blob-driver.ts`). */
+  blobOther?: BlobOtherBackend;
   /**
    * Clés VAPID du Web Push. `null` hors production quand elles sont absentes :
    * la passe de maintenance est un no-op.
@@ -254,18 +256,21 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     vapid: readVapidConfig(env, environment === "production", environment === "production"),
     apns: readApnsConfig(env, environment === "production"),
   } satisfies Omit<WorkerConfig, "blob">;
+  const fileRoot = sharedFileBlobRoot(fileBlobRoot(env, environment === "production"));
   if (blobDriver === "file") {
     return {
       ...base,
       blob: {
         driver: "file",
-        root: sharedFileBlobRoot(fileBlobRoot(env, environment === "production")),
+        root: fileRoot,
         fallbackReason: blobChoice.fallbackReason,
       },
+      blobOther: otherBlobBackend(env, "file", fileRoot),
     };
   }
   return {
     ...base,
+    blobOther: otherBlobBackend(env, "r2", fileRoot),
     blob: {
       driver: "r2",
       bucket: required(env.R2_BUCKET, "R2_BUCKET"),

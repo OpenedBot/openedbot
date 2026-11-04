@@ -12,7 +12,7 @@ import {
   deleteOrganization,
   deleteOwnedDeletion,
   deleteUnclaimedDeletion,
-  deleteUserWithoutMemberships,
+  eraseAccountUser,
   findDeletionCandidate,
   hasActiveProfileDelete,
   hasActiveProfileImport,
@@ -37,8 +37,11 @@ const BLOB_DELETION_BATCH_SIZE = 50;
 export type TenantDeletionOptions = {
   workerId: string;
   webAppUrl: string;
-  /** Removes one stored object; the worker binds its blob driver here. Idempotent. */
-  deleteBlob: (key: string) => Promise<void>;
+  /**
+   * Removes one stored object from the store its row names (`null`: unknown,
+   * every reachable store). Idempotent; an unreachable store throws.
+   */
+  deleteBlob: (key: string, driver: "file" | "r2" | null) => Promise<void>;
 };
 
 class TenantDeletionLeaseLostError extends Error {
@@ -124,7 +127,10 @@ export async function processTenantDeletion(db: Db, options: TenantDeletionOptio
           });
         }
         for (const accountUser of accountUsers) {
-          await deleteUserWithoutMemberships(tx, accountUser.userId);
+          const erasure = await eraseAccountUser(tx, accountUser.userId);
+          if (erasure === "pseudonymized") {
+            console.info(JSON.stringify({ event: "worker.account_user_pseudonymized", userId: accountUser.userId }));
+          }
         }
       }
       return { cancelled: false, deleted: true, blobs };
@@ -163,7 +169,7 @@ async function processTenantBlobDeletions(
 
   for (const row of rows) {
     try {
-      await options.deleteBlob(row.key);
+      await options.deleteBlob(row.key, row.driver);
       await completeBlobDeletion(db, row.key, options.workerId);
     } catch (error) {
       const delaySeconds = Math.min(3_600, 2 ** Math.min(12, Math.max(0, row.attempts)));
