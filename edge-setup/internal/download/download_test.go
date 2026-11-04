@@ -82,3 +82,74 @@ func TestFetchWithoutAnHTTPClientFailsInsteadOfPanicking(t *testing.T) {
 		t.Fatal("nothing must be written")
 	}
 }
+
+// A file that already holds the pinned bytes is reused only when nobody but
+// its expected owner can have changed it: another mode is downloaded again
+// and replaced, so the caller never runs a copy someone else may write.
+func TestFetchReusesOnlyAFileWithTheExpectedModeAndOwner(t *testing.T) {
+	body := []byte("#!/bin/sh\necho pinned\n")
+	sum := sha256.Sum256(body)
+	want := hex.EncodeToString(sum[:])
+	calls := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	c := Client{HTTP: srv.Client(), Retries: 1, Backoff: time.Millisecond}
+	for _, tc := range []struct {
+		name      string
+		mode      os.FileMode
+		wantCalls int
+	}{
+		{"expected mode is reused", 0o700, 0},
+		{"group-writable copy is replaced", 0o770, 1},
+		{"world-writable copy is replaced", 0o777, 1},
+		{"other mode is replaced", 0o755, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls = 0
+			dest := filepath.Join(t.TempDir(), "hermes-install.sh")
+			if err := os.WriteFile(dest, body, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(dest, tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := os.Stat(dest)
+			if err := c.Fetch(context.Background(), srv.URL+"/i", dest, SHA256, want, 0o700, fsx.Current()); err != nil {
+				t.Fatal(err)
+			}
+			if calls != tc.wantCalls {
+				t.Fatalf("downloads = %d, want %d", calls, tc.wantCalls)
+			}
+			after, err := fsx.Lstat(dest)
+			if err != nil || after.Mode != 0o700 || after.Owner != fsx.Current() {
+				t.Fatalf("after fetch: %+v %v", after, err)
+			}
+			if st, _ := os.Stat(dest); tc.wantCalls > 0 && os.SameFile(before, st) {
+				t.Fatal("the existing file was kept instead of replaced")
+			}
+		})
+	}
+}
+
+func TestFetchRefusesASymlinkInsteadOfFollowingIt(t *testing.T) {
+	body := []byte("pinned\n")
+	sum := sha256.Sum256(body)
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(body) }))
+	defer srv.Close()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(dir, "artefact")
+	if err := os.Symlink(target, dest); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	c := Client{HTTP: srv.Client(), Retries: 1, Backoff: time.Millisecond}
+	if err := c.Fetch(context.Background(), srv.URL+"/a", dest, SHA256, hex.EncodeToString(sum[:]), 0o600, fsx.Current()); err == nil {
+		t.Fatal("a symlink holding the pinned bytes was accepted")
+	}
+}

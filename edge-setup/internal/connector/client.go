@@ -393,6 +393,14 @@ func gatewayDialRefused(err error) bool {
 	return errors.As(err, &opErr) && opErr.Op == "dial" && errors.Is(err, syscall.ECONNREFUSED)
 }
 
+// operatorDialFailed reports a failure to connect to the operator's socket
+// (missing, refused, or cancelled before connecting): no byte of the request
+// was written.
+func operatorDialFailed(err error) bool {
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
 // loopbackRefusal reports a connection refused by a loopback openedbot
 // origin: the only failure the short LoopbackRefusedBackoff applies to.
 func loopbackRefusal(wsURL string, err error) bool {
@@ -1270,6 +1278,18 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 	}
 	c.inflight[f.ID] = s
 	c.mu.Unlock()
+	// Installed as soon as the slot is taken: every return below, the early
+	// refusals included, must give it back, or MaxInFlight of them leave the
+	// link answering LINK_BUSY until it reconnects.
+	defer func() {
+		cancel()
+		if s.body != nil {
+			_ = s.body.Close()
+		}
+		c.mu.Lock()
+		delete(c.inflight, f.ID)
+		c.mu.Unlock()
+	}()
 	if early != nil && early.tooBig {
 		c.sendErr(send, f.ID, "HERMES_PROTOCOL_LIMIT", "request exceeds the stream limit", StageBeforeDispatch)
 		return
@@ -1284,15 +1304,6 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 			_ = s.body.Close()
 		}
 	}
-	defer func() {
-		cancel()
-		if s.body != nil {
-			_ = s.body.Close()
-		}
-		c.mu.Lock()
-		delete(c.inflight, f.ID)
-		c.mu.Unlock()
-	}()
 	if route.Events {
 		if since, ok := replaySince(f); ok && c.Journal != nil {
 			c.serveReplay(ctx, f, send, since)
@@ -1396,7 +1407,14 @@ func (c *Client) serveHost(ctx context.Context, f Text, send sender, bodyReader 
 	}
 	resp, err := c.operatorClient().Do(req)
 	if err != nil {
-		c.sendErr(send, f.ID, "HERMES_OPERATOR_UNAVAILABLE", "the host operator did not answer", StageBeforeDispatch)
+		// Only a failed dial proves the operator never saw the request. A
+		// connection that broke afterwards may follow a mutation the operator
+		// already applied: the platform must not replay it as unsent.
+		stage := StageAfterDispatch
+		if operatorDialFailed(err) {
+			stage = StageBeforeDispatch
+		}
+		c.sendErr(send, f.ID, "HERMES_OPERATOR_UNAVAILABLE", "the host operator did not answer", stage)
 		return
 	}
 	defer resp.Body.Close()
@@ -1640,6 +1658,11 @@ func (c *Client) serveReplay(ctx context.Context, f Text, send sender, since uin
 		}
 		c.startTail(runID, profileOf(f.Path))
 		since = 0
+	} else if !st.Terminal && !st.Truncated {
+		// A journal the connector filled before it restarted has no tail any
+		// more: without one, nothing collects the rest of the run and this
+		// replay would wait forever. startTail is a no-op when one runs.
+		c.startTail(runID, profileOf(f.Path))
 	}
 	cursor := since
 	for {
@@ -1670,6 +1693,13 @@ func (c *Client) serveReplay(ctx context.Context, f Text, send sender, since uin
 	_ = send(websocket.MessageText, end)
 }
 
+// Resubscription bounds of a run's tail after its upstream stream ended
+// without a terminal event. Variables for the tests.
+var (
+	tailResubscribeLimit = 5
+	tailResubscribeDelay = time.Second
+)
+
 // startTail opens one upstream subscription per run and journals it,
 // independently of the broker connection.
 func (c *Client) startTail(runID, profile string) {
@@ -1687,48 +1717,137 @@ func (c *Client) startTail(runID, profile string) {
 			delete(c.tails, runID)
 			c.mu.Unlock()
 		}()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Gateway+profile+"/v1/runs/"+runID+"/events", nil)
-		if err != nil {
+		c.tailRun(ctx, runID, profile)
+	}()
+}
+
+// tailRun feeds the run's journal until a terminal event. A stream that ends
+// without one is a transport event, not the end of the run: the gateway is
+// asked for the run's status, and only a finished or unknown run marks the
+// journal terminal. A run still going is subscribed again, at most
+// tailResubscribeLimit times in a row without a new event; past that the
+// journal stays open and the next replay request starts a new tail.
+func (c *Client) tailRun(ctx context.Context, runID, profile string) {
+	failures := 0
+	for {
+		terminal, progressed := c.tailOnce(ctx, runID, profile)
+		if terminal || ctx.Err() != nil {
 			return
 		}
-		req.Header.Set("Accept", "text/event-stream")
-		req.Header.Set("Authorization", "Bearer "+c.Bearer)
-		resp, err := c.HTTP.Do(req)
-		if err != nil {
-			c.Logf("tail %s: %v", runID, err)
+		if progressed {
+			failures = 0
+		}
+		if c.runEnded(ctx, runID, profile) {
+			c.Journal.MarkTerminal(runID)
 			return
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			c.Logf("tail %s: HTTP %d", runID, resp.StatusCode)
+		if failures++; failures > tailResubscribeLimit {
+			c.Logf("tail %s: upstream stream keeps ending; leaving the journal open", runID)
 			return
 		}
-		var pending strings.Builder
-		buf := make([]byte, 16<<10)
-		for {
-			n, rerr := resp.Body.Read(buf)
-			if n > 0 {
-				pending.Write(buf[:n])
-				raw := pending.String()
-				if i := strings.LastIndex(raw, "\n\n"); i >= 0 {
-					complete, rest := raw[:i+2], raw[i+2:]
-					pending.Reset()
-					pending.WriteString(rest)
-					for _, block := range ParseSSEBlocks(complete) {
-						terminal := IsTerminal(block)
-						if _, _, err := c.Journal.Append(runID, block, terminal); err != nil {
-							log.Printf("journal %s: %v", runID, err)
-						}
-						if terminal {
-							return
-						}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(tailResubscribeDelay * time.Duration(failures)):
+		}
+	}
+}
+
+// tailOnce reads one upstream subscription into the journal. It reports
+// whether a terminal event was journaled and whether any event was.
+//
+// A subscription opened on a run that already has entries may start by
+// sending them again: blocks equal, in order, to the journal's own first
+// entries are skipped, and everything from the first difference on is new.
+func (c *Client) tailOnce(ctx context.Context, runID, profile string) (terminal, progressed bool) {
+	known, err := c.Journal.After(runID, 0)
+	if err != nil {
+		c.Logf("tail %s: journal unreadable", runID)
+		return false, false
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Gateway+profile+"/v1/runs/"+runID+"/events", nil)
+	if err != nil {
+		return false, false
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Authorization", "Bearer "+c.Bearer)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		c.Logf("tail %s: %v", runID, err)
+		return false, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		c.Logf("tail %s: HTTP %d", runID, resp.StatusCode)
+		return false, false
+	}
+	replayed := 0
+	var pending strings.Builder
+	buf := make([]byte, 16<<10)
+	for {
+		n, rerr := resp.Body.Read(buf)
+		if n > 0 {
+			pending.Write(buf[:n])
+			raw := pending.String()
+			if i := strings.LastIndex(raw, "\n\n"); i >= 0 {
+				complete, rest := raw[:i+2], raw[i+2:]
+				pending.Reset()
+				pending.WriteString(rest)
+				for _, block := range ParseSSEBlocks(complete) {
+					if replayed >= 0 && replayed < len(known) && known[replayed].Event == block {
+						replayed++
+						continue
+					}
+					replayed = -1
+					terminal := IsTerminal(block)
+					if _, _, err := c.Journal.Append(runID, block, terminal); err != nil {
+						log.Printf("journal %s: %v", runID, err)
+					}
+					progressed = true
+					if terminal {
+						return true, true
 					}
 				}
 			}
-			if rerr != nil {
-				c.Journal.MarkTerminal(runID)
-				return
-			}
 		}
-	}()
+		if rerr != nil {
+			return false, progressed
+		}
+	}
+}
+
+// runEnded asks the gateway whether the run is over: a terminal status, or a
+// run the gateway no longer knows (404), whose events can never come. Any
+// other answer, or none, keeps the run open.
+func (c *Client) runEnded(ctx context.Context, runID, profile string) bool {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Gateway+profile+"/v1/runs/"+runID, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.Bearer)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return true
+	}
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	var run struct {
+		Status string `json:"status"`
+	}
+	if json.NewDecoder(io.LimitReader(resp.Body, MaxResponseBody)).Decode(&run) != nil {
+		return false
+	}
+	switch run.Status {
+	case "completed", "failed", "interrupted", "cancelled", "canceled", "error", "stopped":
+		return true
+	}
+	return false
 }

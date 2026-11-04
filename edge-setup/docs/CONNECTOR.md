@@ -919,6 +919,13 @@ connecteur réécrit le JSON du gateway, sans en retirer aucune clé).
 Sans journal (démon redémarré en cours de run) : `event: replay-gap`, puis le
 temps réel depuis `seq=1` ; openedbot décide (aujourd'hui : bascule en
 `polling` de `GET /v1/runs/{id}`).
+Un journal existant mais non terminé (démon redémarré après le premier
+événement) est repris au premier rejeu par une nouvelle souscription amont ;
+les événements que l'amont renverrait depuis le début ne sont pas journalisés
+deux fois. Une fin du flux amont sans événement terminal n'achève pas le run :
+le connecteur lit `GET /v1/runs/{id}` et ne clôt le journal que pour un état
+terminal ou un run inconnu (404) ; sinon il se réabonne (5 fois de suite au
+plus sans nouvel événement, le rejeu suivant relance alors la souscription).
 
 Rétention : 7 jours après l'événement terminal ; plafond 50 MiB par run
 (coupure + `event: journal-truncated`).

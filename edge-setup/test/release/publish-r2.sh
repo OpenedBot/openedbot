@@ -103,11 +103,50 @@ last_versioned="$(grep -n '^edge-setup/v0.0.1/' <<<"$puts" | tail -n 1 | cut -d:
 grep -q '^GET https://releases.example.test/edge-setup/v0.0.1/SHA256SUMS' "$tmp/run/log" || fail "no public read-back of the versioned manifest"
 grep -q '^GET https://releases.example.test/edge-setup/SHA256SUMS' "$tmp/run/log" || fail "no public read-back of the latest manifest"
 
-# 2. A published version is immutable: a second run refuses before any write.
+# 2. A published version is immutable. The same files again only finish the
+#    aliases and never rewrite the versioned tree; other files are refused
+#    before any write.
 : > "$tmp/run/log"
-if run_publish v0.0.1 > "$tmp/run/out" 2>&1; then fail "republishing v0.0.1 was accepted"; fi
+run_publish v0.0.1 > "$tmp/run/out" 2>&1 || { cat "$tmp/run/out"; fail "rerunning the same v0.0.1 failed"; }
+! grep -q '^PUT .*/objects/edge-setup/v0.0.1/' "$tmp/run/log" || fail "a rerun rewrote the versioned tree"
+echo changed >> "$tmp/run/dist/edge-setup_linux_amd64"
+(
+	cd "$tmp/run/dist"
+	if command -v sha256sum >/dev/null 2>&1; then sum=(sha256sum); else sum=(shasum -a 256); fi
+	"${sum[@]}" edge-setup_linux_amd64 edge-setup_linux_arm64 hermes-setup_linux_amd64 > SHA256SUMS
+)
+: > "$tmp/run/log"
+if run_publish v0.0.1 > "$tmp/run/out" 2>&1; then fail "republishing v0.0.1 with other files was accepted"; fi
 grep -q 'already published' "$tmp/run/out" || { cat "$tmp/run/out"; fail "no immutability message"; }
 ! grep -q '^PUT ' "$tmp/run/log" || fail "a refused republication still wrote objects"
+
+# 2b. A run that failed after the versioned manifest resumes: the versioned
+#     tree is checked, not rewritten, and the aliases and LATEST are finished.
+setup
+if FAKE_FAIL_KEY=edge-setup/LATEST run_publish v0.0.5 > "$tmp/run/out" 2>&1; then fail "a failed LATEST write was ignored"; fi
+stored edge-setup/v0.0.5/SHA256SUMS || fail "the versioned manifest was not written before LATEST"
+! stored edge-setup/LATEST || fail "LATEST written by the failed run"
+: > "$tmp/run/log"
+run_publish v0.0.5 > "$tmp/run/out" 2>&1 || { cat "$tmp/run/out"; fail "resuming v0.0.5 failed"; }
+! grep -q '^PUT .*/objects/edge-setup/v0.0.5/' "$tmp/run/log" || fail "the resume rewrote the versioned tree"
+[[ "$(cat "$tmp/run/store/edge-setup%LATEST")" == v0.0.5 ]] || fail "the resume did not move LATEST"
+grep -q '^GET https://releases.example.test/edge-setup/LATEST' "$tmp/run/log" || fail "the resume did not read LATEST back"
+
+# 2c. A resume whose stored binary differs from the verified one, or that would
+#     move LATEST back from a newer release, writes nothing.
+setup
+if FAKE_FAIL_KEY=edge-setup/SHA256SUMS run_publish v0.0.6 > "$tmp/run/out" 2>&1; then fail "a failed alias write was ignored"; fi
+printf 'other\n' > "$tmp/run/store/edge-setup%v0.0.6%edge-setup_linux_arm64"
+: > "$tmp/run/log"
+if run_publish v0.0.6 > "$tmp/run/out" 2>&1; then fail "a resume over a different stored binary was accepted"; fi
+grep -q 'differs from the verified one' "$tmp/run/out" || { cat "$tmp/run/out"; fail "no mismatch message"; }
+! grep -q '^PUT ' "$tmp/run/log" || fail "a refused resume still wrote objects"
+cp "$tmp/run/dist/edge-setup_linux_arm64" "$tmp/run/store/edge-setup%v0.0.6%edge-setup_linux_arm64"
+printf 'v0.0.10\n' > "$tmp/run/store/edge-setup%LATEST"
+: > "$tmp/run/log"
+if run_publish v0.0.6 > "$tmp/run/out" 2>&1; then fail "a resume moved LATEST back"; fi
+grep -q 'newer than v0.0.6' "$tmp/run/out" || { cat "$tmp/run/out"; fail "no rollback message"; }
+! grep -q '^PUT ' "$tmp/run/log" || fail "a refused rollback still wrote objects"
 
 # 3. A failed write stops before latest moves: hosts keep the previous release.
 setup

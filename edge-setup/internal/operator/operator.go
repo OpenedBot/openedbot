@@ -203,6 +203,11 @@ type Server struct {
 	// silently lose one of the changes.
 	toolsetBusy sync.Mutex
 	mcpBusy     sync.Mutex
+	// configLocks hold one lock per config.yaml, taken by every writer for
+	// its whole read, change and rewrite (config_lock.go). The two mutexes
+	// above only keep one toolset or MCP change at a time: model, memory,
+	// skill and policy writes go through neither. Guarded by mu.
+	configLocks map[string]chan struct{}
 	// probeCache and probeFlights make the two READ verbs cheap: each one
 	// starts a cold interpreter, and the capability page needs one of them to
 	// render at all.
@@ -338,8 +343,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /profiles/{slug}/mcp/servers/{server}", s.removeProfileMCP)
 	mux.HandleFunc("POST /profiles/{slug}/model", s.setProfileModel)
 	mux.HandleFunc("POST /profiles/models", s.setProfileModels)
-	mux.HandleFunc("GET /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.ApprovalPolicyWrite))
-	mux.HandleFunc("PUT /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.ApprovalPolicyWrite))
+	mux.HandleFunc("GET /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.lockedApprovalPolicyWrite()))
+	mux.HandleFunc("PUT /profiles/{slug}/approval-policy", approvalPolicyHandler(s.ApprovalPolicyRead, s.lockedApprovalPolicyWrite()))
 	mux.HandleFunc("POST /profiles/{slug}/skills/{skill}", s.setProfileSkill)
 	mux.HandleFunc("POST /profiles/{slug}/bundled-skills", s.setProfileBundledSkills)
 	mux.HandleFunc("POST /profiles/{slug}/providers/{provider}/credentials", s.addProfileCredential)

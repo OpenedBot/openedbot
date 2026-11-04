@@ -217,6 +217,9 @@ func (i *Installer) prepareDirs(info *account.Info) error {
 			return err
 		}
 	}
+	if err := fsx.EnsureDir(layout.DownloadDir, 0o700, fsx.Root); err != nil {
+		return err
+	}
 	// The managed cache is reset before every run so nothing from a previous
 	// unprivileged build survives.
 	if err := os.RemoveAll(layout.UVCacheDir); err != nil {
@@ -232,10 +235,10 @@ func (i *Installer) prepareVersionHome(info *account.Info) error {
 
 func (i *Installer) installUV(ctx context.Context) error {
 	archive := layout.UVArchivePath()
-	if err := i.Download.Fetch(ctx, pins.HermesInstallerURL, layout.InstallerPath, download.SHA256, pins.HermesInstallerSHA256, 0o755, fsx.Root); err != nil {
+	if err := i.Download.Fetch(ctx, pins.HermesInstallerURL, layout.InstallerPath, download.SHA256, pins.HermesInstallerSHA256, 0o700, fsx.Root); err != nil {
 		return err
 	}
-	if err := i.Download.Fetch(ctx, pins.UVArchiveURL(i.Arch), archive, download.SHA256, i.Arch.UVArchiveSHA256, 0o644, fsx.Root); err != nil {
+	if err := i.Download.Fetch(ctx, pins.UVArchiveURL(i.Arch), archive, download.SHA256, i.Arch.UVArchiveSHA256, 0o600, fsx.Root); err != nil {
 		return err
 	}
 	uvOK, _ := download.VerifyFile(layout.UVBinary, download.SHA256, i.Arch.UVBinarySHA256)

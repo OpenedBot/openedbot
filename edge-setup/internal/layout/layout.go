@@ -56,16 +56,25 @@ const (
 	PythonInstall   = "/usr/local/share/hermes-python"
 	UVCacheDir      = "/var/cache/hermes/uv"
 	BootstrapHome   = "/usr/local/lib/hermes-bootstrap"
-	InstallerPath   = "/var/tmp/hermes-install.sh"
+	InstallerPath   = DownloadDir + "/hermes-install.sh"
 	GatewayHost     = "127.0.0.1"
 	GatewayPort     = 8642
 	GatewayUnit     = "hermes-gateway"
 	GatewayUnitPath = "/etc/systemd/system/" + GatewayUnit + ".service"
 )
 
+// DownloadDir holds the pinned downloads root executes or unpacks. It is a
+// root-owned 0700 directory: a shared directory such as /var/tmp would let
+// another account plant or keep a writable copy of a file root later runs.
+const DownloadDir = "/var/cache/hermes/downloads"
+
+// LegacyDownloadPaths are where earlier releases kept their downloads, under
+// /var/tmp; they are only ever removed, never read.
+var LegacyDownloadPaths = []string{"/var/tmp/hermes-install.sh", "/var/tmp/uv-" + pins.UVVersion + ".tar.gz"}
+
 // UVArchivePath is where the pinned uv release archive is downloaded before
 // verification; named after the pin so a bump never reuses a stale file.
-func UVArchivePath() string { return "/var/tmp/uv-" + pins.UVVersion + ".tar.gz" }
+func UVArchivePath() string { return DownloadDir + "/uv-" + pins.UVVersion + ".tar.gz" }
 
 // Node for the runtime's bridges: a root-owned tree, reached through PATH.
 // It deliberately does NOT live under HERMES_HOME, where the service user
@@ -78,7 +87,7 @@ const (
 // NodeArchivePath names the archive after the pin, so a bump never reuses a
 // stale file.
 func NodeArchivePath(target string) string {
-	return "/var/tmp/node-" + pins.NodeVersion + "-linux-" + target + ".tar.xz"
+	return DownloadDir + "/node-" + pins.NodeVersion + "-linux-" + target + ".tar.xz"
 }
 
 // DockerModulesLoad persists the kernel modules the rootless sandbox needs
