@@ -311,9 +311,14 @@ function inlineAttachmentBlock(file: LoadedAttachment): string {
   return `<attachment name="${escapeQuotes(file.name)}" type="${escapeQuotes(file.contentType)}">\n${body}\n</attachment>`;
 }
 
-/** Le nom d'une image jointe au tour ; ses pixels suivent en part `image_url`. */
+/**
+ * Le nom d'une image jointe au tour ; ses pixels suivent en part `image_url`.
+ * Le nom seul faisait croire à un fichier : le modèle appelait
+ * `vision_analyze("IMG_8245.jpg")`, qui échoue (aucun fichier de ce nom dans
+ * le bac à sable) et laissait un outil rouge au fil avant la vraie réponse.
+ */
 export function imageAttachmentNote(name: string, contentType: string): string {
-  return `[image attached: "${escapeQuotes(name)}" (${escapeQuotes(contentType)}), sent with this message as an image]`;
+  return `[image attached: "${escapeQuotes(name)}" (${escapeQuotes(contentType)}), sent with this message as an image you can already see. It is not a file in your workspace: read it directly, do not open it with vision_analyze or a file tool]`;
 }
 
 /** L'image n'a pas pu partir avec le tour : le modèle ne doit pas faire comme s'il l'avait vue. */

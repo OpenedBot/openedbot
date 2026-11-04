@@ -72,6 +72,7 @@ import {
 } from "./runner/provider-recovery";
 import { pendingSteerOf, reconcileHermesRun, replayUndeliveredRunSteersSafely, type ReconcileStopCause } from "./runner/reconcile";
 import { groupSendState, packRoomHistory, prepareGroupTurn } from "./runner/rooms";
+import { silentRunStillWorking, watchdogStopCause } from "./runner/silent-run";
 import { readAgentTranscript } from "./runner/transcript";
 import {
   MAX_EVENT_REPLAY_ATTEMPTS,
@@ -252,16 +253,12 @@ export async function executeRun(
       controller.abort("approval_expired");
       return;
     }
-    // Un run en streaming muet trop longtemps est avorté (jamais pendant une approbation).
-    // En polling, aucune frame n'arrive par construction : la réconciliation a sa
-    // propre limite, et ce watchdog y arrêtait un run sain au bout de 2 minutes.
-    if (
-      rows[0].status === "running" && activeContext.externalState === "streaming" &&
-      Date.now() - lastFrameAt > config.runInactivityMs
-    ) {
-      idleTimedOut = true;
-      controller.abort("stream_idle");
-      return;
+    // Un run en streaming muet trop longtemps est avorté (jamais pendant une approbation),
+    // sauf si Hermes le dit encore actif (`silentRunStillWorking`). En polling, aucune frame
+    // n'arrive par construction : la réconciliation a sa propre limite.
+    if (rows[0].status === "running" && activeContext.externalState === "streaming" && Date.now() - lastFrameAt > config.runInactivityMs) {
+      if (await silentRunStillWorking(client, hermesRunId, controller.signal, activeContext.id, lastFrameAt)) lastFrameAt = Date.now();
+      else { idleTimedOut = true; controller.abort("stream_idle"); return; }
     }
     await forwardReadyApprovals();
   }
@@ -1325,6 +1322,7 @@ export async function executeRun(
           hermesRunId,
           "HERMES_STOP_OUTCOME_UNKNOWN",
           "L’arrêt Hermes n’a pas pu être confirmé.",
+          watchdogStopCause(idleTimedOut, config.runInactivityMs),
         );
       }
       return;

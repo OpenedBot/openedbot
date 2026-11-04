@@ -3,9 +3,9 @@ import { cancelledOutputFromEvents } from "../../src/application/runner/cancel";
 import { conversationHistory } from "../../src/application/runner/history";
 import { persistThreadCompaction, runThreadCompaction } from "@openedbot/conversation/application/compact-thread";
 import type { CompactHermes } from "@openedbot/conversation/application/compact-thread";
-import { droppedHistoryNotice } from "../../src/application/runner/history";
+import { droppedHistoryNotice, interruptedRequestNote } from "../../src/application/runner/history";
 
-type MessageRow = { role: string; content: unknown; sequence: number };
+type MessageRow = { role: string; content: unknown; sequence: number; interruptedStatus?: "failed" | "cancelled" | null; interruptedTools?: string[] | null };
 
 function text(value: string) {
   return [{ type: "text", text: value }];
@@ -76,6 +76,45 @@ function compactClient(output: string | null, status: "completed" | "failed" = "
     }),
   };
 }
+
+describe("conversationHistory interrupted turns", () => {
+  test("une demande dont le run a échoué revient, marquée non aboutie", async () => {
+    const packed = await conversationHistory(
+      fakeDb({
+        messages: [
+          { role: "user", content: text("Audite les repos DeepSeek"), sequence: 1, interruptedStatus: "failed", interruptedTools: ["skill_view", "web_search"] },
+          { role: "user", content: text("Tu es toujours en recherche ?"), sequence: 2, interruptedStatus: null },
+        ],
+      }),
+      context,
+    );
+    expect(packed.history).toEqual([
+      { role: "user", content: `${interruptedRequestNote("failed", ["skill_view", "web_search"])}\nAudite les repos DeepSeek` },
+      { role: "user", content: "Tu es toujours en recherche ?" },
+    ]);
+  });
+
+  test("la note interdit de reprendre seul une demande arrêtée", () => {
+    expect(interruptedRequestNote("cancelled")).toContain("stopped before you answered");
+    expect(interruptedRequestNote("failed")).toContain("do not act on it unless the user asks again");
+    // Le travail déjà vu dans le fil est nommé, sans prétendre en avoir les résultats.
+    expect(interruptedRequestNote("cancelled", ["web_search", "skill_view"]))
+      .toContain("already used: web_search, skill_view; their results are not in this history");
+    expect(interruptedRequestNote("cancelled")).not.toContain("already used");
+  });
+
+  test("la requête ne réintègre que les messages utilisateur non absorbés", async () => {
+    let sql = "";
+    const db = ((strings: TemplateStringsArray) => {
+      const text = [...strings].join(" ");
+      if (text.includes("limit 201")) sql = text;
+      return Promise.resolve([]);
+    }) as unknown as Bun.SQL;
+    await conversationHistory(db, context);
+    expect(sql).toContain("m.role = 'user'\n             and source_run.status in ('failed', 'cancelled')");
+    expect(sql).toContain("coalesce(source_run.completion_kind, '') not in ('steered_into_active', 'folded_into_followup', 'superseded_by_followup')");
+  });
+});
 
 describe("conversationHistory pack", () => {
   test("fil court : tout part, pas de compact", async () => {

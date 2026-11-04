@@ -35,7 +35,7 @@
   "modules/conversation/src/domain/thread-tools.ts": 605,
   "modules/execution/src/application/queue.ts": 678,
   "modules/execution/src/application/run-steering.ts": 913,
-  "modules/execution/src/application/runner.ts": 1430,
+  "modules/execution/src/application/runner.ts": 1428,
   "modules/execution/src/application/runner/rooms.ts": 742,
   "modules/portability/src/domain/team-markdown.ts": 618,
   "modules/roster/src/application/bots.ts": 686,

@@ -34,9 +34,27 @@ export async function conversationHistory(
   // PROUVE qu'il en existe de plus anciennes. Sans elle, la coupe par `limit`
   // serait indistinguable d'un fil qui commence là : et l'aveu d'entête,
   // muet. Un `count(*)` séparé coûterait un aller-retour de plus par run.
-  const rows = await db<Array<{ role: string; content: unknown; sequence: number }>>`
-    select role, content, sequence from (
-      select m.role, m.content, m.sequence from messages m
+  const rows = await db<Array<{
+    role: string;
+    content: unknown;
+    sequence: number;
+    interruptedStatus: InterruptedRunStatus | null;
+    interruptedTools: string[] | null;
+  }>>`
+    select role, content, sequence, interrupted_status as "interruptedStatus",
+      interrupted_tools as "interruptedTools" from (
+      select m.role, m.content, m.sequence,
+        case when m.role = 'user' and source_run.status in ('failed', 'cancelled')
+          then source_run.status end as interrupted_status,
+        -- Ce que le tour interrompu avait déjà fait : sans cela le bot
+        -- nie un travail que l'utilisateur a vu dans le fil.
+        case when m.role = 'user' and source_run.status in ('failed', 'cancelled') then (
+          select array_agg(distinct event.payload->>'tool' order by event.payload->>'tool')
+            from run_events event
+           where event.organization_id = source_run.organization_id and event.run_id = source_run.id
+             and event.type = 'tool.call' and event.payload->>'tool' is not null
+        ) end as interrupted_tools
+        from messages m
        left join runs source_run
          on source_run.organization_id = m.organization_id and source_run.id = m.run_id
        where m.organization_id = ${context.organizationId} and m.thread_id = ${context.threadId}
@@ -47,9 +65,18 @@ export async function conversationHistory(
          -- que l'utilisateur l'avait explicitement arrêté. Les messages sans
          -- run (ingress/import historique) restent du contexte ; pour un run,
          -- seule une issue réussie prouve que la paire est conversationnelle.
+         -- Le taire tout à fait rendait pourtant le bot amnésique : « tu es
+         -- toujours en recherche ? » recevait « aucune recherche en cours ».
+         -- Il revient donc, marqué non abouti (interruptedRequestNote). Un
+         -- message absorbé par un autre run est déjà dans l'entrée de celui-ci.
          and (
            m.run_id is null
            or source_run.status = 'completed'
+           or (
+             m.role = 'user'
+             and source_run.status in ('failed', 'cancelled')
+             and coalesce(source_run.completion_kind, '') not in ('steered_into_active', 'folded_into_followup', 'superseded_by_followup')
+           )
            or (
              m.role = 'assistant'
              and source_run.status = 'cancelled'
@@ -72,11 +99,16 @@ export async function conversationHistory(
   const olderExist = rows.length > HISTORY_MESSAGE_CAP || branchRows[0]?.prefixTruncated === true;
   const messages: HistoryMessage[] = rows
     .slice(-HISTORY_MESSAGE_CAP)
-    .map((row) => ({
-      role: row.role,
-      content: messageText(row.content),
-      sequence: Number(row.sequence),
-    }))
+    .map((row) => {
+      const content = messageText(row.content);
+      return {
+        role: row.role,
+        content: row.interruptedStatus && content.length > 0
+          ? `${interruptedRequestNote(row.interruptedStatus, row.interruptedTools ?? [])}\n${content}`
+          : content,
+        sequence: Number(row.sequence),
+      };
+    })
     .filter((row) => row.content.length > 0);
 
   const fallback = (): PackedHistory => ({
@@ -142,6 +174,21 @@ export async function conversationHistory(
     history: assemblePackedHistory(plan),
     packInstructions: buildConversationPackInstructions(),
   };
+}
+
+type InterruptedRunStatus = "failed" | "cancelled";
+
+/**
+ * L'en-tête d'une demande dont le tour n'a pas abouti. Le modèle doit savoir
+ * qu'elle a existé (sinon il nie un travail que l'utilisateur a vu), sans la
+ * reprendre de lui-même (sinon un ordre arrêté se rejoue).
+ */
+export function interruptedRequestNote(status: InterruptedRunStatus, tools: readonly string[] = []): string {
+  const outcome = status === "cancelled" ? "it was stopped before you answered" : "it failed before you answered";
+  const work = tools.length > 0
+    ? ` Before it stopped you had already used: ${tools.slice(0, 12).join(", ")}; their results are not in this history.`
+    : "";
+  return `[Earlier request, not completed: ${outcome}.${work} Context only: do not act on it unless the user asks again.]`;
 }
 
 /** Une image relue, sous la forme d'une part `image_url` : un data-URI. */
