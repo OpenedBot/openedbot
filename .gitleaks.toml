@@ -78,3 +78,9 @@ description = "API error journal test: a fake invitation token the journal must 
 condition = "AND"
 paths = ['''^apps/api/tests/unhandled-error-journal\.test\.ts$''']
 regexes = ['''^Zq3v9XlYk2Rr7TtUuPpWwAaBbCcDdEeFfGg_hh-ii$''']
+
+[[rules.allowlists]]
+description = "Access-log test: a fake invitation token the log must never carry"
+condition = "AND"
+paths = ['''^platform/observability/tests/access-log\.test\.ts$''']
+regexes = ['''^inv_Zq8f3K1mW9pX2bN7cR4tY6uA0sD5eG$''']
