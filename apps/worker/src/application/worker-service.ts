@@ -149,7 +149,9 @@ export function createWorkerService(
       console.error(JSON.stringify({ event: "worker.queue_listener_close_failed" }));
     });
     for (const controller of runControllers.values()) controller.abort("worker_shutdown");
-    await Promise.allSettled(executions);
+    // A pass still in flight may track more work (a review it just started):
+    // drain until nothing is left, never on a snapshot.
+    while (executions.size > 0) await Promise.allSettled([...executions]);
     await registry.releaseLeasesAndClose();
   }
 

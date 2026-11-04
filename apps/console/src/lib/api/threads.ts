@@ -73,8 +73,10 @@ export const threadsApi = {
     }),
   cancelRun: (runId: string) => request<void>(`/api/runs/${runId}/cancel`, { method: "POST" }),
   /** Résume l'historique d'un salon (DEV-332). Lent : jusqu'à quelques minutes. */
+  // La route se donne 250 s (`COMPACT_REQUEST_DEADLINE_MS`) : le client attend
+  // un peu plus, pour lire sa réponse plutôt que d'abandonner avant elle.
   compactThread: (threadId: string) =>
-    request<ThreadCompactResult>(`/api/threads/${threadId}/compact`, { method: "POST" }),
+    request<ThreadCompactResult>(`/api/threads/${threadId}/compact`, { method: "POST" }, { timeoutMs: 270_000 }),
   /** L'historique des exécutions, page par page (curseur opaque `<iso>|<uuid>`). */
   workflowHistory: (input: { status?: "all" | "active" | "attention"; cursor?: string | null; limit?: number } = {}) => {
     const query = new URLSearchParams();

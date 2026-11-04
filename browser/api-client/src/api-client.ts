@@ -73,6 +73,8 @@ export class ApiClient {
     threadIds?: readonly string[];
     /** Flux filtré : le serveur a écarté jusqu'à `cursor`, la reprise repart de là. */
     onCursor?: (cursor: number) => void;
+    /** Silence toléré avant d'abandonner la connexion. Défaut : `EVENT_STREAM_IDLE_TIMEOUT_MS`. */
+    idleTimeoutMs?: number;
   }): AsyncGenerator<OrganizationEvent> {
     const organizationId = this.requireOrganization();
     let cursor = input.cursor;
@@ -80,6 +82,7 @@ export class ApiClient {
     const threadQuery = (input.threadIds ?? []).map((id) => `&threadId=${encodeURIComponent(id)}`).join("");
     while (!input.signal.aborted) {
       let slowConsumer = false;
+      let openedAt: number | null = null;
       try {
         if (input.getCursor) cursor = Math.max(cursor, input.getCursor());
         const response = await this.raw(`/api/events?cursor=${cursor}${threadQuery}`, {
@@ -95,9 +98,13 @@ export class ApiClient {
           throw error;
         }
         if (!response.body) throw new ApiClientError(502, "Le flux cloud est vide.", "EVENT_STREAM_EMPTY");
-        attempt = 0;
+        // Le compteur n'est remis à zéro qu'après une connexion qui a tenu :
+        // un flux recoupé aussitôt (slow_consumer, proxy) doit faire monter le repli.
+        openedAt = Date.now();
         input.onOpen?.();
-        for await (const frame of parseEventStream(response.body)) {
+        for await (const frame of parseEventStream(response.body, {
+          idleTimeoutMs: input.idleTimeoutMs ?? EVENT_STREAM_IDLE_TIMEOUT_MS,
+        })) {
           if (frame.event === "stream.revoked") {
             if (typeof frame.data === "object" && frame.data !== null
               && (frame.data as { organizationId?: unknown }).organizationId === organizationId) {
@@ -136,7 +143,7 @@ export class ApiClient {
         }
         if (!input.signal.aborted) {
           if (slowConsumer) {
-            attempt += 1;
+            attempt = nextStreamAttempt(attempt, openedAt);
             await wait(eventStreamRetryDelay(attempt, "slow_consumer"), input.signal);
             continue;
           }
@@ -149,13 +156,13 @@ export class ApiClient {
         // on ne retente pas à 500 ms, ce qui renfoncerait le client lent.
         if (slowConsumer) {
           slowConsumer = false;
-          attempt += 1;
+          attempt = nextStreamAttempt(attempt, openedAt);
           await wait(eventStreamRetryDelay(attempt, "slow_consumer"), input.signal);
           continue;
         }
         input.onError?.(error);
         if (input.signal.aborted || (error instanceof ApiClientError && error.code === "WORKSPACE_ACCESS_REVOKED")) return;
-        attempt += 1;
+        attempt = nextStreamAttempt(attempt, openedAt);
         await wait(eventStreamRetryDelay(attempt), input.signal);
       }
     }
@@ -240,20 +247,45 @@ function readStreamCursor(value: unknown): StreamCursor | null {
 }
 
 /**
+ * Silence toléré sur le flux d'organisation : le serveur y écrit un heartbeat
+ * toutes les 15 s, trois battements manqués signent une connexion morte.
+ */
+export const EVENT_STREAM_IDLE_TIMEOUT_MS = 45_000;
+
+/**
+ * Durée au-delà de laquelle une connexion est jugée stable : le compteur de
+ * repli repart alors de zéro au lieu de continuer à monter.
+ */
+export const STABLE_STREAM_MS = 30_000;
+
+/** Le rang du prochain repli : remis à 1 si la connexion précédente a tenu. */
+export function nextStreamAttempt(attempt: number, openedAt: number | null, now = Date.now()): number {
+  if (openedAt !== null && now - openedAt >= STABLE_STREAM_MS) return 1;
+  return attempt + 1;
+}
+
+/**
  * Trames SSE, avec leur nom (`event:`) : `stream.gap` et `stream.cursor` ne
  * sont pas des événements d'organisation et ne se rendent pas comme un
  * événement de fil ; seul `stream.cursor` avance le curseur.
+ *
+ * `idleTimeoutMs` : sans aucun octet reçu (commentaires compris) pendant ce
+ * délai, la lecture échoue avec `EVENT_STREAM_IDLE`. Une sortie avant la fin
+ * du flux (délai, trame invalide, consommateur parti) annule le flux sous-jacent.
  */
 export async function* parseEventStream(
   stream: ReadableStream<Uint8Array>,
+  options: { idleTimeoutMs?: number } = {},
 ): AsyncGenerator<EventStreamFrame> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let finished = false;
   try {
     while (true) {
-      const { value, done } = await reader.read();
-      buffer += decoder.decode(value, { stream: !done }).replaceAll("\r\n", "\n");
+      const { value, done } = await readWithDeadline(reader, options.idleTimeoutMs);
+      // Normalisé après concaténation : un `\r\n` coupé entre deux blocs se recolle ici.
+      buffer = (buffer + decoder.decode(value, { stream: !done })).replaceAll("\r\n", "\n");
       let boundary = buffer.indexOf("\n\n");
       while (boundary >= 0) {
         const frame = buffer.slice(0, boundary);
@@ -268,11 +300,32 @@ export async function* parseEventStream(
         const eventLine = lines.find((line) => line.startsWith("event:"));
         yield { event: eventLine ? eventLine.slice(6).trim() : null, data: JSON.parse(data) as unknown };
       }
-      if (done) return;
+      if (done) {
+        finished = true;
+        return;
+      }
     }
   } finally {
+    // L'annulation ne doit pas masquer l'erreur qui a interrompu la lecture :
+    // son propre rejet n'a plus rien à signaler, le flux est abandonné.
+    if (!finished) reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
+}
+
+function readWithDeadline(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  idleTimeoutMs: number | undefined,
+): ReturnType<ReadableStreamDefaultReader<Uint8Array>["read"]> {
+  if (idleTimeoutMs === undefined) return reader.read();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () => reject(new ApiClientError(504, "Le flux cloud ne répond plus.", "EVENT_STREAM_IDLE")),
+      idleTimeoutMs,
+    );
+  });
+  return Promise.race([reader.read(), deadline]).finally(() => clearTimeout(timeout));
 }
 
 /**
@@ -287,15 +340,17 @@ export function eventStreamRetryDelay(attempt: number, reason?: "slow_consumer")
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timeout);
-        resolve();
-      },
-      { once: true },
-    );
+    // L'écouteur est retiré quand le délai expire : sinon chaque reconnexion
+    // en laisse un de plus sur le même signal.
+    const onAbort = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }
 

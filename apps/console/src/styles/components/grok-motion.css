@@ -1,0 +1,90 @@
+/*
+ * The motion of grok.com's chat, verbatim from the streaming-ui template
+ * (MakFly/streaming-ui, `src/templates/grok.tsx`, its `CSS` string): same
+ * keyframes, durations and curves. Only the colours read the thread tokens
+ * (`--grok-*`, thread-theme.css), so the shimmer works in light too.
+ * `--grok-ease` is the template's `EASE`.
+ */
+:root {
+  --grok-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The template's `MONO`, for queries and URLs in the feed. */
+  --grok-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+@keyframes grok-blur-in { 0% { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+@keyframes grok-feed-in { 0% { opacity: 0; transform: translateY(5px) scale(0.9); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes grok-feed-out { 0% { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateY(-10px) scale(0.9); filter: blur(4px); } }
+@keyframes grok-enter { 0% { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes grok-pop { 0% { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes grok-row-in { 0% { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes grok-spring { 0% { opacity: 0; transform: scale(0.6); } 38% { opacity: 1; transform: scale(1.046); } 60% { transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+@keyframes grok-dot { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes grok-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes grok-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes grok-fade { 0% { opacity: 0; } to { opacity: 1; } }
+@keyframes grok-fade-out { 0% { opacity: 1; } to { opacity: 0; } }
+@keyframes grok-swap-out { 0% { opacity: 1; filter: blur(0); } to { opacity: 0; filter: blur(4px); } }
+@keyframes grok-swap-in { 0% { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+@keyframes grok-menu-in { 0% { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes shimmer-text-sweep { 0% { background-position: 200% 50%, 0 0; } to { background-position: -200% 50%, 0 0; } }
+
+.grok-w { animation: grok-blur-in 0.2s var(--grok-ease) both; }
+.grok-feed-in { animation: grok-feed-in 0.45s var(--grok-ease) both; transform-origin: center top; }
+.grok-feed-out { animation: grok-feed-out 0.4s var(--grok-ease) both; transform-origin: center top; }
+.grok-enter { animation: grok-enter 0.2s var(--grok-ease) both; }
+.grok-pop { animation: grok-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.grok-row-in { animation: grok-row-in 0.15s ease-out both; }
+.grok-status-in { animation: grok-fade 0.2s ease-out both; }
+.grok-spring { animation: grok-spring 0.4s linear both; }
+.grok-dot { animation: grok-dot 1.2s ease-in-out infinite; }
+.grok-pulse { animation: grok-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.grok-twinkle { animation: grok-twinkle 1.6s ease-in-out infinite; transform-origin: center; }
+.grok-f100 { animation: grok-fade 0.1s ease-in-out both; }
+.grok-f120 { animation: grok-fade 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.grok-f180 { animation: grok-fade 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.grok-out120 { animation: grok-fade-out 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.grok-swap-out { animation: grok-swap-out 0.2s cubic-bezier(0.32, 0, 0.67, 0) both; }
+.grok-swap-in { animation: grok-swap-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.grok-menu:not([data-state="closed"]) {
+  animation: grok-menu-in 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin, var(--radix-popover-content-transform-origin));
+}
+.grok-scroll { scrollbar-width: none; }
+.grok-scroll::-webkit-scrollbar { display: none; }
+
+/* The running label: the secondary ink, a band of the primary one sweeping it every 2.4 s. */
+.grok-shimmer {
+  color: transparent !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-repeat: no-repeat;
+  background-size: 200% 100%, 100% 100%;
+  background-image:
+    linear-gradient(90deg, transparent 35%, var(--grok-fg) 50%, transparent 65%),
+    linear-gradient(var(--grok-fg2), var(--grok-fg2));
+  animation: shimmer-text-sweep 2400ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grok-shimmer,
+  .grok-f100,
+  .grok-f120,
+  .grok-f180,
+  .grok-out120,
+  .grok-swap-out,
+  .grok-swap-in,
+  .grok-w,
+  .grok-feed-in,
+  .grok-feed-out,
+  .grok-enter,
+  .grok-pop,
+  .grok-menu,
+  .grok-row-in,
+  .grok-status-in,
+  .grok-spring,
+  .grok-dot,
+  .grok-pulse,
+  .grok-twinkle {
+    animation: none !important;
+  }
+}

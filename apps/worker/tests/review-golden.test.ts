@@ -174,8 +174,9 @@ function fakeDeps(script: ClientScript, now: { at: number }, calls: unknown[], i
     client: (runtime) => ({
       mcpInventory: async () => ({ platform: "api_server", servers: [{ name: "linear" }, ...(script.uncoveredRootServer ? [{ name: "drive" }] : [])], catalog: [] }) as never,
       hostProfileInventory: async () => ({ profiles: [{ name: "ohb-reviewer", mcpServers: [{ name: "linear", enabled: script.staleProfile === true }] }] }) as never,
-      createRun: async (input) => {
-        // The input (rules included) is stored once per distinct value, apart.
+      createRun: async ({ signal: _signal, ...input }) => {
+        // The input (rules included) is stored once per distinct value, apart;
+        // the abort signal is plumbing, not part of what the model is asked.
         const stored = JSON.stringify(clean(input));
         if (!inputs.includes(stored)) inputs.push(stored);
         calls.push({ call: "createRun", runtime: (runtime as { runtimeId?: string }).runtimeId, input: inputs.indexOf(stored) });

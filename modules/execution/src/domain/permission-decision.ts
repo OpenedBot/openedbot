@@ -24,7 +24,7 @@
  * this code does not know asks (iso Grok Bot: unknown -> needs approval).
  */
 
-import { commandDeletes, commandHitsCircuitBreaker, isSensitivePath, shellWords } from "@openedbot/roster/domain/editor-directives";
+import { commandDeletes, commandHitsCircuitBreaker, commandStarts, isSensitivePath, shellWords } from "@openedbot/roster/domain/editor-directives";
 import type { GateDescriptor, GateKind } from "./gate-identity";
 
 export type PermissionModeId = "manual" | "plan" | "auto" | "bypass";
@@ -103,7 +103,9 @@ function descriptorPaths(descriptor: GateDescriptor | null): string[] {
 /**
  * Each blocklist entry is a command prefix of words (`git push --force`). A
  * command matches when one of its segments starts with those words, past
- * variable assignments and `sudo`. `null`: the command cannot be read.
+ * variable assignments, or when the command a wrapper runs does (`sudo -n`,
+ * `env -i`, `timeout 5`... with their options). `null`: the command cannot
+ * be read, including a wrapper option whose arity is unknown.
  */
 export function commandMatchesBlocklist(command: string, blocklist: readonly string[]): boolean | null {
   const patterns = blocklist.map((entry) => shellWords(entry.trim())).filter((words): words is string[] => !!words && words.length > 0);
@@ -111,11 +113,12 @@ export function commandMatchesBlocklist(command: string, blocklist: readonly str
     if (!segment.trim()) continue;
     const words = shellWords(segment.trim());
     if (words === null) return null;
-    let start = 0;
-    while (start < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[start] ?? "")) start += 1;
-    if (words[start] === "sudo" || words[start] === "command") start += 1;
-    const head = words.slice(start).map((word, index) => (index === 0 ? word.split("/").pop() ?? word : word));
-    if (patterns.some((pattern) => pattern.every((word, index) => head[index] === word))) return true;
+    const starts = commandStarts(words);
+    if (starts === null) return null;
+    for (const start of starts) {
+      const head = words.slice(start).map((word, index) => (index === 0 ? word.split("/").pop() ?? word : word));
+      if (patterns.some((pattern) => pattern.every((word, index) => head[index] === word))) return true;
+    }
   }
   return false;
 }

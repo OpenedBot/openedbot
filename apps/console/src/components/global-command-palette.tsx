@@ -62,7 +62,7 @@ export function GlobalCommandPalette() {
   }, [open, query]);
 
   const globalSearch = useQuery({
-    queryKey: ["global-search", debouncedQuery],
+    queryKey: queryKeys.globalSearch(debouncedQuery),
     queryFn: () => api.globalSearch(debouncedQuery, 12),
     enabled: open && debouncedQuery.length > 0,
     staleTime: 30_000,

@@ -31,10 +31,13 @@ function keyRow(keyId: string, keyring = currentKeyring, retired = false): Audit
   };
 }
 
-function fakeTx(rows: AuditKeyRow[], statements: Statement[], anchor: { writeSeq: number } | null = null) {
+function fakeTx(rows: AuditKeyRow[], statements: Statement[], anchor: { writeSeq: number; keyId?: string; tail?: string } | null = null) {
   return (async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...strings].join(" ");
     statements.push({ sql, values });
+    if (sql.includes("from runtime_audit_anchors")) {
+      return anchor ? [{ keyId: anchor.keyId ?? "k-1", writeSeq: anchor.writeSeq, eventCount: 2, dropped: 0, tail: anchor.tail ?? "a".repeat(64), receivedAt: new Date() }] : [];
+    }
     if (sql.includes("from runtime_audit_keys") && sql.includes("key_id = ")) return rows.filter((row) => row.keyId === values[2]).map((row) => ({ keyId: row.keyId }));
     if (sql.includes("from runtime_audit_keys")) return rows;
     if (sql.includes("update runtime_audit_keys set retired_at")) {
@@ -44,6 +47,7 @@ function fakeTx(rows: AuditKeyRow[], statements: Statement[], anchor: { writeSeq
     if (sql.includes("insert into runtime_audit_anchors")) {
       const writeSeq = Number(values[3]);
       if (anchor && anchor.writeSeq > writeSeq) return [];
+      if (anchor && anchor.writeSeq === writeSeq && (anchor.tail ?? "a".repeat(64)) !== values[6]) return [];
       return [{ runtimeId: LINK_RUNTIME_ID }];
     }
     return [];
@@ -187,6 +191,38 @@ describe("clés d'audit en base", () => {
     expect(await recordAuditAnchor(fakeTx([keyRow("k-1")], statements, { writeSeq: 5 }), "org-1", LINK_RUNTIME_ID, frame)).toBe("regressed");
     expect(await recordAuditAnchor(fakeTx([keyRow("k-1")], statements, { writeSeq: 2 }), "org-1", LINK_RUNTIME_ID, frame)).toBe("recorded");
     const upsert = statements.filter((entry) => entry.sql.includes("insert into runtime_audit_anchors"));
-    expect(upsert.every((entry) => entry.sql.includes("runtime_audit_anchors.write_seq <= excluded.write_seq"))).toBe(true);
+    expect(upsert.every((entry) => entry.sql.includes("runtime_audit_anchors.write_seq < excluded.write_seq"))).toBe(true);
+  });
+
+  test("recordAuditAnchor au même writeSeq : un doublon strict est idempotent, un contenu différent est refusé", async () => {
+    const statements: Statement[] = [];
+    const frame = { t: "audit.anchor" as const, runtimeId: LINK_RUNTIME_ID, keyId: "k-1", writeSeq: 3, count: 2, dropped: 0, tail: "a".repeat(64) };
+    expect(await recordAuditAnchor(fakeTx([keyRow("k-1")], statements, { writeSeq: 3 }), "org-1", LINK_RUNTIME_ID, frame)).toBe("recorded");
+    const contradicting = { ...frame, tail: "b".repeat(64) };
+    expect(await recordAuditAnchor(fakeTx([keyRow("k-1")], statements, { writeSeq: 3 }), "org-1", LINK_RUNTIME_ID, contradicting)).toBe("conflicting");
+    // Seul un contenu identique peut réécrire la même position.
+    const upsert = statements.find((entry) => entry.sql.includes("insert into runtime_audit_anchors"))!;
+    for (const column of ["key_id", "event_count", "dropped", "tail"]) {
+      expect(upsert.sql).toContain(`runtime_audit_anchors.${column} = excluded.${column}`);
+    }
+  });
+
+  test("rotateAuditKey refuse une rotation qui rendrait plus de deux clés retirées nécessaires au snapshot de l'hôte", async () => {
+    const keyAt = (keyId: string, hour: number, retired: boolean): AuditKeyRow => ({
+      ...keyRow(keyId, currentKeyring, retired), createdAt: new Date(`2026-09-06T${String(hour).padStart(2, "0")}:00:00Z`),
+    });
+    // De la plus récente à la plus ancienne, comme `readAuditKeyRows`.
+    const rows = () => [keyAt("k-2", 12, false), keyAt("k-1", 11, true), keyAt("k-0", 10, true)];
+    // Snapshot ancré sous k-0 : k-0, k-1 et k-2 deviendraient nécessaires, `audit.key` n'en porte que deux.
+    const refused = await rotateAuditKey(fakeTx(rows(), [], { writeSeq: 9, keyId: "k-0" }), "org-1", LINK_RUNTIME_ID, { current: currentKeyring, previous: [] })
+      .then(() => null, (caught: unknown) => caught);
+    expect(refused).toMatchObject({ status: 409, code: "AUDIT_KEY_RESEAL_PENDING" });
+    // Sans aucune ancre, toutes les clés comptent.
+    const unanchored = await rotateAuditKey(fakeTx(rows(), []), "org-1", LINK_RUNTIME_ID, { current: currentKeyring, previous: [] })
+      .then(() => null, (caught: unknown) => caught);
+    expect(unanchored).toMatchObject({ code: "AUDIT_KEY_RESEAL_PENDING" });
+    // Une ancre sous k-1 prouve le rescellement : k-1 et k-2 suffisent, la rotation passe.
+    const keys = await rotateAuditKey(fakeTx(rows(), [], { writeSeq: 9, keyId: "k-1" }), "org-1", LINK_RUNTIME_ID, { current: currentKeyring, previous: [] });
+    expect(keys.previous.map((entry) => entry.keyId)).toEqual(["k-2", "k-1"]);
   });
 });

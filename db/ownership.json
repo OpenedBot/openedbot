@@ -207,7 +207,9 @@
   "tenant_blob_deletions": {
     "owner": "identity",
     "writers": [
+      "conversation",
       "portability",
+      "roster",
       "support"
     ]
   },

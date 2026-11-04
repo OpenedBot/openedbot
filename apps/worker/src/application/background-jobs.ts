@@ -3,7 +3,11 @@ export type BackgroundJob = {
   name: string;
   /** Minimum gap between two pass starts; a pass longer than this delays the next one. */
   everyMs: number;
-  run(signal: AbortSignal): Promise<void>;
+  /**
+   * `track`: work the pass starts without awaiting it (an approval review);
+   * the worker drains it on shutdown like the pass itself.
+   */
+  run(signal: AbortSignal, track?: (work: Promise<void>) => void): Promise<void>;
 };
 
 export type BackgroundJobs = {
@@ -34,7 +38,7 @@ export function createBackgroundJobs(
       if (last !== undefined && now - last < job.everyMs) continue;
       lastStartedAt.set(job.name, now);
       const execution = Promise.resolve()
-        .then(() => job.run(signal))
+        .then(() => job.run(signal, track))
         .catch((error) => {
           console.error(JSON.stringify({ event: "worker.job_failed", job: job.name, error: String(error) }));
         })

@@ -70,6 +70,11 @@ try {
       locale: "fr",
     }),
   });
+  if (subscribe.status === 400) {
+    throw new Error(
+      `POST /api/push-subscriptions refused the loopback endpoint: set PUSH_ALLOW_LOOPBACK_ENDPOINTS=1 in .env.local, restart the local stack (API and worker) and re-run make e2e-push. ${await subscribe.text()}`,
+    );
+  }
   if (!subscribe.ok) {
     throw new Error(`POST /api/push-subscriptions failed with HTTP ${subscribe.status}: ${await subscribe.text()}`);
   }

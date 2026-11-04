@@ -142,3 +142,46 @@ export function rehypeReveal() {
     }
   };
 }
+
+/** Splits text into words that keep their trailing whitespace: `join("")` gives the text back. */
+function streamWords(text: string): string[] {
+  return text.match(/\s+|\S+\s*/g) ?? [];
+}
+
+function wrapWords(parent: { children: HastNode[] }): void {
+  parent.children = parent.children.flatMap((child): HastNode[] => {
+    if (child.type === "text") {
+      return streamWords((child as HastText).value).map((word): HastNode =>
+        word.trim()
+          ? { type: "element", tagName: "span", properties: { className: ["grok-w"] }, children: [{ type: "text", value: word }] }
+          : { type: "text", value: word },
+      );
+    }
+    if (isHastElement(child) && !isOpaqueHastElement(child)) wrapWords(child);
+    return [child];
+  });
+}
+
+/**
+ * grok.com's streamed answer (`Words`, `.grok-w`): every word is its own
+ * span, so React keeps the spans already on screen and only a NEW word plays
+ * its 200 ms blur-in (`.grok-w`, grok-motion.css). No tail, no caret. A
+ * word still being written keeps its span as it grows: it never replays.
+ *
+ * Code and math are never split (Shiki and KaTeX own them): a top-level one
+ * born in the stream blurs in as a whole (`ohb-reveal`), once.
+ */
+export function rehypeStreamWords() {
+  return (tree: HastRoot) => {
+    for (const child of tree.children) {
+      if (isHastElement(child) && isOpaqueHastElement(child)) {
+        const existing = child.properties?.className;
+        child.properties = {
+          ...child.properties,
+          className: [...(Array.isArray(existing) ? existing : []), "ohb-reveal"],
+        };
+      }
+    }
+    wrapWords(tree);
+  };
+}

@@ -10,7 +10,7 @@ import { dirname, resolve, sep } from "node:path";
 function importBlobs(config: WorkerConfig): ImportBlobStore {
   return {
     driver: config.blob.driver,
-    delete: (key) => deleteBlob(config, key),
+    delete: (key) => deleteBlob(config, key, config.blob.driver),
     async put(key, bytes, contentType) {
       if (!/^org\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i.test(key)) throw new Error("Invalid import blob key");
       if (config.blob.driver === "r2") {

@@ -6,11 +6,17 @@ import { threadSessionKeys } from "@openedbot/conversation/domain/thread-session
 import { cancelMaintenanceRunsTx, isMaintenanceStepKind } from "@openedbot/execution/application/run-cancellation";
 import { HermesClientError, type HermesClient, type HermesProfileInventory } from "@openedbot/hermes";
 import { withTenant } from "@openedbot/platform-db";
-import { deleteBotAfterHostProfileDelete } from "@openedbot/roster/sql/bot-import";
+import {
+  deleteBotAfterHostProfileDelete,
+  lockBotWithHostProfileDeleting,
+  markBotHostProfileDeleting,
+  releaseBotHostProfileDeleting,
+} from "@openedbot/roster/sql/bot-import";
 import { workflowSessionKey } from "@openedbot/roster/domain/autonomous-workflow";
 import { personaDraftSessionKey } from "@openedbot/roster/domain/persona-draft";
 import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
 import { ProfileDeleteError } from "../domain/errors";
+import { assertProfileNamesAvailable, lockProfileImports } from "../sql/reservations";
 
 export const PROFILE_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 export const PROFILE_INVENTORY_TIMEOUT_MS = 60_000;
@@ -21,9 +27,28 @@ export type HostProfileDeleteClient = Pick<HermesClient, "hostProfileInventory" 
 type ActiveBotRun = { id: string; stepKind: string | null; threadId: string };
 
 /**
+ * Prouve que l'appelant tient encore le travail (le bail d'un job de
+ * suppression). Rejouée avant CHAQUE mutation : un bail perdu en cours de
+ * route ne laisse aucun effet de plus à l'ancien propriétaire.
+ */
+export type HostProfileDeleteOwnership = {
+  /** Avant un effet distant (session, profil). */
+  assertOwned(): Promise<void>;
+  /** Dans une transaction qui mute, sous le verrou d'import déjà pris. */
+  assertOwnedTx(tx: TransactionSQL): Promise<void>;
+};
+
+/**
  * Suppression d'un profil sur le disque de l'hôte. Si un bot (y compris
  * archivé) porte ce hermes_profile, ses sessions runtime partent d'abord ;
  * un échec de purge ou une relue qui voit encore le slug laisse la ligne SQL.
+ *
+ * Le bot lié passe d'abord à l'état durable « suppression engagée »
+ * (`host_profile_deleting_at`, archivé) : aucun run ne peut naître pendant
+ * les appels à l'hôte. Si la tentative échoue avant d'avoir touché au profil,
+ * le bot est rendu tel qu'il était. Au-delà, l'état reste : une reprise qui
+ * trouve le profil déjà absent termine le nettoyage local au lieu de
+ * répondre PROFILE_NOT_FOUND.
  *
  * Twin of the former inline DELETE /profiles/:slug handler: the HTTP route and
  * the delete-job worker share this function so a bulk job cannot skip a guard.
@@ -36,12 +61,21 @@ export async function deleteHostProfile(
     host: HostProfileDeleteClient;
     sessionClient: (profile: string) => Pick<HermesClient, "deleteSession">;
     timeoutMs?: number;
+    ownership?: HostProfileDeleteOwnership;
   },
 ): Promise<RuntimeProfileDeleteDto> {
   if (slug === "default" || !PROFILE_SLUG_PATTERN.test(slug) || OPENEDBOT_SERVICE_PROFILES.has(slug)) {
     throw new ProfileDeleteError(400, "PROFILE_INVALID", "Ce slug de profil n’est pas valide.");
   }
   const timeoutMs = deps.timeoutMs ?? PROFILE_INVENTORY_TIMEOUT_MS;
+  // Un bail perdu interdit aussi de rendre le bot : un autre propriétaire
+  // peut déjà reprendre la suppression à partir de l'état posé.
+  let ownershipLost = false;
+  const owned = async (check: () => Promise<void>) => {
+    try { await check(); } catch (error) { ownershipLost = true; throw error; }
+  };
+  const assertOwned = () => owned(async () => { await deps.ownership?.assertOwned(); });
+  const assertOwnedTx = (tx: TransactionSQL) => owned(async () => { await deps.ownership?.assertOwnedTx(tx); });
   let inventory: HermesProfileInventory;
   try {
     inventory = await withDeadline(deps.host.hostProfileInventory(), timeoutMs);
@@ -49,73 +83,119 @@ export async function deleteHostProfile(
     throw hostDeleteError(error);
   }
   if (!inventory.profiles.some((profile) => profile.name === slug)) {
-    throw new ProfileDeleteError(404, "PROFILE_NOT_FOUND", "Ce profil n’existe pas sur l’hôte.");
+    // Reprise : le profil est parti lors d'une tentative précédente, dont la
+    // finalisation locale n'a pas abouti. Seul un bot marqué le prouve.
+    const resumedBotId = await withTenant(db, organizationId, async (tx) => {
+      await lockProfileImports(tx, organizationId);
+      await assertOwnedTx(tx);
+      const botId = await lockBotWithHostProfileDeleting(tx, organizationId, slug);
+      if (botId) await deleteBotAfterHostProfileDelete(tx, organizationId, botId);
+      return botId;
+    });
+    if (!resumedBotId) throw new ProfileDeleteError(404, "PROFILE_NOT_FOUND", "Ce profil n’existe pas sur l’hôte.");
+    return { slug, hostDeleted: true, botId: resumedBotId, purgedSessions: 0, failedSessions: 0 };
   }
 
-  const linked = await withTenant(db, organizationId, async (tx) =>
-    tx<Array<{ id: string }>>`
+  // Le verrou d'import et la réservation du slug : un import qui a créé ce
+  // profil sans avoir encore matérialisé son bot ne le voit pas supprimer.
+  const engaged = await withTenant(db, organizationId, async (tx) => {
+    await lockProfileImports(tx, organizationId);
+    await assertOwnedTx(tx);
+    await assertProfileNamesAvailable(tx, organizationId, [slug]);
+    const linked = await tx<Array<{ id: string }>>`
       select id from bots
        where organization_id = ${organizationId} and hermes_profile = ${slug}
-    `,
-  );
-  const botId = linked[0]?.id ?? null;
+    `;
+    const botId = linked[0]?.id ?? null;
+    if (!botId) return null;
+    await assertLinkedBotDeletable(tx, organizationId, botId);
+    const marked = await markBotHostProfileDeleting(tx, organizationId, botId);
+    if (!marked) return null;
+    const threads = await tx<Array<{ sessionId: string; threadId: string; sessionGeneration: number }>>`
+      select hermes_session_id as "sessionId", id as "threadId", hermes_session_generation as "sessionGeneration" from threads
+       where organization_id = ${organizationId} and bot_id = ${botId}
+    `;
+    const workflows = await tx<Array<{ workflowId: string }>>`
+      select distinct workflow_id as "workflowId" from runs
+       where organization_id = ${organizationId} and workflow_id is not null
+         and (bot_id = ${botId} or caller_bot_id = ${botId} or handoff_target_bot_id = ${botId})
+    `;
+    return { botId, marked, scope: { threads, workflows } };
+  });
+  const botId = engaged?.botId ?? null;
 
-  let purgedSessions = 0;
-  let failedSessions = 0;
-  if (botId) {
-    const scope = await withTenant(db, organizationId, async (tx) => {
-      await assertLinkedBotDeletable(tx, organizationId, botId);
-      const threads = await tx<Array<{ sessionId: string; threadId: string; sessionGeneration: number }>>`
-        select hermes_session_id as "sessionId", id as "threadId", hermes_session_generation as "sessionGeneration" from threads
-         where organization_id = ${organizationId} and bot_id = ${botId}
-      `;
-      const workflows = await tx<Array<{ workflowId: string }>>`
-        select distinct workflow_id as "workflowId" from runs
-         where organization_id = ${organizationId} and workflow_id is not null
-           and (bot_id = ${botId} or caller_bot_id = ${botId} or handoff_target_bot_id = ${botId})
-      `;
-      return { threads, workflows };
-    });
-    const sessions = botRuntimeSessionIds(organizationId, botId, scope);
-    const purged = await purgeRuntimeSessions(deps.sessionClient(slug), sessions);
-    if (purged.failed.length > 0) {
+  // Avant l'appel qui supprime le profil, un échec rend le bot ; une
+  // tentative qui avait déjà trouvé l'état posé le laisse à sa reprise.
+  let profileDeleteAttempted = false;
+  try {
+    let purgedSessions = 0;
+    let failedSessions = 0;
+    if (engaged) {
+      const sessions = botRuntimeSessionIds(organizationId, engaged.botId, engaged.scope);
+      const purged = await purgeRuntimeSessions(deps.sessionClient(slug), sessions, assertOwned);
+      if (purged.failed.length > 0) {
+        throw new ProfileDeleteError(
+          502,
+          "RUNTIME_PURGE_FAILED",
+          purged.reason
+            ?? "Les sessions liées à ce profil n’ont pas pu être effacées sur votre runtime Hermes. La suppression du profil n’a pas été tentée.",
+        );
+      }
+      purgedSessions = purged.deleted;
+      failedSessions = purged.failed.length;
+    }
+
+    await assertOwned();
+    profileDeleteAttempted = true;
+    try {
+      await deps.host.hostDeleteProfile(slug);
+    } catch (error) {
+      throw hostDeleteError(error);
+    }
+    let after: HermesProfileInventory;
+    try {
+      after = await withDeadline(deps.host.hostProfileInventory(), timeoutMs);
+    } catch (error) {
+      throw hostDeleteError(error);
+    }
+    if (after.profiles.some((profile) => profile.name === slug)) {
       throw new ProfileDeleteError(
         502,
-        "RUNTIME_PURGE_FAILED",
-        purged.reason
-          ?? "Les sessions liées à ce profil n’ont pas pu être effacées sur votre runtime Hermes. La suppression du profil n’a pas été tentée.",
+        "PROFILE_UNVERIFIED",
+        "L’hôte n’a pas confirmé la suppression de ce profil. Aucune ligne n’a été effacée chez openedbot.",
       );
     }
-    purgedSessions = purged.deleted;
-    failedSessions = purged.failed.length;
-  }
 
-  try {
-    await deps.host.hostDeleteProfile(slug);
+    if (botId) {
+      await withTenant(db, organizationId, async (tx) => {
+        await lockProfileImports(tx, organizationId);
+        await assertOwnedTx(tx);
+        await deleteBotAfterHostProfileDelete(tx, organizationId, botId);
+      });
+    }
+
+    return { slug, hostDeleted: true, botId, purgedSessions, failedSessions };
   } catch (error) {
-    throw hostDeleteError(error);
+    if (engaged && !engaged.marked.alreadyDeleting && !profileDeleteAttempted && !ownershipLost) {
+      try {
+        await withTenant(db, organizationId, async (tx) => {
+          await lockProfileImports(tx, organizationId);
+          await assertOwnedTx(tx);
+          await releaseBotHostProfileDeleting(tx, organizationId, engaged.botId, engaged.marked.wasArchived);
+        });
+      } catch (releaseError) {
+        // L'état reste posé, donc sûr : une nouvelle suppression le reprend.
+        // L'erreur d'origine reste celle que voit l'appelant.
+        console.error(JSON.stringify({
+          event: "portability.host_profile_delete_release_failed",
+          organizationId,
+          botId: engaged.botId,
+          error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+        }));
+      }
+    }
+    throw error;
   }
-  let after: HermesProfileInventory;
-  try {
-    after = await withDeadline(deps.host.hostProfileInventory(), timeoutMs);
-  } catch (error) {
-    throw hostDeleteError(error);
-  }
-  if (after.profiles.some((profile) => profile.name === slug)) {
-    throw new ProfileDeleteError(
-      502,
-      "PROFILE_UNVERIFIED",
-      "L’hôte n’a pas confirmé la suppression de ce profil. Aucune ligne n’a été effacée chez openedbot.",
-    );
-  }
-
-  if (botId) {
-    await withTenant(db, organizationId, async (tx) => {
-      await deleteBotAfterHostProfileDelete(tx, organizationId, botId);
-    });
-  }
-
-  return { slug, hostDeleted: true, botId, purgedSessions, failedSessions };
 }
 
 export function parseDeleteJobSlugs(body: unknown): string[] {
@@ -165,11 +245,14 @@ function botRuntimeSessionIds(
 async function purgeRuntimeSessions(
   client: Pick<HermesClient, "deleteSession">,
   sessions: ReadonlyArray<string>,
+  assertOwned: () => Promise<void>,
 ): Promise<{ deleted: number; failed: string[]; reason: string | null }> {
   let deleted = 0;
   const failed: string[] = [];
   let reason: string | null = null;
   for (const sessionId of sessions) {
+    // Hors du try : un bail perdu arrête la purge, ce n'est pas l'échec d'une session.
+    await assertOwned();
     try {
       await client.deleteSession(sessionId);
       deleted += 1;

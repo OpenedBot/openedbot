@@ -1,5 +1,4 @@
 import { memo, useState, type ComponentType, type ReactNode } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   RiCustomerService2Line,
@@ -17,7 +16,7 @@ import { LOCALES } from "@openedbot/contracts-locale";
 import { useOperatorIdentity } from "../../lib/session/operator-identity";
 import { useOpenSettings } from "../../lib/shell/settings-overlay";
 import { useFleetFrameContext } from "../../pro-console/slots";
-import { signOut } from "../../lib/session/sign-out";
+import { useSignOut } from "../../lib/session/sign-out";
 import { useSupportDeskAvailable } from "../../lib/support/support-desk-availability";
 import { useSupportUnread } from "../../lib/support/support-watch";
 import { haptics } from "../../lib/platform/haptics";
@@ -140,7 +139,6 @@ export const AccountMenu = memo(function AccountMenu({
   const openSettings = () => openSettingsAt(fleetHome ? "/settings/profile" : "/settings");
   const deskAvailable = useSupportDeskAvailable();
   const supportUnread = useSupportUnread();
-  const queryClient = useQueryClient();
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const mobileDrawer = useMobileDrawer();
@@ -148,7 +146,7 @@ export const AccountMenu = memo(function AccountMenu({
   const segmentShift = mobileDrawer ? "translate-x-[46px]" : "translate-x-[26px]";
   const { name, email, signedIn, impersonating } = useOperatorIdentity();
   const shortName = name.replace(/^@/, "");
-  const leaving = useMutation({ mutationFn: () => signOut(queryClient) });
+  const leaving = useSignOut();
 
   const navigate = useNavigate();
   const run = (action: () => void) => {

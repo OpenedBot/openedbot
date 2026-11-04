@@ -10,7 +10,7 @@ import { unlinkGoogle } from "@openedbot/identity/application/google-link";
 import type { LinkClaimResult, LinkOptions } from "@openedbot/identity/sql/oauth-attempt-store";
 import type { AppVariables } from "./auth";
 import type { Db } from "@openedbot/platform-db";
-import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
+import { assertPassword, assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 
 /** La part de `createGoogleAuth` dont la liaison a besoin : un double suffit aux tests. */
 export type GoogleLinker = {
@@ -58,8 +58,8 @@ export function accountSecurityRoutes(
   routes.post("/password", async (context) => {
     const auth = context.get("auth");
     const body = await jsonBody(context.req.raw);
-    const currentPassword = assertString(body.currentPassword, "Le mot de passe actuel", { max: 1_024 });
-    const newPassword = assertString(body.newPassword, "Le nouveau mot de passe", { max: 1_024 });
+    const currentPassword = assertPassword(body.currentPassword, "Le mot de passe actuel");
+    const newPassword = assertPassword(body.newPassword, "Le nouveau mot de passe");
     const dto: ChangePasswordDto = {
       revokedOtherSessions: await changeOwnPassword(db, {
         userId: auth.userId,
@@ -90,7 +90,7 @@ export function accountSecurityRoutes(
   routes.post("/google/unlink", async (context) => {
     const auth = context.get("auth");
     const body = await jsonBody(context.req.raw);
-    const currentPassword = assertString(body.currentPassword, "Le mot de passe actuel", { max: 1_024 });
+    const currentPassword = assertPassword(body.currentPassword, "Le mot de passe actuel");
     const dto: GoogleUnlinkDto = {
       revokedOtherSessions: await unlinkGoogle(db, {
         userId: auth.userId,

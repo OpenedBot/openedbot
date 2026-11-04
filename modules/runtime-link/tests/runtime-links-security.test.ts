@@ -1,7 +1,9 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { LINK_CONTROL_FORWARD_TIMEOUT_MS } from "../src/application/instances";
+import { LINK_CONTROL_FORWARD_TIMEOUT_MS, RUNTIME_LINK_RELAY_STAGE_HEADER } from "../src/application/instances";
 import {
   LINK_CONTROL_CALL_TIMEOUT_MS,
+  LINK_TOKEN_UNCONFIRMED_HOLD_HOURS,
+  SESSION_RECONCILIATION_BATCH,
   LINK_SESSIONS_INVENTORY_TIMEOUT_MS,
   reconcileRuntimeSessions,
   rotateStaleLinkTokens,
@@ -14,12 +16,13 @@ type Captured = { sql: string; values: unknown[] };
  * Une base factice : les runtimes dus sont rendus tels quels, chaque
  * écriture est journalisée, et l'update de rotation rend l'ancien hash.
  */
-function fakeDb(captured: Captured[], options: { due?: Array<{ id: string; organizationId: string }>; known?: string[] } = {}): Bun.SQL {
+function fakeDb(captured: Captured[], options: { due?: Array<{ id: string; organizationId: string }>; known?: string[]; held?: boolean } = {}): Bun.SQL {
   return ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...strings].join("?");
     captured.push({ sql, values });
     if (sql.includes("from runtimes")) return Promise.resolve(options.due ?? []);
     if (sql.includes("link_token_previous_hash = link_token_hash")) return Promise.resolve([{ previousHash: "old-hash" }]);
+    if (sql.includes("link_token_rotation_unconfirmed_at = now()")) return Promise.resolve(options.held ? [{ id: "held" }] : []);
     if (sql.includes("hermes_session_id as id from threads")) return Promise.resolve((options.known ?? []).map((id) => ({ id })));
     return Promise.resolve([]);
   }) as unknown as Bun.SQL;
@@ -106,28 +109,52 @@ describe("rotation automatique du jeton de lien", () => {
     expect(captured.some((entry) => entry.sql.includes("insert into runtime_link_events"))).toBe(false);
   });
 
-  test("un relais injoignable est traité comme non poussé", async () => {
+  test("un refus avant envoi (aucune instance ne tient le lien) défait aussi la rotation", async () => {
     const captured: Captured[] = [];
-    const rotated = await rotateStaleLinkTokens(fakeDb(captured, { due }), 24, { ...control, fetchImpl: async () => { throw new Error("ECONNREFUSED"); } });
+    const refused = async () => Response.json({ error: { code: "RUNTIME_LINK_UNAVAILABLE" } }, {
+      status: 503, headers: { [RUNTIME_LINK_RELAY_STAGE_HEADER]: "before_dispatch" },
+    });
+    const rotated = await rotateStaleLinkTokens(fakeDb(captured, { due }), 24, { ...control, fetchImpl: refused });
     expect(rotated).toBe(0);
     expect(captured.some((entry) => entry.sql.includes("set link_token_hash = ?, link_token_previous_hash = null"))).toBe(true);
+    expect(captured.some((entry) => entry.sql.includes("link_token_rotation_unconfirmed_at = now()"))).toBe(false);
   });
 
+  // L'hôte a pu enregistrer le nouveau jeton avant que la réponse se perde :
+  // défaire la rotation le couperait. Les deux jetons restent valables, et la
+  // prochaine admission de l'hôte tranche.
+  for (const [name, fetchImpl] of [
+    ["un relais injoignable", async () => { throw new Error("ECONNRESET"); }],
+    ["une erreur serveur non marquée", async () => new Response("", { status: 502 })],
+    ["un saut d'instance incertain", async () => Response.json({ pushed: false, uncertain: true })],
+    ["une réponse illisible", async () => new Response("<html>", { status: 200 })],
+  ] as Array<[string, LinkFetch]>) {
+    test(`${name} laisse la rotation en attente de confirmation, sans la défaire`, async () => {
+      const captured: Captured[] = [];
+      const rotated = await rotateStaleLinkTokens(fakeDb(captured, { due, held: true }), 24, { ...control, fetchImpl });
+      expect(rotated).toBe(0);
+      expect(captured.some((entry) => entry.sql.includes("set link_token_hash = ?, link_token_previous_hash = null"))).toBe(false);
+      const hold = captured.find((entry) => entry.sql.includes("link_token_rotation_unconfirmed_at = now()"))!;
+      expect(hold.sql).toContain("link_token_previous_expires_at = now() + (? * interval '1 hour')");
+      expect(hold.values[0]).toBe(LINK_TOKEN_UNCONFIRMED_HOLD_HOURS);
+      const event = captured.find((entry) => entry.sql.includes("insert into runtime_link_events"))!;
+      expect(event.values[2]).toEqual({ automatic: true, reason: "max_age", confirmed: false });
+    });
+  }
+
   // Le worker n'a qu'une passe à la fois par job : un relais muet qui la
-  // suspendrait arrêterait la rotation pour de bon, avec un jeton que personne
-  // n'a reçu. L'appel est borné et, comme sur une erreur réseau, la rotation
-  // est défaite.
-  test("un relais muet : l'appel de contrôle est borné et la rotation est défaite", async () => {
+  // suspendrait arrêterait la rotation pour de bon. L'appel est borné et,
+  // comme sur une erreur réseau, l'issue est inconnue : rien n'est défait.
+  test("un relais muet : l'appel de contrôle est borné et la rotation attend sa confirmation", async () => {
     const captured: Captured[] = [];
     const { outcome, requested } = await withShortTimeouts(() =>
-      rotateStaleLinkTokens(fakeDb(captured, { due }), 24, { ...control, fetchImpl: silentRelay }));
+      rotateStaleLinkTokens(fakeDb(captured, { due, held: true }), 24, { ...control, fetchImpl: silentRelay }));
     expect(outcome).toBe(0);
     expect(requested).toEqual([LINK_CONTROL_CALL_TIMEOUT_MS]);
     // L'appel englobe le saut de l'instance vers le propriétaire : il lui survit.
     expect(LINK_CONTROL_CALL_TIMEOUT_MS).toBeGreaterThan(LINK_CONTROL_FORWARD_TIMEOUT_MS);
-    const revert = captured.find((entry) => entry.sql.includes("set link_token_hash = ?, link_token_previous_hash = null"))!;
-    expect(revert.values[0]).toBe("old-hash");
-    expect(captured.some((entry) => entry.sql.includes("insert into runtime_link_events"))).toBe(false);
+    expect(captured.some((entry) => entry.sql.includes("set link_token_hash = ?, link_token_previous_hash = null"))).toBe(false);
+    expect(captured.some((entry) => entry.sql.includes("link_token_rotation_unconfirmed_at = now()"))).toBe(true);
   });
 });
 
@@ -146,6 +173,28 @@ describe("réconciliation des sessions Hermes", () => {
     expect(inserted).toHaveLength(1);
     expect(inserted[0]!.sql).toContain("'unattributed_session'");
     expect(inserted[0]!.values[2]).toEqual({ sessionId: "ghost-1", profile: "default", createdAt: "2026-09-06T11:00:00Z" });
+  });
+
+  test("les vrais identifiants openedbot (ohb:<org>:<thread>) sont réconciliés, un identifiant hors grammaire jamais", async () => {
+    const captured: Captured[] = [];
+    const real = "ohb:0b9c6a1e-0000-4000-8000-000000000001:7d1f0c2a-1111-4222-8333-444455556666";
+    const sessions = [{ id: real, profile: "bot-a", createdAt: "2026-09-06T10:00:00Z" }, { id: "../etc/passwd", profile: "x", createdAt: "" }];
+    const result = await reconcileRuntimeSessions(fakeDb(captured, { due }), { ...control, fetchImpl: async () => Response.json({ sessions, total: 2, truncated: false }) });
+    expect(result.unattributed).toBe(1);
+    const known = captured.find((entry) => entry.sql.includes("hermes_session_id as id from threads"))!;
+    expect(JSON.stringify(known.values)).toContain(real);
+    const inserted = captured.filter((entry) => entry.sql.includes("insert into runtime_link_events"));
+    expect(inserted.map((entry) => (entry.values[2] as { sessionId: string }).sessionId)).toEqual([real]);
+  });
+
+  test("la passe avance : les runtimes les moins récemment réconciliés d'abord, chacun daté même sans inventaire", async () => {
+    const captured: Captured[] = [];
+    const next = { id: "9a4c3d2e-2222-4333-8444-555566667777", organizationId: "org-1" };
+    await reconcileRuntimeSessions(fakeDb(captured, { due: [...due, next] }), { ...control, fetchImpl: async () => new Response("", { status: 503 }) });
+    expect(captured[0]!.sql).toContain("order by link_sessions_reconciled_at asc nulls first, id");
+    expect(captured[0]!.values).toEqual([SESSION_RECONCILIATION_BATCH]);
+    const stamps = captured.filter((entry) => entry.sql.includes("set link_sessions_reconciled_at = now()"));
+    expect(stamps.map((entry) => entry.values[0])).toEqual([due[0]!.id, next.id]);
   });
 
   test("une session déjà journalisée ou connue par un run n'est pas rejouée", async () => {

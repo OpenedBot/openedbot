@@ -7,6 +7,8 @@ import { announceOrganizationCreated } from "../application/organization-created
 import { randomCredential } from "@openedbot/platform-db/credential";
 import { runOrganizationCreating } from "../application/organization-creating";
 import { organizationSlugCandidate } from "../domain/signup";
+import { lockUserSessions } from "./sessions";
+import { verifyPassword } from "../application/password-hash";
 
 /** Les environnements de l'API, tels que `ApiConfig["environment"]` les nomme. */
 export type ApiEnvironment = "development" | "test" | "production";
@@ -175,7 +177,7 @@ export async function verifyCredentials(
     select id, email, password_hash as "passwordHash" from users where lower(email) = ${email} limit 1
   `;
   const user = users[0];
-  if (!user?.passwordHash || !(await Bun.password.verify(password, user.passwordHash))) {
+  if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
     throw new HttpError(401, "CREDENTIALS_INVALID", "Email ou mot de passe invalide.");
   }
   const memberships = await withAuthenticatingUser(db, user.id, (tx) =>
@@ -346,6 +348,7 @@ export async function clearGoogleSubjectRevokingOtherSessions(
   currentSessionId: string,
 ): Promise<number> {
   const revoked = await withAuthenticatingUser(db, userId, async (tx) => {
+    await lockUserSessions(tx, userId);
     await tx`
       update users set google_subject = null, google_unlinked_at = now(), updated_at = now()
        where id = ${userId}
@@ -380,6 +383,7 @@ export async function replacePasswordRevokingOtherSessions(
   currentSessionId: string,
 ): Promise<number> {
   const revoked = await withAuthenticatingUser(db, userId, async (tx) => {
+    await lockUserSessions(tx, userId);
     await tx`
       update users set password_hash = ${passwordHash}, must_change_password = false, updated_at = now()
        where id = ${userId}

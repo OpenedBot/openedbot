@@ -147,3 +147,141 @@ func TestTerminalEventUsesNamedOrJSONEnvelope(t *testing.T) {
 		}
 	}
 }
+
+// A body refused as too big before its request frame arrived must not keep
+// its in-flight slot: MaxInFlight of them made every later request LINK_BUSY.
+func TestEarlyBodyTooBigReleasesTheInFlightSlot(t *testing.T) {
+	c := New("", Auth{}, "http://127.0.0.1:1", "secret", nil)
+	for id := uint32(1); id <= MaxInFlight+1; id++ {
+		c.mu.Lock()
+		c.early[id] = &earlyBody{tooBig: true}
+		c.mu.Unlock()
+		var got Text
+		c.serve(context.Background(), Text{T: TReq, ID: id, Method: "POST", Path: "/v1/runs", Body: "stream"}, func(_ websocket.MessageType, data []byte) error {
+			got, _ = DecodeText(data)
+			return nil
+		})
+		if got.Code != "HERMES_PROTOCOL_LIMIT" {
+			t.Fatalf("request %d: %+v", id, got)
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.inflight) != 0 {
+		t.Fatalf("%d slots still held", len(c.inflight))
+	}
+}
+
+// replayGateway serves the run's events: each subscription gets the next
+// script (blocks then EOF), and GET /v1/runs/<id> answers status.
+func replayGateway(t *testing.T, runID, status string, scripts ...[]string) (*httptest.Server, *atomic.Int32) {
+	t.Helper()
+	var subscriptions atomic.Int32
+	gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/runs/" + runID + "/events":
+			n := int(subscriptions.Add(1))
+			w.Header().Set("Content-Type", "text/event-stream")
+			if n <= len(scripts) {
+				for _, block := range scripts[n-1] {
+					fmt.Fprint(w, block+"\n\n")
+				}
+			}
+		case "/v1/runs/" + runID:
+			if status == "" {
+				w.WriteHeader(404)
+				return
+			}
+			fmt.Fprintf(w, `{"id":%q,"status":%q}`, runID, status)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	t.Cleanup(gw.Close)
+	return gw, &subscriptions
+}
+
+func fastResubscribe(t *testing.T) {
+	prevLimit, prevDelay := tailResubscribeLimit, tailResubscribeDelay
+	tailResubscribeLimit, tailResubscribeDelay = 3, time.Millisecond
+	t.Cleanup(func() { tailResubscribeLimit, tailResubscribeDelay = prevLimit, prevDelay })
+}
+
+const (
+	deltaBlock     = `data: {"event": "message.delta", "delta": "hi"}`
+	completedBlock = `data: {"event": "run.completed"}`
+)
+
+// After a connector restart the journal exists but nobody tails the run: a
+// replay must subscribe again, and an upstream that sends the run from its
+// start must not journal the known events twice.
+func TestReplayOfAnOpenJournalResubscribesWithoutDuplicates(t *testing.T) {
+	fastResubscribe(t)
+	journal, err := NewJournal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := journal.Append("run-1", deltaBlock, false); err != nil {
+		t.Fatal(err)
+	}
+	gw, subscriptions := replayGateway(t, "run-1", "running", []string{deltaBlock, completedBlock})
+	c := New("", Auth{}, gw.URL, "secret", journal)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var bodies []string
+	ended := false
+	c.serveReplay(ctx, Text{ID: 1, Path: "/v1/runs/run-1/events"}, func(kind websocket.MessageType, data []byte) error {
+		if kind == websocket.MessageBinary {
+			_, body, _ := DecodeBinary(data)
+			bodies = append(bodies, string(body))
+		} else if frame, _ := DecodeText(data); frame.T == TEnd {
+			ended = true
+		}
+		return nil
+	}, 1)
+	if ctx.Err() != nil || !ended {
+		t.Fatalf("replay never ended: %q", bodies)
+	}
+	if len(bodies) != 1 || !strings.HasPrefix(bodies[0], "id: 2\n") || !strings.Contains(bodies[0], "run.completed") {
+		t.Fatalf("replay after cursor 1 = %q", bodies)
+	}
+	entries, _ := journal.After("run-1", 0)
+	if len(entries) != 2 || subscriptions.Load() != 1 {
+		t.Fatalf("journal %+v after %d subscriptions", entries, subscriptions.Load())
+	}
+}
+
+// An upstream stream that ends without a terminal event is a transport break:
+// the run stays open, is subscribed again, and ends with its real terminal
+// event, or with the gateway's word that it is over.
+func TestTailTransportEndIsNotTheEndOfTheRun(t *testing.T) {
+	fastResubscribe(t)
+	for _, tc := range []struct {
+		name        string
+		status      string
+		scripts     [][]string
+		wantEntries int
+		terminal    bool
+	}{
+		{"resubscribed until the terminal event", "running", [][]string{{deltaBlock}, {completedBlock}}, 2, true},
+		{"finished according to the gateway", "completed", [][]string{{deltaBlock}}, 1, true},
+		{"unknown to the gateway", "", [][]string{{deltaBlock}}, 1, true},
+		{"gives up but stays open", "running", [][]string{{deltaBlock}}, 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			journal, err := NewJournal(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			gw, _ := replayGateway(t, "run-2", tc.status, tc.scripts...)
+			c := New("", Auth{}, gw.URL, "secret", journal)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			c.tailRun(ctx, "run-2", "")
+			entries, _ := journal.After("run-2", 0)
+			if len(entries) != tc.wantEntries || journal.Status("run-2").Terminal != tc.terminal {
+				t.Fatalf("entries %d terminal %v, want %d %v", len(entries), journal.Status("run-2").Terminal, tc.wantEntries, tc.terminal)
+			}
+		})
+	}
+}

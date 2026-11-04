@@ -204,6 +204,62 @@ describe("permission pipeline, named rows", () => {
     expect(commandMatchesBlocklist("echo git push", ["git push"])).toBe(false);
     expect(commandMatchesBlocklist("echo 'open", ["git push"])).toBeNull();
   });
+
+  test("a wrapper's options never hide the command it runs", () => {
+    for (const command of [
+      "sudo -n git push origin main",
+      "sudo -u deploy git push",
+      "sudo --user=deploy -- git push",
+      "command -- git push origin main",
+      "command -p git push",
+      "env -i FOO=1 git push",
+      "env -u HOME -- git push",
+      "nice -n 10 git push",
+      "nice -5 git push",
+      "nohup git push &",
+      "timeout -s KILL 30 git push",
+      "timeout --kill-after=5 30s git push",
+      "xargs -I{} git push",
+      "sudo -n env FOO=1 timeout 5 /usr/bin/git push",
+    ]) {
+      expect([command, commandMatchesBlocklist(command, ["git push"])]).toEqual([command, true]);
+    }
+    expect(commandMatchesBlocklist("sudo -n ls", ["sudo"])).toBe(true);
+    expect(commandMatchesBlocklist("sudo -u git ls", ["git push"])).toBe(false);
+    expect(commandMatchesBlocklist("timeout 5 ls", ["git push"])).toBe(false);
+  });
+
+  test("a wrapper option of unknown arity makes the command unreadable, hence refused", () => {
+    expect(commandMatchesBlocklist("sudo --frobnicate git push", ["git push"])).toBeNull();
+    expect(commandMatchesBlocklist("env -S 'git push' x", ["git push"])).toBeNull();
+    expect(decidePermission(
+      { ...GATES.push!, command: "sudo -n git push origin main" },
+      { ...base, mode: "bypass", commandBlocklist: ["git push"] },
+    )).toMatchObject({ outcome: "deny", stage: "forbidden", reason: "command_blocklisted" });
+    expect(decidePermission(
+      { ...GATES.push!, command: "sudo --frobnicate git push" },
+      { ...base, mode: "bypass", commandBlocklist: ["npm publish"] },
+    )).toMatchObject({ outcome: "deny", stage: "forbidden", reason: "command_unreadable" });
+  });
+
+  test("a redirection onto a sensitive absolute path is held in every mode", () => {
+    for (const command of [
+      "echo x > /workspace/.env",
+      "echo x >> /home/bot/.ssh/authorized_keys",
+      "printf k 2> '/workspace/.git/config'",
+      "echo x &>/workspace/.env",
+      "echo \"$(date)\" > /workspace/.env",
+      "echo x > \"/my dir/.ssh/id\"",
+      "echo x > $(printf /workspace/.env)",
+    ]) {
+      expect([command, decidePermission({ ...GATES.push!, command }, { ...base, mode: "bypass" })])
+        .toMatchObject([command, { outcome: "human", stage: "floor", reason: "circuit_breaker" }]);
+    }
+    for (const command of ["echo x > /workspace/out.txt", "ls 2>&1 >/dev/null", "echo 'a > b'"]) {
+      expect([command, decidePermission({ ...GATES.push!, command }, { ...base, mode: "bypass" })])
+        .toMatchObject([command, { outcome: "once" }]);
+    }
+  });
 });
 
 describe("a run nobody attends (PERM2-9), every combination", () => {

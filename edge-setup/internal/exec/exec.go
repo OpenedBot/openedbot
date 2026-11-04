@@ -10,6 +10,7 @@ import (
 	"fmt"
 	osexec "os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -28,6 +29,11 @@ type Cmd struct {
 
 // DefaultTimeout applies to commands without an explicit one.
 const DefaultTimeout = 5 * time.Minute
+
+// PipeWaitDelay bounds how long Run still waits for stdout and stderr once
+// the command has exited or been killed: a descendant that left the process
+// group can hold them open forever.
+var PipeWaitDelay = 5 * time.Second
 
 // Result is the outcome of a command.
 type Result struct {
@@ -99,6 +105,17 @@ func (Host) Run(ctx context.Context, c Cmd) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := osexec.CommandContext(ctx, c.Path, c.Args...)
+	// The command leads its own process group and a timeout kills the whole
+	// group: killing only the command left its children running, holding the
+	// output pipes, and Run waiting on them well past the timeout.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+			return err
+		}
+		return nil
+	}
+	cmd.WaitDelay = PipeWaitDelay
 	if c.Env != nil {
 		cmd.Env = c.Env
 	}
@@ -112,6 +129,11 @@ func (Host) Run(ctx context.Context, c Cmd) (Result, error) {
 	err := cmd.Run()
 	res := Result{Stdout: out.String(), Stderr: errb.String()}
 	if err == nil {
+		return res, nil
+	}
+	if errors.Is(err, osexec.ErrWaitDelay) && ctx.Err() == nil {
+		// The command succeeded; a process it left behind still held its
+		// output, which was closed after PipeWaitDelay.
 		return res, nil
 	}
 	var exit *osexec.ExitError

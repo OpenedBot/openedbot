@@ -5,7 +5,7 @@ import { Dialog, cn } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { ProviderIcon } from "../provider-icon";
-import { ProviderLimitsPanel, providerLimitsAlerting, useProviderLimits } from "./provider-limits-panel";
+import { ProviderLimitsPanel, providerLimitsAlerting, useProviderLimits, type ProviderLimits } from "./provider-limits-panel";
 import { BUTTON } from "../settings/primitives";
 
 /**
@@ -20,6 +20,34 @@ export async function refreshProviderLimits(queryClient: QueryClient, runtimeId:
   } catch {
     await queryClient.invalidateQueries({ queryKey: queryKeys.runtimeProviderUsage(runtimeId) });
   }
+}
+
+/** Le relevé complet en modale : la carte du pied de barre et le rail l'ouvrent. */
+export function ProviderLimitsDialog({ open, onClose, limits }: { open: boolean; onClose: () => void; limits: ProviderLimits }) {
+  const { t } = useT();
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t("providerLimits.title")}
+      description={t("providerLimits.subtitle")}
+      closeLabel={t("providerLimits.close")}
+      bodyClassName="px-5 pt-2 pb-5"
+      footer={
+        // Rien à confirmer ici : la modale se lit. Le bleu de marque irait à
+        // l'action la moins importante de l'écran.
+        <button
+          type="button"
+          onClick={onClose}
+          className={`${BUTTON.secondary} w-full sm:w-auto`}
+        >
+          {t("providerLimits.close")}
+        </button>
+      }
+    >
+      <ProviderLimitsPanel limits={limits} onNavigate={onClose} />
+    </Dialog>
+  );
 }
 
 /**
@@ -86,27 +114,7 @@ export function ProviderLimitsCard({ compact = false }: { compact?: boolean }) {
         <ChevronRight className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden />
       </button>
 
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        title={t("providerLimits.title")}
-        description={t("providerLimits.subtitle")}
-        closeLabel={t("providerLimits.close")}
-        bodyClassName="px-5 pt-2 pb-5"
-        footer={
-          // Rien à confirmer ici : la modale se lit. Le bleu de marque irait à
-          // l'action la moins importante de l'écran.
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className={`${BUTTON.secondary} w-full sm:w-auto`}
-          >
-            {t("providerLimits.close")}
-          </button>
-        }
-      >
-        <ProviderLimitsPanel limits={limits} onNavigate={() => setOpen(false)} />
-      </Dialog>
+      <ProviderLimitsDialog open={open} onClose={() => setOpen(false)} limits={limits} />
     </>
   );
 }

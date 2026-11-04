@@ -10,6 +10,12 @@ La numérotation repart de v0.0.1 avec le dépôt autonome et la nouvelle origin
 de téléchargement. Les versions v0.2.0 à v1.4.0, publiées depuis l'ancien
 dépôt, restent listées plus bas pour l'historique.
 
+## Non publié
+
+### Ajouté
+
+- Les quotas d'un abonnement xAI (SuperGrok, Premium+) remontent dans openedbot, comme ceux d'Anthropic, d'OpenAI et d'OpenRouter.
+
 ## v1.0.0 - 2026-11-03
 
 Première version stable d'edge-setup, publiée avec l'ouverture d'openedbot à tous. Elle reprend tout ce qu'apportait v0.0.5, sans changement de comportement.

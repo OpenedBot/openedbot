@@ -3,10 +3,35 @@ import { mkdir } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 import { createHmac } from "node:crypto";
 import type { ApiConfig } from "./config";
+import type { BlobOtherBackend } from "@openedbot/platform-config/blob-driver";
 
+export type BlobDriver = "file" | "r2";
+
+/**
+ * `driver` est celui qui écrit. Lire, supprimer et servir un objet passent
+ * par le driver que SA ligne a persisté (`attachments.driver`) : après une
+ * bascule disque ↔ R2, un objet ancien reste lisible là où il a été écrit, et
+ * une suppression ne se confirme jamais sur le mauvais magasin.
+ */
 export type BlobStore = {
-  readonly driver: "file" | "r2";
+  readonly driver: BlobDriver;
   readonly metrics: BlobMetrics;
+  put(key: string, data: Uint8Array, contentType: string): Promise<void>;
+  get(key: string, driver: BlobDriver): Promise<Blob>;
+  delete(key: string, driver: BlobDriver): Promise<void>;
+  deliveryUrl(key: string, driver: BlobDriver, expiresInSeconds?: number): string | null;
+};
+
+/** L'objet vit sur un magasin que ce déploiement ne sait plus joindre. */
+export class BlobDriverUnavailableError extends Error {
+  constructor(readonly driver: BlobDriver) {
+    super(`Blob driver ${driver} is not configured on this deployment.`);
+    this.name = "BlobDriverUnavailableError";
+  }
+}
+
+type DriverStore = {
+  readonly driver: BlobDriver;
   put(key: string, data: Uint8Array, contentType: string): Promise<void>;
   get(key: string): Promise<Blob>;
   delete(key: string): Promise<void>;
@@ -53,8 +78,52 @@ export class BlobMetrics {
   }
 }
 
-export function createBlobStore(config: ApiConfig["blob"]): BlobStore {
-  return config.driver === "file" ? new FileBlobStore(config.root) : new R2BlobStore(config);
+export function createBlobStore(config: ApiConfig["blob"], other: BlobOtherBackend): BlobStore {
+  const metrics = new BlobMetrics();
+  const primary: DriverStore = config.driver === "file"
+    ? new FileBlobStore(config.root, metrics)
+    : new R2BlobStore(config, config, metrics);
+  const secondary: DriverStore | null = !other
+    ? null
+    : other.driver === "file"
+      ? new FileBlobStore(other.root, metrics)
+      // Sans CDN pour l'ancien magasin R2 : l'API sert l'objet elle-même.
+      : new R2BlobStore(other, null, metrics);
+  return new RoutedBlobStore(primary, secondary, metrics);
+}
+
+class RoutedBlobStore implements BlobStore {
+  readonly driver: BlobDriver;
+
+  constructor(
+    private readonly primary: DriverStore,
+    private readonly secondary: DriverStore | null,
+    readonly metrics: BlobMetrics,
+  ) {
+    this.driver = primary.driver;
+  }
+
+  put(key: string, data: Uint8Array, contentType: string): Promise<void> {
+    return this.primary.put(key, data, contentType);
+  }
+
+  async get(key: string, driver: BlobDriver): Promise<Blob> {
+    return this.store(driver).get(key);
+  }
+
+  async delete(key: string, driver: BlobDriver): Promise<void> {
+    return this.store(driver).delete(key);
+  }
+
+  deliveryUrl(key: string, driver: BlobDriver, expiresInSeconds?: number): string | null {
+    return this.store(driver).deliveryUrl(key, expiresInSeconds);
+  }
+
+  private store(driver: BlobDriver): DriverStore {
+    if (this.primary.driver === driver) return this.primary;
+    if (this.secondary?.driver === driver) return this.secondary;
+    throw new BlobDriverUnavailableError(driver);
+  }
 }
 
 export function objectKey(organizationId: string, objectId: string): string {
@@ -67,12 +136,11 @@ export function isValidObjectKey(key: string): boolean {
   return shape && !key.includes("..") && !key.includes("\\");
 }
 
-class FileBlobStore implements BlobStore {
+class FileBlobStore implements DriverStore {
   readonly driver = "file" as const;
-  readonly metrics = new BlobMetrics();
   private readonly root: string;
 
-  constructor(root: string) {
+  constructor(root: string, private readonly metrics: BlobMetrics) {
     this.root = resolve(root);
   }
 
@@ -120,12 +188,17 @@ class FileBlobStore implements BlobStore {
   }
 }
 
-class R2BlobStore implements BlobStore {
+type R2Access = { bucket: string; endpoint: string; accessKeyId: string; secretAccessKey: string };
+
+class R2BlobStore implements DriverStore {
   readonly driver = "r2" as const;
-  readonly metrics = new BlobMetrics();
   private readonly client: Bun.S3Client;
 
-  constructor(private readonly config: Extract<ApiConfig["blob"], { driver: "r2" }>) {
+  constructor(
+    config: R2Access,
+    private readonly cdn: { cdnUrl: string; cdnSigningKey: string } | null,
+    private readonly metrics: BlobMetrics,
+  ) {
     this.client = new Bun.S3Client({
       bucket: config.bucket,
       endpoint: config.endpoint,
@@ -162,14 +235,15 @@ class R2BlobStore implements BlobStore {
     }
   }
 
-  deliveryUrl(key: string, expiresInSeconds = 300): string {
+  deliveryUrl(key: string, expiresInSeconds = 300): string | null {
     this.assertKey(key);
+    if (!this.cdn) return null;
     const ttl = Math.max(1, Math.min(300, Math.floor(expiresInSeconds)));
     const expires = Math.floor(Date.now() / 1_000) + ttl;
-    const signature = createHmac("sha256", this.config.cdnSigningKey)
+    const signature = createHmac("sha256", this.cdn.cdnSigningKey)
       .update(`${key}\n${expires}`)
       .digest("base64url");
-    const url = new URL(`${this.config.cdnUrl}/files/${key}`);
+    const url = new URL(`${this.cdn.cdnUrl}/files/${key}`);
     url.searchParams.set("expires", String(expires));
     url.searchParams.set("signature", signature);
     return url.toString();

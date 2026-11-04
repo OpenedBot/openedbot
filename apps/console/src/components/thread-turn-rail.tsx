@@ -10,6 +10,10 @@ const targetSelector = (targetId: string) =>
  * le DOM : un trait est « visible » quand la section de son tour (de sa bulle
  * à la bulle suivante) croise la zone défilante. Un tour hors de la fenêtre
  * montée n'a pas de nœud : il est plus ancien que tout ce qui est affiché.
+ *
+ * Il se superpose au bord gauche du fil sans lui réserver de gouttière
+ * (`thread-timeline.css`) : 2.5rem, la marge du fil (1rem) plus le débord du
+ * composer (24 px) au plus serré, pour que ses traits ne couvrent pas le texte.
  */
 export function ThreadTurnRail({ turns }: { turns: readonly ThreadRailTurn[] }) {
   const { t } = useT();
@@ -70,7 +74,7 @@ export function ThreadTurnRail({ turns }: { turns: readonly ThreadRailTurn[] }) 
   return (
     <div
       ref={root}
-      className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-14 items-center"
+      className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-10 items-center"
       onPointerLeave={() => setHover(null)}
     >
       <nav

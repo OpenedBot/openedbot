@@ -4,13 +4,12 @@ import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, toast, useIsMobile } from "@openedbot/browser-ui-kit";
+import { toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
 import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
-import { randomId } from "../../lib/random-id";
 import {
   threadContainsOutgoingUserInput,
 } from "../../lib/thread/thread-anchor";
@@ -26,21 +25,14 @@ import { GroupContextTab } from "../../components/group-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
-import { VoiceDictation } from "../../components/voice-dictation";
-import { GroupVoiceCall, type GroupVoiceResponse } from "../../components/group-voice-call";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
-import {
-  prepareMessageSubmission,
-  type IdempotentMessageSubmission,
-} from "@openedbot/conversation/domain/message-submission";
 import { useT } from "../../lib/i18n";
 import { readableRunFailure } from "../../lib/run/model-unavailable";
 import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
 import { currentThreadRun } from "../../lib/thread/current-thread-run";
 import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
 import { useThreadFind } from "../../lib/thread/use-thread-find";
-import { mergeVoiceTranscript } from "../../lib/voice/web-voice-recognition";
 import { PendingApprovalDock } from "../../components/gate-card";
 import { liveApprovals } from "../../lib/run/live-approvals";
 import { RunActivityDock } from "../../components/run-activity-dock";
@@ -59,9 +51,6 @@ export function GroupConversationScreen() {
   const isMobile = useIsMobile();
   const { groupId } = useParams({ from: "/_app/g/$groupId" });
   const queryClient = useQueryClient();
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [voiceMode, setVoiceMode] = useState<"dictation" | "call">("dictation");
-  const [callSessionActive, setCallSessionActive] = useState(false);
   const draftScope = `group:${groupId}`;
   const [draft, setDraft] = useWorkspaceTextDraft(draftScope);
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -72,7 +61,6 @@ export function GroupConversationScreen() {
   };
   /** Les pièces jointes du brouillon (US-CHAT-08) : tenues par l'écran, comme le texte. */
   const [attachments, setAttachments] = useWorkspaceAttachmentDraft(draftScope);
-  const pendingCallSubmission = useRef<IdempotentMessageSubmission | null>(null);
 
   const roster = useQuery({ queryKey: queryKeys.roster, queryFn: api.roster });
   const me = useQuery({ queryKey: queryKeys.authMe, queryFn: api.authMe });
@@ -142,39 +130,10 @@ export function GroupConversationScreen() {
   const retryOutgoing = useCallback(() => sendRetryRef.current(), []);
 
   useEffect(() => {
-    pendingCallSubmission.current = null;
-    setCallSessionActive(false);
     clearReply();
     // L'échec appartient au salon qui l'a produit, pas au suivant.
     send.reset();
   }, [group?.threadId]);
-
-  // Un tour vocal n'altère jamais le brouillon, les pièces jointes ou la
-  // réponse citée. Sa clé reste idempotente si le transport est rejoué.
-  const callSend = useMutation({
-    mutationFn: (input: string) => {
-      const submission = prepareMessageSubmission(
-        pendingCallSubmission.current,
-        { input, attachments: [] },
-        randomId,
-      );
-      pendingCallSubmission.current = submission;
-      return api.sendMessage(group!.threadId, submission.input, [], submission.idempotencyKey);
-    },
-    onSuccess: (accepted) => {
-      pendingCallSubmission.current = null;
-      applySendAcceptedToCaches(queryClient, group!.threadId, accepted);
-    },
-  });
-
-  const callApproval = useMutation({
-    mutationFn: ({ approvalId, choice }: { approvalId: string; choice: "once" | "deny" }) =>
-      api.respondApproval(approvalId, { choice }),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.thread(group!.threadId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.roster });
-    },
-  });
 
   const reaction = useMutation({
     mutationFn: ({ messageId, emoji, active }: {
@@ -248,19 +207,10 @@ export function GroupConversationScreen() {
     [thread.data?.approvals, thread.data?.runs],
   );
   const pendingGate = timelineApprovals.length > 0;
-  const callApprovalRequest = timelineApprovals.find((approval) => approval.status === "pending") ?? null;
-  const approvalRequester = callApprovalRequest
-    ? group?.members.find((member) => member.id === callApprovalRequest.botId)?.name
+  const pendingApprovalRequest = timelineApprovals.find((approval) => approval.status === "pending") ?? null;
+  const approvalRequester = pendingApprovalRequest
+    ? group?.members.find((member) => member.id === pendingApprovalRequest.botId)?.name
     : undefined;
-  const callResponses = useMemo<GroupVoiceResponse[]>(() => {
-    const runBotIds = new Map((thread.data?.runs ?? []).map((run) => [run.id, run.botId ?? null] as const));
-    return (thread.data?.messages ?? []).flatMap((message) => message.role === "assistant" ? [{
-      id: message.id,
-      runId: message.runId,
-      authorBotId: message.authorBot?.id ?? (message.runId ? runBotIds.get(message.runId) ?? null : null),
-      text: message.content.map((part) => part.type === "text" ? part.text : "").join(""),
-    }] : []);
-  }, [thread.data?.messages, thread.data?.runs]);
   const threadLoading = loading || thread.data?.id !== group?.threadId;
   const threadFailed = thread.isError && thread.data?.id !== group?.threadId;
   const threadFailureMessage = thread.error instanceof ApiError &&
@@ -404,76 +354,6 @@ export function GroupConversationScreen() {
   return (
     <AttachmentCanvasProvider>
       {isMobile ? header : null}
-      <Dialog
-        open={voiceOpen}
-        onClose={() => {
-          setVoiceOpen(false);
-          setCallSessionActive(false);
-        }}
-        title={t("voicePanel.title")}
-        description={t("voicePanel.description")}
-        closeLabel={t("common.close")}
-        className="max-w-xl"
-      >
-        <div role="group" aria-label={t("voicePanel.callModeLabel")} className="mb-3 flex gap-1 rounded-lg bg-muted p-1">
-          <button
-            type="button"
-            aria-pressed={voiceMode === "dictation"}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${voiceMode === "dictation" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            onClick={() => setVoiceMode("dictation")}
-          >
-            {t("voicePanel.callModeDictation")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={voiceMode === "call"}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${voiceMode === "call" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            onClick={() => setVoiceMode("call")}
-          >
-            {t("voicePanel.callModeCall")}
-          </button>
-        </div>
-        {voiceMode === "dictation" ? (
-          <VoiceDictation
-            callAvailable
-            onInsert={(transcript) => {
-              setDraft((current) => mergeVoiceTranscript(current, transcript));
-              setVoiceOpen(false);
-              requestAnimationFrame(() => {
-                document.querySelector<HTMLTextAreaElement>("textarea[data-composer]")?.focus();
-              });
-            }}
-            onSend={async (transcript) => {
-              const input = mergeVoiceTranscript(draft, transcript);
-              await send.mutateAsync({ input, attachments, replyToId });
-              setVoiceOpen(false);
-            }}
-            sendDisabled={threadLoading || pendingGate || send.isPending}
-          />
-        ) : (
-          <GroupVoiceCall
-            responses={callResponses}
-            runs={thread.data?.runs ?? []}
-            workflows={thread.data?.workflows ?? []}
-            roomRunning={Boolean(group.running)}
-            approval={callApprovalRequest ? {
-              id: callApprovalRequest.id,
-              runId: callApprovalRequest.runId,
-              action: callApprovalRequest.action,
-              choices: callApprovalRequest.choices.filter(
-                (choice): choice is "once" | "deny" => choice === "once" || choice === "deny",
-              ),
-            } : null}
-            voiceByBotId={speechVoiceByBotId}
-            disabled={threadLoading || (running && !callApprovalRequest) || callSend.isPending || callApproval.isPending}
-            onSend={(transcript) => callSend.mutateAsync(transcript)}
-            onApproval={async (approvalId, choice) => {
-              await callApproval.mutateAsync({ approvalId, choice });
-            }}
-            onActiveChange={setCallSessionActive}
-          />
-        )}
-      </Dialog>
 
       {/* US-CHAT-08 : le fil et le canevas de lecture partagent la rangée : un
           fichier s'ouvre À CÔTÉ de la conversation qui en parle, jamais
@@ -541,7 +421,6 @@ export function GroupConversationScreen() {
               onReaction={onReaction}
               speechScope={group.id}
               speechVoiceByBotId={speechVoiceByBotId}
-              speechDisabled={callSessionActive}
               resnap={askUser !== null}
               scrollToBottomOnThreadKey={group.threadId ?? null}
             /></DevRenderProfiler>
@@ -604,7 +483,6 @@ export function GroupConversationScreen() {
               if (send.isError) send.reset();
               setAttachments(next);
             }}
-            onVoice={() => setVoiceOpen(true)}
             replyPreview={replyPreview}
             onCancelReply={clearReply}
           /></DevRenderProfiler>

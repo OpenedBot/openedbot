@@ -56,7 +56,7 @@ mode vérifiés à la relecture).
 | `/var/lib/hermes-operator/`, `/run/hermes-operator/operator.sock` | root 0700 / 0750 | état et socket de l'opérateur |
 | `/srv/hermes/data/` (`runtime.env`, `config.yaml`, profils, workspaces) | hermes, secrets 0600 | données runtime, bearer gateway, clés fournisseurs |
 | `/usr/local/lib/hermes-agent`, `hermes-uv`, `hermes-node`, `hermes-bootstrap`, `/usr/local/share/hermes-python`, `/var/cache/hermes/uv` | root | arbres d'exécution (le service ne peut pas réécrire son interpréteur) |
-| `/var/tmp/hermes-install.sh`, `/var/tmp/uv-*.tar.gz`, `/var/tmp/node-*.tar.xz` | root 0644 | téléchargements vérifiés par SHA-256 |
+| `/var/cache/hermes/downloads/` (`hermes-install.sh`, `uv-*.tar.gz`, `node-*.tar.xz`) | root 0700 (fichiers 0600, installeur 0700) | téléchargements vérifiés par SHA-256 ; un fichier existant n'est réutilisé que s'il a le propriétaire et le mode attendus |
 | `/etc/systemd/system/hermes-*.service`, `.timer`, `user@.service.d/delegate.conf` | root 0644 | unités |
 | P7 : `/etc/ssh/sshd_config.d/00-hermes-hardening.conf`, `/etc/sudoers.d/80-hermes-admin`, `81-hermes-logging`, `/etc/fail2ban/jail.d/sshd.local`, `/etc/security/pwquality.conf.d/…`, `/etc/systemd/resolved.conf.d/…`, `/etc/apt/apt.conf.d/{20auto-upgrades,52-hermes-unattended}`, `/etc/logrotate.d/hermes-sudo`, `/var/backups/hermes-access/`, `/var/lib/hermes-host-hardening/` | root | politiques d'hôte, uniquement si l'option est choisie |
 | `--sandbox` : `/etc/apt/sources.list.d/docker.sources`, clé APT Docker, `/etc/modules-load.d/hermes-docker.conf`, `~hermes/.config/systemd/user/docker.service` | root / hermes | Docker rootless |

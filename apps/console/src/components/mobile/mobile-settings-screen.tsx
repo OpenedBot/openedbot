@@ -1,12 +1,12 @@
 import type { ComponentType, ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { IconLogout, IconRestore } from "@tabler/icons-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { api, queryKeys, runtimeQueryOptions } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { runtimeHealthLabel } from "../../lib/runtime/runtime-health";
-import { signOut } from "../../lib/session/sign-out";
+import { useSignOut } from "../../lib/session/sign-out";
 import { SHOW_DEV_SETTINGS } from "../../lib/shell/dev-settings-ui";
 import { SETTINGS_GROUPS, useVisibleSettingsGroups } from "../dashboard/settings-sidebar";
 import {
@@ -70,10 +70,9 @@ export function MobileSettingsGroups({
   onSelect?: (url: string) => void;
 }) {
   const { t } = useT();
-  const queryClient = useQueryClient();
   const me = useQuery({ queryKey: queryKeys.authMe, queryFn: api.authMe });
   const impersonating = me.data?.kind === "session" && me.data.session.impersonation !== null;
-  const leaving = useMutation({ mutationFn: () => signOut(queryClient) });
+  const leaving = useSignOut();
   const restart = useDevOnboardingRestart();
   const restartAvailable = useDevOnboardingAvailable();
   const groups = useVisibleSettingsGroups(SETTINGS_GROUPS);

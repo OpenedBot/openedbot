@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/OpenedBot/openedbot/edge-setup/internal/exec"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/gateway"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/pins"
 )
@@ -85,7 +84,7 @@ func (s *Server) setProfileToolset(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	cmd := s.hermesCommand("-p", profile, "tools", verb, name, "--platform", toolsetPlatform)
 	cmd.Timeout = ToolsetTimeout
-	if _, err := exec.Must(ctx, s.Runner, cmd); err != nil {
+	if err := s.runConfigWriter(ctx, profile, cmd); err != nil {
 		s.logf("profile toolset %s %s refused by the CLI", profile, name)
 		writeError(w, http.StatusBadGateway, "CLI_REFUSED", "the runtime refused the profile toolset change")
 		return

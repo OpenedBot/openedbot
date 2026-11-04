@@ -6,6 +6,8 @@
 // own (OPENEDBOT_CONSOLE_URL): a non-production API usually serves the API only, so
 // its console is the Vite server the developer runs locally.
 
+import { createHash } from "node:crypto";
+
 /**
  * The production console: the built-in default. Its own host since the
  * landing left the console (2026-10-29); the apex now serves the public site.
@@ -87,10 +89,30 @@ export function targetLabel(apiOrigin: string): string | null {
  * The tokens file for one API. Production keeps the historical `tokens.bin`;
  * any other API gets its own file, so switching target never sends a refresh
  * token to the wrong server and never wipes the other session on its 401.
+ * The name derives from the whole origin, protocol included: `http://` and
+ * `https://` on one host are two issuers, and a refresh token must never
+ * travel in clear to the one that did not issue it. The readable part is for
+ * whoever lists the folder; the hash is what keeps two origins apart.
  */
 export function tokensFileName(apiOrigin: string): string {
   if (apiOrigin === PRODUCTION_API_ORIGIN) return "tokens.bin";
-  return `tokens-${new URL(apiOrigin).host.toLowerCase().replace(/[^a-z0-9.-]/g, "_")}.bin`;
+  const url = new URL(apiOrigin);
+  const digest = createHash("sha256").update(url.origin).digest("hex").slice(0, 16);
+  return `tokens-${url.protocol.replace(":", "")}-${readableHost(url)}-${digest}.bin`;
+}
+
+/**
+ * The file name used before the protocol was part of it, shared by http and
+ * https on one host: nobody can tell which issuer wrote it, so it is only ever
+ * deleted, never read (token-store.ts). null for production, never affected.
+ */
+export function legacyTokensFileName(apiOrigin: string): string | null {
+  if (apiOrigin === PRODUCTION_API_ORIGIN) return null;
+  return `tokens-${readableHost(new URL(apiOrigin))}.bin`;
+}
+
+function readableHost(url: URL): string {
+  return url.host.toLowerCase().replace(/[^a-z0-9.-]/g, "_");
 }
 
 /**

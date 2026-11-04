@@ -242,7 +242,8 @@ export function createPopupHost(deps: PopupHostDeps): PopupHost {
         return;
       }
       case "signOut":
-        auth.signOut();
+        // A failed revocation is logged by the auth service; the popup has no place to show it.
+        void auth.signOut();
         return;
       case "fatal":
         log.error(`popup refused to run: ${message.code}`);

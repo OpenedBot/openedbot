@@ -3,7 +3,6 @@ import { isoInstant } from "@openedbot/contracts-primitives";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { pauseMemberRoutines } from "@openedbot/execution/sql/routines";
-import { dropMemberPushSubscriptions } from "@openedbot/notifications/sql/push-subscriptions";
 import { assertMutableMemberRole } from "../domain/member-policy";
 import {
   listActiveMembers,
@@ -57,9 +56,10 @@ export async function removeMember(db: Db, input: {
     if (!current) throw new HttpError(404, "MEMBER_NOT_FOUND", "Ce membre est introuvable.");
     assertMutableMemberRole(current);
     await revokeMembership(tx, input.organizationId, input.userId);
-    await dropMemberPushSubscriptions(tx, input.organizationId, input.userId);
-    // APNs devices of the member go with the revocation itself: trigger
-    // `memberships_drop_apns_devices` (0108).
+    // Web Push subscriptions and APNs devices of the member go with the
+    // revocation itself: triggers `memberships_drop_push_subscriptions` (0170)
+    // and `memberships_drop_apns_devices` (0108). An application DELETE here
+    // would see none of them under the owner-only RLS policies.
     await pauseMemberRoutines(tx, input.organizationId, input.userId);
     await recordMemberRevoked(tx, {
       organizationId: input.organizationId,

@@ -63,6 +63,30 @@ const EXIT_MS = 150
  * celle du dessus répond donc au clavier.
  */
 const stack: symbol[] = []
+
+/**
+ * Verrou de défilement partagé par toutes les boîtes ouvertes. Chacune prend
+ * une part ; la valeur d'origine n'est rendue qu'à la dernière libération,
+ * quel que soit l'ordre de fermeture. Une sauvegarde locale par boîte
+ * supposait une fermeture strictement inverse de l'ouverture.
+ */
+let scrollLockOwners = 0
+let scrollLockRestore = ""
+
+export function lockBodyScroll(body: { style: { overflow: string } } = document.body): () => void {
+  if (scrollLockOwners === 0) {
+    scrollLockRestore = body.style.overflow
+    body.style.overflow = "hidden"
+  }
+  scrollLockOwners += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    scrollLockOwners -= 1
+    if (scrollLockOwners === 0) body.style.overflow = scrollLockRestore
+  }
+}
 const FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
@@ -164,17 +188,13 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
     }
     stack.push(idRef.current)
     document.addEventListener("keydown", onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = "hidden"
+    const releaseScroll = lockBodyScroll()
     return () => {
       const at = stack.lastIndexOf(idRef.current)
       if (at !== -1) stack.splice(at, 1)
       if (focusFrame !== null) cancelAnimationFrame(focusFrame)
       document.removeEventListener("keydown", onKey)
-      // Une boîte encore ouverte en dessous garde le verrou : `prev` porte
-      // alors "hidden", posé par elle. Rendre le défilement ici ferait
-      // défiler la page derrière la boîte restante.
-      document.body.style.overflow = prev
+      releaseScroll()
       const previousFocus = previousFocusRef.current
       previousFocusRef.current = null
       if (previousFocus?.isConnected) previousFocus.focus()

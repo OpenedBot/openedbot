@@ -9,9 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { IconArrowLeft, IconMessageCircle, IconMessages, IconPlus, IconRefresh, IconX } from "@tabler/icons-react";
-import { RiAddLine } from "@remixicon/react";
 import { createPortal } from "react-dom";
-import { ageSince } from "@openedbot/browser-i18n";
 import { isEmailSyntaxValid, normalizeEmail } from "@openedbot/identity/domain/email-address";
 import type { SupportSnapshotDto, SupportThreadSummaryDto } from "@openedbot/contracts-api";
 import { SUPPORT_MESSAGE_MAX_CHARS } from "@openedbot/contracts-api";
@@ -20,8 +18,10 @@ import {
   SUPPORT_ATTACHMENT_ACCEPT,
   type MessageAttachmentInput,
 } from "@openedbot/conversation/domain/attachments";
+import { prepareMessageSubmission, type IdempotentMessageSubmission } from "@openedbot/conversation/domain/message-submission";
 import { prepareAttachments, type AttachmentError } from "../../lib/composer/attachments";
 import { SupportImage } from "./support-image";
+import { SupportHistoryCanvas, SupportHistoryList } from "./support-history";
 import { SupportMarkdown } from "./support-markdown";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
@@ -209,6 +209,21 @@ export function SupportPanel({
   const [attachments, setAttachments] = useState<MessageAttachmentInput[]>([]);
   const [attachmentErrors, setAttachmentErrors] = useState<AttachmentError[]>([]);
   const [preparing, setPreparing] = useState(false);
+  /**
+   * Un envoi échoué alors que le composer avait déjà reçu autre chose : il ne
+   * l'écrase pas, il attend ici son « Réessayer ». `conversationId` nul : le
+   * premier message, celui qui ouvre le fil.
+   */
+  const [failedSend, setFailedSend] = useState<{ conversationId: string | null; submission: IdempotentMessageSubmission } | null>(null);
+  /** Le dernier envoi non confirmé : la même clé d'idempotence tant que son contenu ne change pas. */
+  const unconfirmedRef = useRef<{ conversationId: string; submission: IdempotentMessageSubmission } | null>(null);
+  // Lus par les réponses asynchrones : le composer a-t-il changé depuis l'envoi ?
+  const composerRef = useRef({ draft, attachments });
+  composerRef.current = { draft, attachments };
+  /** Démonté : aucune réponse tardive ne touche plus l'état ni n'ouvre de flux. */
+  const mountedRef = useRef(true);
+  /** Chaque lecture de fil prend un numéro : seule la dernière demandée s'affiche. */
+  const openGeneration = useRef(0);
 
   const tokenRef = useRef<string | null>(null);
   /**
@@ -298,10 +313,23 @@ export function SupportPanel({
     return session && session.conversationId === conversationId ? session.token : null;
   }, []);
 
-  /** Lit un fil et s'y abonne. Le flux part APRÈS l'instantané, à son curseur. */
+  /**
+   * Lit un fil et s'y abonne. Le flux part APRÈS l'instantané, à son curseur.
+   *
+   * Ouvrir A puis B : si A répond après B, sa réponse est écartée, son échec
+   * aussi. Sinon A réapparaîtrait à l'écran et dans l'URL par-dessus B.
+   */
   const openThread = useCallback(async (conversationId: string) => {
+    const generation = ++openGeneration.current;
     const token = tokenFor(conversationId);
-    const current = await api.support.snapshot(conversationId, token);
+    let current: SupportSnapshotDto;
+    try {
+      current = await api.support.snapshot(conversationId, token);
+    } catch (cause) {
+      if (!mountedRef.current || generation !== openGeneration.current) return;
+      throw cause;
+    }
+    if (!mountedRef.current || generation !== openGeneration.current) return;
     tokenRef.current = token;
     setSnapshot(current);
     setView("thread");
@@ -367,10 +395,14 @@ export function SupportPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshotConversation]);
 
-  useEffect(() => () => {
-    streamRef.current?.close();
-    streamRef.current = null;
-    if (typingTimer.current) clearTimeout(typingTimer.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      streamRef.current?.close();
+      streamRef.current = null;
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    };
   }, []);
 
   // Échap referme la carte, comme tout panneau de l'app ; une page ne se
@@ -445,9 +477,11 @@ export function SupportPanel({
     }
     setOpening(true);
     try {
+      const generation = ++openGeneration.current;
       const opened = await api.support.open({ email: address, locale });
-      tokenRef.current = opened.token;
       writeSupportSession({ conversationId: opened.conversationId, token: opened.token });
+      if (!mountedRef.current || generation !== openGeneration.current) return;
+      tokenRef.current = opened.token;
       setSnapshot(opened.snapshot);
       setView("thread");
       attachStream(opened.snapshot, opened.token);
@@ -474,13 +508,18 @@ export function SupportPanel({
    * mensonge de plus à défaire. Le composer dit « Envoi… » le temps de
    * l'aller-retour.
    */
-  const openWithFirstMessage = (body: string, files: readonly MessageAttachmentInput[]) => {
+  const openWithFirstMessage = (submission: IdempotentMessageSubmission, fromComposer: boolean) => {
     if (readOnly) return;
+    const { input: body, attachments: files } = submission;
     setError(null);
+    setFailedSend(null);
     setSending(true);
-    setDraft("");
-    setAttachments([]);
+    if (fromComposer) {
+      setDraft("");
+      setAttachments([]);
+    }
     const fresh = freshRef.current;
+    const generation = ++openGeneration.current;
     api.support
       .open({ locale, body, attachments: files, ...(fresh ? { fresh: true } : {}) })
       .then((opened) => {
@@ -489,16 +528,17 @@ export function SupportPanel({
         // serveur a rejoint un fil existant du compte, et il n'y a aucun
         // secret porteur à retenir.
         const token = opened.token === "" ? null : opened.token;
-        tokenRef.current = token;
         if (token) writeSupportSession({ conversationId: opened.conversationId, token });
+        if (!mountedRef.current || generation !== openGeneration.current) return;
+        tokenRef.current = token;
         setSnapshot(opened.snapshot);
         setView("thread");
         attachStream(opened.snapshot, token);
         refreshHistory();
       })
       .catch((cause) => {
-        setDraft(body);
-        setAttachments([...files]);
+        if (!mountedRef.current) return;
+        keepFailedSend(null, submission);
         // `SUPPORT_EMAIL_REQUIRED` : le serveur ne voit aucune session, donc le
         // miroir local était périmé. Cette fenêtre n'est PAS identifiée, et la
         // porte e-mail reprend la main avec le message du serveur.
@@ -508,49 +548,89 @@ export function SupportPanel({
           setSnapshot(null);
         }
       })
-      .finally(() => setSending(false));
+      .finally(() => {
+        if (mountedRef.current) setSending(false);
+      });
   };
 
-  const submitMessage = () => {
-    const token = tokenRef.current;
-    const body = draft.trim();
-    if (readOnly || sending || preparing || body.length === 0) return;
-    const files = attachments;
-    if (snapshot === null) {
-      if (!identified) return;
-      openWithFirstMessage(body, files);
-      return;
+  /**
+   * Un envoi échoué revient dans le composer s'il est resté vide : renvoyé
+   * tel quel, il garde sa clé d'idempotence (`prepareMessageSubmission`).
+   * Sinon le nouveau brouillon reste, et l'envoi échoué attend son
+   * « Réessayer ». Le perdre en silence serait le pire des deux.
+   */
+  const keepFailedSend = (conversationId: string | null, submission: IdempotentMessageSubmission) => {
+    const composer = composerRef.current;
+    if (composer.draft.trim() === "" && composer.attachments.length === 0) {
+      setDraft(submission.input);
+      setAttachments([...submission.attachments]);
+    } else {
+      setFailedSend({ conversationId, submission });
     }
+  };
+
+  const deliver = (conversationId: string, submission: IdempotentMessageSubmission, fromComposer: boolean) => {
+    const token = tokenRef.current;
     setError(null);
+    setFailedSend(null);
     setSending(true);
-    setDraft("");
-    setAttachments([]);
+    if (fromComposer) {
+      setDraft("");
+      setAttachments([]);
+    }
+    unconfirmedRef.current = { conversationId, submission };
     // La bulle apparaît tout de suite, au-dessus du composer : c'est le geste
     // natif. Elle disparaît quand le serveur rend le vrai message.
-    const optimistic = pendingMessage(randomId(), body);
+    const optimistic = pendingMessage(randomId(), submission.input);
     setSnapshot((current) => (current === null ? current : {
       ...current,
       messages: [...current.messages, optimistic],
     }));
     api.support
-      .send(snapshot.conversationId, token, body, randomId(), files)
-      .then((next) => setSnapshot((current) => mergeSupportSnapshot(current, next)))
+      .send(conversationId, token, submission.input, submission.idempotencyKey, submission.attachments)
+      .then((next) => {
+        if (unconfirmedRef.current?.submission === submission) unconfirmedRef.current = null;
+        if (!mountedRef.current) return;
+        setSnapshot((current) => (current?.conversationId === conversationId ? mergeSupportSnapshot(current, next) : current));
+      })
       .catch((cause) => {
-        // L'envoi a échoué : le texte revient dans le composer et la bulle
-        // repart. Le perdre en silence serait le pire des deux.
+        if (!mountedRef.current) return;
         setSnapshot((current) => (current === null ? current : {
           ...current,
           messages: current.messages.filter((message) => message.id !== optimistic.id),
         }));
-        setDraft(body);
-        setAttachments([...files]);
+        keepFailedSend(conversationId, submission);
         setError(cause instanceof ApiError ? cause.message : t("support.errorSend"));
       })
-      .finally(() => setSending(false));
+      .finally(() => {
+        if (mountedRef.current) setSending(false);
+      });
+  };
+
+  const submitMessage = () => {
+    const body = draft.trim();
+    if (readOnly || sending || preparing || body.length === 0) return;
+    const conversationId = snapshot?.conversationId ?? null;
+    const previous = unconfirmedRef.current?.conversationId === conversationId ? unconfirmedRef.current.submission : null;
+    const submission = prepareMessageSubmission(previous, { input: body, attachments }, randomId);
+    if (conversationId === null) {
+      if (!identified) return;
+      openWithFirstMessage(submission, true);
+      return;
+    }
+    deliver(conversationId, submission, true);
     requestAnimationFrame(() => {
       resize();
       if (isMobile) releaseComposerKeyboard();
     });
+  };
+
+  /** « Réessayer » : l'envoi échoué repart tel quel, avec sa clé, sans toucher au composer. */
+  const retryFailedSend = () => {
+    if (!failedSend || readOnly || sending) return;
+    const { conversationId, submission } = failedSend;
+    if (conversationId === null) openWithFirstMessage(submission, false);
+    else if (conversationId === snapshot?.conversationId) deliver(conversationId, submission, false);
   };
 
   const notifyTyping = () => {
@@ -579,6 +659,8 @@ export function SupportPanel({
   const restart = () => {
     if (readOnly) return;
     setRestarting(true);
+    // Une lecture de fil encore en vol ne doit pas rouvrir l'ancien par-dessus.
+    openGeneration.current += 1;
     streamRef.current?.close();
     streamRef.current = null;
     clearSupportSession();
@@ -591,6 +673,7 @@ export function SupportPanel({
     setDraft("");
     setAttachments([]);
     setAttachmentErrors([]);
+    setFailedSend(null);
     setError(null);
     setRestarting(false);
   };
@@ -898,6 +981,14 @@ export function SupportPanel({
                   <p className="px-1 pb-2 text-xs leading-5 text-muted-foreground">{t("support.subtitleClosed")}</p>
                 ) : null}
                 {error ? <p className="px-1 pb-2 text-xs leading-5 text-destructive-text">{error}</p> : null}
+                {failedSend && (failedSend.conversationId ?? null) === (snapshot?.conversationId ?? null) ? (
+                  <div className="flex items-center gap-2 px-1 pb-2 text-xs leading-5 text-muted-foreground">
+                    <span className="min-w-0 truncate">{t("support.failedSendKept", { preview: failedSend.submission.input })}</span>
+                    <button type="button" className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-50" disabled={sending} onClick={retryFailedSend}>
+                      {t("support.failedSendRetry")}
+                    </button>
+                  </div>
+                ) : null}
                 {/* La MÊME pilule que le composer du fil
                     (`components/composer.tsx`), et les mêmes attributs
                     `data-composer*` : sous la coque mobile, `mobile.css` lui
@@ -1173,141 +1264,6 @@ function SupportPageActions({
         </button>
       ) : null}
     </div>
-  );
-}
-
-/**
- * Les fils de ce visiteur, du plus récent au plus ancien, et la seule porte
- * vers un fil neuf : la liste en place du fil (carte, mobile, page étroite).
- */
-function SupportHistoryList({
-  history,
-  onPick,
-  onNew,
-}: {
-  history: readonly SupportThreadSummaryDto[];
-  onPick: (conversationId: string) => void;
-  onNew: () => void;
-}) {
-  const { t, formatDate } = useT();
-  return (
-    <>
-      <p className="text-sm font-medium">{t("support.historyTitle")}</p>
-      {history.length === 0 ? (
-        <p className="text-xs leading-5 text-muted-foreground">{t("support.historyEmpty")}</p>
-      ) : null}
-      {history.map((item) => (
-          <button
-            key={item.conversationId}
-            type="button"
-            data-support-history-item={item.conversationId}
-            onClick={() => onPick(item.conversationId)}
-            className="ohb-press flex w-full flex-col gap-1 rounded-2xl border border-border/60 bg-card px-3 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring dark:bg-muted/40"
-          >
-            <span className="flex w-full items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                {formatDate(item.lastMessageAt ?? item.createdAt)}
-              </span>
-              {item.status === "closed" ? (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {t("support.historyClosed")}
-                </span>
-              ) : null}
-              {item.unreadCount > 0 ? (
-                <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[11px] text-primary-foreground">
-                  {item.unreadCount}
-                </span>
-              ) : null}
-            </span>
-            <span className="line-clamp-2 text-sm text-foreground">
-              {item.lastMessagePreview ?? t("support.historyNoMessage")}
-            </span>
-          </button>
-      ))}
-      {/* Un fil neuf se demande ICI, et nulle part ailleurs : c'est le seul
-          endroit où l'on voit ce qu'on laisse derrière soi. */}
-      <div className="mt-auto pt-2">
-        <button type="button" className={cn(BUTTON.secondary, "w-full")} onClick={onNew}>
-          {t("support.historyNew")}
-        </button>
-      </div>
-    </>
-  );
-}
-
-/**
- * La carte « Chat history » du template BoardUI « Chat Starter », à droite
- * de la carte principale : « Nouvelle conversation » en tête, puis les fils
- * récents sur une ligne (aperçu tronqué, âge à droite, point si une réponse
- * du staff attend). Le fil à l'écran est surligné.
- */
-function SupportHistoryCanvas({
-  history,
-  activeId,
-  onPick,
-  onNew,
-}: {
-  history: readonly SupportThreadSummaryDto[];
-  activeId: string | null;
-  onPick: (conversationId: string) => void;
-  onNew: () => void;
-}) {
-  const { t, locale } = useT();
-  return (
-    <aside
-      aria-label={t("support.historyTitle")}
-      data-support-history-canvas=""
-      className="ms-4 hidden h-full w-[260px] shrink-0 flex-col gap-6 overflow-hidden rounded-3xl bg-background-secondary-default p-3 xl:flex"
-    >
-      <button
-        type="button"
-        onClick={onNew}
-        className="flex w-full cursor-pointer items-center gap-2 rounded-2lg px-2 py-2 text-body-medium text-text-primary outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <RiAddLine aria-hidden className="size-5 shrink-0 text-foreground-icon-secondary" />
-        {t("support.historyNew")}
-      </button>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto [scrollbar-width:none]">
-        <p className="px-2 pb-1 text-body-2-medium text-text-tertiary">{t("support.historyTitle")}</p>
-        {history.length === 0 ? (
-          <p className="px-2 text-body-2-regular text-text-tertiary">{t("support.historyEmpty")}</p>
-        ) : null}
-        {history.map((item) => {
-          const active = item.conversationId === activeId;
-          const unread = item.unreadCount > 0;
-          const closed = item.status === "closed";
-          return (
-            <button
-              key={item.conversationId}
-              type="button"
-              data-support-history-item={item.conversationId}
-              aria-current={active ? "true" : undefined}
-              title={closed ? t("support.historyClosed") : undefined}
-              onClick={() => {
-                if (!active) onPick(item.conversationId);
-              }}
-              className={cn(
-                "flex w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-2lg py-1.5 ps-2 pe-2 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-                active ? "bg-background-secondary-hover" : "hover:bg-background-secondary-hover",
-              )}
-            >
-              {unread ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-button-primary" /> : null}
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate text-body-2-regular",
-                  unread ? "text-text-primary" : closed ? "text-text-tertiary" : "text-text-secondary",
-                )}
-              >
-                {item.lastMessagePreview ?? t("support.historyNoMessage")}
-              </span>
-              <span className="shrink-0 text-caption-1-regular text-text-tertiary">
-                {ageSince(locale, item.lastMessageAt ?? item.createdAt)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
   );
 }
 

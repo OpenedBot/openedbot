@@ -92,6 +92,11 @@ export function isUnauthorized(error: unknown): error is ApiError {
   return error instanceof ApiError && error.status === 401 && UNAUTHORIZED_CODES.has(error.code ?? "");
 }
 
+/** La réponse appartenait à un autre espace ou une autre session que ceux de la fenêtre. */
+export function isWorkspaceChanged(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.code === "WORKSPACE_CHANGED";
+}
+
 export function isApiUnavailable(error: unknown): error is ApiError {
   return error instanceof ApiError && error.code === "API_UNAVAILABLE";
 }
@@ -199,7 +204,50 @@ export type RequestOptions = {
   skipOrganizationHeader?: boolean;
   /** Bind agency client reads to either the selected client frame or its fleet frame. */
   fleetClientContext?: FleetClientRequestContext;
+  /**
+   * Échéance de l'appel, lecture du corps comprise. Par défaut
+   * `READ_TIMEOUT_MS` pour une lecture, `WRITE_TIMEOUT_MS` pour une écriture ;
+   * une opération longue connue (la compaction) passe la sienne.
+   */
+  timeoutMs?: number;
 };
+
+/**
+ * Sans échéance, un proxy qui accepte la connexion sans jamais répondre
+ * figeait l'appel : un garde de route sur `auth/me`, une déconnexion, une
+ * mutation. Une lecture couvre l'inventaire le plus lent de l'API (60 s).
+ * Une écriture peut attendre une mutation Hermes (jusqu'à 190 s) : sa borne
+ * suit le plafond d'inactivité du serveur (`API_IDLE_TIMEOUT`, 255 s max),
+ * au-delà duquel aucune réponse ne peut plus arriver.
+ */
+export const READ_TIMEOUT_MS = 75_000;
+export const WRITE_TIMEOUT_MS = 260_000;
+
+/**
+ * Délai dépassé. Une écriture n'est JAMAIS rejouée d'office : le serveur a pu
+ * l'appliquer, et le message le dit à qui voudrait recommencer.
+ */
+function timeoutError(method: string): ApiError {
+  const write = !["GET", "HEAD", "OPTIONS"].includes(method);
+  return new ApiError(0, t(currentLocale() ?? DEFAULT_LOCALE, write ? "apiClient.writeTimeout" : "apiClient.readTimeout"), "API_TIMEOUT");
+}
+
+/**
+ * Un 2xx dont le corps n'est pas le JSON attendu (page HTML d'un proxy, JSON
+ * tronqué) : le traiter comme `null` déclenchait les succès des mutations sans
+ * opération confirmée et rangeait `null` dans le cache.
+ */
+function invalidResponseError(response: Response): ApiError {
+  return new ApiError(
+    response.status,
+    t(currentLocale() ?? DEFAULT_LOCALE, "apiClient.invalidResponse", { status: response.status }),
+    "INVALID_RESPONSE",
+    response.headers.get("X-Request-Id") ?? undefined,
+  );
+}
+
+/** Les statuts qui n'ont, par définition, aucun corps à lire. */
+const BODYLESS_STATUSES = new Set([204, 205, 304]);
 
 export type FleetClientRequestContext = {
   frameOrganizationId: string;
@@ -305,22 +353,37 @@ export async function attempt<T>(
   const capturedFleet = activeFleetId();
   const capturedIdentity = readCloudSession()?.csrfToken;
   if (options.fleetClientContext) assertFleetClientRequestContext(options.fleetClientContext);
+  const method = (init?.method ?? "GET").toUpperCase();
+  const deadline = new AbortController();
+  const timer = setTimeout(
+    () => deadline.abort(),
+    options.timeoutMs ?? (["GET", "HEAD", "OPTIONS"].includes(method) ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS),
+  );
   let response: Response;
+  let text: string | null = null;
   try {
-    const method = (init?.method ?? "GET").toUpperCase();
-    response = await fetch(`${API_ORIGIN}${path}`, {
-      ...init,
-      // Coque native : aucun cookie ne voyage, l'identité est le bearer.
-      credentials: bridge ? "omit" : "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...cloudHeaders(method, !options.skipOrganizationHeader, bridge !== null),
-        ...authHeadersFor(bearer),
-        ...init?.headers,
-      },
-    });
-  } catch {
-    throw new ApiError(0, apiUnavailableMessage(), "API_UNAVAILABLE");
+    try {
+      response = await fetch(`${API_ORIGIN}${path}`, {
+        ...init,
+        signal: init?.signal ? AbortSignal.any([init.signal, deadline.signal]) : deadline.signal,
+        // Coque native : aucun cookie ne voyage, l'identité est le bearer.
+        credentials: bridge ? "omit" : "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...cloudHeaders(method, !options.skipOrganizationHeader, bridge !== null),
+          ...authHeadersFor(bearer),
+          ...init?.headers,
+        },
+      });
+      // L'échéance couvre aussi le corps : un serveur peut envoyer ses
+      // en-têtes puis se taire.
+      if (!BODYLESS_STATUSES.has(response.status)) text = await response.text();
+    } catch {
+      if (deadline.signal.aborted) throw timeoutError(method);
+      throw new ApiError(0, apiUnavailableMessage(), "API_UNAVAILABLE");
+    }
+  } finally {
+    clearTimeout(timer);
   }
 
   if (options.fleetClientContext) assertFleetClientRequestContext(options.fleetClientContext);
@@ -330,8 +393,18 @@ export async function attempt<T>(
   if (capturedIdentity && capturedIdentity !== readCloudSession()?.csrfToken) {
     throw new ApiError(409, "La session a changé.", "WORKSPACE_CHANGED");
   }
-  if (response.status === 204) return undefined as T;
-  const body = await response.json().catch(() => null);
+  if (BODYLESS_STATUSES.has(response.status)) return undefined as T;
+  // Un corps vide est une réponse sans contenu ; un corps illisible n'en est
+  // pas une. Sur un refus, il retombe sur la phrase du statut (`errorFrom`).
+  let body: unknown = null;
+  let unreadable = false;
+  if (text) {
+    try {
+      body = JSON.parse(text) as unknown;
+    } catch {
+      unreadable = true;
+    }
+  }
   if (options.fleetClientContext) assertFleetClientRequestContext(options.fleetClientContext);
   else if (!options.skipOrganizationHeader && (capturedOrganization !== activeOrganizationId() || capturedFleet !== activeFleetId())) {
     throw new ApiError(409, "Le contexte de l’espace a changé.", "WORKSPACE_CHANGED");
@@ -365,5 +438,6 @@ export async function attempt<T>(
     }
     throw error;
   }
+  if (unreadable) throw invalidResponseError(response);
   return body as T;
 }

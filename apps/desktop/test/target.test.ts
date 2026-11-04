@@ -6,6 +6,7 @@ import {
   devUserDataName,
   environmentOf,
   LEGACY_PRODUCTION_CONSOLE_URL,
+  legacyTokensFileName,
   LOCAL_CONSOLE_URL,
   PRODUCTION_API_ORIGIN,
   PRODUCTION_CONSOLE_URL,
@@ -63,8 +64,21 @@ test("environmentOf: production by its origin, dev for any other API", () => {
 
 test("tokensFileName keeps tokens.bin for production and splits every other API", () => {
   expect(tokensFileName(PRODUCTION_API_ORIGIN)).toBe("tokens.bin");
-  expect(tokensFileName("https://api.staging.example.test")).toBe("tokens-api.staging.example.test.bin");
-  expect(tokensFileName("http://10.0.0.50:8790")).toBe("tokens-10.0.0.50_8790.bin");
+  expect(tokensFileName("https://api.staging.example.test")).toMatch(/^tokens-https-api\.staging\.example\.test-[0-9a-f]{16}\.bin$/);
+  expect(tokensFileName("http://10.0.0.50:8790")).toMatch(/^tokens-http-10\.0\.0\.50_8790-[0-9a-f]{16}\.bin$/);
+});
+
+test("tokensFileName: http and https on one host and port are two files, one origin is one file", () => {
+  const secure = tokensFileName("https://api.lab.test:8790");
+  const plain = tokensFileName("http://api.lab.test:8790");
+  expect(secure).not.toBe(plain);
+  expect(tokensFileName("https://API.lab.test:8790")).toBe(secure);
+  expect(tokensFileName("https://api.lab.test:443")).toBe(tokensFileName("https://api.lab.test"));
+  // Never the shared name of the old scheme, which is only ever deleted.
+  expect(legacyTokensFileName("https://api.lab.test:8790")).toBe("tokens-api.lab.test_8790.bin");
+  expect(legacyTokensFileName("http://api.lab.test:8790")).toBe("tokens-api.lab.test_8790.bin");
+  expect([secure, plain]).not.toContain("tokens-api.lab.test_8790.bin");
+  expect(legacyTokensFileName(PRODUCTION_API_ORIGIN)).toBeNull();
 });
 
 test("devUserDataName follows the backend the environment aims at", () => {

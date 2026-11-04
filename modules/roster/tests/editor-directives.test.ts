@@ -122,6 +122,22 @@ describe("workerMayApproveGate", () => {
     expect(workerMayApproveGate(null, "rm -rf /")).toBe(false);
   });
 
+  test("a wrapper's options never hide a circuit breaker or a deletion", () => {
+    expect(workerMayApproveGate("bypass", "sudo -n rm -rf /")).toBe(false);
+    expect(workerMayApproveGate("bypass", "env -i timeout 5 rm -rf ~")).toBe(false);
+    expect(workerMayApproveGate("auto", "sudo -u root rm notes.txt")).toBe(false);
+    expect(workerMayApproveGate("bypass", "sudo --frobnicate ls")).toBe(false);
+    expect(workerMayApproveGate("bypass", "sudo -n ls /tmp")).toBe(true);
+  });
+
+  test("bypass holds a redirection onto an absolute sensitive path", () => {
+    expect(workerMayApproveGate("bypass", "echo x > /workspace/.env")).toBe(false);
+    expect(workerMayApproveGate("bypass", "echo x>>/root/.ssh/authorized_keys")).toBe(false);
+    expect(workerMayApproveGate("bypass", "echo x > /workspace/.git/hooks/pre-commit")).toBe(false);
+    expect(workerMayApproveGate("bypass", "echo x >")).toBe(false);
+    expect(workerMayApproveGate("bypass", "echo x > /workspace/notes.md 2>&1")).toBe(true);
+  });
+
   test("bypass allows a deletion under the home directory that is not the home itself", () => {
     expect(workerMayApproveGate("bypass", "rm -rf ~/notes")).toBe(true);
   });

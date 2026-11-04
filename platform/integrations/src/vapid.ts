@@ -2,6 +2,11 @@ export type VapidConfig = {
   publicKey: string;
   privateKey: string;
   subject: string;
+  /**
+   * Accepte un endpoint Push en boucle locale (serveur push simulé de
+   * `make e2e-push`, certificat auto-signé). Absent : refusé.
+   */
+  allowLoopbackEndpoints?: boolean;
 };
 
 const URL_SAFE_BASE64 = /^[A-Za-z0-9_-]+$/;
@@ -14,7 +19,9 @@ const URL_SAFE_BASE64 = /^[A-Za-z0-9_-]+$/;
 export function readVapidConfig(
   env: Record<string, string | undefined>,
   required: boolean,
+  production: boolean,
 ): VapidConfig | null {
+  const allowLoopbackEndpoints = readAllowLoopback(env.PUSH_ALLOW_LOOPBACK_ENDPOINTS, production);
   const publicKey = env.PUSH_VAPID_PUBLIC_KEY?.trim() ?? "";
   const privateKey = env.PUSH_VAPID_PRIVATE_KEY?.trim() ?? "";
   const subject = env.PUSH_VAPID_SUBJECT?.trim() ?? "";
@@ -26,7 +33,15 @@ export function readVapidConfig(
   if (present !== 3) {
     throw new Error("PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY and PUSH_VAPID_SUBJECT must be set together.");
   }
-  return parseVapidConfig({ publicKey, privateKey, subject });
+  return { ...parseVapidConfig({ publicKey, privateKey, subject }), allowLoopbackEndpoints };
+}
+
+function readAllowLoopback(value: string | undefined, production: boolean): boolean {
+  const normalized = value?.trim() ?? "";
+  if (normalized === "" || normalized === "0") return false;
+  if (normalized !== "1") throw new Error("PUSH_ALLOW_LOOPBACK_ENDPOINTS must be 1 or empty.");
+  if (production) throw new Error("PUSH_ALLOW_LOOPBACK_ENDPOINTS is refused in production: pushes go to the browser push services only.");
+  return true;
 }
 
 export function parseVapidConfig(input: VapidConfig): VapidConfig {

@@ -162,7 +162,8 @@ export async function scheduleSubscriptionEndedDeletion(
 
 export type TenantDeletionTask = { organizationId: string; reason: string };
 
-export type ClaimedBlobDeletion = { organizationId: string; key: string; attempts: number };
+/** `driver` : le magasin de l'objet (0171) ; null pour une ligne qui ne le sait pas. */
+export type ClaimedBlobDeletion = { organizationId: string; key: string; attempts: number; driver: "file" | "r2" | null };
 
 /**
  * Une purge est prête quand sa grâce est échue, qu'aucune importation ou
@@ -336,17 +337,20 @@ export async function listAccountUsers(
  * `message_ingress`, propriété de conversation). Rend le nombre de clés.
  */
 export async function manifestTenantBlobs(tx: TransactionDb, organizationId: string): Promise<number> {
+  // Le driver de la pièce jointe suit sa clé ; une clé connue du seul
+  // manifeste d'ingestion n'en a pas (null : tous les magasins joignables).
   const manifested = await tx<Array<{ key: string }>>`
     with object_keys as (
-      select object_key as key from attachments where organization_id = ${organizationId}
+      select object_key as key, driver from attachments where organization_id = ${organizationId}
       union
-      select item->>'key' as key from message_ingress ingress
+      select item->>'key' as key, null as driver from message_ingress ingress
       cross join lateral jsonb_array_elements(ingress.attachment_manifest) item
        where ingress.organization_id = ${organizationId}
          and jsonb_typeof(item) = 'object' and item ? 'key'
     )
-    insert into tenant_blob_deletions (object_key, organization_id)
-    select key, ${organizationId} from object_keys where key is not null
+    insert into tenant_blob_deletions (object_key, organization_id, driver)
+    select distinct on (key) key, ${organizationId}, driver from object_keys where key is not null
+     order by key, driver nulls last
     on conflict (object_key) do nothing
     returning object_key as key
   `;
@@ -362,12 +366,27 @@ export async function deleteOrganization(tx: TransactionDb, organizationId: stri
   return Boolean(deleted[0]);
 }
 
-/** Supprime le compte qui n'a plus aucune membership. */
-export async function deleteUserWithoutMemberships(tx: TransactionDb, userId: string): Promise<void> {
-  await tx`
-    delete from users u where u.id = ${userId}
-      and not exists (select 1 from memberships m where m.user_id = u.id)
+export type AccountUserErasure = "deleted" | "pseudonymized" | "kept" | "absent";
+
+/**
+ * Efface le compte qui n'a plus aucune adhésion VIVANTE, comme l'éligibilité
+ * le promet (`listOtherMemberships` ignore les adhésions révoquées). Sans
+ * aucune adhésion, la ligne part. Avec des adhésions révoquées, elles portent
+ * l'historique d'autres tenants (décisions, invitations…) que la suppression
+ * emporterait ou bloquerait : le compte est alors pseudonymisé (adresse,
+ * identifiants de connexion et sessions effacés). Le worker n'a aucun droit
+ * d'écriture sur `users` ni sur `sessions` : la fonction SECURITY DEFINER de
+ * 0171 porte seule ces règles.
+ */
+export async function eraseAccountUser(tx: TransactionDb, userId: string): Promise<AccountUserErasure> {
+  const rows = await tx<Array<{ outcome: AccountUserErasure }>>`
+    select public.erase_account_user(${userId}::uuid) as outcome
   `;
+  const outcome = rows[0]?.outcome;
+  if (outcome !== "deleted" && outcome !== "pseudonymized" && outcome !== "kept" && outcome !== "absent") {
+    throw new Error("Unexpected account erasure outcome.");
+  }
+  return outcome;
 }
 
 /** Réclame un lot de blobs à supprimer (bail court, `skip locked` : plusieurs workers ne se marchent pas dessus). */
@@ -392,7 +411,8 @@ export async function claimBlobDeletions(
       lease_expires_at = now() + (${leaseSeconds} * interval '1 second'),
       attempts = deletion.attempts + 1, last_error = null
      from candidates where deletion.object_key = candidates.object_key
-    returning deletion.organization_id as "organizationId", deletion.object_key as key, deletion.attempts
+    returning deletion.organization_id as "organizationId", deletion.object_key as key, deletion.attempts,
+              deletion.driver
   `) as ClaimedBlobDeletion[];
 }
 

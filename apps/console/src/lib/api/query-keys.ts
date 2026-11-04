@@ -65,6 +65,7 @@ export const queryKeys = {
   workflowHistory: (status: string) =>
     workspaceQueryKey(activeOrganizationId(), "workflow-history", status),
   get inbox() { return workspaceQueryKey(activeOrganizationId(), "inbox"); },
+  globalSearch: (query: string) => workspaceQueryKey(activeOrganizationId(), "global-search", query),
   get authProviders() { return ["auth", "providers"] as const; },
   /** Bootstrap stays account scoped; a delegated view reads its own effective privileges. */
   get authMe() {

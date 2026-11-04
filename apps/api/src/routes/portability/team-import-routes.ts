@@ -43,6 +43,12 @@ export function teamImportRoutes(
   const routes = new Hono<{ Variables: AppVariables }>();
   const readRuntime = dependencies.readRuntime ?? readRuntimeSecret;
   const blobs = dependencies.blobs;
+  // L'import écrit avec le driver du jour, et ne retire que ce qu'il vient d'écrire.
+  const importBlobs = blobs && {
+    driver: blobs.driver,
+    put: (key: string, bytes: Uint8Array, contentType: string) => blobs.put(key, bytes, contentType),
+    delete: (key: string) => blobs.delete(key, blobs.driver),
+  };
   const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
   routes.route("/hermes-bundle", hermesBundleImportRoutes(db, config, readRuntime));
 
@@ -152,7 +158,7 @@ export function teamImportRoutes(
         const result = await importHermesProfile(tx, {
           organizationId: auth.organizationId, userId: auth.userId, sectionId,
           position: nextPosition++, managed: false, model: resolved.model, blobKeys,
-        }, profile, avatar, blobs);
+        }, profile, avatar, importBlobs);
         imported.push({ slug, botId: result.botId, threadId: result.threadId, name: result.name });
         routines.push(...result.routines);
         limitations.push(...result.limitations);
@@ -169,7 +175,7 @@ export function teamImportRoutes(
       return { imported, skipped, groups: grouped.groups, routines, limitations } satisfies RuntimeProfileImportDto;
       } catch (error) { callbackFailed = true; throw error; }
     }).catch(async (error) => {
-      if (callbackFailed && blobs) await Promise.allSettled(blobKeys.map((key) => blobs.delete(key)));
+      if (callbackFailed && blobs) await Promise.allSettled(blobKeys.map((key) => blobs.delete(key, blobs.driver)));
       if (error instanceof ProfileImportError) throw new HttpError(error.status, error.code, error.message, {}, error.details);
       if (error instanceof HttpError) throw error;
       if (isUniqueViolation(error)) throw new HttpError(409, "PROFILE_ALREADY_IMPORTED", "Un profil de cet import est déjà lié à un bot.");

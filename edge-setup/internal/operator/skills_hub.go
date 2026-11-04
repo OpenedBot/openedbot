@@ -252,9 +252,12 @@ func (s *Server) loadSkillOperationsLocked() {
 			_ = os.Remove(path)
 			continue
 		}
-		if op.State == "running" {
+		// A queued operation had no worker either: the operator stopped between
+		// persisting it and starting it. Left queued, it would refuse every
+		// later install on its profile.
+		if op.State == "queued" || op.State == "running" {
 			op.State = "failed"
-			op.Error = &skillOperationError{Code: "OPERATION_INTERRUPTED", Detail: "the operator restarted while this operation was running"}
+			op.Error = &skillOperationError{Code: "OPERATION_INTERRUPTED", Detail: "the operator restarted before this operation finished"}
 			_ = s.persistSkillOperationLocked(&op)
 		}
 		s.skillOps[op.OperationID] = &op
@@ -441,6 +444,12 @@ func (s *Server) installSkill(w http.ResponseWriter, r *http.Request) {
 	op := &skillOperation{OperationID: newSkillOperationID(), Profile: profile, Identifier: body.Identifier, State: "queued", CreatedAt: s.now()}
 	s.skillOps[op.OperationID] = op
 	err := s.persistSkillOperationLocked(op)
+	if err != nil {
+		// No worker will run it: keeping the reservation would refuse every
+		// install on this profile until the operator restarts.
+		delete(s.skillOps, op.OperationID)
+		_ = os.Remove(filepath.Join(s.skillOperationDir(), op.OperationID+".json"))
+	}
 	s.mu.Unlock()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "HOST_UNAVAILABLE", "the skill operation could not be persisted")

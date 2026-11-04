@@ -10,20 +10,20 @@ const SUBJECT = "mailto:ops@ohb.example";
 
 describe("readVapidConfig", () => {
   test("absentes toutes les trois : fonctionnalité éteinte", () => {
-    expect(readVapidConfig({}, false)).toBeNull();
+    expect(readVapidConfig({}, false, false)).toBeNull();
     expect(readVapidConfig({
       PUSH_VAPID_PUBLIC_KEY: "",
       PUSH_VAPID_PRIVATE_KEY: "  ",
       PUSH_VAPID_SUBJECT: "",
-    }, false)).toBeNull();
+    }, false, false)).toBeNull();
   });
 
   test("production sans clés : erreur nommée", () => {
-    expect(() => readVapidConfig({}, true)).toThrow(/PUSH_VAPID_PUBLIC_KEY/);
+    expect(() => readVapidConfig({}, true, true)).toThrow(/PUSH_VAPID_PUBLIC_KEY/);
   });
 
   test("un seul secret posé n'est pas un push désactivé", () => {
-    expect(() => readVapidConfig({ PUSH_VAPID_PUBLIC_KEY: PUBLIC_B64 }, false))
+    expect(() => readVapidConfig({ PUSH_VAPID_PUBLIC_KEY: PUBLIC_B64 }, false, false))
       .toThrow(/together/);
   });
 
@@ -32,11 +32,26 @@ describe("readVapidConfig", () => {
       PUSH_VAPID_PUBLIC_KEY: PUBLIC_B64,
       PUSH_VAPID_PRIVATE_KEY: PRIVATE_B64,
       PUSH_VAPID_SUBJECT: SUBJECT,
-    }, false)).toEqual({
+    }, false, false)).toEqual({
       publicKey: PUBLIC_B64,
       privateKey: PRIVATE_B64,
       subject: SUBJECT,
+      allowLoopbackEndpoints: false,
     });
+  });
+
+  test("boucle locale : opt-in explicite, refusé en production", () => {
+    const triplet = {
+      PUSH_VAPID_PUBLIC_KEY: PUBLIC_B64,
+      PUSH_VAPID_PRIVATE_KEY: PRIVATE_B64,
+      PUSH_VAPID_SUBJECT: SUBJECT,
+    };
+    expect(readVapidConfig({ ...triplet, PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1" }, false, false)?.allowLoopbackEndpoints)
+      .toBe(true);
+    expect(() => readVapidConfig({ ...triplet, PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1" }, true, true))
+      .toThrow(/refused in production/);
+    expect(() => readVapidConfig({ ...triplet, PUSH_ALLOW_LOOPBACK_ENDPOINTS: "yes" }, false, false))
+      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
   });
 });
 

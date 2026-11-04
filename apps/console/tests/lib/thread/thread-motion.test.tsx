@@ -12,6 +12,7 @@ import {
 } from "../../../src/lib/thread/thread-motion";
 
 let animated: string[] = [];
+let delays: number[] = [];
 const originalAnimate = HTMLElement.prototype.animate;
 const originalMatchMedia = window.matchMedia;
 
@@ -26,10 +27,12 @@ function setReducedMotion(reduce: boolean) {
 
 beforeEach(() => {
   animated = [];
+  delays = [];
   setReducedMotion(false);
   HTMLElement.prototype.animate = function (this: HTMLElement, _keyframes: unknown, options?: number | KeyframeAnimationOptions) {
     const timing = typeof options === "object" ? options : {};
     animated.push(`${this.dataset.row}|${timing.duration}|${timing.easing}`);
+    delays.push(timing.delay ?? 0);
     return { addEventListener() {} } as unknown as Animation;
   } as typeof HTMLElement.prototype.animate;
 });
@@ -75,16 +78,43 @@ describe("entrée des messages dans le fil", () => {
     expect(animated).toEqual([]);
   });
 
-  test("la bulle optimiste monte, la rangée enregistrée qui la remplace non", async () => {
-    const view = render(<Thread>{[answer("a1")]}</Thread>);
-    view.rerender(<Thread>{[answer("a1"), outgoing("salut")]}</Thread>);
-    await Promise.resolve();
-    expect(animated.map((entry) => entry.split("|")[0])).toEqual(["outgoing"]);
-    view.rerender(<Thread>{[answer("a1"), user("u2", "salut"), outgoing("salut")]}</Thread>);
-    await Promise.resolve();
-    view.rerender(<Thread>{[answer("a1"), user("u2", "salut")]}</Thread>);
-    await Promise.resolve();
-    expect(animated.map((entry) => entry.split("|")[0])).toEqual(["outgoing"]);
+  test("la bulle optimiste monte ; enregistrée en pleine montée, sa remplaçante la finit sans la rejouer", async () => {
+    const now = performance.now;
+    let clock = 1_000;
+    performance.now = () => clock;
+    try {
+      const view = render(<Thread>{[answer("a1")]}</Thread>);
+      view.rerender(<Thread>{[answer("a1"), outgoing("salut")]}</Thread>);
+      await Promise.resolve();
+      expect(animated.map((entry) => entry.split("|")[0])).toEqual(["outgoing"]);
+      clock += 80;
+      view.rerender(<Thread>{[answer("a1"), user("u2", "salut"), outgoing("salut")]}</Thread>);
+      await Promise.resolve();
+      view.rerender(<Thread>{[answer("a1"), user("u2", "salut")]}</Thread>);
+      await Promise.resolve();
+      // The same rise, resumed 80 ms in: a negative delay, never a new 12 px.
+      expect(animated.map((entry) => entry.split("|")[0])).toEqual(["outgoing", "u2"]);
+      expect(delays.at(-1)).toBe(-80);
+    } finally {
+      performance.now = now;
+    }
+  });
+
+  test("enregistrée une fois la montée finie, la remplaçante ne bouge pas", async () => {
+    const now = performance.now;
+    let clock = 1_000;
+    performance.now = () => clock;
+    try {
+      const view = render(<Thread>{[answer("a1")]}</Thread>);
+      view.rerender(<Thread>{[answer("a1"), outgoing("salut")]}</Thread>);
+      await Promise.resolve();
+      clock += ROW_ENTER_MS + 1;
+      view.rerender(<Thread>{[answer("a1"), user("u2", "salut")]}</Thread>);
+      await Promise.resolve();
+      expect(animated.map((entry) => entry.split("|")[0])).toEqual(["outgoing"]);
+    } finally {
+      performance.now = now;
+    }
   });
 
   test("un séparateur de date n'anime pas", async () => {

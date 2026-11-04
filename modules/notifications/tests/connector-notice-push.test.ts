@@ -19,7 +19,7 @@ const NOTICE = {
 
 const OWNER_SUB = {
   id: "sub-1",
-  endpoint: "https://push.example/abc",
+  endpoint: "https://fcm.googleapis.com/fcm/send/abc",
   p256dh: "p256dhKeyValue012345",
   auth: "authKeyValue01",
   locale: "en",

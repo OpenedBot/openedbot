@@ -70,7 +70,6 @@ function ComposerSkeleton() {
             <Skeleton data-composer-attachment="" className="size-11 shrink-0 rounded-full motion-reduce:animate-none sm:size-8" />
             <Skeleton className="h-6 w-20 shrink-0 rounded-full motion-reduce:animate-none" />
             <span className="min-w-0 flex-1" />
-            <Skeleton data-composer-voice="" className="size-11 shrink-0 rounded-full motion-reduce:animate-none sm:size-8" />
             <Skeleton
               data-composer-action="send"
               data-composer-primary-action=""

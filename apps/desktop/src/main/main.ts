@@ -237,7 +237,17 @@ function start(): void {
       window,
       targetLabel: label,
       isSignedIn: () => service.isSignedIn(),
-      onSignOut: () => service.signOut(),
+      onSignOut: () => {
+        void service.signOut().then(({ revocationFailed }) => {
+          if (!revocationFailed) return;
+          // Forgotten here, but possibly still open on the server: say so, the user can revoke it from another device.
+          void dialog.showMessageBox({
+            type: "warning",
+            message: "Déconnexion incomplète",
+            detail: "Cette application a oublié la session, mais le serveur n’a pas pu la révoquer. Révoquez-la depuis Réglages → Sécurité sur un autre appareil.",
+          });
+        });
+      },
       onQuit: () => app.quit(),
       displayMode: popupSupported
         ? { current: () => displayMode, popupAvailable: () => locatePopupBundle() !== null, set: setDisplayMode }

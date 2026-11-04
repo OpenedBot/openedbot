@@ -788,6 +788,12 @@ def named_profile_names():
 
 
 def load_profile_config(name):
+    """The profile's config, for a caller that may change and save it.
+
+    A file that exists but cannot be read as a mapping is refused: every
+    mutation saves back what this returns, and an empty dict standing in for
+    an unreadable file would replace the whole config with the one block the
+    mutation set. Only an absent or empty file reads as {}."""
     try:
         from hermes_cli.config import load_config
 
@@ -803,8 +809,23 @@ def load_profile_config(name):
     try:
         with open(path, "r", encoding="utf-8") as handle:
             loaded = yaml_load(handle.read())
-        return loaded if isinstance(loaded, dict) else {}
+    except FileNotFoundError:
+        return {}
     except Exception:
+        raise Refused("PROFILE_CONFIG_REFUSED", "the profile config cannot be read")
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, dict):
+        raise Refused("PROFILE_CONFIG_REFUSED", "the profile config is not a mapping")
+    return loaded
+
+
+def read_profile_config(name):
+    """The profile's config for a read-only view: an unreadable file shows as
+    an empty config rather than hiding every other profile. Never save it."""
+    try:
+        return load_profile_config(name)
+    except Refused:
         return {}
 
 
@@ -2562,7 +2583,7 @@ def read_avatar(name):
 
 
 def profile_view(name):
-    config = load_profile_config(name)
+    config = read_profile_config(name)
     meta = ui_meta_view(config)
     title = meta["title"] if meta else None
     display = title or text(config.get("display_name") or config.get("name"), 120) or name
@@ -2684,7 +2705,7 @@ def verb_model_context(request):
         profile = require_profile_slug(name)
         if not profile_exists(profile):
             raise Refused("PROFILE_UNKNOWN", "no such profile on this host")
-        config = load_profile_config(profile)
+        config = read_profile_config(profile)
 
     model_cfg = config.get("model", "") if isinstance(config, dict) else ""
     if isinstance(model_cfg, dict):

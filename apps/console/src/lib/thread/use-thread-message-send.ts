@@ -5,6 +5,7 @@ import { prepareMessageSubmission, type IdempotentMessageSubmission } from "@ope
 import { api, queryKeys } from "../api";
 import { applySendAcceptedToCaches } from "./apply-send-accepted";
 import { randomId } from "../random-id";
+import { readCloudSession } from "../session/cloud-session";
 import type { OutgoingUserInput } from "./thread-anchor";
 
 type Draft = { input: string; attachments: MessageAttachmentInput[]; replyToId?: string | null; planOnly?: boolean };
@@ -25,12 +26,35 @@ type Request = {
   draft: Draft;
 };
 
+/**
+ * Sends not yet confirmed, per user and thread. `prepare` has already cleared
+ * the persisted draft: if the screen leaves the thread (or unmounts) before
+ * the POST settles, a failure has nowhere to restore it. Kept here, the send
+ * comes back as a failed bubble with its retry, and its idempotency key, when
+ * the thread is shown again. Memory only: it dies with the page.
+ */
+const unconfirmedSends = new Map<string, { request: Request; failed: boolean }>();
+
+function unconfirmedKey(scope: string): string {
+  return `${readCloudSession()?.userId ?? ""}|${scope}`;
+}
+
+function outgoingFor(request: Request, failed?: boolean): OutgoingUserInput & { scope: string } {
+  const { submission, scope } = request;
+  return { scope, id: `pending:${submission.idempotencyKey}`, text: submission.input,
+    clientSubmissionId: submission.idempotencyKey,
+    attachments: submission.attachments.map((attachment) => ({ type: "attachment", name: attachment.name,
+      contentType: attachment.contentType, kind: attachment.kind, bytes: attachmentBytes(attachment) })),
+    ...(failed ? { failed: true } : {}) };
+}
+
 /** Captures the destination and submitted draft before any asynchronous work. */
 export function useThreadMessageSend(options: Options) {
   const queryClient = useQueryClient();
   const scope = JSON.stringify(queryKeys.thread(options.threadId ?? "none"));
   const current = useRef({ ...options, scope });
   current.current = { ...options, scope };
+  const mounted = useRef(true);
   const pending = useRef<Request | null>(null);
   const [outgoing, setOutgoing] = useState<(OutgoingUserInput & { scope: string }) | null>(null);
 
@@ -43,6 +67,8 @@ export function useThreadMessageSend(options: Options) {
     },
     onSuccess: async (accepted, request) => {
       if (pending.current === request) pending.current = null;
+      const key = unconfirmedKey(request.scope);
+      if (unconfirmedSends.get(key)?.request === request) unconfirmedSends.delete(key);
       // A workspace switch must not patch another tenant's cache.
       if (request.rosterKey === JSON.stringify(queryKeys.roster)) {
         if (accepted.message) {
@@ -58,10 +84,15 @@ export function useThreadMessageSend(options: Options) {
         : value);
     },
     onError: (error, request) => {
-      if (current.current.scope !== request.scope) return;
+      const key = unconfirmedKey(request.scope);
+      const entry = unconfirmedSends.get(key);
+      if (entry?.request === request) entry.failed = true;
+      // Another thread is shown, or none: the send waits there for its return.
+      if (!mounted.current || current.current.scope !== request.scope) return;
       const latest = current.current.draft;
       const empty = !latest.input && !latest.attachments.length && !latest.replyToId;
       if (empty) {
+        if (entry?.request === request) unconfirmedSends.delete(key);
         current.current.restoreDraft(request.draft);
         setOutgoing(null);
       } else {
@@ -73,9 +104,17 @@ export function useThreadMessageSend(options: Options) {
   });
 
   useEffect(() => {
-    pending.current = null;
-    setOutgoing(null);
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  useEffect(() => {
     mutation.reset();
+    // Back on a thread whose send was left unconfirmed: show it again, failed
+    // or still in flight, with the same submission for the retry.
+    const left = unconfirmedSends.get(unconfirmedKey(scope));
+    pending.current = left?.request ?? null;
+    setOutgoing(left ? outgoingFor(left.request, left.failed) : null);
   }, [scope]);
 
   const prepare = useCallback((draft: Draft): Request => {
@@ -85,10 +124,8 @@ export function useThreadMessageSend(options: Options) {
     const submission = prepareMessageSubmission(previous, draft, randomId);
     const request = { threadId, scope, rosterKey: JSON.stringify(queryKeys.roster), submission, draft };
     pending.current = request;
-    setOutgoing({ scope, id: `pending:${submission.idempotencyKey}`, text: submission.input,
-      clientSubmissionId: submission.idempotencyKey,
-      attachments: submission.attachments.map((attachment) => ({ type: "attachment", name: attachment.name,
-        contentType: attachment.contentType, kind: attachment.kind, bytes: attachmentBytes(attachment) })) });
+    unconfirmedSends.set(unconfirmedKey(scope), { request, failed: false });
+    setOutgoing(outgoingFor(request));
     current.current.clearDraft();
     return request;
   }, [scope]);
@@ -96,10 +133,15 @@ export function useThreadMessageSend(options: Options) {
   const retry = useCallback(() => {
     const request = pending.current;
     if (!request || request.scope !== scope || mutation.isPending) return;
+    unconfirmedSends.set(unconfirmedKey(scope), { request, failed: false });
     setOutgoing((value) => value ? { ...value, failed: false } : value);
     mutation.mutate(request);
   }, [scope, mutation.isPending, mutation.mutate]);
-  const clearOutgoing = useCallback(() => setOutgoing(null), []);
+  // The timeline now holds the message: nothing is left to recover.
+  const clearOutgoing = useCallback(() => {
+    unconfirmedSends.delete(unconfirmedKey(scope));
+    setOutgoing(null);
+  }, [scope]);
   const mutate = useCallback((draft: Draft) => mutation.mutate(prepare(draft)), [mutation.mutate, prepare]);
   const mutateAsync = useCallback((draft: Draft) => mutation.mutateAsync(prepare(draft)), [mutation.mutateAsync, prepare]);
 

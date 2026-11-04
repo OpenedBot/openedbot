@@ -57,6 +57,15 @@ export function useThreadRowEnter(content: RefObject<HTMLElement | null>, thread
     if (!root || typeof MutationObserver === "undefined" || prefersReducedMotion()) return;
     // Le texte de la dernière bulle optimiste vue : sa remplaçante ne rejoue pas.
     let outgoingText: string | null = null;
+    let outgoingAt = 0;
+    // `delay` négatif : l'entrée reprend là où elle en est, au lieu de repartir de 12 px.
+    const rise = (row: Element, delay = 0) => {
+      if (typeof (row as HTMLElement).animate !== "function") return;
+      (row as HTMLElement).animate(
+        [{ transform: `translateY(${ROW_ENTER_OFFSET_PX}px)` }, { transform: "none" }],
+        { duration: ROW_ENTER_MS, easing: ROW_ENTER_EASING, delay },
+      );
+    };
     const observer = new MutationObserver((records) => {
       const added = new Set<Element>();
       for (const record of records) {
@@ -76,15 +85,19 @@ export function useThreadRowEnter(content: RefObject<HTMLElement | null>, thread
         const text = userBubbleText(node);
         if (node.matches("[data-thread-outgoing]")) {
           outgoingText = text;
+          outgoingAt = performance.now();
         } else if (text !== null && text === outgoingText) {
           outgoingText = null;
+          // Enregistrée en pleine montée de la bulle optimiste, la rangée (et la
+          // ligne « Réflexion » arrivée avec elle) finit cette montée : sans
+          // quoi le reste, quelques pixels, tombait d'un coup.
+          const elapsed = performance.now() - outgoingAt;
+          if (elapsed < ROW_ENTER_MS) {
+            for (const row of [node, ...[...added].filter((other) => other.matches("[data-thread-thinking]"))]) rise(row, -elapsed);
+          }
           continue;
         }
-        if (typeof (node as HTMLElement).animate !== "function") continue;
-        (node as HTMLElement).animate(
-          [{ transform: `translateY(${ROW_ENTER_OFFSET_PX}px)` }, { transform: "none" }],
-          { duration: ROW_ENTER_MS, easing: ROW_ENTER_EASING },
-        );
+        rise(node);
       }
     });
     observer.observe(root, { childList: true });

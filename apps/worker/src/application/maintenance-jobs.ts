@@ -40,7 +40,7 @@ import {
 } from "@openedbot/runtime-link/application/runtime-links";
 import { evaluateRuntimeLinkAlerts } from "@openedbot/runtime-link/application/link-alerts";
 import { DIRECT_PROBE_TICK_MS, probeDirectRuntimes, failRunsOnUnhealthyDirectRuntimes } from "@openedbot/execution/application/runtime-direct";
-import { MANAGED_EXPOSURE_TICK_MS, reconcileManagedExposures } from "@openedbot/runtimes/application/managed-exposure-reconciliation";
+import { MANAGED_EXPOSURE_TICK_MS, cleanupRevokedManagedExposures, reconcileManagedExposures } from "@openedbot/runtimes/application/managed-exposure-reconciliation";
 
 /** Poison leases only exist once a 30 s lease has expired: a second is ample. */
 const POISON_REAP_TICK_MS = 1_000;
@@ -118,7 +118,7 @@ export function maintenanceJobs(
       // PERM2-7: a gate under review has 15 s end to end; claim it fast.
       name: "approval-reviews",
       everyMs: Math.min(config.pollMs * 5, 500),
-      run: (signal) => guardedPass("approval.review_worker_failed", () => processApprovalReviews(db, config, signal)),
+      run: (signal, track) => guardedPass("approval.review_worker_failed", () => processApprovalReviews(db, config, signal, track)),
     },
     {
       name: "review-profiles",
@@ -167,7 +167,7 @@ export function maintenanceJobs(
         await processTenantDeletion(db, {
           workerId: config.workerId,
           webAppUrl: config.webAppUrl,
-          deleteBlob: (key) => deleteBlob(config, key),
+          deleteBlob: (key, driver) => deleteBlob(config, key, driver),
         });
       },
     },
@@ -176,7 +176,8 @@ export function maintenanceJobs(
       everyMs: config.routineTickMs,
       run: async () => {
         const ingressMaintenance = await maintainMessageIngress(db, config, {
-          deleteObject: (key) => deleteBlob(config, key),
+          // Un manifeste d'ingestion ne nomme pas son driver.
+          deleteObject: (key) => deleteBlob(config, key, null),
         });
         if (ingressMaintenance.failed > 0) {
           console.error(JSON.stringify({
@@ -239,6 +240,8 @@ export function maintenanceJobs(
       run: (signal) => guardedPass("worker.managed_exposures_failed", async () => {
         const reconciled = await reconcileManagedExposures(db, config.managedTunnel, undefined, signal);
         if (reconciled > 0) console.info(JSON.stringify({ event: "worker.managed_exposures_reconciled", count: reconciled }));
+        const cleaned = await cleanupRevokedManagedExposures(db, config.managedTunnel, undefined, signal);
+        if (cleaned > 0) console.info(JSON.stringify({ event: "worker.managed_exposures_cleanup", count: cleaned }));
       }),
     },
     {

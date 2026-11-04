@@ -5,6 +5,12 @@
  * relit, pour qu'un incident ou une réécriture de profil ne restent pas collés.
  */
 export const WARM_MODEL_SELECTION_TTL_MS = 45_000;
+/**
+ * Plafond du cache, partagé par tous les tenants d'un worker. Une clé change à
+ * chaque reconnexion, changement de modèle ou profil supprimé : l'ancienne
+ * n'est plus relue, la mémoire ne doit donc pas dépendre des relectures.
+ */
+export const WARM_MODEL_SELECTION_MAX_ENTRIES = 1_000;
 
 export type WarmModelSelection = {
   provider: string | null;
@@ -63,6 +69,17 @@ export function rememberWarmModelSelection(
 ): void {
   const model = selection.model?.trim() ?? "";
   if (!key || !model) return;
+  // Chaque écriture purge les entrées expirées, puis, si le plafond tient
+  // encore, la plus ancienne écrite (une clé réécrite repasse en fin d'ordre).
+  for (const [stale, stamp] of stamps) {
+    if (nowMs - stamp.atMs >= WARM_MODEL_SELECTION_TTL_MS) stamps.delete(stale);
+  }
+  stamps.delete(key);
+  while (stamps.size >= WARM_MODEL_SELECTION_MAX_ENTRIES) {
+    const oldest = stamps.keys().next().value;
+    if (oldest === undefined) break;
+    stamps.delete(oldest);
+  }
   stamps.set(key, {
     atMs: nowMs,
     selection: {
@@ -84,6 +101,11 @@ export async function takeWarmOrSelectModel<T extends { model: string | null }>(
 ): Promise<T | null> {
   if (warm?.model) return warm;
   return select();
+}
+
+/** Taille du cache, pour les tests du plafond. */
+export function warmModelSelectionSize(): number {
+  return stamps.size;
 }
 
 export function resetWarmModelSelection(): void {

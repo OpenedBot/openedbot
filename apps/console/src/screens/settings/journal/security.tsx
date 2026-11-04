@@ -16,7 +16,7 @@ import { passwordProblem } from "@openedbot/identity/domain/password";
 import type { AccountAuthMethodDto, AccountSessionDto } from "@openedbot/contracts-api";
 import { Dialog, Tabs, TabsContent, TabsList, TabsTrigger, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys } from "../../../lib/api";
-import { signOut } from "../../../lib/session/sign-out";
+import { useSignOut } from "../../../lib/session/sign-out";
 import { resetAuthStatus } from "../../../lib/session/auth-status";
 import { useT } from "../../../lib/i18n";
 import {
@@ -80,7 +80,7 @@ export function CloudSecuritySettings() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.accountSecurity });
 
-  const logout = useMutation({ mutationFn: () => signOut(queryClient) });
+  const logout = useSignOut();
 
   const revokeSession = useMutation({
     mutationFn: (sessionId: string) => api.revokeSession(sessionId),

@@ -85,21 +85,85 @@ func TestSkillOperationTrustAndPolicyGuards(t *testing.T) {
 	}
 }
 
-func TestSkillOperationPersistenceMarksRunningInterrupted(t *testing.T) {
-	dir := t.TempDir()
-	id := "11111111-1111-4111-8111-111111111111"
-	op := skillOperationDisk{OperationID: id, Profile: "scout", Identifier: "official/a", State: "running", CreatedAt: time.Now().Add(-time.Hour)}
-	raw, _ := json.Marshal(op)
-	if err := os.WriteFile(filepath.Join(dir, id+".json"), raw, 0o600); err != nil {
+// An operation found queued or running at startup has no worker any more:
+// both are interrupted, or the profile refuses every later install.
+func TestSkillOperationPersistenceMarksUnfinishedInterrupted(t *testing.T) {
+	for _, state := range []string{"queued", "running"} {
+		dir := t.TempDir()
+		id := "11111111-1111-4111-8111-111111111111"
+		op := skillOperationDisk{OperationID: id, Profile: "scout", Identifier: "official/a", State: state, CreatedAt: time.Now().Add(-time.Hour)}
+		raw, _ := json.Marshal(op)
+		if err := os.WriteFile(filepath.Join(dir, id+".json"), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s := &Server{SkillsOperationDir: dir, Probe: func(context.Context, string, []byte) ([]byte, error) { return []byte(`{"available":true}`), nil }, SkillsHubReady: true}
+		_ = s.Handler()
+		s.mu.Lock()
+		got := s.skillOps[id]
+		s.mu.Unlock()
+		if got == nil || got.State != "failed" || got.Error == nil || got.Error.Code != "OPERATION_INTERRUPTED" {
+			t.Fatalf("%s: %+v", state, got)
+		}
+		var disk skillOperationDisk
+		if raw, err := os.ReadFile(filepath.Join(dir, id+".json")); err != nil || json.Unmarshal(raw, &disk) != nil || disk.State != "failed" {
+			t.Fatalf("%s: persisted %+v %v", state, disk, err)
+		}
+	}
+}
+
+// A reservation whose persistence failed has no worker: it must not refuse
+// the next install once the storage works again.
+func TestSkillInstallPersistenceFailureReleasesTheReservation(t *testing.T) {
+	root := t.TempDir()
+	blocker := filepath.Join(root, "state")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{SkillsOperationDir: dir, Probe: func(context.Context, string, []byte) ([]byte, error) { return []byte(`{"available":true}`), nil }, SkillsHubReady: true}
-	_ = s.Handler()
+	release := make(chan struct{})
+	s := &Server{SkillsOperationDir: filepath.Join(blocker, "ops"), SkillsHubReady: true, Probe: func(_ context.Context, verb string, _ []byte) ([]byte, error) {
+		if verb == "skills-hub-scan" {
+			<-release
+		}
+		return []byte(`{"policy":"allow","trustLevel":"community","source":"github","verdict":"safe","findings":[]}`), nil
+	}}
+	h := s.Handler()
+	install := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/profiles/scout/skills/hub/install", strings.NewReader(`{"identifier":"github/a/skill"}`)))
+		return w
+	}
+	if w := install(); w.Code != http.StatusBadGateway {
+		t.Fatalf("persistence failure: %d %s", w.Code, w.Body.String())
+	}
 	s.mu.Lock()
-	got := s.skillOps[id]
+	left := len(s.skillOps)
 	s.mu.Unlock()
-	if got == nil || got.State != "failed" || got.Error == nil || got.Error.Code != "OPERATION_INTERRUPTED" {
-		t.Fatalf("%+v", got)
+	if left != 0 {
+		t.Fatalf("%d reservations left after the failure", left)
+	}
+	if err := os.Remove(blocker); err != nil {
+		t.Fatal(err)
+	}
+	w := install()
+	close(release)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("after the storage recovered: %d %s", w.Code, w.Body.String())
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s.mu.Lock()
+		pending := false
+		for _, op := range s.skillOps {
+			pending = pending || op.State == "queued" || op.State == "running"
+		}
+		s.mu.Unlock()
+		if !pending {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the install never reached a terminal state")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 

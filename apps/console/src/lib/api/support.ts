@@ -1,6 +1,7 @@
 import type { SupportHistoryDto, SupportOpenedDto, SupportSnapshotDto } from "@openedbot/contracts-api";
 import type { MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
-import { request, sharedRead, supportTokenHeader } from "./http";
+import { nativeBridge } from "../platform/native-bridge";
+import { API_ORIGIN, ApiError, authHeadersFor, request, sharedRead, supportTokenHeader } from "./http";
 
 export const supportApi = {
   /**
@@ -82,5 +83,22 @@ export const supportApi = {
         method: "POST",
         headers: supportTokenHeader(token),
       }, { tokenOverride: "", skipOrganizationHeader: true }),
+
+    /**
+     * Une capture du fil, en `Blob` (`SupportImage`). Même transport que
+     * `threadsApi.attachment` et le flux du guichet : dans la coque, aucun
+     * cookie ne voyage, l'identité est le bearer du pont. Sans lui, un fil
+     * retrouvé par le compte (sans jeton de guichet) rendait ses images en 401.
+     */
+    attachment: async (attachmentId: string, token: string | null): Promise<Blob> => {
+      const bridge = nativeBridge();
+      const bearer = bridge ? (await bridge.readAccessToken()) ?? "" : "";
+      const response = await fetch(`${API_ORIGIN}/api/support/attachments/${attachmentId}`, {
+        credentials: bridge ? "omit" : "include",
+        headers: { ...supportTokenHeader(token), ...authHeadersFor(bearer) },
+      });
+      if (!response.ok) throw new ApiError(response.status, "Capture illisible.", "ATTACHMENT_UNREADABLE");
+      return response.blob();
+    },
   },
 };

@@ -17,7 +17,7 @@ import {
   readThrough,
   wantsFreshRead,
 } from "@openedbot/runtimes/application/runtime-read-snapshots";
-import { asProfileHttpError } from "@openedbot/portability/application/profile-import-guard";
+import { asProfileHttpError, withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
 import { deleteHostProfile, parseDeleteJobSlugs } from "@openedbot/portability/application/host-profile-delete";
 import { enqueueProfileDelete, lastProfileJobChange, listDeleteJobs } from "@openedbot/portability/sql/delete-jobs";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
@@ -150,11 +150,14 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
       throw new HttpError(404, "RUNTIME_REQUIRED", "Aucun runtime Hermes actif : il n’y a rien à configurer.");
     }
     try {
-      const result = await deleteHostProfile(db, auth.organizationId, slug, {
-        host: client,
-        sessionClient: (profile) => clientFactory({ ...runtime.client, profile }),
-        timeoutMs: PROFILE_INVENTORY_TIMEOUT_MS,
-      });
+      // Le verrou d'import est tenu pendant toute la suppression : un import
+      // ne réserve pas ce slug entre la vérification et le DELETE distant.
+      const result = await withProfileNamesLock(db, auth.organizationId, [slug], (connection) =>
+        deleteHostProfile(connection, auth.organizationId, slug, {
+          host: client,
+          sessionClient: (profile) => clientFactory({ ...runtime.client, profile }),
+          timeoutMs: PROFILE_INVENTORY_TIMEOUT_MS,
+        }));
       return context.json<RuntimeProfileDeleteDto>(result);
     } catch (error) {
       const mapped = asProfileHttpError(error);

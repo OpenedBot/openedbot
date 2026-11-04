@@ -140,11 +140,13 @@ export const navUser = {
   newGroup: "New group",
   lightTheme: "Light theme",
   darkTheme: "Dark theme",
-  switchLanguage: "Switch to {language}",
   installApp: "Install the app",
   signOut: "Sign out",
   impersonationReadOnly: "Assistance mode · read only",
   leaveImpersonation: "Leave assistance mode",
+  /** Revocation failed: nothing was cleared, the action retries. */
+  signOutNotConfirmed: "The server did not confirm the sign-out: your session is still open.",
+  signOutRetry: "Try again",
 } as const;
 
 /** The mobile shell: side panel + scene, after ChatGPT's iOS drawer. */

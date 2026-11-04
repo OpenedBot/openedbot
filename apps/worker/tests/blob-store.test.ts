@@ -45,6 +45,38 @@ describe("worker blob store", () => {
     expect(await Bun.file(filePath).exists()).toBe(false);
   });
 
+  test("deletes where the row says, even after the driver switched to R2", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    temporaryRoots.push(root);
+    const filePath = join(root, objectKey);
+    await mkdir(dirname(filePath), { recursive: true });
+    await Bun.write(filePath, "payload");
+    // R2 écrit désormais ; l'objet, lui, a été écrit sur le disque.
+    const config = {
+      blob: { driver: "r2" as const, bucket: "b", endpoint: "https://r2.invalid", accessKeyId: "k", secretAccessKey: "s" },
+      blobOther: { driver: "file" as const, root },
+    };
+    await deleteBlob(config, objectKey, "file");
+    expect(await Bun.file(filePath).exists()).toBe(false);
+  });
+
+  test("never confirms a deletion on a store this worker cannot reach", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    temporaryRoots.push(root);
+    await expect(deleteBlob({ blob: { driver: "file", root }, blobOther: null }, objectKey, "r2"))
+      .rejects.toThrow("Blob driver r2 is not configured on this worker.");
+  });
+
+  test("an unknown driver deletes on every reachable store", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    temporaryRoots.push(root);
+    const filePath = join(root, objectKey);
+    await mkdir(dirname(filePath), { recursive: true });
+    await Bun.write(filePath, "payload");
+    await deleteBlob({ blob: { driver: "file", root }, blobOther: null }, objectKey, null);
+    expect(await Bun.file(filePath).exists()).toBe(false);
+  });
+
   test("rejects a key outside the two known namespaces", async () => {
     const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
     temporaryRoots.push(root);

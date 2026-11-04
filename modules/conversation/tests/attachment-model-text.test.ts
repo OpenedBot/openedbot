@@ -16,6 +16,8 @@ describe("modelTextFromContent", () => {
     ], new Map([["a", photo]]));
     expect(text.startsWith("decrit moi la photo")).toBe(true);
     expect(text).toContain('image attached: "desk agent.png" (image/png)');
+    // Un nom seul faisait chercher le fichier par vision_analyze, qui échouait.
+    expect(text).toContain("do not open it with vision_analyze");
     expect(text).not.toContain("base64");
   });
 

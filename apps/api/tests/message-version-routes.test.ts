@@ -59,6 +59,8 @@ function source(overrides: Record<string, unknown> = {}) {
     authorBotId: null,
     initiatorUserId: USER,
     sequence: 4,
+    planOnly: false,
+    neverWait: false,
     ...overrides,
   };
 }
@@ -357,5 +359,39 @@ describe("message version persistence contract", () => {
     expect(runInsert?.values).toContain("question corrigée\n\n<attachment name=notes.md>\npreuve jointe\n</attachment>");
     const branchMessageInsert = fake.calls.filter(({ sql }) => sql.includes("insert into messages"))[1];
     expect(JSON.stringify(branchMessageInsert?.values)).toContain(attachmentId);
+  });
+
+  test("a variant of a plan-only, never-wait turn keeps both restrictions", async () => {
+    const fake = fakeDb((sql) => {
+      if (sql.includes("join messages message")) return [source({ planOnly: true, neverWait: true })];
+      if (sql.includes("as \"activeRun\"")) return [{ activeRun: false, pendingApproval: false }];
+      if (sql.includes("select count(*) as count from message_versions")) return [{ count: 0 }];
+      if (sql.includes("from bots where")) return [{
+        id: BOT, name: "Neo", slug: "neo", autonomyEnabled: false,
+        autonomyMaxDepth: 3, autonomyMaxSteps: 8, autonomyMaxHandoffs: 4,
+        autonomyTimeoutSeconds: 1_800, autonomyTokenBudget: 50_000,
+      }];
+      if (sql.includes("select count(*) as count from threads")) return [{ count: 1 }];
+      if (sql.includes("insert into message_versions")) return [];
+      if (sql.includes("from message_versions version") && fake.calls.some((call) => call.sql.includes("insert into message_versions"))) {
+        return [{
+          rootThreadId: THREAD, rootMessageId: MESSAGE, parentThreadId: THREAD, parentMessageId: MESSAGE,
+          branchThreadId: THREAD, branchMessageId: MESSAGE, runId: "run", workflowId: "workflow",
+          kind: "regenerate", ordinal: 1, requestHash: "x", workflowUpdatedAt: NOW, autonomyEnabled: false,
+        }];
+      }
+      return [];
+    });
+    const response = await request(mount(fake.db).app, { mode: "regenerate", expectedVersionCount: 1 });
+    expect(response.status).toBe(201);
+    const sourceRead = fake.calls.find(({ sql }) => sql.includes("join messages message") && sql.includes("for update of thread"));
+    expect(sourceRead?.sql).toContain("coalesce(message_run.plan_only, false) or coalesce(workflow.plan_only, false)");
+    expect(sourceRead?.sql).toContain("coalesce(workflow.never_wait, false)");
+    const workflowInsert = fake.calls.find(({ sql }) => sql.includes("insert into workflows"));
+    expect(workflowInsert?.sql).toContain("plan_only, never_wait");
+    expect(workflowInsert?.values.slice(-2)).toEqual([true, true]);
+    const runInsert = fake.calls.find(({ sql }) => sql.includes("insert into runs"));
+    expect(runInsert?.sql).toContain("plan_only");
+    expect(runInsert?.values.at(-1)).toBe(true);
   });
 });

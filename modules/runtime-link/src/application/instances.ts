@@ -44,11 +44,18 @@ export type RuntimeLinkLocator = {
   /** Relais HTTP vers l'instance propriétaire (même chemin, même bearer, hop=1). */
   forwardProxy(runtimeId: string, request: Request): Promise<Response>;
   forwardDial(runtimeId: string, request: RelayRequest, signal?: AbortSignal): Promise<Response>;
-  forwardRotate(runtimeId: string, frame: RelayLinkRotateFrame): Promise<boolean>;
+  /**
+   * `"unknown"` : la trame a peut-être été écrite (saut expiré, réponse
+   * perdue ou illisible). L'appelant ne doit pas défaire la rotation.
+   */
+  forwardRotate(runtimeId: string, frame: RelayLinkRotateFrame): Promise<ControlPush>;
   forwardClose(runtimeId: string, code: number, reason: string): Promise<boolean>;
   /** Sonde le lien sur l'instance propriétaire ; attend son verdict, borné. */
   forwardProbe(runtimeId: string, expectedGeneration: string | null): Promise<LinkProbeResult>;
 };
+
+/** Issue d'une trame de contrôle poussée : certaine (`true`/`false`) ou inconnue. */
+export type ControlPush = boolean | "unknown";
 
 export type InstanceRegistry = {
   heartbeat(): Promise<void>;
@@ -217,11 +224,12 @@ export function createRuntimeLinkLocator(
     async forwardClose(runtimeId, code, reason) {
       const target = await remoteUrl(runtimeId);
       if (!("url" in target)) return false;
-      return forwardControl(fetchImpl, config, target.url, runtimeId, {
+      // Une fermeture incertaine n'a rien à défaire : seul `true` compte.
+      return (await forwardControl(fetchImpl, config, target.url, runtimeId, {
         kind: "close",
         code,
         reason,
-      });
+      })) === true;
     },
     async forwardProbe(runtimeId, expectedGeneration) {
       const target = await remoteUrl(runtimeId);
@@ -380,9 +388,10 @@ async function forwardControl(
   base: string,
   runtimeId: string,
   body: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<ControlPush> {
+  let response: Response;
   try {
-    const response = await fetchImpl(
+    response = await fetchImpl(
       `${base.replace(/\/+$/, "")}${RUNTIME_LINK_INTERNAL_PREFIX}/${encodeURIComponent(runtimeId)}/control`,
       {
         method: "POST",
@@ -398,12 +407,33 @@ async function forwardControl(
         signal: AbortSignal.timeout(LINK_CONTROL_FORWARD_TIMEOUT_MS),
       },
     );
-    if (!response.ok) return false;
-    const payload = await response.json().catch(() => null) as { pushed?: unknown } | null;
-    return payload?.pushed === true;
   } catch {
-    return false;
+    // Échéance ou coupure : la requête a pu atteindre le propriétaire.
+    return "unknown";
   }
+  return controlPushOf(response);
+}
+
+/**
+ * Lit la réponse de la route `control`. Refus certain : un échec marqué
+ * `before_dispatch`, une erreur 4xx (la route refuse avant toute trame), ou
+ * `{ pushed: false }` sans réserve. Tout le reste (5xx non marqué, corps
+ * illisible, `uncertain`) est inconnu.
+ */
+export async function controlPushOf(response: Response): Promise<ControlPush> {
+  if (!response.ok) {
+    if (relayStageOf(response.headers) === "before_dispatch") return false;
+    return response.status >= 400 && response.status < 500 ? false : "unknown";
+  }
+  let payload: { pushed?: unknown; uncertain?: unknown } | null;
+  try {
+    payload = await response.json() as { pushed?: unknown; uncertain?: unknown } | null;
+  } catch {
+    return "unknown";
+  }
+  if (payload?.pushed === true) return true;
+  if (payload?.pushed === false && payload.uncertain !== true) return false;
+  return "unknown";
 }
 
 async function dialFailureFromRelay(response: Response, stage: "before_dispatch" | "after_dispatch"): Promise<RelayDialError> {

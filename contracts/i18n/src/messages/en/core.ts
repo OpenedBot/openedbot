@@ -97,6 +97,12 @@ export const apiClient = {
   httpGateway: "The API is unreachable or restarting (HTTP {status}).",
   httpServerError: "The API hit an error without explaining it (HTTP {status}). Retry; if it persists, check its log.",
   httpRefused: "Request refused by the API (HTTP {status}).",
+  /** Client deadline exceeded, no HTTP status: a read is safe to retry. */
+  readTimeout: "The API did not answer in time. Try again in a moment.",
+  /** A write without an answer may have gone through: do not blindly redo it. */
+  writeTimeout: "The API did not answer in time: the action may have gone through. Check before trying again.",
+  /** A success whose body is not JSON (proxy page, truncated answer). */
+  invalidResponse: "Unreadable answer from the API (HTTP {status}): nothing was confirmed.",
 } as const;
 
 export const face = {

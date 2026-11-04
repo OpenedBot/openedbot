@@ -76,7 +76,13 @@ function BotRuntimeMemoryPanel({
   const [draft, setDraft] = useState("");
   const [target, setTarget] = useState<RuntimeMemoryTarget>("memory");
   const [editing, setEditing] = useState<{ target: RuntimeMemoryTarget; entry: string; value: string } | null>(null);
-  const [brief, setBrief] = useState("");
+  /**
+   * Le brief en cours d'édition. `null` : pas touché, le champ montre celui
+   * de la section. Une chaîne vide est un brief VIDÉ exprès, à enregistrer :
+   * sans cette distinction, effacer le champ y remettait l'ancien brief et la
+   * suppression ne partait jamais.
+   */
+  const [brief, setBrief] = useState<string | null>(null);
   const roster = useQuery({ queryKey: queryKeys.roster, queryFn: api.roster });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.botRuntimeMemory(bot.id) });
 
@@ -98,8 +104,11 @@ function BotRuntimeMemoryPanel({
   });
   const saveBrief = useMutation({
     mutationFn: (context: string) => api.updateSection(bot.sectionId, { context }),
-    onSuccess: async () => {
+    onSuccess: async (_section, saved) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.roster });
+      // Enregistré : le champ suit de nouveau la section, sauf si l'on a
+      // repris la saisie entre-temps.
+      setBrief((current) => (current === saved ? null : current));
     },
   });
 
@@ -296,12 +305,11 @@ function BotRuntimeMemoryPanel({
             <Label htmlFor="bot-runtime-memory-team-brief">{t("botMemory.teamBriefTitle")}</Label>
             <textarea
               id="bot-runtime-memory-team-brief"
-              value={brief || section.context || ""}
+              value={brief ?? section.context ?? ""}
               maxLength={SECTION_CONTEXT_MAX_CHARS}
               onChange={(event) => setBrief(event.target.value)}
               onBlur={() => {
-                const next = brief || section.context || "";
-                if (next !== (section.context ?? "")) saveBrief.mutate(next);
+                if (brief !== null && brief !== (section.context ?? "")) saveBrief.mutate(brief);
               }}
               placeholder={t("botMemory.teamBriefPlaceholder")}
               className="scrollbar-subtle min-h-20 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm"

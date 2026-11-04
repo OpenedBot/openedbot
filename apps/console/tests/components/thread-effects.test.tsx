@@ -73,96 +73,68 @@ describe("live turn header", () => {
     </I18nProvider>
   );
 
-  test("thinks while working, collapses to the worked line when the answer starts, then settles", () => {
+  test("thinks while working, reads « Réflexions » while the answer streams, then « Réflexion : Ns »", () => {
     const { container, rerender } = render(view({ live: true }));
     const block = () => container.querySelector<HTMLElement>("[data-turn-activity]")!;
     const head = () => block().querySelector<HTMLButtonElement>("[data-activity-head]")!;
     expect(block().hasAttribute("data-thinking")).toBe(true);
-    expect(head().getAttribute("aria-expanded")).toBe("true");
-    expect(head().querySelector("[data-thinking-elapsed]")).not.toBeNull();
+    expect(head().querySelector("[data-thinking-elapsed]")?.textContent).toBe("2s");
 
     rerender(view({ live: true, answering: true }));
     expect(block().hasAttribute("data-thinking")).toBe(false);
-    expect(head().querySelector("[data-thinking-status]")).toBeNull();
-    expect(head().getAttribute("aria-expanded")).toBe("false");
-    // The timer froze where the answer started (about 2 s of the run).
-    expect(head().querySelector("[data-activity-summary]")?.textContent).toMatch(/^A travaillé 2\s?s$/);
+    expect(head().querySelector("[data-thinking-elapsed]")).toBeNull();
+    expect(head().querySelector("[data-activity-summary]")?.textContent).toBe("Réflexions");
 
     rerender(view({ live: false, workedMs: 6400 }));
-    expect(head().querySelector("[data-activity-summary]")?.textContent).toMatch(/^A travaillé 6,4\s?s$/);
+    expect(head().querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 6s");
+    expect(head().getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("names the tool that is running, from its preview, instead of the generic status", () => {
-    const running: ToolCall[] = [
-      { tool: "web_search", done: true, preview: "old query" },
-      { tool: "web_search", done: false, preview: "cours du bitcoin en euros" },
-    ];
-    const label = (container: HTMLElement) => container.querySelector("[data-turn-activity] [data-thinking-label]")?.textContent;
-    const { container, rerender } = render(
-      <I18nProvider>
-        <TurnActivity calls={running} live since={Date.now()} forceOpen={false} author={null} showAuthorLabel={false}>
-          <ActivityRow kind="thinking">log row</ActivityRow>
-        </TurnActivity>
-      </I18nProvider>,
-    );
-    expect(label(container)).toBe("Recherche : cours du bitcoin en euros");
-
-    // Every tool closed: the model is thinking again, and the line says so.
-    rerender(
-      <I18nProvider>
-        <TurnActivity calls={[{ tool: "web_search", done: true, preview: "x" }]} live since={Date.now()} forceOpen={false} author={null} showAuthorLabel={false}>
-          <ActivityRow kind="thinking">log row</ActivityRow>
-        </TurnActivity>
-      </I18nProvider>,
-    );
-    // Not held: the 800 ms hold paces one tool label after another, but a
-    // tool that ended returns to the generic line at once (086376fb).
-    expect(label(container)).toBe("Réfléchit…");
-  });
-
-  test("a turn waiting on a decision stays open but does not animate as thinking", () => {
+  test("a turn waiting on a decision opens its log and does not roll the feed", () => {
     const { container } = render(view({ live: true, waiting: true }));
     expect(container.querySelector("[data-turn-activity]")!.hasAttribute("data-thinking")).toBe(false);
-    expect(container.querySelector("[data-thinking-status]")).toBeNull();
-    expect(container.querySelector("[data-activity-head]")!.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector("[data-turn-activity] > [data-open]")!.getAttribute("data-open")).toBe("true");
   });
 });
 
-describe("answer reveal", () => {
-  const blocks = (container: HTMLElement) =>
-    [...container.querySelectorAll("p, li")].map((node) => `${node.textContent}:${node.classList.contains("ohb-reveal")}`);
+describe("answer stream words", () => {
+  const words = (container: HTMLElement) => [...container.querySelectorAll(".grok-w")].map((node) => node.textContent);
 
-  test("only blocks born while streaming blur in; a settled answer carries no reveal class", () => {
+  test("only blocks the stream writes carry word spans; a settled answer carries none", () => {
     const settled = render(<ThreadMarkdown>{"Un.\n\nDeux."}</ThreadMarkdown>);
-    expect(settled.container.querySelector(".ohb-reveal")).toBeNull();
+    expect(settled.container.querySelector(".grok-w")).toBeNull();
     settled.unmount();
 
-    // Mounted mid-stream with a block already there: that block does not replay.
-    const midStream = render(<ThreadMarkdown streaming>{"Un."}</ThreadMarkdown>);
-    expect(blocks(midStream.container)).toEqual(["Un.:false"]);
-    midStream.rerender(<ThreadMarkdown streaming>{"Un.\n\nDeux."}</ThreadMarkdown>);
-    expect(blocks(midStream.container)).toEqual(["Un.:false", "Deux.:true"]);
-    // Ending the stream keeps the class on the revealed block (no cut animation);
-    // a block that only the final flush brings is born in the same mount, so it reveals too.
-    midStream.rerender(<ThreadMarkdown>{"Un.\n\nDeux.\n\nTrois."}</ThreadMarkdown>);
-    expect(blocks(midStream.container)).toEqual(["Un.:false", "Deux.:true", "Trois.:true"]);
+    // Mounted mid-stream with a block already there: only the block being written is wrapped.
+    const midStream = render(<ThreadMarkdown streaming>{"Un deux.\n\nTrois"}</ThreadMarkdown>);
+    expect(words(midStream.container)).toEqual(["Trois"]);
+    midStream.rerender(<ThreadMarkdown streaming>{"Un deux.\n\nTrois quatre.\n\nCinq"}</ThreadMarkdown>);
+    expect(words(midStream.container)).toEqual(["Cinq"]);
+    // Ending the stream keeps the spans of a block it wrote: its last words finish their blur.
+    midStream.rerender(<ThreadMarkdown>{"Un deux.\n\nTrois quatre.\n\nCinq six."}</ThreadMarkdown>);
+    expect(words(midStream.container)).toEqual(["Cinq ", "six."]);
   });
 
-  test("an answer that starts empty reveals every block, and a list reveals item by item", () => {
+  test("a word already on screen keeps its node as the stream grows: only new words blur in", () => {
     const view = render(<ThreadMarkdown streaming>{""}</ThreadMarkdown>);
-    view.rerender(<ThreadMarkdown streaming>{"Intro.\n\n- a\n- b"}</ThreadMarkdown>);
-    expect(blocks(view.container)).toEqual(["Intro.:true", "a:true", "b:true"]);
-    expect(view.container.querySelector("ul")!.classList.contains("ohb-reveal")).toBe(false);
+    view.rerender(<ThreadMarkdown streaming>{"Bonjour à"}</ThreadMarkdown>);
+    const first = view.container.querySelector(".grok-w")!;
+    view.rerender(<ThreadMarkdown streaming>{"Bonjour à tous, voici"}</ThreadMarkdown>);
+    expect(view.container.querySelector(".grok-w")).toBe(first);
+    expect(words(view.container)).toEqual(["Bonjour ", "à ", "tous, ", "voici"]);
+    expect(view.container.querySelector(".ohb-stream-caret, .ohb-stream-tail")).toBeNull();
   });
 
-  test("the caret flips data-tick on every update so its blink restarts", () => {
-    const view = render(<ThreadMarkdown streaming>{"Bon"}</ThreadMarkdown>);
-    const tick = () => view.container.querySelector(".ohb-stream-caret")!.getAttribute("data-tick");
-    const first = tick();
-    view.rerender(<ThreadMarkdown streaming>{"Bonjour"}</ThreadMarkdown>);
-    expect(tick()).not.toBe(first);
+  test("a streamed lead title still reads as a title", () => {
+    const view = render(<ThreadMarkdown streaming>{""}</ThreadMarkdown>);
+    view.rerender(<ThreadMarkdown streaming>{"Ce qui tient\nLa suite arrive"}</ThreadMarkdown>);
+    expect(view.container.querySelector("[data-lead-title]")?.textContent).toBe("Ce qui tient");
+    view.rerender(<ThreadMarkdown streaming>{"Prix : dix euros"}</ThreadMarkdown>);
+    expect(view.container.querySelector("[data-lead-label]")?.textContent).toBe("Prix");
+    expect(view.container.querySelector("p")!.textContent).toBe("Prix : dix euros");
   });
 });
+
 
 describe("thread timeline status and action row", () => {
   function timeline(props: { events: StoredProductEvent[]; runs: Array<Pick<RunDto, "id" | "status" | "completionKind" | "stepKind" | "createdAt">>; running: boolean }) {
@@ -200,12 +172,12 @@ describe("thread timeline status and action row", () => {
 
   test("a queued run shows the thinking status before any step, counting from the run's start", () => {
     const { container } = render(timeline({ events: [], runs: [runOf("queued")], running: true }));
-    const status = container.querySelector("[data-thread-thinking] [data-thinking-status]");
+    const status = container.querySelector("[data-thread-thinking][data-thinking-status]");
     expect(status).not.toBeNull();
-    expect(container.querySelector("[data-thinking-elapsed]")!.textContent).toMatch(/^3,[0-9]\s?s$/);
+    expect(container.querySelector("[data-thinking-elapsed]")!.textContent).toMatch(/^3s$/);
   });
 
-  test("a salon names the member whose turn it is while their run has no block yet", () => {
+  test("a salon marks the member whose turn it is while their run has no block yet", () => {
     const camille = { id: "bot-camille", name: "Camille", slug: "camille", face: null };
     const { container } = render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -222,7 +194,7 @@ describe("thread timeline status and action row", () => {
         </I18nProvider>
       </QueryClientProvider>,
     );
-    expect(container.querySelector("[data-thread-thinking] [data-thinking-label]")!.textContent).toBe("Camille réfléchit…");
+    expect(container.querySelector("[data-thread-thinking]")!.getAttribute("data-author")).toBe("bot-camille");
   });
 
   test("a salon keeps the live block of a member still working after another member's run closed", () => {
@@ -243,17 +215,21 @@ describe("thread timeline status and action row", () => {
     const long = `${"Une réponse assez longue pour être confirmée. ".repeat(8)}`;
     const { container } = render(timeline({ events: [text(long)], runs: [runOf("running")], running: true }));
     expect(container.querySelector("[data-thread-thinking]")).toBeNull();
-    expect(container.querySelector("[data-assistant-layout='bubble']")).not.toBeNull();
+    expect(container.querySelector("[data-assistant-layout='grok']")).not.toBeNull();
   });
 
-  test("a finished answer has nothing under it, as in Grok Bot: no action row, no stopwatch", () => {
+  test("a finished answer carries grok's action row, risen in once; no stopwatch", () => {
     const long = `${"Une réponse assez longue pour être confirmée. ".repeat(8)}`;
     const done = text(long);
     const live = render(timeline({ events: [done], runs: [runOf("running")], running: true }));
+    expect(live.container.querySelector("[data-message-actions-placement='below']")).toBeNull();
     live.rerender(timeline({ events: [done], runs: [runOf("completed")], running: false }));
-    expect(live.container.querySelector("[data-message-actions-row]")).toBeNull();
-    expect(live.container.querySelector("[data-message-hover-actions]")).toBeNull();
-    expect(live.container.querySelector(".tabular-nums")).toBeNull();
+    const row = live.container.querySelector("[data-message-actions-placement='below']");
+    expect(row).not.toBeNull();
+    expect(row!.className).toContain("opacity-100");
+    expect(row!.className).toContain("grok-enter");
+    expect(row!.querySelector("button[aria-label]")).not.toBeNull();
+    expect(live.container.querySelector("[data-run-timing]")).toBeNull();
   });
 });
 
@@ -264,6 +240,14 @@ describe("prefers-reduced-motion", () => {
     expect(reduced).toMatch(/\.ohb-stream-caret \{\s*animation: none;/);
   });
 
+  test("every grok.com motion stops: words, feed, dots, shimmer, pop", () => {
+    const reduced = reducedMotion(css("grok-motion.css"));
+    for (const name of [".grok-w", ".grok-feed-in", ".grok-feed-out", ".grok-dot", ".grok-shimmer", ".grok-pop", ".grok-enter"]) {
+      expect(reduced).toContain(`${name},`);
+    }
+    expect(reduced).toContain("animation: none !important;");
+  });
+
   test("the dots' pop-in and the guide draw stop", () => {
     // Grok Bot's typing dots never wave: only their pop-in moves.
     expect(css("agent-activity.css")).not.toMatch(/\.ohb-thinking-dots > i \{[^}]*animation/);
@@ -272,44 +256,60 @@ describe("prefers-reduced-motion", () => {
   });
 });
 
-describe("Grok Bot's thread theme", () => {
+describe("grok.com's thread theme", () => {
   const theme = css("thread-theme.css");
   const block = (selector: string) => {
     const start = theme.indexOf(`${selector} {`);
     return theme.slice(start, theme.indexOf("}", start));
   };
 
-  test("the measured surfaces, light and dark", () => {
-    expect(block(":root")).toContain("--ohb-thread-page: #f5f5f6;");
-    expect(block(":root")).toContain("--ohb-bubble-agent: rgb(28 28 28 / 0.06);");
-    // OpenBot's canvas (restyle 2026-11-02), like the main card it sits in.
-    expect(block(".dark")).toContain("--ohb-thread-page: #1a1a1a;");
-    expect(block(".dark")).toContain("--ohb-bubble-agent: rgb(245 245 245 / 0.04);");
-    expect(block(".dark [data-thread-column]")).toContain("--bui-background-primary-default: #1f1f1f;");
+  test("grok.com's dark tokens, and their light transposition", () => {
+    expect(block(".dark")).toContain("--grok-base: #131211;");
+    expect(block(".dark")).toContain("--grok-raised: #201f1d;");
+    expect(block(".dark")).toContain("--grok-fg: #fcfcfc;");
+    expect(block(".dark")).toContain("--grok-fg2: #9e9e9e;");
+    expect(block(":root")).toContain("--grok-base: #ffffff;");
+    expect(block(":root")).toContain("--grok-blue: #299fff;");
   });
 
-  test("the operator's bubble is the bot's colour, darkened 12 % in light and 8 % in dark", () => {
-    expect(block(":root")).toContain("--ohb-bubble-user-mix: 88%;");
-    expect(block(".dark")).toContain("--ohb-bubble-user-mix: 92%;");
-    expect(theme).toContain("color-mix(in srgb, var(--bot-tint) var(--ohb-bubble-user-mix), black)");
+  test("the answer has no bubble: 15/22.5, headings 20/28 at 550, blocks 15 px apart", () => {
+    expect(block('[data-assistant-layout="grok"] .prose')).toContain("line-height: 22.5px;");
+    expect(block('[data-assistant-layout="grok"] .prose :is(h1, h2, h3, h4, h5, h6)')).toContain("font-weight: 550;");
+    expect(block('[data-assistant-layout="grok"] .prose > * + *')).toContain("margin-top: 15px;");
+    expect(block('[data-assistant-layout="grok"] [data-md-table]')).toContain("border-radius: 16px;");
   });
 
-  test("a bot without colour: the operator's bubble and send button are ink, as Grok Bot's grey bot", () => {
-    expect(block(":root")).toContain("--ohb-bubble-user-neutral: #1c1c1c;");
-    expect(block(":root")).toContain("--ohb-send-neutral: #1c1c1c;");
-    expect(block(".dark")).toContain("--ohb-bubble-user-neutral: rgb(245 245 245 / 0.18);");
-    expect(block(".dark")).toContain("--ohb-send-neutral: #f5f5f5;");
-    expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--ohb-bubble-user-neutral\);/);
+  test("the bubbles are Grok Bot's: agent veil, user ink or the bot's fill, per theme", () => {
+    expect(theme).toContain("--ohb-bubble-agent: rgb(28 28 28 / 0.06);");
+    expect(theme).toContain("--ohb-bubble-agent: rgb(245 245 245 / 0.04);");
+    expect(theme).toContain("--ohb-bubble-user: #1c1c1c;");
+    expect(theme).toContain("--ohb-bubble-user: rgb(245 245 245 / 0.18);");
+    expect(theme).toMatch(/\[data-assistant-layout="grok"\] \{\s*background-color: var\(--ohb-bubble-agent\);/);
+    expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--ohb-user-fill, var\(--ohb-bubble-user\)\);/);
+    expect(theme).toMatch(/\.dark \[data-thread-column\] \{\s*--ohb-user-fill: var\(--ohb-user-fill-dark\);/);
   });
 
-  test("a code block is Grok Bot's card: radius 14, mono 12/18", () => {
-    expect(block("[data-code-block]")).toContain("border-radius: 14px;");
-    expect(block("[data-code-block] > :is(.ohb-code, pre)")).toContain("line-height: 18px;");
+  test("inline code is Grok Bot's in both themes: the text's ink on a 4 % / 2 % veil", () => {
+    expect(theme).toContain("--ohb-code-inline: rgb(28 28 28 / 0.04);");
+    expect(theme).toContain("--ohb-code-inline: rgb(245 245 245 / 0.02);");
+    expect(theme).toMatch(/\.prose :not\(pre\) > code \{\s*color: inherit;\s*background-color: var\(--ohb-code-inline\);/);
+    // Typography's inks follow the thread tokens, never its light-only defaults.
+    expect(theme).toContain("--tw-prose-code: var(--grok-fg);");
+  });
+
+  test("the composer is grok's: radius 24, 16/28 field, blue send that pops, a quiet disabled send when empty", () => {
+    expect(theme).toContain("border-radius: 24px;");
+    expect(theme).toContain("line-height: 28px;");
+    expect(theme).toContain("background: var(--grok-blue);");
+    expect(theme).toContain("animation: grok-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;");
+    expect(theme).toContain("[data-composer-send-action]:disabled {");
+    expect(theme).not.toContain("data-composer-voice");
+    expect(theme).not.toContain("data-voice-mode");
   });
 
   test("a date is a plain centred line, not a pill", () => {
     const chip = block("[data-thread-date] .bui-date-chip");
     expect(chip).toContain("background: none;");
-    expect(chip).toContain("font-size: 12px;");
+    expect(chip).toContain("font-size: 13px;");
   });
 });

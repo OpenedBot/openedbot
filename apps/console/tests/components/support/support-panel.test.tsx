@@ -1,6 +1,6 @@
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -24,6 +24,10 @@ let openReply: { status: number; body: unknown } = { status: 201, body: null };
 let historyReply: { conversations: unknown[] } = { conversations: [] };
 /** Les fils que `GET /api/support/conversations/:id` sait rendre. */
 let threads: Record<string, unknown> = {};
+/** Une lecture de fil retenue jusqu'à ce que le test la libère. */
+let threadDelays: Record<string, Promise<void>> = {};
+/** Statut de `POST …/messages` : 201 par défaut, une panne si le test le règle. */
+let sendStatus = 201;
 
 function href(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
@@ -82,6 +86,8 @@ beforeEach(() => {
   calls = [];
   historyReply = { conversations: [] };
   threads = {};
+  threadDelays = {};
+  sendStatus = 201;
   openReply = { status: 201, body: { conversationId: snapshot().conversationId, token: "jeton-de-test-assez-long-0123456789", snapshot: snapshot() } };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = href(input);
@@ -98,6 +104,7 @@ beforeEach(() => {
     }
     const thread = /\/api\/support\/conversations\/([0-9a-f-]{36})$/.exec(url);
     if (thread && method === "GET") {
+      await threadDelays[thread[1] as string];
       const found = threads[thread[1] as string];
       return found ? json(found) : new Response(null, { status: 404 });
     }
@@ -119,6 +126,7 @@ beforeEach(() => {
       });
     }
     if (url.includes("/messages")) {
+      if (sendStatus !== 201) return json({ error: { code: "UNAVAILABLE", message: "Envoi indisponible." } }, sendStatus);
       return new Response(
         JSON.stringify(snapshot([
           { id: "m-1", author: "guest", staffName: null, body: "mon runtime ne se connecte pas", attachments: [], createdAt: "2026-09-12T08:01:00.000Z" },
@@ -151,7 +159,7 @@ function signIn(): void {
 
 async function renderPanel(
   initialPath = "/",
-  options: { identified?: boolean; panel?: ComponentProps<typeof SupportPanel> } = {},
+  options: { identified?: boolean; panel?: ComponentProps<typeof SupportPanel>; host?: () => ReactElement } = {},
 ) {
   // `DEFAULT_LOCALE` est l'anglais : sans ce réglage, l'écran se rend en
   // anglais et les libellés attendus ici ne s'y trouvent pas. Même préambule
@@ -160,7 +168,7 @@ async function renderPanel(
   if (options.identified) signIn();
   const panel = options.panel ?? { onClose: () => {} };
   const rootRoute = createRootRoute({
-    component: () => <SupportPanel {...panel} />,
+    component: options.host ?? (() => <SupportPanel {...panel} />),
   });
   const anyRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -283,6 +291,47 @@ describe("l’envoi d’un message", () => {
   });
 });
 
+describe("un envoi qui échoue", () => {
+  async function openedThread() {
+    await renderPanel();
+    fireEvent.change(screen.getByLabelText("Votre adresse e-mail"), { target: { value: "visiteur@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Commencer" }));
+    return await waitFor(() => screen.getByPlaceholderText("Écrire un message") as HTMLTextAreaElement);
+  }
+  const sends = () => calls.filter((call) => call.url.includes("/messages"));
+
+  test("un composer resté vide reprend le texte, et le renvoi garde la même clé", async () => {
+    const field = await openedThread();
+    sendStatus = 503;
+    fireEvent.change(field, { target: { value: "premier essai" } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer" }));
+    await waitFor(() => expect(field.value).toBe("premier essai"));
+
+    sendStatus = 201;
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer" }));
+    await waitFor(() => expect(sends()).toHaveLength(2));
+    expect(sends()[1]!.headers["Idempotency-Key"]).toBe(sends()[0]!.headers["Idempotency-Key"]);
+  });
+
+  test("un nouveau brouillon n'est pas écrasé : l'envoi échoué attend son « Réessayer », avec sa clé", async () => {
+    const field = await openedThread();
+    sendStatus = 503;
+    fireEvent.change(field, { target: { value: "premier message" } });
+    fireEvent.click(screen.getByRole("button", { name: "Envoyer" }));
+    fireEvent.change(field, { target: { value: "deuxième, commencé pendant l’envoi" } });
+
+    await waitFor(() => expect(screen.getByText("Message non envoyé, gardé de côté : « premier message »")).toBeTruthy());
+    expect(field.value).toBe("deuxième, commencé pendant l’envoi");
+
+    sendStatus = 201;
+    fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    await waitFor(() => expect(sends()).toHaveLength(2));
+    expect((sends()[1]!.body as { body: string }).body).toBe("premier message");
+    expect(sends()[1]!.headers["Idempotency-Key"]).toBe(sends()[0]!.headers["Idempotency-Key"]);
+    expect(field.value).toBe("deuxième, commencé pendant l’envoi");
+  });
+});
+
 describe("l’historique du visiteur", () => {
   test("un opérateur connecté RETROUVE le fil de son compte, sans jeton local", async () => {
     // Le cas qui manquait : aucune session de support dans ce navigateur, et
@@ -396,6 +445,38 @@ describe("la page `/support`", () => {
     fireEvent.click(screen.getByText("un fil de la semaine dernière"));
     expect(changes).toContainEqual([older, false]);
     expect(calls.some((call) => call.method === "GET" && call.url.endsWith(older))).toBe(false);
+  });
+});
+
+describe("deux fils ouverts coup sur coup", () => {
+  test("la réponse tardive du premier ne remplace pas le second, ni à l’écran ni dans l’URL", async () => {
+    const first = "44444444-4444-4444-8444-444444444444";
+    const second = "55555555-5555-4555-8555-555555555555";
+    threads = {
+      [first]: snapshot([{ id: "m-a", author: "guest", staffName: null, body: "le fil lent", attachments: [], createdAt: "2026-09-12T08:00:00.000Z" }], first),
+      [second]: snapshot([{ id: "m-b", author: "guest", staffName: null, body: "le fil rapide", attachments: [], createdAt: "2026-09-12T08:00:00.000Z" }], second),
+    };
+    let release!: () => void;
+    threadDelays[first] = new Promise<void>((resolve) => { release = resolve; });
+    const changes: Array<string | null> = [];
+    let select!: (id: string) => void;
+    function Host() {
+      const [conversationId, setConversationId] = useState(first);
+      select = setConversationId;
+      return <SupportPanel variant="page" conversationId={conversationId} onConversationChange={(id) => changes.push(id)} />;
+    }
+    await renderPanel("/", { identified: true, host: Host });
+
+    act(() => select(second));
+    await waitFor(() => expect(screen.getByText("le fil rapide")).toBeTruthy());
+    await act(async () => {
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(screen.queryByText("le fil lent")).toBeNull();
+    expect(screen.getByText("le fil rapide")).toBeTruthy();
+    expect(changes).not.toContain(first);
   });
 });
 

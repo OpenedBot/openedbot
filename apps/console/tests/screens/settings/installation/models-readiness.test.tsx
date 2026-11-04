@@ -347,11 +347,12 @@ describe("écran Modèles ouvert", () => {
   test("bureau : une page en trois blocs, sans onglet ni dialogue", async () => {
     stubFetch({ runtimeMode: "external", runtime, catalog: catalogWith([provider]) });
     renderModels();
-    expect(await screen.findByText("Modèle par défaut")).toBeTruthy();
+    // Le libellé lié à un vrai sélecteur : la silhouette écrit déjà les titres fixes.
+    expect(await screen.findByLabelText("Fournisseur")).toBeTruthy();
+    expect(screen.getByText("Modèle par défaut")).toBeTruthy();
     expect(screen.getByText("Modèle des bots")).toBeTruthy();
     expect(screen.queryByRole("tab")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByLabelText("Fournisseur")).toBeTruthy();
     expect(screen.getAllByRole("radio")).toHaveLength(2);
     expect(screen.queryByPlaceholderText("Rechercher un fournisseur…")).toBeNull();
   });

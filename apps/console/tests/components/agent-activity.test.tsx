@@ -7,6 +7,8 @@ import { I18nProvider } from "../../src/lib/i18n";
 import { ActivityNarration, ActivityRow, ActivitySearch, TurnActivity } from "../../src/components/thread-turn-activity";
 import { toolKindIcon } from "../../src/components/thread-tool-state-icon";
 import { ToolActivity } from "../../src/components/thread-tool-activity";
+import type { GrokFeedItem } from "../../src/components/grok/grok-feed";
+import { AttachmentCanvas, AttachmentCanvasProvider } from "../../src/components/attachment-canvas";
 
 /** A ResizeObserver stand-in: the components observe, nothing here measures. */
 const observers: Array<{ callback: ResizeObserverCallback; targets: Element[] }> = [];
@@ -32,10 +34,10 @@ const calls: ToolCall[] = [
   { tool: "terminal", done: true, preview: "bun run build", durationMs: 800 },
 ];
 
-function view({ live, forceOpen = false, feed = calls }: { live: boolean; forceOpen?: boolean; feed?: ToolCall[] }) {
+function view({ live, forceOpen = false, feed = calls, rows = [] }: { live: boolean; forceOpen?: boolean; feed?: ToolCall[]; rows?: GrokFeedItem[] }) {
   return (
     <I18nProvider>
-      <TurnActivity calls={feed} live={live} forceOpen={forceOpen} author={null} showAuthorLabel={false}>
+      <TurnActivity calls={feed} feed={rows} live={live} forceOpen={forceOpen} author={null} showAuthorLabel={false}>
         <ActivityRow kind="thinking">
           <ActivityNarration text="Je regarde le dépôt." streaming={false} />
         </ActivityRow>
@@ -74,23 +76,31 @@ describe("ToolActivity identity", () => {
   });
 });
 
-describe("TurnActivity (« A travaillé » fold)", () => {
-  test("a live turn shows a working header and its whole chronological list, never capped", () => {
-    const { container } = render(view({ live: true }));
+describe("TurnActivity (grok.com's agents header and rolling feed)", () => {
+  const rows: GrokFeedItem[] = [
+    { id: "s1", kind: "status", text: "Je regarde le dépôt." },
+    { id: "q1", kind: "search", query: "acme pricing", results: 4, sites: [] },
+    { id: "t1", kind: "tool", label: "Lecture : app.ts" },
+    { id: "t2", kind: "tool", label: "Commande : bun test", pending: true },
+  ];
+  const fold = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-turn-activity] > [data-open]")!;
+
+  test("a live turn rolls its last three steps under grok's solo « Réflexion • Ns »; the full log waits, folded", () => {
+    const { container } = render(view({ live: true, rows }));
     const block = container.querySelector<HTMLElement>("[data-turn-activity]")!;
     expect(block.hasAttribute("data-live")).toBe(true);
     expect(block.getAttribute("aria-busy")).toBe("true");
     const head = block.querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    expect(head.getAttribute("aria-expanded")).toBe("true");
-    // The live header is the thinking status: dots, shimmering label, timer.
-    expect(head.querySelector("[data-thinking-dots]")).not.toBeNull();
-    expect(head.querySelector("[data-thinking-label]")?.textContent).toBe("Réfléchit…");
-    expect(head.querySelector("[data-thinking-elapsed]")?.textContent).toMatch(/^\d+,\d s$/);
-    expect(block.querySelector("[data-activity-window]")).toBeNull();
-    expect(block.querySelector("[data-activity-show-all]")).toBeNull();
+    // Running, the header opens nothing: grok's is a plain status line.
+    expect(head.hasAttribute("aria-expanded")).toBe(false);
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion");
+    expect(head.querySelector("[data-thinking-elapsed]")?.textContent).toMatch(/^\d+s$/);
+    const feed = [...block.querySelectorAll("[data-agent-feed-item] [data-feed-row]")].map((row) => row.getAttribute("data-feed-row"));
+    expect(feed).toEqual(["search", "tool", "tool"]);
+    expect(fold(container).getAttribute("data-open")).toBe("false");
+    // The log keeps every row, in order, never capped.
     const list = block.querySelector<HTMLElement>("[data-activity-list]")!;
     expect(list.getAttribute("role")).toBe("list");
-    expect(list.style.transform).toBe("");
     expect([...list.querySelectorAll("[data-activity-row]")].map((row) => row.getAttribute("data-activity-row")))
       .toEqual(["thinking", "tool", "tool", "tool"]);
     // The two consecutive commands share one Tool Result: `terminal ×2`.
@@ -98,23 +108,22 @@ describe("TurnActivity (« A travaillé » fold)", () => {
     expect(list.textContent).toContain("×2");
   });
 
-  test("the turn concluding folds into « A travaillé », then the tool families", () => {
-    const { container, rerender } = render(view({ live: true }));
-    rerender(view({ live: false }));
+  test("the turn concluding empties the feed and folds into « Réflexion : Ns », which opens the log", () => {
+    const { container, rerender } = render(view({ live: true, rows }));
+    rerender(view({ live: false, rows }));
     const block = container.querySelector<HTMLElement>("[data-turn-activity]")!;
     expect(block.hasAttribute("data-live")).toBe(false);
     const head = block.querySelector<HTMLButtonElement>("[data-activity-head]")!;
     expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(head.getAttribute("aria-controls")).toBe(fold(container).id);
     // No run duration given: the tools' own durations (1.2 s + 0.8 s).
-    expect(head.querySelector("[data-activity-summary]")?.textContent).toMatch(/^A travaillé 2\s?s$/);
-    expect(head.querySelector("[data-activity-kinds]")?.textContent).toBe("· 1 recherche web, 1 lecture et 2 commandes");
-    const fold = block.querySelector<HTMLElement>(".ohb-disclosure")!;
-    expect(fold.getAttribute("data-open")).toBe("false");
-    expect(fold.hasAttribute("inert")).toBe(true);
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 2s");
+    expect(fold(container).getAttribute("data-open")).toBe("false");
+    expect(fold(container).firstElementChild?.hasAttribute("inert")).toBe(true);
 
     fireEvent.click(head);
     expect(head.getAttribute("aria-expanded")).toBe("true");
-    expect(fold.getAttribute("data-open")).toBe("true");
+    expect(fold(container).getAttribute("data-open")).toBe("true");
   });
 
   test("the run's own duration wins over the sum of its tools", () => {
@@ -125,24 +134,13 @@ describe("TurnActivity (« A travaillé » fold)", () => {
         </TurnActivity>
       </I18nProvider>,
     );
-    expect(container.querySelector("[data-activity-summary]")?.textContent).toMatch(/^A travaillé 6\s?s$/);
+    expect(container.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 6s");
   });
 
-  test("a pending decision keeps the list open, whatever the run does", () => {
-    const { container } = render(view({ live: true, forceOpen: true }));
-    const head = container.querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    expect(head.getAttribute("aria-expanded")).toBe("true");
-    fireEvent.click(head);
-    expect(head.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  test("the operator can fold a live turn, and reopen it", () => {
-    const { container } = render(view({ live: true }));
-    const head = container.querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    fireEvent.click(head);
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(head);
-    expect(head.getAttribute("aria-expanded")).toBe("true");
+  test("a pending decision opens the log and stops the feed, whatever the run does", () => {
+    const { container } = render(view({ live: true, forceOpen: true, rows }));
+    expect(fold(container).getAttribute("data-open")).toBe("true");
+    expect(container.querySelectorAll("[data-agent-feed-item]")).toHaveLength(0);
   });
 
   test("a turn that ended on a failed tool stays open on it; the operator's click still folds it", () => {
@@ -154,16 +152,15 @@ describe("TurnActivity (« A travaillé » fold)", () => {
     rerender(view({ live: false, feed: failing }));
     const head = container.querySelector<HTMLButtonElement>("[data-activity-head]")!;
     expect(head.getAttribute("aria-expanded")).toBe("true");
-    const fold = container.querySelector<HTMLElement>("[data-turn-activity] > .ohb-disclosure")!;
-    expect(fold.getAttribute("data-open")).toBe("true");
-    expect(fold.hasAttribute("inert")).toBe(false);
-    const failed = fold.querySelector<HTMLElement>('[data-tool-result][data-state="failed"]')!;
+    expect(fold(container).getAttribute("data-open")).toBe("true");
+    expect(fold(container).firstElementChild?.hasAttribute("inert")).toBe(false);
+    const failed = fold(container).querySelector<HTMLElement>('[data-tool-result][data-state="failed"]')!;
     expect(failed.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded")).toBe("true");
     expect(failed.querySelector("[data-tool-error-inline]")?.textContent).toBe("exit status 1");
 
     fireEvent.click(head);
     expect(head.getAttribute("aria-expanded")).toBe("false");
-    expect(fold.getAttribute("data-open")).toBe("false");
+    expect(fold(container).getAttribute("data-open")).toBe("false");
   });
 
   test("a turn read back from history with a failed tool mounts open", () => {
@@ -171,7 +168,7 @@ describe("TurnActivity (« A travaillé » fold)", () => {
     expect(container.querySelector("[data-activity-head]")?.getAttribute("aria-expanded")).toBe("true");
   });
 
-  test("a turn of unknown tools without any duration only counts them; partial failures read in the header", () => {
+  test("a turn without any duration says « Réflexions », never a made-up time; partial failures read in the header", () => {
     const { container } = render(view({
       live: false,
       feed: [
@@ -180,7 +177,7 @@ describe("TurnActivity (« A travaillé » fold)", () => {
       ],
     }));
     const head = container.querySelector<HTMLElement>("[data-activity-head]")!;
-    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("2 outils");
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexions");
     expect(head.textContent).toContain("1 échec sur 2");
   });
 });
@@ -249,5 +246,60 @@ describe("prefers-reduced-motion", () => {
     const appCss = readFileSync(new URL("../../../../browser/ui-kit/src/styles/app.css", import.meta.url), "utf8");
     const roll = appCss.slice(appCss.indexOf(".ohb-roll {"));
     expect(roll).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.ohb-roll-in \{\s*animation: none;\s*\}\s*\.ohb-roll-out \{\s*display: none;/);
+  });
+});
+
+describe("grok's « Réflexions » panel in the canvas", () => {
+  const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
+  const speaker = { id: "bot-1", name: "Atlas", face: null };
+  const log: GrokFeedItem[] = [
+    { id: "m1", kind: "msg", agent: speaker, text: "Je lance le calcul." },
+    { id: "s1", kind: "search", query: "nombres premiers", results: 2, sites: [], sources: [{ title: "Premiers", url: "https://example.org/p", domain: "example.org" }] },
+    { id: "t1", kind: "tool", label: "Exécute une commande", failed: true, detail: "Traceback (most recent call last)" },
+  ];
+  function canvasView() {
+    return render(
+      <I18nProvider>
+        <AttachmentCanvasProvider>
+          <TurnActivity calls={[{ tool: "terminal", done: true, failed: true }]} feed={log} live={false} forceOpen={false} author={author} showAuthorLabel={false} workedMs={20_000}>
+            <ActivityRow kind="thinking"><span>detail row</span></ActivityRow>
+          </TurnActivity>
+          <AttachmentCanvas />
+        </AttachmentCanvasProvider>
+      </I18nProvider>,
+    );
+  }
+
+  test("the header stays one line and counts the failure; a click opens the panel, not the inline fold", () => {
+    const { container } = canvasView();
+    const head = container.querySelector<HTMLElement>("[data-activity-head]")!;
+    expect(head.className).toContain("whitespace-nowrap");
+    expect(head.textContent).toContain("Réflexion : 20s");
+    expect(head.textContent).toContain("1 échec sur 1");
+    expect(head.textContent).not.toContain("Traceback");
+    fireEvent.click(head);
+    const panel = container.querySelector<HTMLElement>("[data-thoughts-panel]");
+    expect(panel).not.toBeNull();
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    // The thread's own fold stays shut: the log reads in the canvas.
+    expect(container.querySelector("[data-turn-activity] [data-open]")?.getAttribute("data-open")).toBe("false");
+    expect(panel!.querySelector("[data-thoughts-group]")?.textContent).toContain("Atlas");
+    expect(panel!.querySelector('[data-thoughts-row="msg"]')?.textContent).toBe("Je lance le calcul.");
+  });
+
+  test("a failed tool unfolds its error; a search its real sources; close folds the panel", () => {
+    const { container } = canvasView();
+    fireEvent.click(container.querySelector<HTMLElement>("[data-activity-head]")!);
+    const panel = container.querySelector<HTMLElement>("[data-thoughts-panel]")!;
+    const tool = panel.querySelector<HTMLElement>('[data-thoughts-row="tool"]')!;
+    expect(tool.hasAttribute("data-failed")).toBe(true);
+    expect(tool.textContent).not.toContain("Traceback");
+    fireEvent.click(tool.querySelector("button")!);
+    expect(tool.querySelector("pre")?.textContent).toContain("Traceback");
+    const search = panel.querySelector<HTMLElement>('[data-thoughts-row="search"]')!;
+    fireEvent.click(search.querySelector("button")!);
+    expect(search.querySelector("a")?.getAttribute("href")).toBe("https://example.org/p");
+    fireEvent.click(panel.querySelector<HTMLElement>('button[aria-label="Fermer"]')!);
+    expect(container.querySelector("[data-activity-head]")?.getAttribute("aria-expanded")).toBe("false");
   });
 });

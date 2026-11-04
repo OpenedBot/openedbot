@@ -1,8 +1,11 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { segmentMentions } from "@openedbot/roster/domain/mentions";
+import { Check, Copy } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
+import { GrokIcon } from "./grok/grok-icons";
 import { stabilizeStreamingMarkdown } from "../lib/stream/streaming-markdown";
 import { useSmoothText } from "../lib/stream/use-smooth-text";
 import type { MessageAttachmentChip } from "./attachment-canvas";
@@ -146,20 +149,24 @@ export const AssistantMessage = memo(function AssistantMessage({
   const markdown = streaming || text !== targetText
     ? stabilizeStreamingMarkdown(text)
     : text;
-  // La bulle de Grok Bot (`message`) : au plus 560 px, 80 % du fil, et
-  // 82 px de marge face au bord ; rayon 18, marges 7 / 12, le voile vient de
-  // `thread-theme.css`. Rien dessous, comme chez lui : les gestes sont au
-  // clic droit, la durée sous la bulle en dev seulement.
+  // An answer this view saw stream: its action row rises in once (grok.com
+  // `.grok-enter`); one read back from history just sits there.
+  const streamed = useRef(false);
+  if (streaming) streamed.current = true;
+  // Grok Bot's agent bubble (fill, sheen and edge in `thread-theme.css`):
+  // radius 18, padding 7 / 12, at most min(80 %, 560 px, 100 % − 82 px).
+  // Inside, grok.com's `Answer` typography (`data-assistant-layout="grok"`);
+  // every streamed word blurs in (`.grok-w`).
   const surface = (
     <div
       data-thread-find-target={author || hover ? undefined : findTargetId}
-      data-assistant-layout="bubble"
+      data-assistant-layout="grok"
       tabIndex={-1}
       className={`w-fit max-w-[min(80%,560px,calc(100%-82px))] min-w-0 self-start rounded-[18px] px-3 py-[7px] ${findActive ? "ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
       {/* `wrap-anywhere` : une URL interminable (liens RSS Google News…) doit
           casser dans la réponse, jamais élargir le fil en scroll horizontal. */}
-      <div className="ai-response-reveal prose prose-sm max-w-none wrap-anywhere text-[15px] leading-[22px] text-text-primary [--tw-prose-body:var(--bui-text-primary)] [--tw-prose-headings:var(--bui-text-primary)] [--tw-prose-bold:var(--bui-text-primary)] [--tw-prose-links:var(--bui-text-primary)] dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-headings:mt-4 prose-headings:mb-2 prose-h1:text-[22px] prose-h1:leading-[28px] prose-h1:tracking-[-0.012em] prose-h2:text-[17px] prose-h2:leading-6 prose-h2:tracking-[-0.008em] prose-h3:text-[15px] prose-h4:text-[15px] prose-p:my-0 prose-p:leading-[22px] prose-ul:my-0 prose-ol:my-0 prose-li:my-0.5 prose-li:leading-[22px] [&>*+*]:mt-3 [&_li:has([data-lead-title])]:mt-4 prose-li:marker:text-text-tertiary prose-pre:my-3 prose-strong:font-semibold prose-code:rounded prose-code:bg-background-tertiary-hover/60 prose-code:px-1 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+      <div className="prose max-w-none wrap-anywhere text-[15px] leading-[22.5px] prose-code:before:content-none prose-code:after:content-none">
         <ThreadMarkdown streaming={streaming}>{markdown}</ThreadMarkdown>
       </div>
     </div>
@@ -168,7 +175,9 @@ export const AssistantMessage = memo(function AssistantMessage({
     <MessageInteractionShell
       surface="card"
       width="fill"
-      actions="menu"
+      actions="below"
+      persistentActions
+      actionsReveal={streamed.current}
       messageId={hover.messageId}
       align="start"
       labels={hover.labels}
@@ -268,6 +277,7 @@ export const UserMessage = memo(function UserMessage({
   findTargetId,
   findActive = false,
   settled = false,
+  onEdit,
 }: {
   text: string;
   /**
@@ -285,18 +295,19 @@ export const UserMessage = memo(function UserMessage({
   findActive?: boolean;
   /** Hors des derniers tours et du direct : `content-visibility: auto`. Jamais posé sur la bulle sortante. */
   settled?: boolean;
+  /** Rewrite this message (grok.com's « Modifier » under the bubble). */
+  onEdit?: () => void;
 }) {
   const { t } = useT();
   const segments = segmentMentions(text, mentionSlugs);
+  const editAllowed = useThreadEditAvailability((state) => state.canEdit);
   return (
-    // `max-w-[520px]`, la largeur de la bulle, et non `max-w-full` : un plafond en pourcentage ne
-    // borne pas la largeur intrinsèque d'un élément flex. La colonne prenait alors toute la place, la
-    // bulle (plafonnée à 520 px) restait calée à droite dedans, et les actions latérales du survol
-    // (réagir, répondre, …) se retrouvaient loin d'elle sur un long message.
+    // The user's turn: the bubble is at most 560 px (Grok Bot) inside the
+    // 85 % cap the interaction shell around it already sets (`max-w-[85%]`).
     <div
       data-thread-find-target={findTargetId}
       tabIndex={-1}
-      className={`flex max-w-[520px] flex-col items-end gap-1.5 self-end ${settled ? "ohb-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`flex max-w-full flex-col items-end gap-1.5 self-end ${settled ? "ohb-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
     >
       {attachments?.length ? (
         <ul className="flex flex-wrap justify-end gap-1.5">
@@ -312,17 +323,12 @@ export const UserMessage = memo(function UserMessage({
       ) : null}
       {/* Une bulle vide sous les puces se lirait comme un message perdu :
           joindre sans écrire un mot n'en rend aucune. */}
-      {/* Le fond et l'encre viennent de `thread-theme.css`, comme chez Grok
-          Bot : la couleur du bot, ou l'encre pour un bot sans couleur.
-          Plafond en pixels seuls (560, celui de Grok Bot), pas `min(560px,100%)` : ce pourcentage se
-          rapporte à une colonne dimensionnée par la bulle elle-même, et
-          Firefox en tirait une largeur trop courte d'un cheveu (« carbo ? »
-          renvoyait le « ? » à la ligne). La colonne flex `items-end` la
-          borne déjà à sa largeur. */}
+      {/* La bulle de Grok Bot : rayon 18, 7 × 12, 15/22, au plus 560 px ;
+          l'aplat (neutre ou couleur du bot) dans `thread-theme.css`. */}
       {text ? (
     <div
       data-user-bubble=""
-      className="w-fit max-w-[560px] whitespace-pre-wrap break-words rounded-[18px] px-3 py-[7px] text-start text-[15px] leading-[22px]"
+      className="w-fit max-w-[min(560px,100%)] whitespace-pre-wrap break-words rounded-[18px] px-3 py-[7px] text-start text-[15px] leading-[22px]"
     >
       {segments.map((segment, index) =>
         segment.kind === "mention" ? (
@@ -342,6 +348,7 @@ export const UserMessage = memo(function UserMessage({
       )}
     </div>
       ) : null}
+      {text ? <UserTurnActions text={text} onEdit={editAllowed ? onEdit : undefined} /> : null}
       {steeredIntoActive || steeredIntoSettled ? (
         <p className="px-1 text-xs text-muted-foreground">
           {t(steeredIntoActive ? "threadTimeline.steeredIntoActive" : "threadTimeline.steeredIntoSettled")}
@@ -350,6 +357,34 @@ export const UserMessage = memo(function UserMessage({
     </div>
   );
 });
+
+/** grok.com's `UserTurn` row: « Modifier » and « Copier », 32 px, shown while the pointer is on the message. */
+function UserTurnActions({ text, onEdit }: { text: string; onEdit?: () => void }) {
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1_200);
+    } catch {
+      setCopied(false);
+    }
+  };
+  const button = "grid size-8 place-items-center rounded-full text-[var(--grok-fg2)] outline-none transition-colors hover:bg-[var(--grok-hover)] hover:text-[var(--grok-fg)] focus-visible:ring-2 focus-visible:ring-border-focus-ring";
+  return (
+    <div data-user-turn-actions="" className="-mt-1 flex h-8 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+      {onEdit ? (
+        <button type="button" aria-label={t("threadTimeline.grokEdit")} title={t("threadTimeline.grokEdit")} onClick={onEdit} className={button}>
+          <GrokIcon name="edit" className="size-4" />
+        </button>
+      ) : null}
+      <button type="button" aria-label={t("threadTimeline.grokCopy")} title={t("threadTimeline.grokCopy")} onClick={() => void copy()} className={button}>
+        {copied ? <Check className="size-4" strokeWidth={2} aria-hidden /> : <Copy className="size-4" strokeWidth={2} aria-hidden />}
+      </button>
+    </div>
+  );
+}
 
 /**
  * Un message écrit par un AUTRE bot (bot mode, hand-off), rôle `user` côté

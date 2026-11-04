@@ -24,15 +24,6 @@
 }
 
 /**
- * Le rail des tours (`thread-turn-rail.tsx`) occupe la marge gauche du fil
- * d'un bot, au bureau. Le fil reste pleine largeur : seule sa gouttière
- * gauche s'élargit pour que les traits ne touchent plus le texte.
- */
-[data-turn-rail] [role="log"] {
-  padding-left: 3.5rem;
-}
-
-/**
  * Carte d'équipe d'un salon (`RoomAnswerCard`, thread-timeline.tsx).
  *
  * Le gris reste sur CHAQUE bulle, pas sur la carte. La rangée d'actions est
@@ -101,7 +92,8 @@
  * le CONTENU de chaque rangée tombe sur les mêmes bords que les messages.
  */
 [data-thread-column] {
-  --ohb-thread-column: 60rem;
+  /* grok.com: a 736 px lane in `px-4`, so 704 px of text (`max-w-[736px] px-4`). */
+  --ohb-thread-column: 44rem;
 }
 
 [data-thread-column] [data-thread-messages] {
@@ -122,68 +114,49 @@
   margin-inline: auto;
 }
 
-/*
- * « Aller en bas » à droite, au bord droit de la colonne (donc du composer),
- * comme Grok Bot iPhone ; centré, il couvrait le texte du fil. Hors colonne,
- * le repli garde 0.75rem du bord.
- */
-[data-thread-scroll-bottom] {
-  right: max(0.75rem, calc((100% - var(--ohb-thread-column, 100%)) / 2));
-}
-
-/* Composer en `sm:p-1`, et le voile qui le bloque quand il est désactivé. */
+/* The composer, grok's `max-w-[752px]`: the text lane plus 24 px each side. */
 [data-thread-column] :is([data-thread-composer], [data-composer-disabled-surface]) {
   width: 100%;
-  max-width: calc(var(--ohb-thread-column) + 0.5rem);
+  max-width: calc(var(--ohb-thread-column) + 3rem);
   margin-inline: auto;
 }
 
 /*
- * Avec le rail des tours, le fil a 3.5rem de gouttière gauche. La droite
- * grandit jusqu'à 3.5rem dès que la place le permet, sinon la colonne serait
- * centrée sur la zone à droite du rail et décalée des docks et du composer,
- * qui eux se centrent sur la fenêtre.
- */
-[data-thread-column] [data-turn-rail] [role="log"] {
-  padding-right: clamp(0.75rem, 100% - var(--ohb-thread-column) - 3.5rem, 3.5rem);
-}
-
-/* L'activité suit le rail (`pl-14`) : sa largeur compte cette gouttière des deux côtés. */
-[data-thread-column]:has([data-turn-rail]) [data-run-activity] {
-  max-width: calc(var(--ohb-thread-column) + 7rem);
-}
-
-/*
- * La gouttière de Grok Bot (`ui-scroll-area__viewport` : `padding: 0 84px`) :
- * au bureau, le fil, les docks et le composer gardent 84 px de chaque côté
- * de la colonne, 12 % d'une colonne étroite (au moins 1 rem). Le pourcentage
- * se rapporte à la colonne, le parent de chacun : messages et composer
- * tombent sur les mêmes bords. Le rail des tours vit dans la gouttière
- * gauche, qui ne descend pas sous ses 3.5rem.
+ * The gutter of grok.com: at desktop width the thread, the docks and the
+ * composer keep 16 px on each side of their lane. The turn rail
+ * (`thread-turn-rail.tsx`, desktop only) is an overlay on the left edge of
+ * the thread: it reserves no gutter, so the lane stays centered on the
+ * composer whether the rail shows or not.
  */
 @media (min-width: 40rem) {
   [data-thread-column] {
-    --ohb-thread-gutter: clamp(1rem, 12%, 84px);
+    /* grok.com's lane and composer dock are both `px-4`. */
+    --ohb-thread-gutter: 1rem;
   }
 
   [data-thread-column] [role="log"] {
     padding-inline: var(--ohb-thread-gutter);
   }
 
-  [data-thread-column] [data-turn-rail] [role="log"],
-  [data-thread-column]:has([data-turn-rail]) [data-run-activity] {
-    padding-left: max(3.5rem, var(--ohb-thread-gutter));
-    padding-right: var(--ohb-thread-gutter);
+  /*
+   * The composer card is the lane plus 24 px each side, capped by the dock's
+   * gutter on a narrow window: the lane follows it there (100% is the log's
+   * content box, as wide as the dock's), so the overhang stays 24 px.
+   */
+  [data-thread-column]:not([data-mobile-scene] *) [data-thread-messages] {
+    max-width: min(var(--ohb-thread-column), 100% - 3rem);
   }
 
-  [data-thread-column] :is([data-thread-lane], [data-approval-dock], [data-plan-dock], [data-run-activity]),
-  [data-thread-column] [data-thread-composer] {
+  [data-thread-column] :is([data-thread-lane], [data-approval-dock], [data-plan-dock], [data-run-activity]) {
     padding-inline: var(--ohb-thread-gutter);
     max-width: calc(var(--ohb-thread-column) + 2 * var(--ohb-thread-gutter));
   }
 
-  [data-thread-column]:has([data-turn-rail]) [data-run-activity] {
-    max-width: calc(var(--ohb-thread-column) + max(3.5rem, var(--ohb-thread-gutter)) + var(--ohb-thread-gutter));
+  /* The dock: `px-4 pb-5`, the card at 752 px. */
+  [data-thread-column] [data-thread-composer] {
+    padding-inline: var(--ohb-thread-gutter);
+    padding-bottom: 20px;
+    max-width: calc(var(--ohb-thread-column) + 3rem + 2 * var(--ohb-thread-gutter));
   }
 
   [data-thread-column] [data-composer-disabled-surface] {

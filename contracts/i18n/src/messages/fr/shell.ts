@@ -140,12 +140,13 @@ export const navUser = {
   newGroup: "Nouveau groupe",
   lightTheme: "Thème clair",
   darkTheme: "Thème sombre",
-  /** Le bouton de langue du rail : il dit la langue vers laquelle il bascule. */
-  switchLanguage: "Passer en {language}",
   installApp: "Installer l’application",
   signOut: "Se déconnecter",
   impersonationReadOnly: "Mode assistance · lecture seule",
   leaveImpersonation: "Quitter le mode assistance",
+  /** La révocation n’a pas abouti : rien n’a été effacé, le bouton relance. */
+  signOutNotConfirmed: "Le serveur n’a pas confirmé la déconnexion : votre session reste ouverte.",
+  signOutRetry: "Réessayer",
 } as const;
 
 /** La coque mobile : panneau latéral + scène, sur le modèle du drawer iOS de ChatGPT. */

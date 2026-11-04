@@ -78,11 +78,15 @@ const storedBotRow = {
   autonomyTokenBudget: 120_000,
 } satisfies BotRow;
 
-function deletionDb(calls: string[], active: boolean | "late" | "memory", inGroup = false, profileManaged = false, cleanupStatus: string | null = null, cleanupDeletedAt = "2026-09-01T00:00:00.000Z"): SQL {
+function deletionDb(calls: string[], active: boolean | "late" | "memory", inGroup = false, profileManaged = false, cleanupStatus: string | null = null, cleanupDeletedAt = "2026-09-01T00:00:00.000Z", preparing = false): SQL {
   let activeChecks = 0;
   const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...strings].join(" ");
     calls.push(sql);
+    if (preparing && sql.includes("from bot_profile_provisions") && sql.includes("'queued', 'running'")) {
+      return Promise.resolve([{ status: "running" }]);
+    }
+    if (inGroup && sql.includes("delete from group_members")) return Promise.resolve([{ groupId: "group-1" }]);
     if (sql.includes("select id from bots")) return Promise.resolve([{ id: "bot-1" }]);
     if (sql.includes("from runs r")) {
       activeChecks += 1;
@@ -337,6 +341,49 @@ describe("suppression d'un bot en deux temps", () => {
       groupsDetached: { left: 0, deleted: 0 },
     });
     expect(calls.some((sql) => sql.includes("delete from bots"))).toBe(true);
+  });
+
+  test("une purge forcée refusée (profil en préparation) ne détache aucun salon", async () => {
+    const calls: string[] = [];
+    const response = await mount(
+      deletionDb(calls, false, true, false, null, undefined, true), owner, deleteRuntimeDeps(calls),
+    ).request("/bot-1?purge=1&force=1", { method: "DELETE" });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "BOT_PROFILE_PREPARING" } });
+    expect(calls.some((sql) => sql.includes("delete from group_members"))).toBe(false);
+    expect(calls.some((sql) => sql.includes("delete from bot_groups"))).toBe(false);
+  });
+
+  test("une purge forcée refusée (mission en cours) ne détache aucun salon", async () => {
+    const calls: string[] = [];
+    const response = await mount(deletionDb(calls, true, true), owner, deleteRuntimeDeps(calls))
+      .request("/bot-1?purge=1&force=1", { method: "DELETE" });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "BOT_BUSY" } });
+    expect(calls.some((sql) => sql.includes("delete from group_members"))).toBe(false);
+  });
+
+  test("le détachement suit les gardes, dans la transaction qui supprime, et réaffecte le pilote", async () => {
+    const calls: string[] = [];
+    const response = await mount(deletionDb(calls, false, true), owner, deleteRuntimeDeps(calls))
+      .request("/bot-1?purge=1&force=1", { method: "DELETE" });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ groupsDetached: { left: 1, deleted: 0 } });
+    const deletion = calls.findIndex((sql) => sql.includes("delete from bots"));
+    const detach = calls.findIndex((sql) => sql.includes("delete from group_members"));
+    const lastGuard = calls.reduce(
+      (found, sql, index) => index < deletion && sql.includes("from runs r") && sql.includes("for update of r") ? index : found,
+      -1,
+    );
+    const pilot = calls.findIndex((sql) => sql.includes("update bot_groups g") && sql.includes("default_responder"));
+    expect(lastGuard).toBeGreaterThan(calls.findIndex((sql) => sql.includes('hermes_session_id as "sessionId"')));
+    expect(detach).toBeGreaterThan(lastGuard);
+    expect(pilot).toBeGreaterThan(detach);
+    expect(deletion).toBeGreaterThan(pilot);
+    expect(calls[pilot]).toContain("order by m.position");
   });
 
   test("la purge après corbeille réutilise la tâche existante sans en insérer une seconde", async () => {
