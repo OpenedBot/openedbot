@@ -39,6 +39,7 @@ import { readIdempotencyKey } from "@openedbot/conversation/application/message-
 import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
+import { assertSourceEligible, readSource } from "./message-version-source";
 
 const OPERATION = "thread.message.version.create";
 const MAX_INPUT_CHARS = 100_000;
@@ -47,20 +48,6 @@ const ACTIVE_RUN_STATUSES = ["queued", "starting", "running", "awaiting_approval
 
 type RuntimeReader = typeof readRuntimeSecret;
 type ToolsetClient = Pick<HermesClient, "toolsets">;
-
-type SourceRow = {
-  threadId: string;
-  threadTitle: string;
-  botId: string | null;
-  botName: string | null;
-  botSlug: string | null;
-  messageId: string;
-  role: "user" | "assistant";
-  content: MessageContent;
-  authorBotId: string | null;
-  initiatorUserId: string | null;
-  sequence: number | string;
-};
 
 type VersionRow = {
   rootThreadId: string;
@@ -326,27 +313,31 @@ export function messageVersionRoutes(
         const maxSteps = mention ? Math.max(policy.maxSteps, 2) : policy.maxSteps;
         const maxHandoffs = mention ? Math.max(policy.maxHandoffs, 1) : policy.maxHandoffs;
         const workflowUpdatedAt = new Date().toISOString();
+        // La variante garde les restrictions du tour source : un plan reste un
+        // plan, une routine sans attente le reste.
         await tx`
           insert into workflows (
             id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
             kind, status, protocol_version, autonomy_enabled, max_depth, max_steps, max_handoffs,
-            timeout_seconds, token_budget, used_steps, used_handoffs, used_tokens, deadline_at
+            timeout_seconds, token_budget, used_steps, used_handoffs, used_tokens, deadline_at,
+            plan_only, never_wait
           ) values (
             ${workflowId}, ${auth.organizationId}, ${branchThreadId}, ${runId}, ${rootBot.id}, ${auth.userId},
             'dm', 'queued', 1, ${policy.enabled}, ${policy.maxDepth}, ${maxSteps}, ${maxHandoffs},
             ${policy.timeoutSeconds}, ${policy.tokenBudget}, 1, ${usedHandoffs}, 0,
-            now() + (${policy.timeoutSeconds} * interval '1 second')
+            now() + (${policy.timeoutSeconds} * interval '1 second'),
+            ${source.planOnly === true}, ${source.neverWait === true}
           )
         `;
         await tx`
           insert into runs (
             id, organization_id, thread_id, bot_id, input, status, workflow_id,
             step_index, step_kind, stack_depth, caller_bot_id, execution_session_key,
-            external_state, events_complete
+            external_state, events_complete, plan_only
           ) values (
             ${runId}, ${auth.organizationId}, ${branchThreadId}, ${runBotId}, ${runInput}, 'queued',
             ${workflowId}, 0, ${stepKind}, ${stackDepth}, ${callerBotId}, ${executionSessionKey},
-            'not_started', true
+            'not_started', true, ${source.planOnly === true}
           )
         `;
         await tx`
@@ -447,67 +438,6 @@ async function assertPveReady(
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(502, "RUNTIME_UNREACHABLE", "Le runtime Hermes n’est pas joignable.");
-  }
-}
-
-async function readSource(
-  tx: TransactionDb,
-  organizationId: string,
-  threadId: string,
-  messageId: string,
-  lock: boolean,
-): Promise<SourceRow | null> {
-  const rows = lock
-    ? await tx<SourceRow[]>`
-        select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
-               message.id as "messageId", message.role, message.content,
-               message.author_bot_id as "authorBotId",
-               coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",
-               message.sequence
-          from threads thread
-          join messages message on message.organization_id = thread.organization_id and message.thread_id = thread.id
-          left join bots bot on bot.organization_id = thread.organization_id and bot.id = thread.bot_id
-          left join runs message_run on message_run.organization_id = message.organization_id
-            and message_run.id = message.run_id
-          left join workflows workflow on workflow.organization_id = message_run.organization_id
-            and workflow.id = message_run.workflow_id
-         where thread.organization_id = ${organizationId} and thread.id = ${threadId} and message.id = ${messageId}
-         for update of thread
-      `
-    : await tx<SourceRow[]>`
-        select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
-               message.id as "messageId", message.role, message.content,
-               message.author_bot_id as "authorBotId",
-               coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",
-               message.sequence
-          from threads thread
-          join messages message on message.organization_id = thread.organization_id and message.thread_id = thread.id
-          left join bots bot on bot.organization_id = thread.organization_id and bot.id = thread.bot_id
-          left join runs message_run on message_run.organization_id = message.organization_id
-            and message_run.id = message.run_id
-          left join workflows workflow on workflow.organization_id = message_run.organization_id
-            and workflow.id = message_run.workflow_id
-         where thread.organization_id = ${organizationId} and thread.id = ${threadId} and message.id = ${messageId}
-      `;
-  return rows[0] ?? null;
-}
-
-function assertSourceEligible(source: SourceRow | null, userId: string): asserts source is SourceRow {
-  if (!source) throw new HttpError(404, "MESSAGE_NOT_FOUND", "Message introuvable dans cette conversation.");
-  if (!source.botId) {
-    throw new HttpError(409, "MESSAGE_VERSION_DM_REQUIRED", "Les variantes sont réservées au fil d’un bot.");
-  }
-  if (source.role !== "user" || source.authorBotId) {
-    throw new HttpError(409, "MESSAGE_VERSION_USER_REQUIRED", "Seul un message de l’opérateur peut être modifié ou régénéré.");
-  }
-  if (!source.initiatorUserId || source.initiatorUserId !== userId) {
-    throw new HttpError(
-      403,
-      "MESSAGE_VERSION_AUTHOR_REQUIRED",
-      "Seul l’auteur de ce message peut en créer une variante.",
-    );
   }
 }
 

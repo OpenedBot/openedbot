@@ -28,6 +28,7 @@ import {
   isGroupSendState,
   type GroupSendState,
 } from "../../domain/group-send";
+import { readRoomLinesNewestFirst, type RoomLine } from "./room-lines";
 import {
   HISTORY_CHAR_BUDGET,
   assemblePackedHistory,
@@ -132,16 +133,6 @@ export function groupSendState(context: RunContext): GroupSendState | null {
 /** L'entrée d'une synthèse d'équipe quand rien de neuf n'est arrivé depuis sa contribution. */
 const GROUP_SYNTHESIS_CUE = "Write the team's final answer now.";
 
-/** Une ligne du fil telle que lue en base, avec l'auteur résolu. */
-type RoomLine = {
-  role: string;
-  content: unknown;
-  runId?: string | null;
-  authorBotId: string | null;
-  authorName: string | null;
-  authorSlug: string | null;
-  sequence?: number;
-};
 
 /** Fenêtre de repli quand le membre n'a jamais parlé : les 30 derniers messages. */
 const ROOM_UNREAD_FALLBACK = 30;
@@ -465,35 +456,7 @@ export async function prepareGroupTurn(
        and b.archived_at is null
      order by gm.position asc
   `;
-  const newestFirst = await db<RoomLine[]>`
-    select m.role, m.content, m.sequence, m.run_id as "runId",
-           coalesce(m.original_author_bot_id, m.author_bot_id) as "authorBotId",
-           coalesce(m.original_author_name, ab.name) as "authorName", ab.slug as "authorSlug"
-      from messages m
-      left join bots ab on ab.organization_id = m.organization_id and ab.id = m.author_bot_id
-      left join runs message_run
-        on message_run.organization_id = m.organization_id and message_run.id = m.run_id
-      left join workflows message_workflow
-        on message_workflow.organization_id = message_run.organization_id
-       and message_workflow.id = message_run.workflow_id
-      left join workflows current_workflow
-        on current_workflow.organization_id = m.organization_id
-       and current_workflow.id = ${context.workflowId}
-     where m.organization_id = ${context.organizationId} and m.thread_id = ${context.threadId}
-       -- Le message opérateur qui ouvre l'envoi porte le run_id du premier tour :
-       -- seul l'éventuel output assistant du run courant est exclu, jamais l'entrée.
-       and (m.run_id is null or m.run_id <> ${context.id} or m.role = 'user')
-       -- Un follow-up peut être créé pendant ce tour. Il appartient à un
-       -- workflow racine ultérieur : ni ce tour ni les rounds suivants du
-       -- workflow courant ne doivent le consommer avant sa propre exécution.
-       and (
-         current_workflow.id is null or message_workflow.id is null
-         or message_workflow.id = current_workflow.id
-         or (message_workflow.created_at, message_workflow.id)
-              < (current_workflow.created_at, current_workflow.id)
-       )
-     order by m.sequence desc limit 260
-  `;
+  const newestFirst = await readRoomLinesNewestFirst(db, context);
   const lines = newestFirst.reverse();
   const positions = await db<Array<{ sequence: string | number }>>`
     select last_message_sequence as sequence from group_member_read_positions

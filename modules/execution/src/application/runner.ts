@@ -46,7 +46,7 @@ import {
   requestedCancellationRecoveryMode,
 } from "./runner/cancel";
 import { readContext } from "./runner/context";
-import { NamedRunError, handleFailure, markRunUnknown, retiredServiceStep } from "./runner/failure";
+import { NamedRunError, failureCode, handleFailure, markRunUnknown, retiredServiceStep, settleOrphanCreate } from "./runner/failure";
 import { conversationHistory, loadRunImages } from "./runner/history";
 import { type DmStepPrompt, assignedPlaybookBlock, dmInstructions, withTurnGuidance } from "./runner/instructions";
 import { createApprovalForwarder } from "./runner/approval-forwarder";
@@ -865,42 +865,7 @@ export async function executeRun(
          returning id
       `;
       if (!updated[0]) {
-        let remoteStopState: "confirmed" | "ambiguous" = "ambiguous";
-        try {
-          await client.stopRun(hermesRunId);
-          remoteStopState = "confirmed";
-        } catch (error) {
-          log("worker.orphan_create_stop_unconfirmed", {
-            runId: context.id,
-            hermesRunId,
-            error: describe(error),
-          });
-        }
-        await db.begin(async (tx) => {
-          const rows = await tx<Array<{ workflowId: string | null }>>`
-            update runs set hermes_run_id = coalesce(hermes_run_id, ${hermesRunId}),
-              status = 'unknown', external_state = ${remoteStopState === "confirmed" ? "polling" : "ambiguous"},
-              remote_stop_state = ${remoteStopState}, events_complete = false,
-              error_code = 'HERMES_CREATE_COMMIT_LOST',
-              error_message = 'Hermes a créé le run mais le lease local a été perdu avant la confirmation.',
-              lease_owner = null, lease_expires_at = null, ended_at = null, updated_at = now()
-             where id = ${context.id} and organization_id = ${context.organizationId}
-               and status in ('starting','running','awaiting_approval','unknown')
-             returning workflow_id as "workflowId"
-          `;
-          if (rows[0]?.workflowId) await tx`
-            update workflows set status = 'unknown', error_code = 'HERMES_CREATE_COMMIT_LOST',
-              error_message = 'Le run Hermes existe mais sa création locale doit être réconciliée.',
-              recovery_state = ${{
-                runId: context.id,
-                needsReview: true,
-                action: "reconcile_or_abandon",
-                hermesRunIdAvailable: true,
-              }}, ended_at = null, updated_at = now()
-             where organization_id = ${context.organizationId} and id = ${rows[0].workflowId}
-               and status not in ('completed','failed','expired')
-          `;
-        });
+        await settleOrphanCreate(db, context, client, hermesRunId);
         return;
       }
       activeContext.externalState = "streaming";
@@ -976,13 +941,18 @@ export async function executeRun(
     let restartAfterFallback = false;
     /** Set when the run's own provider refused its login: its `run.error` names it. */
     let authRequiredProvider: string | null = null;
+    // Un repli remet l'identifiant à null le temps de sa création, puis le
+    // confirme ou sort : le flux ne s'ouvre jamais sans identifiant.
+    let streamRunId: string;
     while (true) {
+    if (hermesRunId === null) throw new Error("Flux Hermes sans identifiant de run.");
+    streamRunId = hermesRunId;
     const eventStreamController = new AbortController();
     const stopEventStream = () => eventStreamController.abort(controller.signal.reason);
     if (controller.signal.aborted) stopEventStream();
     else controller.signal.addEventListener("abort", stopEventStream, { once: true });
     const rawIterator = client.events(
-      hermesRunId,
+      streamRunId,
       eventStreamController.signal,
       {
         ...(replaySupported ? { since: rawSequence } : {}),
@@ -1067,6 +1037,23 @@ export async function executeRun(
               normalizer.skipPast(recovered.fallbackSequence);
               activeSelection = recovered.selection;
               retryState = recovered.state;
+              // Intention durable AVANT le POST, curseur remis à zéro : un
+              // worker perdu pendant cette création laisse `creating` sans
+              // identifiant, une issue ambiguë à réconcilier, jamais l'ancien
+              // run suivi pendant que le nouveau tourne sans suivi.
+              const intent = await db<Array<{ id: string }>>`
+                update runs set hermes_run_id = null, external_state = 'creating', last_hermes_sequence = 0,
+                  model = ${activeSelection.model}, events_complete = false, updated_at = now()
+                 where id = ${context.id} and organization_id = ${context.organizationId}
+                   and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
+                   and status in ('starting','running','awaiting_approval')
+                 returning id
+              `;
+              // Bail perdu avant tout envoi : le repreneur réconcilie l'ancien run.
+              if (!intent[0]) return;
+              hermesRunId = null;
+              activeContext.externalState = "creating";
+              context.lastHermesSequence = 0;
               const nextId = await client.createRun({
                 input: runCreateArgs.input,
                 images: runCreateArgs.images,
@@ -1081,13 +1068,20 @@ export async function executeRun(
                 signal: controller.signal,
               });
               hermesRunId = nextId;
-              await db`
+              const confirmed = await db<Array<{ id: string }>>`
                 update runs set hermes_run_id = ${nextId}, model = ${activeSelection.model},
                   status = 'running', external_state = 'streaming', events_complete = false, updated_at = now()
                  where id = ${context.id} and organization_id = ${context.organizationId}
                    and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
                    and status in ('starting','running','awaiting_approval')
+                   and external_state = 'creating' and hermes_run_id is null
+                 returning id
               `;
+              if (!confirmed[0]) {
+                await settleOrphanCreate(db, context, client, nextId);
+                return;
+              }
+              activeContext.externalState = "streaming";
               context.provider = activeSelection.provider;
               context.model = activeSelection.model;
               rawSequence = 0;
@@ -1278,7 +1272,7 @@ export async function executeRun(
            and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
       `;
       activeContext.externalState = "polling";
-      await reconcileHermesRun(db, config, activeContext, client, hermesRunId, controller.signal, trace);
+      await reconcileHermesRun(db, config, activeContext, client, streamRunId, controller.signal, trace);
       terminal = true;
     }
   } catch (error) {
@@ -1327,13 +1321,17 @@ export async function executeRun(
       }
       return;
     }
-    if (
-      hermesRunId && error instanceof HermesClientError &&
-      ["HERMES_STREAM_INTERRUPTED", "HERMES_PROTOCOL_LIMIT", "HERMES_UNREACHABLE"].includes(error.code)
-    ) {
+    // Une panne LOCALE après création (flux coupé, trame SSE invalide,
+    // écriture refusée...) ne dit rien de l'issue du run distant, qui peut
+    // encore agir : son identifiant connu est réconcilié par le statut,
+    // jamais clos en `failed` à l'aveugle.
+    if (hermesRunId) {
+      const code = failureCode(error);
+      const message = error instanceof Error ? error.message : "Panne locale après la création Hermes.";
+      log("worker.local_failure_reconcile", { runId: context.id, organizationId: context.organizationId, code });
       await db`
         update runs set external_state = 'polling', events_complete = false,
-          error_code = ${error.code}, error_message = ${error.message}, updated_at = now()
+          error_code = ${code}, error_message = ${message}, updated_at = now()
          where id = ${context.id} and organization_id = ${context.organizationId}
            and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
       `;

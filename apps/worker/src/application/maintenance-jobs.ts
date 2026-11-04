@@ -118,7 +118,7 @@ export function maintenanceJobs(
       // PERM2-7: a gate under review has 15 s end to end; claim it fast.
       name: "approval-reviews",
       everyMs: Math.min(config.pollMs * 5, 500),
-      run: (signal) => guardedPass("approval.review_worker_failed", () => processApprovalReviews(db, config, signal)),
+      run: (signal, track) => guardedPass("approval.review_worker_failed", () => processApprovalReviews(db, config, signal, track)),
     },
     {
       name: "review-profiles",

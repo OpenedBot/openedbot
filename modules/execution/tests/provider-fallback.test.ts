@@ -16,7 +16,12 @@ import {
   type ProviderRetryState,
 } from "../src/application/provider-fallback";
 import { resolveRunnableSelection } from "../src/application/runner";
-import { chosenProviderAuthRequired, resolveSelectionForNewRun } from "../src/application/runner/provider-recovery";
+import {
+  chosenProviderAuthRequired,
+  profileServesOtherProvider,
+  recoverProviderFailure,
+  resolveSelectionForNewRun,
+} from "../src/application/runner/provider-recovery";
 import { NamedRunError } from "../src/application/runner/failure";
 import type { RunContext } from "../src/application/runner/types";
 
@@ -422,6 +427,60 @@ describe("a chosen provider that lost its login is never served by another one",
     expect(failure).toBeInstanceOf(NamedRunError);
     expect((failure as NamedRunError).code).toBe("PROVIDER_AUTH_REQUIRED");
     expect((failure as NamedRunError).details).toEqual({ provider: "openai-codex" });
+  });
+});
+
+describe("a model selection the profile does not carry", () => {
+  const tx = async () => [];
+  const db = Object.assign(tx, { begin: async (callback: (sql: typeof tx) => Promise<unknown>) => callback(tx) });
+  const context = {
+    id: "run-1",
+    organizationId: "org-1",
+    runtimeId: "runtime-1",
+    provider: "opencode-free",
+    model: "nemotron",
+    reasoningEffort: null,
+    hermesProfile: "atlas",
+    runtimeSelectedProvider: null,
+    runtimeSelectedModel: null,
+    linkFeatures: [PROFILE_MANAGEMENT_FEATURE],
+  } as unknown as RunContext;
+  const host = (applied: boolean) => ({
+    hostSetProfileModel: async (profile: string, input: { provider: string; model: string }) =>
+      ({ profile, ...input, applied }),
+  });
+
+  test("a new run is refused while its profile still routes to another provider", async () => {
+    const failure = await resolveSelectionForNewRun(db as never, host(false) as never, context, Promise.resolve(catalog))
+      .then(() => null, (error: unknown) => error);
+    expect(failure).toBeInstanceOf(NamedRunError);
+    expect((failure as NamedRunError).code).toBe("PROFILE_MODEL_NOT_APPLIED");
+    expect((failure as NamedRunError).details).toEqual({ provider: "opencode-free", model: "nemotron" });
+  });
+
+  test("a confirmed write launches the run on the requested selection", async () => {
+    const selection = await resolveSelectionForNewRun(db as never, host(true) as never, context, Promise.resolve(catalog));
+    expect(selection).toMatchObject({ provider: "opencode-free", model: "nemotron" });
+  });
+
+  test("a fallback the profile does not carry is not retried on the provider that just failed", async () => {
+    const recovery = await recoverProviderFailure(
+      db as never,
+      { webAppUrl: "https://app.test" } as never,
+      { ...host(false), modelOptions: async () => catalog } as never,
+      { ...context, provider: "openai-codex", model: "gpt-5.4" } as RunContext,
+      { status: 429, message: "HTTP 429: The usage limit has been reached" },
+      { provider: "openai-codex", model: "gpt-5.4", reasoningEffort: null },
+      emptyState(),
+    );
+    expect(recovery).toEqual({ action: "give_up" });
+  });
+
+  test("only a profile block naming another provider proves the gap", () => {
+    expect(profileServesOtherProvider({ provider: "openai-codex" }, "opencode-free")).toBe(true);
+    expect(profileServesOtherProvider({ provider: " opencode-free " }, "opencode-free")).toBe(false);
+    expect(profileServesOtherProvider({ provider: null }, "opencode-free")).toBe(false);
+    expect(profileServesOtherProvider(null, "opencode-free")).toBe(false);
   });
 });
 

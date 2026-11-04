@@ -237,6 +237,64 @@ describe("workflow recovery routes", () => {
     expect(calls.some(({ sql }) => sql.includes("workflow_id is distinct from"))).toBe(false);
   });
 
+  test("réactive le repli ambigu avec un recovery_state objet, jamais NULL", async () => {
+    const calls: SqlCall[] = [];
+    const response = await mount(recoveryDb(calls, { ambiguousSteer: true })).request(
+      "/workflow-1/retry",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmDuplicateRisk: true }),
+      },
+    );
+
+    expect(response.status).toBe(202);
+    const requeue = calls.find(({ sql }) => sql.includes("update workflows set status = 'queued'"));
+    // 0005 : `recovery_state jsonb not null check (jsonb_typeof = 'object')`.
+    expect(requeue?.sql).toContain("recovery_state = '{}'::jsonb");
+    expect(requeue?.sql).not.toContain("recovery_state = null");
+  });
+
+  test("la relance garde le plan, la routine sans attente et le message source du tour d'origine", async () => {
+    const calls: SqlCall[] = [];
+    const response = await mount(idempotentRetryDb(calls, {
+      planOnly: true,
+      neverWait: true,
+      sourceMessageId: "message-1",
+    })).request("/workflow-1/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmDuplicateRisk: true }),
+    });
+
+    expect(response.status).toBe(202);
+    const rootRead = calls.find(({ sql }) => sql.includes('bot_id as "botId"'));
+    expect(rootRead?.sql).toContain("(run.plan_only or source.plan_only)");
+    expect(rootRead?.sql).toContain("source.never_wait");
+    expect(rootRead?.sql).toContain("coalesce(run.source_message_id,");
+    const workflowInsert = calls.find(({ sql }) => sql.includes("insert into workflows"));
+    expect(workflowInsert?.sql).toContain("recovery_state, plan_only, never_wait");
+    expect(workflowInsert?.values.slice(-2)).toEqual([true, true]);
+    const runInsert = calls.find(({ sql }) => sql.includes("insert into runs"));
+    expect(runInsert?.sql).toContain("plan_only, source_message_id");
+    expect(runInsert?.values.slice(-2)).toEqual([true, "message-1"]);
+  });
+
+  test("une relance ordinaire n'invente aucune restriction", async () => {
+    const calls: SqlCall[] = [];
+    const response = await mount(idempotentRetryDb(calls)).request("/workflow-1/retry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmDuplicateRisk: true }),
+    });
+
+    expect(response.status).toBe(202);
+    const workflowInsert = calls.find(({ sql }) => sql.includes("insert into workflows"));
+    expect(workflowInsert?.values.slice(-2)).toEqual([false, false]);
+    const runInsert = calls.find(({ sql }) => sql.includes("insert into runs"));
+    expect(runInsert?.values.slice(-2)).toEqual([false, null]);
+  });
+
   test("refuse la relance si le run de repli ambigu a disparu", async () => {
     const calls: SqlCall[] = [];
     const response = await mount(recoveryDb(calls, {
@@ -364,7 +422,10 @@ function recoveryDb(
   return tx;
 }
 
-function idempotentRetryDb(calls: SqlCall[]): SQL {
+function idempotentRetryDb(
+  calls: SqlCall[],
+  options: { planOnly?: boolean; neverWait?: boolean; sourceMessageId?: string | null } = {},
+): SQL {
   let recoveryState: Record<string, unknown> = {};
   const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...strings].join(" ");
@@ -379,7 +440,7 @@ function idempotentRetryDb(calls: SqlCall[]): SQL {
       return Promise.resolve([{ ...workflowRow(), status: recoveryState.resolution === "retried" ? "failed" : "unknown", recoveryState }]);
     }
     if (sql.includes("workflow_id is distinct from")) return Promise.resolve([]);
-    if (sql.includes('select bot_id as "botId"')) {
+    if (sql.includes('bot_id as "botId"')) {
       return Promise.resolve([{
         botId: "bot-1",
         input: "Retry this",
@@ -389,6 +450,9 @@ function idempotentRetryDb(calls: SqlCall[]): SQL {
         callerBotId: null,
         groupTurnPosition: null,
         groupState: null,
+        planOnly: options.planOnly ?? false,
+        neverWait: options.neverWait ?? false,
+        sourceMessageId: options.sourceMessageId ?? null,
       }]);
     }
     if (sql.includes("select id from bots")) return Promise.resolve([{ id: "bot-1" }]);

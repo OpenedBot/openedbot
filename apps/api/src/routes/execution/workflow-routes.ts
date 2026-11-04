@@ -8,6 +8,7 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { workflowSessionKey } from "@openedbot/roster/domain/autonomous-workflow";
 import { requestWorkflowCancellationTx } from "@openedbot/execution/application/run-cancellation";
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
+import { readRetrySource } from "./workflow-retry-source";
 
 type WorkflowRow = {
   id: string;
@@ -298,7 +299,7 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
         }
         await tx`
           update workflows set status = 'queued', error_code = null, error_message = null,
-            recovery_state = null, ended_at = null,
+            recovery_state = '{}'::jsonb, ended_at = null,
             deadline_at = now() + (${workflow.timeoutSeconds} * interval '1 second'), updated_at = now()
            where organization_id = ${auth.organizationId} and id = ${workflow.id} and status = 'unknown'
         `;
@@ -326,23 +327,7 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
           "Le roster du salon peut avoir changé. Abandonnez ce workflow puis envoyez un nouveau message au salon.",
         );
       }
-      const roots = await tx<Array<{
-        botId: string | null;
-        input: string;
-        model: string | null;
-        stepKind: "root" | "delegated" | "group" | null;
-        stackDepth: number;
-        callerBotId: string | null;
-        groupTurnPosition: number | null;
-        groupState: unknown;
-      }>>`
-        select bot_id as "botId", input, model, step_kind as "stepKind", stack_depth as "stackDepth",
-               caller_bot_id as "callerBotId", group_turn_position as "groupTurnPosition",
-               group_state as "groupState"
-          from runs where organization_id = ${auth.organizationId} and id = ${workflow.rootRunId}
-         limit 1 for update
-      `;
-      const root = roots[0];
+      const root = await readRetrySource(tx, auth.organizationId, workflow.rootRunId);
       if (!root) throw new HttpError(409, "WORKFLOW_ROOT_MISSING", "Le run racine n’existe plus.");
       if (!root.botId) {
         throw new HttpError(409, "WORKFLOW_BOT_MISSING", "Le bot racine n’existe plus ou est archivé.");
@@ -383,30 +368,33 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
       `;
 
       const usedHandoffs = root.stepKind === "delegated" ? 1 : 0;
+      // La relance rejoue le tour d'origine sous ses restrictions : un plan
+      // reste un plan, une routine sans attente le reste, et le message source
+      // (ses images) reste celui que le worker relit.
       await tx`
         insert into workflows (
           id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id, kind, status,
           protocol_version, autonomy_enabled, max_depth, max_steps, max_handoffs, timeout_seconds, token_budget,
-          used_steps, used_handoffs, used_tokens, deadline_at, recovery_state
+          used_steps, used_handoffs, used_tokens, deadline_at, recovery_state, plan_only, never_wait
         ) values (
           ${workflowId}, ${auth.organizationId}, ${workflow.threadId}, ${runId}, ${workflow.rootBotId}, ${auth.userId},
           ${workflow.kind}, 'queued', ${workflow.protocolVersion}, ${workflow.autonomyEnabled}, ${workflow.maxDepth}, ${workflow.maxSteps},
           ${workflow.maxHandoffs}, ${workflow.timeoutSeconds}, ${Number(workflow.tokenBudget)}, 1, ${usedHandoffs}, 0,
           now() + (${workflow.timeoutSeconds} * interval '1 second'),
-          ${{ retryOf: workflow.id, duplicateRisk: true }}
+          ${{ retryOf: workflow.id, duplicateRisk: true }}, ${root.planOnly === true}, ${root.neverWait === true}
         )
       `;
       await tx`
         insert into runs (
           id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, model,
           status, workflow_id, step_index, step_kind, stack_depth, caller_bot_id,
-          execution_session_key, external_state, events_complete
+          execution_session_key, external_state, events_complete, plan_only, source_message_id
         ) values (
           ${runId}, ${auth.organizationId}, ${workflow.threadId}, ${root.botId}, ${root.groupTurnPosition},
           ${root.groupState}, ${root.input}, ${root.model}, 'queued', ${workflowId}, 0,
           ${root.stepKind ?? "root"}, ${root.stackDepth}, ${root.callerBotId},
           ${root.stepKind === "root" ? null : workflowSessionKey(auth.organizationId, workflowId, root.botId)},
-          'not_started', true
+          'not_started', true, ${root.planOnly === true}, ${root.sourceMessageId}
         )
       `;
       return { workflowId, runId, status: "queued", duplicateRisk: true };

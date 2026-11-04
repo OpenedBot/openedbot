@@ -200,7 +200,9 @@ export function runImage(file: LoadedAttachment): HermesRunImage {
  * Les images du message opérateur qui a créé ce run (DM, mention, version).
  *
  * L'API n'écrit plus le data-URI dans `runs.input` : le message lié au run
- * (`messages.run_id`) garde les puces, et les octets se relisent ici.
+ * (`messages.run_id`) garde les puces, et les octets se relisent ici. Une
+ * relance n'a pas de message à elle : `runs.source_message_id` désigne celui
+ * du tour d'origine, sans dupliquer la conversation.
  */
 export async function loadRunImages(
   db: SQL,
@@ -208,9 +210,11 @@ export async function loadRunImages(
   blob: WorkerConfig["blob"] | undefined,
 ): Promise<{ images: HermesRunImage[]; missing: string[] }> {
   const messages = await db<Array<{ content: unknown }>>`
-    select content from messages
-     where organization_id = ${context.organizationId} and run_id = ${context.id} and role = 'user'
-     order by sequence asc nulls last limit 1
+    select message.content from runs run
+      join messages message on message.organization_id = run.organization_id and message.role = 'user'
+       and (message.run_id = run.id or message.id = run.source_message_id)
+     where run.organization_id = ${context.organizationId} and run.id = ${context.id}
+     order by (message.run_id is not distinct from run.id) desc, message.sequence asc nulls last limit 1
   `;
   const chips = attachmentChips(messages[0]?.content).filter((chip) => chip.kind === "image");
   if (chips.length === 0) return { images: [], missing: [] };
