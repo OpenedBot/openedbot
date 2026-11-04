@@ -188,7 +188,7 @@ export function interruptedRequestNote(status: InterruptedRunStatus, tools: read
   const work = tools.length > 0
     ? ` Before it stopped you had already used: ${tools.slice(0, 12).join(", ")}; their results are not in this history.`
     : "";
-  return `[Earlier request, not completed: ${outcome}.${work} Context only: do not act on it unless the user asks again.]`;
+  return `[Earlier request, not completed: ${outcome}.${work} Context only. If the user asks about it, say it was interrupted and offer to start it again; do not redo it on your own unless the user asks for it again.]`;
 }
 
 /** Une image relue, sous la forme d'une part `image_url` : un data-URI. */

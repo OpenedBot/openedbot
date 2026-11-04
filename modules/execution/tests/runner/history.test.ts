@@ -96,7 +96,9 @@ describe("conversationHistory interrupted turns", () => {
 
   test("la note interdit de reprendre seul une demande arrêtée", () => {
     expect(interruptedRequestNote("cancelled")).toContain("stopped before you answered");
-    expect(interruptedRequestNote("failed")).toContain("do not act on it unless the user asks again");
+    expect(interruptedRequestNote("failed")).toContain("do not redo it on your own unless the user asks for it again");
+    // « Tu es toujours en recherche ? » appelle un état, pas une relance.
+    expect(interruptedRequestNote("failed")).toContain("say it was interrupted and offer to start it again");
     // Le travail déjà vu dans le fil est nommé, sans prétendre en avoir les résultats.
     expect(interruptedRequestNote("cancelled", ["web_search", "skill_view"]))
       .toContain("already used: web_search, skill_view; their results are not in this history");
