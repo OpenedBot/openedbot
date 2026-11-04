@@ -8,6 +8,13 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Corrigé
+
+- **Quotas du rail au rechargement.** Les logos GPT, Anthropic et Grok
+  tiennent leur place dès l'ouverture, estompés, le temps de la première
+  lecture, puis leurs anneaux se remplissent sur place. Ils n'apparaissent
+  plus d'un coup une à deux secondes après le reste du rail.
+
 ## 1.0.1 — 2026-11-04
 
 ### Ajouté
