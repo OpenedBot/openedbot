@@ -11,6 +11,7 @@ import type { AppVariables } from "../identity/auth";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
+import { isAllowedPushEndpoint } from "@openedbot/notifications/domain/push-endpoint";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 
 const MAX_SUBSCRIPTIONS_PER_USER = 10;
@@ -64,6 +65,9 @@ export function pushSubscriptionRoutes(
     }
     const auth = context.get("auth");
     const input = readSubscriptionInput(await jsonBody(context.req.raw));
+    if (!isAllowedPushEndpoint(input.endpoint, { allowLoopback: config.vapid.allowLoopbackEndpoints === true })) {
+      throw new HttpError(400, "VALIDATION_ERROR", "L’endpoint Push doit appartenir à un service Push de navigateur.");
+    }
     const userAgent = context.req.header("user-agent")?.trim().slice(0, 512) || null;
     const outcome = await withOwner(db, auth.organizationId, auth.userId, async (tx) => {
       const existing = await tx<SubscriptionRow[]>`

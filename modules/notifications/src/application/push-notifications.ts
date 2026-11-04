@@ -2,15 +2,24 @@
 import type { SQL } from "bun";
 import { Agent } from "node:https";
 import { connectorUpgradePushPayload, isPushEventType, webPushPayload, type PushEventType } from "../domain/push-payload";
+import { isAllowedPushEndpoint, isLoopbackPushEndpoint, type PushEndpointPolicy } from "../domain/push-endpoint";
 import { normalizeLocale, type Locale } from "@openedbot/contracts-locale";
 import type { VapidConfig } from "@openedbot/platform-integrations/vapid";
 import type { ApnsConfig } from "@openedbot/platform-integrations/apns";
 import { fanOutApnsDeliveries } from "./apns-deliveries";
 
-const LOOPBACK_AGENT = new Agent({ rejectUnauthorized: false });
-
 const LEASE_SECONDS = 60;
 const MAX_ATTEMPTS = 5;
+/** Inactivité tolérée sur la socket d'un envoi (option `timeout` de web-push). */
+const WEB_PUSH_SOCKET_TIMEOUT_MS = 10_000;
+/** Échéance totale d'un envoi, réponse lente au goutte-à-goutte comprise. */
+const SEND_DEADLINE_MS = 15_000;
+/**
+ * Aucun nouvel envoi ne part au-delà de ce délai après la réclamation : le
+ * dernier envoi lancé finit avant l'expiration du bail (30 + 15 < 60 s), donc
+ * un autre worker ne reprend jamais une ligne encore en cours d'envoi.
+ */
+const OUTBOX_SEND_BUDGET_MS = 30_000;
 const BATCH = 10;
 const MAX_ERROR_LENGTH = 500;
 /** An outdated connector notice older than this is marked skipped, not pushed late. */
@@ -54,19 +63,22 @@ type SubscriptionRow = {
  * rater, et les tests injectent un transport simulé : aucun réseau.
  */
 export function createWebPushTransport(vapid: VapidConfig): PushTransport {
+  // Certificat auto-signé du serveur push simulé : seulement sur opt-in
+  // explicite (refusé en production par `readVapidConfig`).
+  const loopbackAgent = vapid.allowLoopbackEndpoints ? new Agent({ rejectUnauthorized: false }) : null;
   return {
     async send(input) {
       const webpush = await loadWebPush();
       webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
       try {
-        const loopback = isLoopbackPushEndpoint(input.endpoint);
+        const agent = loopbackAgent && isLoopbackPushEndpoint(input.endpoint) ? loopbackAgent : null;
         const result = await webpush.sendNotification(
           {
             endpoint: input.endpoint,
             keys: { p256dh: input.p256dh, auth: input.auth },
           },
           input.payload,
-          { TTL: 86_400, urgency: "normal", ...(loopback ? { agent: LOOPBACK_AGENT } : {}) },
+          { TTL: 86_400, urgency: "normal", timeout: WEB_PUSH_SOCKET_TIMEOUT_MS, ...(agent ? { agent } : {}) },
         );
         return { statusCode: result.statusCode };
       } catch (error) {
@@ -86,32 +98,113 @@ export function createWebPushTransport(vapid: VapidConfig): PushTransport {
  */
 export async function processPushNotifications(
   db: SQL,
-  config: { vapid: VapidConfig | null; apns?: ApnsConfig | null; workerId: string },
+  config: {
+    vapid: VapidConfig | null;
+    apns?: ApnsConfig | null;
+    workerId: string;
+    /** Échéance d'un envoi ; les tests la raccourcissent. */
+    sendDeadlineMs?: number;
+  },
   transport: PushTransport | null = null,
 ): Promise<{ processed: number; delivered: number; gone: number }> {
   const apnsEnabled = Boolean(config.apns);
   if (!config.vapid && !apnsEnabled) return { processed: 0, delivered: 0, gone: 0 };
-  const sender = config.vapid ? transport ?? createWebPushTransport(config.vapid) : null;
+  const webPush: WebPush | null = config.vapid
+    ? {
+      transport: transport ?? createWebPushTransport(config.vapid),
+      policy: { allowLoopback: config.vapid.allowLoopbackEndpoints === true },
+      deadlineMs: config.sendDeadlineMs ?? SEND_DEADLINE_MS,
+    }
+    : null;
+  await abandonExhaustedOutbox(db);
   let processed = 0;
   let delivered = 0;
   let gone = 0;
   for (let i = 0; i < BATCH; i += 1) {
-    const outcome = await processOneOutbox(db, config.workerId, sender, apnsEnabled);
+    const outcome = await processOneOutbox(db, config.workerId, webPush, apnsEnabled);
     if (outcome === "idle") break;
     processed += 1;
     delivered += outcome.delivered;
     gone += outcome.gone;
   }
   // Connector notices are a Web Push only channel (the e-mail is durable).
-  if (!sender) return { processed, delivered, gone };
+  if (!webPush) return { processed, delivered, gone };
   for (let i = 0; i < BATCH; i += 1) {
-    const outcome = await processOneConnectorNotice(db, sender);
+    const outcome = await processOneConnectorNotice(db, webPush);
     if (outcome === "idle") break;
     processed += 1;
     delivered += outcome.delivered;
     gone += outcome.gone;
   }
   return { processed, delivered, gone };
+}
+
+type WebPush = {
+  transport: PushTransport;
+  policy: PushEndpointPolicy;
+  deadlineMs: number;
+};
+
+/**
+ * Lignes dont le dernier essai autorisé n'a pas abouti : un bail mort au
+ * dernier essai, ou une ligne déjà remise en `pending` avec ses essais
+ * épuisés. La réclamation ne les reprend jamais : elles sont closes en
+ * `failed` plutôt que de rester en suspens pour toujours.
+ */
+async function abandonExhaustedOutbox(db: SQL): Promise<void> {
+  const rows = await db<Array<{ id: string }>>`
+    update push_outbox
+       set status = 'failed', lease_owner = null, lease_expires_at = null,
+           last_error = ${"Essais épuisés sans livraison complète."}
+     where attempts >= ${MAX_ATTEMPTS}
+       and (status = 'pending' or (status = 'sending' and lease_expires_at <= now()))
+    returning id
+  `;
+  if (rows.length > 0) {
+    console.error(JSON.stringify({ event: "worker.push_outbox_abandoned", count: rows.length }));
+  }
+}
+
+/**
+ * Borne un envoi quel que soit le transport : un endpoint qui accepte la
+ * connexion sans jamais finir sa réponse ne bloque pas le job single-flight.
+ */
+async function sendWithDeadline(
+  webPush: WebPush,
+  input: Parameters<PushTransport["send"]>[0],
+): Promise<PushTransportResult> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Web Push send exceeded ${webPush.deadlineMs} ms.`)),
+      webPush.deadlineMs,
+    );
+  });
+  try {
+    return await Promise.race([webPush.transport.send(input), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Endpoint enregistré avant le filtrage des destinations (ou opt-in boucle
+ * locale retiré) : jamais contacté, l'abonnement est marqué en échec.
+ */
+async function rejectedEndpoint(
+  db: SQL,
+  webPush: WebPush,
+  subscription: SubscriptionRow,
+  organizationId: string,
+): Promise<boolean> {
+  if (isAllowedPushEndpoint(subscription.endpoint, webPush.policy)) return false;
+  await db`update push_subscriptions set failed_at = now() where id = ${subscription.id}`;
+  console.error(JSON.stringify({
+    event: "worker.push_endpoint_rejected",
+    organizationId,
+    subscriptionId: subscription.id,
+  }));
+  return true;
 }
 
 type ConnectorNoticeRow = {
@@ -132,7 +225,7 @@ type ConnectorNoticeRow = {
  */
 async function processOneConnectorNotice(
   db: SQL,
-  transport: PushTransport,
+  webPush: WebPush,
 ): Promise<"idle" | { delivered: number; gone: number }> {
   const claimed = await db.begin(async (tx) => {
     const rows = await tx<ConnectorNoticeRow[]>`
@@ -172,6 +265,7 @@ async function processOneConnectorNotice(
   let delivered = 0;
   let gone = 0;
   for (const subscription of subscriptions) {
+    if (await rejectedEndpoint(db, webPush, subscription, claimed.organizationId)) continue;
     const payload = JSON.stringify(connectorUpgradePushPayload({
       runtimeName: claimed.runtimeName,
       installedVersion: claimed.installedVersion,
@@ -180,7 +274,7 @@ async function processOneConnectorNotice(
       workspace: claimed.organizationSlug ?? claimed.organizationId,
     }));
     try {
-      const result = await transport.send({
+      const result = await sendWithDeadline(webPush, {
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
@@ -217,7 +311,7 @@ async function processOneConnectorNotice(
 async function processOneOutbox(
   db: SQL,
   workerId: string,
-  transport: PushTransport | null,
+  webPush: WebPush | null,
   apnsEnabled: boolean,
 ): Promise<"idle" | { delivered: number; gone: number }> {
   const claimed = await db.begin(async (tx) => {
@@ -250,6 +344,7 @@ async function processOneOutbox(
   }) as OutboxRow | null;
 
   if (!claimed) return "idle";
+  const sendUntil = Date.now() + OUTBOX_SEND_BUDGET_MS;
   if (!isPushEventType(claimed.eventType)) {
     await markOutbox(db, claimed.id, workerId, "skipped", "Type d'événement inattendu.");
     return { delivered: 0, gone: 0 };
@@ -271,12 +366,16 @@ async function processOneOutbox(
   // APNs first: its deliveries are reserved (idempotently) before any Web
   // Push send, so a crash in the loop below never loses the iOS fan-out.
   const apnsDevices = apnsEnabled ? await fanOutApnsDeliveries(db, claimed.organizationId, claimed.id) : 0;
-  const subscriptions = transport ? await db<SubscriptionRow[]>`
-    select id, endpoint, p256dh, auth, locale
-      from push_subscriptions
-     where organization_id = ${claimed.organizationId} and failed_at is null
+  // Membership active exigée : un membre retiré ne reçoit plus rien, même si
+  // son abonnement a survécu à la révocation.
+  const subscriptions = webPush ? await db<SubscriptionRow[]>`
+    select s.id, s.endpoint, s.p256dh, s.auth, s.locale
+      from push_subscriptions s
+      join memberships m on m.organization_id = s.organization_id and m.user_id = s.user_id
+     where s.organization_id = ${claimed.organizationId} and s.failed_at is null
+       and m.revoked_at is null
   ` : [];
-  if (!transport || subscriptions.length === 0) {
+  if (!webPush || subscriptions.length === 0) {
     await markOutbox(db, claimed.id, workerId, apnsDevices > 0 ? "sent" : "skipped", null);
     return { delivered: 0, gone: 0 };
   }
@@ -285,13 +384,24 @@ async function processOneOutbox(
   let gone = 0;
   let retryable = false;
   for (const subscription of subscriptions) {
+    if (Date.now() >= sendUntil) {
+      // Le reste part au prochain essai : les livraisons `sent` ne repartent pas.
+      retryable = true;
+      break;
+    }
+    if (await rejectedEndpoint(db, webPush, subscription, claimed.organizationId)) continue;
+    // Une réservation `pending` déjà là a été abandonnée par un worker tombé
+    // entre l'INSERT et l'envoi (le bail de l'outbox, que nous tenons, a
+    // expiré) : elle est reprise. Seule une livraison `sent` est sautée.
     const reserved = await db<Array<{ id: string }>>`
       insert into push_deliveries (
         organization_id, workflow_id, notification_sequence, subscription_id, status
       ) values (
         ${claimed.organizationId}, ${claimed.workflowId}, ${claimed.notificationSequence},
         ${subscription.id}, 'pending'
-      ) on conflict (workflow_id, notification_sequence, subscription_id) do nothing
+      ) on conflict (workflow_id, notification_sequence, subscription_id) do update
+        set status = excluded.status
+        where push_deliveries.status = 'pending'
       returning id
     `;
     if (!reserved[0]) continue;
@@ -305,7 +415,7 @@ async function processOneOutbox(
     }));
 
     try {
-      const result = await transport.send({
+      const result = await sendWithDeadline(webPush, {
         endpoint: subscription.endpoint,
         p256dh: subscription.p256dh,
         auth: subscription.auth,
@@ -344,7 +454,15 @@ async function processOneOutbox(
     }
   }
 
-  if (retryable) {
+  if (retryable && claimed.attempts >= MAX_ATTEMPTS) {
+    await markOutbox(db, claimed.id, workerId, "failed", "Essais épuisés sans livraison complète.");
+    console.error(JSON.stringify({
+      event: "worker.push_outbox_abandoned",
+      organizationId: claimed.organizationId,
+      outboxId: claimed.id,
+      attempts: claimed.attempts,
+    }));
+  } else if (retryable) {
     await db`
       update push_outbox set status = 'pending', lease_owner = null, lease_expires_at = null,
         available_at = now() + interval '30 seconds',
@@ -376,15 +494,6 @@ function localeOf(value: string): Locale {
   return normalizeLocale(value);
 }
 
-function isLoopbackPushEndpoint(endpoint: string): boolean {
-  try {
-    const host = new URL(endpoint).hostname;
-    return host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
-  } catch {
-    return false;
-  }
-}
-
 function webPushStatus(error: unknown): number | null {
   if (!error || typeof error !== "object") return null;
   const status = (error as { statusCode?: unknown }).statusCode;
@@ -396,7 +505,7 @@ type WebPushModule = {
   sendNotification(
     subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
     payload: string,
-    options?: { TTL?: number; urgency?: string; agent?: Agent },
+    options?: { TTL?: number; urgency?: string; timeout?: number; agent?: Agent },
   ): Promise<{ statusCode: number }>;
 };
 

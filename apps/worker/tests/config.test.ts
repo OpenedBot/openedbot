@@ -172,6 +172,21 @@ describe("web push VAPID", () => {
       WORKER_INTERNAL_TOKEN: "worker-secret",
     }))).toThrow(/PUSH_VAPID/);
   });
+
+  test("production : l'opt-in boucle locale du Web Push est refusé", () => {
+    expect(() => readWorkerConfig(productionEnvironment({
+      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.ohb.example/send",
+      TRANSACTIONAL_EMAIL_TOKEN: "token",
+      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
+    })))
+      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
+    expect(readWorkerConfig(testEnvironment({
+      PUSH_VAPID_PUBLIC_KEY: productionEnvironment().PUSH_VAPID_PUBLIC_KEY!,
+      PUSH_VAPID_PRIVATE_KEY: productionEnvironment().PUSH_VAPID_PRIVATE_KEY!,
+      PUSH_VAPID_SUBJECT: "mailto:ops@example.test",
+      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
+    })).vapid?.allowLoopbackEndpoints).toBe(true);
+  });
 });
 
 describe("link events retention", () => {

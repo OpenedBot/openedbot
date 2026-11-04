@@ -251,7 +251,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     },
     webAppUrl: (env.WEB_APP_URL?.trim() || "http://localhost:1420").replace(/\/+$/, ""),
     deployEnvironment: deployEnvironment(env.OPENEDBOT_ENV),
-    vapid: readVapidConfig(env, environment === "production"),
+    vapid: readVapidConfig(env, environment === "production", environment === "production"),
     apns: readApnsConfig(env, environment === "production"),
   } satisfies Omit<WorkerConfig, "blob">;
   if (blobDriver === "file") {

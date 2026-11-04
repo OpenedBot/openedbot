@@ -232,6 +232,11 @@ describe("production configuration", () => {
     expect(readApiConfig(development).vapid).toBeNull();
   });
 
+  test("the loopback Web Push opt-in is refused in production", () => {
+    expect(() => readApiConfig({ ...production, PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1" }))
+      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
+  });
+
   test("the displayed price defaults to 19 € and reads BILLING_PRICE_EUR", () => {
     expect(readApiConfig(production).billingPriceEur).toBe(19);
     expect(readApiConfig({ ...production, BILLING_PRICE_EUR: "29" }).billingPriceEur).toBe(29);

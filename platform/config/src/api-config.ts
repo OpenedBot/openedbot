@@ -498,7 +498,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
         terms: legalFilePath(env, "terms", legalDocumentsDirectory),
       },
     },
-    vapid: readVapidConfig(env, false),
+    vapid: readVapidConfig(env, false, environment === "production"),
     apns: readApiApnsConfig(env, environment === "production"),
   } satisfies Omit<ApiConfig, "blob">;
 
