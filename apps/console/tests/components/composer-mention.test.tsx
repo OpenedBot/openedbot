@@ -152,14 +152,12 @@ test("status line: real left and right facts under the card, nothing without the
   expect(container.querySelector("[data-composer-statusline]")).toBeNull();
 });
 
-test("the mic takes its listening tint only while the engine listens", () => {
-  const { container, rerender } = render(<Harness onVoice={() => {}} voiceListening={false} />);
-  const mic = () => container.querySelector("[data-composer-voice]")!;
-  expect(mic().getAttribute("aria-pressed")).toBe("false");
-  expect(mic().querySelector(".animate-ping")).toBeNull();
-  rerender(<Harness onVoice={() => {}} voiceListening />);
-  expect(mic().getAttribute("aria-pressed")).toBe("true");
-  expect(mic().querySelector(".animate-ping")?.className).toContain("motion-reduce:animate-none");
+test("no mic: an empty field leaves the send button there, disabled", () => {
+  const { container } = render(<Harness />);
+  expect(container.querySelector("[data-composer-voice]")).toBeNull();
+  const send = container.querySelector<HTMLButtonElement>("[data-composer-send-action]");
+  expect(send?.disabled).toBe(true);
+  expect(send?.hasAttribute("data-voice-mode")).toBe(false);
 });
 
 test("upload tile: the ring and percentage follow the real progress, then give way to dismiss", () => {

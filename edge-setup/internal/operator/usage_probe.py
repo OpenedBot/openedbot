@@ -1,7 +1,7 @@
 """Bounded, read-only account-usage probe run by hermes-operator.
 
 This source is embedded in the edge-setup binary and is sent on stdin to the
-managed Hermes venv interpreter.  It intentionally accepts only the three
+managed Hermes venv interpreter.  It intentionally accepts only the
 provider names the Go caller passes from a fixed allowlist.  In particular it
 does not receive a credential, a URL, a path, or an arbitrary command.
 """
@@ -10,13 +10,14 @@ import concurrent.futures
 import dataclasses
 import datetime
 import json
+import math
 import os
 import sys
 
 from agent.account_usage import fetch_account_usage
 
 
-ALLOWED = {"anthropic", "openai-codex", "openrouter"}
+ALLOWED = {"anthropic", "openai-codex", "openrouter", "xai-oauth"}
 MAX_OUTPUT = 256 * 1024
 
 
@@ -102,7 +103,107 @@ def anthropic_serves_api_key():
         return False
 
 
+# Hermes reads no account usage for xAI.  Its ``xai-oauth`` login is the Grok
+# CLI's own OAuth client (``XAI_OAUTH_CLIENT_ID`` b1a00492-..., scope
+# ``grok-cli:access``), so the token opens the endpoint the Grok CLI reads its
+# subscription quota from (same call as t3code ``provider-grok/usageLimits.ts``).
+XAI_BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+XAI_BILLING_MAX_BODY = 64 * 1024
+
+
+def xai_oauth_token():
+    """The xAI OAuth access token the gateway serves with, never refreshed here.
+
+    Refreshing rotates the grant the gateway owns: this read-only probe only
+    reads.  An expired token yields an HTTP 401, reported as unavailable, and
+    the next run refreshes it.
+    """
+    try:
+        from agent.credential_pool import load_pool
+
+        pool = load_pool("xai-oauth")
+        entry = pool.peek() if pool is not None else None
+        key = str(getattr(entry, "runtime_api_key", "") or "").strip() if entry is not None else ""
+        if key:
+            return key
+    except Exception:
+        pass
+    try:
+        from hermes_cli.auth_xai import resolve_xai_oauth_runtime_credentials
+
+        credentials = resolve_xai_oauth_runtime_credentials(refresh_if_expiring=False)
+        return str(credentials.get("api_key") or "").strip() or None
+    except Exception:
+        return None
+
+
+def _iso_instant(value):
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(datetime.timezone.utc)
+
+
+def xai_billing_usage(body):
+    """Grok's billing document as one usage window, or None when unreadable.
+
+    ``{"config": {"creditUsagePercent": 12.5, "currentPeriod": {"type":
+    "USAGE_PERIOD_TYPE_WEEKLY", "start": "...", "end": "..."}}}``.  Grok omits
+    a zero percentage but keeps the period: a complete weekly or monthly
+    period without a percentage reads 0 %, anything else is not a reading.
+    """
+    config = body.get("config") if isinstance(body, dict) else None
+    if not isinstance(config, dict):
+        return None
+    period = config.get("currentPeriod")
+    period = period if isinstance(period, dict) else {}
+    kind = str(period.get("type") or "").replace("USAGE_PERIOD_TYPE_", "", 1)
+    label = {"WEEKLY": "Weekly", "MONTHLY": "Monthly"}.get(kind, "Subscription")
+    start, end = _iso_instant(period.get("start")), _iso_instant(period.get("end"))
+    used = config.get("creditUsagePercent")
+    if used is None and kind in ("WEEKLY", "MONTHLY") and start is not None and end is not None and start < end:
+        used = 0
+    if isinstance(used, bool) or not isinstance(used, (int, float)) or not math.isfinite(used):
+        return None
+    window = {"label": label, "used_percent": max(0.0, min(100.0, float(used)))}
+    if end is not None:
+        window["reset_at"] = end.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return {"windows": [window]}
+
+
+def fetch_xai_oauth_usage():
+    token = xai_oauth_token()
+    if not token:
+        return None
+    import httpx
+
+    with httpx.Client(timeout=10.0, follow_redirects=False) as client:
+        response = client.get(
+            XAI_BILLING_URL,
+            headers={"Authorization": "Bearer " + token, "Accept": "application/json"},
+        )
+    # A 403 ``WKE=privacy-mode:`` (legacy privacy setting) or a 401 (expired
+    # token) is a failure like any other: its text is never relayed.
+    response.raise_for_status()
+    if len(response.content) > XAI_BILLING_MAX_BODY:
+        return None
+    return xai_billing_usage(response.json())
+
+
 def probe(provider):
+    if provider == "xai-oauth":
+        try:
+            usage = fetch_xai_oauth_usage()
+        except Exception:
+            usage = None
+        if usage is None:
+            return {"provider": provider, "unavailableReason": "account usage is unavailable"}
+        return {"provider": provider, "usage": usage}
     if provider == "anthropic" and anthropic_serves_api_key():
         return {"provider": provider, "credential": "api_key"}
     try:

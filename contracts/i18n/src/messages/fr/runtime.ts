@@ -333,6 +333,16 @@ export const runtimeHealth = {
   headerAria: "État du runtime : {status}",
 } as const;
 
+export const railQuotas = {
+  title: "Quota LLM restant",
+  remaining: "{provider} : {percent} % restant",
+  remainingReset: "{provider} : {percent} % restant · réinit. dans {reset}",
+  apiKey: "{provider} : clé API, facturée à l’usage",
+  unmeasured: "{provider} : pas de relevé chez ce fournisseur",
+  unavailable: "{provider} : relevé indisponible",
+  off: "{provider} : non branché",
+} as const;
+
 export const runtimeRail = {
   named: "Runtime « {name} » : {state}",
   unnamed: "Runtime : {state}",

@@ -407,7 +407,8 @@ programmes sont tout aussi fixes : le redémarrage du gateway (voir
 « Redémarrage du gateway par le lien ») et cinq programmes Python
 **embarqués** (usage, inventaire, OAuth MCP, politiques A2A et d'approbation). La sonde d'usage
 est passée sur stdin au Python du venv sous `hermes` avec les seuls slugs
-fixés `anthropic`, `openai-codex` et `openrouter`. La liste complète est celle
+fixés `anthropic`, `openai-codex`, `openrouter` et `xai-oauth` (ce dernier lu
+chez `cli-chat-proxy.grok.com`, Hermes n'en lisant pas). La liste complète est celle
 de « Invariants ». Aucun shell, chemin, URL, credential ou argument libre ne
 peut traverser le lien. Le connecteur tourne
 sous l'unique compte système `hermes`, mais son unité masque les données du

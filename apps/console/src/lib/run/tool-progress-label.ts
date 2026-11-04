@@ -18,7 +18,7 @@ function stripQuotes(text: string): string {
 }
 
 /** The search terms of a `web_search` preview, or `null` when it holds none. */
-function searchQuery(preview: string): string | null {
+export function searchQuery(preview: string): string | null {
   const query = stripQuotes(preview);
   // A query that carries a URL or `name=value` pairs may hold a credential the
   // secret masker does not know by name: such a preview gets the generic verb.

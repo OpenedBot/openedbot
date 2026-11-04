@@ -3,7 +3,7 @@ import { lazyRouteComponent, useRouterState } from "@tanstack/react-router";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { FleetClientSettingsContext } from "../../pro-console/slots";
 import { proConsole, useProFeature } from "../../pro-console/registry";
-import { OverviewBodySkeleton, SettingsBodySkeleton } from "./settings-skeletons";
+import { ModelsBodySkeleton, OverviewBodySkeleton, SettingsBodySkeleton } from "./settings-skeletons";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { useSettingsOverlay, type OverlaySettingsPath } from "../../lib/shell/settings-overlay";
 import { isRuntimeSection } from "./installation/cloud/cloud-shared";
@@ -94,7 +94,7 @@ export const SETTINGS_SECTIONS: Record<OverlaySettingsPath, SettingsSection> = {
   "/settings/journal": section("fleet.journalSettings", FleetJournalSettings),
   "/settings/runtime": section("settingsSidebar.runtime", RuntimeOverlaySettings),
   "/settings/agents": section("settingsSidebar.agents", AgentsSettings),
-  "/settings/models": section("settingsSidebar.models", ModelsSettings),
+  "/settings/models": section("settingsSidebar.models", ModelsSettings, ModelsBodySkeleton),
   "/settings/appearance": section("settingsSidebar.appearance", AppearanceSettings),
   "/settings/archives": section("settingsSidebar.archives", ArchivesSettings),
   "/settings/connectors": section("settingsSidebar.connectors", ConnectorsSettings),

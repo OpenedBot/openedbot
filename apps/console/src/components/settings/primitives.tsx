@@ -125,7 +125,7 @@ export function SectionHeading({
  */
 export const SETTINGS_SHELL = "overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm";
 export const SETTINGS_PANEL = "rounded-xl border border-border/60 bg-card shadow-sm";
-const SHELL_HEADER = "px-4 pt-3.5 pb-3";
+export const SETTINGS_SHELL_HEADER = "px-4 pt-3.5 pb-3";
 
 export function SettingsCard({
   children,
@@ -179,7 +179,7 @@ export function SettingsCard({
     }
     return (
       <section data-settings-card="" className={SETTINGS_SHELL} {...rest}>
-        <div className={SHELL_HEADER}>{heading}</div>
+        <div className={SETTINGS_SHELL_HEADER}>{heading}</div>
         <div className={cn("border-t border-border/60 [&>:first-child]:mt-0", padded && "p-4", className)}>{content}</div>
       </section>
     );
@@ -482,7 +482,7 @@ export function ListSection({
   return (
     // La coque grise autour d'un panneau bordé doublait le cadre en sombre.
     <section data-settings-list="" className={cn("flex flex-col", SETTINGS_SHELL, className)}>
-      <div className={cn("flex items-start justify-between gap-3", SHELL_HEADER)}>
+      <div className={cn("flex items-start justify-between gap-3", SETTINGS_SHELL_HEADER)}>
         <div className="min-w-0">
           <h2 className="text-sm font-medium text-foreground">{title}</h2>
           {description ? (

@@ -127,15 +127,19 @@ fin
 };
 
 function render(node: React.ReactNode) {
-  // `data-tick` alternates on every parse by design (it restarts the caret
-  // blink): it is not part of the DOM shape compared here.
-  return renderToStaticMarkup(<I18nProvider>{node}</I18nProvider>).replace(/ data-tick="\d"/g, "");
+  // The stream's word spans (`rehypeStreamWords`) and the reveal class of its
+  // code are motion, not structure: a block the stream did not write carries
+  // none, so they are not part of the DOM shape compared here.
+  return renderToStaticMarkup(<I18nProvider>{node}</I18nProvider>)
+    .replace(/<span class="grok-w">([^<]*)<\/span>/g, "$1")
+    .replace(/ class="ohb-reveal"/g, "")
+    .replace(/ ohb-reveal(?=")/g, "");
 }
 
 /**
  * Le rendu d'un seul tenant, tel que `ThreadMarkdown` le faisait avant la
- * découpe. En flux, la queue floue et le caret (« Stream Text ») suivent le
- * dernier texte : le même que celui du dernier bloc.
+ * découpe. En flux, les mots du bloc écrit sortent du flou : une fois ces
+ * enveloppes retirées, le DOM est le même.
  */
 function whole(markdown: string, streaming: boolean) {
   const source = streaming ? markdown : promoteSummaryCallout(markdown);

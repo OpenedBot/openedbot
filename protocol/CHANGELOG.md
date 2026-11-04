@@ -7,6 +7,11 @@ uses [semantic versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+### Changed
+- Provider usage probe: `xai-oauth` joins the fixed providers (`anthropic`,
+  `openai-codex`, `openrouter`); its quotas are read from xAI, Hermes does not
+  report them.
+
 ### Added
 - `inventory.changed` (host → openedbot, no field): the host's inventory files
   moved, or a session starts. Sent only when `link.context.accepts` names it.

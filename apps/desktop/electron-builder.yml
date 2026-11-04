@@ -96,7 +96,13 @@ linux:
         - x64
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   executableName: openedbot
-  icon: src/renderer/icon.png
+  # The hicolor sizes, so every launcher and dock picks a sharp one
+  # (derived from src/renderer/icon.png: `sips -z N N`).
+  icon: build/icons
+  # Electron reports desktopName (package.json) as the window's app_id / WM_CLASS.
+  # The .desktop entry must carry that same name, or GNOME (Wayland above all)
+  # cannot tie the running window to its launcher and shows a generic icon.
+  syncDesktopName: true
   category: Office
   synopsis: Drive your AI agents from a native window
   # The .deb control file needs a maintainer; package.json has no author.

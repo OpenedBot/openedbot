@@ -1,8 +1,8 @@
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceTextDraft, useWorkspaceAttachmentDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { botAccentColor, botBubbleColor, tintTextColor } from "../../lib/bots/bot-tint";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { botAccentColor, botBubbleColor, botTintStyle, botUserBubbleFill } from "../../lib/bots/bot-tint";
 import { useBotAccentMode } from "../../lib/bots/bot-accent-preference";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
@@ -40,8 +40,6 @@ import { WorkflowOverview } from "../../components/workflow-overview";
 import { ThreadContextTab } from "../../components/thread-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
 import { ThreadModelPicker } from "../../components/composer-model-picker";
-import { VoiceDictation } from "../../components/voice-dictation";
-import { assistantVoiceResponses, VoiceCall } from "../../components/voice-call";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { useOpenSettings } from "../../lib/shell/settings-overlay";
 import { ConversationHeader } from "../../components/boardui/conversation-header";
@@ -53,10 +51,6 @@ import { ConversationPending, ThreadSkeleton } from "../../components/thread-ske
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { visibleRosterItems } from "@/lib/thread/thread-visibility";
-import {
-  prepareMessageSubmission,
-  type IdempotentMessageSubmission,
-} from "@openedbot/conversation/domain/message-submission";
 import { useT } from "../../lib/i18n";
 import { readableRunFailure, runFailureExplainedInThread } from "../../lib/run/model-unavailable";
 import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
@@ -65,7 +59,6 @@ import { currentThreadRun } from "../../lib/thread/current-thread-run";
 import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
 import { useThreadFind } from "../../lib/thread/use-thread-find";
 import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
-import { mergeVoiceTranscript } from "../../lib/voice/web-voice-recognition";
 import { ChromeIconButton } from "../../components/mobile/mobile-header";
 import { SHOW_FEATURE_LAB } from "../../lib/thread/dev-approval-probe";
 import { isStandaloneDisplay } from "../../lib/platform/pwa-display";
@@ -115,10 +108,6 @@ export function ConversationScreen() {
   const openBotApprovals = useCallback(() => {
     if (botId) openManage(botId, "approvals", shownThreadIdRef.current);
   }, [botId, openManage]);
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [voiceListening, setVoiceListening] = useState(false);
-  const [voiceMode, setVoiceMode] = useState<"dictation" | "call">("dictation");
-  const [callSessionActive, setCallSessionActive] = useState(false);
   const draftScope = `bot:${botId}:${new URLSearchParams(window.location.search).get("task") ?? "default"}`;
   const [draft, setDraft] = useWorkspaceTextDraft(draftScope);
   const [goal, setGoal] = useThreadGoal(`bot:${botId}`);
@@ -132,7 +121,6 @@ export function ConversationScreen() {
   /** Les pièces jointes du brouillon (US-CHAT-08), tenues ici pour la même
    *  raison que le texte : seul l'écran sait si l'envoi a abouti. */
   const [attachments, setAttachments] = useWorkspaceAttachmentDraft(draftScope);
-  const pendingCallSubmission = useRef<IdempotentMessageSubmission | null>(null);
   const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
   const pendingVersion = useRef<{
     messageId: string;
@@ -163,10 +151,8 @@ export function ConversationScreen() {
   // interrupteurs, focus) : un gris n'en devient pas un (`botAccentColor`).
   const botAccentMode = useBotAccentMode();
   const accentColor = botAccentMode === "bot" ? botAccentColor(bubbleColor) : null;
-  const tintStyle = useMemo(
-    () => (bubbleColor ? ({ "--bot-tint": bubbleColor, "--bot-tint-text": tintTextColor(bubbleColor) } as CSSProperties) : undefined),
-    [bubbleColor],
-  );
+  const userFill = botUserBubbleFill(bot?.id, bot?.face);
+  const tintStyle = useMemo(() => botTintStyle(bubbleColor, userFill), [bubbleColor, userFill]);
   // Une URL conservée ne doit pas rouvrir un bot sorti du roster actif. La
   // suppression est un soft delete (donc la ligne reste dans le roster pour
   // Réglages → Archives) : il faut juger `archivedAt`, pas seulement l'absence
@@ -268,8 +254,6 @@ export function ConversationScreen() {
   });
   useEffect(() => {
     if (!conversationBlocked) return;
-    setVoiceOpen(false);
-    setCallSessionActive(false);
     setEditingMessage(null);
     const field = document.querySelector<HTMLTextAreaElement>("textarea[data-composer]");
     field?.blur();
@@ -381,9 +365,7 @@ export function ConversationScreen() {
   useEffect(() => {
     setDismissedError(null);
     setSubmissionError(null);
-    pendingCallSubmission.current = null;
     pendingVersion.current = null;
-    setCallSessionActive(false);
     clearReply();
     setEditingMessage(null);
     // L'échec appartient au fil qui l'a produit : sans ce reset, l'alerte
@@ -469,38 +451,6 @@ export function ConversationScreen() {
       : api.addMessageReaction(activeThreadId!, messageId, emoji),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.thread(activeThreadId!) });
-    },
-  });
-
-  // Les tours d'appel ne consomment jamais le brouillon, ses pièces jointes
-  // ou sa réponse citée. Leur clé reste idempotente si la requête est rejouée.
-  const callSend = useMutation({
-    mutationFn: (input: string) => {
-      requireRuntime();
-      const submission = prepareMessageSubmission(
-        pendingCallSubmission.current,
-        { input, attachments: [] },
-        randomId,
-      );
-      pendingCallSubmission.current = submission;
-      return api.sendMessage(activeThreadId!, submission.input, [], submission.idempotencyKey);
-    },
-    onSuccess: (accepted) => {
-      pendingCallSubmission.current = null;
-      if (activeThreadId) applySendAcceptedToCaches(queryClient, activeThreadId, accepted);
-    },
-    onError: (error) => {
-      setDismissedError(null);
-      setSubmissionError(error);
-    },
-  });
-
-  const callApproval = useMutation({
-    mutationFn: ({ approvalId, choice }: { approvalId: string; choice: "once" | "deny" }) =>
-      api.respondApproval(approvalId, { choice }),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.thread(activeThreadId!) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.roster });
     },
   });
 
@@ -714,11 +664,6 @@ export function ConversationScreen() {
   // sur `onEditMessage`/`onRegenerateMessage` plus bas.
   const canEditMessages = me.data?.session.canWrite === true && !running && !pendingGate &&
     !createVersion.isPending;
-  const callApprovalRequest = timelineApprovals.find((approval) => approval.status === "pending") ?? null;
-  const callResponses = useMemo(
-    () => assistantVoiceResponses(thread.data?.messages ?? []),
-    [thread.data?.messages],
-  );
 
   // ask_user : la question qui TERMINE le dernier tour achevé. La sortie du
   // run est la source (pas la timeline) : dès que l'opérateur répond, le
@@ -963,76 +908,6 @@ export function ConversationScreen() {
         />
       ) : null}
       <Dialog
-        open={voiceOpen}
-        onClose={() => {
-          setVoiceOpen(false);
-          setCallSessionActive(false);
-        }}
-        title={t("voicePanel.title")}
-        description={t("voicePanel.description")}
-        closeLabel={t("common.close")}
-        className="max-w-xl"
-      >
-        <div role="group" aria-label={t("voicePanel.callModeLabel")} className="mb-3 flex gap-1 rounded-lg bg-muted p-1">
-          <button
-            type="button"
-            aria-pressed={voiceMode === "dictation"}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${voiceMode === "dictation" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            onClick={() => setVoiceMode("dictation")}
-          >
-            {t("voicePanel.callModeDictation")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={voiceMode === "call"}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${voiceMode === "call" ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            onClick={() => setVoiceMode("call")}
-          >
-            {t("voicePanel.callModeCall")}
-          </button>
-        </div>
-        {voiceMode === "dictation" ? (
-          <VoiceDictation
-            callAvailable
-            onInsert={(transcript) => {
-              setDraft((current) => mergeVoiceTranscript(current, transcript));
-              setVoiceOpen(false);
-              requestAnimationFrame(() => {
-                document.querySelector<HTMLTextAreaElement>("textarea[data-composer]")?.focus();
-              });
-            }}
-            onSend={async (transcript) => {
-              const input = mergeVoiceTranscript(draft, transcript);
-              await send.mutateAsync({ input, attachments, replyToId });
-              setVoiceOpen(false);
-            }}
-            sendDisabled={threadLoading || pendingGate || conversationBlocked || send.isPending}
-            onListeningChange={setVoiceListening}
-          />
-        ) : (
-          <VoiceCall
-            responses={callResponses}
-            approval={callApprovalRequest ? {
-              id: callApprovalRequest.id,
-              runId: callApprovalRequest.runId,
-              action: callApprovalRequest.action,
-              choices: callApprovalRequest.choices.filter(
-                (choice): choice is "once" | "deny" => choice === "once" || choice === "deny",
-              ),
-            } : null}
-            runs={thread.data?.runs ?? []}
-            disabled={threadLoading || running || callSend.isPending || callApproval.isPending}
-            voiceId={bot.voiceId}
-            onSend={(transcript) => callSend.mutateAsync(transcript)}
-            onApproval={async (approvalId, choice) => {
-              await callApproval.mutateAsync({ approvalId, choice });
-            }}
-            onActiveChange={setCallSessionActive}
-          />
-        )}
-      </Dialog>
-
-      <Dialog
         open={editingMessage !== null}
         onClose={() => setEditingMessage(null)}
         title={t("conversation.editMessageTitle")}
@@ -1102,7 +977,7 @@ export function ConversationScreen() {
             La rangée reste pleine largeur : le défilement du fil garde sa
             barre au bord de la fenêtre, l'en-tête ses actions à droite. */}
         <div
-          data-thread-column=""
+          data-thread-column="" data-thread-solo=""
           data-bot-tint={bubbleColor ? "" : undefined}
           data-bot-accent={accentColor ? "" : undefined}
           style={tintStyle}
@@ -1218,7 +1093,6 @@ export function ConversationScreen() {
             onReaction={onReaction}
             onOpenBotErrors={openBotErrors}
             speechScope={bot.id}
-            speechDisabled={callSessionActive}
             speechVoiceByBotId={speechVoiceByBotId}
             resnap={askUser !== null}
             scrollToBottomOnThreadKey={activeThreadId ?? null}
@@ -1325,8 +1199,6 @@ export function ConversationScreen() {
               if (send.isError) send.reset();
               setAttachments(next);
             }}
-            onVoice={() => setVoiceOpen(true)}
-            voiceListening={voiceListening}
             // L'anneau de contexte du dernier tour mesuré (rien tant que le fil
             // n'a pas tourné). Le modèle reste dans l'en-tête.
             contextMeter={isMobile ? contextMeter : undefined}

@@ -321,7 +321,7 @@ app.get("/api/health", async (context) => {
   // the same host otherwise look alike. A tier name is no secret.
   // `supportDesk` : un plug-in sert le guichet (`/api/support`) ; la console
   // cache le lanceur, le bouton d'en-tête et l'écran sans lui (solo).
-  return context.json({ ok: true, version: "1.0.0", architecture: "cloud-only", environment: config.deployEnvironment, supportDesk: supportDesk !== null });
+  return context.json({ ok: true, version: "1.0.1", architecture: "cloud-only", environment: config.deployEnvironment, supportDesk: supportDesk !== null });
 });
 // Avant le rate limiter : même un 429 est un corps JSON, et le compresseur doit
 // envelopper toutes les réponses `/api/*` sauf celles qu'il exclut lui-même

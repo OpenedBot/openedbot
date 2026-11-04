@@ -33,6 +33,7 @@ function renderTimeline({
   scrollToBottomOnThreadKey = null,
   approvals = [],
   onOpenBotErrors,
+  outgoing = null,
 }: {
   events?: StoredProductEvent[];
   userInputs?: Array<{
@@ -48,6 +49,7 @@ function renderTimeline({
   scrollToBottomOnThreadKey?: string | null;
   approvals?: ApprovalRequestDto[];
   onOpenBotErrors?: () => void;
+  outgoing?: { id: string; text: string; failed?: boolean } | null;
 }) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -62,6 +64,7 @@ function renderTimeline({
           defaultAuthor={defaultAuthor}
           scrollToBottomOnThreadKey={scrollToBottomOnThreadKey}
           onOpenBotErrors={onOpenBotErrors}
+          outgoing={outgoing}
         />
       </I18nProvider>
     </QueryClientProvider>,
@@ -219,7 +222,24 @@ describe("ThreadTimeline", () => {
     }
   });
 
-  test("le ResizeObserver repingle le contenu qui grandit dans une frame", () => {
+  test("dans le fil d'un bot, la bulle envoyée amène sa ligne « Réflexion » dans la même peinture", () => {
+    const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
+    const sent = renderTimeline({ defaultAuthor: author, outgoing: { id: "out-1", text: "salut" } });
+    // Under the bubble, in its box: one push of the thread, not a second one when the run is acknowledged.
+    const box = sent.container.querySelector("[data-thread-outgoing]");
+    expect(box?.querySelector("[data-user-bubble]")).not.toBeNull();
+    expect(box?.lastElementChild?.hasAttribute("data-thread-thinking")).toBe(true);
+    expect(sent.container.querySelectorAll("[data-thread-thinking]")).toHaveLength(1);
+    sent.unmount();
+    // A failed send thinks nothing; neither does a room, where no bot may answer.
+    const failed = renderTimeline({ defaultAuthor: author, outgoing: { id: "out-2", text: "salut", failed: true } });
+    expect(failed.container.querySelector("[data-thread-thinking]")).toBeNull();
+    failed.unmount();
+    const room = renderTimeline({ outgoing: { id: "out-3", text: "salut" } });
+    expect(room.container.querySelector("[data-thread-thinking]")).toBeNull();
+  });
+
+  test("le ResizeObserver repingle le contenu qui grandit dans son rappel, avant la peinture", () => {
     const originalResizeObserver = globalThis.ResizeObserver;
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
     const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
@@ -260,9 +280,10 @@ describe("ThreadTimeline", () => {
 
       Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 1_000 });
       Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+      // No frame of delay: a pin handed to the next frame painted the grown
+      // thread one frame too high, then jumped (the « bump » on every send).
       act(() => callback?.([{ target: content } as unknown as ResizeObserverEntry], {} as ResizeObserver));
-      expect(frames).toHaveLength(1);
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
+      expect(frames).toHaveLength(0);
       expect(scroller.scrollTop).toBe(1_000);
 
       Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 1_400 });
@@ -272,8 +293,7 @@ describe("ThreadTimeline", () => {
           { target: content } as unknown as ResizeObserverEntry,
         ], {} as ResizeObserver);
       });
-      expect(frames).toHaveLength(1);
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
+      expect(frames).toHaveLength(0);
       expect(scroller.scrollTop).toBe(1_400);
     } finally {
       globalThis.ResizeObserver = originalResizeObserver;
@@ -366,7 +386,7 @@ describe("ThreadTimeline", () => {
     expect(container.textContent).not.toContain("remember:");
   });
 
-  test("rien sous la bulle, comme Grok Bot : la durée réelle passe dans l'infobulle de la réponse", () => {
+  test("la réponse dans la bulle de Grok Bot : sans signature ni durée affichée", () => {
     const answerRun = {
       ...run("run-answer", "completed"),
       createdAt: "2026-09-03T00:00:00.000Z",
@@ -394,14 +414,15 @@ describe("ThreadTimeline", () => {
     expect(response?.className).toContain("w-full");
     // Plus de signature sous la bulle : le fil d'un DM n'a qu'un locuteur.
     expect(turn?.querySelector("[data-assistant-author]")).toBeNull();
-    expect(response?.querySelector(".ai-response-reveal")).not.toBeNull();
+    expect(response?.querySelector('[data-assistant-layout="grok"] .prose')).not.toBeNull();
     expect([...(response?.querySelectorAll("button") ?? [])].some((button) => button.textContent === "1.25s")).toBe(false);
-    // Aucune infobulle native : ni heure ni durée au survol du tour.
+    // Aucune infobulle native d'heure ni de durée au survol du tour : seuls
+    // les boutons de la rangée d'actions nomment leur geste.
     expect(turn?.hasAttribute("title")).toBe(false);
-    expect(container.querySelector("[data-turn-of] [title]")).toBeNull();
+    expect(container.querySelector("[data-turn-of] [title]:not(button)")).toBeNull();
   });
 
-  test("une réponse longue tient dans une seule bulle, jamais en pile de cartes", () => {
+  test("une réponse longue tient dans une seule surface, jamais en pile de cartes", () => {
     const { container } = renderTimeline({
       events: [{
         cursor: 1,
@@ -437,7 +458,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
     const surface = container.querySelector<HTMLElement>("[data-assistant-layout]");
     // La bulle de Grok Bot : une seule surface, au plus 560 px, dont le voile
     // vient de la feuille de style (aucune classe `bg-`).
-    expect(surface?.getAttribute("data-assistant-layout")).toBe("bubble");
+    expect(surface?.getAttribute("data-assistant-layout")).toBe("grok");
     expect(surface?.className).toContain("max-w-[min(80%,560px,calc(100%-82px))]");
     expect(surface?.className).not.toContain("bg-");
     expect(surface?.closest("article")?.className).toContain("w-full");
@@ -446,9 +467,9 @@ En résumé : monolithe modulaire, domaines isolés.`,
     // L'arborescence est un bloc, pas cinq paragraphes ni trois cartes.
     expect(container.querySelector("[data-path-listing]")?.textContent).toBe("src/\nShared/\nDomain/\nApplication/\nInfrastructure/");
     expect(container.querySelector("aside")?.textContent).toContain("En résumé");
-    // Comme Grok Bot, aucune barre autour de la réponse : les gestes sont au
-    // clic droit, sur la bulle, qui prend le focus pour la touche Menu.
-    expect(container.querySelector("[data-message-hover-actions]")).toBeNull();
+    // Comme grok.com, la rangée d'actions vit sous la réponse finie ; la
+    // surface garde le focus pour la touche Menu.
+    expect(container.querySelector("[data-message-hover-actions]")).not.toBeNull();
     expect(surface?.closest("[tabindex='0']")).not.toBeNull();
   });
 
@@ -467,9 +488,8 @@ En résumé : monolithe modulaire, domaines isolés.`,
     });
 
     const surface = container.querySelector<HTMLElement>("[data-assistant-layout]");
-    expect(surface?.getAttribute("data-assistant-layout")).toBe("bubble");
+    expect(surface?.getAttribute("data-assistant-layout")).toBe("grok");
     expect(surface?.className).not.toContain("bg-");
-    expect(container.querySelector("[data-message-hover-actions]")).toBeNull();
   });
 
   test("aligne aussi la carte outil sous l'avatar du bot", () => {
@@ -513,14 +533,11 @@ En résumé : monolithe modulaire, domaines isolés.`,
       runs: [run("run-activity", "completed")],
     });
 
-    // One summary for the whole turn, by tool family; the Tool Result rows
-    // inside the feed never repeat it.
-    const summaries = [...container.querySelectorAll("[data-turn-activity] > button")]
-      .filter((button) => button.textContent?.includes("2 commandes"));
-    const nestedSummaries = [...container.querySelectorAll("[data-turn-activity] [data-tool-activity] button")]
-      .filter((button) => button.textContent?.includes("commandes"));
-    expect(summaries).toHaveLength(1);
-    expect(nestedSummaries).toHaveLength(0);
+    // One header for the whole turn, grok's « Réflexion » line; the Tool
+    // Result rows inside the log never repeat it.
+    const heads = container.querySelectorAll("[data-turn-activity] > [data-activity-head]");
+    expect(heads).toHaveLength(1);
+    expect(heads[0]!.textContent).toContain("Réflexion");
     // The sentence between the two calls is a « thinking » row of the feed,
     // between the two Tool Result rows, in the runtime's order.
     const rows = [...container.querySelectorAll("[data-turn-activity] [data-activity-row]")]
@@ -633,15 +650,17 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(result!.querySelector("[data-tool-failure-reason]")?.textContent).toContain("command not found: foo");
     const errors = [...result!.querySelectorAll("[data-tool-error-inline]")].map((line) => line.textContent);
     expect(errors).toEqual(["command not found: foo", "exit status 127"]);
-    // The folded turn says the failure and its reason without a click.
-    expect(container.querySelector("[data-activity-head]")?.textContent).toContain("command not found: foo");
-    expect(container.textContent).toContain("échec : command not found: foo");
+    // The header counts the failure on its one line; the raw error never
+    // squeezes in after « Réflexion : Ns » (it reads in the log and the panel).
+    const head = container.querySelector("[data-activity-head]");
+    expect(head?.textContent).toContain("1 échec sur 1");
+    expect(head?.textContent).not.toContain("command not found");
 
     fireEvent.click(result!.querySelector<HTMLElement>("[data-tool-inspect]")!);
     expect(screen.getByRole("dialog").textContent).toContain("exit status 127");
   });
 
-  test("un seul échec connu apparaît dans l'en-tête du groupe avec sa raison", () => {
+  test("un seul échec connu : son compte dans l'en-tête du tour, sa raison dans le journal", () => {
     const at = new Date("2026-10-17T10:00:00.000Z");
     const { container } = renderTimeline({
       events: [
@@ -653,7 +672,8 @@ En résumé : monolithe modulaire, domaines isolés.`,
       runs: [run("run-partial", "completed")],
     });
 
-    expect(container.textContent).toContain("1 échec sur 2 : permission denied");
+    expect(container.querySelector("[data-activity-head]")?.textContent).toContain("1 échec sur 2");
+    expect(container.querySelector("[data-activity-head]")?.textContent).not.toContain("permission denied");
     expect(container.querySelectorAll("[data-tool-failure-reason]").length).toBeGreaterThan(0);
   });
 
@@ -908,7 +928,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
 
   // Une trace conclue est un chemin parcouru : dépliée, trois requêtes et leurs
   // sources repoussaient la réponse hors de l'écran.
-  test("la trace de recherche se replie quand le tour est conclu, et reste ouverte pendant", () => {
+  test("la trace de recherche se replie quand le tour est conclu, et roule dans le flux pendant", () => {
     const trace = (runId: string) => ({
       cursor: 1,
       sequence: 1,
@@ -929,13 +949,14 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(teteConclue?.getAttribute("aria-expanded")).toBe("false");
     cleanup();
 
+    // En cours, la recherche roule dans le flux de grok.com, sous l'en-tête.
     const enCours = renderTimeline({
       events: [trace("run-live")],
       runs: [run("run-live", "running")],
       running: true,
     });
-    const teteEnCours = enCours.container.querySelector("[data-activity-head]");
-    expect(teteEnCours?.getAttribute("aria-expanded")).toBe("true");
+    expect(enCours.container.querySelector("[data-turn-activity][data-thinking]")).not.toBeNull();
+    expect(enCours.container.querySelector('[data-agent-feed-item] [data-feed-row="search"]')?.textContent).toContain("météo Lille");
   });
 
   // Le tour s'ouvrait sur un bloc orphelin : « N recherches sur le web » se
@@ -1006,8 +1027,8 @@ En résumé : monolithe modulaire, domaines isolés.`,
     });
 
     expect(screen.queryByText("En attente…")).toBeNull();
-    // The live turn carries the thinking status itself, once.
-    expect(document.querySelectorAll("[data-turn-activity][data-thinking] [data-thinking-status]")).toHaveLength(1);
+    // The live turn carries the thinking header itself, once.
+    expect(document.querySelectorAll("[data-turn-activity][data-thinking] [data-thinking-elapsed]")).toHaveLength(1);
   });
 
   // Écrire pendant que le bot répond : le second message est ABSORBÉ par le run

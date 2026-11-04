@@ -33,7 +33,8 @@ import {
 } from "../lib/stream/assistant-article-sections";
 import { useT } from "../lib/i18n";
 import { splitMarkdownBlocks } from "../lib/stream/streaming-markdown";
-import { rehypeReveal, rehypeStreamTail } from "../lib/stream/stream-tail-rehype";
+import { rehypeStreamWords } from "../lib/stream/stream-tail-rehype";
+import { itemsAfter, leadingText } from "../lib/stream/stream-word-text";
 import type { ThemeRegistration } from "shiki";
 
 /**
@@ -53,11 +54,12 @@ import type { ThemeRegistration } from "shiki";
  */
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
 const rehypePlugins = [rehypeKatex];
-/** The streaming block's own pipeline: its newest characters in a blurred tail, then a caret. */
-const streamingTailRehypePlugins = [rehypeKatex, rehypeStreamTail];
-/** A block that appeared while the answer streams: it blurs in (`ohb-reveal`). */
-const revealRehypePlugins = [rehypeKatex, rehypeReveal];
-const revealTailRehypePlugins = [rehypeKatex, rehypeStreamTail, rehypeReveal];
+/**
+ * A block the stream writes or wrote: grok.com's word-by-word blur-in
+ * (`rehypeStreamWords`). A block born in the stream keeps its word spans once
+ * the stream ends, so the last words finish their blur instead of snapping.
+ */
+const streamWordsRehypePlugins = [rehypeKatex, rehypeStreamWords];
 
 const ALERT_ICONS = {
   NOTE: Info,
@@ -251,7 +253,7 @@ export function isTitleLine(text: string): boolean {
 
 /**
  * The overridden block components drop the hast `className`; the stream's
- * `ohb-reveal` (`rehypeReveal`) would never reach the DOM. This hands it to
+ * `ohb-reveal` (`rehypeStreamWords`, on code) would never reach the DOM. This hands it to
  * the root element of whatever they render.
  */
 function carryingClassName<Props extends { className?: string; children?: ReactNode }, Rendered>(
@@ -263,6 +265,7 @@ function carryingClassName<Props extends { className?: string; children?: ReactN
     return cloneElement(rendered, { className: cn(rendered.props.className, props.className) });
   };
 }
+
 
 function ParagraphBlock({ children }: { children?: ReactNode; className?: string }) {
   const text = reactText(children);
@@ -288,36 +291,30 @@ function ParagraphBlock({ children }: { children?: ReactNode; className?: string
     );
   }
   // Le label n'est mis en gras que s'il est un texte nu en tête : un premier
-  // enfant déjà balisé (lien, code, gras du modèle) est laissé tel quel.
+  // enfant déjà balisé (lien, code, gras du modèle) est laissé tel quel. Les
+  // mots d'un bloc écrit par le flux (`.grok-w`) se lisent comme ce texte nu.
   const items = Children.toArray(children);
-  const first = items[0];
-  const second = items[1];
-  if (
-    typeof first === "string" &&
-    isValidElement(second) &&
-    second.type === "br" &&
-    isTitleLine(first)
-  ) {
+  const lead = leadingText(items);
+  if (!lead.count) return <p>{children}</p>;
+  const next = items[lead.count];
+  if (isValidElement(next) && next.type === "br" && isTitleLine(lead.text)) {
     return (
       <p>
-        <strong data-lead-title="">{first}</strong>
-        {items.slice(1)}
+        <strong data-lead-title="">{lead.text}</strong>
+        {items.slice(lead.count)}
       </p>
     );
   }
-  if (typeof first === "string") {
-    const split = splitLeadLabel(first);
-    if (split) {
-      const [label, separator, rest] = split;
-      return (
-        <p>
-          <strong data-lead-label="">{label}</strong>
-          {separator}
-          {rest}
-          {items.slice(1)}
-        </p>
-      );
-    }
+  const split = splitLeadLabel(lead.text);
+  if (split) {
+    const [label, separator, rest] = split;
+    return (
+      <p>
+        <strong data-lead-label="">{label}</strong>
+        {separator}
+        {itemsAfter(items, lead.text.length - rest.length)}
+      </p>
+    );
   }
   return <p>{children}</p>;
 }
@@ -597,7 +594,7 @@ const wells: Pick<Components, "pre" | "table" | "a"> = {
   pre: carryingClassName(Pre),
   a: MarkdownLink,
   table: carryingClassName(({ children }: { children?: ReactNode; className?: string }) => (
-    <div className="scrollbar-subtle my-2 overflow-x-auto rounded-lg border border-border/50">
+    <div data-md-table="" className="scrollbar-subtle my-2 overflow-x-auto rounded-lg border border-border/50">
       <table className="w-full text-sm">{children}</table>
     </div>
   )),
@@ -683,19 +680,15 @@ export const ThreadMarkdownBlock = memo(function ThreadMarkdownBlock({
 }: {
   markdown: string;
   variant?: "prose" | "steps";
-  /** The block the stream is writing: « Stream Text » tail + caret (`stream-tail-rehype.ts`). */
+  /** The block the stream is writing: its new words blur in (`rehypeStreamWords`). */
   tail?: boolean;
-  /** The block was mounted by the stream: its elements blur in once. */
+  /** The block was mounted by the stream: it keeps its word spans, nothing replays. */
   reveal?: boolean;
 }) {
   return (
     <Markdown
       remarkPlugins={remarkPlugins}
-      rehypePlugins={
-        tail
-          ? reveal ? revealTailRehypePlugins : streamingTailRehypePlugins
-          : reveal ? revealRehypePlugins : rehypePlugins
-      }
+      rehypePlugins={tail || reveal ? streamWordsRehypePlugins : rehypePlugins}
       components={variant === "steps" ? stepComponents : proseComponents}
     >
       {markdown}
@@ -705,8 +698,8 @@ export const ThreadMarkdownBlock = memo(function ThreadMarkdownBlock({
 
 /**
  * La réponse est rendue bloc par bloc (`splitMarkdownBlocks`) : pendant le
- * flux, chaque mise à jour ne reparse que le dernier bloc, qui porte seul la
- * queue floue et le caret (« Stream Text »), les blocs déjà
+ * flux, chaque mise à jour ne reparse que le dernier bloc, dont seuls les
+ * mots nouveaux sortent du flou (`rehypeStreamWords`), les blocs déjà
  * terminés gardent leur texte et leur `memo`. Le `"\n"` entre deux blocs est
  * le nœud texte que `react-markdown` intercale entre deux blocs de premier
  * niveau : le DOM est celui d'un rendu d'un seul tenant. Même découpe hors

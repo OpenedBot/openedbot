@@ -18,15 +18,15 @@ import { useRuntimeHealth } from "../../lib/runtime/use-runtime-health";
 import { SupportUnreadDot } from "../support/support-unread-dot";
 import { useFleetFrameContext } from "../../pro-console/slots";
 import packageJson from "../../../package.json";
-import { RailLanguageToggle, RailThemeToggle } from "./rail-account";
+import { RailLlmQuotas } from "./rail-llm-quotas";
 import { RailRuntimeHealth } from "./rail-runtime-health";
 
 /**
  * Variante C (`lib/shell/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
  * d'OpenBot, dans la console comme dans le desktop. Un rail d'icônes posé sur
- * le fond du cadre : Accueil, À traiter en haut ; en bas, tout ce que portait
- * le menu du compte, à plat (`rail-account.tsx`) : runtime, Support,
- * thème, langue et Réglages. Aucun popover, aucun avatar.
+ * le fond du cadre : Accueil, À traiter en haut ; en bas, le quota LLM
+ * restant (GPT, Anthropic, Grok), runtime, Support et Réglages. Aucun popover, aucun avatar : le thème et la langue se règlent
+ * dans Réglages > Apparence, plus dans le rail (décision du 04-11-2026).
  */
 
 /** 36 px, icône de 18 px, pas de 42 px entre deux boutons (gap 6). */
@@ -103,6 +103,7 @@ export function BoardIconRail() {
       </nav>
       <div className="flex-1" />
       <nav aria-label={t("boardui.accountMenu", { name: t("navUser.operator") })} className="flex shrink-0 flex-col items-center gap-1.5">
+        <RailLlmQuotas buttonClassName={RAIL_BUTTON} />
         <RailRuntimeHealth reading={runtimeHealth} buttonClassName={RAIL_BUTTON} onOpenSettings={openSettings} />
         {deskAvailable ? (
           <RailTip label={supportLabel}>
@@ -112,9 +113,6 @@ export function BoardIconRail() {
             </button>
           </RailTip>
         ) : null}
-        <div aria-hidden className={RAIL_DIVIDER} />
-        <RailThemeToggle buttonClassName={RAIL_BUTTON} />
-        <RailLanguageToggle buttonClassName={RAIL_BUTTON} />
         <div aria-hidden className={RAIL_DIVIDER} />
         <RailTip label={t("navUser.settings")}>
           <button type="button" aria-label={t("navUser.settings")} className={RAIL_BUTTON} onClick={() => openSettings(fleetHome ? "/settings/profile" : "/settings")}>

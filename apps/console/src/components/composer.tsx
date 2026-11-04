@@ -15,17 +15,9 @@ import {
   type SyntheticEvent,
 } from "react";
 import { Square } from "lucide-react";
-import {
-  RiAddFill,
-  RiApps2AddLine,
-  RiArrowUpLine,
-  RiAttachment2,
-  RiCheckLine,
-  RiFocus3Line,
-  RiListCheck3,
-  RiMic2Line,
-} from "@remixicon/react";
+import { RiAddFill, RiApps2AddLine, RiAttachment2, RiCheckLine, RiFocus3Line, RiListCheck3 } from "@remixicon/react";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger, BuiSectionLabel } from "./boardui/menu";
+import { GrokIcon } from "./grok/grok-icons";
 import { useMobileDrawer } from "./mobile/mobile-drawer-shell";
 import {
   cn,
@@ -210,8 +202,6 @@ export function Composer({
   mcpPlugins = EMPTY_MCP_PLUGINS,
   attachments = EMPTY_ATTACHMENTS,
   onAttachmentsChange,
-  onVoice,
-  voiceListening = false,
   modelControl,
   statusTab,
   statusLeft,
@@ -262,10 +252,6 @@ export function Composer({
    */
   attachments?: readonly MessageAttachmentInput[];
   onAttachmentsChange?: (next: MessageAttachmentInput[]) => void;
-  /** Ouvre la dictée réelle du navigateur pour ce brouillon. */
-  onVoice?: () => void;
-  /** La dictée écoute pour de bon (reconnaissance démarrée) : le micro prend sa teinte rouge. */
-  voiceListening?: boolean;
   /**
    * La ligne de statut sous la carte (26 px, texte tertiaire) : `statusLeft`
    * à gauche, `contextMeter` (anneau de contexte et pourcentage) à droite.
@@ -596,19 +582,17 @@ export function Composer({
   /** Ce qu'il y a à envoyer : du texte, OU des pièces jointes. Joindre une
    *  capture sans écrire un mot est un envoi légitime. */
   const empty = !value.trim() && attachments.length === 0;
-  // ChatGPT iOS : mic XOR send. Pendant un run, un brouillon remplace Stop
-  // par Envoyer : les deux actions côte à côte donnaient deux boutons
-  // primaires concurrents et faisaient croire qu'il fallait interrompre avant
-  // d'ajouter une instruction à la réponse en cours.
-  const showVoice = Boolean(onVoice) && (!coarse || (empty && !running));
   // Carte de plan ouverte, champ vide : Lancer, pas la flèche Envoyer.
   // Un texte dans le champ reste une correction, envoyée par la flèche.
   const showLaunch = Boolean(planPending && onPlanLaunch) && !running && empty;
-  const showSend = !showLaunch && (running ? !empty : (!coarse || !empty));
-  // Sans languette ni modèle (salon), personne ne porte `ml-auto` : le micro,
-  // sinon le bouton principal, pousse alors le groupe droit au bout.
+  // Pendant un run, un brouillon remplace Stop par Envoyer : les deux actions
+  // côte à côte donnaient deux boutons primaires concurrents et faisaient
+  // croire qu'il fallait interrompre avant d'ajouter une instruction.
+  const showSend = !showLaunch && (running ? !empty : true);
+  // Sans languette ni modèle (salon), personne ne porte `ml-auto` : le bouton
+  // principal pousse alors le groupe droit au bout.
   const anchorRight = !statusTab && !modelControl;
-  const primaryAnchor = anchorRight && !showVoice && "sm:ml-auto";
+  const primaryAnchor = anchorRight && "sm:ml-auto";
   const sendBlocked = disabled || preparing || empty || sending;
   // Partagé par le champ et son calque miroir, sinon le calque peint à côté.
   const fieldPadding = expanded ? "sm:px-2.5 sm:pt-2 sm:pb-1" : "sm:px-2";
@@ -967,7 +951,7 @@ export function Composer({
                     >
                       {addOpen
                         ? <svg width="10.8" height="10.8" viewBox="0 0 10.8 10.8" fill="none" aria-hidden><path d="M2 2L8.8 8.8M8.8 2L2 8.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                        : <RiAddFill className="size-5 transition-transform duration-200" aria-hidden />}
+                        : <GrokIcon name="plus" className="size-5 transition-transform duration-200" />}
                     </button>
                   </BuiPopoverTrigger>
                   <BuiPopoverContent
@@ -1046,34 +1030,6 @@ export function Composer({
               <div data-composer-status="" className="hidden min-w-0 sm:order-3 sm:ml-auto sm:flex">
                 {statusTab}
               </div>
-            ) : null}
-            {showVoice ? (
-              <button
-                data-composer-voice=""
-                type="button"
-                onPointerDown={keepSoftKeyboard}
-                onClick={onVoice}
-                disabled={disabled}
-                aria-label={t("voicePanel.open")}
-                aria-pressed={voiceListening}
-                title={t("voicePanel.open")}
-                data-listening={voiceListening ? "" : undefined}
-                className={cn(
-                  "ohb-press relative mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40 sm:order-5 sm:mb-0 sm:size-7 sm:p-1",
-                  // Écoute : teinte rouge et anneau `animate-ping` (kit streaming-ui, `MicButton`).
-                  voiceListening
-                    ? "bg-red-500/10 text-red-500 sm:hover:bg-red-500/15"
-                    : "text-foreground-icon-secondary sm:hover:bg-background-tertiary-default sm:hover:text-foreground-icon-primary",
-                  anchorRight && "sm:ml-auto",
-                )}
-              >
-                {voiceListening ? (
-                  <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-red-500/20 motion-reduce:animate-none" />
-                ) : null}
-                <SwapIcon ready={motionReady}>
-                  <RiMic2Line className="relative size-4 sm:size-[18px]" aria-hidden />
-                </SwapIcon>
-              </button>
             ) : null}
             {/* Le champ n'est plus l'enfant direct de la rangée : le calque
                 miroir a besoin d'un parent positionné. C'est donc CE nœud qui
@@ -1267,7 +1223,7 @@ export function Composer({
                 aria-label={planPending ? t("planCard.sendCorrection") : t("composer.send")}
               >
                 <SwapIcon ready={motionReady}>
-                  <RiArrowUpLine className="size-4 sm:size-5" aria-hidden />
+                  <GrokIcon name="arrowUp" className="size-4 sm:size-5" />
                 </SwapIcon>
               </button>
             ) : null}

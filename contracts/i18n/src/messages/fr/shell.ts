@@ -140,8 +140,6 @@ export const navUser = {
   newGroup: "Nouveau groupe",
   lightTheme: "Thème clair",
   darkTheme: "Thème sombre",
-  /** Le bouton de langue du rail : il dit la langue vers laquelle il bascule. */
-  switchLanguage: "Passer en {language}",
   installApp: "Installer l’application",
   signOut: "Se déconnecter",
   impersonationReadOnly: "Mode assistance · lecture seule",
