@@ -148,6 +148,28 @@ describe("RailLlmQuotas", () => {
     expect(await screen.findByRole("dialog")).toBeTruthy();
   });
 
+  test("au rechargement, les trois logos tiennent leur place pendant la lecture, puis s'y remplissent", async () => {
+    const answered = globalThis.fetch;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes("/provider-usage")) await gate;
+      return answered(input, init);
+    }) as typeof fetch;
+    const { container } = renderRail();
+    await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas='loading']") !== null).toBe(true));
+    const slots = [...container.querySelectorAll("[data-rail-llm-quotas='loading'] [data-rail-quota]")];
+    expect(slots.map((node) => `${node.getAttribute("data-rail-quota")}:${node.getAttribute("data-rail-quota-state")}`))
+      .toEqual(["gpt:loading", "anthropic:loading", "grok:loading"]);
+    // Inertes : ni bouton ni nom accessible avant le relevé.
+    expect(container.querySelector("[data-rail-llm-quotas='loading'] button") === null).toBe(true);
+    release();
+    const group = await screen.findByRole("group", { name: "Quota LLM restant" });
+    expect(group.querySelectorAll("button[data-rail-quota]").length).toBe(3);
+    expect(container.querySelector("[data-rail-llm-quotas='loading']") === null).toBe(true);
+  });
+
   test("fermer la modale rend le focus au logo sans rouvrir son infobulle", async () => {
     renderRail();
     const gpt = await screen.findByRole("button", { name: /^GPT : 58 % restant/ });
@@ -188,8 +210,10 @@ describe("RailLlmQuotas", () => {
     providers = [{ slug: "openrouter", name: "OpenRouter" }];
     snapshots = [snapshot("openrouter", [["Credits", 10]])];
     const { container } = renderRail();
-    await waitFor(() => expect(clients[0]!.isFetching()).toBe(0));
-    expect(container.querySelector("[data-rail-llm-quotas]") === null).toBe(true);
+    // La place de chargement, puis plus rien une fois le catalogue lu.
+    await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas='loading']") !== null).toBe(true));
+    await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas]") === null).toBe(true));
+    expect(clients[0]!.isFetching()).toBe(0);
   });
 
   test("lien fermé : les logos restent, en pointillés, et disent pourquoi", async () => {

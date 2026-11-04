@@ -151,6 +151,29 @@ function QuotaMark({ family }: { family: RailQuotaFamily }) {
 }
 
 /**
+ * La place des trois logos avant le premier relevé : logo estompé dans une
+ * piste neutre qui pulse, inerte et muette (aucun état à annoncer encore).
+ */
+function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: string }) {
+  return (
+    <div aria-hidden data-rail-llm-quotas="loading" className="flex shrink-0 flex-col items-center gap-1.5">
+      {RAIL_QUOTA_FAMILIES.map((family) => (
+        <span key={family.key} data-rail-quota={family.key} data-rail-quota-state="loading" className={cn(buttonClassName, "pointer-events-none")}>
+          <span className="relative inline-flex size-7 items-center justify-center motion-safe:animate-pulse">
+            <svg viewBox="0 0 28 28" className="absolute inset-0 size-7 overflow-visible">
+              <circle cx="14" cy="14" r={RING_R} fill="none" strokeWidth="2" className="stroke-foreground/15" />
+            </svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" className="size-3.5 opacity-35">
+              <path d={BRAND_MARKS[family.mark].path} />
+            </svg>
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Le quota LLM restant chez GPT, Anthropic et Grok, juste au-dessus du runtime
  * dans le rail : les trois logos, empilés dans cet ordre, chacun dans un
  * anneau rempli de ce qui reste sur la fenêtre la plus entamée du compte.
@@ -160,8 +183,9 @@ function QuotaMark({ family }: { family: RailQuotaFamily }) {
  *
  * Même lecture, en cache, que l'onglet du composer (`useProviderLimits`) :
  * aucune requête de plus. Rien pour un membre (les quotas sont lus par les
- * owners et admins), ni tant que la première lecture n'a pas eu lieu : le
- * groupe apparaît au-dessus du runtime, le bas du rail reste ancré.
+ * owners et admins). Pendant la première lecture (au rechargement, elle
+ * attend les lectures secondaires, ~1,5 s), les trois logos tiennent déjà leur
+ * place (`RailLlmQuotasLoading`) : ils ne surgissent plus au-dessus du runtime.
  */
 export function RailLlmQuotas({ buttonClassName }: { buttonClassName: string }) {
   const { t } = useT();
@@ -175,7 +199,9 @@ export function RailLlmQuotas({ buttonClassName }: { buttonClassName: string }) 
   */
   const swallowFocusRef = useRef(false);
   const limits = useProviderLimits(open);
-  if (!limits.canView || limits.runtimeId === null || limits.pending) return null;
+  if (!limits.canView) return null;
+  if (limits.runtimePending || (limits.runtimeId !== null && limits.pending)) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
+  if (limits.runtimeId === null) return null;
   const families = railQuotaFamilies(limits);
   const broken = limits.readFailed || limits.status === "error" || limits.status === "disconnected";
   if (!broken && families.every((family) => family.reading.state === "off")) return null;

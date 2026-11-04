@@ -214,6 +214,8 @@ export function useProviderLimits(_active: boolean) {
   return {
     canView,
     runtimeId,
+    /** Le runtime n'est pas encore connu : `runtimeId` nul ne veut pas encore dire « aucun runtime ». */
+    runtimePending: canView && runtimes.isPending,
     providers,
     snapshots,
     providerBots,
