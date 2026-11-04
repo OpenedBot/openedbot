@@ -10,6 +10,7 @@ import {
   markLinkSeen,
   replaceLinkTokenEmergency,
   setLinkFeatures,
+  settleLinkTokenRotation,
 } from "@openedbot/runtimes/sql/runtime-link-rows";
 import { hashCredential, randomCredential } from "@openedbot/platform-db/credential";
 import { logEvent } from "@openedbot/platform-observability";
@@ -79,9 +80,16 @@ export function createLinkLivenessStore(db: Db, options: LinkLivenessStoreOption
     },
     async connected(link, instanceId, features) {
       const generation = requiredGeneration(link);
-      await withCredential(db, link.tokenHash, async (tx) => {
+      const settled = await withCredential(db, link.tokenHash, async (tx) => {
         if (!await markLinkConnected(tx, link, { instanceId, generation, features })) throw new LinkLeaseLostError();
+        // Le jeton présenté à l'admission tranche une rotation en cours (0174).
+        const outcome = await settleLinkTokenRotation(tx, link);
+        if (outcome === "reverted") {
+          await insertRuntimeLinkEvent(tx, link.organizationId, link.runtimeId, "rotated", { automatic: true, reason: "unconfirmed_reverted" });
+        }
+        return outcome;
       });
+      if (settled) logEvent("runtime_link.token_rotation_settled", { runtimeId: link.runtimeId, outcome: settled });
       // Hello accepté : les capacités annoncées peuvent avoir changé. Le
       // worker, autre processus, voit le même événement via `link_connected_at`.
       invalidateHermesPreflightCache({

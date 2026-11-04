@@ -8,6 +8,8 @@ import {
   resetWarmModelSelection,
   takeWarmOrSelectModel,
   warmModelSelectionKey,
+  warmModelSelectionSize,
+  WARM_MODEL_SELECTION_MAX_ENTRIES,
   WARM_MODEL_SELECTION_TTL_MS,
 } from "../../src/application/warm-model-selection";
 
@@ -164,5 +166,36 @@ describe("warm preflight (DEV-214)", () => {
     await expect(attempt).rejects.toMatchObject({ code: "HERMES_FORBIDDEN_TOOLSETS_ACTIVE" });
     expect(cachedReads).toBe(0);
     expect(probeCalls).toBe(0);
+  });
+
+  test("expired selections leave the cache on the next write, even if their key is never read again", () => {
+    resetWarmModelSelection();
+    const key = (connectedAt: string) => warmModelSelectionKey({ ...scope, profile: "neo", provider: null, reasoningEffort: null, linkConnectedAt: connectedAt });
+    const selection = { provider: null, model: "grok-4", reasoningEffort: null };
+    // A reconnection changes the key: the previous one is never read again.
+    rememberWarmModelSelection(key("2026-10-09T00:00:00.000Z"), selection, 0);
+    rememberWarmModelSelection(key("2026-10-09T01:00:00.000Z"), selection, 1_000);
+    expect(warmModelSelectionSize()).toBe(2);
+    rememberWarmModelSelection(key("2026-10-09T02:00:00.000Z"), selection, WARM_MODEL_SELECTION_TTL_MS + 500);
+    expect(warmModelSelectionSize()).toBe(2);
+    expect(readWarmModelSelection(key("2026-10-09T01:00:00.000Z"), WARM_MODEL_SELECTION_TTL_MS + 500)).toEqual({ provider: null, model: "grok-4", reasoningEffort: null });
+    resetWarmModelSelection();
+  });
+
+  test("the cache never grows past its cap; the oldest write goes first", () => {
+    resetWarmModelSelection();
+    const key = (index: number) => warmModelSelectionKey({ ...scope, runtimeId: `rt-${index}`, profile: null, provider: null, reasoningEffort: null });
+    const selection = { provider: null, model: "grok-4", reasoningEffort: null };
+    for (let index = 0; index <= WARM_MODEL_SELECTION_MAX_ENTRIES; index += 1) rememberWarmModelSelection(key(index), selection, 10);
+    expect(warmModelSelectionSize()).toBe(WARM_MODEL_SELECTION_MAX_ENTRIES);
+    expect(readWarmModelSelection(key(0), 10)).toBeNull();
+    expect(readWarmModelSelection(key(1), 10)).not.toBeNull();
+    expect(readWarmModelSelection(key(WARM_MODEL_SELECTION_MAX_ENTRIES), 10)).not.toBeNull();
+    // Rewriting a key moves it to the back: it survives the next eviction.
+    rememberWarmModelSelection(key(1), selection, 10);
+    rememberWarmModelSelection(key(WARM_MODEL_SELECTION_MAX_ENTRIES + 1), selection, 10);
+    expect(readWarmModelSelection(key(1), 10)).not.toBeNull();
+    expect(readWarmModelSelection(key(2), 10)).toBeNull();
+    resetWarmModelSelection();
   });
 });

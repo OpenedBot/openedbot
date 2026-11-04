@@ -21,6 +21,7 @@ const MARK_TINTS: Record<BrandMarkKey, string> = {
   openai: NEUTRAL,
   opencode: NEUTRAL,
   openrouter: NEUTRAL,
+  grok: NEUTRAL,
   x: NEUTRAL,
   googlegemini: BLUE,
   googlecloud: BLUE,
@@ -49,7 +50,8 @@ const PROVIDERS: Record<string, KnownProvider> = {
   "opencode-zen": { label: "OpenCode Zen", mark: "opencode" },
   openrouter: { label: "OpenRouter", mark: "openrouter" },
   xai: { label: "xAI", mark: "x" },
-  "xai-oauth": { label: "xAI", mark: "x" },
+  // L'abonnement SuperGrok / Premium+ : la marque Grok, pas celle de X.
+  "xai-oauth": { label: "xAI", mark: "grok" },
   gemini: { label: "Google Gemini", mark: "googlegemini" },
   vertex: { label: "Google Vertex AI", mark: "googlecloud" },
   deepseek: { label: "DeepSeek", mark: "deepseek" },
@@ -115,7 +117,7 @@ export function ProviderIcon({ provider, name, decorative = false, tagged = fals
         title={withTitle ? visual.label : undefined}
         className={cn(PILL, "relative", MARK_TINTS[visual.mark], className)}
       >
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="size-4">
+        <svg viewBox="0 0 24 24" fill="currentColor" fillRule={visual.mark === "grok" ? "evenodd" : undefined} aria-hidden className="size-4">
           <path d={mark.path} />
         </svg>
         {tagged && visual.tag ? (

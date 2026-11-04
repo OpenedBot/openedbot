@@ -156,14 +156,39 @@ describe("AuditAnchor : chaîne locale puis ancrage externe", () => {
     expect(outcome.external).toMatchObject({ state: "failed", error: "no answer within 10 ms" });
   });
 
-  test("un maillon déjà chaîné n'est pas ré-ancré", async () => {
-    const { tx } = chainDb();
-    let calls = 0;
-    const counting: AuditAnchor = { id: "count", anchor: async () => { calls += 1; } };
-    const anchoring = createAuditAnchoring({ anchor: counting });
+  test("un maillon dont l'ancrage externe a échoué est ré-ancré au rejeu, avec ses octets d'origine", async () => {
+    const { tx, rows } = chainDb();
+    const worm = new MemoryAuditWormStore();
+    let down = true;
+    const flaky: AuditAnchor = { id: "flaky", anchor: async (txn, anchored) => {
+      if (down) throw new Error("bucket unreachable");
+      await wormAuditAnchor(worm).anchor(txn, anchored);
+    } };
+    const anchoring = createAuditAnchoring({ anchor: flaky, blocking: async () => false });
+    expect((await anchoring(tx, event(1))).external).toMatchObject({ state: "failed" });
+    down = false;
+    // Le rejeu porte une autre heure de réception : seul le contenu chaîné part.
+    const replay = event(1);
+    const later = { ...replay.payload, receivedAt: "2026-10-28T10:00:00.000Z" };
+    const outcome = await anchoring(tx, { ...replay, payload: later, bytes: anchorRecordBytes(later as never) });
+    expect(outcome.local.appended).toBe(false);
+    expect(outcome.external).toEqual({ state: "anchored", anchorId: "flaky" });
+    expect(rows).toHaveLength(1);
+    expect(new TextDecoder().decode((await worm.get(anchorObjectKey(RT, 1)))!)).toBe(new TextDecoder().decode(event(1).bytes));
+    // Déjà déposé : un nouveau rejeu reste idempotent.
+    expect((await anchoring(tx, event(1))).external).toEqual({ state: "anchored", anchorId: "flaky" });
+    expect(worm.keys()).toEqual([anchorObjectKey(RT, 1)]);
+  });
+
+  test("un maillon chaîné qui ne correspond plus à son empreinte n'est jamais ancré", async () => {
+    const { tx, rows } = chainDb();
+    const sent: string[] = [];
+    const recording: AuditAnchor = { id: "rec", anchor: async (_txn, anchored) => { sent.push(anchored.objectKey); } };
+    const anchoring = createAuditAnchoring({ anchor: recording, blocking: async () => false });
     await anchoring(tx, event(1));
-    expect((await anchoring(tx, event(1))).external).toEqual({ state: "none" });
-    expect(calls).toBe(1);
+    rows[0]!.payload = { ...rows[0]!.payload, tail: "b".repeat(64) };
+    expect((await anchoring(tx, event(1))).external).toMatchObject({ state: "failed", error: expect.stringContaining("does not match its digest") });
+    expect(sent).toHaveLength(1);
   });
 });
 

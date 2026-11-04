@@ -138,31 +138,24 @@ export function createHermesClientContext(options: {
   }
 
   async function json(requestPath: string, jsonOptions: { timeoutMs: number; maxBytes?: number }): Promise<unknown> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), jsonOptions.timeoutMs);
+    const response = await fetchUnderDeadline((signal) => send(requestPath, { signal }), jsonOptions.timeoutMs);
+    if (!response.ok) await throwResponse(response);
     try {
-      const response = await send(requestPath, { signal: controller.signal });
-      if (!response.ok) await throwResponse(response);
-      try {
-        return jsonOptions.maxBytes
-          ? await readBoundedJsonParser(response, jsonOptions.maxBytes)
-          : await response.json();
-      } catch (error) {
-        if (error instanceof HermesClientError) {
-          recordResponseEvidence(error, response);
-          throw error;
-        }
-        const invalid = new HermesClientError(
-          "Hermes a renvoyé une réponse JSON invalide.",
-          502,
-          "HERMES_RESPONSE_INVALID",
-          { requestDelivery: "response_received", cause: error },
-        );
-        recordResponseEvidence(invalid, response);
-        throw invalid;
+      // Toujours une lecture bornée : une route plus lourde déclare sa borne.
+      return await readBoundedJsonParser(response, jsonOptions.maxBytes ?? DEFAULT_JSON_BODY_BYTES);
+    } catch (error) {
+      if (error instanceof HermesClientError) {
+        recordResponseEvidence(error, response);
+        throw error;
       }
-    } finally {
-      clearTimeout(timeout);
+      const invalid = new HermesClientError(
+        "Hermes a renvoyé une réponse JSON invalide.",
+        502,
+        "HERMES_RESPONSE_INVALID",
+        { requestDelivery: "response_received", cause: error },
+      );
+      recordResponseEvidence(invalid, response);
+      throw invalid;
     }
   }
 
@@ -217,13 +210,11 @@ export function createHermesClientContext(options: {
     timeoutMs: number,
   ): Promise<Response> {
     const rootClient = config.profile ? options.withProfile(null) : context;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort("host_route_timeout"), timeoutMs);
-    try {
-      return await rootClient.fetch(requestPath, { ...init, signal: controller.signal }, kind);
-    } finally {
-      clearTimeout(timeout);
-    }
+    return fetchUnderDeadline(
+      (signal) => rootClient.fetch(requestPath, { ...init, signal }, kind),
+      timeoutMs,
+      "host_route_timeout",
+    );
   }
 
   const context: HermesClientContext = {
@@ -240,6 +231,85 @@ export function createHermesClientContext(options: {
     throwProviderResponse,
   };
   return context;
+}
+
+/**
+ * La borne de `json()` quand la route n'en déclare pas : celle d'un
+ * inventaire. Une réponse du runtime n'est jamais lue sans plafond, quel que
+ * soit le transport (la borne du lien ne couvre pas le transport direct).
+ */
+export const DEFAULT_JSON_BODY_BYTES = MAX_INVENTORY_BODY_BYTES;
+
+const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
+
+/**
+ * Le délai couvre la réponse ENTIÈRE, corps compris, pas seulement les
+ * en-têtes : un hôte qui envoie ses en-têtes puis suspend son corps ne tient
+ * pas la lecture au-delà de l'échéance. Le délai tombe quand le corps est lu
+ * jusqu'au bout, échoue ou est annulé. À l'échéance, le signal part (le
+ * transport coupe ce qu'il peut) et la lecture du corps échoue en 504, la
+ * réponse ayant été reçue.
+ */
+async function fetchUnderDeadline(
+  fetchResponse: (signal: AbortSignal) => Promise<Response>,
+  timeoutMs: number,
+  abortReason?: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  let expireBody: (() => void) | null = null;
+  const timeout = setTimeout(() => {
+    controller.abort(abortReason);
+    expireBody?.();
+  }, timeoutMs);
+  let response: Response;
+  try {
+    response = await fetchResponse(controller.signal);
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
+  }
+  if (!response.body || NULL_BODY_STATUSES.has(response.status)) {
+    clearTimeout(timeout);
+    return response;
+  }
+  const reader = response.body.getReader();
+  let expired = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      expireBody = () => {
+        expired = true;
+        const error = new HermesClientError(
+          "Hermes n’a pas terminé sa réponse dans le délai imparti.",
+          504,
+          "HERMES_UNREACHABLE",
+          { requestDelivery: "response_received" },
+        );
+        streamController.error(error);
+        void reader.cancel(error).catch(() => undefined);
+      };
+    },
+    async pull(streamController) {
+      let result: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        result = await reader.read();
+      } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+      }
+      if (expired) return;
+      if (result.done) {
+        clearTimeout(timeout);
+        streamController.close();
+        return;
+      }
+      streamController.enqueue(result.value);
+    },
+    cancel(reason) {
+      clearTimeout(timeout);
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
 }
 
 /** Le `error.code` d'une enveloppe d'erreur OpenAI du gateway, ou `null`. */

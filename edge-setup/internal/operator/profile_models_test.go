@@ -103,3 +103,56 @@ print(json.dumps({"result": result, "saved": saved}))
 		t.Fatalf("an exception message crossed the probe: %s", output)
 	}
 }
+
+// With a Hermes whose load_config takes no profile=, the probe reads the
+// profile's YAML itself. A file it cannot read as a mapping must refuse the
+// mutation and stay untouched: an empty config standing in for it would be
+// saved back as the whole config, dropping every other block.
+func TestProfileConfigUnreadableRefusesTheMutationAndKeepsTheFile(t *testing.T) {
+	for _, tc := range []struct{ name, content, want string }{
+		{"invalid yaml", "model: [unclosed\nplugins:\n  enabled: [a]\n", "PROFILE_CONFIG_REFUSED"},
+		{"not a mapping", "- just\n- a list\n", "PROFILE_CONFIG_REFUSED"},
+		{"empty file", "", "saved"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			code := `import json, os, sys
+scope = {"__name__": "profile_config_test"}
+exec(compile(sys.stdin.read(), "inventory_probe.py", "exec"), scope)
+home = sys.argv[1]
+os.makedirs(os.path.join(home, "profiles", "scout"))
+path = os.path.join(home, "profiles", "scout", "config.yaml")
+with open(path, "w") as handle:
+    handle.write(sys.argv[2])
+scope["hermes_home"] = lambda: home
+scope["profile_exists"] = lambda name: True
+saved = []
+scope["save_profile_config"] = lambda name, config: saved.append(config)
+try:
+    scope["invoke_handler"]("profile-model-set", {"name": "scout", "provider": "xai-oauth", "model": "grok-4.7"})
+    outcome = "saved" if saved else "nothing"
+except scope["Refused"] as refusal:
+    outcome = refusal.code
+with open(path) as handle:
+    print(json.dumps({"outcome": outcome, "kept": handle.read() == sys.argv[2], "saved": len(saved)}))
+`
+			cmd := osexec.Command("python3", "-c", code, home, tc.content)
+			cmd.Stdin = strings.NewReader(string(inventoryProbeScript))
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("probe: %v\n%s", err, output)
+			}
+			var got struct {
+				Outcome string
+				Kept    bool
+				Saved   int
+			}
+			if err := json.Unmarshal(output, &got); err != nil {
+				t.Fatalf("%v\n%s", err, output)
+			}
+			if got.Outcome != tc.want || !got.Kept {
+				t.Fatalf("outcome %+v, want %s with the file kept", got, tc.want)
+			}
+		})
+	}
+}

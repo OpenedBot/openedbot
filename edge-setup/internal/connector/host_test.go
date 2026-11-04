@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coder/websocket"
 )
 
 // fakeOperator is hermes-operator behind a Unix socket.
@@ -243,4 +245,61 @@ func fakeCapabilitiesGateway(t *testing.T, body string) *httptest.Server {
 	}))
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+// A host route whose operator connection breaks after it was accepted may
+// have been applied: only a refused or missing socket proves nothing was sent.
+func TestHostRouteDispatchStageFollowsWhatTheFailureProves(t *testing.T) {
+	dir, err := os.MkdirTemp("/tmp", "op")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, socket string)
+		want  string
+	}{
+		{"connection closed before the answer", func(t *testing.T, socket string) {
+			ln, err := net.Listen("unix", socket)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { ln.Close() })
+			go func() {
+				for {
+					conn, err := ln.Accept()
+					if err != nil {
+						return
+					}
+					// Read the request, as an operator that applies it would, then drop it.
+					_, _ = conn.Read(make([]byte, 4096))
+					conn.Close()
+				}
+			}()
+		}, StageAfterDispatch},
+		{"refused connection", func(t *testing.T, socket string) {
+			ln, err := net.Listen("unix", socket)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ln.(*net.UnixListener).SetUnlinkOnClose(false)
+			ln.Close()
+		}, StageBeforeDispatch},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			socket := filepath.Join(dir, strings.ReplaceAll(tc.name, " ", "-")[:8]+".sock")
+			tc.setup(t, socket)
+			c := New("", Auth{}, "http://127.0.0.1:1", bearer, nil)
+			c.OperatorSocket = socket
+			var got Text
+			c.serveHost(context.Background(), Text{ID: 1, Method: "POST", Path: "/hermes-setup/toolsets/browser"}, func(_ websocket.MessageType, data []byte) error {
+				got, _ = DecodeText(data)
+				return nil
+			}, strings.NewReader(`{"enabled":true}`))
+			if got.T != TErr || got.Code != "HERMES_OPERATOR_UNAVAILABLE" || got.Stage != tc.want {
+				t.Fatalf("%+v, want stage %s", got, tc.want)
+			}
+		})
+	}
 }

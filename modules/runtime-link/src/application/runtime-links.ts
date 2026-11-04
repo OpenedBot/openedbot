@@ -1,8 +1,8 @@
 import type { SQL } from "bun";
 import { createHash, randomBytes } from "node:crypto";
-import { rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/sql/runtime-link-rows";
+import { holdUnconfirmedLinkTokenRotation, rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/sql/runtime-link-rows";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
-import { LINK_CONTROL_FORWARD_TIMEOUT_MS } from "./instances";
+import { controlPushOf, LINK_CONTROL_FORWARD_TIMEOUT_MS, type ControlPush } from "./instances";
 
 /**
  * Entretien du lien connecteur côté worker.
@@ -175,6 +175,12 @@ export async function failRunsOnDisconnectedRuntimes(db: SQL, timeoutMs: number)
 
 /** Fenêtre de grâce de l'ancien jeton après rotation, la même que `POST …/link/rotate` (0027). */
 export const LINK_TOKEN_GRACE_MINUTES = 10;
+/**
+ * Livraison de `link.rotate` incertaine (0174) : les deux jetons restent
+ * valables jusqu'à la prochaine admission de l'hôte, qui tranche. Au-delà de
+ * trente jours sans reconnexion, l'ancien hash expire comme une grâce ordinaire.
+ */
+export const LINK_TOKEN_UNCONFIRMED_HOLD_HOURS = 30 * 24;
 /** Cadence des passes de sécurité du lien (rotation automatique, réconciliation des sessions). */
 export const LINK_SECURITY_TICK_MS = 60 * 60_000;
 /** Sessions inconnues journalisées par passe et par runtime, au plus. */
@@ -183,9 +189,8 @@ export const UNATTRIBUTED_SESSIONS_PER_PASS = 50;
  * Borne de l'appel du worker à la route de contrôle interne. Cet appel englobe
  * le saut de l'instance qui le reçoit vers celle qui tient le lien
  * (`LINK_CONTROL_FORWARD_TIMEOUT_MS`) : le worker attend ce saut, plus la même
- * marge pour l'instance elle-même, sinon il défait la rotation pendant que la
- * trame est encore en route. À l'échéance personne n'a confirmé le jeton : la
- * rotation est défaite, comme sur une erreur réseau.
+ * marge pour l'instance elle-même. À l'échéance la trame a pu partir : la
+ * rotation reste en attente de confirmation, comme sur une erreur réseau.
  */
 export const LINK_CONTROL_CALL_TIMEOUT_MS = 2 * LINK_CONTROL_FORWARD_TIMEOUT_MS;
 /**
@@ -219,9 +224,12 @@ function linkOrigin(options: LinkControlOptions): string {
  * connecté dont le jeton a plus de `maxAgeHours` reçoit un nouveau jeton en
  * mode maintenance : l'ancien hash glisse en `link_token_previous_hash` pour
  * dix minutes, le nouveau part par `link.rotate` sur le lien via la route de
- * contrôle interne. Si la trame ne peut pas être poussée (aucune instance ne
- * tient le lien), la rotation est DÉFAITE : un jeton que personne n'a reçu
- * tuerait le lien à la fin de la grâce. Le jeton n'est jamais journalisé.
+ * contrôle interne. Si la trame n'a certainement pas été poussée (aucune
+ * instance ne tient le lien), la rotation est DÉFAITE : un jeton que personne
+ * n'a reçu tuerait le lien à la fin de la grâce. Si l'issue est inconnue
+ * (réponse perdue, échéance), l'hôte a peut-être déjà enregistré le nouveau
+ * jeton : les deux restent valables jusqu'à sa prochaine admission
+ * (`settleLinkTokenRotation`). Le jeton n'est jamais journalisé.
  */
 export async function rotateStaleLinkTokens(db: SQL, maxAgeHours: number, options: LinkControlOptions): Promise<number> {
   const fetchImpl: LinkFetch = options.fetchImpl ?? ((input, init) => fetch(input, init));
@@ -253,22 +261,21 @@ export async function rotateStaleLinkTokens(db: SQL, maxAgeHours: number, option
       graceMinutes: LINK_TOKEN_GRACE_MINUTES,
     });
     if (!previousHash) continue;
-    let pushed = false;
+    let pushed: ControlPush;
     try {
       const response = await fetchImpl(`${linkOrigin(options)}/internal/runtime-links/${encodeURIComponent(runtime.id)}/control`, {
         method: "POST",
         headers: { Authorization: `Bearer ${options.apiInternalToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "rotate", runtimeId: runtime.id, linkToken }),
         cache: "no-store",
-        // Jamais une attente sans fin : l'échéance tombe dans le `catch`, donc dans la rotation défaite.
+        // Jamais une attente sans fin : l'échéance tombe dans le `catch`, issue inconnue.
         signal: AbortSignal.timeout(LINK_CONTROL_CALL_TIMEOUT_MS),
       });
-      const body = response.ok ? await response.json().catch(() => ({})) as { pushed?: unknown } : {};
-      pushed = body.pushed === true;
+      pushed = await controlPushOf(response);
     } catch {
-      pushed = false;
+      pushed = "unknown";
     }
-    if (!pushed) {
+    if (pushed === false) {
       // Personne n'a le nouveau jeton : on rend l'ancien, sans grâce ni trace.
       await undoLinkTokenRotation(db, {
         runtimeId: runtime.id,
@@ -277,6 +284,22 @@ export async function rotateStaleLinkTokens(db: SQL, maxAgeHours: number, option
         tokenHash,
       });
       console.warn(JSON.stringify({ event: "worker.link_token_rotation_not_pushed", runtimeId: runtime.id }));
+      continue;
+    }
+    if (pushed === "unknown") {
+      const held = await holdUnconfirmedLinkTokenRotation(db, {
+        runtimeId: runtime.id,
+        organizationId: runtime.organizationId,
+        tokenHash,
+        holdHours: LINK_TOKEN_UNCONFIRMED_HOLD_HOURS,
+      });
+      if (held) {
+        await db`
+          insert into runtime_link_events (organization_id, runtime_id, kind, meta)
+          values (${runtime.organizationId}, ${runtime.id}, 'rotated', ${{ automatic: true, reason: "max_age", confirmed: false }}::jsonb)
+        `;
+      }
+      console.warn(JSON.stringify({ event: "worker.link_token_rotation_unconfirmed", runtimeId: runtime.id, held }));
       continue;
     }
     await db`
@@ -290,7 +313,14 @@ export async function rotateStaleLinkTokens(db: SQL, maxAgeHours: number, option
 
 type HostSessionsInventory = { sessions: Array<{ id: string; profile: string; createdAt: string }>; total: number; truncated: boolean };
 
-const SESSION_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
+/**
+ * Un identifiant de session tel que le gateway l'accepte sur le lien (même
+ * alphabet que `HERMES_SESSION_SEGMENT`, deux-points compris) : les sessions
+ * d'openedbot s'appellent `ohb:<org>:<thread>`.
+ */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9._~:-]{1,256}$/;
+/** Runtimes lus par passe : 100 x `LINK_SESSIONS_INVENTORY_TIMEOUT_MS` reste sous `LINK_SECURITY_TICK_MS`. */
+export const SESSION_RECONCILIATION_BATCH = 100;
 
 /**
  * Réconciliation des sessions (OHB-55 côté hôte, OHB-56 ici). Pour chaque
@@ -311,11 +341,14 @@ export async function reconcileRuntimeSessions(db: SQL, options: LinkControlOpti
        and link_connected_at is not null
        and last_health_status <> 'disconnected'
        and 'sessions_inventory' = any(link_features)
-     order by id
-     limit 100
+     order by link_sessions_reconciled_at asc nulls first, id
+     limit ${SESSION_RECONCILIATION_BATCH}
   `;
   let unattributed = 0;
   for (const runtime of runtimes) {
+    // Datée avant la lecture, réussie ou non : la passe suivante prend les
+    // runtimes qui attendent depuis le plus longtemps, jamais les cent mêmes.
+    await db`update runtimes set link_sessions_reconciled_at = now() where id = ${runtime.id} and organization_id = ${runtime.organizationId}`;
     let inventory: HostSessionsInventory;
     try {
       const response = await fetchImpl(`${linkOrigin(options)}/internal/runtime-links/${encodeURIComponent(runtime.id)}/proxy/hermes-setup/sessions-inventory`, {

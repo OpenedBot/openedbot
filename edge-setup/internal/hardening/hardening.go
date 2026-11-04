@@ -61,6 +61,9 @@ type Hardener struct {
 	SSHDropin, ResolvedDropin, PwqualityDropin, Fail2banJail string
 	SudoersAdmin, SudoersLogging, SudoLog, SudoLogrotate     string
 	LoopbackGuardPath                                        string
+	// QuarantineHome and QuarantineSudoers are where restoring the
+	// quarantined cloud-init account puts its key and its sudoers file back.
+	QuarantineHome, QuarantineSudoers string
 	// ResolverFiles are the resolv.conf files the host's nameservers are read
 	// from (layout.ResolverFiles).
 	ResolverFiles []string
@@ -83,6 +86,8 @@ func New(r exec.Runner, log func(string, ...any)) *Hardener {
 		SSHDropin: layout.SSHDropin, ResolvedDropin: layout.ResolvedDropin, PwqualityDropin: layout.PwqualityDropin, Fail2banJail: layout.Fail2banJail,
 		SudoersAdmin: layout.SudoersAdmin, SudoersLogging: layout.SudoersLogging, SudoLog: layout.SudoLog, SudoLogrotate: layout.SudoLogrotate,
 		LoopbackGuardPath: "/etc/systemd/system/" + layout.LoopbackGuardUnit + ".service",
+		QuarantineHome:    "/home/" + layout.QuarantineUser,
+		QuarantineSudoers: layout.QuarantineSudoers,
 		ResolverFiles:     layout.ResolverFiles,
 		Log:               log,
 	}

@@ -1,25 +1,25 @@
-import { memo, useId, useState } from "react";
-import { Brain, ChevronDown, Search, Sparkles } from "lucide-react";
+import { memo, useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
+import { Search, Sparkles } from "lucide-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import type { WebSearchQuery, WebSearchTrail } from "@openedbot/execution/domain/agent-web-search";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
-import {
-  formatToolDuration,
-  toolFailureSummary,
-  toolKind,
-  type ToolCall,
-  type ToolKind,
-} from "@openedbot/conversation/domain/thread-tools";
+import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import { useT } from "../lib/i18n";
-import { toolProgressLabel } from "../lib/run/tool-progress-label";
-import { ActivityDisclosure } from "./activity-disclosure";
 import { TurnAuthorHeader } from "./thread-author";
 import { ThreadMarkdown } from "./thread-markdown";
 import { SearchSources } from "./thread-search-sources";
-import { activityKindSummary, partialFailureLabel } from "./thread-tool-labels";
-import { ThinkingStatus } from "./thread-thinking-status";
-import { ToolStateIcon } from "./thread-tool-state-icon";
+import { partialFailureLabel } from "./thread-tool-labels";
+import { BotFace } from "./bot-face";
+import { AgentFeed } from "./grok/agent-feed";
+import { GrokAgentsHeader, GrokFeedRow, type GrokFeedItem } from "./grok/grok-feed";
+import { GrokThoughtsPanel } from "./grok/grok-thoughts-panel";
+import { grokSpeaker } from "./grok/turn-feed";
+import { useAttachmentCanvas } from "./attachment-canvas";
+
+/** grok.com's first beat: the bulb before the agents are called. */
+const PRE_BEAT_MS = 400;
 
 /** One row of the feed. Rows enter with a fade and a short rise while the turn is live. */
 export function ActivityRow({ kind, className, children }: {
@@ -90,24 +90,23 @@ export function ActivitySearch({ trail }: { trail: WebSearchTrail }) {
 }
 
 /**
- * L'activité d'un tour, en UN bloc, as the « Assistant » template of
- * streaming-ui.pulseview.app on BoardUI tokens: a chronological list of what
- * the agent did (its sentences, web searches with their results, reads,
- * edits, commands, decisions), each tool as a Tool Result (component 12).
- * While the run works, the list is open at its natural height; once the turn
- * concludes it folds into one line, « A travaillé 6 s », the tool families
- * (« 2 recherches web et 3 commandes ») and its failures. The answer stays
- * below, outside the block. The live status itself (Thinking Shimmer) is the
- * dock above the composer (`run-activity-dock.tsx`), not this header.
+ * L'activité d'un tour, as grok.com's chat (streaming-ui Grok template, Heavy
+ * mode): `AgentsHeader` over `AgentFeed`. While the run works, the header
+ * reads « Réflexion • Ns » (the bot's face springs in at its first step) and
+ * the feed rolls its last three steps, blurring in below and out above. Once
+ * the answer streams the feed empties and the header reads « Réflexions »,
+ * then « Réflexion : Ns ». A click on it opens grok's « Réflexions » panel in
+ * the thread's canvas (`GrokThoughtsPanel`), the turn's whole log; a second
+ * click, or its close button, folds it.
  *
- * A pending decision or a find target forces the block open: a question for
- * the operator never hides in a fold. A turn that ended with a failed tool
- * stays open too, so the failed Tool Result (open on its error) still reads
- * without a click. The operator's click wins over the automatic open and
- * fold.
+ * The detailed rows (Tool Results, sources, decisions) stay in the thread,
+ * folded: a pending decision or a find target opens them in place, so a
+ * question for the operator never hides. A screen without a canvas (tests,
+ * embeds) keeps that fold as its log, opened on a failed turn.
  */
 export const TurnActivity = memo(function TurnActivity({
   calls,
+  feed = [],
   live,
   forceOpen,
   author,
@@ -120,6 +119,8 @@ export const TurnActivity = memo(function TurnActivity({
   waiting = false,
 }: {
   calls: readonly ToolCall[];
+  /** The turn's steps as grok.com's feed rows (`turnFeed`). */
+  feed?: readonly GrokFeedItem[];
   live: boolean;
   /** The run's own duration (created to ended), once it has one. */
   workedMs?: number | null;
@@ -132,120 +133,93 @@ export const TurnActivity = memo(function TurnActivity({
   settled?: boolean;
   /** The run's real start (epoch ms): where the thinking timer counts from. */
   since?: number | null;
-  /** The answer has started streaming below: the live status folds to its summary line. */
+  /** The answer has started streaming below: the feed empties, « Réflexions ». */
   answering?: boolean;
-  /** The agent waits for the operator (a pending decision): no thinking animation. */
+  /** The agent waits for the operator (a pending decision). */
   waiting?: boolean;
 }) {
-  const { t, plural, formatNumber, locale } = useT();
-  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
+  const { t, plural } = useT();
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const bodyId = useId();
   const visibleCalls = calls.filter((call) => !isTodoTool(call.tool));
   const failedCalls = visibleCalls.filter((call) => call.failed);
   const failedCount = failedCalls.length;
-  // A failure stays open: folding the turn would hide the failed Tool Result
-  // that keeps its error on screen.
-  const thinking = live && !answering && !waiting;
-  // "Thought for 2s": the answer starting freezes the timer where it stood.
+  const partial = failedCount > 0 && failedCount < visibleCalls.length;
   const [mountedAt] = useState(() => Date.now());
   const start = since ?? mountedAt;
+  // grok's first beat: the bulb and « Réflexion pendant Ns » for 400 ms.
+  const [pre, setPre] = useState(() => live && Date.now() - start < PRE_BEAT_MS);
+  useEffect(() => {
+    if (!pre) return;
+    const timer = window.setTimeout(() => setPre(false), Math.max(0, PRE_BEAT_MS - (Date.now() - start)));
+    return () => window.clearTimeout(timer);
+  }, [pre, start]);
+  // « Réflexion : 23s » freezes where the answer started.
   const [frozenMs, setFrozenMs] = useState<number | null>(null);
   if (live && answering && frozenMs === null) setFrozenMs(Math.max(0, Date.now() - start));
-  const expanded = forceOpen || (userExpanded ?? (thinking || waiting || failedCount > 0));
-  const onHeadClick = () => setUserExpanded(!expanded);
-  const partial = failedCount > 0 && failedCount < visibleCalls.length;
-  const failureSummary = failedCount === 1
-    ? toolFailureSummary({ errorMessages: failedCalls.flatMap((call) => call.errorMessage ? [call.errorMessage] : []) })
-    : null;
-  const failureTitle = failedCalls.find((call) => call.errorMessage)?.errorMessage ?? null;
-  const durations = visibleCalls
-    .map((call) => call.durationMs)
-    .filter((value): value is number => typeof value === "number");
+  const durations = visibleCalls.map((call) => call.durationMs).filter((value): value is number => typeof value === "number");
   const totalDuration = durations.length ? durations.reduce((sum, value) => sum + value, 0) : null;
-  const kinds = new Map<ToolKind, number>();
-  for (const call of visibleCalls) {
-    const kind = toolKind(call.tool);
-    kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
-  }
-  // The tool the runtime started and has not closed: the live line names it
-  // (« Recherche : cours du bitcoin ») instead of the generic « Réfléchit… ».
-  const runningCall = thinking ? visibleCalls.findLast((call) => !call.done) : undefined;
-  const runningLabel = runningCall ? toolProgressLabel(t, runningCall.tool, runningCall.preview) : undefined;
-  const kindSummary = activityKindSummary(t, plural, locale, kinds);
-  // « A travaillé 6 s » from the run itself, else from its tools' durations.
   const worked = workedMs ?? (live ? frozenMs : null) ?? totalDuration;
-  const heading = live && !answering
-    ? t("threadTimeline.activityWorking")
-    : worked !== null
-      ? t("threadTimeline.activityWorked", { duration: formatToolDuration(worked, formatNumber) })
-      : kindSummary ?? t("threadTimeline.activityDone");
+  const running = live && !answering;
+  const rolling = running && !waiting && !forceOpen;
+  const canvas = useAttachmentCanvas();
+  const panelId = useId();
+  const panelOpen = canvas?.panel?.id === panelId;
+  const panelSlot = canvas?.panelSlot?.owner === panelId ? canvas.panelSlot.element : null;
+  const speaker = grokSpeaker(author);
+  const logOpen = forceOpen || waiting || (!canvas && (userOpen ?? (!live && failedCount > 0)));
+  const togglePanel = () => {
+    if (!canvas) return setUserOpen(!logOpen);
+    if (panelOpen) canvas.close();
+    else canvas.openPanel({ id: panelId, label: t("threadTimeline.grokThoughts") });
+  };
+  const agents = author && (feed.length > 0 || answering || !live)
+    ? [{ id: author.id, avatar: <BotFace name={author.name ?? author.slug ?? ""} seed={author.id} face={author.face} className="size-[18px]" /> }]
+    : [];
   const block = (
     <section
       data-turn-activity=""
       data-live={live ? "" : undefined}
-      data-thinking={thinking ? "" : undefined}
+      data-thinking={rolling ? "" : undefined}
       aria-label={t("threadTimeline.activityFeed")}
       aria-busy={live}
-      className={cn(
-        "flex w-full min-w-0 max-w-full flex-col self-start text-body-regular text-text-secondary",
-        settled && "ohb-turn-contain",
-      )}
+      className={cn("flex w-full min-w-0 max-w-full flex-col self-start", settled && "ohb-turn-contain")}
     >
-      <button
-        type="button"
-        data-activity-head=""
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        onClick={onHeadClick}
-        className="group flex min-h-7 w-fit max-w-full min-w-0 origin-left cursor-pointer items-center gap-2 rounded-md py-1 text-left text-body-2-medium text-text-secondary outline-none transition-[color,scale] hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring active:scale-[0.98] motion-reduce:transition-none"
-      >
-        {thinking ? (
-          <span data-activity-summary="" className="min-w-0">
-            <ThinkingStatus since={start} label={runningLabel} announce={false} />
-          </span>
-        ) : (
-          <>
-            <span aria-hidden className="grid size-4 shrink-0 place-items-center">
-              {failedCount > 0
-                ? <ToolStateIcon done failed={!partial} partial={partial} />
-                : <Brain className="size-4" />}
-            </span>
-            <span data-activity-summary="" className="min-w-0 truncate">
-              {heading}
-            </span>
-          </>
-        )}
-        {!live && worked !== null && kindSummary ? (
-          <span data-activity-kinds="" className="min-w-0 shrink truncate font-normal text-text-tertiary">· {kindSummary}</span>
-        ) : null}
-        {failedCount > 0 ? (
+      <GrokAgentsHeader
+        agents={agents}
+        started={start}
+        running={running}
+        streaming={live && answering}
+        seconds={worked !== null ? Math.max(1, Math.round(worked / 1000)) : null}
+        pre={pre && feed.length === 0}
+        open={canvas ? panelOpen : logOpen}
+        onOpen={!canvas || feed.length > 0 ? togglePanel : undefined}
+        controls={canvas ? undefined : bodyId}
+        // The count only, on the header's line: the error itself reads in the
+        // panel, never as raw output squeezed after « Réflexion : Ns ».
+        trailing={failedCount > 0 ? (
           <span
-            className={cn("shrink-0", partial ? "text-warn-700" : "text-destructive-text")}
+            className={cn("ms-1 min-w-0 truncate", partial ? "text-warn-700" : "text-destructive-text")}
             data-tool-partial-failure={partial ? "" : undefined}
-            data-tool-failure-reason={failureSummary ? "" : undefined}
-            title={failureSummary ? failureTitle ?? undefined : undefined}
           >
-            {failureSummary
-              ? t("threadTimeline.toolFailureWithReason", {
-                  status: partial ? partialFailureLabel(t, plural, failedCount, visibleCalls.length) : t("threadTimeline.toolFailed"),
-                  reason: failureSummary,
-                })
-              : partialFailureLabel(t, plural, failedCount, visibleCalls.length)}
+            {`• ${partialFailureLabel(t, plural, failedCount, visibleCalls.length)}`}
           </span>
         ) : null}
-        <ChevronDown
-          aria-hidden
-          className={cn("ohb-activity-chevron size-4 shrink-0 text-text-tertiary group-hover:text-text-primary", !expanded && "-rotate-90")}
-        />
-        <span className="sr-only">
-          {expanded ? t("threadTimeline.activityCollapse") : t("threadTimeline.activityExpand")}
-        </span>
-      </button>
-      <ActivityDisclosure open={expanded} id={bodyId}>
-        <div role="list" data-activity-list="" className="ohb-activity-list flex flex-col gap-0.5 py-1">
-          {children}
+      />
+      <AgentFeed items={feed} running={rolling} renderItem={(item) => <GrokFeedRow item={item} />} />
+      <div
+        id={bodyId}
+        data-open={logOpen ? "true" : "false"}
+        className={cn("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", logOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
+        style={{ transitionTimingFunction: "var(--grok-ease)" }}
+      >
+        <div className="min-h-0 overflow-hidden" inert={!logOpen} aria-hidden={!logOpen}>
+          <div role="list" data-activity-list="" className="ohb-activity-list flex flex-col gap-0.5 py-1">
+            {children}
+          </div>
         </div>
-      </ActivityDisclosure>
+      </div>
+      {panelSlot && canvas ? createPortal(<GrokThoughtsPanel items={feed} speaker={speaker} onClose={canvas.close} />, panelSlot) : null}
     </section>
   );
   if (!author || !showAuthorLabel) return block;

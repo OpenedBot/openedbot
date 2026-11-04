@@ -34,7 +34,7 @@ func (i *Installer) installNode(ctx context.Context) (bool, error) {
 		return false, i.linkNode(ctx)
 	}
 	archive := layout.NodeArchivePath(i.Arch.NodeTarget)
-	if err := i.Download.Fetch(ctx, pins.NodeArchiveURL(i.Arch), archive, download.SHA256, i.Arch.NodeArchiveSHA256, 0o644, fsx.Root); err != nil {
+	if err := i.Download.Fetch(ctx, pins.NodeArchiveURL(i.Arch), archive, download.SHA256, i.Arch.NodeArchiveSHA256, 0o600, fsx.Root); err != nil {
 		return false, err
 	}
 	if err := fsx.EnsureDir(layout.NodeRoot, 0o755, fsx.Root); err != nil {

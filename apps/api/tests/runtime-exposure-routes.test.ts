@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { Hono } from "hono";
 import { decryptSecretFromKeyring, secretEncryptionKey } from "@openedbot/hermes";
-import type { CloudflareApiClient } from "@openedbot/platform-integrations/cloudflare-api";
+import { CloudflareApiError, type CloudflareApiClient } from "@openedbot/platform-integrations/cloudflare-api";
 import type { TailscaleApiClient } from "@openedbot/platform-integrations/tailscale-api";
 import type { ApiConfig } from "../src/infrastructure/config";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
@@ -24,7 +24,7 @@ function fakeCloudflare() {
   const log: string[] = [];
   const dns = new Set<string>();
   /** Une zone où tout nom est déjà publié : ce que voit un tirage saturé. */
-  const state = { everyNameTaken: false };
+  const state = { everyNameTaken: false, failNextTunnelDelete: false };
   const factory = (apiToken: string): CloudflareApiClient => ({
     verifyToken: async () => { log.push(`verify:${apiToken.slice(0, 4)}`); return { id: "t", status: "active" }; },
     listZones: async (name) => { log.push(`zones:${name}`); return name === "example.com" ? [{ id: "zone-1", name, accountId: "acct-1" }] : []; },
@@ -33,7 +33,13 @@ function fakeCloudflare() {
     readTunnel: async (_a, id) => ({ id, name: "x", status: "healthy", deletedAt: null }),
     putTunnelIngress: async (_a, _id, hostname) => { log.push(`ingress:${hostname}`); },
     readTunnelToken: async () => "install-".padEnd(48, "t"),
-    deleteTunnel: async (_a, id) => { log.push(`deleteTunnel:${id}`); },
+    deleteTunnel: async (_a, id) => {
+      if (state.failNextTunnelDelete) {
+        state.failNextTunnelDelete = false;
+        throw new CloudflareApiError("CLOUDFLARE_UNAVAILABLE", 503, "down");
+      }
+      log.push(`deleteTunnel:${id}`);
+    },
     findDnsRecord: async (_z, name) => state.everyNameTaken || dns.has(name) ? { id: "rec-taken", name, type: "CNAME", content: "" } : null,
     upsertTunnelCname: async (_z, name) => { log.push(`cname:${name}`); return { id: "rec-1", name, type: "CNAME", content: "" }; },
     deleteDnsRecord: async (_z, id) => { log.push(`deleteDns:${id}`); },
@@ -44,7 +50,11 @@ function fakeCloudflare() {
     deleteServiceToken: async (_a, id) => { log.push(`deleteToken:${id}`); },
     createServiceAuthPolicy: async () => { log.push("policy"); },
   });
-  return { factory, log, dns, takeEveryName: () => { state.everyNameTaken = true; } };
+  return {
+    factory, log, dns,
+    takeEveryName: () => { state.everyNameTaken = true; },
+    failNextTunnelDelete: () => { state.failNextTunnelDelete = true; },
+  };
 }
 
 /** Un tailnet en mémoire : un fichier de politique, des machines, un journal des verbes. */
@@ -62,7 +72,7 @@ function fakeTailscale(devices: Array<{ id: string; name: string }> = [{ id: "de
   return { factory, log, devices, policy: () => policy };
 }
 
-function mount(options: { config?: Partial<ApiConfig>; role?: AuthContext["role"]; runtimes?: RuntimeRow[]; healthy?: () => boolean; now?: () => Date; tailscale?: ReturnType<typeof fakeTailscale> } = {}) {
+function mount(options: { config?: Partial<ApiConfig>; role?: AuthContext["role"]; runtimes?: RuntimeRow[]; healthy?: () => boolean; now?: () => Date; tailscale?: ReturnType<typeof fakeTailscale>; failExposureInsert?: boolean } = {}) {
   const exposures: RuntimeExposureRow[] = [];
   const runtimes: RuntimeRow[] = options.runtimes ?? [];
   const calls: Array<{ sql: string; values: unknown[] }> = [];
@@ -74,6 +84,7 @@ function mount(options: { config?: Partial<ApiConfig>; role?: AuthContext["role"
     const sql = strings.join(" ? ").replace(/\s+/g, " ").trim();
     calls.push({ sql, values });
     if (sql.startsWith("insert into runtime_direct_exposures")) {
+      if (options.failExposureInsert) throw new Error("insert refused");
       const [id, organizationId, , kind, hostname, endpoint, cloudflareAccountId, zoneId, tunnelId, dnsRecordId, accessAppId, serviceTokenId, tailscaleAuthKeyId,
         installTokenCiphertext, installTokenNonce, installTokenTag, installTokenKeyId, edgeAuthCiphertext, edgeAuthNonce, edgeAuthTag, edgeAuthKeyId] = values as string[];
       const row = { id, organizationId, runtimeId: null, kind, hostname, endpoint, cloudflareAccountId, zoneId, tunnelId, dnsRecordId, accessAppId, serviceTokenId, tailscaleAuthKeyId,
@@ -98,8 +109,13 @@ function mount(options: { config?: Partial<ApiConfig>; role?: AuthContext["role"
       return [];
     }
     if (sql.startsWith("update runtime_direct_exposures set status = 'revoked'")) {
-      const row = exposures.find((candidate) => candidate.id === values[1])!;
-      Object.assign(row, { status: "revoked", revokedAt: new Date(), installTokenCiphertext: null, edgeAuthCiphertext: null });
+      const row = exposures.find((candidate) => candidate.id === values.at(-1))!;
+      Object.assign(row, { status: "revoked", revokedAt: new Date(), cleanupStatus: values[0], installTokenCiphertext: null, edgeAuthCiphertext: null });
+      return [];
+    }
+    if (sql.startsWith("update runtime_direct_exposures set cleanup_status = 'done'")) {
+      const row = exposures.find((candidate) => candidate.id === values.at(-1))!;
+      if (row.cleanupStatus === "pending") row.cleanupStatus = "done";
       return [];
     }
     if (sql.startsWith("insert into runtimes")) {
@@ -286,6 +302,31 @@ describe("OHB-75 runtime exposure routes", () => {
     const cleaned = await withKeys.app.request(`/${id}`, body({ tailscale: { clientId: OAUTH.oauthClientId, clientSecret: OAUTH.oauthClientSecret } }, "DELETE"));
     expect(await cleaned.json()).toEqual({ ok: true, cloudflareCleanup: "done" });
     expect(withKeys.tailscale.log.filter((entry) => entry.startsWith("delete"))).toEqual(["deleteKey:key-1", "deleteDevice:dev-new"]);
+  });
+
+  test("revoke : la révocation est commitée avant Cloudflare, et un retrait à moitié fait se reprend", async () => {
+    const site = mount({ config: { managedTunnel: managed } as Partial<ApiConfig> });
+    const id = (await (await site.app.request("/", body({ kind: "managed_cloudflare", slug: "mon-vps" }))).json()).exposure.id as string;
+    site.cloudflare.failNextTunnelDelete();
+    const failed = await site.app.request(`/${id}`, { method: "DELETE" });
+    expect(failed.status).toBe(502);
+    // Le service token est déjà parti : la publication ne redevient pas vivante.
+    expect(site.exposures[0]).toMatchObject({ status: "revoked", cleanupStatus: "pending" });
+    expect(site.cloudflare.log).toContain("deleteToken:st-1");
+
+    const resumed = await site.app.request(`/${id}`, { method: "DELETE" });
+    expect(await resumed.json()).toEqual({ ok: true, cloudflareCleanup: "done" });
+    expect(site.exposures[0]!.cleanupStatus).toBe("done");
+    expect(site.cloudflare.log).toContain("deleteTunnel:tun-1");
+    expect(await (await site.app.request(`/${id}`, { method: "DELETE" })).json()).toEqual({ ok: true, cloudflareCleanup: "none" });
+  });
+
+  test("une ligne non écrite (rollback certain) fait retirer le tunnel tout juste provisionné", async () => {
+    const site = mount({ config: { managedTunnel: managed } as Partial<ApiConfig>, failExposureInsert: true });
+    const response = await site.app.request("/", body({ kind: "managed_cloudflare", slug: "mon-vps" }));
+    expect(response.status).toBe(500);
+    expect(site.cloudflare.log.filter((entry) => entry.startsWith("delete")))
+      .toEqual(["deleteToken:st-1", "deleteApp:app-1", "deleteDns:rec-1", "deleteTunnel:tun-1"]);
   });
 
   test("la liste rend les publications sans runtime, ni déclarées ni révoquées, et sans secret", async () => {

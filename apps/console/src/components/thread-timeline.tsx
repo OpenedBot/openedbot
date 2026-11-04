@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, CircleHelp, ListChecks } from "lucide-react";
+import { CircleHelp, ListChecks } from "lucide-react";
 import { AgentProgress, TrailItem, type AgentStep } from "@openedbot/browser-ui-kit";
 import type { BotSettingProposalDto, MessageAuthorBot } from "@openedbot/contracts-api";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
@@ -69,6 +69,8 @@ import { AskUserCard } from "./ask-user-card";
 import { dismissAskUser, useDismissedAskUserRuns } from "../lib/run/ask-user-dismissals";
 import { openSecondaryReads, THREAD_FIRST_PAINT_MARK } from "../lib/shell/after-first-paint";
 import { isConfirmedLiveAnswer } from "../lib/stream/live-answer";
+import { grokSpeaker, turnFeed } from "./grok/turn-feed";
+import { GrokScrollDown } from "./grok/grok-scroll-down";
 
 /** Référence stable : un tableau `[]` recréé à chaque rendu casserait le
  * `memo` des bulles utilisateur (le `Set` de mentions en dépend). */
@@ -206,9 +208,7 @@ function ThreadTimelineView({
     pinFrame.current = requestAnimationFrame(() => {
       pinFrame.current = null;
       const node = scroller.current;
-      if (!node || !pinned.current) return;
-      node.scrollTop = node.scrollHeight;
-      scrollBox.current = readThreadScrollBox(node);
+      if (node && pinned.current) node.scrollTop = node.scrollHeight;
     });
   }, []);
   useEffect(() => () => {
@@ -341,6 +341,8 @@ function ThreadTimelineView({
     scrollBox.current = readThreadScrollBox(node);
   }, [scrollToBottomOnThreadKey]);
 
+  // A bot's thread: the sent message brings its « Réflexion » line in the same paint, not 70 ms later.
+  const outgoingThinks = Boolean(outgoing && !outgoing.failed && defaultAuthor);
   useEffect(() => {
     pinned.current = true;
     setAtBottom(true);
@@ -348,20 +350,18 @@ function ThreadTimelineView({
   }, [approvals.length, lastUserInputId, outgoing?.id, resnap, schedulePin]);
 
   useEffect(() => {
-    // Le contenu grandit aussi ENTRE deux événements (lissage caractère par
-    // caractère) : seul un ResizeObserver voit ces pas-là. Il suit le bas
-    // uniquement si le lecteur y est épinglé.
+    // Le ResizeObserver suit le bas (lecteur épinglé) DANS son rappel, avant la peinture : remis au rAF,
+    // le fil se peignait une frame trop haut puis sautait (le « bump » de l'envoi). `onScroll` relit `scrollBox`.
     const contentNode = content.current;
     if (!contentNode || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
       if (!entries.some((entry) => entry.target === contentNode)) return;
       const node = scroller.current;
-      if (!node) return;
-      schedulePin();
+      if (node && pinned.current) node.scrollTop = node.scrollHeight;
     });
     observer.observe(contentNode);
     return () => observer.disconnect();
-  }, [schedulePin]);
+  }, []);
 
   const timelineInput = useMemo(() => ({
     events,
@@ -773,6 +773,7 @@ function ThreadTimelineView({
                     findTargetId={entry.targetId}
                     findActive={entry.targetId === activeFindTargetId}
                     settled={settled}
+                    onEdit={onEditMessage ? () => onEditMessage(entry.key) : undefined}
                   />
                 )}
               </MessageInteractionShell>
@@ -1434,6 +1435,7 @@ function ThreadTimelineView({
               <TurnActivity
                 key={`activity:${entry.key}`}
                 calls={members.flatMap((member) => (member.kind === "tools" ? member.calls : []))}
+                feed={turnFeed(members, t, grokSpeaker(runAuthors?.get(runId) ?? defaultAuthor))}
                 live={live}
                 workedMs={workedMs !== null && Number.isFinite(workedMs) ? workedMs : null}
                 since={Number.isFinite(runStart) ? runStart : null}
@@ -1475,7 +1477,7 @@ function ThreadTimelineView({
         // A run is working and no block of its own exists yet (queued, or
         // thinking before the first step): the thinking status stands in. Once
         // an answer has text, the status gives way to it.
-        if (running && !liveGroupRendered && !answeredRunIds.has(streamingRunId ?? "")) {
+        if (running && !outgoingThinks && !liveGroupRendered && !answeredRunIds.has(streamingRunId ?? "")) {
           let since: number | null = null;
           let activeRunId: string | null = null;
           for (const candidate of runsById.values()) {
@@ -1532,6 +1534,7 @@ function ThreadTimelineView({
           toolFailuresByRun,
           turnTimeByRun,
           running,
+          outgoingThinks,
           hiddenAssistantRunIds,
         ])}
         {outgoing ? (
@@ -1544,6 +1547,7 @@ function ThreadTimelineView({
             mentionSlugs={mentionSlugs}
             findTargetId={`message:${outgoing.id}`}
           />
+          {outgoingThinks ? <PendingThinking key="pending-thinking" since={null} /> : null}
           {outgoing.failed && onRetryOutgoing ? (
             <button type="button" onClick={onRetryOutgoing} className={`${BUTTON.small} self-end`}>
               {t("common.retry")}
@@ -1555,9 +1559,8 @@ function ThreadTimelineView({
       </div>
     </div>
     {atBottom ? null : (
-      <button
-        type="button"
-        aria-label={t("threadTimeline.scrollToBottom")}
+      <GrokScrollDown
+        label={t("threadTimeline.scrollToBottom")}
         onClick={() => {
           const node = scroller.current;
           if (!node) return;
@@ -1566,11 +1569,7 @@ function ThreadTimelineView({
           node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
           scrollBox.current = readThreadScrollBox(node);
         }}
-        data-thread-scroll-bottom=""
-        className="ohb-scroll-bottom-enter absolute bottom-3 z-10 flex size-8 items-center justify-center rounded-full border border-border-button-default bg-background-primary-default text-foreground-icon-primary shadow-xs outline-none transition-colors hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
-      >
-        <ChevronDown aria-hidden className="size-4" />
-      </button>
+      />
     )}
     </div>
   );

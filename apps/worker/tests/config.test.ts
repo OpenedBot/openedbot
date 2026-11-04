@@ -71,6 +71,13 @@ describe("worker instance identity", () => {
 });
 
 
+describe("OPENEDBOT_ENV", () => {
+  test("an unknown value refuses to start instead of running on development rules", () => {
+    expect(() => readWorkerConfig(productionEnvironment({ OPENEDBOT_ENV: "prod" }))).toThrow(/OPENEDBOT_ENV must be one of/);
+    expect(readWorkerConfig(productionEnvironment({ OPENEDBOT_ENV: "preprod", TRANSACTIONAL_EMAIL_RESEND_API_KEY: "re_test-secret" })).environment).toBe("production");
+  });
+});
+
 describe("transactional email transports", () => {
   test("two transports together are refused, whichever pair", () => {
     expect(() => readWorkerConfig(testEnvironment({
@@ -171,6 +178,21 @@ describe("web push VAPID", () => {
       TRANSACTIONAL_EMAIL_FROM: "OHB <ops@ohb.example>",
       WORKER_INTERNAL_TOKEN: "worker-secret",
     }))).toThrow(/PUSH_VAPID/);
+  });
+
+  test("production : l'opt-in boucle locale du Web Push est refusé", () => {
+    expect(() => readWorkerConfig(productionEnvironment({
+      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.ohb.example/send",
+      TRANSACTIONAL_EMAIL_TOKEN: "token",
+      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
+    })))
+      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
+    expect(readWorkerConfig(testEnvironment({
+      PUSH_VAPID_PUBLIC_KEY: productionEnvironment().PUSH_VAPID_PUBLIC_KEY!,
+      PUSH_VAPID_PRIVATE_KEY: productionEnvironment().PUSH_VAPID_PRIVATE_KEY!,
+      PUSH_VAPID_SUBJECT: "mailto:ops@example.test",
+      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
+    })).vapid?.allowLoopbackEndpoints).toBe(true);
   });
 });
 

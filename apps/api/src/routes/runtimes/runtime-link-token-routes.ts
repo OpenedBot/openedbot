@@ -54,6 +54,7 @@ export function runtimeLinkTokenRoutes(ctx: RuntimeRouteContext): Hono<{ Variabl
             update runtimes
                set link_token_previous_hash = null,
                    link_token_previous_expires_at = null,
+                   link_token_rotation_unconfirmed_at = null,
                    link_token_rotated_at = now(),
                    link_token_hash = ${tokenHash},
                    updated_at = now()
@@ -65,6 +66,7 @@ export function runtimeLinkTokenRoutes(ctx: RuntimeRouteContext): Hono<{ Variabl
             update runtimes
                set link_token_previous_hash = link_token_hash,
                    link_token_previous_expires_at = now() + (${LINK_TOKEN_GRACE_MINUTES} * interval '1 minute'),
+                   link_token_rotation_unconfirmed_at = null,
                    link_token_rotated_at = now(),
                    link_token_hash = ${tokenHash},
                    updated_at = now()
@@ -85,7 +87,8 @@ export function runtimeLinkTokenRoutes(ctx: RuntimeRouteContext): Hono<{ Variabl
       }
     } else {
       pushed = links.notifyRotation(runtimeId, { t: "link.rotate", runtimeId, linkToken });
-      if (!pushed) pushed = await locator.forwardRotate(runtimeId, { t: "link.rotate", runtimeId, linkToken });
+      // Une livraison incertaine reste « non poussée » ici : le jeton est rendu à l'opérateur.
+      if (!pushed) pushed = (await locator.forwardRotate(runtimeId, { t: "link.rotate", runtimeId, linkToken })) === true;
     }
     logger.info({ event: "api.runtime_link_rotated", runtimeId, mode, pushed }, "runtime link rotated");
     context.header("Cache-Control", "no-store");

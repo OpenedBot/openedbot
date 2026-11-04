@@ -52,9 +52,25 @@ export type AuthService = {
   cancelSignIn(): void;
   /** The browser step is over (deep link or loopback hit): poll now instead of waiting. */
   nudge(): void;
-  signOut(): void;
+  /**
+   * Revokes the session on the API (POST /api/auth/logout), then forgets it
+   * locally. The local part always happens: a failed revocation is logged and
+   * reported through `revocationFailed`, never swallowed.
+   */
+  signOut(): Promise<SignOutResult>;
   dispose(): void;
 };
+
+export type SignOutResult = { revocationFailed: boolean };
+
+/** Where the session is persisted; injectable for tests. */
+export type TokenStore = {
+  save(tokens: NativeTokens): void;
+  load(): NativeTokens | null;
+  clear(): void;
+};
+
+const fileTokenStore: TokenStore = { save: saveTokens, load: loadTokens, clear: clearTokens };
 
 export type AuthDeps = {
   config: DesktopConfig;
@@ -62,6 +78,7 @@ export type AuthDeps = {
   startLoopback(): Promise<void>;
   stopLoopback(): void;
   events: AuthEvents;
+  tokenStore?: TokenStore;
 };
 
 class ApiError extends Error {
@@ -127,6 +144,7 @@ function failure(error: unknown): { code: string; message: string } {
 
 export function createAuthService(deps: AuthDeps): AuthService {
   const { config, redirectUri, events } = deps;
+  const store = deps.tokenStore ?? fileTokenStore;
 
   let tokens: NativeTokens | null = null;
   let refreshInFlight: Promise<string | null> | null = null;
@@ -183,7 +201,7 @@ export function createAuthService(deps: AuthDeps): AuthService {
     // even if persisting fails the running session must use it.
     tokens = next;
     try {
-      saveTokens(next);
+      store.save(next);
     } catch (error) {
       log.error("could not persist tokens", error);
     }
@@ -194,7 +212,7 @@ export function createAuthService(deps: AuthDeps): AuthService {
     tokens = null;
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = null;
-    clearTokens();
+    store.clear();
     events.onSignedOut(reason);
   }
 
@@ -435,6 +453,42 @@ export function createAuthService(deps: AuthDeps): AuthService {
     });
   }
 
+  // The route the console calls too. A 401 means the session is no longer live:
+  // typically the console revoked it just before handing sign-out over.
+  async function revokeServerSession(accessToken: string): Promise<void> {
+    const response = await net.fetch(`${config.apiOrigin}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok && response.status !== 401) throw new ApiError(response.status, "LOGOUT_FAILED");
+  }
+
+  async function signOut(): Promise<SignOutResult> {
+    cancelSignIn();
+    let revocationFailed = false;
+    try {
+      // A rotation in flight would replace the session being revoked, and the
+      // replacement would survive: let every rotation land first. An expired
+      // access token is refreshed so the API still recognises it.
+      let accessToken: string | null;
+      do {
+        if (refreshInFlight) await Promise.allSettled([refreshInFlight]);
+        accessToken = await readAccessToken();
+      } while (refreshInFlight);
+      // From here no rotation can start: the session only lives until its revocation.
+      tokens = null;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = null;
+      if (accessToken) await revokeServerSession(accessToken);
+    } catch (error) {
+      revocationFailed = true;
+      log.error("sign-out could not revoke the server session, local tokens are cleared anyway", error);
+    }
+    dropSession("signed-out");
+    return { revocationFailed };
+  }
+
   function cancelSignIn(): void {
     attempt?.abort();
     attempt = null;
@@ -443,7 +497,7 @@ export function createAuthService(deps: AuthDeps): AuthService {
 
   return {
     restore(): boolean {
-      tokens = loadTokens();
+      tokens = store.load();
       // An expired access token gets refreshed right away (delay 0).
       scheduleRefresh();
       return tokens !== null;
@@ -481,10 +535,7 @@ export function createAuthService(deps: AuthDeps): AuthService {
 
     nudge: () => wakePoll?.(),
 
-    signOut(): void {
-      cancelSignIn();
-      dropSession("signed-out");
-    },
+    signOut,
 
     dispose(): void {
       cancelSignIn();

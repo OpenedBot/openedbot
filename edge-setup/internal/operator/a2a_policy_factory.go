@@ -23,7 +23,12 @@ func wireA2APolicyServer(server *Server, cfg a2aPolicyHostConfig) {
 		defer server.toolsetBusy.Unlock()
 		server.mcpBusy.Lock()
 		defer server.mcpBusy.Unlock()
-		status, err := policy.Write(ctx, mutation)
+		// The policy lives in the root's config.yaml and .env.
+		var status a2aPolicyWriteStatus
+		err := server.withConfigLock(ctx, rootConfig, func() (err error) {
+			status, err = policy.Write(ctx, mutation)
+			return err
+		})
 		if status.Persisted && status.NeedsGatewayRestart {
 			server.markGatewayRestartPending()
 		}

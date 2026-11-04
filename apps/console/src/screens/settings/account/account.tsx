@@ -26,7 +26,7 @@ import { activeOrganizationId } from "../../../lib/session/cloud-session";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
 import { isNativeShell } from "../../../lib/platform/native-bridge";
-import { signOut } from "../../../lib/session/sign-out";
+import { useSignOut } from "../../../lib/session/sign-out";
 import {
   ACTIONS,
   BUTTON,
@@ -131,8 +131,7 @@ function AccountPage({ team }: { team: boolean }) {
 
 function SignOutSection({ impersonating }: { impersonating: boolean }) {
   const { t } = useT();
-  const queryClient = useQueryClient();
-  const leaving = useMutation({ mutationFn: () => signOut(queryClient) });
+  const leaving = useSignOut();
   const label = t(impersonating ? "settingsSidebar.leaveImpersonation" : "settingsSidebar.signOut");
   return (
     <ListSection title={t("settingsAccount.sessionTitle")}>

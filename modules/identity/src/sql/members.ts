@@ -48,6 +48,16 @@ export async function readActiveMembershipRole(
   return rows[0]?.role ?? null;
 }
 
+/**
+ * Verrou de l'organisation que prend aussi l'acceptation d'une invitation
+ * (`member-invitation-consent.ts`). À prendre dans une instruction à part,
+ * AVANT de compter les membres : le comptage voit alors toute acceptation
+ * commitée, et une acceptation qui suit voit la suppression programmée.
+ */
+export async function lockOrganizationMembers(tx: TransactionDb, organizationId: string): Promise<void> {
+  await tx`select id from organizations where id = ${organizationId} for no key update`;
+}
+
 export async function countActiveMembers(tx: TransactionDb, organizationId: string): Promise<number> {
   const rows = await tx<Array<{ count: string | number }>>`
     select count(*) as count from memberships where organization_id = ${organizationId} and revoked_at is null

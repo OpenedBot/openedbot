@@ -26,7 +26,7 @@ const VAPID = {
   subject: "mailto:ops@ohb.example",
 };
 
-const ENDPOINT = "https://push.example/sub/abc";
+const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc";
 const KEYS = { p256dh: "p256dhKeyValue012345", auth: "authKeyValue01" };
 
 type Row = { id: string; endpoint: string; createdAt: Date; lastUsedAt: Date | null };
@@ -34,7 +34,7 @@ type Row = { id: string; endpoint: string; createdAt: Date; lastUsedAt: Date | n
 function mount(
   db: SQL,
   authContext: AuthContext = auth,
-  vapid: typeof VAPID | null = VAPID,
+  vapid: (typeof VAPID & { allowLoopbackEndpoints?: boolean }) | null = VAPID,
 ): Hono<{ Variables: AppVariables }> {
   const app = new Hono<{ Variables: AppVariables }>();
   app.use("*", async (context, next) => {
@@ -176,6 +176,59 @@ describe("POST /api/push-subscriptions", () => {
       body: JSON.stringify({ endpoint: "http://push.example/x", keys: KEYS }),
     });
     expect(response.status).toBe(400);
+  });
+
+  test("refuse toute destination hors des services Push, sans écriture", async () => {
+    for (const endpoint of [
+      "https://127.0.0.1:9443/push/e2e",
+      "https://localhost/push",
+      "https://[::1]/push",
+      "https://10.0.0.5/push",
+      "https://169.254.169.254/latest/meta-data",
+      "https://metadata.google.internal/push",
+      "https://push.example/sub/abc",
+      "https://fcm.googleapis.com.evil.example/fcm/send/abc",
+      "https://evilpush.apple.com.example/x",
+      "https://fcm.googleapis.com:8443/fcm/send/abc",
+      "https://user:pass@fcm.googleapis.com/fcm/send/abc",
+    ]) {
+      const calls: string[] = [];
+      const response = await mount(fakeDb({ calls })).request("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint, keys: KEYS }),
+      });
+      expect({ endpoint, status: response.status }).toEqual({ endpoint, status: 400 });
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  test("accepte les services Push des navigateurs", async () => {
+    for (const endpoint of [
+      "https://updates.push.services.mozilla.com/wpush/v2/abc",
+      "https://wns2-par02p.notify.windows.com/w/?token=abc",
+      "https://web.push.apple.com/QGx",
+    ]) {
+      const response = await mount(fakeDb({ calls: [], inserted: { ...row, endpoint } })).request("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint, keys: KEYS }),
+      });
+      expect({ endpoint, status: response.status }).toEqual({ endpoint, status: 201 });
+    }
+  });
+
+  test("boucle locale : seulement avec l'opt-in du serveur push simulé", async () => {
+    const response = await mount(
+      fakeDb({ calls: [], inserted: { ...row, endpoint: "https://127.0.0.1:9443/push/e2e" } }),
+      auth,
+      { ...VAPID, allowLoopbackEndpoints: true },
+    ).request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: "https://127.0.0.1:9443/push/e2e", keys: KEYS }),
+    });
+    expect(response.status).toBe(201);
   });
 
   test("sans VAPID : 404, aucune écriture", async () => {

@@ -189,10 +189,11 @@ async function deliverOne(
     return finish("sent", status, null);
   }
   if (outcome.kind === "revoke") {
-    await withTenant(db, delivery.organizationId, (tx) =>
-      revokeApnsDevice(tx, delivery.organizationId, delivery.deviceId, outcome.reason));
+    const revoked = await withTenant(db, delivery.organizationId, (tx) =>
+      revokeApnsDevice(tx, delivery.organizationId, delivery.deviceId, device.tokenHash, outcome.reason));
     console.info(JSON.stringify({
-      event: "worker.apns_device_revoked",
+      // Not revoked: the installation registered a new token meanwhile.
+      event: revoked ? "worker.apns_device_revoked" : "worker.apns_stale_token_rejected",
       organizationId: delivery.organizationId,
       deviceId: delivery.deviceId,
       httpStatus: status,

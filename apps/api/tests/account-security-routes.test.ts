@@ -345,6 +345,22 @@ describe("POST /api/account/security/password", () => {
     expect(await Bun.password.verify(nextPassword, newHash)).toBe(true);
   });
 
+  test("15b. espaces de bord : le mot de passe actuel se vérifie tel que haché, le nouveau est haché tel que saisi", async () => {
+    const calls: string[] = [];
+    const bindings: unknown[][] = [];
+    const current = ` ${CURRENT_PASSWORD} `;
+    const nextPassword = "  A-Brand-New-Password-1 ";
+    const response = await passwordRequest(fakeDb({
+      calls,
+      bindings,
+      passwordHash: await Bun.password.hash(current, { algorithm: "argon2id" }),
+    }), { currentPassword: current, newPassword: nextPassword });
+    expect(response.status).toBe(200);
+    const newHash = bindings[calls.findIndex((sql) => sql.includes("update users set password_hash"))]?.[0] as string;
+    expect(await Bun.password.verify(nextPassword, newHash)).toBe(true);
+    expect(await Bun.password.verify(nextPassword.trim(), newHash)).toBe(false);
+  });
+
   test("16. atomicité : update users et update sessions dans la même transaction, session courante exclue", async () => {
     const calls: string[] = [];
     const beginCount = { value: 0 };

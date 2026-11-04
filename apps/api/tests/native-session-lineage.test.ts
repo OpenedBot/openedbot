@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { refreshNativeSession } from "@openedbot/identity/application/native-auth";
-import { createNativeSession, listUserSessions } from "@openedbot/identity/sql/sessions";
+import { replacePasswordRevokingOtherSessions } from "@openedbot/identity/sql/accounts";
+import {
+  createNativeSession,
+  listUserSessions,
+  revokeOtherUserSessions,
+  revokeUserSession,
+} from "@openedbot/identity/sql/sessions";
 
 /**
  * La coque openedbot-desktop tourne son refresh token toutes les 15 minutes. Chaque
@@ -21,7 +27,7 @@ type Rotated = {
   ip: string | null;
 };
 
-function fakeDb(options: { calls: string[]; bindings: unknown[][]; rotated?: Rotated | null }): SQL {
+function fakeDb(options: { calls: string[]; bindings: unknown[][]; rotated?: Rotated | null; transactions?: { count: number } }): SQL {
   const query = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...strings].join(" ").replace(/\s+/g, " ").trim();
     options.calls.push(sql);
@@ -32,7 +38,10 @@ function fakeDb(options: { calls: string[]; bindings: unknown[][]; rotated?: Rot
     return Promise.resolve([]);
   }) as unknown as SQL;
   (query as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
-    async (callback: (inner: SQL) => unknown) => callback(query);
+    async (callback: (inner: SQL) => unknown) => {
+      if (options.transactions) options.transactions.count += 1;
+      return callback(query);
+    };
   return query;
 }
 
@@ -117,6 +126,21 @@ describe("refreshNativeSession", () => {
     expect(row).not.toContain(OPENED_AT);
   });
 
+  test("tourne en une transaction, sous le verrou du compte pris avant la ligne", async () => {
+    const calls: string[] = [];
+    const bindings: unknown[][] = [];
+    const transactions = { count: 0 };
+    await refreshNativeSession(fakeDb({ calls, bindings, rotated, transactions }), "refresh-token", { userAgent: null, ip: null });
+    expect(transactions.count).toBe(1);
+    const step = (fragment: string) => calls.findIndex((sql) => sql.includes(fragment));
+    const lock = step("pg_advisory_xact_lock");
+    expect(bindings[lock]).toEqual(["user-1"]);
+    expect(step("select user_id")).toBeLessThan(lock);
+    expect(lock).toBeLessThan(step("for update"));
+    expect(step("for update")).toBeLessThan(step("revoked_reason = 'refresh_rotation'"));
+    expect(step("revoked_reason = 'refresh_rotation'")).toBeLessThan(step("insert into sessions"));
+  });
+
   test("un refresh token inconnu reste un 401", async () => {
     const calls: string[] = [];
     const bindings: unknown[][] = [];
@@ -135,5 +159,31 @@ describe("listUserSessions", () => {
     expect(list).toBeDefined();
     expect(list).toContain("kind = 'native' and revoked_reason is distinct from 'refresh_rotation'");
     expect(list).not.toContain("and kind = 'web' and");
+  });
+});
+
+describe("révocations", () => {
+  const cases: Array<[string, (db: SQL) => Promise<unknown>, string]> = [
+    ["autres sessions", (db) => revokeOtherUserSessions(db, "user-1", "session-current"), "update sessions"],
+    ["une session", (db) => revokeUserSession(db, "user-1", "session-1"), "update sessions"],
+    ["mot de passe", (db) => replacePasswordRevokingOtherSessions(db, "user-1", "hash", "session-current"), "update users"],
+  ];
+  for (const [name, revoke, firstWrite] of cases) {
+    test(`${name} : le verrou de la rotation est pris avant toute écriture`, async () => {
+      const calls: string[] = [];
+      const bindings: unknown[][] = [];
+      await revoke(fakeDb({ calls, bindings }));
+      const lock = calls.findIndex((sql) => sql.includes("pg_advisory_xact_lock(hashtext( ), hashtext('ohb-user-sessions'))"));
+      expect(lock).toBeGreaterThanOrEqual(0);
+      expect(bindings[lock]).toEqual(["user-1"]);
+      expect(lock).toBeLessThan(calls.findIndex((sql) => sql.includes(firstWrite)));
+    });
+  }
+
+  test("révoquer une session native atteint sa remplaçante de la même famille", async () => {
+    const calls: string[] = [];
+    const bindings: unknown[][] = [];
+    await revokeUserSession(fakeDb({ calls, bindings }), "user-1", "session-1");
+    expect(calls.find((sql) => sql.includes("update sessions"))).toContain("or family_id = ( select family_id from sessions");
   });
 });

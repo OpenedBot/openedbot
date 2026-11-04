@@ -1,7 +1,8 @@
 {
   "name": "openedbot-desktop",
   "productName": "openedbot",
-  "version": "1.0.0",
+  "desktopName": "openedbot.desktop",
+  "version": "1.0.1",
   "private": true,
   "description": "openedbot desktop shell: a compact native window around the openedbot web console",
   "license": "Apache-2.0",

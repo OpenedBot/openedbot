@@ -459,3 +459,40 @@ func TestRemoveLoopbackGuardRulesSurvivesFailure(t *testing.T) {
 		t.Errorf("a failing deletion stopped the loop after %d commands", n)
 	}
 }
+
+// --restore-cloud-user runs with no transaction (Run refuses an active one),
+// where Rollback does nothing: the restoration must actually be attempted,
+// and when it fails, the reset stops before --remove-admin can take away the
+// remaining access and before the backups are deleted.
+func TestRestoreAccessCloudUserFailureKeepsAdminAndStops(t *testing.T) {
+	prevRoot := fsx.Root
+	fsx.Root = fsx.Current()
+	t.Cleanup(func() { fsx.Root = prevRoot })
+	r, f := newTestResetter(t, true, "root")
+	if err := r.Guard.EnsureDirs(); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"debian.manifest":        "user=debian\nshell=/bin/bash\ngroups=debian sudo\nkey_fingerprint=SHA256:x\n",
+		"debian.authorized_keys": "ssh-ed25519 AAAA debian\n",
+		"debian.sudoers":         layout.QuarantineSudoersLine + "\n",
+	} {
+		if err := fsx.WriteAtomic(r.Guard.BackupPath(name), []byte(content), 0o600, fsx.Current()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec := hookRemovals(t, f)
+	h := hardening.New(f, nil)
+	h.Guard, h.Accounts = r.Guard, r.Accounts
+	// The test account lookup knows no debian account: restoration fails.
+	err := r.restoreAccess(context.Background(), h, Options{RestoreCloudUser: true, RemoveAdmin: true})
+	if err == nil || !strings.Contains(err.Error(), "backups in") {
+		t.Fatalf("err = %v, want the restoration failure", err)
+	}
+	if f.Ran("/usr/sbin/userdel --force --remove "+layout.AdminUser) || rec.removed(layout.SudoersAdmin) {
+		t.Fatalf("%s removed although the cloud account was not restored", layout.AdminUser)
+	}
+	if !fsx.Exists(r.Guard.BackupPath("debian.manifest")) {
+		t.Fatal("backups removed")
+	}
+}

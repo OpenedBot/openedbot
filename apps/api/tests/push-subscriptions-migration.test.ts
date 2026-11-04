@@ -26,3 +26,26 @@ describe("0039 push subscriptions migration", () => {
     expect(sql).toContain("event_type");
   });
 });
+
+describe("0170 push subscriptions member revocation migration", () => {
+  const sql = readFileSync(
+    new URL("../../../db/migrations/0170_push_subscriptions_member_revocation.sql", import.meta.url),
+    "utf8",
+  );
+
+  test("la révocation d'une membership emporte ses abonnements, sous SECURITY DEFINER", () => {
+    expect(sql).toContain("security definer");
+    expect(sql).toContain("set search_path = pg_catalog, public");
+    expect(sql).toContain("if old.revoked_at is null and new.revoked_at is not null then");
+    expect(sql).toMatch(
+      /delete from public\.push_subscriptions\s+where organization_id = new\.organization_id and user_id = new\.user_id;/,
+    );
+    expect(sql).toMatch(/create trigger memberships_drop_push_subscriptions\s+after update of revoked_at on memberships/);
+    expect(sql).toContain("revoke all on function drop_push_subscriptions_of_revoked_member() from public;");
+  });
+
+  test("purge les abonnements des membres déjà révoqués et s'enregistre", () => {
+    expect(sql).toMatch(/delete from push_subscriptions s\s+using memberships m[\s\S]*m\.revoked_at is not null;/);
+    expect(sql).toContain("insert into schema_migrations(version) values ('0170_push_subscriptions_member_revocation')");
+  });
+});

@@ -1,5 +1,7 @@
-import { recordAuditAnchorFrame } from "./audit-anchor-frame";
+import { AuditAnchorQueue } from "./audit-anchor-frame";
 import { InventorySignal } from "./inventory-signal";
+import { firstResponseBudgetMs } from "./link-budgets";
+import { forwardedResponseHeaders, headerValue, isCreationRequest } from "./link-relay-headers";
 import { RelayDialError, type RelayRequest } from "@openedbot/hermes";
 import {
   decodeBinaryFrame,
@@ -8,7 +10,6 @@ import {
   RELAY_CLOSE_REVOKED,
   RELAY_CLOSE_TOO_BIG,
   RELAY_CLOSE_UNAUTHORIZED,
-  RELAY_FORWARDED_RESPONSE_HEADERS,
   RELAY_MAX_IN_FLIGHT,
   RELAY_MAX_REQUEST_BODY,
   RELAY_MAX_RESPONSE_BODY,
@@ -38,7 +39,6 @@ const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 const RELAY_MAX_DROPPED_OVERRUN = 8 << 20;
 /** Ce qu'on garde d'une réponse de création pour en lire `run_id` : jamais plus. */
 const DISPATCH_RESPONSE_CAPTURE_BYTES = 64 << 10;
-const CREATION_PATH = /^(?:\/p\/[a-z0-9][a-z0-9_-]{0,62})?\/v1\/runs$/;
 const REMOTE_ID_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/;
 
 /** Ce que le broker retient d'une création en vol, jusqu'à son enregistrement. */
@@ -87,6 +87,7 @@ export class LinkConnection {
 
   private readonly diagnosticsInFlight = new Set<string>();
   private readonly inventorySignal: InventorySignal;
+  private readonly auditAnchors: AuditAnchorQueue;
   private retiring = false;
   private nextRequestId = 1;
   private readonly inFlight = new Map<number, PendingRequest>();
@@ -129,6 +130,7 @@ export class LinkConnection {
   ) {
     this.openedAt = options.now();
     this.inventorySignal = new InventorySignal({ ...options, isClosed: () => this.closed });
+    this.auditAnchors = new AuditAnchorQueue(options, () => this.closed);
     this.pingTimer = setInterval(() => {
       if (!this.closed) this.sendFrame({ t: "ping" });
     }, options.pingIntervalMs);
@@ -259,7 +261,9 @@ export class LinkConnection {
         onAbort: null,
         creation: null,
       };
-      this.inFlight.set(id, pending);
+      // Inscrite seulement une fois le `req` accepté : un envoi raté ferme le
+      // lien et rejetterait toutes les requêtes en vol `after_dispatch`, alors
+      // qu'aucun octet de celle-ci n'est parti (une création serait ambiguë).
       const sent = this.sendFrame({
         t: "req",
         id,
@@ -269,9 +273,10 @@ export class LinkConnection {
         body: hasBody ? "stream" : "none",
       });
       if (!sent) {
-        this.settle(pending, new RelayDialError("Le lien connecteur n'a pas accepté la requête.", "before_dispatch", "LINK_CLOSED"));
+        reject(new RelayDialError("Le lien connecteur n'a pas accepté la requête.", "before_dispatch", "LINK_CLOSED"));
         return;
       }
+      this.inFlight.set(id, pending);
       if (this.options.liveness.dispatched && isCreationRequest(request)) {
         const idempotencyKey = headerValue(request.headers, "idempotency-key");
         pending.creation = {
@@ -287,7 +292,7 @@ export class LinkConnection {
             new RelayDialError("L'hôte n'a pas répondu dans le délai du lien.", "after_dispatch", "LINK_TIMEOUT"),
             { cancel: true },
           );
-        }, this.options.firstResponseTimeoutMs);
+        }, firstResponseBudgetMs(request.method, request.path, this.options.firstResponseTimeoutMs));
       }
       if (signal) {
         pending.onAbort = () => {
@@ -357,7 +362,7 @@ export class LinkConnection {
         this.touchSeen();
         return;
       case "audit.anchor":
-        if (this.identity && this.admitted && !this.closed) recordAuditAnchorFrame(this.identity, frame, this.options);
+        if (this.identity && this.admitted && !this.closed) this.auditAnchors.push(this.identity, frame);
         return;
       case "res":
         this.handleResponse(frame.id, frame.status, frame.headers ?? {});
@@ -651,15 +656,24 @@ export class LinkConnection {
       );
       return;
     }
+    // Construits AVANT de marquer la réponse reçue : un en-tête refusé lèverait
+    // sinon après `responded`, et la promesse ne serait plus jamais réglée.
+    let headers: Headers;
+    try {
+      headers = forwardedResponseHeaders(rawHeaders);
+    } catch (error) {
+      this.settle(
+        pending,
+        new RelayDialError("En-têtes de réponse invalides.", "after_dispatch", "LINK_PROTOCOL_ERROR", { cause: error }),
+        { cancel: true },
+      );
+      return;
+    }
     pending.responded = true;
     if (pending.creation) pending.creation.status = status;
     if (pending.firstResponseTimer) clearTimeout(pending.firstResponseTimer);
     pending.firstResponseTimer = null;
     this.touchSeen();
-    const headers = new Headers();
-    for (const [name, value] of Object.entries(rawHeaders)) {
-      if (RELAY_FORWARDED_RESPONSE_HEADERS.has(name.toLowerCase())) headers.set(name, value);
-    }
     if (NULL_BODY_STATUSES.has(status)) {
       pending.bodySettled = true;
       pending.resolve(new Response(null, { status, headers }));
@@ -760,18 +774,4 @@ export class LinkConnection {
         this.options.log("runtime_link.liveness_failed", { runtimeId: identity.runtimeId, write: "dispatched", error: String(error) });
       });
   }
-}
-
-export function isCreationRequest(request: RelayRequest): boolean {
-  if (request.method.toUpperCase() !== "POST") return false;
-  const path = request.path.split("?")[0] ?? "";
-  return CREATION_PATH.test(path);
-}
-
-export function headerValue(headers: Record<string, string> | undefined, name: string): string | null {
-  if (!headers) return null;
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === name && value.trim()) return value.trim();
-  }
-  return null;
 }

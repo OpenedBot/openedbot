@@ -339,6 +339,9 @@ export async function recoverProviderFailure(
       model: fallback.model,
       capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
     });
+    // Le repli repartirait chez le fournisseur du profil, celui qui vient
+    // d'échouer : pas de nouvelle tentative sous une étiquette fausse.
+    if (profileServesOtherProvider(catalog, fallback.provider)) return { action: "give_up" };
   }
   const sequenceRows = await db<Array<{ next: number }>>`
     select coalesce(max(sequence), -1) + 1 as next from run_events
@@ -361,6 +364,28 @@ export async function recoverProviderFailure(
     profileApplied: applied,
   });
   return { action: "retry", selection: plan.selection, state: plan.state, fallbackSequence };
+}
+
+/**
+ * Le profil multiplexé route sur un AUTRE fournisseur que celui demandé : tant
+ * que son bloc `model` n'est pas réécrit, le prompt partirait chez lui. Un bloc
+ * vide ou un catalogue illisible ne prouve pas l'écart.
+ */
+export function profileServesOtherProvider(
+  catalog: { provider: string | null } | null,
+  requestedProvider: string,
+): boolean {
+  const current = catalog?.provider?.trim();
+  return Boolean(current) && current !== requestedProvider;
+}
+
+/** The error a new run fails with when its model could not be set on its profile. */
+export function profileModelNotAppliedError(provider: string, model: string): NamedRunError {
+  return new NamedRunError(
+    "PROFILE_MODEL_NOT_APPLIED",
+    "Le modèle choisi n’a pas pu être appliqué au profil Hermes de ce bot : le run n’a pas été lancé, pour ne pas répondre avec un autre fournisseur. Réessayez dans un instant.",
+    { provider, model },
+  );
 }
 
 /** The error a run fails with when its provider refused the bot's login. */
@@ -443,6 +468,12 @@ export async function resolveSelectionForNewRun(
         profileModel: catalog.model,
         capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
       });
+      // Le gateway route sur le fournisseur du profil, pas sur celui du corps
+      // du run : lancer quand même afficherait le modèle demandé pendant qu'un
+      // autre fournisseur répond.
+      if (profileServesOtherProvider(catalog, selection.provider)) {
+        throw profileModelNotAppliedError(selection.provider, selection.model);
+      }
     }
   }
   return resolved;

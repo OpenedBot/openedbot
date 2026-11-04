@@ -4,6 +4,7 @@ import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { useT } from "../lib/i18n";
 import { useExitGhost } from "../lib/thread/thread-motion";
 import { useHeldValue } from "../lib/hooks/use-held-value";
+import { GrokAgentsHeader } from "./grok/grok-feed";
 
 /** How often the elapsed timer repaints (the reference ticks every 100 ms). */
 export const THINKING_TICK_MS = 100;
@@ -104,20 +105,29 @@ export const ThinkingStatus = memo(function ThinkingStatus({ since, label, class
 
 /**
  * The status of a turn that has no block yet: the run is queued or thinking
- * and nothing has been written. It stands where the turn's block will appear,
- * and the block's own header takes over (same dots, same timer base) the
- * moment the first step arrives. It leaves as Grok Bot's mark does: a copy
- * shrinks to 0.92 and fades out over 140 ms (`useExitGhost`).
+ * and nothing has been written. It is grok.com's `AgentsHeader` before the
+ * agents are called: the bulb and « Réflexion pendant 1s » for a beat, then
+ * the 3 × 3 dot loader with « Réflexion • Ns ». The turn's own block takes
+ * over (same header, same timer base) the moment the first step arrives; this
+ * one leaves as a copy that shrinks to 0.92 and fades out (`useExitGhost`).
  */
 export function PendingThinking({ since, author = null }: { since: number | null; author?: MessageAuthorBot | null }) {
-  const { t } = useT();
   const [mountedAt] = useState(() => Date.now());
+  const start = since ?? mountedAt;
+  const [pre, setPre] = useState(() => Date.now() - start < PENDING_PRE_BEAT_MS);
+  useEffect(() => {
+    if (!pre) return;
+    const timer = window.setTimeout(() => setPre(false), Math.max(0, PENDING_PRE_BEAT_MS - (Date.now() - start)));
+    return () => window.clearTimeout(timer);
+  }, [pre, start]);
   const node = useRef<HTMLDivElement>(null);
   useExitGhost(node);
-  const name = author?.name ?? author?.slug ?? null;
   return (
-    <div ref={node} data-thread-thinking="" className="ohb-typing-enter flex min-h-7 w-full self-start px-1 py-1 text-body-2-medium">
-      <ThinkingStatus entering since={since ?? mountedAt} label={name ? t("agentActivity.thinkingBot", { name }) : undefined} />
+    <div ref={node} role="status" data-thread-thinking="" data-thinking-status="" data-author={author?.id} className="flex w-full self-start">
+      <GrokAgentsHeader agents={[]} started={start} running streaming={false} pre={pre} />
     </div>
   );
 }
+
+/** grok.com's first beat: the bulb before the agents are called. */
+const PENDING_PRE_BEAT_MS = 400;

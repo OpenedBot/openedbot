@@ -33,6 +33,15 @@ export const HERMES_RUN_FAILURE_CODE = "HERMES_RUN_FAILED";
 /** The Hermes gateway interrupted a run, usually during a gateway restart. */
 export const HERMES_RUN_INTERRUPTED_CODE = "HERMES_RUN_INTERRUPTED";
 
+/**
+ * openedbot a arrêté le run lui-même : Hermes ne répondait plus depuis
+ * `WORKER_RUN_INACTIVITY_MS` (et ne le disait pas vivant), ou le run a
+ * dépassé `WORKER_RUN_TIMEOUT_MS`. Sans ces noms, l'arrêt se lisait
+ * « Run Hermes annulé », comme si quelqu'un l'avait annulé (`runner.ts`).
+ */
+export const RUN_INACTIVITY_STOP_CODE = "RUN_INACTIVITY_TIMEOUT";
+export const RUN_TIMEOUT_STOP_CODE = "RUN_TIMEOUT";
+
 /** Codes nommés visibles dans l'historique (et, pour l'abandon, comme run.error). */
 export const ROUTINE_ERROR_BUSY_RETRIES_EXHAUSTED = "ROUTINE_BUSY_RETRIES_EXHAUSTED";
 export const ROUTINE_ERROR_GROUP_EMPTY = "GROUP_EMPTY";

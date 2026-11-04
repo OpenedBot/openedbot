@@ -76,6 +76,8 @@ export type ReviewDeps = {
   client(runtime: Omit<RuntimeClientContext, "hermesProfile">): Pick<HermesClient, "createRun" | "getRunStatus" | "stopRun" | "deleteSession" | "mcpInventory" | "hostProfileInventory">;
   now(): number;
   sleep(ms: number): Promise<unknown>;
+  /** The worker's shutdown: an interrupted review hands the gate to a person. */
+  signal?: AbortSignal;
 };
 
 /** Claims up to `limit` gates under review, oldest first. */
@@ -204,10 +206,19 @@ export function reviewModelSelection(job: Pick<ReviewJob,
   return selection;
 }
 
-async function askReviewer(job: ReviewJob, rules: readonly ReviewRule[], deps: ReviewDeps, deadline: number): Promise<ReviewOutcome> {
+const REVIEW_TIMEOUT: ReviewOutcome = { kind: "escalate", code: "review_timeout", reason: null };
+
+async function askReviewer(
+  job: ReviewJob,
+  rules: readonly ReviewRule[],
+  deps: ReviewDeps,
+  deadline: number,
+  signal: AbortSignal,
+): Promise<ReviewOutcome> {
   if (!job.runtime) return { kind: "escalate", code: "review_runtime_missing", reason: null };
   const client = deps.client(job.runtime);
   if (!(await reviewProfileStillToolLess(client))) return { kind: "escalate", code: "review_profile_stale", reason: null };
+  if (deps.now() >= deadline) return REVIEW_TIMEOUT;
   const selection = reviewModelSelection(job);
   const sessionId = `ohb-review-${job.id}`;
   let hermesRunId: string | null = null;
@@ -226,10 +237,13 @@ async function askReviewer(job: ReviewJob, rules: readonly ReviewRule[], deps: R
       // One review per gate, in its own session: a 1h write would be wasted.
       promptCacheTtl: "5m",
       idempotencyKey: `review:${job.id}:${job.claimToken}`,
+      signal,
     }));
     if (hermesRunId === null) return { kind: "escalate", code: "review_runtime_busy", reason: null };
     while (deps.now() < deadline) {
-      const status = await client.getRunStatus(hermesRunId);
+      const status = await client.getRunStatus(hermesRunId, signal);
+      // A reply that lands after the budget is no verdict: a person decides.
+      if (deps.now() >= deadline) break;
       if (status.status === "completed") {
         const verdict = parseReviewVerdict(status.output);
         if (!verdict) return { kind: "escalate", code: "review_unreadable", reason: null };
@@ -240,7 +254,13 @@ async function askReviewer(job: ReviewJob, rules: readonly ReviewRule[], deps: R
       await deps.sleep(REVIEW_POLL_MS);
     }
     await client.stopRun(hermesRunId).catch(() => undefined);
-    return { kind: "escalate", code: "review_timeout", reason: null };
+    return REVIEW_TIMEOUT;
+  } catch (error) {
+    if (!signal.aborted) throw error;
+    // The budget or the worker's shutdown cut a call short: the remote review
+    // is stopped (outside the spent signal) and the gate goes to a person.
+    if (hermesRunId !== null) await client.stopRun(hermesRunId).catch(() => undefined);
+    return deps.signal?.aborted ? { kind: "escalate", code: "review_failed", reason: null } : REVIEW_TIMEOUT;
   } finally {
     await client.deleteSession(sessionId).catch(() => undefined);
   }
@@ -265,13 +285,17 @@ async function preflight(db: SQL, job: ReviewJob, deps: ReviewDeps): Promise<Rev
 async function writeOutcome(
   db: SQL,
   job: ReviewJob,
-  outcome: ReviewOutcome,
+  verdictOrEscalation: ReviewOutcome,
   durationMs: number,
   source: ResolvedPermissionRuleSource,
-): Promise<{ written: boolean; neverWait: boolean }> {
+  lateAfter: () => boolean,
+): Promise<{ written: boolean; neverWait: boolean; outcome: ReviewOutcome }> {
   return db.begin(async (tx) => {
     await tx`select id from runs where organization_id = ${job.organizationId} and id = ${job.runId} for update`;
     const neverWait = await lockWorkflowTx(tx as unknown as SQL, job.organizationId, job.workflowId, source);
+    // Re-checked under the locks: a verdict that reaches the write after the
+    // budget is refused, and the gate goes to a person like any timeout.
+    const outcome = verdictOrEscalation.kind === "verdict" && lateAfter() ? REVIEW_TIMEOUT : verdictOrEscalation;
     const reasonCode = outcome.kind === "verdict" ? `review_${outcome.verdict}` : outcome.code;
     const detail = { reason: reasonCode, ...(outcome.reason ? { reviewerReason: outcome.reason } : {}), durationMs };
     // The detail MERGES into what the pipeline wrote: `effectiveMode` is what
@@ -311,13 +335,13 @@ async function writeOutcome(
              and decision_claim_token = ${job.claimToken} and status = 'pending' and decision_state = 'reviewing'
           returning id
         `;
-    if (!rows[0]) return { written: false, neverWait };
+    if (!rows[0]) return { written: false, neverWait, outcome };
     if (outcome.kind === "escalate" && !neverWait && job.workflowId) await tx`
       update workflows set status = 'awaiting_approval', updated_at = now()
        where organization_id = ${job.organizationId} and id = ${job.workflowId} and status = 'running'
     `;
-    return { written: true, neverWait };
-  }) as Promise<{ written: boolean; neverWait: boolean }>;
+    return { written: true, neverWait, outcome };
+  }) as Promise<{ written: boolean; neverWait: boolean; outcome: ReviewOutcome }>;
 }
 
 export async function reviewGate(db: SQL, job: ReviewJob, deps: ReviewDeps): Promise<void> {
@@ -329,6 +353,10 @@ export async function reviewGate(db: SQL, job: ReviewJob, deps: ReviewDeps): Pro
   // The port is resolved once, outside every transaction; a failing selector
   // falls back to the core's on its own (permission-rule-sources.ts).
   const source = await permissionRuleSourceFor(job.organizationId);
+  // One signal for every reviewer call: the budget's end or the worker's shutdown.
+  const budget = new AbortController();
+  const timer = setTimeout(() => budget.abort("review_budget"), Math.max(0, deadline - deps.now()));
+  const signal = deps.signal ? AbortSignal.any([budget.signal, deps.signal]) : budget.signal;
   try {
     const held = await preflight(db, job, deps);
     if (held) {
@@ -337,15 +365,19 @@ export async function reviewGate(db: SQL, job: ReviewJob, deps: ReviewDeps): Pro
       // A failed read is a failed review: a human decides, never a review without the rules.
       const rules = await readReviewRules(db, job.organizationId, job.botId, source);
       rulesCount = rules.length;
-      outcome = await askReviewer(job, rules, deps, deadline);
+      outcome = await askReviewer(job, rules, deps, deadline, signal);
     }
   } catch (error) {
     // The code and status only: a provider message may quote the gate.
     failure = error instanceof HermesClientError ? { code: String(error.code), status: error.status } : { code: null, status: null };
     outcome = { kind: "escalate", code: "review_failed", reason: null };
+  } finally {
+    clearTimeout(timer);
   }
   const durationMs = Math.round(deps.now() - started);
-  const { written, neverWait } = await writeOutcome(db, job, outcome, durationMs, source);
+  const result = await writeOutcome(db, job, outcome, durationMs, source, () => deps.now() >= deadline);
+  const { written, neverWait } = result;
+  outcome = result.outcome;
   const unattended = outcome.kind === "escalate" && neverWait;
   log("approval.decision", {
     runId: job.runId, stage: unattended ? "unattended" : "review", reviewer: true,

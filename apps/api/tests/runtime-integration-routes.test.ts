@@ -893,6 +893,9 @@ function fakeProfileBots(options: {
   busy?: boolean;
   inGroup?: boolean;
   calls?: string[];
+  /** Un bot dont la suppression de profil a déjà été engagée (0171). */
+  deleting?: boolean;
+  reserved?: boolean;
 } = {}): SQL {
   const calls = options.calls ?? [];
   const botId = options.botId ?? null;
@@ -900,6 +903,13 @@ function fakeProfileBots(options: {
     const statement = [...strings].join(" ");
     calls.push(statement);
     if (statement.includes("set_config")) return [];
+    if (statement.includes("from profile_import_items")) return options.reserved ? [{ slug: "scout" }] : [];
+    if (statement.includes("update bots b") && statement.includes("host_profile_deleting_at")) {
+      return botId ? [{ alreadyDeleting: options.deleting === true, wasArchived: options.deleting === true }] : [];
+    }
+    if (statement.includes("host_profile_deleting_at is not null") && statement.includes("for update")) {
+      return botId && options.deleting ? [{ id: botId }] : [];
+    }
     if (statement.includes("delete from bots")) return botId ? [{ id: botId }] : [];
     if (statement.includes("from bots")) return botId ? [{ id: botId, hermesProfile: "scout" }] : [];
     if (statement.includes("from runs r")) {
@@ -912,6 +922,8 @@ function fakeProfileBots(options: {
   }) as unknown as SQL;
   (tx as unknown as { begin: (callback: (inner: SQL) => Promise<unknown>) => Promise<unknown> }).begin =
     async (callback) => callback(tx);
+  // La route tient le verrou d'import sur une connexion réservée.
+  Object.assign(tx, { reserve: async () => Object.assign(tx, { release: () => {}, close: async () => {} }) });
   return tx;
 }
 
@@ -1101,6 +1113,86 @@ describe("DELETE /profiles/:slug", () => {
     expect(await response.json()).toMatchObject({ error: { code: "PROFILE_UNVERIFIED" } });
     expect(mounted.writes().at(-1)).toBe("hostDelete scout");
     expect(calls.some((sql) => sql.includes("delete from bots"))).toBe(false);
+    // Le profil a pu partir : l'état « suppression engagée » reste pour la reprise.
+    expect(calls.some((sql) => sql.includes("set host_profile_deleting_at = null"))).toBe(false);
+  });
+
+  test("un import qui réserve le slug : 409, ni appel hôte ni écriture", async () => {
+    const calls: string[] = [];
+    const mounted = mount({
+      hostFeatures: ["profile_management"],
+      hostProfileInventory: async () => inventory,
+      hostDeleteProfile: async () => undefined,
+      deleteSession: async () => undefined,
+      db: fakeProfileBots({ botId: "bot-1", calls, reserved: true }),
+    });
+    const response = await mounted.app.request("/profiles/scout", { method: "DELETE" });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "PROFILE_IMPORT_IN_PROGRESS" } });
+    expect(mounted.writes()).toEqual([]);
+    expect(calls.some((sql) => sql.includes("pg_advisory_lock"))).toBe(true);
+    expect(calls.some((sql) => sql.includes("host_profile_deleting_at"))).toBe(false);
+  });
+
+  test("le bot lié est marqué avant l'hôte, ses octets entrent en file avec sa suppression", async () => {
+    const calls: string[] = [];
+    let listed = inventory.profiles;
+    const mounted = mount({
+      hostFeatures: ["profile_management"],
+      hostProfileInventory: async () => ({ profiles: listed }),
+      hostDeleteProfile: async (slug) => {
+        calls.push("HOST DELETE");
+        listed = listed.filter((profile) => profile.name !== slug);
+      },
+      deleteSession: async () => undefined,
+      db: fakeProfileBots({ botId: "bot-1", calls }),
+    });
+    expect((await mounted.app.request("/profiles/scout", { method: "DELETE" })).status).toBe(200);
+    const marked = calls.findIndex((sql) => sql.includes("update bots b") && sql.includes("host_profile_deleting_at"));
+    const guard = calls.findIndex((sql) => sql.includes("from runs r") && sql.includes("for update of r"));
+    const host = calls.indexOf("HOST DELETE");
+    const queued = calls.findIndex((sql) => sql.includes("insert into tenant_blob_deletions"));
+    const deleted = calls.findIndex((sql) => sql.includes("delete from bots"));
+    expect(guard).toBeGreaterThanOrEqual(0);
+    expect(marked).toBeGreaterThan(guard);
+    expect(host).toBeGreaterThan(marked);
+    expect(queued).toBeGreaterThan(host);
+    expect(deleted).toBeGreaterThan(queued);
+    expect(calls[queued]).toContain("t.bot_id");
+  });
+
+  test("une purge de sessions en échec rend le bot tel qu'il était, sans toucher au profil", async () => {
+    const calls: string[] = [];
+    const mounted = mount({
+      hostFeatures: ["profile_management"],
+      hostProfileInventory: async () => inventory,
+      hostDeleteProfile: async () => undefined,
+      deleteSession: async () => { throw new HermesClientError("down", 503, "HERMES_OPERATOR_UNAVAILABLE"); },
+      db: fakeProfileBots({ botId: "bot-1", calls }),
+    });
+    const response = await mounted.app.request("/profiles/scout", { method: "DELETE" });
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ error: { code: "RUNTIME_PURGE_FAILED" } });
+    expect(mounted.writes().some((write) => write.startsWith("hostDelete"))).toBe(false);
+    expect(calls.some((sql) => sql.includes("set host_profile_deleting_at = null"))).toBe(true);
+  });
+
+  test("reprise : profil déjà absent et bot marqué, le nettoyage local se termine", async () => {
+    const calls: string[] = [];
+    const mounted = mount({
+      hostFeatures: ["profile_management"],
+      hostProfileInventory: async () => ({ profiles: [] }),
+      hostDeleteProfile: async () => undefined,
+      db: fakeProfileBots({ botId: "bot-1", calls, deleting: true }),
+    });
+    const response = await mounted.app.request("/profiles/scout", { method: "DELETE" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      slug: "scout", hostDeleted: true, botId: "bot-1", purgedSessions: 0, failedSessions: 0,
+    });
+    expect(mounted.writes()).toEqual([]);
+    expect(calls.some((sql) => sql.includes("insert into tenant_blob_deletions"))).toBe(true);
+    expect(calls.some((sql) => sql.includes("delete from bots"))).toBe(true);
   });
 });
 

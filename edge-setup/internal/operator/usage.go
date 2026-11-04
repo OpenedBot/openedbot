@@ -29,7 +29,7 @@ const (
 	maxUsageDetails   = 16
 )
 
-var usageProbeProviders = []string{"anthropic", "openai-codex", "openrouter"}
+var usageProbeProviders = []string{"anthropic", "openai-codex", "openrouter", "xai-oauth"}
 
 //go:embed usage_probe.py
 var usageProbeScript []byte

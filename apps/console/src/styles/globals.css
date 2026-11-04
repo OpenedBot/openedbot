@@ -6,6 +6,7 @@
 @import "./components/boardui.css";
 @import "./components/bot-accent.css";
 @import "./components/thread-theme.css";
+@import "./components/grok-motion.css";
 @import "./components/bot-create.css";
 @import "./components/bot-manage.css";
 @import "./components/native-titlebar.css";

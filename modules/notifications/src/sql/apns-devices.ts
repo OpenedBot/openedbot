@@ -265,6 +265,8 @@ export type ApnsDeviceSecretRow = {
   environment: ApnsEnvironment;
   revoked: boolean;
   memberActive: boolean;
+  /** Version of the token read here; a revocation only applies to this one. */
+  tokenHash: string;
   ciphertext: string | null;
   nonce: string | null;
   tag: string | null;
@@ -283,7 +285,7 @@ export async function readApnsDeviceSecret(
            exists (select 1 from memberships m
                     where m.organization_id = d.organization_id and m.user_id = d.user_id
                       and m.revoked_at is null) as "memberActive",
-           d.token_ciphertext as ciphertext, d.token_nonce as nonce,
+           d.token_hash as "tokenHash", d.token_ciphertext as ciphertext, d.token_nonce as nonce,
            d.token_tag as tag, d.token_key_id as "keyId"
       from apns_devices d
      where d.organization_id = ${organizationId} and d.id = ${deviceId}
@@ -291,19 +293,27 @@ export async function readApnsDeviceSecret(
   return rows[0] ?? null;
 }
 
-/** Revokes a device Apple declared dead; its secret is erased in the same write. */
+/**
+ * Revokes a device Apple declared dead; its secret is erased in the same
+ * write. Only while the row still holds the token that was sent: a token
+ * re-registered on the same installation during the APNs call stays active.
+ */
 export async function revokeApnsDevice(
   tx: TransactionDb,
   organizationId: string,
   deviceId: string,
+  sentTokenHash: string,
   reason: ApnsRevocationReason,
-): Promise<void> {
-  await tx`
+): Promise<boolean> {
+  const rows = await tx<Array<{ id: string }>>`
     update apns_devices
        set revoked_at = now(), revoked_reason = ${reason}, token_ciphertext = null,
            token_nonce = null, token_tag = null, token_key_id = null, updated_at = now()
      where organization_id = ${organizationId} and id = ${deviceId} and revoked_at is null
+       and token_hash = ${sentTokenHash}
+    returning id
   `;
+  return rows.length > 0;
 }
 
 export async function touchApnsDevice(tx: TransactionDb, organizationId: string, deviceId: string): Promise<void> {

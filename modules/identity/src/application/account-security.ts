@@ -2,6 +2,7 @@ import type { AccountSecurityDto } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { Db } from "@openedbot/platform-db";
 import { passwordProblem } from "../domain/password";
+import { verifyPassword } from "./password-hash";
 import { readAccountSecurity, readPasswordHash, replacePasswordRevokingOtherSessions } from "../sql/accounts";
 import { listUserSessions, revokeOtherUserSessions, revokeUserSession } from "../sql/sessions";
 
@@ -69,7 +70,7 @@ export async function changeOwnPassword(db: Db, input: {
   if (!passwordHash) {
     throw new HttpError(409, "PASSWORD_NOT_SET", "Ce compte se connecte uniquement par Google.");
   }
-  if (!(await Bun.password.verify(input.currentPassword, passwordHash))) {
+  if (!(await verifyPassword(input.currentPassword, passwordHash))) {
     throw new HttpError(401, "CREDENTIALS_INVALID", "Le mot de passe actuel est invalide.");
   }
 

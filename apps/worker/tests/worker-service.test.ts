@@ -276,6 +276,49 @@ describe("worker claim loop", () => {
     expect(queue.claimed.map((run) => run.id)).toEqual(["run-1", "run-2"]);
   });
 
+  test("shutdown waits for the reviews a pass started without awaiting, even one started while draining", async () => {
+    const order: string[] = [];
+    const firstStarted = deferred();
+    const finishReviews = deferred();
+    const claimHeld = deferred();
+    let passes = 0;
+    // Like the approval-reviews job: each pass starts its work and returns.
+    const reviews: BackgroundJob = {
+      name: "approval-reviews",
+      everyMs: 1,
+      run: async (signal, track) => {
+        passes += 1;
+        if (passes === 1) {
+          track!(finishReviews.promise.then(() => { order.push("review_1_written"); }));
+          firstStarted.resolve();
+          return;
+        }
+        // A pass still claiming when the stop comes tracks its review late.
+        await claimHeld.promise;
+        expect(signal.aborted).toBe(true);
+        track!(finishReviews.promise.then(() => sleep(50)).then(() => { order.push("review_2_written"); }));
+      },
+    };
+    const { dependencies } = fakeDependencies([reviews], order);
+    const worker = createWorkerService(db, config, dependencies);
+    const running = worker.run();
+    try {
+      await firstStarted.promise;
+      await until(() => passes >= 2);
+      worker.stop("SIGTERM");
+      await sleep(30);
+      claimHeld.resolve();
+      await sleep(30);
+      expect(order).toEqual([]);
+    } finally {
+      worker.stop("SIGTERM");
+      claimHeld.resolve();
+      finishReviews.resolve();
+      await running;
+    }
+    expect(order).toEqual(["review_1_written", "review_2_written", "leases_released"]);
+  });
+
   test("shutdown waits for an in-flight metrics heartbeat before closing the registry", async () => {
     const order: string[] = [];
     const release = deferred();

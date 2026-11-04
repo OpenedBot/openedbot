@@ -24,6 +24,8 @@ import {
   Reply,
   Smile,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   Volume2,
 } from "lucide-react";
 import { ContextMenu } from "radix-ui";
@@ -48,7 +50,7 @@ import {
   useCoarsePointer,
 } from "@openedbot/browser-ui-kit";
 import { haptics } from "../lib/platform/haptics";
-import { RiFileCopyLine, RiMoreFill, RiThumbDownLine, RiThumbUpLine } from "@remixicon/react";
+import { RiFileCopyLine, RiMoreFill } from "@remixicon/react";
 import { BUI_MENU_ITEM, BUI_POPOVER, BuiContextMenu, BuiContextMenuContent, BuiContextMenuItem, BuiContextMenuTrigger } from "./boardui/menu";
 
 export type MessageInteractionLabels = {
@@ -100,11 +102,12 @@ const ACTION =
   "flex size-[22px] items-center justify-center rounded-md bg-background-tertiary-default text-foreground-icon-tertiary outline-none transition-colors hover:text-foreground-icon-secondary focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50 aria-pressed:text-foreground-icon-primary";
 
 /**
- * The action row under an answer (reference: 28 px buttons, 16 px icons,
- * tertiary tone, primary on hover, a quiet fill under the pointer).
+ * The action row under an answer, grok.com's `IconBtn`: 32 px round buttons,
+ * 16 px lucide icons at stroke 2, the secondary ink, the primary one and a
+ * 6 % wash under the pointer (`--grok-*`, thread-theme.css).
  */
 const BELOW_ACTION =
-  "grid size-7 shrink-0 place-items-center rounded-md text-foreground-icon-tertiary outline-none transition-colors hover:bg-background-tertiary-hover hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50 aria-pressed:text-foreground-icon-primary motion-reduce:transition-none";
+  "grid size-8 shrink-0 place-items-center rounded-full text-[var(--grok-fg2)] outline-none transition-colors hover:bg-[var(--grok-hover)] hover:text-[var(--grok-fg)] data-[state=open]:bg-[var(--grok-hover)] data-[state=open]:text-[var(--grok-fg)] focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50 aria-pressed:text-[var(--grok-fg)] motion-reduce:transition-none";
 
 /** Les deux avis du template BoardUI : utile, inutile. Exclusifs. */
 const HELPFUL: MessageReactionEmoji = "👍";
@@ -490,12 +493,23 @@ export function MessageInteractionShell({
               data-message-actions-placement="below"
               aria-label={labels.more}
               className={cn(
-                "-ms-1 flex shrink-0 items-center gap-0.5 pt-1 transition-opacity duration-200",
-                actionsReveal && "ohb-fade-up",
+                "mt-0.5 -ms-1.5 flex h-8 shrink-0 items-center transition-opacity duration-200",
+                actionsReveal && "grok-enter",
                 persistentActions ? "opacity-100" : "opacity-0 group-hover/reply:opacity-100 group-hover/message:opacity-100 group-focus-within/message:opacity-100",
                 (pickerOpen || menuOpen) && "opacity-100",
               )}
             >
+              {canCopy ? (
+                <button
+                  type="button"
+                  aria-label={copyState === "copied" ? labels.copied : labels.copyResponse}
+                  title={copyState === "copied" ? labels.copied : labels.copyResponse}
+                  onClick={() => void copy()}
+                  className={BELOW_ACTION}
+                >
+                  {copyState === "copied" ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" strokeWidth={2} aria-hidden />}
+                </button>
+              ) : null}
               {canReact && messageId ? (
                 <>
                   <button
@@ -507,7 +521,7 @@ export function MessageInteractionShell({
                     onClick={() => void toggleVerdict(HELPFUL)}
                     className={BELOW_ACTION}
                   >
-                    <RiThumbUpLine className="size-4" aria-hidden />
+                    <ThumbsUp className="size-4" strokeWidth={2} fill={reacted(HELPFUL) ? "currentColor" : "none"} aria-hidden />
                   </button>
                   <button
                     type="button"
@@ -518,21 +532,13 @@ export function MessageInteractionShell({
                     onClick={() => void toggleVerdict(UNHELPFUL)}
                     className={BELOW_ACTION}
                   >
-                    <RiThumbDownLine className="size-4" aria-hidden />
+                    <ThumbsDown className="size-4" strokeWidth={2} fill={reacted(UNHELPFUL) ? "currentColor" : "none"} aria-hidden />
                   </button>
                 </>
               ) : null}
-              {canCopy ? (
-                <button
-                  type="button"
-                  aria-label={copyState === "copied" ? labels.copied : labels.copyResponse}
-                  title={copyState === "copied" ? labels.copied : labels.copyResponse}
-                  onClick={() => void copy()}
-                  className={BELOW_ACTION}
-                >
-                  {copyState === "copied"
-                    ? <Check className="size-4" aria-hidden />
-                    : <RiFileCopyLine className="size-4" aria-hidden />}
+              {canRegenerate && messageId ? (
+                <button type="button" aria-label={labels.regenerate} title={labels.regenerate} onClick={() => onRegenerate?.(messageId)} className={BELOW_ACTION}>
+                  <RefreshCw className="size-4" strokeWidth={2} aria-hidden />
                 </button>
               ) : null}
               {canReact || canReply || canEdit || canRegenerate || speaker ? (
@@ -546,7 +552,7 @@ export function MessageInteractionShell({
                   >
                     <DropdownMenuTrigger asChild>
                       <button type="button" aria-label={labels.more} title={labels.more} className={BELOW_ACTION}>
-                        <RiMoreFill className="size-4" aria-hidden />
+                        <Ellipsis className="size-4" strokeWidth={2} aria-hidden />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className={cn(BUI_POPOVER, "min-w-[198px] gap-1")}>
@@ -585,12 +591,6 @@ export function MessageInteractionShell({
                         <DropdownMenuItem className={BUI_MENU_ITEM} onSelect={() => onEdit?.(messageId)}>
                           <Pencil className="size-5 shrink-0 text-foreground-icon-secondary" aria-hidden />
                           {labels.edit}
-                        </DropdownMenuItem>
-                      ) : null}
-                      {canRegenerate && messageId ? (
-                        <DropdownMenuItem className={BUI_MENU_ITEM} onSelect={() => onRegenerate?.(messageId)}>
-                          <RefreshCw className="size-5 shrink-0 text-foreground-icon-secondary" aria-hidden />
-                          {labels.regenerate}
                         </DropdownMenuItem>
                       ) : null}
                     </DropdownMenuContent>

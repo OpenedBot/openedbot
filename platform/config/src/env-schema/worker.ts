@@ -246,6 +246,12 @@ export const WORKER_ENV: readonly EnvVar[] = [
     productionExample: "mailto:ops@example.invalid",
   },
   {
+    name: "PUSH_ALLOW_LOOPBACK_ENDPOINTS",
+    scope: "shared",
+    tier: "default_only",
+    doc: "1 lets a Web Push endpoint target a loopback host with a self-signed certificate (make e2e-push fake push server); API and worker. Empty (default): only the browser push services (FCM, Mozilla, Windows, Apple). Refused in production.",
+  },
+  {
     name: "APNS_KEY_ID",
     scope: "shared",
     tier: "local",

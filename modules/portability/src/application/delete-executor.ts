@@ -2,10 +2,10 @@ import type { SQL, TransactionSQL } from "bun";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { RuntimeProfileDeleteJobItemDto } from "@openedbot/contracts-api";
 import { HermesClientError, type HermesClient } from "@openedbot/hermes";
-import { ProfileDeleteError } from "../domain/errors";
+import { ProfileDeleteError, ProfileImportError } from "../domain/errors";
 import { lockProfileImports } from "../sql/reservations";
 import { DELETE_LEASE_SECONDS, type DeleteJobRow } from "../sql/delete-jobs";
-import { deleteHostProfile, type HostProfileDeleteClient } from "./host-profile-delete";
+import { deleteHostProfile, type HostProfileDeleteClient, type HostProfileDeleteOwnership } from "./host-profile-delete";
 
 export type DeleteExecutorDependencies = {
   client(runtimeId: string, profile?: string): HostProfileDeleteClient & Pick<HermesClient, "deleteSession">;
@@ -39,19 +39,30 @@ export async function executeProfileDelete(db: SQL, claimed: DeleteJobRow, deps:
       throw new DeleteLeaseLost();
     }
   };
+  // Le bail relu sous verrou dans la transaction de l'appelant, qui a déjà
+  // pris le verrou d'import (même ordre partout : import, puis job).
+  const fenceTx = async (tx: TransactionSQL): Promise<DeleteJobRow> => {
+    checkLocal();
+    const rows = await tx<DeleteJobRow[]>`
+      select * from profile_delete_jobs where id = ${claimed.id} and organization_id = ${claimed.organization_id}
+        and status = 'running' and lease_owner = ${claimed.lease_owner} and lease_generation = ${claimed.lease_generation}
+        and lease_expires_at > now() for update
+    `;
+    if (!rows[0]) { lost = true; throw new DeleteLeaseLost(); }
+    checkLocal();
+    return rows[0];
+  };
   const guarded = async <T>(fn: (tx: TransactionSQL, job: DeleteJobRow) => Promise<T>): Promise<T> => {
     checkLocal();
     return db.begin(async (tx) => {
       await lockProfileImports(tx, claimed.organization_id);
-      const rows = await tx<DeleteJobRow[]>`
-        select * from profile_delete_jobs where id = ${claimed.id} and organization_id = ${claimed.organization_id}
-          and status = 'running' and lease_owner = ${claimed.lease_owner} and lease_generation = ${claimed.lease_generation}
-          and lease_expires_at > now() for update
-      `;
-      if (!rows[0]) { lost = true; throw new DeleteLeaseLost(); }
-      checkLocal();
-      return fn(tx, rows[0]);
+      return fn(tx, await fenceTx(tx));
     }) as Promise<T>;
+  };
+  // Rejoué par `deleteHostProfile` avant chaque mutation, distante ou SQL.
+  const ownership: HostProfileDeleteOwnership = {
+    assertOwned: () => guarded(async () => undefined),
+    assertOwnedTx: async (tx) => { await fenceTx(tx); },
   };
   const heartbeat = setInterval(() => {
     if (renewing || lost || deps.signal?.aborted) return;
@@ -88,6 +99,7 @@ export async function executeProfileDelete(db: SQL, claimed: DeleteJobRow, deps:
         await deleteHostProfile(db, claimed.organization_id, slug, {
           host,
           sessionClient: (profile) => deps.client(claimed.runtime_id, profile),
+          ownership,
         });
         item = { slug, ok: true };
       } catch (error) {
@@ -156,7 +168,7 @@ export async function cancelQueuedDeletesForDeletion(db: SQL): Promise<void> {
 }
 
 function publicDeleteFailure(error: unknown): { code: string; message: string } {
-  if (error instanceof ProfileDeleteError) return { code: error.code, message: error.message };
+  if (error instanceof ProfileDeleteError || error instanceof ProfileImportError) return { code: error.code, message: error.message };
   if (error instanceof HttpError) return { code: error.code, message: error.message };
   if (error instanceof HermesClientError) return { code: error.code, message: error.message };
   return { code: "PROFILE_DELETE_FAILED", message: "La suppression de ce profil n’a pas pu être terminée." };

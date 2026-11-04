@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { BotFaceSpec } from "@openedbot/contracts-api";
 import { resolveBotArtwork } from "@openedbot/browser-face/artworks";
 import { resolveFace } from "@openedbot/browser-face/presets";
@@ -16,6 +17,41 @@ export function botBubbleColor(botId: string | null | undefined, face: BotFaceSp
   if (!botId || !face) return null;
   if (face.artwork?.startsWith("/api/") || resolveBotArtwork(face.artwork)) return null;
   return resolveFace(face, botId).color.hex;
+}
+
+/** La bulle de l'utilisateur teintée par le bot, une valeur par thème. */
+export type BotBubbleFill = { light: string; dark: string };
+
+/*
+ * Grok Bot (app desktop, `dist/renderer/assets/index.eager-common-*.js`) :
+ * en DM, la bulle de l'utilisateur prend la teinte du bot, l'aplat
+ * `{teinte}FillHover` en clair (primitive 2) et `{teinte}Fill` en sombre
+ * (primitive 1), texte blanc. L'encre et le gris (`black`, `gray` chez lui) ne
+ * teintent pas, la crème non plus (absente de sa palette) : la bulle reste
+ * neutre. Notre palette → la sienne : ambre = yellow, turquoise = cyan,
+ * violet = purple, rose = magenta.
+ */
+const GROK_BOT_USER_BUBBLE: Readonly<Record<string, BotBubbleFill>> = {
+  rouge: { light: "#c82532", dark: "#cf2b35" },
+  orange: { light: "#d2550a", dark: "#cd5309" },
+  ambre: { light: "#c2730b", dark: "#c8770c" },
+  vert: { light: "#0d9655", dark: "#0e9f5a" },
+  turquoise: { light: "#0d9381", dark: "#0e9886" },
+  bleu: { light: "#126fd4", dark: "#116dd2" },
+  violet: { light: "#7442d1", dark: "#7845d7" },
+  rose: { light: "#c82779", dark: "#cf297e" },
+  brun: { light: "#86592e", dark: "#8c5d31" },
+};
+
+/**
+ * L'aplat Grok Bot de la bulle de l'utilisateur dans le fil d'un bot, ou
+ * `null` (bulle neutre) : même règle d'avatar que `botBubbleColor`, plus les
+ * couleurs que Grok Bot ne teinte pas.
+ */
+export function botUserBubbleFill(botId: string | null | undefined, face: BotFaceSpec | null | undefined): BotBubbleFill | null {
+  if (!botId || !face) return null;
+  if (face.artwork?.startsWith("/api/") || resolveBotArtwork(face.artwork)) return null;
+  return GROK_BOT_USER_BUBBLE[resolveFace(face, botId).color.id] ?? null;
 }
 
 /** Le texte posé sur un aplat clair (ambre, vert, crème…). */
@@ -63,4 +99,19 @@ export function botAccentColor(bubbleColor: string | null): string | null {
   const rgb = channels(bubbleColor);
   if (!rgb) return null;
   return Math.max(...rgb) - Math.min(...rgb) >= MIN_ACCENT_CHROMA ? bubbleColor : null;
+}
+
+/**
+ * Le style que l'écran d'un bot pose sur sa colonne : la couleur du bot
+ * (`--bot-tint`, son texte) et l'aplat Grok Bot de la bulle de l'utilisateur
+ * par thème (`--ohb-user-fill-*`, lus par thread-theme.css ; absents, la bulle
+ * reste neutre).
+ */
+export function botTintStyle(bubbleColor: string | null, userFill: BotBubbleFill | null): CSSProperties | undefined {
+  if (!bubbleColor) return undefined;
+  return {
+    "--bot-tint": bubbleColor,
+    "--bot-tint-text": tintTextColor(bubbleColor),
+    ...(userFill ? { "--ohb-user-fill-light": userFill.light, "--ohb-user-fill-dark": userFill.dark } : {}),
+  } as CSSProperties;
 }

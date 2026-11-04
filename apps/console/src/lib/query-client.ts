@@ -1,6 +1,17 @@
 import { QueryClient, replaceEqualDeep } from "@tanstack/react-query";
-import { isUnauthorized } from "./api";
+import { isUnauthorized, isWorkspaceChanged } from "./api";
 import { isRestoredQueryData, persistQueryFn } from "./query-persister";
+
+/**
+ * Un 401 ne se rejoue pas : la réponse ne changera pas sans nouveau jeton, et
+ * le second essai ne ferait que retarder l'étape « Se connecter ».
+ * `WORKSPACE_CHANGED` non plus : le nouvel essai relirait l'espace devenu
+ * actif et rangerait sa réponse sous la clé de l'ancien. Le reste garde son
+ * unique nouvel essai.
+ */
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  return !isUnauthorized(error) && !isWorkspaceChanged(error) && failureCount < 1;
+}
 
 /**
  * Singleton TanStack Query de l'app. Le garde de route y dépose
@@ -12,10 +23,7 @@ export const queryClient = new QueryClient({
       // Le cloud API est en loopback : une requête coûte une milliseconde, mais
       // refetch au focus ferait clignoter un fil en cours de streaming.
       refetchOnWindowFocus: false,
-      // Un 401 ne se rejoue pas : la réponse ne changera pas sans nouveau
-      // jeton, et le second essai ne ferait que retarder l'étape « Se
-      // connecter ». Le reste garde son unique nouvel essai.
-      retry: (count, error) => !isUnauthorized(error) && count < 1,
+      retry: shouldRetryQuery,
       // Un second observateur après le garde de route ne doit pas refetch.
       staleTime: 10_000,
       // Roster and threads only survive a refresh (`lib/query-persister.ts`);

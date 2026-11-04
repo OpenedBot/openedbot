@@ -40,7 +40,7 @@ export type InternalRelayContext = {
     readonly method: string;
     readonly raw: Request;
   };
-  json(object: { pushed: boolean } | LinkProbeResult): Response;
+  json(object: { pushed: boolean; uncertain?: true } | LinkProbeResult): Response;
 };
 
 export type InternalRelayHandlers = {
@@ -151,7 +151,8 @@ export function runtimeLinkInternalRelay(
             runtimeId: body.runtimeId,
             linkToken: body.linkToken,
           });
-          return context.json({ pushed });
+          // Le saut a pu livrer la trame : le worker ne doit pas défaire la rotation.
+          return context.json(pushed === "unknown" ? { pushed: false, uncertain: true } : { pushed });
         }
         return relayFailure(400, "HERMES_LINK_BAD_REQUEST", "Trame de contrôle invalide.", "before_dispatch");
       }

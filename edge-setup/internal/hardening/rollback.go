@@ -1,6 +1,7 @@
 package hardening
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -153,6 +154,84 @@ func (h *Hardener) Rollback(ctx context.Context) (string, error) {
 	return "rolled-back", nil
 }
 
+// RestoreCloudUser gives the quarantined cloud-init account its audited
+// access back outside any transaction. Rollback refuses once hardening is
+// finalized, which is exactly when reset --restore-cloud-user runs, so this
+// path restores from the backups directly, then proves the result: the
+// audited key, shell, sudoers file and sudo membership must all be back. An
+// error means the account is not usable and the backups must be kept.
+func (h *Hardener) RestoreCloudUser(ctx context.Context) error {
+	g := h.Guard
+	unlock, err := g.Lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	for _, name := range []string{"debian.manifest", "debian.authorized_keys", "debian.sudoers"} {
+		if exists, err := fsx.RequireRegular(g.BackupPath(name), 0o600, g.Owner); err != nil || !exists {
+			return fmt.Errorf("backup %s is missing or invalid; refusing an unproven restoration", name)
+		}
+	}
+	if err := h.restoreQuarantine(ctx); err != nil {
+		return err
+	}
+	if err := h.validateAndReloadSSH(ctx); err != nil {
+		return err
+	}
+	return h.verifyCloudUser(ctx)
+}
+
+// verifyCloudUser checks the restored account against its manifest and
+// backups, not against what restoreQuarantine meant to do.
+func (h *Hardener) verifyCloudUser(ctx context.Context) error {
+	g := h.Guard
+	q := layout.QuarantineUser
+	kv, err := g.ReadMarker(g.BackupPath("debian.manifest"))
+	if err != nil {
+		return err
+	}
+	info, err := h.Accounts.Get(ctx, q)
+	if err != nil {
+		return err
+	}
+	if info == nil {
+		return fmt.Errorf("%s no longer exists", q)
+	}
+	shell := kv["shell"]
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+	if info.Shell != shell {
+		return fmt.Errorf("%s has shell %q after restoration, want %q", q, info.Shell, shell)
+	}
+	keys, err := exec.Output(ctx, h.Runner, "/usr/bin/ssh-keygen", "-lf", h.QuarantineHome+"/.ssh/authorized_keys", "-E", "sha256")
+	if err != nil {
+		return err
+	}
+	if want := kv["key_fingerprint"]; want == "" || !ContainsFingerprint(Fingerprints(keys), want) {
+		return fmt.Errorf("%s does not carry its audited key %s after restoration", q, kv["key_fingerprint"])
+	}
+	want, err := fsx.ReadRegular(g.BackupPath("debian.sudoers"), 0o600, g.Owner)
+	if err != nil {
+		return err
+	}
+	got, err := fsx.ReadRegular(h.QuarantineSudoers, 0o440, fsx.Root)
+	if err != nil {
+		return fmt.Errorf("%s after restoration: %w", h.QuarantineSudoers, err)
+	}
+	if !bytes.Equal(got, want) {
+		return fmt.Errorf("%s does not match its backup after restoration", h.QuarantineSudoers)
+	}
+	groups, err := h.Accounts.Groups(ctx, q)
+	if err != nil {
+		return err
+	}
+	if wasSudo := HasGroup(strings.Fields(kv["groups"]), "sudo"); HasGroup(groups, "sudo") != wasSudo {
+		return fmt.Errorf("%s sudo membership is not the audited one after restoration", q)
+	}
+	return nil
+}
+
 func (h *Hardener) restoreQuarantine(ctx context.Context) error {
 	g := h.Guard
 	q := layout.QuarantineUser
@@ -168,13 +247,13 @@ func (h *Hardener) restoreQuarantine(ctx context.Context) error {
 		return errors.New("the quarantined account no longer exists; manual recovery is required")
 	}
 	owner := fsx.Owner{UID: info.UID, GID: info.GID}
-	if err := fsx.EnsureDir("/home/"+q+"/.ssh", 0o700, owner); err != nil {
+	if err := fsx.EnsureDir(h.QuarantineHome+"/.ssh", 0o700, owner); err != nil {
 		return err
 	}
-	if err := fsx.CopyFile(g.BackupPath("debian.authorized_keys"), "/home/"+q+"/.ssh/authorized_keys", 0o600, owner); err != nil {
+	if err := fsx.CopyFile(g.BackupPath("debian.authorized_keys"), h.QuarantineHome+"/.ssh/authorized_keys", 0o600, owner); err != nil {
 		return err
 	}
-	if err := fsx.CopyFile(g.BackupPath("debian.sudoers"), layout.QuarantineSudoers, 0o440, fsx.Root); err != nil {
+	if err := fsx.CopyFile(g.BackupPath("debian.sudoers"), h.QuarantineSudoers, 0o440, fsx.Root); err != nil {
 		return err
 	}
 	shell := kv["shell"]

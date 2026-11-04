@@ -60,9 +60,10 @@ describe("silhouettes du cadre", () => {
     document.documentElement.classList.add("dark");
     render(<I18nProvider><AppFrameSkeleton /></I18nProvider>);
     const rail = document.querySelector("[data-board-icon-rail]")!;
-    expect(rail.textContent).toBe("fr");
+    // Ni thème ni langue : ils se règlent dans Réglages > Apparence.
+    expect(rail.textContent).toBe("");
     expect(rail.querySelector(".tabler-icon-server-bolt")).toBeTruthy();
-    expect(rail.querySelectorAll("svg")).toHaveLength(6);
+    expect(rail.querySelectorAll("svg")).toHaveLength(5);
     expect(rail.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
 
@@ -92,6 +93,24 @@ describe("silhouettes du cadre", () => {
     await screen.findByText("Quitter les réglages");
     expect(document.querySelectorAll('[data-settings-pane] [data-slot="card"]')).toHaveLength(6);
     expect(screen.getAllByText("Activité").length).toBeGreaterThan(1);
+  });
+
+  // Modèles : l'en-tête et les trois cartes de la page (modèle par défaut,
+  // modèle des bots avec son tableau, fournisseurs), pas une carte générique.
+  // C'est aussi la silhouette de l'écran pendant la lecture du catalogue.
+  test("sur Modèles, la carte porte les trois blocs de la page", async () => {
+    setAccountLayout("c");
+    window.location.href = "http://localhost/o/dev/settings/models";
+    const root = createRootRoute({ component: AppFrameSkeleton });
+    const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/o/dev/settings/models"] }) });
+    render(<I18nProvider><RouterProvider router={router as never} /></I18nProvider>);
+    await screen.findByText("Quitter les réglages");
+    const page = document.querySelector("[data-settings-pane] [data-models-skeleton]")!;
+    expect(page).toBeTruthy();
+    expect(page.querySelectorAll("[data-settings-card]")).toHaveLength(3);
+    expect(page.textContent).toContain("Modèle par défaut");
+    expect(page.textContent).toContain("Modèle des bots");
+    expect(page.textContent).toContain("Effort de raisonnement");
   });
 
   test("le roster dessine le nombre de rangées demandé", () => {

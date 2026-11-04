@@ -14,22 +14,39 @@ import type { WorkerConfig } from "../config";
  * arbitrary path: anything outside these two shapes is refused loudly, and the
  * row is retried rather than silently skipped.
  */
-export async function deleteBlob(config: Pick<WorkerConfig, "blob">, key: string): Promise<void> {
+export async function deleteBlob(
+  config: Pick<WorkerConfig, "blob" | "blobOther">,
+  key: string,
+  driver: "file" | "r2" | null = config.blob.driver,
+): Promise<void> {
   if (!/^(org|support)\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i.test(key) || key.includes("..")) {
     throw new Error("Invalid deletion blob key.");
   }
-  if (config.blob.driver === "r2") {
+  const backends = [config.blob, ...(config.blobOther ? [config.blobOther] : [])];
+  // Driver inconnu (ligne d'avant 0171, manifeste d'ingestion) : chaque
+  // magasin joignable, tous idempotents. Driver connu : le sien seulement, et
+  // un magasin absent est un échec réessayé, jamais une suppression confirmée
+  // sur le mauvais.
+  const targets = driver === null ? backends : backends.filter((backend) => backend.driver === driver);
+  if (targets.length === 0) throw new Error(`Blob driver ${driver} is not configured on this worker.`);
+  for (const backend of targets) await deleteFrom(backend, key);
+}
+
+type Backend = Pick<WorkerConfig, "blob">["blob"] | NonNullable<WorkerConfig["blobOther"]>;
+
+async function deleteFrom(backend: Backend, key: string): Promise<void> {
+  if (backend.driver === "r2") {
     const client = new Bun.S3Client({
-      bucket: config.blob.bucket,
-      endpoint: config.blob.endpoint,
-      accessKeyId: config.blob.accessKeyId,
-      secretAccessKey: config.blob.secretAccessKey,
+      bucket: backend.bucket,
+      endpoint: backend.endpoint,
+      accessKeyId: backend.accessKeyId,
+      secretAccessKey: backend.secretAccessKey,
       region: "auto",
     });
     await client.delete(key);
     return;
   }
-  const root = resolve(config.blob.root);
+  const root = resolve(backend.root);
   const path = resolve(root, key);
   if (!path.startsWith(`${root}${sep}`)) throw new Error("Deletion blob path escaped root.");
   const file = Bun.file(path);

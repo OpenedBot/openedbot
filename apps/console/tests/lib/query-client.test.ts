@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createInvalidateScheduler, DEFAULT_INVALIDATE_DELAY_MS } from "../../src/lib/query-client";
+import { ApiError, queryKeys } from "../../src/lib/api";
+import { createInvalidateScheduler, DEFAULT_INVALIDATE_DELAY_MS, shouldRetryQuery } from "../../src/lib/query-client";
 
 type FakeTimer = { callback: () => void; delayMs: number };
 
@@ -82,5 +83,34 @@ describe("createInvalidateScheduler", () => {
     expect(scheduler.pending()).toBe(2);
     clock.fire();
     expect(count).toBe(2);
+  });
+});
+
+describe("shouldRetryQuery", () => {
+  test("une erreur ordinaire garde son unique nouvel essai", () => {
+    const error = new ApiError(503, "Indisponible");
+    expect(shouldRetryQuery(0, error)).toBe(true);
+    expect(shouldRetryQuery(1, error)).toBe(false);
+  });
+
+  test("WORKSPACE_CHANGED ne se rejoue jamais : la reprise lirait l'autre espace sous l'ancienne clé", () => {
+    expect(shouldRetryQuery(0, new ApiError(409, "Le contexte de l’espace a changé.", "WORKSPACE_CHANGED"))).toBe(false);
+  });
+
+  test("un 401 de session ne se rejoue pas", () => {
+    expect(shouldRetryQuery(0, new ApiError(401, "Session expirée.", "SESSION_EXPIRED"))).toBe(false);
+  });
+});
+
+describe("queryKeys.globalSearch", () => {
+  test("le même terme cherché dans deux espaces n'occupe pas la même entrée du cache", () => {
+    window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-a", csrfToken: "csrf", userId: "user-1" }));
+    window.sessionStorage.clear();
+    const inA = queryKeys.globalSearch("budget");
+    window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-b", csrfToken: "csrf", userId: "user-1" }));
+    window.sessionStorage.clear();
+    const inB = queryKeys.globalSearch("budget");
+    expect(inA).toEqual(["organization", "org-a", "global-search", "budget"]);
+    expect(inB).toEqual(["organization", "org-b", "global-search", "budget"]);
   });
 });

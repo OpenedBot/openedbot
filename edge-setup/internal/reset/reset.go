@@ -54,7 +54,7 @@ var Units = []string{
 // RuntimePaths are removed unconditionally (no data inside).
 var RuntimePaths = []string{
 	layout.InstallDir, layout.UVRoot, layout.BootstrapHome, layout.PythonInstall, "/var/cache/hermes",
-	layout.InstallerPath, layout.UVArchivePath(),
+	layout.InstallerPath, layout.UVArchivePath(), layout.LegacyDownloadPaths[0], layout.LegacyDownloadPaths[1],
 	"/etc/systemd/system/user@.service.d/delegate.conf", layout.DockerModulesLoad,
 	// The operator unit keeps its RuntimeDirectory across restarts
 	// (RuntimeDirectoryPreserve=yes), so stopping it no longer empties the
@@ -223,6 +223,7 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 	}
 	// 3. Access: restore, never close.
 	h := hardening.New(r.Runner, nil)
+	h.Guard, h.Accounts = g, r.Accounts
 	if err := r.restoreAccess(ctx, h, o); err != nil {
 		return err
 	}
@@ -372,9 +373,18 @@ func (r *Resetter) restoreAccess(ctx context.Context, h *hardening.Hardener, o O
 		}
 	}
 	r.checkSudoers(ctx)
-	if o.RestoreCloudUser && fsx.Exists(g.BackupPath("debian.manifest")) {
-		if _, err := h.Rollback(ctx); err != nil {
-			r.Out("cloud user restoration through rollback failed: %v", err)
+	// Run refuses an active transaction, so Rollback would only answer
+	// "not-armed" or "already-finalized" here: the account is restored
+	// directly. A failure stops the reset before --remove-admin and before the
+	// backups are deleted, so neither the last way in nor the means to rebuild
+	// it is lost.
+	if o.RestoreCloudUser {
+		if !fsx.Exists(g.BackupPath("debian.manifest")) {
+			r.Out("no backup of the %s account in %s: nothing to restore", layout.QuarantineUser, g.BackupDir)
+		} else if err := h.RestoreCloudUser(ctx); err != nil {
+			return fmt.Errorf("restoring the %s account failed, backups in %s are kept: %w", layout.QuarantineUser, g.BackupDir, err)
+		} else {
+			r.Out("restored the %s account from %s", layout.QuarantineUser, g.BackupDir)
 		}
 	}
 	if o.RemoveAdmin && admin != nil {

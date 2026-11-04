@@ -163,6 +163,130 @@ export function shellWords(input: string): string[] | null {
   return open ? null : tokenize(input);
 }
 
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+type WrapperSpec = {
+  /** Short options that take a value, attached (`-uroot`) or as the next word. */
+  valued: string;
+  /** Short options that take none. */
+  flags: string;
+  /** Short options whose value is attached only (`xargs -i{}`), never the next word. */
+  attached?: string;
+  longValued?: readonly string[];
+  longFlags?: readonly string[];
+  /** Operands before the wrapped command (`timeout 5 cmd`). */
+  operands?: number;
+  /** `nice -5`, `env -`. */
+  numeric?: boolean;
+  bareDash?: boolean;
+};
+
+/**
+ * Commands that run the command written after them. Their options are read
+ * with their arity: `sudo -u root git push` wraps `git push`, not `root`. An
+ * option missing from this table makes the segment unreadable (fail closed),
+ * because guessing its arity would let a wrapped command slip past a check.
+ */
+const WRAPPERS: Readonly<Record<string, WrapperSpec>> = {
+  sudo: {
+    valued: "CDgpRrTtUu",
+    flags: "AbBEeHiKklnPSsVv",
+    longValued: ["chdir", "chroot", "close-from", "command-timeout", "group", "host", "other-user", "prompt", "role", "type", "user"],
+    longFlags: ["askpass", "background", "bell", "edit", "list", "login", "non-interactive", "preserve-env", "preserve-groups", "remove-timestamp", "reset-timestamp", "set-home", "shell", "stdin", "validate"],
+  },
+  doas: { valued: "Cu", flags: "Lns" },
+  command: { valued: "", flags: "pVv" },
+  builtin: { valued: "", flags: "" },
+  exec: { valued: "a", flags: "cl" },
+  env: {
+    valued: "Cu",
+    flags: "0iv",
+    longValued: ["chdir", "unset"],
+    longFlags: ["debug", "ignore-environment", "null"],
+    bareDash: true,
+  },
+  nice: { valued: "n", flags: "", longValued: ["adjustment"], numeric: true },
+  nohup: { valued: "", flags: "" },
+  timeout: {
+    valued: "ks",
+    flags: "v",
+    longValued: ["kill-after", "signal"],
+    longFlags: ["foreground", "preserve-status", "verbose"],
+    operands: 1,
+  },
+  stdbuf: { valued: "eio", flags: "", longValued: ["error", "input", "output"] },
+  time: { valued: "fo", flags: "apqv", longValued: ["format", "output"], longFlags: ["append", "portability", "quiet", "verbose"] },
+  xargs: {
+    valued: "adEILnPs",
+    flags: "0oprtx",
+    attached: "eil",
+    longValued: ["arg-file", "delimiter", "max-args", "max-chars", "max-lines", "max-procs", "process-slot-var"],
+    longFlags: ["exit", "interactive", "no-run-if-empty", "null", "open-tty", "show-limits", "verbose"],
+  },
+};
+
+/** Index past one wrapper's options and operands; `null` on an option it does not know. */
+function skipWrapperOptions(words: readonly string[], start: number, spec: WrapperSpec): number | null {
+  let index = start;
+  while (index < words.length) {
+    const word = words[index]!;
+    if (word === "--") {
+      index += 1;
+      break;
+    }
+    if (word === "-" && spec.bareDash) {
+      index += 1;
+      continue;
+    }
+    if (!word.startsWith("-") || word === "-") break;
+    if (word.startsWith("--")) {
+      const name = word.slice(2).split("=")[0]!;
+      const valued = spec.longValued?.includes(name) ?? false;
+      if (!valued && !(spec.longFlags?.includes(name) ?? false)) return null;
+      index += valued && !word.includes("=") ? 2 : 1;
+      continue;
+    }
+    if (spec.numeric && /^-\d+$/.test(word)) {
+      index += 1;
+      continue;
+    }
+    let takesNext = false;
+    for (let position = 1; position < word.length; position += 1) {
+      const option = word[position]!;
+      if (spec.flags.includes(option)) continue;
+      if (spec.attached?.includes(option)) break;
+      if (!spec.valued.includes(option)) return null;
+      takesNext = position === word.length - 1;
+      break;
+    }
+    index += takesNext ? 2 : 1;
+  }
+  return index + (spec.operands ?? 0);
+}
+
+/**
+ * Where each command of one shell segment starts: every wrapper (`sudo`,
+ * `env`, `timeout`...) and the command it finally runs, past `NAME=value`
+ * assignments and the wrappers' options. `sudo -n git push` starts at `sudo`
+ * and at `git`. `null`: an option the parser cannot size, the segment is
+ * unreadable and the caller must refuse rather than guess.
+ */
+export function commandStarts(words: readonly string[]): number[] | null {
+  const starts: number[] = [];
+  let index = 0;
+  for (;;) {
+    while (index < words.length && ASSIGNMENT.test(words[index] ?? "")) index += 1;
+    const word = words[index];
+    if (word === undefined) return starts;
+    starts.push(index);
+    const spec = WRAPPERS[word.split("/").pop() ?? word];
+    if (!spec) return starts;
+    const next = skipWrapperOptions(words, index + 1, spec);
+    if (next === null) return null;
+    index = next;
+  }
+}
+
 function isCircuitBreaker(command: string): boolean {
   return scanCommand(command, (hit) => hit.circuit);
 }
@@ -176,19 +300,21 @@ function scanCommand(command: string, pick: (hit: { circuit: boolean; deletion: 
     const trimmed = segment.trim();
     if (!trimmed) continue;
     const tokens = tokenize(trimmed);
-    let index = 0;
-    while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index] ?? "")) index += 1;
-    if (tokens[index] === "sudo" || tokens[index] === "command") index += 1;
-    const rawName = tokens[index];
-    if (!rawName) continue;
+    const starts = commandStarts(tokens);
+    // A wrapper option the parser cannot size hides the command: held.
+    if (starts === null) return true;
+    const index = starts.at(-1);
+    const rawName = index === undefined ? undefined : tokens[index];
+    if (index === undefined || !rawName) continue;
     const name = rawName.split("/").pop() ?? rawName;
     const args = tokens.slice(index + 1);
-    if (pick(classifySegment(name, args, trimmed))) return true;
+    const hit = classifySegment(name, args);
+    if (pick({ ...hit, circuit: hit.circuit || redirectsToProtected(trimmed) })) return true;
   }
   return false;
 }
 
-function classifySegment(name: string, args: string[], raw: string): { circuit: boolean; deletion: boolean } {
+function classifySegment(name: string, args: string[]): { circuit: boolean; deletion: boolean } {
   if (name === "rm" || name === "rmdir" || name === "unlink" || name === "shred") {
     const paths = operandPaths(args);
     return {
@@ -207,7 +333,7 @@ function classifySegment(name: string, args: string[], raw: string): { circuit: 
   if (name === "tee" || name === "cp" || name === "mv" || name === "install") {
     return { deletion: false, circuit: args.some((arg) => isProtectedPath(arg)) };
   }
-  return { deletion: false, circuit: redirectsToProtected(raw) };
+  return { deletion: false, circuit: false };
 }
 
 function operandPaths(args: readonly string[]): string[] {
@@ -247,8 +373,66 @@ function isProtectedPath(path: string): boolean {
     || /(?:^|\/)credentials(?:\.json)?$/.test(path);
 }
 
+/**
+ * A write redirection (`>`, `>>`, `>|`, `&>`, `2>`, `<>`) onto a sensitive
+ * path, relative or absolute (`> /workspace/.env`). A redirection whose
+ * target cannot be read (missing, cut by `$(`) counts as one. The plain scan
+ * ignores quotes on purpose: a segment cut inside a quote by the `$(` split
+ * must not hide its redirection.
+ */
 function redirectsToProtected(raw: string): boolean {
-  return /(?:>>?)\s*['"]?(?:\.git\/config|\.git\/hooks|\.ssh(?:\/|$)|(?:^|[\s/'"])\.env\b|id_rsa|credentials(?:\.json)?)/.test(raw);
+  if (/(?:>>?)\s*['"]?(?:\.git\/config|\.git\/hooks|\.ssh(?:\/|$)|(?:^|[\s/'"])\.env\b|id_rsa|credentials(?:\.json)?)/.test(raw)) {
+    return true;
+  }
+  for (const match of raw.matchAll(/>\s*['"]?([^\s;&|<>()'"]+)/g)) {
+    if (isSensitivePath(match[1]!)) return true;
+  }
+  const targets = redirectionTargets(raw);
+  return targets === null || targets.some(isSensitivePath);
+}
+
+/** The targets of a segment's write redirections, quotes removed; `null` when one has none. */
+function redirectionTargets(raw: string): string[] | null {
+  const targets: string[] = [];
+  let quote: string | null = null;
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index]!;
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (char !== ">") continue;
+    let cursor = index + 1;
+    if (raw[cursor] === ">" || raw[cursor] === "|") cursor += 1;
+    // `>&2`, `2>&1`, `>&-` duplicate or close a descriptor: no file.
+    const duplicate = raw[cursor] === "&" && /^&(?:\d+|-)(?![^\s;&|<>()])/.test(raw.slice(cursor));
+    if (raw[cursor] === "&") cursor += 1;
+    while (raw[cursor] === " " || raw[cursor] === "\t") cursor += 1;
+    let target = "";
+    let targetQuote: string | null = null;
+    for (; cursor < raw.length; cursor += 1) {
+      const next = raw[cursor]!;
+      if (targetQuote) {
+        if (next === targetQuote) targetQuote = null;
+        else target += next;
+        continue;
+      }
+      if (next === "'" || next === '"') {
+        targetQuote = next;
+        continue;
+      }
+      if (/[\s;&|<>()]/.test(next)) break;
+      target += next;
+    }
+    if (targetQuote || !target) return null;
+    if (!duplicate) targets.push(target);
+    index = cursor - 1;
+  }
+  return targets;
 }
 
 function tokenize(input: string): string[] {

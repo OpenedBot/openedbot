@@ -134,6 +134,9 @@ export const support = {
   scrollToEnd: "Aller au dernier message",
   errorOpen: "La conversation n’a pas pu être ouverte. Réessayez dans un instant.",
   errorSend: "Ce message n’est pas parti. Réessayez.",
+  /** Un envoi échoué alors qu’un nouveau brouillon était commencé : il attend son nouvel essai. */
+  failedSendKept: "Message non envoyé, gardé de côté : « {preview} »",
+  failedSendRetry: "Réessayer",
   restart: "Ouvrir une nouvelle conversation",
   historyOpen: "Mes conversations",
   historyBack: "Revenir à la conversation",

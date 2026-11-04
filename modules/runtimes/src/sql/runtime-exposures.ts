@@ -36,6 +36,8 @@ export type RuntimeExposureRow = {
   errorCode: string | null;
   createdAt: Date | string;
   revokedAt: Date | string | null;
+  /** 0171 : le retrait distant après révocation ; lu par la révocation seulement. */
+  cleanupStatus?: "pending" | "done" | "manual" | null;
 };
 
 export type RuntimeExposureSummary = NonNullable<RuntimePublicDto["exposure"]>;
@@ -50,7 +52,7 @@ export function readExposureById(tx: Bun.TransactionSQL, organizationId: string,
            edge_auth_ciphertext as "edgeAuthCiphertext", edge_auth_nonce as "edgeAuthNonce",
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId",
            status, last_tunnel_status as "lastTunnelStatus", last_checked_at as "lastCheckedAt", error_code as "errorCode",
-           created_at as "createdAt", revoked_at as "revokedAt"
+           created_at as "createdAt", revoked_at as "revokedAt", cleanup_status as "cleanupStatus"
       from runtime_direct_exposures
      where organization_id = ${organizationId} and id = ${id}
      limit 1`;

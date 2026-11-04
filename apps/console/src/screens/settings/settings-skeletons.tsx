@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { CardSkeleton } from "../../components/settings/primitives";
 import { OverviewDashboardSkeleton } from "../../components/dashboard/overview-skeleton";
+import { CatalogSkeleton } from "./installation/models/models-catalog-parts";
 import { useT } from "../../lib/i18n";
 import { SettingsPane } from "./pane";
 
@@ -34,7 +35,23 @@ export function OverviewBodySkeleton() {
   );
 }
 
+/**
+ * Modèles (`/settings/models`) : la silhouette que l'écran affiche lui-même
+ * pendant la lecture du catalogue. Le module puis les données gardent ainsi
+ * le même dessin, au lieu de passer d'une carte générique à trois cartes.
+ */
+export function ModelsBodySkeleton() {
+  const { t } = useT();
+  return (
+    <SettingsPane>
+      <CatalogSkeleton label={t("modelsSettings.loading")} />
+    </SettingsPane>
+  );
+}
+
 /** La silhouette du corps d'une rubrique, d'après son chemin interne (`/settings/...`). */
 export function settingsBodySkeletonFor(path: string): ComponentType {
-  return path === "/settings" ? OverviewBodySkeleton : SettingsBodySkeleton;
+  if (path === "/settings") return OverviewBodySkeleton;
+  if (path === "/settings/models") return ModelsBodySkeleton;
+  return SettingsBodySkeleton;
 }

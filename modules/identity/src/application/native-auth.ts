@@ -3,7 +3,7 @@ import type { Db } from "@openedbot/platform-db";
 import { hashCredential, pkceChallenge, randomCredential } from "@openedbot/platform-db/credential";
 import { recordUserLogin } from "../sql/accounts";
 import { consumeNativeAuthCode, insertNativeAuthCode } from "../sql/native-auth-codes";
-import { createNativeSession, rotateNativeRefreshToken, type SessionDevice } from "../sql/sessions";
+import { createNativeSession, rotateNativeSession, type SessionDevice } from "../sql/sessions";
 
 /**
  * Émet un code d'autorisation natif (PKCE) pour un compte déjà authentifié.
@@ -47,18 +47,10 @@ export async function exchangeNativeAuthCode(db: Db, input: {
 /**
  * Pas de `recordUserLogin` ici : une rotation prolonge une entrée déjà
  * datée, elle n'en ouvre pas une nouvelle (voir `recordUserLogin`). La
- * nouvelle ligne garde la famille et la date d'ouverture de l'ancienne ;
- * l'appareil et l'adresse sont ceux de la requête (la machine a pu changer
- * de réseau), ou à défaut ceux qu'on connaissait.
+ * rotation entière est une seule transaction (`rotateNativeSession`).
  */
 export async function refreshNativeSession(db: Db, refreshToken: string, device: SessionDevice) {
-  const row = await rotateNativeRefreshToken(db, hashCredential(refreshToken));
-  if (!row) throw new HttpError(401, "REFRESH_TOKEN_INVALID", "Le refresh token est invalide ou révoqué.");
-  return createNativeSession(
-    db,
-    row.organizationId,
-    row.userId,
-    { userAgent: device.userAgent ?? row.userAgent, ip: device.ip ?? row.ip },
-    row.familyId ? { familyId: row.familyId, createdAt: row.createdAt } : null,
-  );
+  const session = await rotateNativeSession(db, hashCredential(refreshToken), device);
+  if (!session) throw new HttpError(401, "REFRESH_TOKEN_INVALID", "Le refresh token est invalide ou révoqué.");
+  return session;
 }

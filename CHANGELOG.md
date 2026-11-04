@@ -8,8 +8,14 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 1.0.1 — 2026-11-04
+
 ### Ajouté
 
+- **Panneau Réflexions.** Un clic sur « Réflexion : Ns » au-dessus d'une
+  réponse ouvre le journal du tour dans le panneau de droite : ce que le bot a
+  dit entre ses étapes, ses recherches web avec les pages trouvées, ses outils
+  et, dépliée, l'erreur d'un outil en échec.
 - **Planifier d'abord.** Le menu « + » du composer propose de demander un plan
   avant d'agir, pour les messages de cette conversation seulement. Le bot
   propose un plan sans rien modifier ; « Lancer » l'exécute ensuite avec ses
@@ -24,6 +30,21 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- Le fil et le composer d'une conversation reprennent ceux de grok.com, en
+  clair comme en sombre : pendant le run, les étapes défilent sous
+  « Réflexion • Ns » (messages du bot, recherches, outils) ; la réponse
+  arrive mot à mot dans une bulle, la rangée d'actions dessous.
+- Couleurs des bulles reprises de Grok Bot : la bulle de l'utilisateur prend
+  la couleur du bot de la conversation.
+- L'en-tête « Réflexion » d'un tour tient sur une ligne et ne montre plus
+  qu'un compte d'échecs, jamais la sortie brute d'un outil.
+- Le code en ligne d'une réponse reste lisible en thème sombre.
+- Envoyer un message ne fait plus sauter le fil.
+- Application de bureau Linux : la fenêtre et le lanceur affichent l'icône
+  d'openedbot.
+- La barre latérale suit les quotas GPT, Anthropic et Grok (abonnement
+  SuperGrok / Premium+ compris, marqué Grok) à la place du menu du compte ;
+  un clic ouvre le relevé complet.
 - Le mode de permission d'un bot se règle dans sa fiche (Règles
   d'approbation) et plus depuis le composer : c'est une règle du bot, valable
   pour toutes ses conversations et ses routines.
@@ -42,4 +63,6 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Retiré
 
+- Le bouton micro du composer et la fenêtre vocale qu'il ouvrait (dictée et
+  appel). La lecture à voix haute des réponses reste.
 - Le compte agence de démonstration du jeu de données de développement.

@@ -1,4 +1,4 @@
-import { parseEventStream } from "./api-client";
+import { nextStreamAttempt, parseEventStream } from "./api-client";
 
 /**
  * Boucle de lecture du flux du guichet, commune au backoffice et à la console.
@@ -61,6 +61,7 @@ export function openSupportEventStream<T extends SupportStreamFrameEvent>(
 
   const run = async () => {
     while (!controller.signal.aborted) {
+      let openedAt: number | null = null;
       try {
         const response = await fetchImpl(input.url(cursor), {
           headers: { Accept: "text/event-stream", ...input.headers, "Last-Event-ID": String(cursor) },
@@ -76,7 +77,7 @@ export function openSupportEventStream<T extends SupportStreamFrameEvent>(
           }
           throw new Error(`HTTP ${response.status}`);
         }
-        attempt = 0;
+        openedAt = Date.now();
         input.onStatus?.(true);
         for await (const frame of parseEventStream(response.body)) {
           const event = frame.data as T;
@@ -88,15 +89,15 @@ export function openSupportEventStream<T extends SupportStreamFrameEvent>(
           }
           input.onEvent(event);
         }
-        // Flux clos proprement par le serveur : on rouvre, sans compter cela
-        // comme un échec.
-        input.onStatus?.(false);
       } catch {
-        if (controller.signal.aborted) return;
-        input.onStatus?.(false);
-        attempt += 1;
-        await sleep(supportBackoffMs(attempt), controller.signal);
+        // Panne réseau ou HTTP : même traitement qu'une fin de flux, ci-dessous.
       }
+      // Flux clos par le serveur ou en panne : on rouvre après le repli. Un
+      // proxy qui rend des 200 vides en boucle ferait sinon une rafale de requêtes.
+      if (controller.signal.aborted) return;
+      input.onStatus?.(false);
+      attempt = nextStreamAttempt(attempt, openedAt);
+      await sleep(supportBackoffMs(attempt), controller.signal);
     }
   };
   void run();
@@ -110,14 +111,15 @@ export function openSupportEventStream<T extends SupportStreamFrameEvent>(
 
 function defaultWait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timeout);
-        resolve();
-      },
-      { once: true },
-    );
+    // Retiré à l'expiration : sinon chaque reconnexion laisse un écouteur de plus.
+    const onAbort = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }

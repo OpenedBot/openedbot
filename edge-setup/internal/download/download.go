@@ -48,12 +48,13 @@ func Default() Client {
 var ErrChecksum = errors.New("checksum mismatch")
 
 // Fetch downloads url to dest (mode, owner) only if its digest matches. If
-// dest already exists with the right digest, nothing is downloaded.
+// dest already exists with the right digest, mode and owner, nothing is
+// downloaded; any other file there is replaced.
 func (c Client) Fetch(ctx context.Context, url, dest string, algo Algorithm, want string, mode fs.FileMode, owner fsx.Owner) error {
 	if !strings.HasPrefix(url, "https://") {
 		return fmt.Errorf("download %s: only https is allowed", url)
 	}
-	if ok, _ := VerifyFile(dest, algo, want); ok {
+	if reusable(dest, algo, want, mode, owner) {
 		return nil
 	}
 	// A zero-value Client is a caller's mistake, not a reason to crash a
@@ -135,6 +136,21 @@ func (c Client) fetchOnce(ctx context.Context, url, dest string, algo Algorithm,
 		return err
 	}
 	return fsx.WriteAtomic(dest, data, mode, owner)
+}
+
+// reusable reports whether dest already is the verified artefact. The right
+// bytes are not enough: a file another account owns, or may write, can be
+// changed after this check and before the caller runs or unpacks it, so only
+// a regular file with exactly the requested mode and owner is kept. The digest
+// is computed on the very descriptor whose owner and mode were checked.
+func reusable(dest string, algo Algorithm, want string, mode fs.FileMode, owner fsx.Owner) bool {
+	data, err := fsx.ReadRegular(dest, mode.Perm(), owner)
+	if err != nil {
+		return false
+	}
+	h := newHash(algo)
+	_, _ = h.Write(data)
+	return strings.EqualFold(hex.EncodeToString(h.Sum(nil)), want)
 }
 
 func newHash(algo Algorithm) hash.Hash {

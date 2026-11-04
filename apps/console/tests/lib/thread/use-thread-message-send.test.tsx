@@ -84,4 +84,35 @@ describe("thread send owns only its submitted draft", () => {
     expect(h.result.current.send.outgoing).toBeNull();
     expect(h.call.mock.calls[0]![0]).toBe("thread-a");
   });
+
+  test("a send that fails while another thread is shown comes back failed, with its key", async () => {
+    const h = harness();
+    act(() => h.result.current.send.mutate(h.result.current.draft));
+    await waitFor(() => expect(h.call).toHaveBeenCalledTimes(1));
+    const key = h.call.mock.calls[0]![3];
+    h.rerender({ threadId: "thread-b" });
+    await act(async () => h.reject(new Error("network")));
+    expect(h.result.current.send.outgoing).toBeNull();
+
+    h.rerender({ threadId: "thread-a" });
+    await waitFor(() => expect(h.result.current.send.outgoing).toMatchObject({ text: "Hello", failed: true }));
+    h.call.mockResolvedValueOnce(accepted);
+    act(() => h.result.current.send.retry());
+    await waitFor(() => expect(h.call).toHaveBeenCalledTimes(2));
+    expect(h.call.mock.calls[1]![0]).toBe("thread-a");
+    expect(h.call.mock.calls[1]![3]).toBe(key);
+  });
+
+  test("a send that fails after the screen unmounted is offered again on the next mount", async () => {
+    const h = harness("thread-c");
+    act(() => h.result.current.send.mutate(h.result.current.draft));
+    await waitFor(() => expect(h.call).toHaveBeenCalledTimes(1));
+    h.unmount();
+    await act(async () => h.reject(new Error("network")));
+
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const again = renderHook(() => useThreadMessageSend({ threadId: "thread-c", draft: empty, clearDraft: () => {}, restoreDraft: () => {}, onError: () => {} }),
+      { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(again.result.current.outgoing).toMatchObject({ text: "Hello", failed: true }));
+  });
 });

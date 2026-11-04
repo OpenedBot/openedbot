@@ -10,7 +10,7 @@ import { requestHeader, requestQuery } from "../../application/compat-aliases";
 import type { Db } from "@openedbot/platform-db";
 import { withCredential } from "@openedbot/platform-db";
 import { hashCredential } from "../../infrastructure/crypto";
-import { assertString, boundedTextBody, HttpError, jsonBody } from "../../interfaces/http/http-error";
+import { assertPassword, assertString, boundedTextBody, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { requestClientIp } from "../../interfaces/http/rate-limit";
 import { authFailureCode } from "@openedbot/identity/domain/signup";
 import { createGoogleAuth } from "@openedbot/identity/application/google-auth";
@@ -441,7 +441,7 @@ export function authRoutes(
     }
     const body = await jsonBody(context.req.raw);
     const email = loginEmail(body.email);
-    const password = assertString(body.password, "Le mot de passe", { max: 1_024 });
+    const password = assertPassword(body.password, "Le mot de passe");
     const organizationSlug = typeof body.organizationSlug === "string" ? body.organizationSlug.trim() : null;
     const selected = await verifyCredentials(db, email, password, organizationSlug);
     const emailCode = body.emailCode === undefined || body.emailCode === ""
@@ -473,7 +473,7 @@ export function authRoutes(
     }
     const body = await jsonBody(context.req.raw);
     const email = loginEmail(body.email);
-    const password = assertString(body.password, "Le mot de passe", { max: 1_024 });
+    const password = assertPassword(body.password, "Le mot de passe");
     const codeChallenge = assertString(body.codeChallenge, "Le challenge PKCE", { min: 43, max: 128 });
     const redirectUri = assertString(body.redirectUri, "L’URI de retour", { max: 1_024 });
     const clientId = assertString(body.clientId, "Le client", { max: 100 });

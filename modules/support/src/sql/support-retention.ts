@@ -58,13 +58,20 @@ export async function purgeClosedSupportConversations(
   // requêtes : entre les deux, un fil supprimé aurait emporté la seule ligne
   // qui savait où étaient ses octets, et ils seraient restés à payer sans que
   // personne ne puisse les retrouver.
+  //
+  // Les candidats sont VERROUILLÉS : un message qui rouvre le fil pendant la
+  // purge le tient déjà (il est sauté) ou attend notre fin. Sans ce verrou,
+  // `doomed` pouvait garder l'identifiant d'un fil rouvert entre-temps, et le
+  // DELETE emportait le fil désormais ouvert avec son nouveau message. Le
+  // DELETE revérifie l'état fermé sur ces seules lignes verrouillées.
   const rows = await db<Array<{ count: string | number }>>`
     with doomed as (
       select c.id from support_conversations c
        where c.status = 'closed' and c.updated_at < ${cutoff}
+       for update skip locked
     ), queued as (
-      insert into tenant_blob_deletions (object_key, organization_id)
-      select a.object_key, null
+      insert into tenant_blob_deletions (object_key, organization_id, driver)
+      select a.object_key, null, a.driver
         from support_attachments a
         join doomed d on d.id = a.conversation_id
       on conflict (object_key) do nothing
@@ -72,7 +79,7 @@ export async function purgeClosedSupportConversations(
     ), deleted as (
       delete from support_conversations c
        using doomed d
-       where c.id = d.id
+       where c.id = d.id and c.status = 'closed'
        returning c.id
     )
     select count(*) as count from deleted

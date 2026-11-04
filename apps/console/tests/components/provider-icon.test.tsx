@@ -40,7 +40,8 @@ test("le repli lit le nom donné par Hermes plutôt que le slug technique", () =
 test("les slugs OAuth du runtime gardent la marque de leur fournisseur", () => {
   const { container: xai } = render(<ProviderIcon provider="xai-oauth" />);
   const { container: minimax } = render(<ProviderIcon provider="minimax-oauth" />);
-  expect(xai.querySelector("svg path")?.getAttribute("d")).toBe(BRAND_MARKS.x.path);
+  // SuperGrok / Premium+ : la marque Grok, pas celle de X.
+  expect(xai.querySelector("svg path")?.getAttribute("d")).toBe(BRAND_MARKS.grok.path);
   expect(minimax.querySelector("svg path")?.getAttribute("d")).toBe(BRAND_MARKS.minimax.path);
 });
 

@@ -82,7 +82,7 @@ describe("control frame forward to the owner instance", () => {
     signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   })) as unknown as typeof fetch;
 
-  test("a silent owner ends a close or rotate push as not pushed, within the bound", async () => {
+  test("a silent owner ends a close as not pushed and a rotate as unknown, within the bound", async () => {
     // Real timers, but 20 ms instead of the production bound so the test stays
     // fast; the bound the forward asks for is asserted separately below.
     const requested: number[] = [];
@@ -97,13 +97,36 @@ describe("control frame forward to the owner instance", () => {
         close: () => relay.forwardClose(runtimeId, 4004, "LINK_REVOKED"),
         rotate: () => relay.forwardRotate(runtimeId, { t: "link.rotate", runtimeId, linkToken: "next-token" }),
       };
+      // The frame may have reached the owner: a rotation must not be undone on that.
+      const expected = { close: false, rotate: "unknown" };
       for (const [name, push] of Object.entries(pushes)) {
         const outcome = await Promise.race([push(), Bun.sleep(1_000).then(() => "still waiting")]);
-        expect([name, outcome]).toEqual([name, false]);
+        expect([name, outcome]).toEqual([name, expected[name as keyof typeof expected]]);
       }
       expect(requested).toEqual([LINK_CONTROL_FORWARD_TIMEOUT_MS, LINK_CONTROL_FORWARD_TIMEOUT_MS]);
     } finally {
       timeout.mockRestore();
     }
+  });
+});
+
+describe("rotate push outcome through the owner instance", () => {
+  const rotate = (fetchImpl: typeof fetch) =>
+    locator(fetchImpl).forwardRotate(runtimeId, { t: "link.rotate", runtimeId, linkToken: "next-token" });
+
+  test("only an explicit answer or a pre-dispatch refusal is certain", async () => {
+    const cases: Array<[string, () => Response, boolean | "unknown"]> = [
+      ["pushed", () => Response.json({ pushed: true }), true],
+      ["owner holds no link", () => Response.json({ pushed: false }), false],
+      ["owner hop uncertain", () => Response.json({ pushed: false, uncertain: true }), "unknown"],
+      ["pre-dispatch refusal", () => Response.json({}, { status: 503, headers: { [RUNTIME_LINK_RELAY_STAGE_HEADER]: "before_dispatch" } }), false],
+      ["auth refusal", () => new Response("", { status: 401 }), false],
+      ["unmarked server error", () => new Response("", { status: 500 }), "unknown"],
+      ["unreadable body", () => new Response("not json", { status: 200 }), "unknown"],
+    ];
+    for (const [name, response, expected] of cases) {
+      expect([name, await rotate((async () => response()) as unknown as typeof fetch)]).toEqual([name, expected]);
+    }
+    expect(await rotate((async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch)).toBe("unknown");
   });
 });

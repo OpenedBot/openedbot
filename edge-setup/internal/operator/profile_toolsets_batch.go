@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/OpenedBot/openedbot/edge-setup/internal/exec"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/pins"
 )
 
@@ -117,7 +116,8 @@ func (s *Server) setProfileToolsets(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	inProcess := false
 	if s.ProfileToolsets != nil {
-		if err := s.ProfileToolsets(ctx, profile, enable, disable); err != nil {
+		err := s.withConfigLock(ctx, profile, func() error { return s.ProfileToolsets(ctx, profile, enable, disable) })
+		if err != nil {
 			s.logf("profile toolsets %s: the in-process write failed, falling back on the CLI", profile)
 		} else {
 			inProcess = true
@@ -133,7 +133,7 @@ func (s *Server) setProfileToolsets(w http.ResponseWriter, r *http.Request) {
 		args := append([]string{"-p", profile, "tools", group.verb}, group.names...)
 		cmd := s.hermesCommand(append(args, "--platform", toolsetPlatform)...)
 		cmd.Timeout = ToolsetTimeout
-		if _, err := exec.Must(ctx, s.Runner, cmd); err != nil {
+		if err := s.runConfigWriter(ctx, profile, cmd); err != nil {
 			s.logf("profile toolsets %s %s refused by the CLI", profile, group.verb)
 			writeError(w, http.StatusBadGateway, "CLI_REFUSED", "the runtime refused the profile toolset change")
 			return

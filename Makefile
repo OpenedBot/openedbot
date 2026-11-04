@@ -635,7 +635,7 @@ e2e-link-continuity: ## Recette réelle opt-in : fournisseur explicite, cycle bo
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : E2E_ALLOW_REAL_RUNS=1 et runtime/modèle explicites requis.\n'
 	@$(LOAD_ENV_OPT) bun tests/e2e/runtime-link-live-continuity.ts
 
-e2e-push: ## Web Push contre un serveur simulé (jamais FCM/Mozilla); exige la stack locale déjà lancée et PUSH_VAPID_*.
+e2e-push: ## Web Push contre un serveur simulé (jamais FCM/Mozilla); exige la stack locale déjà lancée, PUSH_VAPID_* et PUSH_ALLOW_LOOPBACK_ENDPOINTS=1.
 	@$(REQUIRE_API)
 	$(LOAD_ENV_OPT) bun tests/e2e/push.ts
 

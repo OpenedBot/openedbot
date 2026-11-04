@@ -19,9 +19,10 @@
  *    nothing is ever deleted.
  */
 import { HttpError } from "@openedbot/contracts-errors/http-error";
+import { canonicalJson } from "@openedbot/hermes";
 import type { TransactionDb } from "@openedbot/platform-db";
 import { logEvent } from "@openedbot/platform-observability";
-import { appendLocalChain, type AppendedLink, type AuditChainEntry } from "./audit-chain";
+import { appendLocalChain, payloadDigest, type AppendedLink, type AuditChainEntry } from "./audit-chain";
 import type { AuditWormStore } from "./audit-worm";
 
 export type AuditAnchorEvent = AuditChainEntry & {
@@ -32,7 +33,11 @@ export type AuditAnchorEvent = AuditChainEntry & {
 export type AuditAnchor = {
   /** For logs only. */
   readonly id: string;
-  /** Anchors the event; throws on failure. May use `tx` for its own rows. */
+  /**
+   * Anchors the event; throws on failure. May use `tx` for its own rows.
+   * Must be idempotent per `objectKey`: a link already chained is anchored
+   * again on replay, with its original bytes, in case the first try failed.
+   */
   anchor(tx: TransactionDb, event: AuditAnchorEvent): Promise<void>;
 };
 
@@ -66,10 +71,13 @@ export function createAuditAnchoring(options: {
   const timeoutMs = options.timeoutMs ?? DEFAULT_AUDIT_ANCHOR_TIMEOUT_MS;
   return async (tx, event) => {
     const local = await appendLocalChain(tx, event);
-    // A link already chained was anchored with it: nothing more to do.
-    if (!anchor || !local.appended) return { local, external: { state: "none" } };
+    if (!anchor) return { local, external: { state: "none" } };
     try {
-      await withTimeout(anchor.anchor(tx, event), timeoutMs);
+      // A link already chained may have missed its external anchor (a
+      // non-blocking failure): replay it with the bytes chained the first
+      // time, never the replayed event's (its receivedAt differs).
+      const target = local.appended ? event : await chainedEvent(tx, event);
+      await withTimeout(anchor.anchor(tx, target), timeoutMs);
       return { local, external: { state: "anchored", anchorId: anchor.id } };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -83,6 +91,18 @@ export function createAuditAnchoring(options: {
       return { local, external: { state: "failed", anchorId: anchor.id, error: message } };
     }
   };
+}
+
+/** The event as first chained under its object key; a stored payload that no longer matches its digest is refused. */
+async function chainedEvent(tx: TransactionDb, event: AuditAnchorEvent): Promise<AuditAnchorEvent> {
+  const rows = await tx<Array<{ payload: Record<string, unknown>; payloadSha256: string }>>`
+    select payload, payload_sha256 as "payloadSha256" from audit_chain
+     where runtime_id = ${event.runtimeId} and object_key = ${event.objectKey}
+  `;
+  const stored = rows[0];
+  if (!stored) throw new Error(`chained link ${event.objectKey} not found`);
+  if (payloadDigest(stored.payload) !== stored.payloadSha256) throw new Error(`chained link ${event.objectKey} does not match its digest`);
+  return { ...event, payload: stored.payload, bytes: canonicalJson(stored.payload) };
 }
 
 /** The legacy install (until step 8): the WORM bucket, written once per key. */

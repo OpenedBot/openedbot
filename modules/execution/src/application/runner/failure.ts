@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import { MODEL_UNAVAILABLE_CODE } from "@openedbot/contracts-errors";
-import { HermesClientError } from "@openedbot/hermes";
+import { HermesClientError, type HermesClient } from "@openedbot/hermes";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { WorkerConfig } from "../worker-config";
 import { MAX_RUN_ATTEMPTS } from "../queue";
@@ -8,7 +8,7 @@ import { isModelUnavailableFailure } from "../../domain/provider-failure";
 import { appendNoticeTx, publish } from "./events";
 import { persistEvents } from "./persist";
 import type { RunContext } from "./types";
-import { log } from "./util";
+import { describe, log } from "./util";
 
 export function shouldRetryHermesRun(error: unknown, attempts: number): boolean {
   if (attempts >= MAX_RUN_ATTEMPTS || !(error instanceof HermesClientError)) return false;
@@ -213,4 +213,48 @@ export async function handleFailure(db: SQL, config: WorkerConfig, context: RunC
  */
 export function retiredServiceStep(kind: string | null): never {
   throw new NamedRunError("SERVICE_STEP_RETIRED", `Le run de service « ${kind ?? "?"} » n'existe plus.`);
+}
+
+/**
+ * Hermes a créé un run (premier envoi ou repli) mais le bail local s'est
+ * perdu avant que son identifiant soit confirmé : on tente l'arrêt, puis on
+ * garde l'identifiant sur une ligne `unknown` à réconcilier.
+ */
+export async function settleOrphanCreate(db: SQL, context: RunContext, client: HermesClient, hermesRunId: string): Promise<void> {
+  let remoteStopState: "confirmed" | "ambiguous" = "ambiguous";
+  try {
+    await client.stopRun(hermesRunId);
+    remoteStopState = "confirmed";
+  } catch (error) {
+    log("worker.orphan_create_stop_unconfirmed", {
+      runId: context.id,
+      hermesRunId,
+      error: describe(error),
+    });
+  }
+  await db.begin(async (tx) => {
+    const rows = await tx<Array<{ workflowId: string | null }>>`
+      update runs set hermes_run_id = coalesce(hermes_run_id, ${hermesRunId}),
+        status = 'unknown', external_state = ${remoteStopState === "confirmed" ? "polling" : "ambiguous"},
+        remote_stop_state = ${remoteStopState}, events_complete = false,
+        error_code = 'HERMES_CREATE_COMMIT_LOST',
+        error_message = 'Hermes a créé le run mais le lease local a été perdu avant la confirmation.',
+        lease_owner = null, lease_expires_at = null, ended_at = null, updated_at = now()
+       where id = ${context.id} and organization_id = ${context.organizationId}
+         and status in ('starting','running','awaiting_approval','unknown')
+       returning workflow_id as "workflowId"
+    `;
+    if (rows[0]?.workflowId) await tx`
+      update workflows set status = 'unknown', error_code = 'HERMES_CREATE_COMMIT_LOST',
+        error_message = 'Le run Hermes existe mais sa création locale doit être réconciliée.',
+        recovery_state = ${{
+          runId: context.id,
+          needsReview: true,
+          action: "reconcile_or_abandon",
+          hermesRunIdAvailable: true,
+        }}, ended_at = null, updated_at = now()
+       where organization_id = ${context.organizationId} and id = ${rows[0].workflowId}
+         and status not in ('completed','failed','expired')
+    `;
+  });
 }

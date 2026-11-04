@@ -343,10 +343,10 @@ func (s *Server) runProbe(ctx context.Context, verb string, request any, out any
 		cancel()
 	case profileScopedWriteVerbs[verb]:
 		defer s.dropProfileReadCache()
-		raw, err = s.invokeProbe(ctx, verb, request)
+		raw, err = s.invokeLockedProbe(ctx, verb, request)
 	default:
 		defer s.dropReadCache()
-		raw, err = s.invokeProbe(ctx, verb, request)
+		raw, err = s.invokeLockedProbe(ctx, verb, request)
 	}
 	if err != nil {
 		return err
@@ -369,6 +369,17 @@ func (s *Server) runFreshProbe(ctx context.Context, verb string, request any, ou
 		return err
 	}
 	return decodeProbe(raw, out)
+}
+
+// invokeLockedProbe runs a write verb under the locks of the config files it
+// rewrites (config_lock.go).
+func (s *Server) invokeLockedProbe(ctx context.Context, verb string, request any) ([]byte, error) {
+	unlock, err := s.lockConfigs(ctx, configWriteTargets(verb, request)...)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	return s.invokeProbe(ctx, verb, request)
 }
 
 func (s *Server) invokeProbe(ctx context.Context, verb string, request any) ([]byte, error) {

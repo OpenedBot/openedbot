@@ -13,12 +13,15 @@ const inFlight = new Set<Promise<void>>();
  * for it, so a slow model never holds the next gate past its budget. A
  * worker that dies mid-review leaves a lease that expires; the next claim
  * takes the gate over, and its budget, counted from the gate's birth, sends
- * it to a human.
+ * it to a human. On a graceful stop, `signal` interrupts the reviews (their
+ * gates go to a person) and `track` hands them to the worker's drain, so the
+ * database stays open until each one has written its outcome.
  */
 export async function processApprovalReviews(
   db: SQL,
   config: WorkerConfig,
   signal?: AbortSignal,
+  track?: (review: Promise<void>) => void,
   clientFactory: typeof createRuntimeClient = createRuntimeClient,
 ): Promise<void> {
   if (signal?.aborted) return;
@@ -29,12 +32,14 @@ export async function processApprovalReviews(
     client: (runtime) => clientFactory({ ...runtime, hermesProfile: REVIEW_PROFILE }, config),
     now: () => Date.now(),
     sleep: (ms) => Bun.sleep(ms),
+    ...(signal ? { signal } : {}),
   };
   for (const job of jobs) {
     const review: Promise<void> = reviewGate(db, job, deps)
       .catch(() => console.error(JSON.stringify({ event: "approval.review_failed", runId: job.runId })))
       .finally(() => { inFlight.delete(review); });
     inFlight.add(review);
+    track?.(review);
   }
 }
 

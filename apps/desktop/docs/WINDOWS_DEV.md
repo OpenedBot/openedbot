@@ -70,7 +70,7 @@ The console's proxy and the shell must name the same API. If the console proxies
 to a local API while the shell signed in elsewhere, every call is refused.
 
 Nothing is shared between backends: the session of a non-production API lives
-in `tokens-<host>.bin` and a dev run in its own folder (`openedbot (dev prod)`,
+in `tokens-<protocol>-<host>-<hash>.bin` (protocol included: http and https on one host are two sessions) and a dev run in its own folder (`openedbot (dev prod)`,
 `openedbot (dev)`); the diagnostics journal is `diagnostics.sqlite` in that
 folder. A shell that is not on production says so in the window title and the
 tray tooltip, and logs a warning.

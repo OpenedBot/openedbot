@@ -1,10 +1,10 @@
-import { GROUP_MEMBERS_MIN } from "@openedbot/contracts-api";
 import { insertBotDefaultThread } from "@openedbot/conversation/sql/threads";
 import type { TransactionDb } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { permissionPipelineOf, type PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-contract";
 import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
 import type { BotRow } from "../domain/bot-dto";
+import { queueBotBlobDeletionsTx } from "./bot-purge";
 import { nextSectionRowPosition } from "./sections";
 import type { EditorSettings, UpdateBotInput } from "../domain/bot-input";
 
@@ -545,34 +545,6 @@ export async function hasPendingBotIngress(
   return Boolean(ingress[0]);
 }
 
-/**
- * Retire un bot de tous ses salons ; un salon qui passerait sous
- * `GROUP_MEMBERS_MIN` est supprimé (son fil et ses routines suivent en
- * cascade). Rend `{ left, deleted }` : salons quittés, salons supprimés.
- */
-export async function detachBotFromGroups(
-  tx: TransactionDb,
-  organizationId: string,
-  botId: string,
-): Promise<{ left: number; deleted: number }> {
-  const memberships = await tx<Array<{ groupId: string }>>`
-    delete from group_members
-     where organization_id = ${organizationId} and bot_id = ${botId}
-    returning group_id as "groupId"
-  `;
-  if (memberships.length === 0) return { left: 0, deleted: 0 };
-  const groupIds = memberships.map((row) => row.groupId);
-  const removed = await tx<Array<{ id: string }>>`
-    delete from bot_groups g
-     where g.organization_id = ${organizationId}
-       and g.id = any(${pgTextArray(groupIds)}::text[]::uuid[])
-       and (select count(*) from group_members m
-             where m.organization_id = g.organization_id and m.group_id = g.id) < ${GROUP_MEMBERS_MIN}
-    returning id
-  `;
-  return { left: memberships.length, deleted: removed.length };
-}
-
 export type BotDeletionScope = {
   deletedAt: Date | null;
   profile: string | null;
@@ -623,6 +595,7 @@ export async function softDeleteBot(tx: TransactionDb, organizationId: string, b
 
 /** Suppression définitive ; `true` si le bot existait. */
 export async function deleteBotRow(tx: TransactionDb, organizationId: string, botId: string): Promise<boolean> {
+  await queueBotBlobDeletionsTx(tx, organizationId, botId);
   const gone = await tx<Array<{ id: string }>>`
     delete from bots where organization_id = ${organizationId} and id = ${botId}
     returning id

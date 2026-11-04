@@ -6,6 +6,7 @@ import { authMiddleware, authRoutes, protectedAuthRoutes, type AppVariables } fr
 import { mobileConnectProtectedRoutes, mobileConnectRoutes } from "./routes/identity/mobile-connect-routes";
 import { nativeCodeLoginRoutes } from "./routes/identity/native-code-login-routes";
 import { createBlobStore } from "./infrastructure/blob-store";
+import { fileBlobRoot, otherBlobBackend } from "@openedbot/platform-config/blob-driver";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { responseCompression } from "./interfaces/http/compression";
 import { assertProductionConfig, readApiConfig } from "./infrastructure/config";
@@ -137,7 +138,10 @@ await initializeProductFeatures(db, isExplicitDevelopmentEnvironment());
 const productFeatures = await readProductFeatures(db);
 // Features basculées depuis le backoffice : relues à chaud, jamais figées au boot.
 const liveFeatures = liveProductFeatures(db);
-const blobs = createBlobStore(baseConfig.blob);
+// L'autre magasin relit et supprime les objets écrits avant une bascule de driver.
+const blobs = createBlobStore(baseConfig.blob, otherBlobBackend(
+  process.env, baseConfig.blob.driver, fileBlobRoot(process.env, baseConfig.environment === "production"),
+));
 // Plug-ins pro : `OPENEDBOT_PLUGINS` vide ou absent = mode solo, et
 // aucune route n'est ajoutée. Un plug-in absent, invalide ou refusé est ignoré
 // avec un avertissement : l'API démarre quand même.
@@ -317,7 +321,7 @@ app.get("/api/health", async (context) => {
   // the same host otherwise look alike. A tier name is no secret.
   // `supportDesk` : un plug-in sert le guichet (`/api/support`) ; la console
   // cache le lanceur, le bouton d'en-tête et l'écran sans lui (solo).
-  return context.json({ ok: true, version: "1.0.0", architecture: "cloud-only", environment: config.deployEnvironment, supportDesk: supportDesk !== null });
+  return context.json({ ok: true, version: "1.0.1", architecture: "cloud-only", environment: config.deployEnvironment, supportDesk: supportDesk !== null });
 });
 // Avant le rate limiter : même un 429 est un corps JSON, et le compresseur doit
 // envelopper toutes les réponses `/api/*` sauf celles qu'il exclut lui-même

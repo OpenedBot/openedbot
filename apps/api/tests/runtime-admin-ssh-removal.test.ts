@@ -88,7 +88,7 @@ describe("OHB-15 : la configuration n'ouvre aucun canal SSH", () => {
   // La variable qui réglait l'administration est retirée : `ssh`, `local`
   // ou toute autre valeur est ignorée et aucun canal ne s'ouvre.
   test("l'ancienne variable d'administration est ignorée, `ssh` compris", () => {
-    for (const environment of ["development", "staging"]) {
+    for (const environment of ["development", "test"]) {
       for (const value of ["ssh", "local"]) {
         const config = readApiConfig({ ...base, OPENEDBOT_ENV: environment, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
         expect(config.runtimeAdminChannels.local).toBe(false);

@@ -5,11 +5,9 @@ import {
   RiHome5Line,
   RiInboxLine,
   RiLogoutBoxRLine,
-  RiMoonLine,
   RiSearchLine,
   RiSettings3Line,
   RiSideBarLine,
-  RiSunLine,
 } from "@remixicon/react";
 import { IconServerBolt } from "@tabler/icons-react";
 import { Skeleton, SkeletonListRow, SkeletonRegion, useIsMobile } from "@openedbot/browser-ui-kit";
@@ -103,10 +101,6 @@ const NAV_ROW = "flex h-8 items-center gap-2.5 px-2.5 text-[13px] leading-[18px]
  * apparaissent au-dessus, le bas du rail est ancré, rien ne bouge.
  */
 function RailSkeleton() {
-  const { locale } = useT();
-  // La classe posée par `index.html` avant la première peinture : la même
-  // source que le thème, sans dépendre de son fournisseur.
-  const dark = globalThis.document?.documentElement.classList.contains("dark") ?? false;
   const icon = `${RAIL_BUTTON} pointer-events-none`;
   return (
     <div aria-hidden data-board-icon-rail="" className={`flex h-full min-h-0 w-14 shrink-0 flex-col items-center pb-3 ${ON_SURFACE}`}>
@@ -125,9 +119,6 @@ function RailSkeleton() {
             <span className="relative size-2.5 rounded-full bg-muted-foreground/30 ring-2 ring-background" />
           </span>
         </span>
-        <span className={RAIL_DIVIDER} />
-        <span className={icon}>{dark ? <RiSunLine /> : <RiMoonLine />}</span>
-        <span className={icon}><span className="text-[11px] leading-none font-semibold tracking-wide uppercase">{locale}</span></span>
         <span className={RAIL_DIVIDER} />
         <span className={icon}><RiSettings3Line /></span>
         <span className={icon}><RiLogoutBoxRLine /></span>

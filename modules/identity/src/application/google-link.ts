@@ -7,6 +7,7 @@ import {
   writeGoogleSubject,
 } from "../sql/accounts";
 import type { GoogleIdentity } from "./google-auth";
+import { verifyPassword } from "./password-hash";
 
 /**
  * Lier et délier Google depuis « Mon compte ».
@@ -47,7 +48,7 @@ export async function unlinkGoogle(db: Db, input: {
       "Définissez un mot de passe avant de délier Google : ce serait la seule entrée du compte.",
     );
   }
-  if (!(await Bun.password.verify(input.currentPassword, account.passwordHash))) {
+  if (!(await verifyPassword(input.currentPassword, account.passwordHash))) {
     throw new HttpError(401, "CREDENTIALS_INVALID", "Le mot de passe actuel est invalide.");
   }
   return clearGoogleSubjectRevokingOtherSessions(db, input.userId, input.currentSessionId);

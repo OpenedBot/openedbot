@@ -1,11 +1,10 @@
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { RiArrowLeftLine, RiLogoutBoxRLine, RiShieldLine, RiUserLine } from "@remixicon/react";
 import { cn } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
 import { useOperatorIdentity } from "../../lib/session/operator-identity";
-import { signOut } from "../../lib/session/sign-out";
+import { useSignOut } from "../../lib/session/sign-out";
 import type { FLEET_OWN_SETTINGS_PATHS } from "../../lib/workspace/workspace-location";
 import { FLEET_CLIENT_SETTINGS_GROUPS, FLEET_SETTINGS_GROUPS, isSettingsEntryActive, SETTINGS_GROUPS, useVisibleSettingsGroups } from "../dashboard/settings-sidebar";
 import { fleetSectionOf, useFleetFrameContext } from "../../pro-console/slots";
@@ -102,9 +101,8 @@ export function SettingsPageSidebar({ signOut = true }: { /** Faux dans la silho
 /** La déconnexion (ou la sortie du mode assistance), tout en bas de la navigation des réglages. */
 function SettingsSignOut() {
   const { t } = useT();
-  const queryClient = useQueryClient();
   const { signedIn, impersonating } = useOperatorIdentity();
-  const leaving = useMutation({ mutationFn: () => signOut(queryClient) });
+  const leaving = useSignOut();
   if (!signedIn) return null;
   const label = t(impersonating ? "navUser.leaveImpersonation" : "navUser.signOut");
   return (
