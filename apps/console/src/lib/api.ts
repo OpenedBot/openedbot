@@ -23,7 +23,7 @@ import { notificationsApi } from "./api/notifications";
 import { mergeApiParts } from "./api/merge";
 import { bindApi } from "./api/self";
 
-export { API_ORIGIN, ApiError, assertFleetClientRequestContext, errorMessage, fleetAuditRequestContext, fleetClientRequestContext, isAlphaClosed, isApiUnavailable, isUnauthorized, request, userFacingError } from "./api/http";
+export { API_ORIGIN, ApiError, assertFleetClientRequestContext, errorMessage, fleetAuditRequestContext, fleetClientRequestContext, isAlphaClosed, isApiUnavailable, isUnauthorized, isWorkspaceChanged, request, userFacingError } from "./api/http";
 export { queryKeys, workspaceQueryKey } from "./api/query-keys";
 export type { CreateBotInput, MobileConnectTicketDto, OnboardingResetScope, SendMessageResult, ThreadView, WorkflowRecoveryResult } from "./api/types";
 

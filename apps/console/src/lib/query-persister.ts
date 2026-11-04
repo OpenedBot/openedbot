@@ -30,10 +30,27 @@ function userScope(): string | null {
   return readCloudSession()?.userId ?? null;
 }
 
+/** Bumped by every purge: a read started before it belongs to the wiped session. */
+let purgeGeneration = 0;
+
+/**
+ * The identity a read started under. IndexedDB answers asynchronously: a read
+ * begun for account A can resolve after sign out, the purge, and account B's
+ * sign in. Its value must then be dropped, never put back in the emptied cache.
+ */
+export function capturePersistedReadScope(): { stillCurrent(): boolean } {
+  const user = userScope();
+  const generation = purgeGeneration;
+  return { stillCurrent: () => generation === purgeGeneration && user === userScope() };
+}
+
 const storage: AsyncStorage<string> = {
   getItem: async (key) => {
     const user = userScope();
-    return store && user ? get<string>(`${user}:${key}`, store) : undefined;
+    if (!store || !user) return undefined;
+    const scope = capturePersistedReadScope();
+    const value = await get<string>(`${user}:${key}`, store);
+    return scope.stillCurrent() ? value : undefined;
   },
   setItem: async (key, value) => {
     const user = userScope();
@@ -89,7 +106,9 @@ export async function restorePersistedQuery(client: QueryClient, queryKey: Query
   if (!isPersistedQueryKey(queryKey)) return undefined;
   const cached = client.getQueryData(queryKey);
   if (cached !== undefined) return cached;
+  const scope = capturePersistedReadScope();
   const data = await persister.retrieveQuery(hashKey(queryKey));
+  if (!scope.stillCurrent()) return undefined;
   // A network answer arrived meanwhile: it wins.
   if (data === undefined || client.getQueryData(queryKey) !== undefined) return client.getQueryData(queryKey);
   client.setQueryData(queryKey, data);
@@ -98,6 +117,7 @@ export async function restorePersistedQuery(client: QueryClient, queryKey: Query
 }
 
 export async function clearPersistedQueries(): Promise<void> {
+  purgeGeneration += 1;
   clearAppAccessHint();
   clearBootIdentity();
   if (store) await clear(store).catch(() => undefined);

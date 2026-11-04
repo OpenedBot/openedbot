@@ -82,12 +82,15 @@ export const accountApi = {
     request<OrganizationPermissionPolicyView>("/api/organization/permissions"),
   saveOrganizationPermissionPolicy: (input: OrganizationPermissionPolicyInput) =>
     request<OrganizationPermissionPolicyView>("/api/organization/permissions", { method: "PUT", body: JSON.stringify(input) }),
+  /**
+   * La session locale ne s'oublie qu'une fois la révocation confirmée : un
+   * échec laisse le cookie valide, et l'oublier ici ferait croire à une
+   * déconnexion. Un 401 a déjà vidé la fenêtre dans `request`.
+   */
   logout: async () => {
-    try { await request<void>("/api/auth/logout", { method: "POST" }); }
-    finally {
-      clearOnboardingDraft();
-      clearCloudSession();
-    }
+    await request<void>("/api/auth/logout", { method: "POST" });
+    clearOnboardingDraft();
+    clearCloudSession();
   },
   /** Écran « Sécurité du compte » : sa méthode de connexion et ses sessions web. */
   accountSecurity: () => request<AccountSecurityDto>("/api/account/security"),

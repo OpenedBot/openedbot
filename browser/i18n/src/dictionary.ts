@@ -86,7 +86,8 @@ export function t(
   if (!params) return template;
   let output = template;
   for (const [name, value] of Object.entries(params)) {
-    output = output.replaceAll(`{${name}}`, String(value));
+    // Fonction de remplacement : une chaîne interpréterait `$&`, `$$` ou `$'` dans la valeur.
+    output = output.replaceAll(`{${name}}`, () => String(value));
   }
   return output;
 }

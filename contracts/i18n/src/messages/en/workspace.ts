@@ -134,6 +134,9 @@ export const support = {
   scrollToEnd: "Go to the last message",
   errorOpen: "The conversation could not be opened. Try again in a moment.",
   errorSend: "This message did not go out. Try again.",
+  /** A send that failed after a new draft was started: it waits for its retry. */
+  failedSendKept: "Unsent message kept aside: “{preview}”",
+  failedSendRetry: "Try again",
   restart: "Open a new conversation",
   historyOpen: "My conversations",
   historyBack: "Back to the conversation",

@@ -1,10 +1,10 @@
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { LogOut } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@openedbot/browser-ui-kit";
 import { ObButton } from "@openedbot/browser-ui-kit/components/onboarding";
 import { api, queryKeys } from "../../../lib/api";
-import { signOut } from "../../../lib/session/sign-out";
+import { useSignOut } from "../../../lib/session/sign-out";
 import { useT } from "../../../lib/i18n";
 
 /**
@@ -29,8 +29,7 @@ export function OnboardingLogoutButton({
   inline?: boolean;
 } = {}) {
   const { t } = useT();
-  const queryClient = useQueryClient();
-  const [pending, setPending] = useState(false);
+  const leaving = useSignOut();
   const me = useQuery({ queryKey: queryKeys.authMe, queryFn: api.authMe, retry: false });
 
   if (me.data?.kind !== "session") return null;
@@ -39,17 +38,14 @@ export function OnboardingLogoutButton({
     <ObButton
       variant="ghost"
       size="sm"
-      disabled={pending}
+      disabled={leaving.isPending}
       className={cn(
         inline
           ? "-ml-2 w-fit shrink-0 text-muted-foreground hover:text-foreground"
           : "fixed top-[max(2rem,env(safe-area-inset-top))] right-[max(2rem,env(safe-area-inset-right))] z-50 text-muted-foreground hover:text-destructive-text",
       )}
       style={{ WebkitAppRegion: "no-drag" } as CSSProperties}
-      onClick={() => {
-        setPending(true);
-        void signOut(queryClient).finally(() => setPending(false));
-      }}
+      onClick={() => leaving.mutate()}
     >
       <LogOut />
       {t("onboarding.common.log_out")}

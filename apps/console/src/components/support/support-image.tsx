@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SupportAttachmentDto } from "@openedbot/contracts-api";
 import { cn } from "@openedbot/browser-ui-kit";
-import { API_ORIGIN } from "../../lib/api";
+import { api } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 
 /**
@@ -12,7 +12,8 @@ import { useT } from "../../lib/i18n";
  * un EN-TÊTE, et un `<img src>` ne sait pas poser d'en-tête. Un opérateur
  * connecté présente son cookie, mais `SameSite=Lax` ne le joint pas à une
  * requête d'image vers une autre origine (`API_ORIGIN`). Les deux portes
- * n'existent donc que pour `fetch`.
+ * n'existent donc que pour `fetch`. Dans la coque, une troisième : le bearer du
+ * pont, posé par `api.support.attachment`.
  *
  * Le jeton ne passe JAMAIS dans l'URL, ce qui serait l'autre façon de faire
  * marcher `<img>` : il finirait dans les journaux du serveur, dans
@@ -39,13 +40,8 @@ export function SupportImage({
     let cancelled = false;
     let objectUrl: string | null = null;
     setFailed(false);
-    void fetch(`${API_ORIGIN}/api/support/attachments/${attachment.id}`, {
-      headers: token ? { "X-OpenedBot-Support-Token": token } : {},
-      credentials: "include",
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
+    void api.support.attachment(attachment.id, token)
+      .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);

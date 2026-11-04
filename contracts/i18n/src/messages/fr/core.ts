@@ -106,6 +106,12 @@ export const apiClient = {
   httpGateway: "L’API est injoignable ou redémarre (HTTP {status}).",
   httpServerError: "L’API a rencontré une erreur sans l’expliquer (HTTP {status}). Réessaie ; si ça persiste, regarde son journal.",
   httpRefused: "Requête refusée par l’API (HTTP {status}).",
+  /** Échéance du client dépassée, sans statut HTTP : une lecture se relance sans risque. */
+  readTimeout: "L’API n’a pas répondu à temps. Réessaie dans un instant.",
+  /** Une écriture sans réponse a peut-être abouti : ne pas la refaire à l’aveugle. */
+  writeTimeout: "L’API n’a pas répondu à temps : l’action a peut-être abouti. Vérifie avant de recommencer.",
+  /** Un succès dont le corps n’est pas du JSON (page de proxy, réponse tronquée). */
+  invalidResponse: "Réponse illisible de l’API (HTTP {status}) : rien n’a été confirmé.",
 } as const;
 
 export const face = {
