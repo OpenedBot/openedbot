@@ -10,7 +10,7 @@ import type { HermesClientTimeouts } from "@openedbot/hermes";
 import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/hermes/mtls";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
 import { readApiInternalUrl, readApiPort } from "@openedbot/platform-config/api-address";
-import { deployEnvironment, isProductionEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
+import { deployEnvironment, readRuntimeEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
@@ -361,7 +361,10 @@ export type ApiConfig = {
 };
 
 export function readApiConfig(env: Record<string, string | undefined> = process.env): ApiConfig {
-  const environment = readEnvironment(env.OPENEDBOT_ENV ?? env.NODE_ENV);
+  const environment: ApiEnvironment = readRuntimeEnvironment(
+    env.OPENEDBOT_ENV ?? env.NODE_ENV,
+    env.OPENEDBOT_ENV === undefined ? "NODE_ENV" : "OPENEDBOT_ENV",
+  );
   // R2 quand il est configuré, sinon le volume du serveur, même en production (`blob-driver.ts`).
   const blobChoice = resolveBlobDriver(env, environment === "production");
   const blobDriver = blobChoice.driver;
@@ -694,10 +697,6 @@ function readComputerProvider(
   };
 }
 
-function readEnvironment(value: string | undefined): ApiEnvironment {
-  // `preprod` is a production deployment with a preprod label (deployEnvironment).
-  return isProductionEnvironment(value) ? "production" : value === "test" ? "test" : "development";
-}
 
 export function readEventsConfig(env: Record<string, string | undefined>): EventsConfig {
   return {

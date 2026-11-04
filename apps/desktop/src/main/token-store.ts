@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import path from "node:path";
 import { getConfig } from "./config";
 import { log } from "./log";
-import { tokensFileName } from "./target";
+import { legacyTokensFileName, tokensFileName } from "./target";
 import { hasRealVault } from "./vault";
 
 // Shape of POST /api/auth/native/token responses.
@@ -65,6 +65,7 @@ export function saveTokens(tokens: NativeTokens): void {
 }
 
 export function loadTokens(): NativeTokens | null {
+  discardLegacyTokens();
   const file = tokensFile();
   if (!existsSync(file)) return null;
   if (!vaultAvailable()) return null;
@@ -83,4 +84,17 @@ export function loadTokens(): NativeTokens | null {
 export function clearTokens(): void {
   rmSync(tokensFile(), { force: true });
   rmSync(`${tokensFile()}.tmp`, { force: true });
+}
+
+// A file named before the protocol entered the name may hold a session issued
+// over http or over https: replaying it could send a refresh token in clear to
+// the wrong issuer. It is deleted unread, and this API signs in again once.
+function discardLegacyTokens(): void {
+  const name = legacyTokensFileName(getConfig().apiOrigin);
+  if (!name) return;
+  const legacy = path.join(app.getPath("userData"), name);
+  if (!existsSync(legacy)) return;
+  rmSync(legacy, { force: true });
+  rmSync(`${legacy}.tmp`, { force: true });
+  log.warn(`${name} predates the protocol-aware token files: discarded unread, sign in again`);
 }

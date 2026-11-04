@@ -8,6 +8,7 @@ import {
   REQUEST_ID_HEADER,
   requestIdOf,
 } from "../src/logger";
+import { redactSecretPath } from "../src/log/redact";
 
 /** Ligne d'access-log telle que le middleware la remet au logger. */
 type LogLine = { level: "info" | "warn" | "error"; fields: Record<string, unknown>; message: string };
@@ -128,6 +129,29 @@ describe("access-log", () => {
     expect(lines[0]?.level).toBe("error");
   });
 
+  test("ne logue jamais le jeton d'invitation porté par le chemin, succès comme erreur", async () => {
+    const lines: LogLine[] = [];
+    const token = "inv_Zq8f3K1mW9pX2bN7cR4tY6uA0sD5eG";
+    const app = new Hono();
+    app.use("*", accessLogMiddleware({ log: fakeLogger(lines) }));
+    app.get("/api/invite/member/:token", (context) => context.json({ ok: true }));
+    app.post("/api/invite/member/:token/accept", () => {
+      throw new Error("panne");
+    });
+    app.onError((_error, context) => context.json({ error: { code: "INTERNAL_ERROR" } }, 500));
+
+    await app.request(`/api/invite/member/${token}`);
+    await app.request(`/api/invite/member/${token}/accept`, { method: "POST" });
+    await app.request(`/api/pro/agency/invite/${token}/register`, { method: "POST" });
+
+    expect(lines.map((line) => [line.level, line.fields.path])).toEqual([
+      ["info", "/api/invite/member/[redacted]"],
+      ["error", "/api/invite/member/[redacted]/accept"],
+      ["warn", "/api/pro/agency/invite/[redacted]/register"],
+    ]);
+    expect(JSON.stringify(lines)).not.toContain(token);
+  });
+
   test("un identifiant distinct par requête", async () => {
     const app = new Hono();
     app.use("*", accessLogMiddleware({ log: fakeLogger([]) }));
@@ -174,5 +198,15 @@ describe("access-log", () => {
     const request = new Request("http://api.test/x");
     expect(requestIdOf(request)).toBe(requestIdOf(request));
     expect(requestIdOf(new Request("http://api.test/x"))).not.toBe(requestIdOf(request));
+  });
+});
+
+describe("redactSecretPath", () => {
+  test("masque le seul segment secret et laisse les autres chemins intacts", () => {
+    expect(redactSecretPath("/api/invite/client/tok/decline")).toBe("/api/invite/client/[redacted]/decline");
+    expect(redactSecretPath("/api/pro/fleet/invite/tok")).toBe("/api/pro/fleet/invite/[redacted]");
+    expect(redactSecretPath("/api/invite/member/")).toBe("/api/invite/member/");
+    expect(redactSecretPath("/api/bots/8f1c2b3a-0000-4000-8000-000000000000")).toBe("/api/bots/8f1c2b3a-0000-4000-8000-000000000000");
+    expect(redactSecretPath("/api/invite/members")).toBe("/api/invite/members");
   });
 });

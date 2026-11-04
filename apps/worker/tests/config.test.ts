@@ -71,6 +71,13 @@ describe("worker instance identity", () => {
 });
 
 
+describe("OPENEDBOT_ENV", () => {
+  test("an unknown value refuses to start instead of running on development rules", () => {
+    expect(() => readWorkerConfig(productionEnvironment({ OPENEDBOT_ENV: "prod" }))).toThrow(/OPENEDBOT_ENV must be one of/);
+    expect(readWorkerConfig(productionEnvironment({ OPENEDBOT_ENV: "preprod", TRANSACTIONAL_EMAIL_RESEND_API_KEY: "re_test-secret" })).environment).toBe("production");
+  });
+});
+
 describe("transactional email transports", () => {
   test("two transports together are refused, whichever pair", () => {
     expect(() => readWorkerConfig(testEnvironment({

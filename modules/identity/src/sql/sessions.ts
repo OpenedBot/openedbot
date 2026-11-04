@@ -56,6 +56,16 @@ export async function createNativeSession(
   device: SessionDevice = { userAgent: null, ip: null },
   lineage: NativeSessionLineage | null = null,
 ) {
+  return db.begin((tx) => insertNativeSession(tx, organizationId, userId, device, lineage));
+}
+
+async function insertNativeSession(
+  tx: TransactionDb,
+  organizationId: string | null,
+  userId: string,
+  device: SessionDevice,
+  lineage: NativeSessionLineage | null,
+) {
   const accessToken = randomCredential();
   const refreshToken = randomCredential();
   const accessTokenExpiresAt = new Date(Date.now() + ACCESS_TTL_MS);
@@ -65,22 +75,29 @@ export async function createNativeSession(
   const createdAt = lineage?.createdAt ?? new Date();
   // Même règle que `createWebSession` : sans organisation, la policy
   // `sessions_credential` accepte l'insertion par son propre jeton d'accès.
-  const open = <T>(callback: (tx: TransactionDb) => Promise<T>) => organizationId
-    ? withTenant(db, organizationId, callback)
-    : withCredential(db, hashCredential(accessToken), callback);
-  await open(async (tx) => {
-    await tx`
-      insert into sessions (
-        id, organization_id, user_id, kind, access_token_hash, refresh_token_hash,
-        access_expires_at, refresh_expires_at, user_agent, ip, family_id, created_at
-      ) values (
-        ${crypto.randomUUID()}, ${organizationId}, ${userId}, 'native', ${hashCredential(accessToken)},
-        ${hashCredential(refreshToken)}, ${accessTokenExpiresAt}, ${new Date(Date.now() + REFRESH_TTL_MS)},
-        ${device.userAgent}, ${device.ip}, ${familyId}, ${createdAt}
-      )
-    `;
-  });
+  if (organizationId) await tx`select set_config('app.organization_id', ${organizationId}, true)`;
+  else await tx`select set_config('app.session_credential_hash', ${hashCredential(accessToken)}, true)`;
+  await tx`
+    insert into sessions (
+      id, organization_id, user_id, kind, access_token_hash, refresh_token_hash,
+      access_expires_at, refresh_expires_at, user_agent, ip, family_id, created_at
+    ) values (
+      ${crypto.randomUUID()}, ${organizationId}, ${userId}, 'native', ${hashCredential(accessToken)},
+      ${hashCredential(refreshToken)}, ${accessTokenExpiresAt}, ${new Date(Date.now() + REFRESH_TTL_MS)},
+      ${device.userAgent}, ${device.ip}, ${familyId}, ${createdAt}
+    )
+  `;
   return { accessToken, accessTokenExpiresAt: accessTokenExpiresAt.toISOString(), refreshToken, organizationId };
+}
+
+/**
+ * Verrou transactionnel des sessions d'un compte. La rotation native et
+ * chaque révocation le prennent AVANT de toucher une ligne : une révocation
+ * voit donc soit l'ancienne session (pas encore tournée), soit sa remplaçante
+ * déjà commitée, jamais l'entre-deux où aucune n'est vivante.
+ */
+export async function lockUserSessions(tx: TransactionDb, userId: string): Promise<void> {
+  await tx`select pg_advisory_xact_lock(hashtext(${userId}), hashtext('ohb-user-sessions'))`;
 }
 
 /** Une session vivante telle que la porte d'authentification la lit. */
@@ -162,14 +179,25 @@ export type RotatedNativeSession = {
 };
 
 /**
- * Consomme un refresh token natif : la session qu'il ouvre est révoquée
- * (rotation) et ses coordonnées rendues pour en ouvrir une nouvelle.
+ * Consomme un refresh token natif et ouvre sa remplaçante, dans UNE
+ * transaction sous le verrou du compte (`lockUserSessions`) : l'ancienne
+ * session n'est jamais révoquée sans que la nouvelle existe, et une
+ * révocation concurrente l'atteint forcément. La nouvelle ligne garde la
+ * famille et la date d'ouverture de l'ancienne ; l'appareil et l'adresse
+ * sont ceux de la requête, ou à défaut ceux qu'on connaissait.
  */
-export async function rotateNativeRefreshToken(
-  db: Db,
-  refreshHash: string,
-): Promise<RotatedNativeSession | null> {
+export async function rotateNativeSession(db: Db, refreshHash: string, device: SessionDevice) {
   return withCredential(db, refreshHash, async (tx) => {
+    // Le compte d'abord, sans verrou de ligne : prendre le verrou du compte
+    // en tenant déjà la ligne inverserait l'ordre des révocations (interblocage).
+    const owners = await tx<Array<{ userId: string }>>`
+      select user_id as "userId" from sessions
+       where refresh_token_hash = ${refreshHash} and kind = 'native'
+    `;
+    const owner = owners[0];
+    if (!owner) return null;
+    await lockUserSessions(tx, owner.userId);
+    // Relue sous le verrou : une révocation passée entre-temps la rend introuvable.
     const rows = await tx<RotatedNativeSession[]>`
       select id, organization_id as "organizationId", user_id as "userId",
              family_id as "familyId", created_at as "createdAt",
@@ -182,7 +210,13 @@ export async function rotateNativeRefreshToken(
     const found = rows[0];
     if (!found) return null;
     await tx`update sessions set revoked_at = now(), revoked_reason = 'refresh_rotation' where id = ${found.id}`;
-    return found;
+    return insertNativeSession(
+      tx,
+      found.organizationId,
+      found.userId,
+      { userAgent: device.userAgent ?? found.userAgent, ip: device.ip ?? found.ip },
+      found.familyId ? { familyId: found.familyId, createdAt: found.createdAt } : null,
+    );
   });
 }
 
@@ -228,12 +262,24 @@ export async function listUserSessions(db: Db, userId: string): Promise<UserSess
 
 /** Vrai quand la session existait, appartenait à ce compte et n'était pas déjà révoquée. */
 export async function revokeUserSession(db: Db, userId: string, sessionId: string): Promise<boolean> {
-  const revoked = await withAuthenticatingUser(db, userId, (tx) => tx<Array<{ id: string }>>`
-    update sessions set revoked_at = now(), revoked_reason = 'user_revoked'
-     where id = ${sessionId} and user_id = ${userId} and revoked_at is null
-       and impersonated_by_staff_user_id is null
-    returning id
-  `);
+  // Une session native désigne sa connexion entière : si elle a tourné depuis
+  // l'affichage de la liste, c'est sa remplaçante (même famille) qui tombe.
+  const revoked = await withAuthenticatingUser(db, userId, async (tx) => {
+    await lockUserSessions(tx, userId);
+    return tx<Array<{ id: string }>>`
+      update sessions set revoked_at = now(), revoked_reason = 'user_revoked'
+       where user_id = ${userId} and revoked_at is null
+         and impersonated_by_staff_user_id is null
+         and (
+           id = ${sessionId}
+           or family_id = (
+             select family_id from sessions
+              where id = ${sessionId} and user_id = ${userId} and kind = 'native'
+           )
+         )
+      returning id
+    `;
+  });
   return revoked.length > 0;
 }
 
@@ -243,11 +289,14 @@ export async function revokeUserSession(db: Db, userId: string, sessionId: strin
  * montre pas, le compte rendu ne doit donc pas les compter.
  */
 export async function revokeOtherUserSessions(db: Db, userId: string, currentSessionId: string): Promise<number> {
-  const revoked = await withAuthenticatingUser(db, userId, (tx) => tx<Array<{ id: string }>>`
-    update sessions set revoked_at = now(), revoked_reason = 'user_revoked'
-     where user_id = ${userId} and id <> ${currentSessionId} and revoked_at is null
-       and impersonated_by_staff_user_id is null
-    returning id
-  `);
+  const revoked = await withAuthenticatingUser(db, userId, async (tx) => {
+    await lockUserSessions(tx, userId);
+    return tx<Array<{ id: string }>>`
+      update sessions set revoked_at = now(), revoked_reason = 'user_revoked'
+       where user_id = ${userId} and id <> ${currentSessionId} and revoked_at is null
+         and impersonated_by_staff_user_id is null
+      returning id
+    `;
+  });
   return revoked.length;
 }

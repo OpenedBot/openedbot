@@ -20,6 +20,17 @@ export function assertString(
   return result;
 }
 
+/**
+ * A password exactly as typed: type and length are checked, no character is
+ * dropped. `assertString` trims, which would make a password hashed raw (or
+ * one with meaningful edge spaces) impossible to verify.
+ */
+export function assertPassword(value: unknown, name: string, options: { max?: number } = {}): string {
+  if (typeof value !== "string" || value.length === 0) throw new HttpError(400, "VALIDATION_ERROR", `${name} est requis.`);
+  if (value.length > (options.max ?? 1_024)) throw new HttpError(400, "VALIDATION_ERROR", `${name} a une longueur invalide.`);
+  return value;
+}
+
 export async function jsonBody(
   request: Request,
   maxBytes = DEFAULT_MAX_JSON_BODY_BYTES,

@@ -10,7 +10,7 @@ import {
   setFallbackLogger,
 } from "./log/context";
 import { logFileStem, logFilesEnabled, logsDirectory, tryCreateLogFileStream } from "./log/files";
-import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS, logRedact } from "./log/redact";
+import { LOG_REDACT_CENSOR, LOG_REDACT_PATHS, logRedact, redactSecretPath } from "./log/redact";
 import { createTestLogger, type LogRecord } from "./log/test-logger";
 
 export {
@@ -162,7 +162,8 @@ export type AccessLogOptions = {
  *
  * - `route` est le motif Hono matché (`/api/bots/:botId`), pas l'URL : c'est
  *   lui qui s'agrège. `path` reste le chemin brut, dont les UUID rendent la
- *   cardinalité infinie.
+ *   cardinalité infinie ; un jeton porté par le chemin (invitation) y est
+ *   remplacé par `[redacted]`.
  * - `requestId` est généré ICI, avant `next()`, posé en en-tête de réponse et
  *   réutilisé par le handler d'erreur 500 : la référence lue par l'utilisateur
  *   retrouve la ligne de log. La pile ALS s'ouvre autour de `next()` pour que
@@ -186,7 +187,7 @@ export function accessLogMiddleware(options: AccessLogOptions = {}): MiddlewareH
       const fields = {
         requestId,
         method: context.req.method,
-        path: context.req.path,
+        path: redactSecretPath(context.req.path),
         route: context.req.routePath,
         status: context.res.status,
         durationMs,

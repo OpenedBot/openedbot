@@ -157,6 +157,15 @@ describe("production configuration", () => {
     expect(readApiConfig(production).deployEnvironment).toBe("prod");
   });
 
+  test("refuses an unknown OPENEDBOT_ENV instead of falling back to development", () => {
+    for (const value of ["prod", "Production", "staging"]) {
+      expect(() => readApiConfig({ ...production, OPENEDBOT_ENV: value })).toThrow(/OPENEDBOT_ENV must be one of/);
+    }
+    const { OPENEDBOT_ENV: _omitted, ...withoutEnv } = production;
+    expect(() => readApiConfig({ ...withoutEnv, NODE_ENV: "prod" })).toThrow(/NODE_ENV must be one of/);
+    expect(readApiConfig({ ...withoutEnv, NODE_ENV: "production" }).environment).toBe("production");
+  });
+
   test("ignores the retired administration variable in production, whatever its value", () => {
     for (const value of ["ssh", "local", "disabled"]) {
       const config = readApiConfig({ ...production, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep

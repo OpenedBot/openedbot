@@ -36,6 +36,11 @@ async function withInvitation<T>(
     // personnel ne s'accepte plus : elle se lit comme indisponible.
     const organizations = await tx<Array<{ name: string }>>`select name from organizations
       where id = ${lookup[0].organizationId} and deleted_at is null and kind <> 'personal' for no key update`;
+    // Sous ce même verrou d'organisation, la programmation d'une suppression
+    // (`account-deletion.ts`) compte les membres : une organisation dont la
+    // purge est programmée n'accueille plus personne.
+    const deletions = await tx`select 1 from tenant_deletions where organization_id = ${lookup[0].organizationId}`;
+    if (deletions[0]) throw unavailable();
     const rows = await tx<Invitation[]>`select id, organization_id as "organizationId", email, role,
       expires_at as "expiresAt" from organization_member_invitations
       where token_hash = ${tokenHash} and status = 'pending' for update`;

@@ -15,6 +15,7 @@ import {
 import {
   countActiveMembers,
   listOtherMemberships,
+  lockOrganizationMembers,
   readActiveMembershipRole,
   readOrganizationFootprint,
 } from "../sql/members";
@@ -125,9 +126,13 @@ async function readState(
   // Keep this first: worker claim/finalization and billing subscription updates
   // take the same lock before touching tenant_deletions.
   const subscriptionStatus = await subscriptionPort().status(tx, scope.organizationId, { lock });
+  // Puis l'organisation (même ordre que le worker), avant le comptage : une
+  // invitation ne peut plus faire entrer un membre entre ce comptage et la
+  // programmation de la purge.
+  if (lock) await lockOrganizationMembers(tx, scope.organizationId);
   const role = await readActiveMembershipRole(tx, scope.organizationId, scope.userId, { lock });
   const organizationMemberCount = await countActiveMembers(tx, scope.organizationId);
-  const others = await otherOrganizations(tx, scope);
+  const others = await otherOrganizations(tx, scope, lock);
   const deletion = await readTenantDeletion(tx, scope.organizationId, { lock });
 
   const soleAgencyOrganizationIds = others.filter((other) => other.soleAgency).map((other) => other.id);
@@ -151,11 +156,18 @@ async function readState(
  * Chaque lecture passe sous le tenant qu'elle vise, puis le tenant courant est
  * rétabli.
  */
-async function otherOrganizations(tx: TransactionDb, scope: AccountDeletionScope): Promise<OtherOrganization[]> {
+async function otherOrganizations(
+  tx: TransactionDb,
+  scope: AccountDeletionScope,
+  lock = false,
+): Promise<OtherOrganization[]> {
   const memberships = await listOtherMemberships(tx, scope.userId, scope.organizationId);
   const result: OtherOrganization[] = [];
   for (const membership of memberships) {
     await scopeToOrganization(tx, membership.id);
+    // Une agence jugée « membre unique » part avec le compte : son nombre de
+    // membres doit rester vrai jusqu'au commit de sa purge.
+    if (lock) await lockOrganizationMembers(tx, membership.id);
     const row = await readOrganizationFootprint(tx, membership.id);
     if (row) result.push({ id: membership.id, soleAgency: row.kind === "agency" && Number(row.members) === 1 });
   }

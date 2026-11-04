@@ -1,6 +1,6 @@
 import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { SQL } from "bun";
-import { isProductionEnvironment } from "@openedbot/platform-config/deploy-environment";
+import { readRuntimeEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { encryptSecret } from "@openedbot/hermes/secrets";
 import { resolve } from "node:path";
 import {
@@ -15,7 +15,7 @@ import { HermesClient } from "@openedbot/hermes";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { initializeProductFeatures, isExplicitDevelopmentEnvironment } from "@openedbot/identity/application/product-features";
 
-if (isProductionEnvironment(process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV)) throw new Error("Development seed is forbidden in production.");
+if (readRuntimeEnvironment(process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV) === "production") throw new Error("Development seed is forbidden in production.");
 // No development password is versioned: a missing one is generated now and
 // stored in the env file `make` loaded; only its location is printed.
 const devEnvFile = devEnvFilePath(process.env, resolve(import.meta.dir, "../../.."));

@@ -175,6 +175,23 @@ describe("self-serve account deletion", () => {
     expect(calls.filter((sql) => sql.includes("insert into tenant_deletions")).length).toBe(2);
   });
 
+  test("locks each organization before counting its members, like invitation acceptance", async () => {
+    const calls: string[] = [];
+    const bindings: unknown[][] = [];
+    const response = await mount(fakeDb({ calls, bindings, userOrganizationCount: 2, otherOrganizationKind: "agency" })).request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE" }),
+    });
+    expect(response.status).toBe(202);
+    const lock = (organizationId: string) => calls.findIndex((sql, index) =>
+      sql.includes("from organizations where id = for no key update") && bindings[index]?.[0] === organizationId);
+    expect(lock("org-1")).toBeGreaterThanOrEqual(0);
+    expect(lock("org-1")).toBeLessThan(calls.findIndex((sql) => sql.includes("select count(*) as count from memberships")));
+    expect(lock("other-0")).toBeGreaterThanOrEqual(0);
+    expect(lock("other-0")).toBeLessThan(calls.findIndex((sql) => sql.includes("select o.kind, (select count(*) from memberships m")));
+  });
+
   test("schedules an idempotent tenant purge after the configured grace", async () => {
     const calls: string[] = [];
     const bindings: unknown[][] = [];

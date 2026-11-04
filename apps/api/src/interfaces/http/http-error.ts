@@ -5,4 +5,4 @@
  * `app.onError` reconnaît.
  */
 export { HttpError } from "@openedbot/contracts-errors/http-error";
-export { assertString, boundedTextBody, DEFAULT_MAX_JSON_BODY_BYTES, jsonBody } from "@openedbot/platform-config/http-body";
+export { assertPassword, assertString, boundedTextBody, DEFAULT_MAX_JSON_BODY_BYTES, jsonBody } from "@openedbot/platform-config/http-body";

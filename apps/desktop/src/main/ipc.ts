@@ -121,12 +121,12 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLo
     await shell.openExternal(parseTrustedExternalUrl(url, config).toString());
   });
 
-  handle("ohb:sign-out", (event) => {
+  handle("ohb:sign-out", async (event) => {
     fromConsole(event);
     // Signing out again would reload the same /login, which would call this
     // again: an old console's loop, broken by the local page.
     if (!auth.isSignedIn() && fallBackToLocalSignin()) return;
-    auth.signOut();
+    await auth.signOut();
   });
 
   handle("auth:start", (event) => {
