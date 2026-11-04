@@ -212,11 +212,11 @@ function split(entry: string): [string, string] {
 }
 
 describe("relay allowlist: identical to internal/connector/allowlist.go", () => {
-  test("is frozen at 15 gateway routes plus 53 host routes", () => {
-    expect(RELAY_ALLOWLIST.length).toBe(68);
+  test("is frozen at 15 gateway routes plus 54 host routes", () => {
+    expect(RELAY_ALLOWLIST.length).toBe(69);
     expect(Object.isFrozen(RELAY_ALLOWLIST)).toBe(true);
     expect(RELAY_ALLOWLIST.filter((route) => route.events).length).toBe(1);
-    expect(RELAY_ALLOWLIST.filter((route) => route.host).length).toBe(53);
+    expect(RELAY_ALLOWLIST.filter((route) => route.host).length).toBe(54);
     expect(RELAY_ALLOWLIST.filter((route) => !route.host).length).toBe(15);
   });
 
@@ -277,6 +277,21 @@ describe("relay allowlist: identical to internal/connector/allowlist.go", () => 
       "/hermes-setup/a2a/peers/a%2Fb/trust", "/hermes-setup/a2a/peers/a/exec",
       "/hermes-setup/a2a/peers/a/restart", "/hermes-setup/a2a/message/send",
     ]) expect(matchRelayRoute("POST", path)).toBeNull();
+  });
+
+  test("reads one bounded workspace file name at the root, never a path", () => {
+    for (const path of ["/hermes-setup/workspace/files/chart.png", "/hermes-setup/workspace/files/rapport_2026-11.pdf"]) {
+      expect(matchRelayRoute("GET", path)?.host).toBe(true);
+      expect(matchRelayRoute("GET", `${path}?`)).toBeNull();
+      expect(matchRelayRoute("GET", `${path}?path=/etc/passwd`)).toBeNull();
+      expect(matchRelayRoute("GET", `/p/demo${path}`)).toBeNull();
+      expect(matchRelayRoute("POST", path)).toBeNull();
+    }
+    for (const path of [
+      "/hermes-setup/workspace/files/sub/chart.png", "/hermes-setup/workspace/files/../runtime.env",
+      "/hermes-setup/workspace/files/.env.png", "/hermes-setup/workspace/files/a%2Fb.png",
+      "/hermes-setup/workspace/files/notes.txt", "/hermes-setup/workspace/files/",
+    ]) expect(matchRelayRoute("GET", path)).toBeNull();
   });
 
   test("never lists an administration verb, except the one gateway restart", () => {

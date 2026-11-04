@@ -33,7 +33,8 @@ export function chainDb(options: ChainDbOptions = {}) {
       return [];
     }
     if (sql.includes("from audit_chain where runtime_id = ? and object_key = ?")) {
-      return rows.filter((row) => row.runtimeId === values[0] && row.objectKey === values[1]).map(({ seq, hash }) => ({ seq: String(seq), hash }));
+      return rows.filter((row) => row.runtimeId === values[0] && row.objectKey === values[1])
+        .map(({ seq, hash, payload, payloadSha256 }) => ({ seq: String(seq), hash, payload: JSON.parse(JSON.stringify(payload)), payloadSha256 }));
     }
     if (sql.includes("from audit_chain where runtime_id = ? order by seq desc limit 1")) {
       const last = rows.filter((row) => row.runtimeId === values[0]).sort((a, b) => b.seq - a.seq)[0];

@@ -4,6 +4,7 @@ import type {
   RelayAuditKeyFrame,
   RelayAuditKeyRef,
 } from "@openedbot/contracts-connector";
+import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { decryptSecretFromKeyring, encryptSecret, SecretDecryptionError, type SecretKeyring } from "@openedbot/hermes/secrets";
 import type { TransactionDb } from "@openedbot/platform-db";
 
@@ -89,13 +90,34 @@ export async function ensureAuditKey(
   return { current, previous };
 }
 
-/** Retire la clé courante et en crée une nouvelle ; rend la trame à pousser sur le lien. */
+/**
+ * Retire la clé courante et en crée une nouvelle ; rend la trame à pousser sur le lien.
+ *
+ * Le snapshot de l'hôte est scellé sous la clé de sa dernière ancre, ou sous
+ * une clé plus récente qu'il a reçue depuis. `audit.key` n'en remet que deux
+ * retirées (borne du protocole) : une rotation qui en rendrait davantage
+ * nécessaires laisserait un hôte longtemps déconnecté face à une clé inconnue,
+ * audit désarmé. Elle est refusée tant qu'une ancre ne prouve pas le rescellement.
+ */
 export async function rotateAuditKey(
   tx: TransactionDb,
   organizationId: string,
   runtimeId: string,
   keyring: SecretKeyring,
 ): Promise<{ current: AuditKeyMaterial; previous: AuditKeyMaterial[] }> {
+  const rows = await readAuditKeyRows(tx, organizationId, runtimeId);
+  const anchor = await readAuditAnchor(tx, organizationId, runtimeId);
+  // Lignes de la plus récente à la plus ancienne : toutes celles depuis la clé
+  // ancrée (elle comprise) deviennent retirées-nécessaires ; sans ancre connue, toutes.
+  const anchoredIndex = anchor ? rows.findIndex((row) => row.keyId === anchor.keyId) : -1;
+  const neededAfterRotation = anchoredIndex >= 0 ? anchoredIndex + 1 : rows.length;
+  if (neededAfterRotation > AUDIT_PREVIOUS_KEYS_LIMIT) {
+    throw new HttpError(
+      409,
+      "AUDIT_KEY_RESEAL_PENDING",
+      "L’hôte n’a pas encore rescellé son audit sous les clés précédentes : reconnectez-le avant une nouvelle rotation.",
+    );
+  }
   await tx`
     update runtime_audit_keys set retired_at = now()
      where organization_id = ${organizationId} and runtime_id = ${runtimeId} and retired_at is null
@@ -136,14 +158,16 @@ export async function readAuditAnchor(tx: TransactionDb, organizationId: string,
   return { ...row, writeSeq: Number(row.writeSeq), dropped: Number(row.dropped) };
 }
 
-export type AnchorWrite = "recorded" | "regressed" | "unknown_key";
+export type AnchorWrite = "recorded" | "regressed" | "conflicting" | "unknown_key";
 
 /**
  * Enregistre la dernière ancre d'un runtime. Un `writeSeq` en recul n'écrase
  * jamais l'ancre courante : c'est un hôte qui rejoue une position ancienne
  * (fichier restauré, ou deux copies du même runtime) et cela se journalise.
- * Une clé inconnue est refusée : l'hôte ne peut ancrer que sous une clé que
- * l'API lui a remise.
+ * Au même `writeSeq`, seul un doublon strict est idempotent : un contenu
+ * différent (`conflicting`) est refusé, sinon l'ancre courante divergerait du
+ * maillon déjà chaîné sous cette position. Une clé inconnue est refusée :
+ * l'hôte ne peut ancrer que sous une clé que l'API lui a remise.
  */
 export async function recordAuditAnchor(
   tx: TransactionDb,
@@ -163,8 +187,15 @@ export async function recordAuditAnchor(
     on conflict (runtime_id) do update
       set key_id = excluded.key_id, write_seq = excluded.write_seq, event_count = excluded.event_count,
           dropped = excluded.dropped, tail = excluded.tail, received_at = now()
-      where runtime_audit_anchors.write_seq <= excluded.write_seq
+      where runtime_audit_anchors.write_seq < excluded.write_seq
+         or (runtime_audit_anchors.write_seq = excluded.write_seq
+             and runtime_audit_anchors.key_id = excluded.key_id
+             and runtime_audit_anchors.event_count = excluded.event_count
+             and runtime_audit_anchors.dropped = excluded.dropped
+             and runtime_audit_anchors.tail = excluded.tail)
     returning runtime_id as "runtimeId"
   `;
-  return written.length ? "recorded" : "regressed";
+  if (written.length) return "recorded";
+  const current = await readAuditAnchor(tx, organizationId, runtimeId);
+  return current?.writeSeq === frame.writeSeq ? "conflicting" : "regressed";
 }

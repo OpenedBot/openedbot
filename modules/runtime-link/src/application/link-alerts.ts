@@ -174,18 +174,18 @@ async function enqueueRuntimeLinkEmails(
   alert: Pick<OpenedAlert, "id" | "organizationId" | "concernedUserId">,
   payloadFor: (workspace: string) => Record<string, unknown>,
 ): Promise<number> {
+  // Tout destinataire est encore membre actif de l'organisation : l'appairage
+  // (`concernedUserId`) est historique et survit à la révocation du membre,
+  // qui ne doit plus rien recevoir de ses runtimes.
   const recipients = await tx<Array<{ userId: string; email: string }>>`
-    select u.id as "userId", u.email
+    select distinct u.id as "userId", u.email
       from users u
+      join memberships m
+        on m.user_id = u.id
+       and m.organization_id = ${alert.organizationId}
+       and m.revoked_at is null
      where u.email is not null
-       and (
-         u.id = ${alert.concernedUserId}
-         or u.id in (
-           select m.user_id from memberships m
-            where m.organization_id = ${alert.organizationId}
-              and m.role in ('owner', 'admin') and m.revoked_at is null
-         )
-       )
+       and (u.id = ${alert.concernedUserId} or m.role in ('owner', 'admin'))
   `;
   const workspace = await workspaceSlug(tx, alert.organizationId);
   const payload = payloadFor(workspace);

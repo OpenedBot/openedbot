@@ -40,10 +40,7 @@ export async function jsonBody(
     throw new HttpError(413, "BODY_TOO_LARGE", "Le corps JSON est trop volumineux.");
   }
   try {
-    const raw = await request.arrayBuffer();
-    if (raw.byteLength > maxBytes) {
-      throw new HttpError(413, "BODY_TOO_LARGE", "Le corps JSON est trop volumineux.");
-    }
+    const raw = await readBoundedBytes(request, maxBytes, "Le corps JSON est trop volumineux.");
     const value = JSON.parse(new TextDecoder().decode(raw)) as unknown;
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return value as Record<string, unknown>;
@@ -62,9 +59,39 @@ export async function boundedTextBody(
   if (Number.isSafeInteger(declaredLength) && declaredLength > maxBytes) {
     throw new HttpError(413, "BODY_TOO_LARGE", "Le corps de la requête est trop volumineux.");
   }
-  const raw = await request.arrayBuffer();
-  if (raw.byteLength > maxBytes) {
-    throw new HttpError(413, "BODY_TOO_LARGE", "Le corps de la requête est trop volumineux.");
+  const tooLarge = "Le corps de la requête est trop volumineux.";
+  return new TextDecoder().decode(await readBoundedBytes(request, maxBytes, tooLarge));
+}
+
+/**
+ * Lit le corps en comptant les octets au fil du flux : sans `Content-Length`
+ * (chunked), la borne tombe dès qu'elle est dépassée, le flux est annulé, et
+ * ni l'allocation ni l'attente ne vont jusqu'à la fin d'un corps trop gros.
+ */
+async function readBoundedBytes(request: Request, maxBytes: number, tooLargeMessage: string): Promise<Uint8Array> {
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel("body_too_large").catch(() => undefined);
+        throw new HttpError(413, "BODY_TOO_LARGE", tooLargeMessage);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return new TextDecoder().decode(raw);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }

@@ -337,6 +337,7 @@ GET    /hermes-setup/profiles/{slug}/skills/hub/operations/{a}-{b}-{c}-{d}-{e}
 DELETE /hermes-setup/profiles/{slug}/skills/{skill}
 GET    /hermes-setup/profiles/{slug}/avatar
 GET    /hermes-setup/sessions-inventory
+GET    /hermes-setup/workspace/files/{file}
 GET    /hermes-setup/a2a/agent-card
 GET    /hermes-setup/a2a/audit
 GET    /hermes-setup/a2a/peers
@@ -858,6 +859,25 @@ n'est ni relue, ni journalisée, ni rendue.
 
 Les erreurs d'exécution ou de preuve qui ne font pas partie de ce jeu fermé
 sont rendues comme indisponibilité hôte, sans traceback, chemin ni secret.
+
+### Les fichiers qu'un bot livre
+
+`GET /hermes-setup/workspace/files/{file}` rend UN fichier qu'un bot a
+fabriqué à la racine du `/workspace` de son bac à sable terminal
+(`/srv/hermes/data/workspaces` sur l'hôte) et désigné par une ligne
+`MEDIA:/workspace/<nom>`. Hermes n'intègre ces lignes que sur ses routes de
+chat, pas sur `/v1/runs` (mesuré sur la VM 240, 2026-11-03) : le worker lit le
+fichier ici pour le joindre au message.
+
+C'est un nom, jamais un chemin : `[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}` suivi de
+`.png`, `.jpg`, `.jpeg`, `.webp` ou `.pdf`, sans dossier, sans point initial,
+sans préfixe `/p/<slug>` ni query. Le bot possède ce dossier et peut y poser
+un lien symbolique ou une FIFO : la lecture passe par `os.Root` (aucune
+résolution hors de la racine), s'ouvre en `O_NONBLOCK`, n'accepte qu'un
+fichier ordinaire de 1 Mio au plus, et les octets doivent être une image ou un
+PDF (nombre magique), quoi que dise l'extension. Le `Content-Type` vient des
+octets. Aucune feature n'est annoncée : un hôte plus ancien refuse la route,
+et openedbot garde alors le nom du fichier dans le texte.
 
 ### L'inventaire des sessions
 

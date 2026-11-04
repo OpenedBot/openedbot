@@ -12,6 +12,7 @@ import { createRuntimeLinkGateway, RUNTIME_LINK_INTERNAL_PREFIX } from "@openedb
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { runtimeLinkInternalRoutes } from "./internal-relay";
+import { beforeDeadline, routingLease, SHUTDOWN_STEP_TIMEOUT_MS, stopPersistence } from "./lifecycle";
 
 const config = readApiConfig();
 const linkConfig = readRuntimeLinkConfig();
@@ -24,6 +25,7 @@ const startedAt = new Date();
 const log = (event: string, fields: Record<string, unknown>) => logger.info({ event, instanceId, ...fields }, event);
 const instanceConfig = { instanceId, apiInternalUrl: linkConfig.internalUrl, workerInternalToken: config.workerInternalToken };
 const registry = createApiInstanceRegistry(db, instanceConfig, startedAt);
+const lease = routingLease(registry);
 const locator = createRuntimeLinkLocator(db, instanceConfig);
 // AuditAnchor : chaîne locale, puis le bucket WORM (OHB-57, installation
 // legacy). Aucun plug-in n'est chargé ici : un ancrage externe en échec n'y
@@ -56,6 +58,10 @@ const gateway = createRuntimeLinkGateway({ db, config, broker, log });
 const app = new Hono();
 app.get("/health", async (context) => {
   await db`select 1`;
+  // Bail expiré : la base répond, mais plus aucune instance ne route vers ces liens.
+  if (!lease.fresh()) {
+    return context.json({ ok: false, role: "runtime-link-gateway", instanceId, draining: service.draining, reason: "routing_lease_expired" }, 503);
+  }
   return context.json({ ok: true, role: "runtime-link-gateway", instanceId, draining: service.draining });
 });
 app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(config, broker, locator, {
@@ -67,10 +73,10 @@ app.onError((error, context) => {
   return context.json({ error: { code: "INTERNAL_ERROR" } }, 500);
 });
 // Register before accepting a socket: every admitted owner must be routable.
-await registry.heartbeat();
+await lease.heartbeat();
 let heartbeatWork = Promise.resolve();
 const heartbeat = setInterval(() => {
-  heartbeatWork = heartbeatWork.then(() => registry.heartbeat()).catch((error) => {
+  heartbeatWork = heartbeatWork.then(() => lease.heartbeat()).catch((error) => {
     logger.error({ event: "runtime_link.instance_heartbeat_failed", instanceId, error }, "gateway heartbeat failed");
   });
 }, API_INSTANCE_HEARTBEAT_MS);
@@ -79,17 +85,11 @@ const service = startRuntimeLinkServer({
   hostname: linkConfig.host, port: linkConfig.port, drainTimeoutMs: linkConfig.drainTimeoutMs, log,
   onStopped: async () => {
     clearInterval(heartbeat);
-    await heartbeatWork;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        broker.flushPersistence(),
-        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Gateway persistence shutdown timeout")), 5_000); }),
-      ]);
-    } finally {
-      clearTimeout(timer);
-      await registry.stop();
-    }
+    await stopPersistence({
+      heartbeatWork,
+      flush: () => broker.flushPersistence(),
+      stopRegistry: () => registry.stop(),
+    });
   },
 });
 log("runtime_link.gateway_started", { url: service.server.url.toString(), startedAt: startedAt.toISOString() });
@@ -98,7 +98,9 @@ function shutdown(signal: string): Promise<void> {
   return shutdownWork ??= (async () => {
     log("runtime_link.gateway_stopping", { signal });
     try { await service.drain(); }
-    finally { await db.close({ timeout: 5 }); }
+    finally {
+      await beforeDeadline(db.close({ timeout: SHUTDOWN_STEP_TIMEOUT_MS / 1_000 }), Date.now() + SHUTDOWN_STEP_TIMEOUT_MS + 1_000, "database close");
+    }
   })();
 }
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

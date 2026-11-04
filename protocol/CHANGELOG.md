@@ -25,6 +25,11 @@ uses [semantic versioning](https://semver.org/) as described in
   bundled-skills state when the creation turned them off. A host that ignores
   the field answers without it; openedbot then writes them through
   `POST /hermes-setup/profiles/{slug}/bundled-skills`.
+- Host route `GET /hermes-setup/workspace/files/{file}` in the reference
+  allowlist and its vectors: one bounded file name (png, jpg, jpeg, webp, pdf)
+  at the root of the bots' `/workspace`, never a path, without the `/p/{slug}`
+  prefix or a query. The cloud and edge-setup already served it; a host built
+  on the previous reference refused the media downloads openedbot asks for.
 
 ### Changed
 - `RELAY_STAGE_HEADER` is now `X-OpenedBot-Relay-Stage`. `relayStageOf`

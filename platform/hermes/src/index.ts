@@ -55,6 +55,13 @@ export type {
 export { fitHermesRunImages, HermesClient, hermesRunRequestBody } from "./client";
 export { PROFILE_MODEL_BATCH_MAX, SESSION_MESSAGES_PAGE_LIMIT } from "./contracts";
 export {
+  MCP_INSTALL_TIMEOUT_MS,
+  MCP_MUTATION_TIMEOUT_MS,
+  PROFILE_MUTATION_TIMEOUT_MS,
+  SKILLS_HUB_INSTALL_TIMEOUT_MS,
+  TOOLSET_MUTATION_TIMEOUT_MS,
+} from "./contracts";
+export {
   SKILLS_HUB_IDENTIFIER_PATTERN,
   SKILLS_HUB_OPERATION_ID_PATTERN,
   SKILLS_HUB_PROFILE_PATTERN,

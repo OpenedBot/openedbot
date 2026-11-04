@@ -231,6 +231,7 @@ export async function replaceLinkTokenEmergency(
   await tx`
     update runtimes
        set link_token_previous_hash = null, link_token_previous_expires_at = null,
+           link_token_rotation_unconfirmed_at = null,
            link_token_rotated_at = now(), link_token_expires_at = null,
            link_token_hash = ${input.tokenHash}, updated_at = now()
      where organization_id = ${input.organizationId} and id = ${input.runtimeId}
@@ -248,7 +249,8 @@ export async function expireRotatedLinkTokens(db: Db): Promise<number> {
   const rows = await db<Array<{ count: string | number }>>`
     with expired as (
       update runtimes
-         set link_token_previous_hash = null, link_token_previous_expires_at = null, updated_at = now()
+         set link_token_previous_hash = null, link_token_previous_expires_at = null,
+             link_token_rotation_unconfirmed_at = null, updated_at = now()
        where link_token_previous_hash is not null
          and (link_token_previous_expires_at is null or link_token_previous_expires_at <= now())
        returning id
@@ -271,6 +273,7 @@ export async function rotateLinkToken(
     update runtimes
        set link_token_previous_hash = link_token_hash,
            link_token_previous_expires_at = now() + (${input.graceMinutes} * interval '1 minute'),
+           link_token_rotation_unconfirmed_at = null,
            link_token_rotated_at = now(),
            link_token_expires_at = ${input.expiresAt},
            link_token_hash = ${input.tokenHash},
@@ -290,7 +293,59 @@ export async function undoLinkTokenRotation(
   await db`
     update runtimes
        set link_token_hash = ${input.previousHash}, link_token_previous_hash = null, link_token_previous_expires_at = null,
-           link_token_expires_at = null, updated_at = now()
+           link_token_rotation_unconfirmed_at = null, link_token_expires_at = null, updated_at = now()
      where id = ${input.runtimeId} and organization_id = ${input.organizationId} and link_token_hash = ${input.tokenHash}
   `;
+}
+
+/**
+ * Livraison de `link.rotate` incertaine (0174) : l'hôte a peut-être le
+ * nouveau jeton, peut-être pas. Les deux hashes restent valables jusqu'à sa
+ * prochaine admission (`settleLinkTokenRotation`), au plus `holdHours`.
+ * `false` si la rotation n'est plus celle-ci (révoquée, retournée entre-temps).
+ */
+export async function holdUnconfirmedLinkTokenRotation(
+  db: Db,
+  input: { runtimeId: string; organizationId: string; tokenHash: string; holdHours: number },
+): Promise<boolean> {
+  const rows = await db<Array<{ id: string }>>`
+    update runtimes
+       set link_token_previous_expires_at = now() + (${input.holdHours} * interval '1 hour'),
+           link_token_rotation_unconfirmed_at = now(), updated_at = now()
+     where id = ${input.runtimeId} and organization_id = ${input.organizationId}
+       and revoked_at is null and link_token_hash = ${input.tokenHash}
+       and link_token_previous_hash is not null
+    returning id
+  `;
+  return rows.length > 0;
+}
+
+/**
+ * L'hôte vient d'être admis avec `scope.tokenHash` : il dit quel jeton il
+ * détient. Le jeton courant confirme toute rotation en cours (l'ancien hash ne
+ * sert plus personne). L'ancien jeton, pendant une rotation non confirmée,
+ * prouve que l'hôte n'a pas enregistré le nouveau : la rotation est défaite
+ * et la passe suivante la rejoue. Une rotation confirmée par la livraison
+ * garde sa grâce ordinaire. Rend ce qui a été tranché, `null` sinon.
+ */
+export async function settleLinkTokenRotation(tx: Db, scope: LinkRuntimeScope): Promise<"confirmed" | "reverted" | null> {
+  const confirmed = await tx<Array<{ id: string }>>`
+    update runtimes
+       set link_token_previous_hash = null, link_token_previous_expires_at = null,
+           link_token_rotation_unconfirmed_at = null, updated_at = now()
+     where id = ${scope.runtimeId} and organization_id = ${scope.organizationId} and revoked_at is null
+       and link_token_hash = ${scope.tokenHash} and link_token_previous_hash is not null
+    returning id
+  `;
+  if (confirmed.length > 0) return "confirmed";
+  const reverted = await tx<Array<{ id: string }>>`
+    update runtimes
+       set link_token_hash = ${scope.tokenHash}, link_token_previous_hash = null, link_token_previous_expires_at = null,
+           link_token_rotation_unconfirmed_at = null, link_token_expires_at = null, updated_at = now()
+     where id = ${scope.runtimeId} and organization_id = ${scope.organizationId} and revoked_at is null
+       and link_token_rotation_unconfirmed_at is not null
+       and link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()
+    returning id
+  `;
+  return reverted.length > 0 ? "reverted" : null;
 }

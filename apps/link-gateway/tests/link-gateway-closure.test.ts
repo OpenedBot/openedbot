@@ -9,7 +9,8 @@ import { dirname, relative, resolve } from "node:path";
  * `make deploy-preprod-link`, qui ferme tous les liens. Chaque fichier de sa fermeture
  * d'imports est donc du code qu'une livraison ordinaire ne met pas à jour. Ce
  * test la calcule depuis `src/main.ts` (imports à l'exécution seulement, les
- * `import type` sont effacés) et refuse qu'un routeur produit y revienne par
+ * `import type` sont effacés ; les imports à effet de bord `import "x"`
+ * comptent, ils exécutent tout le module) et refuse qu'un routeur produit y revienne par
  * un import de commodité : c'est ainsi que `auth.ts`, `conversation-routes.ts`
  * et `runtime-routes.ts` y étaient entrés du temps où elle vivait dans apps/api.
  *
@@ -26,6 +27,7 @@ const REPO_ROOT = resolve(import.meta.dir, "../../..");
 
 const ALLOWED_APP = [
   "apps/link-gateway/src/internal-relay.ts",
+  "apps/link-gateway/src/lifecycle.ts",
   "apps/link-gateway/src/main.ts",
 ];
 
@@ -49,6 +51,9 @@ const ALLOWED_PLATFORM = [
   "platform/config/src/deploy-environment.ts",
   "platform/config/src/hermes-timeouts.ts",
   "platform/config/src/http-body.ts",
+  // Side-effect import first in main.ts: refuses a retired OHB_* variable.
+  "platform/config/src/legacy-env-guard.ts",
+  "platform/config/src/legacy-env.ts",
   "platform/config/src/rate-limit.ts",
   "platform/config/src/runtime-mode.ts",
   "platform/config/src/sse-heartbeat.ts",
@@ -117,16 +122,25 @@ function isTypeOnly(clause: string): boolean {
   return names.length > 0 && names.every((name) => name.startsWith("type "));
 }
 
+/** Les spécificateurs chargés à l'exécution par `source` : imports et réexports nommés, et imports à effet de bord. */
+function runtimeSpecifiers(source: string): string[] {
+  const specifiers: string[] = [];
+  for (const match of source.matchAll(/(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;]*?)\s+from\s+"([^"]+)"/g)) {
+    const [, typeKeyword, clause, specifier] = match;
+    if (typeKeyword || isTypeOnly(clause!)) continue;
+    specifiers.push(specifier!);
+  }
+  for (const match of source.matchAll(/(?:^|\n)\s*import\s*"([^"]+)"/g)) specifiers.push(match[1]!);
+  return specifiers;
+}
+
 function runtimeClosure(entry: string): string[] {
   const seen = new Set<string>([entry]);
   const queue = [entry];
   while (queue.length > 0) {
     const file = queue.shift()!;
-    const source = readFileSync(file, "utf8");
-    for (const match of source.matchAll(/(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;]*?)\s+from\s+"([^"]+)"/g)) {
-      const [, typeKeyword, clause, specifier] = match;
-      if (typeKeyword || isTypeOnly(clause!)) continue;
-      const target = resolveImport(file, specifier!);
+    for (const specifier of runtimeSpecifiers(readFileSync(file, "utf8"))) {
+      const target = resolveImport(file, specifier);
       if (target && !seen.has(target)) {
         seen.add(target);
         queue.push(target);
@@ -135,6 +149,19 @@ function runtimeClosure(entry: string): string[] {
   }
   return [...seen].map((file) => relative(REPO_ROOT, file)).sort();
 }
+
+describe("import scan", () => {
+  test("follows side-effect imports, and still skips type-only ones", () => {
+    const source = [
+      'import "../../api/src/index";',
+      'import "@openedbot/platform-config/legacy-env-guard"; // first',
+      'import type { A } from "./a";',
+      'import { type B } from "./b";',
+      'import { c } from "./c";',
+    ].join("\n");
+    expect(runtimeSpecifiers(source).sort()).toEqual(["../../api/src/index", "./c", "@openedbot/platform-config/legacy-env-guard"]);
+  });
+});
 
 describe("link gateway runtime closure", () => {
   const closure = runtimeClosure(ENTRY);

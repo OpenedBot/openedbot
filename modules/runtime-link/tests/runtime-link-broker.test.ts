@@ -939,6 +939,41 @@ describe("runtime link broker : backpressure et 1009", () => {
     expect(connection.inFlightCount).toBe(0);
   });
 
+  test("un premier req abandonné (send → 0) est réglé before_dispatch, les autres en vol after_dispatch", async () => {
+    const fake = fakeSocket(() => 1);
+    const broker = fakeBroker();
+    const connection = broker.open(fake.socket);
+    broker.bind(connection, identity("rt-drop-req"));
+    const earlier = connection.dispatch({ method: "GET", path: "/health", headers: {}, body: null })
+      .then(() => null, (caught: unknown) => caught);
+    fake.socket.send = () => 0;
+    // Aucun octet de cette création n'est parti : elle se rejoue sans risque.
+    const error = await connection.dispatch({ method: "POST", path: "/v1/runs", headers: {}, body: null })
+      .then(() => null, (caught: unknown) => caught);
+    expect(error).toBeInstanceOf(RelayDialError);
+    expect((error as RelayDialError).stage).toBe("before_dispatch");
+    expect(connection.isClosed).toBe(true);
+    expect(fake.closed).toEqual({ code: 1011, reason: "LINK_SEND_FAILED" });
+    expect(((await earlier) as RelayDialError).stage).toBe("after_dispatch");
+    expect(connection.inFlightCount).toBe(0);
+  });
+
+  test("un en-tête de réponse invalide (NUL) règle la requête LINK_PROTOCOL_ERROR au lieu de la laisser pendante", async () => {
+    const fake = fakeSocket(() => 1);
+    const broker = fakeBroker();
+    const connection = broker.open(fake.socket);
+    broker.bind(connection, identity("rt-bad-header"));
+    const pending = connection.dispatch({ method: "GET", path: "/health", headers: {}, body: null });
+    connection.handleText({ t: "res", id: 1, status: 200, headers: { "content-type": "application/json\u0000x" } });
+    const error = await Promise.race([pending.then(() => null, (caught: unknown) => caught), Bun.sleep(500).then(() => "still pending")]);
+    expect(error).toBeInstanceOf(RelayDialError);
+    expect((error as RelayDialError).code).toBe("LINK_PROTOCOL_ERROR");
+    expect((error as RelayDialError).stage).toBe("after_dispatch");
+    expect(fake.texts.some((frame) => frame.t === "cancel" && frame.id === 1)).toBe(true);
+    expect(connection.inFlightCount).toBe(0);
+    expect(connection.isClosed).toBe(false);
+  });
+
   test("une trame de contrôle abandonnée (send → 0) ferme le lien 1011", () => {
     const fake = fakeSocket(() => 1);
     fake.socket.send = () => 0;
