@@ -8,6 +8,8 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 1.0.2 — 2026-11-04
+
 ### Corrigé
 
 - **Quotas du rail au rechargement.** Les logos GPT, Anthropic et Grok
