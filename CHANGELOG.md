@@ -8,12 +8,67 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Ajouté
+
+- Réglages › Archives : chaque section (corbeille, bots archivés,
+  conversations masquées) s'affiche par pages de 15. Une case par ligne,
+  une case pour cocher la page entière et « Tout sélectionner » pour toute
+  la section. La sélection se restaure, s'affiche ou se supprime
+  définitivement d'un coup. La suppression demande toujours confirmation,
+  et un élément en échec reste sélectionné pour réessayer.
+
 ### Modifié
 
+- Les notifications s'affichent en bas à droite partout, réglages compris.
+- Réglages › Politiques : « Mentions légales », « Politique de
+  confidentialité » et « Conditions d'utilisation » s'ouvrent sur le web,
+  dans le navigateur (celui du système depuis l'app de bureau), et non plus
+  dans l'application.
+- Mon compte : plus d'avatar à initiales devant le nom affiché ni devant
+  les membres.
+- **Nouveau logo : le bloub.** La mascotte openedbot passe au bloub, en
+  vectoriel : favicon (clair ou sombre selon le navigateur), logo de l'app et
+  de la connexion, icône de l'app de bureau sur macOS, Linux et Windows,
+  icône de la barre des tâches Windows, en-tête des e-mails et site de
+  documentation. Sur le bureau, le bloub est posé sur une tuile blanche pour
+  rester visible sur un Dock ou un lanceur sombre. L'ancienne mascotte (le
+  chat masqué) est retirée.
 - Application de bureau macOS : les versions publiées sont signées avec un
   Developer ID et notarisées par Apple. Le dmg téléchargé s'ouvre sans
   alerte, sans passer par « Ouvrir quand même » dans Réglages › Confidentialité
   et sécurité. Les builds des pull requests restent signés ad hoc.
+
+### Corrigé
+
+- Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de
+  nouveau en glissant depuis le bord : il ne saute plus d'un coup à 320 px
+  en décalant le fil.
+- **Chargement d'une conversation au rechargement.** La silhouette affichée
+  avant les données reprend la forme du fil : bulles de questions et de
+  réponses avec leur rangée d'actions, composer à sa taille réelle, titre
+  centré dans la barre du haut, quotas GPT, Anthropic et Grok à leur place
+  dans le rail, bloub dans la barre de titre du bureau. Le passage à la
+  conversation chargée ne fait plus sauter l'écran.
+- Réglages › Archives : les boutons des lignes reprennent ceux des autres
+  réglages, comme dans Runtime. « Restaurer » et « Afficher » sont des
+  pilules neutres, « Supprimer définitivement » une pilule rouge pleine.
+- La page introuvable (404) et l'écran de changement de mot de passe
+  affichent « openedbot » à côté du logo, et non plus « ohb ».
+
+### Retiré
+
+- Mon compte : la carte « Session » et son bouton « Se déconnecter » ; la
+  déconnexion reste en bas de la barre latérale des réglages.
+- Réglages › Connecteurs : le catalogue ne propose plus que Notion, Linear
+  et Cloudflare. Netlify, Todoist, PayPal, Attio, Calendly, Webflow,
+  Supabase, Sentry et GitLab en sont retirés. Un de ces serveurs déjà
+  connecté sur un hôte n'est pas touché : il apparaît comme un serveur
+  ajouté à la main.
+- Derniers restes de l'ancienne PWA dans la console : le titre Apple de
+  l'écran d'accueil, la directive `manifest-src` de la CSP et les textes
+  d'installation et de notifications push qui n'étaient plus affichés. Le service
+  worker de retrait (`/sw.js`) reste en place pour désinscrire les anciennes
+  installations.
 
 ## 1.0.2 — 2026-11-04
 

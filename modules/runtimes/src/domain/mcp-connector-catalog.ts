@@ -19,6 +19,10 @@
  * bien qu'il accepte la DCR : le cœur ne le nomme jamais
  * (`tests/scripts/payment-provider-contract.ts`), il appartient au plug-in.
  *
+ * Le catalogue se limite à Notion, Linear et Cloudflare (décision de
+ * l'opérateur, 2026-11-04). Un serveur d'un éditeur retiré déjà connecté sur
+ * un hôte n'est pas touché : il apparaît comme un serveur ajouté à la main.
+ *
  * L'identifiant est aussi le nom du serveur sur l'hôte : il suit la grammaire
  * des noms MCP de l'hôte et ne change jamais, sinon un serveur déjà connecté
  * ne serait plus reconnu comme venant du catalogue.
@@ -42,7 +46,7 @@ export const MCP_OAUTH_PROFILE_FEATURE = "mcp_oauth_profile";
  */
 export const MCP_PROFILE_DISCONNECT_FEATURE = "mcp_profile_disconnect";
 
-export type McpConnectorCategory = "docs" | "dev" | "payments" | "crm" | "web";
+export type McpConnectorCategory = "docs" | "dev";
 
 export type McpConnectorEntry = {
   /** Nom du serveur sur l'hôte, stable : `^[a-z0-9][a-z0-9_-]{0,63}$`. */
@@ -67,16 +71,7 @@ const VERIFIED_AT = MCP_CONNECTOR_CATALOG_VERSION;
 export const MCP_CONNECTOR_CATALOG: readonly McpConnectorEntry[] = [
   { id: "notion", name: "Notion", url: "https://mcp.notion.com/mcp", category: "docs", auth: "dcr", note: "workspaceAdmin", verifiedAt: VERIFIED_AT, source: "https://developers.notion.com/docs/mcp" },
   { id: "linear", name: "Linear", url: "https://mcp.linear.app/mcp", category: "docs", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://linear.app/docs/mcp" },
-  { id: "todoist", name: "Todoist", url: "https://ai.todoist.net/mcp", category: "docs", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://github.com/Doist/todoist-ai" },
-  { id: "gitlab", name: "GitLab", url: "https://gitlab.com/api/v4/mcp", category: "dev", auth: "dcr", note: "workspaceAdmin", verifiedAt: VERIFIED_AT, source: "https://docs.gitlab.com/user/model_context_protocol/mcp_server/" },
-  { id: "sentry", name: "Sentry", url: "https://mcp.sentry.dev/mcp", category: "dev", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://mcp.sentry.dev" },
   { id: "cloudflare", name: "Cloudflare", url: "https://mcp.cloudflare.com/mcp", category: "dev", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://developers.cloudflare.com/agents/model-context-protocol/" },
-  { id: "supabase", name: "Supabase", url: "https://mcp.supabase.com/mcp", category: "dev", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://supabase.com/docs/guides/getting-started/mcp" },
-  { id: "netlify", name: "Netlify", url: "https://netlify-mcp.netlify.app/mcp", category: "dev", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://docs.netlify.com/build/build-with-ai/netlify-mcp-server/" },
-  { id: "paypal", name: "PayPal", url: "https://mcp.paypal.com/mcp", category: "payments", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://developer.paypal.com/tools/mcp-server/" },
-  { id: "attio", name: "Attio", url: "https://mcp.attio.com/mcp", category: "crm", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://docs.attio.com/mcp/overview" },
-  { id: "calendly", name: "Calendly", url: "https://mcp.calendly.com", category: "crm", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://developer.calendly.com/calendly-mcp-server" },
-  { id: "webflow", name: "Webflow", url: "https://mcp.webflow.com/mcp", category: "web", auth: "dcr", note: null, verifiedAt: VERIFIED_AT, source: "https://developers.webflow.com/mcp/reference/overview" },
 ];
 
 export function mcpConnectorEntry(id: string): McpConnectorEntry | null {

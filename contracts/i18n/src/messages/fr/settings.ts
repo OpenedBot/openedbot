@@ -117,20 +117,6 @@ export const settingsNotifications = {
   enabling: "Demande…",
   disable: "Désactiver dans openedbot",
   pushTitle: "Notifications push",
-  pushReady: "Actives",
-  pushUnavailable: "Non configuré",
-  pushDisabled: "Désactivées",
-  pushUnsupported: "Non prises en charge",
-  pushIosNotInstalled: "PWA non installée",
-  pushDescription:
-    "Réveille le navigateur pour une routine ou une approbation, même si l’onglet est fermé. Le texte reste générique : nom du bot et type d’événement, jamais le contenu d’un message.",
-  pushServerMissing:
-    "Les clés VAPID ne sont pas posées sur ce déploiement. En développement, c’est normal : la fonctionnalité est éteinte tant que PUSH_VAPID_* est absent.",
-  pushIosInstall:
-    "Sur iPhone et iPad, Safari n’autorise le Web Push que pour une PWA ajoutée à l’écran d’accueil (Partager → Sur l’écran d’accueil). Ouvrez ensuite openedbot depuis son icône.",
-  pushEnable: "Activer les notifications push",
-  pushDisable: "Désactiver les notifications push",
-  pushEnabling: "Activation…",
   notificationApprovalTitle: "openedbot : intervention requise",
   notificationCompletedTitle: "openedbot : workflow terminé",
   notificationAttentionTitle: "openedbot : workflow à vérifier",
@@ -153,8 +139,6 @@ export const pushNotifications = {
 
 export const settingsAccount = {
   title: "Mon compte",
-  sessionTitle: "Session",
-  signOutHint: "Ferme la session sur ce navigateur. Vos bots continuent de tourner sur leur runtime.",
   description:
     "Qui vous êtes ici : l’identité avec laquelle vous vous connectez, le nom que vos bots emploient, et les personnes qui partagent votre espace.",
   profileTitle: "Profil",
@@ -408,4 +392,23 @@ export const settingsArchives = {
   emptyDescription: "Archivez un bot ou masquez une conversation depuis sa ligne dans la liste : tout ce que vous rangez atterrit ici.",
   loadFailed: "Les archives n’ont pas pu être chargées.",
   retry: "Réessayer",
+  selectPage: "Sélectionner cette page",
+  selectRow: "Sélectionner {name}",
+  selectedCount: "{count} sur {total} sélectionnés",
+  selectAll: "Tout sélectionner ({count})",
+  clearSelection: "Désélectionner",
+  restoreSelected: "Restaurer ({count})",
+  showSelected: "Afficher ({count})",
+  deleteSelected: "Supprimer définitivement ({count})",
+  purgeManyTitle: "Supprimer définitivement {count} bots ?",
+  restoredMany: "Restaurés : {count}.",
+  shownMany: "Affichées : {count}.",
+  purgedMany: "Supprimés définitivement : {count}.",
+  bulkFailed: "Échec pour {count} : {message}",
+  actionFailed: "L’action a échoué.",
+  paginationLabel: "Pages de « {title} »",
+  paginationRange: "{from} à {to} sur {total}",
+  paginationPrevious: "Page précédente",
+  paginationNext: "Page suivante",
+  paginationPage: "Page {page}",
 } as const;

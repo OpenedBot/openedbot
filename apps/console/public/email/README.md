@@ -9,7 +9,7 @@ les messages déjà envoyés.
 | Fichier | Servi à | Affiché | Source |
 | --- | --- | --- | --- |
 | `waitlist-banner.jpg` | `https://openedbot.app/email/waitlist-banner.jpg` | 440 x 213 | `assets/waitlist/moon-light-1680.webp` (retiré du dépôt ; voir `git show a9b2c3dc:apps/console/public/assets/waitlist/moon-light-1680.webp`) |
-| `ohb-mark.png` | `https://openedbot.app/email/ohb-mark.png` | 40 x 40 | `brand/ohb-icon.webp`, 132 x 132 PNG (sharp, `resize(132,132).png()`) |
+| `ohb-mark.png` | `https://openedbot.app/email/ohb-mark.png` | 40 x 40 | `brand/openedbot-bloub.svg` (le bloub), 132 x 132 PNG (sharp, `resize(132,132).png()`) |
 
 ## Pourquoi ce fichier-là, et pas l'artwork tel quel
 

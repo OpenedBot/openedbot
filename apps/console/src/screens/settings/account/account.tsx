@@ -26,7 +26,6 @@ import { activeOrganizationId } from "../../../lib/session/cloud-session";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
 import { isNativeShell } from "../../../lib/platform/native-bridge";
-import { useSignOut } from "../../../lib/session/sign-out";
 import {
   ACTIONS,
   BUTTON,
@@ -113,7 +112,6 @@ function AccountPage({ team }: { team: boolean }) {
         <ConnectionSection />
         {isNativeShell() ? null : <MobileSection />}
         <WorkspaceSection />
-        {team && !isMobile && session ? <SignOutSection impersonating={impersonating} /> : null}
       </SettingsCardGrid>
       {team && session?.session.role !== "agency" ? (
         <MembersCard
@@ -126,21 +124,6 @@ function AccountPage({ team }: { team: boolean }) {
       ) : null}
       {team ? <FleetGrantsCard /> : null}
     </SettingsPane>
-  );
-}
-
-function SignOutSection({ impersonating }: { impersonating: boolean }) {
-  const { t } = useT();
-  const leaving = useSignOut();
-  const label = t(impersonating ? "settingsSidebar.leaveImpersonation" : "settingsSidebar.signOut");
-  return (
-    <ListSection title={t("settingsAccount.sessionTitle")}>
-      <ListRow label={label} description={t("settingsAccount.signOutHint")}>
-        <button type="button" className={BUTTON.secondary} disabled={leaving.isPending} onClick={() => leaving.mutate()}>
-          {leaving.isPending ? t("settingsSidebar.signingOut") : label}
-        </button>
-      </ListRow>
-    </ListSection>
   );
 }
 
@@ -175,7 +158,6 @@ function ProfileSection() {
             <ListRow
               label={t("settingsAccount.displayNameLabel")}
               description={t("settingsAccount.displayNameHint")}
-              icon={<Avatar name={user.displayName?.trim() || user.email} />}
               value={user.displayName ?? t("settingsAccount.displayNameUnset")}
             />
           ) : null}
@@ -686,18 +668,6 @@ function WorkspaceSection() {
   );
 }
 
-/** Les initiales d'une personne, dans une pastille ronde : la photo qu'on n'a pas. */
-function Avatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden
-      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-xs font-semibold text-muted-foreground uppercase"
-    >
-      {name.slice(0, 2)}
-    </span>
-  );
-}
-
 /**
  * Le changement de mot de passe, en modale.
  *
@@ -1075,7 +1045,6 @@ function MemberRow({
 
   return (
     <ListRow
-      icon={<Avatar name={name} />}
       stacked={editable}
       label={
         <span className="flex min-w-0 items-center gap-2">

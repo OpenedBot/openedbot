@@ -41,7 +41,7 @@ export function NotFoundScreen() {
             <span className="lg-brand-mark">
               <img src="/brand/ohb-icon.webp" alt="" aria-hidden="true" />
             </span>
-            <span>ohb</span>
+            <span>openedbot</span>
           </span>
           <div className="lg-content">
             <div className="lg-copy">

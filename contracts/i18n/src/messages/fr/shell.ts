@@ -140,7 +140,6 @@ export const navUser = {
   newGroup: "Nouveau groupe",
   lightTheme: "Thème clair",
   darkTheme: "Thème sombre",
-  installApp: "Installer l’application",
   signOut: "Se déconnecter",
   impersonationReadOnly: "Mode assistance · lecture seule",
   leaveImpersonation: "Quitter le mode assistance",

@@ -154,7 +154,7 @@ function QuotaMark({ family }: { family: RailQuotaFamily }) {
  * La place des trois logos avant le premier relevé : logo estompé dans une
  * piste neutre qui pulse, inerte et muette (aucun état à annoncer encore).
  */
-function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: string }) {
+export function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: string }) {
   return (
     <div aria-hidden data-rail-llm-quotas="loading" className="flex shrink-0 flex-col items-center gap-1.5">
       {RAIL_QUOTA_FAMILIES.map((family) => (

@@ -4,7 +4,6 @@ import {
   RiArrowRightSLine,
   RiHome5Line,
   RiInboxLine,
-  RiLogoutBoxRLine,
   RiSearchLine,
   RiSettings3Line,
   RiSideBarLine,
@@ -19,10 +18,11 @@ import { readCloudSession } from "../../lib/session/cloud-session";
 import { BotFace } from "../bot-face";
 import { fleetAccountInPath, fleetInPath } from "../../lib/workspace/workspace-location";
 import { isConversationPath, readBootSidebarShape, type BootSidebarShape } from "../../lib/session/boot-shape";
-import { BAR_ICON_BUTTON, useBoardChrome } from "../boardui/board-chrome";
+import { BAR_ICON_BUTTON, TitlebarLogo, useBoardChrome } from "../boardui/board-chrome";
 import { useAccountLayout } from "../../lib/shell/account-layout";
 import { ConversationBodySkeleton, HeaderActionsSkeleton, HeaderTitleSkeleton } from "../thread-skeleton";
 import { RAIL_BUTTON, RAIL_DIVIDER } from "../boardui/board-rails";
+import { RailLlmQuotasLoading } from "../boardui/rail-llm-quotas";
 import { SettingsPage, SettingsPageSidebar } from "../boardui/settings-modal";
 import { isSettingsEntryActive, SETTINGS_GROUPS } from "../dashboard/settings-sidebar";
 import { settingsBodySkeletonFor } from "../../screens/settings/settings-skeletons";
@@ -94,11 +94,11 @@ const NAV_ROW = "flex h-8 items-center gap-2.5 px-2.5 text-[13px] leading-[18px]
 
 /**
  * Variante C (`BoardIconRail` de board-rails.tsx) : le rail de 56 px, logo à
- * la hauteur de la barre du haut, Salon et À traiter en haut ; en bas, ce que
- * le rail porte toujours : le runtime (pastille neutre, comme pendant sa
- * première lecture), le thème et la langue de l'appareil, Réglages et la
- * déconnexion. Les quotas et le Support dépendent de données : ils
- * apparaissent au-dessus, le bas du rail est ancré, rien ne bouge.
+ * la hauteur de la barre du haut, Salon et À traiter en haut ; en bas, les
+ * quotas LLM en chargement (`RailLlmQuotasLoading`, les trois places que la
+ * première lecture remplit), le runtime (pastille neutre, comme pendant sa
+ * première lecture), puis Réglages. Le Support dépend de données : il
+ * apparaît en dessous, le bas du rail est ancré.
  */
 function RailSkeleton() {
   const icon = `${RAIL_BUTTON} pointer-events-none`;
@@ -113,6 +113,7 @@ function RailSkeleton() {
       </div>
       <div className="flex-1" />
       <div className="flex shrink-0 flex-col items-center gap-1.5">
+        <RailLlmQuotasLoading buttonClassName={RAIL_BUTTON} />
         <span className={icon}>
           <IconServerBolt />
           <span className="absolute right-1 bottom-1 inline-flex size-2.5">
@@ -121,7 +122,6 @@ function RailSkeleton() {
         </span>
         <span className={RAIL_DIVIDER} />
         <span className={icon}><RiSettings3Line /></span>
-        <span className={icon}><RiLogoutBoxRLine /></span>
       </div>
     </div>
   );
@@ -188,8 +188,9 @@ function TopBarSkeleton({ conversation, organization, title }: {
   const collapsed = useBoardChrome((state) => state.collapsed);
   const bootLabel = readBootIdentityLabel(readCloudSession()?.userId);
   return (
-    <div data-titlebar-drag="" className="flex h-[46px] shrink-0 items-center gap-1 ps-3 pe-3">
+    <div data-titlebar-drag="" className="relative flex h-[46px] shrink-0 items-center gap-1 ps-3 pe-3">
       <div aria-hidden data-titlebar-lights="" />
+      <TitlebarLogo />
       {collapsed || !organization ? null : (
         <span aria-hidden className="flex h-[30px] items-center gap-2 px-1.5">
           {/* The fixed organization face and the label recorded on the last
@@ -215,14 +216,14 @@ function TopBarSkeleton({ conversation, organization, title }: {
         <span className={BAR_ICON_BUTTON}><RiArrowRightSLine className="size-[18px]" /></span>
       </span>
       {conversation ? (
-        <span aria-hidden className="flex min-w-0 flex-1 items-center gap-1">
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
-            <span className="shrink-0 px-1 text-body-2-medium whitespace-nowrap text-text-secondary">{t("overviewPlaceholder.nav")}</span>
-            <span className="shrink-0 text-text-tertiary">›</span>
+        /* `ConversationHeader` : le titre seul, centré sur la barre dès `xl`
+           (`BoardHeader centered`), les actions à droite. */
+        <>
+          <span aria-hidden className="flex min-w-0 flex-1 items-center px-1 xl:absolute xl:top-1/2 xl:left-1/2 xl:max-w-[30%] xl:flex-none xl:-translate-x-1/2 xl:-translate-y-1/2">
             <span className="flex h-[30px] min-w-0 items-center px-1.5"><HeaderTitleSkeleton /></span>
           </span>
           <HeaderActionsSkeleton />
-        </span>
+        </>
       ) : title ? (
         <span aria-hidden className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
           <span className="shrink-0 px-1 text-body-2-medium whitespace-nowrap text-text-secondary">{t("overviewPlaceholder.nav")}</span>

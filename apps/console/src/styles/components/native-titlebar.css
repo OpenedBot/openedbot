@@ -137,11 +137,12 @@
 }
 
 /* Rail d'icônes du cadre personnel, macOS : les feux (x 16 à 76) recouvrent
-   la rangée du logo du rail (56 px de large). Le logo est masqué, sans copie
-   dans la barre du haut (choix de l'opérateur, 2026-10-26), et la rangée vide
-   reste une poignée de la fenêtre. La barre du haut commence après le rail :
-   elle ne réserve aux feux que ce qui en dépasse (76 - (56 + 12) + 8, 16 px
-   sans zoom). */
+   la rangée du logo du rail (56 px de large). Le logo y est masqué et la
+   rangée vide reste une poignée de la fenêtre ; il passe dans la barre du
+   haut, juste après les feux et avant le repli (`TitlebarLogo`, demande de
+   l'opérateur du 2026-11-04). La barre du haut commence après le rail : elle
+   ne réserve aux feux que ce qui en dépasse (76 - (56 + 12) + 8, 16 px sans
+   zoom). */
 :root[data-native-titlebar="mac"] [data-board-icon-rail] [data-titlebar-rail-logo] {
   -webkit-app-region: drag;
   app-region: drag;
@@ -153,6 +154,15 @@
 
 :root[data-native-titlebar="mac"] [data-board-icon-rail] ~ * [data-titlebar-lights] {
   width: calc(var(--ohb-traffic-lights-end) - 60px);
+}
+
+[data-titlebar-logo] {
+  display: none;
+}
+
+:root[data-native-titlebar="mac"] [data-board-icon-rail] ~ * [data-titlebar-logo] {
+  display: block;
+  margin-inline-end: 4px;
 }
 
 /*
@@ -171,7 +181,8 @@
     height: var(--ohb-titlebar-height);
   }
 
-  :root[data-native-titlebar="mac"] [data-titlebar-lights] {
+  :root[data-native-titlebar="mac"] [data-titlebar-lights],
+  :root[data-native-titlebar="mac"] [data-board-icon-rail] ~ * [data-titlebar-logo] {
     display: none;
   }
 }
