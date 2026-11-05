@@ -8,9 +8,20 @@ Le détail technique vit dans les commits et `docs/CONNECTOR.md`.
 
 La numérotation repart de v0.0.1 avec le dépôt autonome et la nouvelle origine
 de téléchargement. Les versions v0.2.0 à v1.4.0, publiées depuis l'ancien
-dépôt, restent listées plus bas pour l'historique.
+dépôt, restent listées plus bas pour l'historique. Depuis v1.5.0, chaque
+nouvelle version passe au-dessus de v1.4.0 : un numéro ne désigne plus jamais
+deux releases différentes.
 
 ## Non publié
+
+## v1.5.0 - 2026-11-06
+
+Même edge-setup que v1.1.0, sous un numéro que l'ancien dépôt n'a jamais utilisé. Une machine en v1.1.0 passe en v1.5.0 avec une mise à jour ordinaire.
+
+### Changé
+
+- La numérotation passe au-dessus des versions de l'ancien dépôt (jusqu'à v1.4.0) : une machine qui affichait une de ces versions voit désormais clairement la plus récente.
+- Chaque version est publiée à l'identique sur l'origine de téléchargement et en release GitHub du dépôt openedbot, avec les mêmes fichiers signés et les mêmes empreintes.
 
 ## v1.1.0 - 2026-11-05
 
