@@ -36,9 +36,18 @@ Versioning restarted at **v0.0.1** with this repository, and reached v1.0.0
 on 2026-11-03. Hosts still on a v1.x of the former repository carry the
 retired default base and see the new v1.0.0 as the same or older: their one-time
 migration is in `CHANGELOG.md` (`upgrade --allow-downgrade --release-url`).
-The former GitHub releases mirror is gone: nothing reads or publishes to it. A
-v1.x binary is rebuilt from its tag in `OpenedBot/openedbot` if it is ever
-needed.
+The former GitHub releases repository is gone: nothing reads or publishes to
+it. A v1.x binary of the former repository is rebuilt from its tag in
+`OpenedBot/openedbot` if it is ever needed.
+
+From v1.5.0 on, every version is numbered above v1.4.0, the last version of
+the former repository, so one number never names two different releases.
+Never reuse a number listed in `CHANGELOG.md`, old section included.
+
+Every version is published twice, identically: on R2 (the only origin hosts
+read) and as the GitHub release `edge-setup/vX.Y.Z` of `OpenedBot/openedbot`
+(never marked Latest: that badge belongs to the desktop app). Both carry the
+same signed files and the same `SHA256SUMS`.
 
 ## Cutting a release
 
@@ -62,9 +71,13 @@ never with `make deploy`, except in explicit dev mode.
    - job `publish`: downloads that artifact, verifies every signature again,
      extracts the `## vX.Y.Z` entry of `CHANGELOG.md` (refused by
      `notes-check` like a manual release), then runs `scripts/publish-r2.sh`.
-     Nothing is rebuilt: the bytes published are the bytes signed.
+     Nothing is rebuilt: the bytes published are the bytes signed;
+   - job `github`: downloads the same artifact, fails unless R2 serves the
+     same `SHA256SUMS`, then creates the GitHub release `edge-setup/vX.Y.Z`
+     with every signed file and the same notes.
 4. Check the release: `curl -fsS https://releases.openedbot.app/edge-setup/LATEST`
-   names the new version, and the console announces it within the hour.
+   names the new version, `gh release view edge-setup/vX.Y.Z` lists the same
+   files, and the console announces it within the hour.
 
 The R2 write token lives only in the GitHub environment `edge-setup-r2`
 (secret `CLOUDFLARE_R2_TOKEN`, variable `CF_ACCOUNT_ID`), whose deployment
