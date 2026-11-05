@@ -12,6 +12,10 @@ dépôt, restent listées plus bas pour l'historique.
 
 ## Non publié
 
+## v1.1.0 - 2026-11-05
+
+Le lien avec openedbot change de format. Une machine déjà liée met à jour edge-setup puis se lie à nouveau avec un nouveau ticket.
+
 ### Changé
 
 - L'adresse d'openedbot se donne avec `--openedbot` (et `--insecure-openedbot` en développement). Le lien et l'audit de création changent de format : une machine déjà liée doit être liée à nouveau, avec un nouveau ticket, après la mise à jour.
