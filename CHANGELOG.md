@@ -40,7 +40,7 @@ connecteur hôte et le protocole tiennent le leur :
   documentation. Sur le bureau, le bloub est posé sur une tuile blanche pour
   rester visible sur un Dock ou un lanceur sombre. L'ancienne mascotte (le
   chat masqué) est retirée.
-- Application de bureau macOS : les versions publiées sont signées avec un
+- Application de bureau macOS (1.0.2) : les versions publiées sont signées avec un
   Developer ID et notarisées par Apple. Le dmg téléchargé s'ouvre sans
   alerte, sans passer par « Ouvrir quand même » dans Réglages › Confidentialité
   et sécurité. Les builds des pull requests restent signés ad hoc.
