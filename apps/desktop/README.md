@@ -22,8 +22,9 @@ window shows the console's `/login`, which signs in through `__OHB_NATIVE__.auth
 (`src/renderer/signin.html`) is only a fallback for a console that predates that screen.
 
 **Scope:** macOS (Apple Silicon) first, Windows x64 and Linux x64 also built, sideloaded. Out of
-scope: auto-update, a developer certificate and notarisation (Gatekeeper / SmartScreen warn on
-first launch). The macOS app is signed ad hoc only.
+scope: auto-update. Released macOS builds are signed with a Developer ID and notarised by Apple
+([macOS signing](#macos-signing)); Windows and Linux builds are unsigned (SmartScreen warns on
+first launch).
 
 ## Download and install
 
@@ -34,7 +35,7 @@ Releases are GitHub releases of this repository, built by
 
 | System | File | Install |
 |---|---|---|
-| macOS, Apple Silicon | `openedbot-mac-arm64.dmg` | Drag *openedbot* to *Applications*. First launch: macOS refuses it, then *System Settings › Privacy & Security › Open Anyway* |
+| macOS, Apple Silicon | `openedbot-mac-arm64.dmg` | Drag *openedbot* to *Applications* and open it: signed and notarised, it opens without a warning |
 | Debian, Ubuntu (x64) | `openedbot-linux-amd64.deb` | `sudo apt install ./openedbot-linux-amd64.deb`, then *openedbot* in the applications menu |
 | Other Linux (x64) | `openedbot-linux-x86_64.AppImage` | `chmod +x openedbot-linux-x86_64.AppImage` and run it (needs FUSE 2: `libfuse2`) |
 
@@ -100,7 +101,8 @@ dependencies and the Electron binary first when needed), and `make stop` also st
 | `make logs` | Latest events from the shell's SQLite diagnostics log |
 | `make lab` | Design lab for the sign-in page (<http://localhost:5317>) |
 | `make popup-check` | Check the popup bundle to embed |
-| `make package-mac` | Dmg + zip, macOS arm64, signed ad hoc, into `release/` (on a Mac) |
+| `make package-mac` | Dmg + zip, macOS arm64, into `release/` (on a Mac): signed ad hoc, or `MAC_SIGN=developer-id` signed and notarised ([macOS signing](#macos-signing)) |
+| `make check-mac` | Checks that build against `MAC_SIGN`: seal, popup, version, dmg; Gatekeeper and stapled tickets for `developer-id` |
 | `make package-linux` | Unsigned AppImage + deb, Linux x64, into `release/` |
 | `make package-win` | Unsigned portable zip, Windows x64, into `release/` |
 | `make package-win-installer` | Unsigned NSIS installer (Wine required from Linux) |
@@ -154,6 +156,41 @@ runs it with `--hosted`. The shell stays the only session holder: the hosted pop
 tokens over stdin/stdout (one JSON line per message, protocol in
 [`src/shared/popup-protocol.ts`](src/shared/popup-protocol.ts)). If the popup crashes it is
 restarted with backoff; after 5 failures in a row the shell falls back to *Window* mode.
+
+## macOS signing
+
+`make package-mac` has two modes, `MAC_SIGN=adhoc` (the default) and `MAC_SIGN=developer-id`:
+
+| | `adhoc` | `developer-id` |
+|---|---|---|
+| Config | `electron-builder.yml` | `electron-builder.developer-id.yml` on top of it |
+| Signature | ad hoc, no hardened runtime | *Developer ID Application: kevin aubrée (QDC76LMF29)*, hardened runtime, secure timestamp, on the app and every nested binary (notch popup included) |
+| Notarisation | none | the app, then the signed dmg (`scripts/notarize-dmg.sh`), tickets stapled |
+| Downloaded copy | refused, then *System Settings › Privacy & Security › Open Anyway* | opens without a warning |
+| Used by | pull requests, forks, a Mac without the certificate | releases (`desktop/vX.Y.Z` tags), manual runs of the workflow |
+
+Entitlements (`build/entitlements.mac.plist`, `build/entitlements.mac.inherit.plist`): JIT and
+writable executable memory for V8, nothing else.
+
+`developer-id` needs the certificate and an App Store Connect API key with the *Developer* role:
+
+- On a Mac: the *Developer ID Application* identity in the login keychain, and
+  `APPLE_API_KEY` (path of the `.p8`), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` in the
+  environment. The Makefile refuses to start without them: electron-builder would otherwise
+  skip notarisation with a mere warning.
+- In the CI (`.github/workflows/desktop-release.yml`), repository secrets: `MACOS_CSC_LINK`
+  (the `.p12`, base64), `MACOS_CSC_KEY_PASSWORD`, `APPLE_API_KEY_P8` (the `.p8` content),
+  `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`. A tag without them fails instead of publishing a
+  build Gatekeeper refuses.
+
+```sh
+APPLE_API_KEY=~/path/AuthKey_XXXX.p8 APPLE_API_KEY_ID=XXXX APPLE_API_ISSUER=... \
+  make package-mac MAC_SIGN=developer-id && make check-mac MAC_SIGN=developer-id
+```
+
+The certificate expires on 2027-12-04: create a new one (developer.apple.com, *Certificates*,
+*Developer ID Application*, account holder only) and replace the two `MACOS_CSC_*` secrets
+before then. Apps signed and notarised earlier keep opening after it expires.
 
 ## Testing
 

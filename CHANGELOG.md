@@ -8,6 +8,13 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Modifié
+
+- Application de bureau macOS : les versions publiées sont signées avec un
+  Developer ID et notarisées par Apple. Le dmg téléchargé s'ouvre sans
+  alerte, sans passer par « Ouvrir quand même » dans Réglages › Confidentialité
+  et sécurité. Les builds des pull requests restent signés ad hoc.
+
 ## 1.0.2 — 2026-11-04
 
 ### Corrigé

@@ -1,6 +1,7 @@
-# Sideload builds only: unsigned Windows x64 (zip, NSIS), macOS arm64 (dmg, zip,
-# signed ad hoc) and Linux x64 (AppImage, deb). No auto-update feed and no
-# developer certificate: SmartScreen and Gatekeeper warn on first run.
+# Sideload builds: unsigned Windows x64 (zip, NSIS), macOS arm64 (dmg, zip) and
+# Linux x64 (AppImage, deb). No auto-update feed. The macOS app is signed ad hoc
+# here; electron-builder.developer-id.yml signs it with the Developer ID and
+# notarises it (the releases). SmartScreen still warns on first run.
 # .github/workflows/desktop-release.yml builds the macOS and Linux files.
 appId: app.openedbot.desktop
 productName: openedbot
@@ -51,6 +52,8 @@ nsis:
 
 # macOS, Apple Silicon. Signed ad hoc, not notarized: Gatekeeper blocks the first
 # launch of a downloaded copy (System Settings > Privacy & Security > Open Anyway).
+# That is the build without the certificate (pull requests, forks, a Mac
+# without it); releases use electron-builder.developer-id.yml on top of this.
 mac:
   target:
     - target: dmg
