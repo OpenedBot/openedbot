@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { en } from "../src/messages.en";
 import { fr } from "../src/messages.fr";
 
-// PERM2-0 (DEV-OHB-249), PERM2-3 (DEV-OHB-253): the permission hints describe
+// PERM2-0, PERM2-3: the permission hints describe
 // what the pipeline and the host actually do (the legacy `auto` has its own
 // line), so they must stay distinct and promise nothing absolute.
 const MODES = ["auto", "autoLegacy", "manual", "plan", "bypass"] as const;

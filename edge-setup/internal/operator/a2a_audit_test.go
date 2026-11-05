@@ -309,7 +309,7 @@ func TestAppendA2APolicyProbeReceiptCreatesRuntimeOwnedFileAsRoot(t *testing.T) 
 	if err != nil || account.Uid != "999" || account.Gid != "989" {
 		t.Skip("requires the lab Hermes account with UID 999 and GID 989")
 	}
-	home, err := os.MkdirTemp("", "ohb84-receipt-owner-")
+	home, err := os.MkdirTemp("", "openedbot84-receipt-owner-")
 	if err != nil {
 		t.Fatal("could not create the isolated fixture")
 	}

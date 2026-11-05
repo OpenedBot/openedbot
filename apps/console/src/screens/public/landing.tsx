@@ -42,50 +42,50 @@ export function ModeLanding() {
   ];
 
   const newBot = (
-    <button type="button" className="ohb-mode-cta" onClick={() => openCreateBot()}>
+    <button type="button" className="openedbot-mode-cta" onClick={() => openCreateBot()}>
       <Plus className="size-4" aria-hidden />
       {t("modeLanding.bot.cta")}
     </button>
   );
 
   return (
-    <div className="ohb-mode scrollbar-subtle flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className={revealed ? "ohb-mode-guide in" : "ohb-mode-guide"} data-kind="bot">
-        <header className="ohb-mode-head">
-          <p className="ohb-mode-eyebrow">{t("modeLanding.bot.eyebrow")}</p>
+    <div className="openedbot-mode scrollbar-subtle flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className={revealed ? "openedbot-mode-guide in" : "openedbot-mode-guide"} data-kind="bot">
+        <header className="openedbot-mode-head">
+          <p className="openedbot-mode-eyebrow">{t("modeLanding.bot.eyebrow")}</p>
           {newBot}
         </header>
-        <h1 className="ohb-mode-title">
+        <h1 className="openedbot-mode-title">
           {t("modeLanding.bot.title")}
           <em>{t("modeLanding.bot.accent")}</em>
         </h1>
-        <p className="ohb-mode-lead">{t("modeLanding.bot.lead")}</p>
-        <p className="ohb-mode-facts">
+        <p className="openedbot-mode-lead">{t("modeLanding.bot.lead")}</p>
+        <p className="openedbot-mode-facts">
           {facts.map((fact) => (
             <span key={fact}>{fact}</span>
           ))}
         </p>
 
-        <section className="ohb-mode-index" aria-labelledby="ohb-mode-index-title">
-          <h2 id="ohb-mode-index-title" className="ohb-mode-index-title">
+        <section className="openedbot-mode-index" aria-labelledby="openedbot-mode-index-title">
+          <h2 id="openedbot-mode-index-title" className="openedbot-mode-index-title">
             {t("modeLanding.bot.indexTitle")}
             <span>{t("modeLanding.bot.indexHint")}</span>
           </h2>
 
           {roster.isSuccess && bots.length === 0 ? (
-            <div className="ohb-mode-empty">
+            <div className="openedbot-mode-empty">
               <p>{t("modeLanding.bot.emptyTitle")}</p>
               <p>{t("modeLanding.bot.emptyBody")}</p>
               {newBot}
             </div>
           ) : null}
 
-          <ul className="ohb-mode-rows">
+          <ul className="openedbot-mode-rows">
             {bots.map((bot, index) => (
-              <li key={bot.id} className="ohb-mode-row" style={{ ["--i" as string]: index }}>
-                <Link to="/bot/$botId" params={{ botId: bot.id }} className="ohb-mode-row-target">
+              <li key={bot.id} className="openedbot-mode-row" style={{ ["--i" as string]: index }}>
+                <Link to="/bot/$botId" params={{ botId: bot.id }} className="openedbot-mode-row-target">
                   <BotFace name={bot.name} seed={bot.id} face={bot.face} className="size-9 shrink-0" />
-                  <span className="ohb-mode-row-text">
+                  <span className="openedbot-mode-row-text">
                     <strong>{bot.name}</strong>
                     <span>
                       {bot.preview
@@ -93,10 +93,10 @@ export function ModeLanding() {
                         : t("modeLanding.bot.noPreview")}
                     </span>
                   </span>
-                  <time className="ohb-mode-row-meta" dateTime={bot.lastActivityAt}>
+                  <time className="openedbot-mode-row-meta" dateTime={bot.lastActivityAt}>
                     {listTimestamp(bot.lastActivityAt, undefined, locale)}
                   </time>
-                  <ArrowRight className="ohb-mode-row-go size-4" aria-hidden />
+                  <ArrowRight className="openedbot-mode-row-go size-4" aria-hidden />
                 </Link>
               </li>
             ))}

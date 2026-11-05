@@ -67,16 +67,16 @@ alter table profile_import_jobs force row level security;
 alter table profile_import_items enable row level security;
 alter table profile_import_items force row level security;
 
-create policy profile_import_jobs_tenant on profile_import_jobs to ohb_api
+create policy profile_import_jobs_tenant on profile_import_jobs to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy profile_import_items_tenant on profile_import_items to ohb_api
+create policy profile_import_items_tenant on profile_import_items to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy profile_import_jobs_worker on profile_import_jobs to ohb_worker using (true) with check (true);
-create policy profile_import_items_worker on profile_import_items to ohb_worker using (true) with check (true);
-grant select, insert, update on profile_import_jobs, profile_import_items to ohb_api;
-grant select, insert, update, delete on profile_import_jobs, profile_import_items to ohb_worker;
+create policy profile_import_jobs_worker on profile_import_jobs to openedbot_worker using (true) with check (true);
+create policy profile_import_items_worker on profile_import_items to openedbot_worker using (true) with check (true);
+grant select, insert, update on profile_import_jobs, profile_import_items to openedbot_api;
+grant select, insert, update, delete on profile_import_jobs, profile_import_items to openedbot_worker;
 
 comment on table profile_import_jobs is 'Durable bounded Hermes archive imports; no raw YAML, credentials or skill content.';
 comment on column profile_import_items.operation is 'Committed before external mutation; an unresolved intent is never replayed after lease loss.';

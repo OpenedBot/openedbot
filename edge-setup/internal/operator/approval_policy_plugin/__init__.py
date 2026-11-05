@@ -5,12 +5,12 @@ import re
 from pathlib import Path
 
 # PERM2-A: every gate names its tool (`rule_key`, which Hermes turns into
-# `pattern_key = "plugin_rule:ohb/v1/<tool_key>"`) and ends its message with
-# one descriptor line, `ohb-gate/v1 <sha256 of the JSON text> <JSON>`. The
+# `pattern_key = "plugin_rule:openedbot/v1/<tool_key>"`) and ends its message with
+# one descriptor line, `openedbot-gate/v1 <sha256 of the JSON text> <JSON>`. The
 # twin reader is `modules/execution/src/domain/gate-identity.ts` in openedbot: a
 # change here changes it there. The descriptor carries only what the
 # permission pipeline needs, never a file content, and fits in 1 KiB.
-RULE_PREFIX = "ohb/v1/"
+RULE_PREFIX = "openedbot/v1/"
 DESCRIPTOR_VERSION = 1
 DESCRIPTOR_MAX_BYTES = 1024
 PATH_MAX_CHARS = 512
@@ -154,7 +154,7 @@ def descriptor_line(tool_key, deletes, opaque, described, digest):
         text = json.dumps(body, separators=(",", ":"), ensure_ascii=True)
     if len(text.encode("utf-8")) > DESCRIPTOR_MAX_BYTES:
         return None
-    return f"ohb-gate/v1 {hashlib.sha256(text.encode('utf-8')).hexdigest()} {text}"
+    return f"openedbot-gate/v1 {hashlib.sha256(text.encode('utf-8')).hexdigest()} {text}"
 
 
 def register(ctx):

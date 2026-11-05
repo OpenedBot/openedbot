@@ -4,9 +4,9 @@
  *
  * Hermes sends `request_id` (the gate to answer), `pattern_key` (what the
  * gate is) and `description`. The openedbot host plugin answers `rule_key =
- * "ohb/v1/<tool_key>"`, which Hermes turns into `pattern_key =
- * "plugin_rule:ohb/v1/<tool_key>"`, and ends its message with one descriptor
- * line: `ohb-gate/v1 <sha256 of the JSON text> <JSON>`. The digest proves the
+ * "openedbot/v1/<tool_key>"`, which Hermes turns into `pattern_key =
+ * "plugin_rule:openedbot/v1/<tool_key>"`, and ends its message with one descriptor
+ * line: `openedbot-gate/v1 <sha256 of the JSON text> <JSON>`. The digest proves the
  * line reached us whole: Hermes redacts the description before egress, and a
  * redaction or a truncation that touched the descriptor turns the gate into
  * `unknown`, never into a partly trusted one.
@@ -54,9 +54,9 @@ export const GATE_COMMAND_MAX_CHARS = 2000;
 const PATTERN_KEY_MAX_CHARS = 200;
 
 const PLUGIN_RULE_PREFIX = "plugin_rule:";
-const OPENEDBOT_RULE_PREFIX = `${PLUGIN_RULE_PREFIX}ohb/v1/`;
-const DESCRIPTOR_LINE = /^ohb-gate\/v1 ([0-9a-f]{64}) (\{.*\})$/;
-const DESCRIPTOR_PREFIX = "ohb-gate/";
+const OPENEDBOT_RULE_PREFIX = `${PLUGIN_RULE_PREFIX}openedbot/v1/`;
+const DESCRIPTOR_LINE = /^openedbot-gate\/v1 ([0-9a-f]{64}) (\{.*\})$/;
+const DESCRIPTOR_PREFIX = "openedbot-gate/";
 const NATIVE_TOOL_KEY = /^[a-z][a-z0-9_]{0,63}$/;
 const MCP_TOOL_KEY = /^mcp:([A-Za-z0-9_.-]{1,64}):([A-Za-z0-9_.-]{1,128})$/;
 const DIGEST = /^[0-9a-f]{64}$/;

@@ -92,7 +92,7 @@ function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes
     if (text.startsWith("insert") || text.startsWith("update")) {
       writes.push({ sql: text, parameters: clean(parameters) });
       if (text.includes("insert into run_events")) {
-        return Promise.resolve([{ cursor: "7", botId: BOT, turnId: "run-1", sessionKey: "ohb:org:thread", leaseGeneration: "1" }]);
+        return Promise.resolve([{ cursor: "7", botId: BOT, turnId: "run-1", sessionKey: "openedbot:org:thread", leaseGeneration: "1" }]);
       }
       return Promise.resolve([]);
     }
@@ -126,7 +126,7 @@ async function runCase(state: OrgState, gate: GateIdentity, command: string | nu
   const db = { begin: async (fn: (tx: SQL) => Promise<unknown>) => fn(fakeTx(state, workflow.row, writes)) } as unknown as SQL;
   const context = {
     id: "run-1", organizationId: ORG, threadId: "thread-1", botId: BOT, botName: "Neo", botSlug: "neo",
-    sessionId: "ohb:org:thread", leaseGeneration: 1, workflowId: workflow.workflowId, workflowRootRunId: null,
+    sessionId: "openedbot:org:thread", leaseGeneration: 1, workflowId: workflow.workflowId, workflowRootRunId: null,
     groupId: null, groupTurnPosition: null, groupState: null, stepKind: "root", originRunId: null, provider: null,
     runtimeId: "rt-1", permissionMode: mode,
   };

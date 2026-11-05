@@ -1,5 +1,5 @@
 /**
- * Traceur de latence d'un run (OHB-107), sans dépendance : il se charge
+ * Traceur de latence d'un run, sans dépendance : il se charge
  * depuis l'API comme depuis le worker sans tirer pino.
  *
  * Une trace ne retient que des NOMS et des DURÉES : jamais un texte, un
@@ -127,10 +127,10 @@ export function endRunTrace(runId: string): RunTrace | undefined {
 }
 
 /**
- * Trois seuils distincts (critère 5 d'OHB-107) : l'admission locale de l'API,
+ * Trois seuils distincts : l'admission locale de l'API,
  * le premier événement du runtime et le premier texte visible, les deux
  * derniers comptés depuis la création du run. Valeurs provisoires, à caler
- * sur le relevé de 20 messages (OHB-119).
+ * sur le relevé de 20 messages.
  */
 export const RUN_LATENCY_BUDGETS_MS = {
   admission: 250,
@@ -178,7 +178,7 @@ export function runLatencyRecord(input: {
     ...summary,
     verdicts: runLatencyVerdicts({
       firstRuntimeEvent: sinceCreated("hermes.first_event"),
-      firstVisibleText: sinceCreated("ohb.first_text_published"),
+      firstVisibleText: sinceCreated("openedbot.first_text_published"),
     }),
   };
 }

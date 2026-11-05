@@ -35,7 +35,7 @@ alter table staff_sessions force row level security;
 
 -- Login looks up by email through app.staff_email; every other access is the
 -- live staff user id. Inserts (seed, session creation) go through staff_user_id.
-create policy staff_users_api on staff_users to ohb_api
+create policy staff_users_api on staff_users to openedbot_api
   using (
     id = nullif(current_setting('app.staff_user_id', true), '')::uuid
     or lower(email) = nullif(current_setting('app.staff_email', true), '')
@@ -44,7 +44,7 @@ create policy staff_users_api on staff_users to ohb_api
     id = nullif(current_setting('app.staff_user_id', true), '')::uuid
   );
 
-create policy staff_sessions_api on staff_sessions to ohb_api
+create policy staff_sessions_api on staff_sessions to openedbot_api
   using (
     session_token_hash = nullif(current_setting('app.staff_session_hash', true), '')
     or staff_user_id = nullif(current_setting('app.staff_user_id', true), '')::uuid
@@ -54,9 +54,9 @@ create policy staff_sessions_api on staff_sessions to ohb_api
     or staff_user_id = nullif(current_setting('app.staff_user_id', true), '')::uuid
   );
 
-grant select, insert, update, delete on staff_users, staff_sessions to ohb_api;
+grant select, insert, update, delete on staff_users, staff_sessions to openedbot_api;
 
--- Cross-tenant reads. ohb_api still cannot SELECT other orgs with a tenant GUC;
+-- Cross-tenant reads. openedbot_api still cannot SELECT other orgs with a tenant GUC;
 -- these definers abort unless app.staff_user_id is a live (non-disabled) staff user.
 create or replace function staff_list_organizations()
 returns table (
@@ -256,9 +256,9 @@ $$;
 revoke all on function staff_list_organizations() from public;
 revoke all on function staff_get_organization(uuid) from public;
 revoke all on function staff_operational_metrics() from public;
-grant execute on function staff_list_organizations() to ohb_api;
-grant execute on function staff_get_organization(uuid) to ohb_api;
-grant execute on function staff_operational_metrics() to ohb_api;
+grant execute on function staff_list_organizations() to openedbot_api;
+grant execute on function staff_get_organization(uuid) to openedbot_api;
+grant execute on function staff_operational_metrics() to openedbot_api;
 
 insert into schema_migrations(version) values ('0023_staff')
 on conflict (version) do nothing;

@@ -1,6 +1,6 @@
 begin;
 
--- OHB-23 : un fait issu de `remember:` ou d'une extraction reste en attente
+-- Un fait issu de `remember:` ou d'une extraction reste en attente
 -- jusqu'à une décision opérateur. Les lignes existantes (opérateur ou bot
 -- déjà injectées) sont `accepted`. RLS inchangée : même table, mêmes policies.
 

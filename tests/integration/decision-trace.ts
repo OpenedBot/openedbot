@@ -1,5 +1,5 @@
 /**
- * PERM2-11 (DEV-OHB-262), tenant side, against a disposable PostgreSQL
+ * PERM2-11, tenant side, against a disposable PostgreSQL
  * database: the decision journal (`GET /decisions`, `listDecisions`) says
  * who or what decided each gate and why. A gate the grant answered shows
  * the grant and its author (by the id the worker records, or for an older
@@ -39,8 +39,8 @@ async function asTenant<T>(sql: SQL, organizationId: string, run: (tx: Bun.Trans
   }) as Promise<T>;
 }
 
-await withDisposablePostgres("ohb262_decision_trace", async ({ owner, connect }) => {
-  const api = await connect("ohb_api");
+await withDisposablePostgres("openedbot262_decision_trace", async ({ owner, connect }) => {
+  const api = await connect("openedbot_api");
 
   await owner`insert into users (id, email, display_name) values
     (${MEMBER}, 'camille.lefevre@example.com', 'Camille Lefèvre'),

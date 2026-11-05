@@ -33,7 +33,7 @@ func (r *approvalPolicyRunner) Run(_ context.Context, cmd hostexec.Cmd) (hostexe
 	if strings.Contains(cmd.Path, "python") && strings.Contains(strings.Join(cmd.Env, " "), "OPENEDBOT_APPROVAL_ENABLE=1") {
 		r.enableRuns++
 		config := filepath.Join(r.root, "profiles", "scout", "config.yaml")
-		return hostexec.Result{}, os.WriteFile(config, []byte("plugins:\n  enabled:\n    - ohb_approval_policy\n"), 0o600)
+		return hostexec.Result{}, os.WriteFile(config, []byte("plugins:\n  enabled:\n    - openedbot_approval_policy\n"), 0o600)
 	}
 	if strings.Contains(cmd.Path, "python") {
 		if r.failReadback && r.enableRuns > 0 {
@@ -45,8 +45,8 @@ func (r *approvalPolicyRunner) Run(_ context.Context, cmd hostexec.Cmd) (hostexe
 			return hostexec.Result{}, err
 		}
 		text := string(data)
-		enabled := strings.Contains(text, "enabled:\n    - ohb_approval_policy")
-		disabled := strings.Contains(text, "disabled:\n    - ohb_approval_policy")
+		enabled := strings.Contains(text, "enabled:\n    - openedbot_approval_policy")
+		disabled := strings.Contains(text, "disabled:\n    - openedbot_approval_policy")
 		return hostexec.Result{Stdout: `{"enabled":` + strconv.FormatBool(enabled) + `,"disabled":` + strconv.FormatBool(disabled) + `}`}, nil
 	}
 	return hostexec.Result{}, nil
@@ -123,7 +123,7 @@ func TestApprovalPolicyDisabledTakesPrecedenceOverEnabled(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(profile, "plugins", approvalPolicyPlugin), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(profile, "config.yaml"), []byte("plugins:\n  enabled:\n    - ohb_approval_policy\n  disabled:\n    - ohb_approval_policy\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(profile, "config.yaml"), []byte("plugins:\n  enabled:\n    - openedbot_approval_policy\n  disabled:\n    - openedbot_approval_policy\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	policyPath := filepath.Join(profile, "plugins", approvalPolicyPlugin, "policy.json")
@@ -159,7 +159,7 @@ func TestApprovalPolicyConfigScriptValidatesListsAndClearsDisabledEntry(t *testi
 		t.Fatal(err)
 	}
 	config := filepath.Join(profile, "config.yaml")
-	if err := os.WriteFile(config, []byte("plugins:\n  enabled:\n    - ohb_approval_policy\n  disabled:\n    - ohb_approval_policy\n"), 0o600); err != nil {
+	if err := os.WriteFile(config, []byte("plugins:\n  enabled:\n    - openedbot_approval_policy\n  disabled:\n    - openedbot_approval_policy\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	// The host venv has no PyYAML: the program must go through Hermes' own

@@ -128,8 +128,8 @@ describe("API runtime metrics", () => {
       headers: { Authorization: "Bearer metrics-secret", Accept: "text/plain" },
     });
     const text = await textResponse.text();
-    expect(text).toContain('ohb_runs_by_status{status="unknown"} 1');
-    expect(text).toContain("ohb_run_leases_expired 1");
+    expect(text).toContain('openedbot_runs_by_status{status="unknown"} 1');
+    expect(text).toContain("openedbot_run_leases_expired 1");
     expect(statements.some((sql) => sql.includes("internal_operational_metrics()"))).toBe(true);
   });
 });

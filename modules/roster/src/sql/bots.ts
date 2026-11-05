@@ -456,7 +456,7 @@ export async function markProfileRecreated(
     update bots set hermes_profile_managed = true,
            model = case when ${model === undefined}::boolean then model else ${model ?? null}::text end,
            -- Un profil recréé repart du clone du profil default : le socle de
-           -- capacités (DEV-OHB-247) doit y être réappliqué.
+           -- capacités doit y être réappliqué.
            capability_baseline_version = 0,
            updated_at = now()
      where organization_id = ${organizationId} and id = ${botId}

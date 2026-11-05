@@ -45,7 +45,7 @@ insert into paging_proof values (
   'unset', 'unset', 'unset', 'unset'
 );
 
-grant select, insert, update on paging_proof to ohb_api;
+grant select, insert, update on paging_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('80000000-0000-4000-8000-000000000091', 'paging-staff@example.test', 'x', 'Paging Staff'),
@@ -84,7 +84,7 @@ insert into threads (id, organization_id, bot_id, title, hermes_session_id) valu
   ('95000000-0000-4000-8000-000000000001', '90000000-0000-4000-8000-000000000091',
    '94000000-0000-4000-8000-000000000001', 'Secret de fabrication', 'paging-session');
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-000000000091', false) \g /dev/null
 
 -- 1. Page 1, puis page 2 depuis le curseur keyset de la derniere ligne servie.
@@ -143,7 +143,7 @@ reset role;
 
 -- 5. Les compteurs disent la meme chose que la table, quelles que soient les
 -- lignes laissees par les preuves precedentes. La comparaison se fait hors du
--- role ohb_api : memberships et organizations sont sous RLS tenant, un compte
+-- role openedbot_api : memberships et organizations sont sous RLS tenant, un compte
 -- lu depuis ce role en dirait zero et la preuve serait fausse pour la mauvaise
 -- raison. Le GUC de staff, lui, reste pose : set_config de session survit au
 -- reset role.
@@ -162,7 +162,7 @@ update paging_proof
    );
 
 -- 6. Sans GUC de staff, les trois fonctions du lot refusent.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '', false) \g /dev/null
 do $paging$
 begin

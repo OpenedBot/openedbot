@@ -122,7 +122,7 @@ type autoUpgrader struct {
 	logf       func(string, ...any)
 	recordPath string
 	asset      string
-	// legacyAsset is the pre-rename asset name (OHB-87): a manifest cut at or
+	// legacyAsset is the pre-rename asset name: a manifest cut at or
 	// before v0.4.0 lists it instead of asset, and the pass must still see a
 	// candidate rather than report the release as unpublished. Empty skips
 	// the fallback (tests that only care about the canonical name).

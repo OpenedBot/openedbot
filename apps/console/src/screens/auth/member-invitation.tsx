@@ -53,7 +53,7 @@ export function MemberInvitationScreen() {
   const invalid = preview.error instanceof ApiError && (preview.error.status === 410 || preview.error.code === "MEMBER_INVITATION_UNAVAILABLE");
 
   return (
-    <main className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-background px-6 pt-[max(2rem,var(--ohb-safe-top))] pb-[max(2rem,var(--ohb-safe-bottom))] text-foreground">
+    <main className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto bg-background px-6 pt-[max(2rem,var(--openedbot-safe-top))] pb-[max(2rem,var(--openedbot-safe-bottom))] text-foreground">
       <div className="mx-auto flex w-full max-w-[28rem] flex-col gap-6">
         <Wordmark className="size-8" />
         {declined ? <p role="status">{t("memberInvitation.declined")}</p> : <>

@@ -105,7 +105,7 @@ export function Menu<T extends string>({
                 setOpen(false)
               }}
               /* boardui dark: dropdown-item-hover = neutral-700 @ 60%, not solid accent */
-              className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-foreground/80 ohb-row hover:bg-accent/60"
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-foreground/80 openedbot-row hover:bg-accent/60"
             >
               <span className="flex min-w-0 items-center gap-1.5">
                 {leading?.(o)}

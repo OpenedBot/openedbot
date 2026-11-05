@@ -10,7 +10,7 @@ import { NATIVE_SESSION_MARK } from "../platform/native-bridge";
  */
 export const COMPACT_PATH = "/compact";
 
-const LAST_BOT_KEY = "ohb:compact-last-bot";
+const LAST_BOT_KEY = "openedbot:compact-last-bot";
 
 export function isCompactPath(pathname: string): boolean {
   return pathname === COMPACT_PATH || pathname.startsWith(`${COMPACT_PATH}/`);

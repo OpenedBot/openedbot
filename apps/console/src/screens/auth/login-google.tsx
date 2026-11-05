@@ -20,7 +20,7 @@ import { loginFailureCode, runNativeStep } from "./login-transport";
  */
 
 /** La tentative en cours, mémorisée le temps de l'aller-retour vers Google (mode web, même onglet). */
-export const PENDING_ATTEMPT_KEY = "ohb:auth-attempt";
+export const PENDING_ATTEMPT_KEY = "openedbot:auth-attempt";
 
 function readPendingAttempt(): string | null {
   try {

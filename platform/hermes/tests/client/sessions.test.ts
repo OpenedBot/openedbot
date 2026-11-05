@@ -29,11 +29,11 @@ function fakeTransport(respond: (sent: Sent) => Response | Promise<Response>) {
 describe("HermesClient.deleteSession", () => {
   test("DELETE /api/sessions/{id}, classé mutation", async () => {
     const { transport, sent } = fakeTransport(() =>
-      Response.json({ object: "hermes.session.deleted", id: "ohb:org-1:thread-1", deleted: true }));
-    await new HermesClient({ transport }).deleteSession("ohb:org-1:thread-1");
+      Response.json({ object: "hermes.session.deleted", id: "openedbot:org-1:thread-1", deleted: true }));
+    await new HermesClient({ transport }).deleteSession("openedbot:org-1:thread-1");
     expect(sent).toEqual([
       {
-        path: "/api/sessions/ohb%3Aorg-1%3Athread-1",
+        path: "/api/sessions/openedbot%3Aorg-1%3Athread-1",
         method: "DELETE",
         kind: "mutation",
       },
@@ -82,10 +82,10 @@ describe("HermesClient.deleteSession", () => {
 });
 
 describe("HermesClient.removeSession", () => {
-  test("says whether a session was there (DEV-OHB-244)", async () => {
+  test("says whether a session was there", async () => {
     const present = fakeTransport(() => Response.json({ object: "hermes.session.deleted", deleted: true }));
-    expect(await new HermesClient({ transport: present.transport }).removeSession("ohb:org-1:t-1")).toBe(true);
+    expect(await new HermesClient({ transport: present.transport }).removeSession("openedbot:org-1:t-1")).toBe(true);
     const absent = fakeTransport(() => new Response(null, { status: 404 }));
-    expect(await new HermesClient({ transport: absent.transport }).removeSession("ohb:org-1:t-1")).toBe(false);
+    expect(await new HermesClient({ transport: absent.transport }).removeSession("openedbot:org-1:t-1")).toBe(false);
   });
 });

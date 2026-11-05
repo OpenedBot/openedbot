@@ -14,7 +14,7 @@ import {
 afterAll(() => stopLinkSessions());
 
 /**
- * La preuve de possession du lien (OHB-54 côté hôte, OHB-56 ici) : un jeton
+ * La preuve de possession du lien, côté API : un jeton
  * volé n'ouvre rien sans la clé device de la machine enrôlée.
  */
 describe("preuve de possession du lien connecteur", () => {
@@ -185,29 +185,29 @@ describe("preuve de possession du lien connecteur", () => {
 
 describe("URL acceptées par la preuve et message signé", () => {
   test("en production, seule l'origine publique en wss:// est acceptée", () => {
-    const config = { environment: "production" as const, publicUrl: "https://api.ohb.example", port: 8790 };
-    expect(expectedLinkWsUrls(config)).toEqual(["wss://api.ohb.example/api/runtime-links/ws"]);
+    const config = { environment: "production" as const, publicUrl: "https://api.openedbot.example", port: 8790 };
+    expect(expectedLinkWsUrls(config)).toEqual(["wss://api.openedbot.example/api/runtime-links/ws"]);
   });
 
   test("en production, une ancienne origine publique reste acceptée après l'actuelle, en wss:// seulement", () => {
     const config = {
       environment: "production" as const,
-      publicUrl: "https://ohb.example",
+      publicUrl: "https://openedbot.example",
       port: 8790,
-      linkLegacyPublicUrls: ["https://console.ohb.example", "http://plain.ohb.example"],
+      linkLegacyPublicUrls: ["https://console.openedbot.example", "http://plain.openedbot.example"],
     };
     expect(expectedLinkWsUrls(config)).toEqual([
-      "wss://ohb.example/api/runtime-links/ws",
-      "wss://console.ohb.example/api/runtime-links/ws",
+      "wss://openedbot.example/api/runtime-links/ws",
+      "wss://console.openedbot.example/api/runtime-links/ws",
     ]);
   });
 
   test("l'origine dédiée du lien passe d'abord, l'origine de l'API reste acceptée", () => {
-    const config = { environment: "production" as const, publicUrl: "https://ohb.example", linkPublicUrl: "https://link.ohb.example", port: 8790, linkLegacyPublicUrls: ["https://console.ohb.example"] };
+    const config = { environment: "production" as const, publicUrl: "https://openedbot.example", linkPublicUrl: "https://link.openedbot.example", port: 8790, linkLegacyPublicUrls: ["https://console.openedbot.example"] };
     expect(expectedLinkWsUrls(config)).toEqual([
-      "wss://link.ohb.example/api/runtime-links/ws",
-      "wss://ohb.example/api/runtime-links/ws",
-      "wss://console.ohb.example/api/runtime-links/ws",
+      "wss://link.openedbot.example/api/runtime-links/ws",
+      "wss://openedbot.example/api/runtime-links/ws",
+      "wss://console.openedbot.example/api/runtime-links/ws",
     ]);
   });
 
@@ -243,9 +243,9 @@ describe("URL acceptées par la preuve et message signé", () => {
   test("le message signé est prefix, nonce brut, runtimeId et wsURL séparés par des sauts de ligne", () => {
     const nonce = Buffer.alloc(32, 1).toString("base64");
     const message = Buffer.from(linkPopMessage(nonce, "rt", "wss://x/api/runtime-links/ws"));
-    expect(message.subarray(0, 16).toString()).toBe("ohb-link-pop/v1\n");
-    expect(message.subarray(16, 48).equals(Buffer.alloc(32, 1))).toBe(true);
-    expect(message.subarray(48).toString()).toBe("\nrt\nwss://x/api/runtime-links/ws\n");
+    expect(message.subarray(0, 22).toString()).toBe("openedbot-link-pop/v1\n");
+    expect(message.subarray(22, 54).equals(Buffer.alloc(32, 1))).toBe(true);
+    expect(message.subarray(54).toString()).toBe("\nrt\nwss://x/api/runtime-links/ws\n");
   });
 
   test("verifyLinkProof rend l'URL signée, et null sur une clé, un nonce ou une signature mal formés", () => {

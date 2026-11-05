@@ -6,7 +6,7 @@ language plpgsql set search_path = pg_catalog, public as $$
 begin
   if tg_op = 'INSERT' then
     if new.status = 'queued' then
-      perform pg_catalog.pg_notify('ohb_run_queue_v1', '');
+      perform pg_catalog.pg_notify('openedbot_run_queue_v1', '');
     end if;
   elsif (new.status = 'queued' and
       (old.status is distinct from new.status or old.next_attempt_at is distinct from new.next_attempt_at
@@ -14,7 +14,7 @@ begin
     or (old.status in ('starting', 'running', 'awaiting_approval', 'relaying', 'unknown') and
       (new.status not in ('starting', 'running', 'awaiting_approval', 'relaying', 'unknown')
         or (old.lease_owner is not null and new.lease_owner is null))) then
-    perform pg_catalog.pg_notify('ohb_run_queue_v1', '');
+    perform pg_catalog.pg_notify('openedbot_run_queue_v1', '');
   end if;
   return new;
 end;

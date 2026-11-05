@@ -66,7 +66,7 @@ export async function agencyBusinessScenarios(context: Context) {
   check(first.authorizedTotal === 2 && first.filteredTotal === 2, 'Exact portfolio and filtered totals');
   check(first.period.timezone === 'UTC' && first.period.from === period.from && first.period.until === period.until, 'Explicit calendar range');
   check(first.summary.totals.runsTotal === 4 && first.summary.totals.completed === 3 && first.summary.totals.failed === 1, 'Period boundaries are inclusive/exclusive');
-  check(first.summary.totals.tokens === 150 && first.summary.totals.successRate === 75, 'Weighted success and measured OHB tokens');
+  check(first.summary.totals.tokens === 150 && first.summary.totals.successRate === 75, 'Weighted success and measured openedbot tokens');
   check(first.summary.totals.runsRunning === 1 && first.summary.totals.pendingApprovals === 1, 'Current activity is independent of period');
   check(first.summary.totals.providerIncidents === 2 && first.summary.totals.runtimeIncidents === 1,
     'Active provider incidents and persisted runtime alerts are counted, inactive and expired signals excluded');
@@ -187,5 +187,5 @@ export async function agencyBusinessScenarios(context: Context) {
   try { await readAgencyDirectory(api, userId, agencyId, 0); } catch { denied = true; }
   check(denied, 'Definer directory independently refuses a revoked agency membership');
   console.log('Agency business integration passed: exact grants, RLS, UTC boundaries, usage coverage, cursor paging and injected partial errors.');
-  console.log(JSON.stringify({ measuredAt: new Date().toISOString(), environment: 'disposable PostgreSQL; ohb_api RLS; seven samples per size', measurements: results }));
+  console.log(JSON.stringify({ measuredAt: new Date().toISOString(), environment: 'disposable PostgreSQL; openedbot_api RLS; seven samples per size', measurements: results }));
 }

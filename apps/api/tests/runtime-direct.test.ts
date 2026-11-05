@@ -73,7 +73,7 @@ function mount(initial: RuntimeRow[] = [], role: AuthContext["role"] = "owner", 
 }
 const body = (value: unknown, method = "POST") => ({ method, headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
 
-describe("OHB-74 direct HTTP contract", () => {
+describe("direct HTTP contract", () => {
   test("draft probe works with an active connector and returns three ordered proofs", async () => {
     const { app, calls } = mount([{ ...base, reachability: "connector", endpoint: null, isActive: true }]);
     const response = await app.request("/test-draft", body({ url: "https://hermes.example.com", token: "bearer" }));

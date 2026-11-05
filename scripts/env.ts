@@ -24,14 +24,12 @@ import {
   type EnvVar,
 } from "../platform/config/src/env-schema";
 import { RUNTIME_MODE } from "../platform/config/src/runtime-mode";
-import { legacyEnvRefusal, mergedEnvTarget, renamedEnvName } from "../platform/config/src/legacy-env";
 import {
   assertUniqueEnvNames,
   classifyLocalEnvEntry,
   mergeEnvFiles,
   parseEnvLine,
   readEnvFiles,
-  withRenamedEnvValues,
 } from "./lib/env-file";
 
 function usage(): never {
@@ -55,13 +53,7 @@ async function runCheck(): Promise<void> {
   if (!files.length) {
     throw new Error(`No ${path} found. Run \`make setup\`, or copy each .env.example next to it.`);
   }
-  const merged = mergeEnvFiles(files);
-  // A retired OHB_* name makes every app refuse to start: say so here first,
-  // with the same advice (`make env-prune` rewrites them).
-  const legacy = legacyEnvRefusal(merged.values);
-  if (legacy) throw new Error(legacy.replace("openedbot refuses to start", `${path} would not start openedbot`));
-  const values = withRenamedEnvValues(merged.values);
-  const { sourceOf } = merged;
+  const { values, sourceOf } = mergeEnvFiles(files);
 
   /** Where a variable must be set, for an error message that is actionable. */
   function fileOf(name: string): string {
@@ -118,10 +110,10 @@ async function runCheck(): Promise<void> {
     if (values.BLOB_DRIVER && values.BLOB_DRIVER !== "r2" && values.BLOB_DRIVER !== "file") {
       throw new Error("BLOB_DRIVER must be r2 or file.");
     }
-    if (values.WORKER_INTERNAL_TOKEN === "ohb-worker-dev-token") {
+    if (values.WORKER_INTERNAL_TOKEN === "openedbot-worker-dev-token") {
       throw new Error("WORKER_INTERNAL_TOKEN must not be the development default in production.");
     }
-    if (values.METRICS_INTERNAL_TOKEN === "ohb-metrics-dev-token" || values.METRICS_INTERNAL_TOKEN === values.WORKER_INTERNAL_TOKEN) {
+    if (values.METRICS_INTERNAL_TOKEN === "openedbot-metrics-dev-token" || values.METRICS_INTERNAL_TOKEN === values.WORKER_INTERNAL_TOKEN) {
       throw new Error("METRICS_INTERNAL_TOKEN must be a distinct production secret.");
     }
     const alertWebhook = new URL(values.ALERT_WEBHOOK_URL!);
@@ -205,7 +197,7 @@ async function runCheck(): Promise<void> {
   }
 
   function assertSameDatabase(values: Record<string, string | undefined>): void {
-    const declared = databaseOfDsn(values.API_DATABASE_URL) ?? "ohb";
+    const declared = databaseOfDsn(values.API_DATABASE_URL) ?? "openedbot";
     const database = databaseOfDsn(values.WORKER_DATABASE_URL);
     if (database && database !== declared) {
       throw new Error(
@@ -259,29 +251,13 @@ async function runAudit(): Promise<void> {
     console.info(`${localName}: absent; templates are consistent.`);
     process.exit(0);
   }
-  const values = withRenamedEnvValues(mergeEnvFiles(locals).values);
+  // Refuses a name declared twice across the files.
+  mergeEnvFiles(locals);
   const runtimeMode = RUNTIME_MODE;
 
   const removable: string[] = [];
-  const renamed: string[] = [];
   const kept: string[] = [];
   const misfiled: string[] = [];
-  const presentNames = new Set(locals.flatMap((local) => local.entries.map((entry) => entry.name)));
-  // A merged old name (ENV_MERGES) changes the value of its target: the
-  // target line is rewritten with the converted value (`values` holds it),
-  // or written in place of the first old line when the target is absent.
-  const mergedTargets = new Set([...presentNames].map(mergedEnvTarget).filter((into): into is string => into !== undefined));
-  const presentAfterRename = new Set([...presentNames].map((name) => renamedEnvName(name) ?? name));
-  const writtenTargets = new Set<string>();
-  const beforeMerges = withRenamedEnvValues(mergeEnvFiles(locals).values, { merges: false });
-  const mergedLine = (into: string): string | null => {
-    if (writtenTargets.has(into)) return null;
-    writtenTargets.add(into);
-    if (values[into] !== undefined) return `${into}=${values[into]}`;
-    // Turned off by an old setting: commented out, never deleted, so that a
-    // secret the operator kept is not lost.
-    return beforeMerges[into] === undefined ? null : `# ${into}=${beforeMerges[into]} # off: an old OHB_* setting disabled it (env-audit)`;
-  };
 
   for (const local of locals) {
     const nextLines: string[] = [];
@@ -291,37 +267,7 @@ async function runAudit(): Promise<void> {
         nextLines.push(line);
         continue;
       }
-      if (mergedTargets.has(parsed.name)) {
-        const rewritten = mergedLine(parsed.name);
-        if (rewritten !== null && rewritten !== line) renamed.push(`${parsed.name}: converted value from the merged old names (${local.path})`);
-        if (rewritten !== null) nextLines.push(rewritten);
-        continue;
-      }
       const decision = classifyLocalEnvEntry(parsed, runtimeMode);
-      const into = mergedEnvTarget(parsed.name);
-      if (decision === "rename" && into) {
-        renamed.push(`${parsed.name} -> folded into ${into} (${local.path})`);
-        if (!presentAfterRename.has(into)) {
-          const rewritten = mergedLine(into);
-          if (rewritten !== null) nextLines.push(rewritten);
-        }
-        continue;
-      }
-      if (decision === "rename") {
-        // The value moves to the new name; never dropped.
-        const next = renamedEnvName(parsed.name)!;
-        if (presentNames.has(next)) {
-          renamed.push(`${parsed.name} -> ${next}, already set: old line removed (${local.path})`);
-        } else if (mergedTargets.has(next)) {
-          renamed.push(`${parsed.name} -> ${next}, value converted from the merged old names (${local.path})`);
-          const rewritten = mergedLine(next);
-          if (rewritten !== null) nextLines.push(rewritten);
-        } else {
-          renamed.push(`${parsed.name} -> ${next} (${local.path})`);
-          nextLines.push(`${next}=${parsed.value}`);
-        }
-        continue;
-      }
       if (decision === "remove") {
         removable.push(`${parsed.name} (${local.path})`);
         continue;
@@ -342,9 +288,6 @@ async function runAudit(): Promise<void> {
   }
 
   console.info(`${localName}: removable empty or obsolete variables: ${removable.sort().join(", ") || "none"}.`);
-  if (renamed.length) {
-    console.info(`${localName}: ${apply ? "renamed" : "to rename (retired OHB_* -> OPENEDBOT_*, values kept or converted; --apply rewrites them)"}: ${renamed.sort().join(", ")}.`);
-  }
   if (kept.length) console.info(`${localName}: preserved non-empty non-local variables: ${[...new Set(kept)].sort().join(", ")}.`);
   for (const line of misfiled.sort()) {
     console.info(`${localName}: in the wrong file, \`bun scripts/env.ts --template --write-local\` moves it — ${line}`);
@@ -530,7 +473,7 @@ async function write(): Promise<void> {
 async function writeLocal(fileName: string): Promise<void> {
   const files = await readEnvFiles(fileName);
   if (!files.length) throw new Error(`No ${fileName} found in the monorepo; nothing to rewrite.`);
-  const existing = withRenamedEnvValues(mergeEnvFiles(files).values);
+  const existing = mergeEnvFiles(files).values;
   const runtimeMode = RUNTIME_MODE;
   const unusedForMode = envUnusedForRuntimeMode(runtimeMode);
 
@@ -569,16 +512,9 @@ async function writeLocal(fileName: string): Promise<void> {
   // Unknown to the schema: kept verbatim in the root file, as env-audit does,
   // so that nothing an operator added on purpose disappears silently.
   const unknown: string[] = [];
-  const renamed: string[] = [];
   for (const file of files) {
     for (const parsed of file.entries) {
       if (envSchemaEntry(parsed.name)) continue;
-      const next = renamedEnvName(parsed.name) ?? mergedEnvTarget(parsed.name);
-      if (next) {
-        // Its value now sits under the new name (withRenamedEnvValues).
-        renamed.push(`${parsed.name} -> ${next}`);
-        continue;
-      }
       if (isDeprecatedEnvName(parsed.name)) {
         removed.push(parsed.name);
         continue;
@@ -613,7 +549,6 @@ async function writeLocal(fileName: string): Promise<void> {
 
   console.info(`runtime mode ${runtimeMode}; removed: ${removed.sort().join(", ") || "none"}.`);
   console.info(`added from the template: ${added.sort().join(", ") || "none"}.`);
-  if (renamed.length) console.info(`renamed (values kept): ${renamed.sort().join(", ")}.`);
   for (const line of moved.sort()) console.info(`moved ${line}`);
   if (preserved.length) console.info(`preserved non-empty non-local variables: ${preserved.sort().join(", ")}.`);
   if (unknown.length) console.info(`kept ${unknown.length} variable(s) unknown to the schema in ${fileName}.`);

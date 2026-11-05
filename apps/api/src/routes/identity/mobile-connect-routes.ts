@@ -22,7 +22,7 @@ import type { AppVariables } from "./auth";
 export const MOBILE_CONNECT_TICKET_TTL_MS = 10 * 60 * 1_000;
 
 /** Schéma de l'app iOS (`CFBundleURLSchemes`), hôte `join`. */
-export const MOBILE_CONNECT_SCHEME = "ohb";
+export const MOBILE_CONNECT_SCHEME = "openedbot";
 
 const TICKET_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{32,64})$/iu;
 

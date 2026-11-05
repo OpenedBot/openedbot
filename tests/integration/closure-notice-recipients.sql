@@ -21,7 +21,7 @@ create temp table closure_proof (
   disabled_staff text
 );
 insert into closure_proof values ('x', 'x', 'x', 'unset', 'unset');
-grant select, insert, update on closure_proof to ohb_api;
+grant select, insert, update on closure_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('80000000-0000-4000-8000-0000000000c1', 'closure-staff@example.test', 'x', 'Closure Staff'),
@@ -33,11 +33,11 @@ insert into users (id, email, display_name) values
   ('9c000000-0000-4000-8000-000000000001', 'camille@closure.test', 'Camille Lefevre'),
   ('9c000000-0000-4000-8000-000000000002', 'sacha@closure.test', null);
 
--- La reference est lue hors du role ohb_api : users est sous RLS.
+-- La reference est lue hors du role openedbot_api : users est sous RLS.
 create temp table closure_expected as select count(*)::bigint as total from users;
-grant select on closure_expected to ohb_api;
+grant select on closure_expected to openedbot_api;
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-0000000000c1', false) \g /dev/null
 
 -- 1. Tous les comptes, une ligne chacun, le total de la table.

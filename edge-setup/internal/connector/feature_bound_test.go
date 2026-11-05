@@ -125,8 +125,8 @@ func TestAnnouncedBoundRaisesTheNextHelloAndTheLastAnnouncementWins(t *testing.T
 		<-done
 		return hello
 	}
-	announcing := `{"t":"link.context","environment":"prod","ohb":"https://openedbot.app","limits":{"features":64}}`
-	silent := `{"t":"link.context","environment":"prod","ohb":"https://openedbot.app"}`
+	announcing := `{"t":"link.context","environment":"prod","openedbot":"https://openedbot.app","limits":{"features":64}}`
+	silent := `{"t":"link.context","environment":"prod","openedbot":"https://openedbot.app"}`
 
 	if got, want := session(announcing), priorityOrder[1:17]; !reflect.DeepEqual(got, want) {
 		t.Errorf("before any announcement: hello lists %d names %v, want the 16 of the default bound %v", len(got), got, want)
@@ -303,7 +303,7 @@ func TestRefusedLongHelloFallsBackToTheDefaultBound(t *testing.T) {
 			_ = conn.Close(websocket.StatusCode(CloseUnauth), "HELLO_REQUIRED")
 			return
 		}
-		frame, _ := EncodeText(Text{T: TLinkContext, Environment: "prod", OHB: "https://openedbot.app"})
+		frame, _ := EncodeText(Text{T: TLinkContext, Environment: "prod", Openedbot: "https://openedbot.app"})
 		_ = conn.Write(r.Context(), websocket.MessageText, frame)
 		// Hold the session until the host hangs up.
 		for {

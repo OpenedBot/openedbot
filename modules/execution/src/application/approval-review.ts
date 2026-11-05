@@ -1,8 +1,8 @@
 /**
- * PERM2-7 (DEV-OHB-258): the automatic reviewer. A gate the pipeline sends to
+ * PERM2-7: the automatic reviewer. A gate the pipeline sends to
  * review is born `reviewing` (persist.ts); this loop, outside any run
  * transaction, claims it with a token and a lease, asks the bot's model on
- * the tool-less `ohb-reviewer` profile, and writes the verdict under that
+ * the tool-less `openedbot-reviewer` profile, and writes the verdict under that
  * token. Whatever goes wrong, the gate ends with a human:
  *
  * The reviewer reads the bot's natural-language rules and its organization's
@@ -220,7 +220,7 @@ async function askReviewer(
   if (!(await reviewProfileStillToolLess(client))) return { kind: "escalate", code: "review_profile_stale", reason: null };
   if (deps.now() >= deadline) return REVIEW_TIMEOUT;
   const selection = reviewModelSelection(job);
-  const sessionId = `ohb-review-${job.id}`;
+  const sessionId = `openedbot-review-${job.id}`;
   let hermesRunId: string | null = null;
   try {
     hermesRunId = await createWithinBudget(deps, deadline, () => client.createRun({

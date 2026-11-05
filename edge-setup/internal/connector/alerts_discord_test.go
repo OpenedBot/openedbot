@@ -55,7 +55,7 @@ func TestDiscordAlertCardGroupsComponentsAndKeepsActiveIncidentVisible(t *testin
 func TestDiscordAlertCardNamesEnvironmentInstanceAndOwner(t *testing.T) {
 	start := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
 	states := map[string]alertState{"link": {incident: true, startedAt: start}}
-	known := AlertContext{Environment: "prod", Instance: "default", OHB: "https://console.openedbot.app", OwnerEmail: "owner_1@example.com", Organization: "Acme <@everyone>"}
+	known := AlertContext{Environment: "prod", Instance: "default", Openedbot: "https://console.openedbot.app", OwnerEmail: "owner_1@example.com", Organization: "Acme <@everyone>"}
 	var payload discordAlert
 	if err := json.Unmarshal(renderDiscordAlert(states, known, start.Add(time.Second)), &payload); err != nil {
 		t.Fatal(err)

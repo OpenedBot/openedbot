@@ -121,7 +121,7 @@ func installA2APolicyHome(runtimeRoot, activeHome string, owner fsx.Owner) error
 			return errors.New("A2A companion file could not be installed safely")
 		}
 	}
-	marker := filepath.Join(activeHome, "plugins", "ohb_a2a_policy", "runtime-home")
+	marker := filepath.Join(activeHome, "plugins", "openedbot_a2a_policy", "runtime-home")
 	if err := fsx.WriteAtomic(marker, []byte(runtimeRoot+"\n"), 0o600, owner); err != nil {
 		return errors.New("A2A runtime binding could not be installed safely")
 	}

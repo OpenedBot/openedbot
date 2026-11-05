@@ -11,7 +11,7 @@ const counters = {
   cacheWriteTokens: 0,
 };
 
-describe("préflight Hermes (OHB-114)", () => {
+describe("préflight Hermes", () => {
   test("les lectures sont parallèles, la session attend leur contrôle et chacun a son coût", async () => {
     let pending = 0;
     let maxPending = 0;
@@ -108,7 +108,7 @@ describe("préflight Hermes (OHB-114)", () => {
     resetHermesPreflightCache();
   });
 
-  test("the replay probe starts at the gate, before the session and run creation resolve (OHB-137)", async () => {
+  test("the replay probe starts at the gate, before the session and run creation resolve", async () => {
     const trace = new RunTrace();
     const order: string[] = [];
     let releaseSession!: () => void;
@@ -154,7 +154,7 @@ describe("préflight Hermes (OHB-114)", () => {
     expect(await failing.replayProbe).toBe(false);
   });
 
-  test("the model catalogue read runs with the inventory and never fails the preflight (OHB-137)", async () => {
+  test("the model catalogue read runs with the inventory and never fails the preflight", async () => {
     let pending = 0;
     let maxPending = 0;
     let release!: () => void;
@@ -212,7 +212,7 @@ describe("préflight Hermes (OHB-114)", () => {
     expect(sessionsCalled).toBe(0);
   });
 
-  test("a cached inventory still meets the gate: a forbidden toolset blocks every run (OHB-138)", async () => {
+  test("a cached inventory still meets the gate: a forbidden toolset blocks every run", async () => {
     resetHermesPreflightCache();
     let reads = 0;
     const client = new HermesClient({

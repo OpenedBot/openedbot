@@ -10,10 +10,10 @@ const OPENEDBOT_RESTART_ERRORS = new Set([
   "openedbot a redémarré ; l’hôte ne s’est pas reconnecté depuis.",
   "openedbot a redémarré avant la fin du drainage ; l’hôte ne s’est pas reconnecté depuis.",
   // Rows written before the rename to openedbot (`last_health_error` is stored text).
-  "L’instance OHBot qui tenait le lien s’est arrêtée.",
-  "L’instance OHBot qui tenait le lien s’est arrêtée avant la fin du drainage.",
-  "OHBot a redémarré ; l’hôte ne s’est pas reconnecté depuis.",
-  "OHBot a redémarré avant la fin du drainage ; l’hôte ne s’est pas reconnecté depuis.",
+  "L’instance openedbot qui tenait le lien s’est arrêtée.",
+  "L’instance openedbot qui tenait le lien s’est arrêtée avant la fin du drainage.",
+  "openedbot a redémarré ; l’hôte ne s’est pas reconnecté depuis.",
+  "openedbot a redémarré avant la fin du drainage ; l’hôte ne s’est pas reconnecté depuis.",
 ]);
 
 export function linkHealthErrorText(

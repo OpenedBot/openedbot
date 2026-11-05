@@ -128,7 +128,7 @@ export function MobileSettingsGroups({
               </span>
             </button>
           ) : (
-            <p className="px-4 py-3 text-center text-[13px] text-[var(--ohb-grouped-caption)]">
+            <p className="px-4 py-3 text-center text-[13px] text-[var(--openedbot-grouped-caption)]">
               {t("mobileShell.localSession")}
             </p>
           )}
@@ -157,13 +157,13 @@ export function MobileSettingsScreen() {
   return (
     <div
       data-mobile-settings=""
-      className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto bg-[var(--ohb-grouped-canvas)] pb-[max(1.5rem,var(--ohb-safe-bottom))]"
+      className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto bg-[var(--openedbot-grouped-canvas)] pb-[max(1.5rem,var(--openedbot-safe-bottom))]"
     >
       <section data-inset-grouped="" className="px-4 pt-6">
         <Link
           to="/settings/account"
           data-inset-grouped-row=""
-          className={cn(insetGroupedRowClassName, "rounded-[20px] bg-[var(--ohb-grouped-card)]")}
+          className={cn(insetGroupedRowClassName, "rounded-[20px] bg-[var(--openedbot-grouped-card)]")}
         >
           <InsetGroupedRowInner
             label={identity}

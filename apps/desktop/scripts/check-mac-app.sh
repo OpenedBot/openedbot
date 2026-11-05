@@ -11,7 +11,7 @@ mode="${1:?usage: check-mac-app.sh adhoc|developer-id <version>}"
 version="${2:?usage: check-mac-app.sh adhoc|developer-id <version>}"
 team=QDC76LMF29
 app=release/mac-arm64/openedbot.app
-popup="$app/Contents/Helpers/OHBPopup.app"
+popup="$app/Contents/Helpers/OpenedbotPopup.app"
 dmg="release/openedbot-$version-mac-arm64.dmg"
 
 fail() { echo "check-mac-app: $*" >&2; exit 1; }
@@ -19,7 +19,7 @@ fail() { echo "check-mac-app: $*" >&2; exit 1; }
 info() { codesign -dv --verbose=2 "$1" 2>&1; }
 
 codesign --verify --deep --strict --verbose=2 "$app"
-[ -x "$popup/Contents/MacOS/OHBPopup" ] || fail "popup missing: $popup"
+[ -x "$popup/Contents/MacOS/OpenedbotPopup" ] || fail "popup missing: $popup"
 [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version" ] ||
   fail "$app is not version $version"
 hdiutil verify "$dmg"

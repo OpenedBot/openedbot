@@ -27,7 +27,7 @@
 -- l'instance précédente doit survivre à ce fichier. Son retrait est une
 -- migration de la release suivante.
 --
--- `agency_grants` ne reçoit AUCUNE policy `ohb_worker` : le worker n'en a pas
+-- `agency_grants` ne reçoit AUCUNE policy `openedbot_worker` : le worker n'en a pas
 -- besoin (la purge d'une organisation retire ses grants par cascade), et la
 -- liste des exceptions worker (`tests/integration/postgres-rls.sh`) ne s'allonge pas.
 begin;
@@ -63,7 +63,7 @@ create index if not exists agency_grants_client_live
 alter table agency_grants enable row level security;
 alter table agency_grants force row level security;
 drop policy if exists agency_grants_tenant on agency_grants;
-create policy agency_grants_tenant on agency_grants to ohb_api
+create policy agency_grants_tenant on agency_grants to openedbot_api
   using (
     agency_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or client_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
@@ -72,7 +72,7 @@ create policy agency_grants_tenant on agency_grants to ohb_api
     agency_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or client_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
   );
-grant select, insert, update on agency_grants to ohb_api;
+grant select, insert, update on agency_grants to openedbot_api;
 
 -- L'invitation d'une agence garde la mémoire de l'agence qui l'a acceptée :
 -- un rejeu rend le même grant au lieu d'en chercher un autre.
@@ -125,12 +125,12 @@ as $$
     from target t;
 $$;
 revoke all on function workspace_access(uuid, uuid) from public;
-grant execute on function workspace_access(uuid, uuid) to ohb_api;
+grant execute on function workspace_access(uuid, uuid) to openedbot_api;
 
 -- 5. Feature pilotée depuis l'admin : l'abonnement propre d'une agence.
 insert into product_features (feature_key, enabled) values ('agency_billing', false)
 on conflict (feature_key) do nothing;
-grant insert, update on product_features to ohb_api;
+grant insert, update on product_features to openedbot_api;
 
 -- 6. Conversion des données.
 do $$
@@ -347,7 +347,7 @@ begin
 end;
 $$;
 revoke all on function staff_get_organization(uuid) from public;
-grant execute on function staff_get_organization(uuid) to ohb_api;
+grant execute on function staff_get_organization(uuid) to openedbot_api;
 
 -- staff_get_user : 0075 + `kind` sur chaque organisation.
 create or replace function staff_get_user(p_id uuid)
@@ -589,7 +589,7 @@ begin
 end;
 $$;
 revoke all on function staff_get_user(uuid) from public;
-grant execute on function staff_get_user(uuid) to ohb_api;
+grant execute on function staff_get_user(uuid) to openedbot_api;
 
 insert into schema_migrations(version) values ('0086_organization_kinds') on conflict (version) do nothing;
 

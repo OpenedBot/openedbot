@@ -10,9 +10,9 @@
   the shimmer and the swaps become instant, nothing else changes.
 */
 :root {
-  --ohb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ohb-spring-layout: cubic-bezier(0.22, 1.12, 0.36, 1);
-  --ohb-spring-swap: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --openedbot-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --openedbot-spring-layout: cubic-bezier(0.22, 1.12, 0.36, 1);
+  --openedbot-spring-swap: cubic-bezier(0.34, 1.32, 0.64, 1);
 }
 
 /*
@@ -20,26 +20,26 @@
   height animates without any measurement. 220 ms to open, 140 ms to close,
   with a top-down clip and a 4 px lift, as pulseview's `disclosure()`.
 */
-.ohb-disclosure {
+.openedbot-disclosure {
   display: grid;
   grid-template-rows: 1fr;
   opacity: 1;
   transform: none;
   clip-path: inset(0 0 0% 0);
   transition:
-    grid-template-rows 0.22s var(--ohb-ease-out),
-    opacity 0.22s var(--ohb-ease-out),
-    transform 0.22s var(--ohb-ease-out),
-    clip-path 0.22s var(--ohb-ease-out);
+    grid-template-rows 0.22s var(--openedbot-ease-out),
+    opacity 0.22s var(--openedbot-ease-out),
+    transform 0.22s var(--openedbot-ease-out),
+    clip-path 0.22s var(--openedbot-ease-out);
 }
-.ohb-disclosure[data-open="false"] {
+.openedbot-disclosure[data-open="false"] {
   grid-template-rows: 0fr;
   opacity: 0;
   transform: translateY(-4px);
   clip-path: inset(0 0 100% 0);
   transition-duration: 0.14s;
 }
-.ohb-disclosure-inner {
+.openedbot-disclosure-inner {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -51,19 +51,19 @@
   read back from history, never replays its entries.
 */
 [data-turn-activity][data-live] [data-activity-row] {
-  animation: ohb-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-[data-turn-activity][data-live] .ohb-activity-list [data-activity-row]::before {
-  animation: ohb-guide-draw 0.14s linear both;
+[data-turn-activity][data-live] .openedbot-activity-list [data-activity-row]::before {
+  animation: openedbot-guide-draw 0.14s linear both;
 }
 
 /* Chevrons turn on the swap spring. */
-.ohb-activity-chevron {
-  transition: transform 0.2s var(--ohb-ease-out), color 0.15s ease;
+.openedbot-activity-chevron {
+  transition: transform 0.2s var(--openedbot-ease-out), color 0.15s ease;
 }
 
 /* The Tool Result log: a quiet panel that scrolls without a bar. */
-.ohb-tool-log {
+.openedbot-tool-log {
   max-height: 160px;
   overscroll-behavior: contain;
 }
@@ -91,23 +91,23 @@
   quarters; two label-widths wide; one pass every 2.2 s in 60 steps. Used by
   the thread's thinking status and the run dock.
 */
-.ohb-thinking-shimmer {
-  --ohb-shimmer-dim: color-mix(in srgb, var(--bui-text-primary) 40%, transparent);
+.openedbot-thinking-shimmer {
+  --openedbot-shimmer-dim: color-mix(in srgb, var(--bui-text-primary) 40%, transparent);
   color: transparent;
   background-image: linear-gradient(
     90deg,
-    var(--ohb-shimmer-dim) 0%,
-    var(--ohb-shimmer-dim) 25%,
+    var(--openedbot-shimmer-dim) 0%,
+    var(--openedbot-shimmer-dim) 25%,
     var(--bui-text-primary) 60%,
-    var(--ohb-shimmer-dim) 75%,
-    var(--ohb-shimmer-dim) 100%
+    var(--openedbot-shimmer-dim) 75%,
+    var(--openedbot-shimmer-dim) 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
-  animation: ohb-thinking-shimmer 2.2s steps(60, end) infinite;
+  animation: openedbot-thinking-shimmer 2.2s steps(60, end) infinite;
 }
-@keyframes ohb-thinking-shimmer {
+@keyframes openedbot-thinking-shimmer {
   from {
     background-position: 200% 0;
   }
@@ -123,13 +123,13 @@
   wave: the mark pops in once (`thread-motion.css`) and the shimmering label
   carries the liveness.
 */
-.ohb-thinking-dots {
+.openedbot-thinking-dots {
   display: inline-flex;
   align-items: center;
   gap: 1.5px;
   color: var(--bot-tint, currentColor);
 }
-.ohb-thinking-dots > i {
+.openedbot-thinking-dots > i {
   width: 4px;
   height: 4px;
   border-radius: 9999px;
@@ -143,53 +143,53 @@
   height. In a live turn a branch draws in 0.14 s and its row blurs in
   (`tpl-guide`, `tpl-reveal`).
 */
-.ohb-activity-list {
-  --ohb-guide-x: 7px;
-  --ohb-guide-gap: 1.125rem;
-  margin-inline-start: var(--ohb-guide-x);
-  padding-inline-start: var(--ohb-guide-gap);
+.openedbot-activity-list {
+  --openedbot-guide-x: 7px;
+  --openedbot-guide-gap: 1.125rem;
+  margin-inline-start: var(--openedbot-guide-x);
+  padding-inline-start: var(--openedbot-guide-gap);
 }
-.ohb-activity-list [data-activity-row] {
+.openedbot-activity-list [data-activity-row] {
   position: relative;
 }
-.ohb-activity-list [data-activity-row]::before {
+.openedbot-activity-list [data-activity-row]::before {
   content: "";
   position: absolute;
   top: 0;
-  left: calc(var(--ohb-guide-gap) * -1);
-  width: calc(var(--ohb-guide-gap) - 4px);
+  left: calc(var(--openedbot-guide-gap) * -1);
+  width: calc(var(--openedbot-guide-gap) - 4px);
   height: 0.9375rem;
   border-left: 1px solid var(--bui-border-button-default);
   border-bottom: 1px solid var(--bui-border-button-default);
   border-bottom-left-radius: 8px;
   pointer-events: none;
 }
-.ohb-activity-list [data-activity-row]::after {
+.openedbot-activity-list [data-activity-row]::after {
   content: "";
   position: absolute;
   top: 0.9375rem;
   bottom: -0.125rem;
-  left: calc(var(--ohb-guide-gap) * -1);
+  left: calc(var(--openedbot-guide-gap) * -1);
   border-left: 1px solid var(--bui-border-button-default);
   pointer-events: none;
 }
-.ohb-activity-list > [data-activity-row]:last-child::after,
-.ohb-activity-list > :last-child > [data-activity-row]:last-child::after {
+.openedbot-activity-list > [data-activity-row]:last-child::after,
+.openedbot-activity-list > :last-child > [data-activity-row]:last-child::after {
   display: none;
 }
-@keyframes ohb-guide-draw {
+@keyframes openedbot-guide-draw {
   from {
     clip-path: inset(0 100% 100% 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-disclosure,
-  .ohb-disclosure[data-open="false"] {
+  .openedbot-disclosure,
+  .openedbot-disclosure[data-open="false"] {
     transition: none;
     transform: none;
   }
-  .ohb-thinking-shimmer {
+  .openedbot-thinking-shimmer {
     animation: none;
     color: var(--bui-text-secondary);
     background: none;
@@ -197,10 +197,10 @@
   [data-turn-activity][data-live] [data-activity-row] {
     animation: none;
   }
-  [data-turn-activity][data-live] .ohb-activity-list [data-activity-row]::before {
+  [data-turn-activity][data-live] .openedbot-activity-list [data-activity-row]::before {
     animation: none;
   }
-  .ohb-activity-chevron {
+  .openedbot-activity-chevron {
     transition: none;
   }
 }

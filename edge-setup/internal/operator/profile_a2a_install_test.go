@@ -15,28 +15,28 @@ config.load_config = lambda: {"plugins": {"enabled": []}}
 sys.modules["hermes_cli.config"] = config
 with tempfile.TemporaryDirectory() as temporary:
     root = pathlib.Path(temporary)
-    profile = root / "profiles" / "ohb-client"
+    profile = root / "profiles" / "openedbot-client"
     profile.mkdir(parents=True, mode=0o700)
     scope["hermes_home"] = lambda: str(root)
     install = scope["install_profile_a2a_guard"]
-    install("ohb-client")
+    install("openedbot-client")
     assert not (profile / "plugins").exists()
-    config.load_config = lambda: {"plugins": {"enabled": ["ohb_a2a_policy"]}}
+    config.load_config = lambda: {"plugins": {"enabled": ["openedbot_a2a_policy"]}}
     try:
-        install("ohb-client")
+        install("openedbot-client")
     except scope["Refused"]:
         pass
     else:
         raise AssertionError("enabled guard missing from root was ignored")
-    source = root / "plugins" / "ohb_a2a_policy"
+    source = root / "plugins" / "openedbot_a2a_policy"
     source.mkdir(parents=True, mode=0o700)
     names = ("plugin.yaml", "__init__.py", "policy.py", "snapshot.py", "runtime_scope.py")
     for name in names:
         path = source / name
         path.write_bytes(("fixture:" + name).encode())
         path.chmod(0o600)
-    install("ohb-client")
-    target = profile / "plugins" / "ohb_a2a_policy"
+    install("openedbot-client")
+    target = profile / "plugins" / "openedbot_a2a_policy"
     for name in names:
         assert (target / name).read_bytes() == (source / name).read_bytes()
         assert (target / name).stat().st_mode & 0o777 == 0o600
@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as temporary:
     (source / "policy.py").symlink_to(root / "outside")
     (root / "outside").write_text("must not follow")
     try:
-        install("ohb-client")
+        install("openedbot-client")
     except (OSError, scope["Refused"]):
         pass
     else:
@@ -57,12 +57,12 @@ with tempfile.TemporaryDirectory() as temporary:
     scope["delete_named_profile"] = cleaned.append
     scope["write_env_key"] = lambda *_: (_ for _ in ()).throw(AssertionError("key write ran after unsafe guard"))
     try:
-        scope["verb_profile_create"]({"name":"ohb-client", "apiServerKey":"fixture-private-profile-bearer"})
+        scope["verb_profile_create"]({"name":"openedbot-client", "apiServerKey":"fixture-private-profile-bearer"})
     except (OSError, scope["Refused"]):
         pass
     else:
         raise AssertionError("unsafe profile was reported as created")
-    assert cleaned == ["ohb-client"]
+    assert cleaned == ["openedbot-client"]
 `
 	cmd := osexec.Command("python3", "-c", code)
 	cmd.Stdin = strings.NewReader(string(inventoryProbeScript))

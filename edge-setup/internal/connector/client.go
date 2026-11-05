@@ -45,7 +45,7 @@ func (a Auth) header() string {
 
 // Client keeps one link to the broker and serves gateway requests over it.
 type Client struct {
-	// WSURL is wss://<ohb>/api/runtime-links/ws.
+	// WSURL is wss://<openedbot>/api/runtime-links/ws.
 	WSURL string
 	Auth  Auth
 	// Agent and HermesVersion go into hello.
@@ -456,7 +456,7 @@ var errOriginMoved = errors.New("openedbot announced a new origin")
 const MaxOriginMoveFailures = 3
 
 // MovedWSURL is the link endpoint to adopt when openedbot announces
-// origin `ohb` (link.context) while the connector dials `current`. Only a
+// origin `openedbot` (link.context) while the connector dials `current`. Only a
 // production link moves, and only within one domain:
 //   - both sides are HTTPS (`wss://` dialled, `https://` announced, no path,
 //     no port change), so a development tunnel never moves;
@@ -467,12 +467,12 @@ const MaxOriginMoveFailures = 3
 // The token, the runtime and the device key do not change: the proof of the
 // next session names the new endpoint, which the server accepts as its
 // public origin.
-func MovedWSURL(current, ohb string) (string, bool) {
+func MovedWSURL(current, openedbot string) (string, bool) {
 	cur, err := url.Parse(current)
 	if err != nil || cur.Scheme != "wss" || cur.Path != RuntimeLinkWSPath || cur.RawQuery != "" {
 		return "", false
 	}
-	next, err := url.Parse(strings.TrimRight(ohb, "/"))
+	next, err := url.Parse(strings.TrimRight(openedbot, "/"))
 	if err != nil || next.Scheme != "https" || next.Path != "" || next.RawQuery != "" || next.User != nil || next.Port() != cur.Port() {
 		return "", false
 	}
@@ -1077,7 +1077,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			// next Session then authenticates with the same token a restart reads.
 			c.Auth.LinkToken = f.LinkToken
 		case TLinkContext:
-			lc := LinkContext{Environment: f.Environment, OHB: f.OHB}
+			lc := LinkContext{Environment: f.Environment, Openedbot: f.Openedbot}
 			if f.Organization != nil {
 				lc.Organization = *f.Organization
 			}
@@ -1106,7 +1106,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 					c.Logf("link context could not be persisted: %v; kept in memory", err)
 				}
 			}
-			c.Logf("link context: environment=%s ohb=%s owner=%s", lc.Environment, lc.OHB, lc.Owner.Email)
+			c.Logf("link context: environment=%s openedbot=%s owner=%s", lc.Environment, lc.Openedbot, lc.Owner.Email)
 			// Only an openedbot that lists inventory.changed may receive it:
 			// an older one closes the link on an unknown frame type.
 			if watchInventory && !inventoryWatchStarted && acceptsInventoryChanged(f) {
@@ -1114,7 +1114,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 				go c.watchInventory(ctx, send)
 			}
 			if c.Auth.EnrollmentTicket == "" && c.OnOriginMoved != nil && c.originFallback == "" {
-				if moved, ok := MovedWSURL(wsURL, lc.OHB); ok && moved != c.originRefused {
+				if moved, ok := MovedWSURL(wsURL, lc.Openedbot); ok && moved != c.originRefused {
 					c.pendingWSURL = moved
 					return errOriginMoved
 				}

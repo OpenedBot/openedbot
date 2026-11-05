@@ -3,8 +3,8 @@
     "name": "write_file",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool write_file.\nohb-gate/v1 4820990ec74e8c6366e344181c2119eaa169b383abf6c695f92fe47d874bbbc4 {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"fa6148a60364a6a60ffdf6abe6eac6f3aefa65e9435f8c9ad204cc9518e18e03\",\"args\":{\"path\":\"notes/todo.md\",\"size\":5}}",
-      "rule_key": "ohb/v1/write_file"
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 4820990ec74e8c6366e344181c2119eaa169b383abf6c695f92fe47d874bbbc4 {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"fa6148a60364a6a60ffdf6abe6eac6f3aefa65e9435f8c9ad204cc9518e18e03\",\"args\":{\"path\":\"notes/todo.md\",\"size\":5}}",
+      "rule_key": "openedbot/v1/write_file"
     },
     "tool": "write_file"
   },
@@ -12,8 +12,8 @@
     "name": "write_file_empties",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool write_file.\nohb-gate/v1 4e655998541bfb09b8d4b7eaf0f3982ad7ebaea53535208a07f03b67366fe8ba {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"a57fc3d0dbb078d9a6f7afdab74ac5af1471af0c64467074beeb67f85ce077a0\",\"args\":{\"path\":\"notes/todo.md\",\"size\":0}}",
-      "rule_key": "ohb/v1/write_file"
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 4e655998541bfb09b8d4b7eaf0f3982ad7ebaea53535208a07f03b67366fe8ba {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"a57fc3d0dbb078d9a6f7afdab74ac5af1471af0c64467074beeb67f85ce077a0\",\"args\":{\"path\":\"notes/todo.md\",\"size\":0}}",
+      "rule_key": "openedbot/v1/write_file"
     },
     "tool": "write_file"
   },
@@ -21,8 +21,8 @@
     "name": "write_file_sensitive",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool write_file.\nohb-gate/v1 6f093c0b9a1cd86c876defbe15814deae4ec3370263304e22a183fd9807d9cef {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"8a5da9b01b863e091fb1ae927b7e77806ed7cc3adbc4170222d442fa9e2e6dd9\",\"args\":{\"path\":\"/root/.ssh/authorized_keys\",\"size\":16}}",
-      "rule_key": "ohb/v1/write_file"
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 6f093c0b9a1cd86c876defbe15814deae4ec3370263304e22a183fd9807d9cef {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"8a5da9b01b863e091fb1ae927b7e77806ed7cc3adbc4170222d442fa9e2e6dd9\",\"args\":{\"path\":\"/root/.ssh/authorized_keys\",\"size\":16}}",
+      "rule_key": "openedbot/v1/write_file"
     },
     "tool": "write_file"
   },
@@ -30,8 +30,8 @@
     "name": "patch_replace",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool patch.\nohb-gate/v1 d595b944e0b8b05e53769dba66d797b040a9ba988f6b3bd600cafb3c267f67d9 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"b2ccc1317993e293adf527b583b3e4b74c1bac1f5965b5006f1fb5a2ae744b38\",\"args\":{\"paths\":[\"src/app.py\"],\"ops\":[\"replace\"]}}",
-      "rule_key": "ohb/v1/patch"
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 d595b944e0b8b05e53769dba66d797b040a9ba988f6b3bd600cafb3c267f67d9 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"b2ccc1317993e293adf527b583b3e4b74c1bac1f5965b5006f1fb5a2ae744b38\",\"args\":{\"paths\":[\"src/app.py\"],\"ops\":[\"replace\"]}}",
+      "rule_key": "openedbot/v1/patch"
     },
     "tool": "patch"
   },
@@ -39,8 +39,8 @@
     "name": "patch_v4a_delete",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool patch.\nohb-gate/v1 1b95210a400441b5b8b03b88c7afa6842279dbbd4d505d1dce8107ac7a2d352b {\"v\":1,\"tool\":\"patch\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"7d8f40a55bac775b7d431bb978567bdafd27b9da81009f1116777916db313ef5\",\"args\":{\"paths\":[\"src/a.py\",\"src/b.py\"],\"ops\":[\"delete\",\"update\"]}}",
-      "rule_key": "ohb/v1/patch"
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 1b95210a400441b5b8b03b88c7afa6842279dbbd4d505d1dce8107ac7a2d352b {\"v\":1,\"tool\":\"patch\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"7d8f40a55bac775b7d431bb978567bdafd27b9da81009f1116777916db313ef5\",\"args\":{\"paths\":[\"src/a.py\",\"src/b.py\"],\"ops\":[\"delete\",\"update\"]}}",
+      "rule_key": "openedbot/v1/patch"
     },
     "tool": "patch"
   },
@@ -48,8 +48,8 @@
     "name": "patch_unreadable",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool patch.\nohb-gate/v1 a66ac982834abd9b3cf16c8c157b44d84a99c6e8ca5a0f17e71f84ef515b26d3 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"04280b3c739264080aab9990c27c4ff7d4a62aa75e31155e28677dcabc2dc4e5\",\"args\":{\"paths\":[],\"ops\":[]}}",
-      "rule_key": "ohb/v1/patch"
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 a66ac982834abd9b3cf16c8c157b44d84a99c6e8ca5a0f17e71f84ef515b26d3 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"04280b3c739264080aab9990c27c4ff7d4a62aa75e31155e28677dcabc2dc4e5\",\"args\":{\"paths\":[],\"ops\":[]}}",
+      "rule_key": "openedbot/v1/patch"
     },
     "tool": "patch"
   },
@@ -57,8 +57,8 @@
     "name": "skill_delete",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool skill_manage.\nohb-gate/v1 03f27a9d4ea67b8f83abcec398c3af9e1956003cfaccb889f5c6e644be76c2a2 {\"v\":1,\"tool\":\"skill_manage\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"0f95486742987b9de19e5e38436ae44b37728bfe70d493302c4027d2f86ec3c1\",\"args\":{\"action\":\"delete\",\"name\":\"plan\"}}",
-      "rule_key": "ohb/v1/skill_manage"
+      "message": "Approve write-capable tool skill_manage.\nopenedbot-gate/v1 03f27a9d4ea67b8f83abcec398c3af9e1956003cfaccb889f5c6e644be76c2a2 {\"v\":1,\"tool\":\"skill_manage\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"0f95486742987b9de19e5e38436ae44b37728bfe70d493302c4027d2f86ec3c1\",\"args\":{\"action\":\"delete\",\"name\":\"plan\"}}",
+      "rule_key": "openedbot/v1/skill_manage"
     },
     "tool": "skill_manage"
   },
@@ -66,8 +66,8 @@
     "name": "send_message",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool send_message.\nohb-gate/v1 305aeddc98c43fa4b684ecb5d89a584f94d9c611ffe214306e829f15f782f25e {\"v\":1,\"tool\":\"send_message\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"07cd5a8543801a18bd0d256e3a903ceb83fadbde61ebdf63586ee4bfc81e2a5d\",\"args\":{\"action\":\"send\",\"target\":\"telegram:42\",\"platform\":\"telegram\"}}",
-      "rule_key": "ohb/v1/send_message"
+      "message": "Approve write-capable tool send_message.\nopenedbot-gate/v1 305aeddc98c43fa4b684ecb5d89a584f94d9c611ffe214306e829f15f782f25e {\"v\":1,\"tool\":\"send_message\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"07cd5a8543801a18bd0d256e3a903ceb83fadbde61ebdf63586ee4bfc81e2a5d\",\"args\":{\"action\":\"send\",\"target\":\"telegram:42\",\"platform\":\"telegram\"}}",
+      "rule_key": "openedbot/v1/send_message"
     },
     "tool": "send_message"
   },
@@ -75,8 +75,8 @@
     "name": "execute_code",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool execute_code.\nohb-gate/v1 9b24e634b4171cd91c3ea758ae88778b97a968c98d6594734734b4a11e78aee5 {\"v\":1,\"tool\":\"execute_code\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"5042e249312efe2f73490958fe0ff77c27bc08a69a2c190b612876a721784b27\",\"args\":{\"language\":\"python\",\"size\":8}}",
-      "rule_key": "ohb/v1/execute_code"
+      "message": "Approve write-capable tool execute_code.\nopenedbot-gate/v1 9b24e634b4171cd91c3ea758ae88778b97a968c98d6594734734b4a11e78aee5 {\"v\":1,\"tool\":\"execute_code\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"5042e249312efe2f73490958fe0ff77c27bc08a69a2c190b612876a721784b27\",\"args\":{\"language\":\"python\",\"size\":8}}",
+      "rule_key": "openedbot/v1/execute_code"
     },
     "tool": "execute_code"
   },
@@ -84,8 +84,8 @@
     "name": "cronjob",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool cronjob.\nohb-gate/v1 a5865403a800bdc066022693d58857b8f7e875921703c5184370a8a3e2207c54 {\"v\":1,\"tool\":\"cronjob\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"e7e4f446ad1ae5e2af6590a040d2d75379b5304927c51104e9519bdac0965184\",\"args\":{}}",
-      "rule_key": "ohb/v1/cronjob"
+      "message": "Approve write-capable tool cronjob.\nopenedbot-gate/v1 a5865403a800bdc066022693d58857b8f7e875921703c5184370a8a3e2207c54 {\"v\":1,\"tool\":\"cronjob\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"e7e4f446ad1ae5e2af6590a040d2d75379b5304927c51104e9519bdac0965184\",\"args\":{}}",
+      "rule_key": "openedbot/v1/cronjob"
     },
     "tool": "cronjob"
   },
@@ -93,8 +93,8 @@
     "name": "mcp",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool mcp__linear__create_issue.\nohb-gate/v1 a15e4d5d3d6fe2042af65518d66a2eda70a16894ba02e602a32aefe1499561a6 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"09619dd27817a84ac9bd6c4f93e8f03f520932ccea5e96c6618e04e46ce59102\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\",\"arguments\":{\"api_token\":\"sk-***\",\"title\":\"Bug\"}}}",
-      "rule_key": "ohb/v1/mcp:linear:create_issue"
+      "message": "Approve write-capable tool mcp__linear__create_issue.\nopenedbot-gate/v1 a15e4d5d3d6fe2042af65518d66a2eda70a16894ba02e602a32aefe1499561a6 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"09619dd27817a84ac9bd6c4f93e8f03f520932ccea5e96c6618e04e46ce59102\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\",\"arguments\":{\"api_token\":\"sk-***\",\"title\":\"Bug\"}}}",
+      "rule_key": "openedbot/v1/mcp:linear:create_issue"
     },
     "tool": "mcp__linear__create_issue"
   },
@@ -102,8 +102,8 @@
     "name": "mcp_legacy_name",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool mcp_old_server_search.\nohb-gate/v1 0143db8b0a7dfc565b41125f4d4038a06cc6ed3771da882bb84e59a162615271 {\"v\":1,\"tool\":\"mcp:old_server:search\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"a69fbbcf7209c6f659a75067c9fa03037c2ae23f55a6f854d5994209129bbbf6\",\"args\":{\"server\":\"old_server\",\"tool\":\"search\",\"arguments\":{\"q\":\"x\"}}}",
-      "rule_key": "ohb/v1/mcp:old_server:search"
+      "message": "Approve write-capable tool mcp_old_server_search.\nopenedbot-gate/v1 0143db8b0a7dfc565b41125f4d4038a06cc6ed3771da882bb84e59a162615271 {\"v\":1,\"tool\":\"mcp:old_server:search\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"a69fbbcf7209c6f659a75067c9fa03037c2ae23f55a6f854d5994209129bbbf6\",\"args\":{\"server\":\"old_server\",\"tool\":\"search\",\"arguments\":{\"q\":\"x\"}}}",
+      "rule_key": "openedbot/v1/mcp:old_server:search"
     },
     "tool": "mcp_old_server_search"
   },
@@ -111,8 +111,8 @@
     "name": "mcp_large",
     "result": {
       "action": "approve",
-      "message": "Approve write-capable tool mcp__linear__create_issue.\nohb-gate/v1 b4b25b712cde6eec7786e8224eeb1f3d15052a2117e04f86473358188291a167 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"d98928fc58acc4202c1b1fdca987a4b3c536e78e4fd7ccc741d913747f86f9b3\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\"}}",
-      "rule_key": "ohb/v1/mcp:linear:create_issue"
+      "message": "Approve write-capable tool mcp__linear__create_issue.\nopenedbot-gate/v1 b4b25b712cde6eec7786e8224eeb1f3d15052a2117e04f86473358188291a167 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"d98928fc58acc4202c1b1fdca987a4b3c536e78e4fd7ccc741d913747f86f9b3\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\"}}",
+      "rule_key": "openedbot/v1/mcp:linear:create_issue"
     },
     "tool": "mcp__linear__create_issue"
   },

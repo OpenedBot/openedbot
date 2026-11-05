@@ -1,4 +1,3 @@
-import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { SQL } from "bun";
 import { createWorkerService } from "./application/worker-service";
 import { readWorkerConfig } from "./config";
@@ -35,7 +34,7 @@ const config = { ...baseConfig, billingEnforced: pro.billingEnforced };
 const worker = createWorkerService(db, config, {
   // The core maintenance passes, then the enabled plug-in jobs.
   jobs: [...maintenanceJobs(db, config), ...pro.jobs],
-  // OHB-139: the probe reads the shared pool only while no LISTEN is acknowledged.
+  // The probe reads the shared pool only while no LISTEN is acknowledged.
   runQueueNotifications: createRunQueueNotifications(config.databaseUrl, {
     probe: () => readQueuedRunsSignature(db),
   }),

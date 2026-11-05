@@ -294,10 +294,10 @@ func TestLinkedClientKeepsLinkContextAndSurvivesPersistenceFailure(t *testing.T)
 	done := make(chan error, 1)
 	go func() { done <- c.Session(ctx) }()
 	<-broker.ready
-	broker.send(Text{T: TLinkContext, Environment: "preprod", OHB: "https://preprod.openedbot.app", Organization: &LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, Owner: &LinkOwner{Email: "owner@example.com", DisplayName: "Owner"}})
+	broker.send(Text{T: TLinkContext, Environment: "preprod", Openedbot: "https://preprod.openedbot.app", Organization: &LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, Owner: &LinkOwner{Email: "owner@example.com", DisplayName: "Owner"}})
 	select {
 	case got := <-persisted:
-		if got.Environment != "preprod" || got.OHB != "https://preprod.openedbot.app" || got.Organization.Name != "Acme" || got.Owner.Email != "owner@example.com" {
+		if got.Environment != "preprod" || got.Openedbot != "https://preprod.openedbot.app" || got.Organization.Name != "Acme" || got.Owner.Email != "owner@example.com" {
 			t.Fatalf("%+v", got)
 		}
 	case <-time.After(5 * time.Second):

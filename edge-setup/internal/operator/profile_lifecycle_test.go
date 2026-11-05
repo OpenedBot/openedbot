@@ -72,7 +72,7 @@ def refused(verb, request, expected):
         raise AssertionError("operation unexpectedly succeeded")
 with tempfile.TemporaryDirectory() as temporary:
     root = pathlib.Path(temporary)
-    name = "ohb-fixture-8f2a"
+    name = "openedbot-fixture-8f2a"
     directory = root / "profiles" / name
     scope["hermes_home"] = lambda: str(root)
     scope["named_profile_names"] = lambda: [name] if (directory / "config.yaml").exists() else []
@@ -180,7 +180,7 @@ print(json.dumps(sorted(codes)))
 	}
 }
 
-// The targeted read-back of a fresh profile (DEV-OHB-244) must say "verified"
+// The targeted read-back of a fresh profile must say "verified"
 // only when the host lists the profile under that name and the model block
 // carries the requested pair; anything else sends the operator to the full
 // inventory.

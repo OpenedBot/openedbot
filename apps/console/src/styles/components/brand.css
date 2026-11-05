@@ -2,6 +2,6 @@
    the mascot's silhouette identical in both themes. Inversion gives the dark
    theme a light body and dark eyes; the hue rotation keeps its near-black
    neutral from turning warm. */
-.dark img[src$="/brand/ohb-icon.webp"] {
+.dark img[src$="/brand/openedbot-icon.webp"] {
   filter: invert(1) hue-rotate(180deg);
 }

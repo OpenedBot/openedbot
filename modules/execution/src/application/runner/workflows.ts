@@ -423,7 +423,7 @@ type WorkflowTokenAccounting = {
  *
  * Concurrence : une session Hermes est partagée par tous les runs d'un même
  * fil (`threads.hermes_session_id`) et, en workflow, par toutes les étapes d'un
- * même bot (`ohb:<org>:workflow:<id>:bot:<id>`). Un delta n'est donc valable
+ * même bot (`openedbot:<org>:workflow:<id>:bot:<id>`). Un delta n'est donc valable
  * que si la fenêtre lue ne couvre QUE cette étape. On le prouve par l'invariant
  * mesuré sur le 211 : l'entrée brute d'un appel vaut l'entrée fraîche plus
  * l'entrée relue du cache : dès que `frais + cache` DÉPASSE l'entrée brute du

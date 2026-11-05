@@ -41,7 +41,7 @@ const inlineSnapshot = () => window.matchMedia(INLINE_QUERY).matches;
  * thread, hidden or not, and edits the bot of that thread: selecting this
  * projection (structural sharing keeps its reference while it is unchanged)
  * stops the 202, the read receipt and every SSE flush from re-rendering the
- * whole editor and its faces (OHB-141).
+ * whole editor and its faces.
  */
 type EditorBot = Omit<BotDto, "running" | "unread" | "preview" | "lastActivityAt" | "lastRunAt" | "awaitingApproval" | "updatedAt">;
 

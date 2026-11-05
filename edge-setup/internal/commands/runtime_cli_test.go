@@ -123,7 +123,7 @@ func TestRuntimeCLIMacEnvSnapshotsAndMirrorsOnlyWithinManagedRuntime(t *testing.
 	rootEnv := filepath.Join(paths.RuntimeRoot, ".env")
 	writeRuntimeCLITestFile(t, rootEnv, []byte("API_SERVER_KEY=root-token\nANTHROPIC_API_KEY=root-old\n"), 0o600)
 	writeRuntimeCLITestFile(t, filepath.Join(paths.RuntimeRoot, "profiles", "personal", ".env"), []byte("ANTHROPIC_API_KEY=personal-owned\nKEEP=personal\n"), 0o600)
-	writeRuntimeCLITestFile(t, filepath.Join(paths.RuntimeRoot, "profiles", "personal", ".env.ohb-own"), []byte("ANTHROPIC_API_KEY\n"), 0o600)
+	writeRuntimeCLITestFile(t, filepath.Join(paths.RuntimeRoot, "profiles", "personal", ".env.openedbot-own"), []byte("ANTHROPIC_API_KEY\n"), 0o600)
 	writeRuntimeCLITestFile(t, filepath.Join(paths.RuntimeRoot, "profiles", "team", ".env"), []byte("KEEP=team\n"), 0o600)
 
 	before, err := host.Env.SnapshotRootEnv()

@@ -266,7 +266,7 @@ export async function cancelMaintenanceRunsTx(
   await tx`
     select pg_advisory_xact_lock(
       hashtext(${organizationId}),
-      hashtext('ohb-run-events-cursor')
+      hashtext('openedbot-run-events-cursor')
     )
   `;
   for (const run of runs) {

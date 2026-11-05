@@ -18,7 +18,7 @@ type Export struct {
 	Mode          string   `json:"mode"`
 	Endpoint      string   `json:"endpoint,omitempty"`
 	RuntimeID     string   `json:"runtime_id,omitempty"`
-	OHB           string   `json:"ohb,omitempty"`
+	Openedbot     string   `json:"openedbot,omitempty"`
 	HermesVersion string   `json:"hermes_version"`
 	HermesCommit  string   `json:"hermes_commit"`
 	Toolsets      []string `json:"toolsets"`
@@ -44,11 +44,11 @@ func buildExport(env cli.Env) (Export, error) {
 	if fsx.Exists(layout.ConnectorLink) {
 		var lf LinkFile
 		if data, err := os.ReadFile(layout.ConnectorLink); err == nil && json.Unmarshal(data, &lf) == nil {
-			e.RuntimeID, e.OHB = lf.RuntimeID, lf.OHB
+			e.RuntimeID, e.Openedbot = lf.RuntimeID, lf.Openedbot
 		}
 		e.Next = "Linked. openedbot reaches the gateway through the outbound link; nothing to configure on its side."
 	} else {
-		e.Next = "In openedbot: Réglages › Runtime Hermes › Appairer depuis le serveur, then run `edge-setup link --ohb <origin> --yes` here and paste the ticket at the hidden prompt."
+		e.Next = "In openedbot: Réglages › Runtime Hermes › Appairer depuis le serveur, then run `edge-setup link --openedbot <origin> --yes` here and paste the ticket at the hidden prompt."
 	}
 	return e, nil
 }
@@ -82,7 +82,7 @@ func runExport(env cli.Env, args []string) int {
 		printf(env.Stdout, "| gateway | `%s` |", e.Endpoint)
 	}
 	if e.RuntimeID != "" {
-		printf(env.Stdout, "| runtime id | `%s` |\n| openedbot | `%s` |", e.RuntimeID, e.OHB)
+		printf(env.Stdout, "| runtime id | `%s` |\n| openedbot | `%s` |", e.RuntimeID, e.Openedbot)
 	}
 	printf(env.Stdout, "| Hermes | `%s` @ `%s` |", e.HermesVersion, e.HermesCommit[:12])
 	printf(env.Stdout, "| toolsets | `%s` |", strings.Join(e.Toolsets, ", "))

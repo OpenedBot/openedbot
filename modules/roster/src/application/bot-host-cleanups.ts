@@ -11,7 +11,7 @@ import type { BotHostCleanupRow } from "../sql/bot-host-cleanups";
 export const BOT_HOST_CLEANUP_LEASE_SECONDS = 240;
 /**
  * Hermes' background title writer can re-create a session row after its
- * DELETE (DEV-OHB-244). A deleted session whose host profile survives is
+ * DELETE. A deleted session whose host profile survives is
  * deleted again after this delay, until a pass finds it absent.
  */
 export const BOT_HOST_CLEANUP_VERIFY_DELAY_SECONDS = 60;

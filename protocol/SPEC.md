@@ -45,13 +45,13 @@ Aucun port applicatif entrant, aucun domaine, aucun certificat côté client ;
 le bearer du gateway ne quitte jamais l'hôte.
 
 Le protocole connector est identique dans les deux environnements. En
-développement, `<ohb>` est la loopback du VPS (`http://127.0.0.1:<port>`,
-derrière `link --insecure-ohb`) qu'un tunnel SSH inverse relie à l'application
+développement, `<openedbot>` est la loopback du VPS (`http://127.0.0.1:<port>`,
+derrière `link --insecure-openedbot`) qu'un tunnel SSH inverse relie à l'application
 openedbot locale ; l'origine HTTPS d'un tunnel Cloudflare lancé à la main reste une
 option avancée. Un tunnel tourne côté
 application, jamais sur le VPS et jamais devant le gateway. En production,
-`<ohb>` est l'origine de lien stable `https://link.openedbot.app`, celle
-que `link` vise par défaut sans `--ohb` (l'ancienne origine
+`<openedbot>` est l'origine de lien stable `https://link.openedbot.app`, celle
+que `link` vise par défaut sans `--openedbot` (l'ancienne origine
 `https://openedbot.app` reste acceptée). Le gateway reste
 dans tous les cas sur `127.0.0.1:8642` : le connector sortant est l'unique
 architecture documentée.
@@ -69,7 +69,7 @@ par le lien ».
  hôte (unité hermes-connector)                    openedbot (apps/api)
  ──────────────────────                           ────────────────────────
  link (ticket sur stdin)
-   ├─ GET wss://<ohb>/api/runtime-links/ws
+   ├─ GET wss://<openedbot>/api/runtime-links/ws
    │    Authorization: Bearer enrollment:<id>.<secret>   (ticket 5 min, usage unique)
    ├─ hello {protocol:1, agent, hermesVersion, features:[…], devicePublicKey}
    │  ◄── link.challenge {nonce}                  (preuve de possession, avant toute req)
@@ -79,11 +79,11 @@ par le lien ».
    │  ──► res/end
    │                                              insert runtimes (reachability=connector),
    │                                              ticket brûlé, org runtime_mode=external
-   │  ◄── link.context {environment, ohb, organization, owner, limits, accepts}   (affichage : alertes, status ; borne des features ; trames facultatives acceptées)
+   │  ◄── link.context {environment, openedbot, organization, owner, limits, accepts}   (affichage : alertes, status ; borne des features ; trames facultatives acceptées)
    │  ◄── link.issued {runtimeId, linkToken}      (une seule fois, jamais en HTTP)
    └─ scelle la clé device (systemd-creds, TPM2 ou clé hôte) dans
       /etc/hermes/connector/device.key.cred, écrit link.json 0600
-      (avec ohb_environment, organization, owner), démarre hermes-connector.service
+      (avec openedbot_environment, organization, owner), démarre hermes-connector.service
 
 reconnexions : Authorization: Bearer link:<runtimeId>.<token>, hello porte
                devicePublicKey, link.challenge → link.proof avant toute req,
@@ -92,7 +92,7 @@ rotation     : link.rotate est persisté atomiquement dans StateDirectory avant
                que le nouveau jeton soit utilisé pour une reconnexion
 ```
 
-En développement, `link --insecure-ohb` accepte une origine `http://` **de la
+En développement, `link --insecure-openedbot` accepte une origine `http://` **de la
 loopback** de l'hôte : la montée est alors `ws://127.0.0.1:<port>/…`, le port
 qu'un tunnel SSH inverse relie au poste de développement. Le fil reste chiffré
 par SSH et le lien meurt avec le tunnel. Toute autre origine exige `https://`.
@@ -112,7 +112,7 @@ Trames **texte** (JSON, un objet par message) :
 |---|---|---|---|
 | `hello` | hôte → openedbot | `protocol` (1), `agent` (`edge-setup/<ver>`), `hermesVersion?`, `features?`, `devicePublicKey?` (base64, 32 octets Ed25519) | obligatoire en premier ; toute autre première trame → fermeture 4401. `features` : tableau d'au plus 64 chaînes `^[a-z0-9_]{1,64}$` (la borne que l'API annonce dans `link.context`, 16 tant que l'hôte n'en connaît pas d'autre : voir « Borne des features »), inconnues ignorées ; `provider_management` annonce les routes d'identification hôte, `provider_usage` la sonde de quotas, `profile_inventory` la lecture nommée des profils déjà présents, `profile_management` la création/suppression, `profile_credentials` la clé fournisseur d'un profil, `profile_capabilities` les toolsets/MCP/skills et le modèle par profil, `profile_bundled_skills` l'activation groupée des skills Hermes fournies avec le runtime, `sessions_inventory` la lecture bornée des identifiants de session par profil, et `skills_inventory` la liste des skills de la racine lue par l'opérateur (repli de `/v1/skills`). `profile_toolsets_batch` l'écriture groupée des toolsets d'un profil (`POST /hermes-setup/profiles/{slug}/toolsets`) ; sans elle, openedbot écrit un toolset par requête. `creation_audit_v2` est une feature du **lien**, annoncée dans `hello` seulement (jamais dans `capabilities` ni `/v1/capabilities`) : l'hôte tient un audit de création scellé et attend `audit.key` |
 | `link.issued` | openedbot → hôte | `runtimeId`, `linkToken` | une fois, après commit |
-| `link.context` | openedbot → hôte | `environment` (`dev` \| `prod`), `ohb` (origine publique), `organization?` (`{id, name, slug}`), `owner?` (`{email, displayName?}`), `limits?` (`{features?}`), `accepts?` (types de trame) | optionnelle, juste après la liaison (après `audit.key`, avant `link.issued` à l'enrôlement) : quel openedbot et quel propriétaire sont derrière ce lien. Données d'affichage (alertes Discord, `status`), chaque texte ≤ 256 caractères, jamais un secret ; un hôte plus ancien ignore la trame (« ignoring frame: unknown frame type »). `limits` fait exception : `features` (entier ≥ 1, 64 aujourd'hui) est le nombre maximal de noms que l'API accepte dans `hello` et `capabilities`, que l'hôte retient et persiste (voir « Borne des features »). Un hôte plus ancien ignore ce champ, comme les seuils de version `latestVersion` et `minimumVersion` : `DecodeText` ne rejette pas les champs inconnus. `accepts` (au plus 16 types `^[a-z][a-z0-9_.]{0,63}$`) nomme les trames facultatives hôte → openedbot que cette API comprend : une API plus ancienne ferme le lien sur un type inconnu, l'hôte n'envoie donc une telle trame (aujourd'hui `inventory.changed`) que si elle y figure |
+| `link.context` | openedbot → hôte | `environment` (`dev` \| `prod`), `openedbot` (origine publique), `organization?` (`{id, name, slug}`), `owner?` (`{email, displayName?}`), `limits?` (`{features?}`), `accepts?` (types de trame) | optionnelle, juste après la liaison (après `audit.key`, avant `link.issued` à l'enrôlement) : quel openedbot et quel propriétaire sont derrière ce lien. Données d'affichage (alertes Discord, `status`), chaque texte ≤ 256 caractères, jamais un secret ; un hôte plus ancien ignore la trame (« ignoring frame: unknown frame type »). `limits` fait exception : `features` (entier ≥ 1, 64 aujourd'hui) est le nombre maximal de noms que l'API accepte dans `hello` et `capabilities`, que l'hôte retient et persiste (voir « Borne des features »). Un hôte plus ancien ignore ce champ, comme les seuils de version `latestVersion` et `minimumVersion` : `DecodeText` ne rejette pas les champs inconnus. `accepts` (au plus 16 types `^[a-z][a-z0-9_.]{0,63}$`) nomme les trames facultatives hôte → openedbot que cette API comprend : une API plus ancienne ferme le lien sur un type inconnu, l'hôte n'envoie donc une telle trame (aujourd'hui `inventory.changed`) que si elle y figure |
 | `link.challenge` | openedbot → hôte | `nonce` (base64, 32 octets) | juste après `hello`, avant la liaison ; voir « Preuve de possession » |
 | `link.proof` | hôte → openedbot | `signature` (base64, 64 octets) | réponse immédiate au challenge ; une `req` reçue avant est refusée `err before_dispatch LINK_POP_PENDING` |
 | `audit.key` | openedbot → hôte | `runtimeId`, `keyId`, `key` (base64, 32 octets), `previous?` (≤ 2 `{keyId,key}`) | seulement si `hello.features` contient `creation_audit_v2` ; envoyée juste après la liaison, avant toute `req` ; jamais journalisée ; voir « Audit de création chiffré » |
@@ -171,7 +171,7 @@ Vers openedbot : `Content-Type`, `Retry-After`.
 la liaison, dans `link.context` :
 
 ```json
-{"t":"link.context","environment":"prod","ohb":"https://openedbot.app","limits":{"features":64}}
+{"t":"link.context","environment":"prod","openedbot":"https://openedbot.app","limits":{"features":64}}
 ```
 
 Avant ce champ, toute API refusait un `hello` de plus de **16** noms par une
@@ -273,7 +273,7 @@ réponse Hermes sans lui ajouter d'état.
 
 `DELETE /api/sessions/{id}` est la seule écriture destructive que le lien
 porte vers le gateway. openedbot l'appelle quand l'opérateur purge un bot
-qu'il avait mis à la corbeille : la session nommée `ohb:<org>:<thread>` et son
+qu'il avait mis à la corbeille : la session nommée `openedbot:<org>:<thread>` et son
 transcript disparaissent du runtime. Le connecteur ne peut pas viser autre
 chose (openedbot ne connaît aucun autre identifiant de session) et cette
 route ne touche ni le profil, ni un fichier, ni l'hôte. Un runtime dont le
@@ -282,7 +282,7 @@ connecteur est antérieur à cette entrée refuse la route en
 lieu de prétendre avoir effacé.
 
 `{id}` n'a pas la même grammaire pour une session que pour un run : un
-identifiant de session porte des deux-points (`ohb:<org>:<thread>`), que le
+identifiant de session porte des deux-points (`openedbot:<org>:<thread>`), que le
 chemin écrit `%3A`. L'allowlist les admet, et eux seuls : `%2F`, `%2E` et un
 `%` nu restent refusés, pour qu'aucun `/` ni `..` ne se faufile en pourcentage
 jusqu'au gateway qui le décoderait.
@@ -437,7 +437,7 @@ processus du lien qui exécute la CLI `hermes`, sous l'utilisateur de service :
 `hermes auth list` et `hermes auth remove` (un seul compte par fournisseur, voir
 ci-dessus), `hermes -p <slug> auth add` (credential d'un profil) et
 `hermes tools enable|disable`, avec ou sans `-p <slug>`, ainsi que
-`hermes -p <slug> plugins enable ohb_approval_policy`. Ses autres
+`hermes -p <slug> plugins enable openedbot_approval_policy`. Ses autres
 programmes sont tout aussi fixes : le redémarrage du gateway (voir
 « Redémarrage du gateway par le lien ») et cinq programmes Python
 **embarqués** (usage, inventaire, OAuth MCP, politiques A2A et d'approbation). La sonde d'usage
@@ -488,7 +488,7 @@ de tous les profils nommés présents sous `HERMES_HOME/profiles/*/`. Les copies
 sont atomiques, en mode `0600`, propriétaires de `hermes`. `API_SERVER_KEY` est
 exclue de ce miroir : un profil nommé doit garder son propre bearer. Une clé
 posée **en propre** sur un profil (`POST /hermes-setup/profiles/{slug}/providers/{provider}/credentials`)
-est marquée (`# ohb:profile-own` et fichier `.env.ohb-own`) : le miroir ne
+est marquée (`# openedbot:profile-own` et fichier `.env.openedbot-own`) : le miroir ne
 l'écrase jamais. Le même miroir est effectué par `edge-setup credentials
 add|remove|login` depuis la console ; une erreur de miroir rend l'opération
 non confirmée.
@@ -772,17 +772,17 @@ prouve une écriture est toujours neuve.
 | `POST /hermes-setup/profiles/{slug}/skills/{skill}` | `{"enabled": bool}` | 200 `{"name", "profile", "platform", "enabled", "requested", "applied"}` ; `enabled` relu sur `profiles.skills[]` ; 400 `PROFILE_INVALID`, `SKILL_INVALID` ou `BODY_INVALID` ; 404 `PROFILE_NOT_FOUND` ou `SKILL_NOT_FOUND` ; 409 `SKILL_IN_PROGRESS` ; 502 `SKILL_UNVERIFIED`. La sonde écrit `disabled_skills` (et `skills.disabled`, la clé que hermes-agent lit) dans le `config.yaml` du profil. |
 | `POST /hermes-setup/profiles/{slug}/bundled-skills` | `{"enabled": bool}` seulement | 200 `{"profile", "requested", "bundled", "bundledEnabled", "applied"}` ; `applied` vérifie l'état relu, les skills essentielles restent actives ; 400 `PROFILE_INVALID` ou `BODY_INVALID` ; 404 `PROFILE_NOT_FOUND` ; 409 `SKILL_IN_PROGRESS` ; 502 `PROFILE_CONFIG_REFUSED` ou `SKILL_UNVERIFIED`. Désactive ou réactive en une écriture toutes les skills indiquées par `.bundled_manifest` et présentes sur le profil. Les skills apprises ou installées depuis le hub ne changent pas. Feature `profile_bundled_skills`, annoncée avec `profile_capabilities`. |
 | `POST /hermes-setup/profiles/{slug}/providers/{provider}/credentials` | `{"apiKey", "label"?}` | 200 `{"provider", "profile", "verification": "confirmed" \| "denied" \| "unverified"}` ; 400 `PROFILE_INVALID`, `PROVIDER_INVALID`, `API_KEY_INVALID` ; 409 `CREDENTIAL_IN_PROGRESS` ; 502 `CLI_REFUSED`, `PROFILE_ENV_REFUSED` ou `PROVIDER_UNKNOWN`. La clé voyage sur stdin ; la preuve est `/p/<slug>/api/model/options`. |
-| `DELETE /hermes-setup/profiles/{slug}/providers/{provider}/credentials` | aucun | 200 `{"provider", "profile", "verification"}` ; mêmes gardes de slug. Retire la variable `key_env` du `.env` du profil et sa marque `ohb:profile-own`. |
+| `DELETE /hermes-setup/profiles/{slug}/providers/{provider}/credentials` | aucun | 200 `{"provider", "profile", "verification"}` ; mêmes gardes de slug. Retire la variable `key_env` du `.env` du profil et sa marque `openedbot:profile-own`. |
 
 ### Identité des gates
 
 Le plugin d'approbation (`approval_policy_plugin/__init__.py`) nomme chaque
-gate qu'il pose : il renvoie `rule_key = "ohb/v1/<clé d'outil>"`, que Hermes
-transmet en `pattern_key = "plugin_rule:ohb/v1/<clé d'outil>"`. La clé est le
+gate qu'il pose : il renvoie `rule_key = "openedbot/v1/<clé d'outil>"`, que Hermes
+transmet en `pattern_key = "plugin_rule:openedbot/v1/<clé d'outil>"`. La clé est le
 nom de l'outil natif (`write_file`, `patch`, `skill_manage`, `send_message`,
 `execute_code`, `cronjob`) ou `mcp:<serveur>:<outil>`, le serveur étant lu
 dans le registre d'outils de Hermes. Son message se termine par une seule
-ligne `ohb-gate/v1 <SHA-256 du JSON> <JSON>` : un descripteur d'au plus
+ligne `openedbot-gate/v1 <SHA-256 du JSON> <JSON>` : un descripteur d'au plus
 1 Kio, qui porte la clé, `deletes` (`yes`, `no`, `unknown`, calculé sur les
 arguments complets), `opaque`, le SHA-256 des arguments complets et les seuls
 arguments utiles à la décision (chemin normalisé et taille, opérations d'un
@@ -854,7 +854,7 @@ mêmes conditions que `profile_capabilities`.
 Un credential de profil tente d'abord `hermes -p <slug> auth add <provider>
 --type api-key` (clé sur stdin). Si la CLI refuse, la sonde écrit la variable
 `key_env` du fournisseur dans le `.env` du profil, stdin seulement, et pose
-la marque `ohb:profile-own`. La preuve est `authenticated` relu sur
+la marque `openedbot:profile-own`. La preuve est `authenticated` relu sur
 `/p/<slug>/api/model/options`, jamais un code de sortie. La valeur de la clé
 n'est ni relue, ni journalisée, ni rendue.
 
@@ -985,11 +985,11 @@ une **clé device** Ed25519 que seul cet hôte détient.
   {signature}` = Ed25519 sur le message exact
 
   ```text
-  "ohb-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n"
+  "openedbot-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n"
   ```
 
   où `runtimeId` est vide pendant l'enrôlement et `wsURL` est l'URL telle
-  que dialée (`wss://<ohb>/api/runtime-links/ws`, ou `ws://127.0.0.1:<port>/…`
+  que dialée (`wss://<openedbot>/api/runtime-links/ws`, ou `ws://127.0.0.1:<port>/…`
   derrière le tunnel de développement). Un nonce ne sert qu'une fois ; une
   preuve ne vaut que pour ce broker et ce runtime.
 - **Avant la preuve.** Une `req` reçue avant `link.proof` est refusée
@@ -1013,7 +1013,7 @@ une **clé device** Ed25519 que seul cet hôte détient.
 
 ## Changement d'origine annoncé par `link.context`
 
-Depuis v0.5.7, `ohb` dans `link.context` n'est plus seulement affiché : quand
+Depuis v0.5.7, `openedbot` dans `link.context` n'est plus seulement affiché : quand
 openedbot change de nom sous le même domaine, le connecteur suit sans
 nouveau ticket. Il adopte l'origine annoncée seulement si les quatre
 conditions tiennent (`connector.MovedWSURL`) :
@@ -1045,8 +1045,8 @@ nouveau lien, et le démon l'ignore.
 ## Instances nommées : dev et prod sur un même hôte
 
 Un `hermes-connector` est **un** lien : un `link.json`, une clé device, une
-unité, un répertoire d'état. Sans rien de plus, `link --ohb` vers une autre
-origine arrêtait l'unité et écrasait le lien précédent. Cas mesuré (OHB-69) : un
+unité, un répertoire d'état. Sans rien de plus, `link --openedbot` vers une autre
+origine arrêtait l'unité et écrasait le lien précédent. Cas mesuré : un
 VPS lié à la production, puis un tunnel SSH inverse et un `link` vers
 `http://127.0.0.1:8790`, et l'API locale répondait `503
 RUNTIME_LINK_UNAVAILABLE` parce que l'unique lien visait la production.
@@ -1080,7 +1080,7 @@ même unité, pas de migration.
 
 Reprise. `link` est un *updateOrCreate* : il écrit le lien de l'instance
 visée, quel qu'ait été le précédent. Basculer l'hôte du développement vers la
-production, ou l'inverse, est la même commande avec une autre `--ohb`. Il n'y
+production, ou l'inverse, est la même commande avec une autre `--openedbot`. Il n'y
 a aucun drapeau à lever : `--replace` a été retiré.
 
 Ce n'est pas un relâchement, parce que ce refus n'a jamais été une frontière.
@@ -1091,7 +1091,7 @@ légitime de basculer. Les frontières réelles sont ailleurs, inchangées :
 - un enrôlement exige un **ticket** émis par un propriétaire authentifié dans
   openedbot, à usage unique et périmable ;
 - une origine `http://` n'est acceptée que sur la **loopback** et seulement
-  derrière `--insecure-ohb`, donc uniquement au bout d'un tunnel SSH inverse
+  derrière `--insecure-openedbot`, donc uniquement au bout d'un tunnel SSH inverse
   que l'hôte d'un client n'a pas ;
 - `reset` est ce qui retire le runtime pour de bon.
 
@@ -1103,17 +1103,17 @@ bascule, et il est annoncé comme tel.
 
 ```bash
 # bascule vers la production
-edge-setup link --ohb https://link.openedbot.app --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 # bascule vers un openedbot de développement, derrière make link-dev-up
-edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb
+edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot
 # garder les deux liens vivants en même temps : une instance nommée
-edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb --name dev
+edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot --name dev
 edge-setup link --rekey --yes --name dev
 edge-setup status          # une ligne par instance : origine, runtime, unité, clé
 journalctl -u hermes-connector@dev
 ```
 
-`status` liste chaque instance (`ohb`, `runtime_id`, unité active, clé device
+`status` liste chaque instance (`openedbot`, `runtime_id`, unité active, clé device
 scellée ; JSON `connectors[]`, `connector_active` et `link_present` restant
 ceux de l'instance par défaut). `upgrade` et `up` installent le template avec
 l'unité par défaut, scellent une clé device pour chaque instance liée qui n'en
@@ -1265,7 +1265,7 @@ par connexion. Une erreur SQL laisse l’événement rejouable. La lecture
 de l’organisation, avec une limite comprise entre 1 et 100. Une trace absente est NULL.
 La révocation logique d’un runtime conserve son historique ; seule sa suppression
 SQL physique déclenche la cascade. Le centre Admin et sa politique de rétention
-font partie de OHB-47, distinct de cette première collecte.
+relèvent d'un chantier distinct de cette première collecte.
 
 ### Audit de création chiffré
 
@@ -1282,7 +1282,7 @@ Clé. Le démon n'écrit jamais de clé sur disque. À la liaison, openedbot
 envoie `audit.key` avec la clé maîtresse courante du runtime (et jusqu'à deux
 clés retirées encore acceptées en lecture). Le démon dérive la clé de
 chiffrement par `HKDF-SHA256(clé maîtresse, salt = runtimeId,
-info = "ohb-creation-audit/v2/enc")`, ouvre le fichier avec la clé que son
+info = "openedbot-creation-audit/v2/enc")`, ouvre le fichier avec la clé que son
 en-tête nomme, vérifie la chaîne, puis rescelle sous la clé courante. Sans
 clé (session non encore liée, API ancienne), une création répond
 `err` `AUDIT_KEY_MISSING` `before_dispatch` : rien n'est dispatché sans preuve,
@@ -1292,7 +1292,7 @@ Format `snapshot.bin` (entiers big-endian) :
 
 | Décalage | Taille | Champ |
 |---|---|---|
-| 0 | 8 | magic `OHBAUDT2` |
+| 0 | 8 | magic `OBAUDIT2` |
 | 8 | 1 | version `0x02` |
 | 9 | 1 | suite `0x01` = AES-256-GCM, HKDF-SHA256, SHA-256 |
 | 10 | 2 | longueur `hlen` de l'en-tête (≤ 1024) |
@@ -1307,7 +1307,7 @@ en-tête ou un nonce modifié fait échouer le tag. Le snapshot en clair porte
 `count`, `dropped`, `base`, `tail`, `events`. `writeSeq` figure dans l'en-tête
 et dans le clair ; un désaccord est un refus.
 
-Chaîne. `base = SHA-256("ohb-creation-audit/v2/genesis" || runtimeId)`, puis
+Chaîne. `base = SHA-256("openedbot-creation-audit/v2/genesis" || runtimeId)`, puis
 `h_i = SHA-256(0x01 || canonical(e_i) || h_{i-1})` ; `tail` est le dernier
 hachage. Quand l'anneau de 4096 événements déborde, l'événement le plus
 ancien quitte le fichier mais pas la chaîne : `base` devient son hachage et
@@ -1378,7 +1378,7 @@ par la position renvoyée à la session suivante.
   `hermes -p <slug> auth add`,
   `hermes tools enable|disable --platform api_server`,
   `hermes -p <slug> tools enable|disable --platform api_server`,
-  `hermes -p <slug> plugins enable ohb_approval_policy`,
+  `hermes -p <slug> plugins enable openedbot_approval_policy`,
   ou l'un de ses cinq programmes Python embarqués (usage, inventaire, OAuth
   MCP, politiques A2A et lecture de configuration d'approbation), tous sous l'utilisateur de service, plus
   `systemctl restart hermes-gateway`, que l'opérateur (root) confie à systemd.

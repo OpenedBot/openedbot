@@ -23,11 +23,11 @@ export function RuntimePromiseLine({ runtime, model = null, pendingModel = null,
 }) {
   const { t } = useT();
   if (!isRuntimeLinked(runtime)) {
-    return <p className="ohb-new-bot-promise" role="status">{t("newBotDialog.promiseUnlinked")}</p>;
+    return <p className="openedbot-new-bot-promise" role="status">{t("newBotDialog.promiseUnlinked")}</p>;
   }
   const current = model || runtime.selectedModel || t("newBotDialog.rulesModelRuntime");
   return (
-    <p className="ohb-new-bot-promise" role="status">
+    <p className="openedbot-new-bot-promise" role="status">
       {t("newBotDialog.promiseLinked", {
         runtime: runtime.name || t("newBotDialog.rulesServerFallback"),
         model: current,

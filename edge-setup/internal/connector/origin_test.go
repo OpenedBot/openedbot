@@ -13,7 +13,7 @@ import (
 func TestMovedWSURLOnlyWithinOneHTTPSDomain(t *testing.T) {
 	const legacy = "wss://console.openedbot.app/api/runtime-links/ws"
 	for _, tc := range []struct {
-		name, current, ohb, want string
+		name, current, openedbot, want string
 	}{
 		{"subdomain to apex", legacy, "https://openedbot.app", "wss://openedbot.app/api/runtime-links/ws"},
 		{"apex to subdomain", "wss://openedbot.app/api/runtime-links/ws", "https://console.openedbot.app/", "wss://console.openedbot.app/api/runtime-links/ws"},
@@ -29,9 +29,9 @@ func TestMovedWSURLOnlyWithinOneHTTPSDomain(t *testing.T) {
 		{"address", legacy, "https://203.0.113.10", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := MovedWSURL(tc.current, tc.ohb)
+			got, ok := MovedWSURL(tc.current, tc.openedbot)
 			if got != tc.want || ok != (tc.want != "") {
-				t.Fatalf("MovedWSURL(%q, %q) = %q, %v; want %q", tc.current, tc.ohb, got, ok, tc.want)
+				t.Fatalf("MovedWSURL(%q, %q) = %q, %v; want %q", tc.current, tc.openedbot, got, ok, tc.want)
 			}
 		})
 	}
@@ -55,7 +55,7 @@ func TestLinkContextAnnouncingTheApexEndsTheSessionForAMove(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- c.Session(ctx) }()
 	<-broker.ready
-	broker.send(Text{T: TLinkContext, Environment: "prod", OHB: "https://openedbot.app"})
+	broker.send(Text{T: TLinkContext, Environment: "prod", Openedbot: "https://openedbot.app"})
 	select {
 	case err := <-done:
 		if !errors.Is(err, errOriginMoved) || c.pendingWSURL != "wss://openedbot.app/api/runtime-links/ws" {

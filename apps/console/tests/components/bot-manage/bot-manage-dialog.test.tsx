@@ -119,7 +119,7 @@ function serve(extra: (url: string, method: string) => Response | null = () => n
 beforeEach(() => {
   deleted = false;
   closed = 0;
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   Object.defineProperty(window, "innerWidth", { value: 1280, configurable: true });
   Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
   serve();

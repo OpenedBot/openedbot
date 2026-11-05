@@ -23,7 +23,7 @@ const other: AuthContext = {
 const VAPID = {
   publicKey: Buffer.concat([Buffer.from([0x04]), Buffer.alloc(64, 7)]).toString("base64url"),
   privateKey: Buffer.alloc(32, 9).toString("base64url"),
-  subject: "mailto:ops@ohb.example",
+  subject: "mailto:ops@openedbot.example",
 };
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc";

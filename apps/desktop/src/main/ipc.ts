@@ -12,7 +12,7 @@ export type IpcDeps = {
   /** Any bridge call from the console proves it supports the shell. */
   onBridgeUse(): void;
   /**
-   * `ohb:sign-out` arrived while the shell is already signed out. When the
+   * `openedbot:sign-out` arrived while the shell is already signed out. When the
    * window shows the console's /login, that console predates the shared
    * sign-in screen and hands sign-in back: the window switches to the local
    * page and answers true. False: not that case, sign out as usual.
@@ -42,7 +42,7 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLo
   const isTrusted = (origin: string | null): boolean => origin !== null && trustedOrigins.includes(origin);
 
   // Internal preload channel: theme updates must not count as an auth bridge probe.
-  handle("ohb:theme", (event, mode) => {
+  handle("openedbot:theme", (event, mode) => {
     const href = senderHref(event);
     if (!href || (href.split(/[?#]/)[0] !== signinUrl && !isTrusted(new URL(href).origin))) {
       throw new Error("Forbidden sender");
@@ -53,7 +53,7 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLo
 
   // Internal preload channel too: the console's text size zooms the whole
   // window. Only the console sets it; the sign-in page stays at 100 %.
-  handle("ohb:text-zoom", (event, factor) => {
+  handle("openedbot:text-zoom", (event, factor) => {
     const href = senderHref(event);
     let origin: string | null = null;
     try {
@@ -70,7 +70,7 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLo
   // a reload or a launch starts at the console's size instead of 100 % then
   // jumping once its JavaScript runs. Answers 1 (no zoom) to anyone but the
   // console's main frame, never throws (a thrown sync handler hangs the page).
-  ipcMain.on("ohb:text-zoom-initial" satisfies IpcChannel, (event: IpcMainEvent) => {
+  ipcMain.on("openedbot:text-zoom-initial" satisfies IpcChannel, (event: IpcMainEvent) => {
     const href = senderHref(event);
     let origin: string | null = null;
     try {
@@ -105,23 +105,23 @@ export function registerIpc({ auth, config, signinUrl, onBridgeUse, fallBackToLo
     if (!isSigninSender(event)) fromConsole(event);
   };
 
-  handle("ohb:read-access-token", (event) => {
+  handle("openedbot:read-access-token", (event) => {
     fromConsole(event);
     return auth.readAccessToken();
   });
 
-  handle("ohb:refresh", (event) => {
+  handle("openedbot:refresh", (event) => {
     fromConsole(event);
     return auth.refresh();
   });
 
-  handle("ohb:open-external", async (event, url) => {
+  handle("openedbot:open-external", async (event, url) => {
     fromConsole(event);
     // Throws (so the renderer promise rejects) for anything outside the console/api origins.
     await shell.openExternal(parseTrustedExternalUrl(url, config).toString());
   });
 
-  handle("ohb:sign-out", async (event) => {
+  handle("openedbot:sign-out", async (event) => {
     fromConsole(event);
     // Signing out again would reload the same /login, which would call this
     // again: an old console's loop, broken by the local page.

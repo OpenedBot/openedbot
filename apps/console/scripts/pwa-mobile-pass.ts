@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { listMailpitMessageIds, readMailpitLoginCode } from "../../../scripts/lib/password-login";
 
 const ORIGIN = process.env.E2E_ORIGIN?.trim() || "http://localhost:1420";
-const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@ohb.local";
+const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@openedbot.local";
 const PASSWORD = process.env.E2E_PASSWORD || (() => { throw new Error("E2E_PASSWORD is not set: run `make setup` (it generates one in .env.local), or export it."); })();
 const OUT = join(import.meta.dir, "../../../tmp/pwa-mobile");
 // Le design system vit hors de la racine Vite (browser/ui-kit) : Vite le sert
@@ -123,7 +123,7 @@ async function main() {
     ([top, right, bottom, left]) => {
       const apply = () => {
         const style = document.createElement("style");
-        style.textContent = `:root{--ohb-safe-top:${top}px;--ohb-safe-right:${right}px;--ohb-safe-bottom:${bottom}px;--ohb-safe-left:${left}px}`;
+        style.textContent = `:root{--openedbot-safe-top:${top}px;--openedbot-safe-right:${right}px;--openedbot-safe-bottom:${bottom}px;--openedbot-safe-left:${left}px}`;
         document.head.append(style);
       };
       if (document.head) apply();

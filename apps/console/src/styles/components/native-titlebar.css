@@ -33,19 +33,19 @@
 :root[data-native-titlebar] {
   /* La hauteur de la barre du haut, donc celle de la bande des boutons du
      système. */
-  --ohb-titlebar-height: 46px;
+  --openedbot-titlebar-height: 46px;
 }
 
 :root[data-native-titlebar="mac"] {
   /* Où les feux finissent, en pixels de la page. Ils ne zooment pas avec la
      taille du texte (`lib/shell/text-size.ts`) : la coque zoome la page et pose
-     `--ohb-native-zoom`, et leurs 76 px d'écran valent 76 / zoom pixels de
+     `--openedbot-native-zoom`, et leurs 76 px d'écran valent 76 / zoom pixels de
      page. La coque recentre aussi les feux sur la barre du haut zoomée. */
-  --ohb-traffic-lights-end: calc(76px / var(--ohb-native-zoom, 1));
+  --openedbot-traffic-lights-end: calc(76px / var(--openedbot-native-zoom, 1));
   /* Depuis le début de la rangée (x 12, barre latérale ou barre du haut
      repliée) : les feux finissent à 76, puis 8 px avant le premier contrôle
      (72 px sans zoom). */
-  --ohb-traffic-lights-width: calc(var(--ohb-traffic-lights-end) - 4px);
+  --openedbot-traffic-lights-width: calc(var(--openedbot-traffic-lights-end) - 4px);
 }
 
 :root[data-native-titlebar="windows"] {
@@ -53,7 +53,7 @@
      fenêtre : ce que la zone de titre libre laisse à droite. Sans les
      variables (une coque sans `titleBarOverlay`), les trois boutons de
      Windows 11 à 46 px, arrondis. */
-  --ohb-caption-buttons-width: calc(
+  --openedbot-caption-buttons-width: calc(
     100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))
   );
 }
@@ -67,14 +67,14 @@
 :root[data-native-titlebar="mac"] [data-titlebar-lights] {
   display: block;
   flex: none;
-  width: var(--ohb-traffic-lights-width);
+  width: var(--openedbot-traffic-lights-width);
 }
 
 /* La barre du haut touche le bord droit de la fenêtre : ses actions
    s'arrêtent avant les boutons du système, avec le même retrait que son bord
    droit sans eux (12 px). */
 :root[data-native-titlebar="windows"] [data-board-topbar] {
-  padding-inline-end: calc(var(--ohb-caption-buttons-width) + 12px);
+  padding-inline-end: calc(var(--openedbot-caption-buttons-width) + 12px);
 }
 
 /* Le haut de la fenêtre au-dessus des cartes (marge du cadre et haut de la
@@ -153,7 +153,7 @@
 }
 
 :root[data-native-titlebar="mac"] [data-board-icon-rail] ~ * [data-titlebar-lights] {
-  width: calc(var(--ohb-traffic-lights-end) - 60px);
+  width: calc(var(--openedbot-traffic-lights-end) - 60px);
 }
 
 [data-titlebar-logo] {
@@ -169,16 +169,16 @@
   Fenêtre étroite (la coque mobile de `useIsMobile`, sous 768 px) : pas de
   carte latérale où loger les feux. Les boutons du système prennent la bande
   de la barre d'état, comme une encoche : la coque mobile la réserve déjà par
-  `--ohb-safe-top`. La fenêtre de la coque ne descend pas sous 800 px ; ce
+  `--openedbot-safe-top`. La fenêtre de la coque ne descend pas sous 800 px ; ce
   cas reste pour un zoom ou un minimum abaissé.
 */
 @media (max-width: 767px) {
   :root[data-native-titlebar] {
-    --ohb-safe-top: var(--ohb-titlebar-height);
+    --openedbot-safe-top: var(--openedbot-titlebar-height);
   }
 
   :root[data-native-titlebar] [data-native-titlebar-band] {
-    height: var(--ohb-titlebar-height);
+    height: var(--openedbot-titlebar-height);
   }
 
   :root[data-native-titlebar="mac"] [data-titlebar-lights],
@@ -198,7 +198,7 @@
 :root[data-native-titlebar] [data-onboarding-titlebar] {
   display: block;
   flex: none;
-  height: var(--ohb-titlebar-height);
+  height: var(--openedbot-titlebar-height);
 }
 
 :root[data-native-titlebar] [data-onboarding-rail] {

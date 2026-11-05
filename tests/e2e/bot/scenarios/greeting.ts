@@ -1,5 +1,5 @@
 /**
- * Bench: bot creation to its first question (DEV-OHB-244). Each sample
+ * Bench: bot creation to its first question. Each sample
  * creates a bot with the greeting, follows the greeting run, then purges the
  * bot and waits for its verified host cleanup before the next sample (an
  * orphan profile would skew the next clone). `--purge-early` purges while

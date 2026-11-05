@@ -17,7 +17,7 @@ function mount(element: React.ReactNode) {
 }
 beforeEach(() => {
   calls = []; verdict = green; delayed = null;
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input, init) => {
     const url = String(input); calls.push({ url, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : null });
     if (url.endsWith("test-draft")) return Response.json(verdict);
@@ -34,7 +34,7 @@ function choosePath(name: RegExp) {
 }
 const exposure = { id: "exp-1", kind: "managed_cloudflare", status: "awaiting_install", hostname: "mon-vps.rt.openedbot.app", endpoint: "https://mon-vps.rt.openedbot.app", runtimeId: null, edgeAuthProvisioned: true, lastTunnelStatus: null, lastCheckedAt: null, errorCode: null, createdAt: "2026-09-07T00:00:00.000Z" };
 const TUNNEL_COMMAND = "sudo cloudflared service install eyJhIjoiSECRET-TUNNEL-TOKEN";
-const FUNNEL_COMMAND = "sudo tailscale up --auth-key tskey-SECRET-AUTH-KEY --hostname mon-vps --advertise-tags tag:ohb-hermes && sudo tailscale funnel --bg 8642";
+const FUNNEL_COMMAND = "sudo tailscale up --auth-key tskey-SECRET-AUTH-KEY --hostname mon-vps --advertise-tags tag:openedbot-hermes && sudo tailscale funnel --bg 8642";
 /** Le faux serveur des publications : création, relecture (joignable à la deuxième), test, déclaration. */
 function exposureFetch(kind: string, reads: { current: number } = { current: 0 }) {
   const funnel = kind === "tailscale_funnel";
@@ -69,7 +69,7 @@ async function publish(_kind: string, radio: RegExp, fields: readonly (readonly 
 }
 const PATHS = [
   ["managed_cloudflare", /Tunnel géré par openedbot/, [], TUNNEL_COMMAND],
-  ["tailscale_funnel", /Tailscale Funnel/, [["Nom de la machine sur le tailnet", "mon-vps"], ["Client ID OAuth Tailscale", "ohb-client-id"], ["Client Secret OAuth Tailscale", "oauth-secret-with-enough-length"]], FUNNEL_COMMAND],
+  ["tailscale_funnel", /Tailscale Funnel/, [["Nom de la machine sur le tailnet", "mon-vps"], ["Client ID OAuth Tailscale", "openedbot-client-id"], ["Client Secret OAuth Tailscale", "oauth-secret-with-enough-length"]], FUNNEL_COMMAND],
 ] as const;
 for (const [kind, radio, fields, command] of PATHS) test(`publication ${kind} : publier, commande rendue une fois, attente du hostname, puis déclaration sans champs Access`, async () => {
   let done: unknown = null;
@@ -85,7 +85,7 @@ for (const [kind, radio, fields, command] of PATHS) test(`publication ${kind} : 
   expect(created.body).toEqual(kind === "managed_cloudflare"
     // Le tunnel géré ne porte aucun nom : openedbot tire le sous-domaine.
     ? { kind }
-    : { kind, slug: "mon-vps", oauthClientId: "ohb-client-id", oauthClientSecret: "oauth-secret-with-enough-length" });
+    : { kind, slug: "mon-vps", oauthClientId: "openedbot-client-id", oauthClientSecret: "oauth-secret-with-enough-length" });
   // The one command with the secret is shown here and nowhere else.
   await screen.findByText(command);
   const next = () => screen.getByRole("button", { name: "Continuer" }) as HTMLButtonElement;
@@ -113,7 +113,7 @@ test("le client OAuth du tailnet ne sert qu’à publier et n’est jamais renvo
   mount(<RuntimeDirectWizard onDone={() => { }} onCancel={() => { }} />);
   await publish(...PATHS[1]!.slice(0, 3) as [string, RegExp, readonly (readonly [string, string])[]]);
   const created = calls.find(c => c.url.endsWith("/api/runtime/exposures") && c.method === "POST")!;
-  expect(created.body).toEqual({ kind: "tailscale_funnel", slug: "mon-vps", oauthClientId: "ohb-client-id", oauthClientSecret: "oauth-secret-with-enough-length" });
+  expect(created.body).toEqual({ kind: "tailscale_funnel", slug: "mon-vps", oauthClientId: "openedbot-client-id", oauthClientSecret: "oauth-secret-with-enough-length" });
   fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Mon gateway" } });
   fireEvent.change(screen.getByLabelText("Bearer API_SERVER_KEY"), { target: { value: "secret-bearer" } });
   fireEvent.click(screen.getByRole("button", { name: "Tester" }));

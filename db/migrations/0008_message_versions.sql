@@ -71,17 +71,17 @@ create index message_versions_parent_idx
 alter table message_versions enable row level security;
 alter table message_versions force row level security;
 
-create policy message_versions_tenant on message_versions to ohb_api
+create policy message_versions_tenant on message_versions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 -- Le worker ne lit que `prefix_truncated` : quand le préfixe copié dépasse sa
 -- fenêtre bornée, il injecte le même avertissement honnête de perte
 -- d'historique qu'un long fil ordinaire. Il ne réécrit jamais la provenance.
-grant select, insert on message_versions to ohb_api;
-create policy message_versions_worker on message_versions to ohb_worker
+grant select, insert on message_versions to openedbot_api;
+create policy message_versions_worker on message_versions to openedbot_worker
   using (true) with check (true);
-grant select on message_versions to ohb_worker;
+grant select on message_versions to openedbot_worker;
 
 insert into schema_migrations(version) values ('0008_message_versions')
 on conflict (version) do nothing;

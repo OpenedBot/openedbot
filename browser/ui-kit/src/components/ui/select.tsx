@@ -100,7 +100,7 @@ function SelectContent({
           "scrollbar-subtle relative z-[115] min-w-36 origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-2xl border border-border bg-card p-1.5 text-foreground shadow-[var(--shadow-elevated)] duration-150",
           rows == null
             ? "max-h-(--radix-select-content-available-height)"
-            : "max-h-[calc(var(--ohb-select-rows)*2rem+(var(--ohb-select-rows)-1)*0.25rem+0.75rem)]",
+            : "max-h-[calc(var(--openedbot-select-rows)*2rem+(var(--openedbot-select-rows)-1)*0.25rem+0.75rem)]",
           position === "popper" && "w-(--radix-select-trigger-width)",
           "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
@@ -109,7 +109,7 @@ function SelectContent({
         style={
           rows == null
             ? style
-            : ({ ...style, "--ohb-select-rows": String(rows) } as React.CSSProperties)
+            : ({ ...style, "--openedbot-select-rows": String(rows) } as React.CSSProperties)
         }
         position={position}
         side={side}

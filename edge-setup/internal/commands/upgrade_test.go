@@ -269,7 +269,7 @@ func TestEnsurePathLinkAt(t *testing.T) {
 
 // forceAliasAt, unlike ensurePathLinkAt, converts a pre-existing regular
 // file into a symlink: this is what ToolAliasPath and ToolLegacyPathLink
-// need after the OHB-87 rename, where a regular file is always this tool's
+// need after the edge-setup rename, where a regular file is always this tool's
 // own stale pre-rename binary, never an operator's copy to preserve.
 func TestForceAliasAtReplacesAStaleRegularFile(t *testing.T) {
 	dir := t.TempDir()
@@ -314,7 +314,7 @@ func TestForceAliasAtReplacesAStaleRegularFile(t *testing.T) {
 
 // legacyAliasTargets only pairs a legacy name with a canonical copy that
 // really exists as a regular file: promotedCanonicalCopies is what creates
-// that canonical file when only the legacy name held one (OHB-87 rename).
+// that canonical file when only the legacy name held one (edge-setup rename).
 func TestLegacyAliasTargetsOnlyExistingRegularCopies(t *testing.T) {
 	canonical := []string{"/usr/local/sbin/edge-setup", "/usr/sbin/edge-setup", "/usr/local/bin/edge-setup"}
 	legacy := []string{"/usr/local/sbin/hermes-setup", "/usr/sbin/hermes-setup", "/usr/local/bin/hermes-setup"}
@@ -397,7 +397,7 @@ func TestPromotedCanonicalCopiesOnlyWhenLegacyIsARegularFile(t *testing.T) {
 	}
 }
 
-// End to end reproduction of the bug found on the dev VPS after the OHB-87
+// End to end reproduction of the bug found on the dev VPS after the edge-setup
 // rename: a v0.4.0 host has a regular file at the pre-rename PATH copy
 // (/usr/local/sbin/hermes-setup, installed by the old bootstrap's `install`)
 // and nothing at the canonical name. An upgrade pass must create the
@@ -478,7 +478,7 @@ func TestForceAliasAtKeepsARegularFileWhoseTargetIsNotOne(t *testing.T) {
 	}
 }
 
-// A v0.4.0 host upgrading itself to this release (OHB-87 bridge): the old
+// A v0.4.0 host upgrading itself to this release (edge-setup rename bridge): the old
 // binary writes the new bytes to the pre-rename name and runs the finish step
 // from there, so the canonical name does not exist yet. The finish keeps that
 // file, makes every name resolve to it, survives a rollback by the old

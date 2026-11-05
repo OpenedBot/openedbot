@@ -9,7 +9,7 @@ begin;
 -- par 0080 et 0082 (`tests/integration/worker-policy-exceptions.sql`).
 
 drop policy if exists mobile_connect_tickets_worker on mobile_connect_tickets;
-revoke all on mobile_connect_tickets from ohb_worker;
+revoke all on mobile_connect_tickets from openedbot_worker;
 
 insert into schema_migrations(version) values ('0148_mobile_connect_tickets_worker_revoke')
 on conflict (version) do nothing;

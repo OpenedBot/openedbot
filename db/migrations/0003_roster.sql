@@ -213,47 +213,47 @@ alter table routines force row level security;
 alter table team_imports enable row level security;
 alter table team_imports force row level security;
 
-create policy sections_tenant on sections to ohb_api
+create policy sections_tenant on sections to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy sections_worker on sections to ohb_worker using (true) with check (true);
+create policy sections_worker on sections to openedbot_worker using (true) with check (true);
 
-create policy bots_tenant on bots to ohb_api
+create policy bots_tenant on bots to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bots_worker on bots to ohb_worker using (true) with check (true);
+create policy bots_worker on bots to openedbot_worker using (true) with check (true);
 
-create policy bot_groups_tenant on bot_groups to ohb_api
+create policy bot_groups_tenant on bot_groups to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_groups_worker on bot_groups to ohb_worker using (true) with check (true);
+create policy bot_groups_worker on bot_groups to openedbot_worker using (true) with check (true);
 
-create policy group_members_tenant on group_members to ohb_api
+create policy group_members_tenant on group_members to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy group_members_worker on group_members to ohb_worker using (true) with check (true);
+create policy group_members_worker on group_members to openedbot_worker using (true) with check (true);
 
-create policy bot_memories_tenant on bot_memories to ohb_api
+create policy bot_memories_tenant on bot_memories to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_memories_worker on bot_memories to ohb_worker using (true) with check (true);
+create policy bot_memories_worker on bot_memories to openedbot_worker using (true) with check (true);
 
-create policy routines_tenant on routines to ohb_api
+create policy routines_tenant on routines to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy routines_worker on routines to ohb_worker using (true) with check (true);
+create policy routines_worker on routines to openedbot_worker using (true) with check (true);
 
-create policy team_imports_tenant on team_imports to ohb_api
+create policy team_imports_tenant on team_imports to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on sections, bots, bot_groups, group_members to ohb_api;
-grant select, insert, update, delete on sections, bots, bot_groups, group_members to ohb_worker;
-grant select, insert, update, delete on bot_memories to ohb_api;
-grant select, insert, update, delete on bot_memories to ohb_worker;
-grant select, insert, update, delete on routines to ohb_api;
-grant select, insert, update, delete on routines to ohb_worker;
-grant select, insert on team_imports to ohb_api;
+grant select, insert, update, delete on sections, bots, bot_groups, group_members to openedbot_api;
+grant select, insert, update, delete on sections, bots, bot_groups, group_members to openedbot_worker;
+grant select, insert, update, delete on bot_memories to openedbot_api;
+grant select, insert, update, delete on bot_memories to openedbot_worker;
+grant select, insert, update, delete on routines to openedbot_api;
+grant select, insert, update, delete on routines to openedbot_worker;
+grant select, insert on team_imports to openedbot_api;
 
 insert into schema_migrations(version) values ('0003_roster')
 on conflict (version) do nothing;

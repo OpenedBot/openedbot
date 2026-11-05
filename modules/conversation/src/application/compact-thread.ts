@@ -194,7 +194,7 @@ export async function loadRoomMessages(
   range: { afterSequence: number; beforeSequence: number | null; newest?: number },
 ): Promise<HistoryMessage[]> {
   const newest = range.newest ?? 0;
-  // Sous `withTenant` : `messages` et `bots` sont sous RLS pour `ohb_api`, qui ne
+  // Sous `withTenant` : `messages` et `bots` sont sous RLS pour `openedbot_api`, qui ne
   // lit RIEN sans `app.organization_id` (ni erreur, ni ligne). Le worker, lui,
   // passe par ses policies `using (true)` et n'est pas gêné par ce réglage.
   const rows = await withTenant(db, context.organizationId, (tx) => tx<Array<{

@@ -15,7 +15,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * La clé ne vaut que pour un run vivant : une fois le run terminé, l'API la
  * refuse, même bien signée.
  */
-const ROUTINE_KEY_LABEL = "ohb:routine-run-key:v1";
+const ROUTINE_KEY_LABEL = "openedbot:routine-run-key:v1";
 
 function mac(secret: string, runId: string, label: string): string {
   const key = createHmac("sha256", secret).update(label).digest();

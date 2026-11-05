@@ -129,10 +129,10 @@ revoke all on function workspace_business_metrics(uuid, timestamptz, timestamptz
 revoke all on function agency_authorized_clients(uuid, uuid) from public;
 revoke all on function agency_client_directory(uuid, uuid, text, integer, integer) from public;
 revoke all on function agency_business_summary(uuid, uuid, timestamptz, timestamptz, timestamptz) from public;
-grant execute on function workspace_run_activity(uuid, timestamptz, timestamptz) to ohb_api;
-grant execute on function workspace_business_metrics(uuid, timestamptz, timestamptz, timestamptz) to ohb_api;
-grant execute on function agency_client_directory(uuid, uuid, text, integer, integer) to ohb_api;
-grant execute on function agency_business_summary(uuid, uuid, timestamptz, timestamptz, timestamptz) to ohb_api;
+grant execute on function workspace_run_activity(uuid, timestamptz, timestamptz) to openedbot_api;
+grant execute on function workspace_business_metrics(uuid, timestamptz, timestamptz, timestamptz) to openedbot_api;
+grant execute on function agency_client_directory(uuid, uuid, text, integer, integer) to openedbot_api;
+grant execute on function agency_business_summary(uuid, uuid, timestamptz, timestamptz, timestamptz) to openedbot_api;
 
 create index membership_events_agency_timeline on membership_events (organization_id, subject_organization_id, occurred_at desc, id desc)
   where kind in ('agency_granted','agency_revoked');

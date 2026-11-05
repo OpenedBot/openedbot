@@ -32,7 +32,7 @@
 -- de lever le refus avant de valider, et de retirer l'accès avant de refuser :
 -- chaque transition reste un geste nommé, jamais un effet de bord.
 --
--- Aucun `grant` nouveau : `ohb_api` a `select`, `insert`, `update` et `delete`
+-- Aucun `grant` nouveau : `openedbot_api` a `select`, `insert`, `update` et `delete`
 -- sur cette table depuis 0065 et 0066. La table reste hors tenant et sans RLS,
 -- pour la raison de 0063 : il n'existe pas encore d'organisation à ce moment.
 begin;

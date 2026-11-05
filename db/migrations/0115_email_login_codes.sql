@@ -12,10 +12,10 @@ create table email_login_codes (
 create index email_login_codes_email_idx on email_login_codes(email, created_at desc);
 alter table email_login_codes enable row level security;
 alter table email_login_codes force row level security;
-create policy email_login_codes_api on email_login_codes to ohb_api
+create policy email_login_codes_api on email_login_codes to openedbot_api
   using (email = nullif(current_setting('app.login_email', true), ''))
   with check (email = nullif(current_setting('app.login_email', true), ''));
-grant select, insert, update on email_login_codes to ohb_api;
+grant select, insert, update on email_login_codes to openedbot_api;
 
 alter table email_outbox drop constraint if exists email_outbox_kind_check;
 alter table email_outbox add constraint email_outbox_kind_check check (kind in (

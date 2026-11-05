@@ -1,4 +1,4 @@
-// OHB-139: without LISTEN (Bun 1.3, or a listener still reconnecting), the
+// Without LISTEN (Bun 1.3, or a listener still reconnecting), the
 // queue probe wakes the real claim loop well before the poll, and two workers
 // woken by the same queue change still claim every run exactly once.
 import { withDisposablePostgres } from "./disposable-postgres";
@@ -19,13 +19,13 @@ const id = (n: number) => `91390000-0000-4000-8000-${String(n).padStart(12, "0")
 const THREADS = [id(100), id(101), id(102)];
 const POLL_MS = 2_000;
 
-await withDisposablePostgres("ohb139_probe", async ({ owner, url, connect }) => {
-  await owner`insert into organizations (id, slug, name) values (${ORG}, 'ohb139', 'Queue probe')`;
+await withDisposablePostgres("openedbot139_probe", async ({ owner, url, connect }) => {
+  await owner`insert into organizations (id, slug, name) values (${ORG}, 'openedbot139', 'Queue probe')`;
   await owner`insert into sections (id, organization_id, name, position) values (${id(4)}, ${ORG}, 'Queue', 0)`;
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${BOT}, ${ORG}, ${id(4)}, 'Queue', 'queue', 0)`;
   for (const [index, thread] of THREADS.entries()) {
     await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-      values (${thread}, ${ORG}, ${BOT}, 'Queue', ${`ohb139-fixture-session-${index}`}, ${index === 0})`;
+      values (${thread}, ${ORG}, ${BOT}, 'Queue', ${`openedbot139-fixture-session-${index}`}, ${index === 0})`;
   }
   const linkHash = new Bun.CryptoHasher("sha256").update(crypto.randomUUID()).digest("hex");
   await owner`insert into runtimes (id, organization_id, name, reachability, is_active, capacity, link_last_seen_at, link_token_hash)
@@ -35,7 +35,7 @@ await withDisposablePostgres("ohb139_probe", async ({ owner, url, connect }) => 
   const queued: number[] = [];
   const emptyClaims = { count: 0 };
   const workers = await Promise.all(["probe-worker-a", "probe-worker-b"].map(async (workerId) => {
-    const db = await connect("ohb_worker");
+    const db = await connect("openedbot_worker");
     const config = { workerId, pollMs: POLL_MS, maxActiveRuns: 2, leaseSeconds: 30, routineTickMs: 10_000,
       healthFile: null } as WorkerConfig;
     // A client without `listen` is exactly Bun 1.3's SQL: only the probe can hint.
@@ -81,7 +81,7 @@ await withDisposablePostgres("ohb139_probe", async ({ owner, url, connect }) => 
     assert(duplicates.length === 0, "Two probed workers must never claim the same run twice.");
     const [left] = await owner<Array<{ count: number }>>`select count(*)::int as count from runs where status <> 'completed'`;
     assert(left?.count === 0, "Every inserted run must be claimed and completed.");
-    console.info(JSON.stringify({ event: "ohb139.queue_probe.passed", firstQueuedMs: Math.round(queued[0]!),
+    console.info(JSON.stringify({ event: "openedbot139.queue_probe.passed", firstQueuedMs: Math.round(queued[0]!),
       claimed: claims.size, maxQueuedMs: Math.round(Math.max(...queued)) }));
   } finally {
     for (const { worker } of workers) worker.stop("integration-complete");

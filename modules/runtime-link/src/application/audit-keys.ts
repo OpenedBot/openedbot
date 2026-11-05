@@ -9,7 +9,7 @@ import { decryptSecretFromKeyring, encryptSecret, SecretDecryptionError, type Se
 import type { TransactionDb } from "@openedbot/platform-db";
 
 /**
- * Les clés maîtresses de l'audit de création (OHB-53 côté hôte).
+ * Les clés maîtresses de l'audit de création, tenu côté hôte.
  *
  * Une clé par runtime, tirée par l'API, chiffrée par le keyring des bearers
  * (`RUNTIME_TOKEN_ENCRYPTION_KEY`) et remise au connecteur à chaque session

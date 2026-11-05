@@ -1,5 +1,5 @@
 /**
- * PERM2-1 (DEV-OHB-251): the permission pipeline of US-PERM2, section 5.
+ * PERM2-1: the permission pipeline of US-PERM2, section 5.
  * A pure function: one identified gate (PERM2-A) and the effective policy at
  * its revision in, one outcome out. Interdictions first, the floor next, the
  * intersection of rights last: no right of one tier lifts a restriction of

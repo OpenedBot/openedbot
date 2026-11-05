@@ -16,11 +16,11 @@ export const BUI_POPOVER =
 
 /** Une ligne de menu : 36 px, icône 20 px grise. Le survol est `dropdown-item-hover` (clair #f7f7f7, sombre un cran au-dessus du panneau). */
 export const BUI_MENU_ITEM =
-  "ohb-row flex w-full cursor-pointer select-none items-center gap-2 rounded-2lg px-2 py-1.5 text-start text-body-medium text-text-primary outline-none hover:bg-dropdown-item-hover-background focus-visible:bg-dropdown-item-hover-background data-[highlighted]:bg-dropdown-item-hover-background data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+  "openedbot-row flex w-full cursor-pointer select-none items-center gap-2 rounded-2lg px-2 py-1.5 text-start text-body-medium text-text-primary outline-none hover:bg-dropdown-item-hover-background focus-visible:bg-dropdown-item-hover-background data-[highlighted]:bg-dropdown-item-hover-background data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
 
 /** Une ligne de panneau (menus « + », compte) : survol par la surface primaire. */
 export const BUI_PANEL_ITEM =
-  "ohb-row flex w-full cursor-pointer items-center gap-2 rounded-2lg px-2 py-1.5 text-start outline-none hover:bg-background-primary-hover focus-visible:bg-background-primary-hover data-[highlighted]:bg-background-primary-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "openedbot-row flex w-full cursor-pointer items-center gap-2 rounded-2lg px-2 py-1.5 text-start outline-none hover:bg-background-primary-hover focus-visible:bg-background-primary-hover data-[highlighted]:bg-background-primary-hover disabled:cursor-not-allowed disabled:opacity-50";
 
 export const BUI_MENU_ICON = "size-5 shrink-0 text-foreground-icon-secondary";
 

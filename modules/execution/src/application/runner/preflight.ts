@@ -10,9 +10,9 @@ import type { RunContext } from "./types";
 
 /**
  * Read inventory and scope concurrently, then gate the session mutation.
- * Each operation keeps its own OHB-107 latency span.
+ * Each operation keeps its own run latency span.
  *
- * OHB-137: two reads leave the serial path. `modelCatalog` (a pure read) starts
+ * Two reads leave the serial path. `modelCatalog` (a pure read) starts
  * with the inventory and is handed back unresolved: the selection that may
  * WRITE the profile model still runs after the gate. `replayProbe` starts as
  * soon as the gate passes, alongside `ensure_session`, and is awaited only
@@ -72,7 +72,7 @@ export async function gatherIndependentPreflight<
 }
 
 /**
- * The inventory the gate checks (OHB-138). A connector runtime with a live
+ * The inventory the gate checks. A connector runtime with a live
  * link instant and an epoch reuses the inventory read by an earlier run on
  * the same link, profile and `toolset_epoch`, for at most
  * `HERMES_TOOLSET_INVENTORY_TTL_MS` (60 s, the staleness bound for host-side

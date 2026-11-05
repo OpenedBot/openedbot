@@ -43,15 +43,15 @@ alter table support_attachments force row level security;
 -- « Qui voit quoi » n'est donc défini qu'une seule fois, sur
 -- `support_conversations`, et les trois portes (jeton, compte, staff) valent
 -- ici sans être répétées.
-create policy support_attachments_scope on support_attachments to ohb_api
+create policy support_attachments_scope on support_attachments to openedbot_api
   using (exists (select 1 from public.support_conversations c where c.id = conversation_id))
   with check (exists (select 1 from public.support_conversations c where c.id = conversation_id));
 
-create policy support_attachments_worker on support_attachments to ohb_worker
+create policy support_attachments_worker on support_attachments to openedbot_worker
   using (true) with check (true);
 
-grant select, insert on support_attachments to ohb_api;
-grant select, insert, update, delete on support_attachments to ohb_worker;
+grant select, insert on support_attachments to openedbot_api;
+grant select, insert, update, delete on support_attachments to openedbot_worker;
 
 -- La file de suppression de blobs devient celle de TOUT le produit.
 --
@@ -107,15 +107,15 @@ alter table tenant_blob_deletions
 comment on table tenant_blob_deletions is
   'La file durable des octets à supprimer, pour tout le produit : clés de tenant (org/…) et clés du guichet de support (support/…). Drainée par le worker avec bail et réessai.';
 
--- La table est sous RLS FORCÉE et n'avait qu'une policy `ohb_worker` : sans
+-- La table est sous RLS FORCÉE et n'avait qu'une policy `openedbot_worker` : sans
 -- celle-ci, l'API ne pourrait rien y écrire. Elle est bornée aux clés du
 -- guichet : l'API ne voit ni n'écrit aucune clé de tenant par cette porte,
 -- c'est le worker qui les met en file quand une organisation part.
-create policy support_blob_deletions_api on tenant_blob_deletions to ohb_api
+create policy support_blob_deletions_api on tenant_blob_deletions to openedbot_api
   using (object_key like 'support/%' and organization_id is null)
   with check (object_key like 'support/%' and organization_id is null);
 
-grant select, insert, update, delete on tenant_blob_deletions to ohb_api;
+grant select, insert, update, delete on tenant_blob_deletions to openedbot_api;
 
 insert into schema_migrations(version) values ('0079_support_attachments')
 on conflict (version) do nothing;

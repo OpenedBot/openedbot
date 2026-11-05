@@ -119,7 +119,7 @@ async function withComputerLifecycleLock<T>(
     await tx`
       select pg_advisory_xact_lock(
         hashtext(${organizationId}),
-        hashtext(${`ohb-computer:${botId}`})
+        hashtext(${`openedbot-computer:${botId}`})
       )
     `;
     return operation();

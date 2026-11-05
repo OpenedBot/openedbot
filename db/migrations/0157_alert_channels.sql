@@ -48,17 +48,17 @@ alter table alert_channels enable row level security;
 alter table alert_channels force row level security;
 
 -- API : l'organisation courante ; le rôle (owner, admin) est vérifié par la route.
-create policy alert_channels_tenant on alert_channels to ohb_api
+create policy alert_channels_tenant on alert_channels to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 -- Worker : sous le tenant de la livraison seulement, jamais en using (true) :
 -- la table porte un secret chiffré (même règle qu'apns_devices, 0108).
-create policy alert_channels_worker on alert_channels to ohb_worker
+create policy alert_channels_worker on alert_channels to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on alert_channels to ohb_api;
-grant select, update on alert_channels to ohb_worker;
+grant select, insert, update, delete on alert_channels to openedbot_api;
+grant select, update on alert_channels to openedbot_worker;
 
 -- Une livraison par (canal, alerte, événement) : la clé unique est
 -- l'idempotence d'une passe d'alertes rejouée. Ni secret ni texte libre :
@@ -100,9 +100,9 @@ alter table alert_deliveries force row level security;
 -- File de réclamation du worker, comme apns_deliveries : elle traverse les
 -- organisations et ne porte aucun secret. Le webhook se relit sous le tenant
 -- de la ligne. L'API n'y a aucun droit : la suppression d'un canal cascade.
-create policy alert_deliveries_worker on alert_deliveries to ohb_worker
+create policy alert_deliveries_worker on alert_deliveries to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on alert_deliveries to ohb_worker;
+grant select, insert, update, delete on alert_deliveries to openedbot_worker;
 
 insert into schema_migrations(version) values ('0157_alert_channels')
 on conflict (version) do nothing;

@@ -148,7 +148,7 @@ Après la préparation nécessaire, utiliser :
 ```bash
 make dev            # API + Console + Worker, avec logs [API], [CONSOLE] et [WORKER]
 make dev-worker     # Worker seul, en mode watch
-make build-worker   # Produit dist/bin/ohb-worker
+make build-worker   # Produit dist/bin/openedbot-worker
 make typecheck      # Vérifie tous les workspaces actifs, dont worker
 make test           # Tests unitaires puis intégration PostgreSQL
 ```

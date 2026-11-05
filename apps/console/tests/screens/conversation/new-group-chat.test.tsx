@@ -8,7 +8,7 @@ import { I18nProvider } from "../../../src/lib/i18n";
 import { NewGroupChatScreen, groupNameFor, recipientOptions } from "../../../src/screens/conversation/new-group-chat";
 
 const spies: Array<{ mockRestore: () => void }> = [];
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(() => {
   cleanup();
   for (const spy of spies.splice(0)) spy.mockRestore();

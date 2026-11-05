@@ -6,7 +6,7 @@ import { verifyChain, type ChainVerdict } from "./chain";
  * Le fichier `snapshot.bin` du connecteur, version 2 : contrat partagé avec
  * `edge-setup` (`internal/connector/audit_format.go`). Entiers big-endian :
  *
- *   0        8     magic "OHBAUDT2"
+ *   0        8     magic "OBAUDIT2"
  *   8        1     version 0x02
  *   9        1     suite   0x01 = AES-256-GCM, HKDF-SHA256, SHA-256
  *   10       2     hlen
@@ -18,7 +18,7 @@ import { verifyChain, type ChainVerdict } from "./chain";
  * Les données associées sont tous les octets qui précèdent le chiffré : un
  * en-tête ou un nonce retouché fait échouer le tag au lieu d'être cru.
  */
-export const CREATION_AUDIT_MAGIC = "OHBAUDT2";
+export const CREATION_AUDIT_MAGIC = "OBAUDIT2";
 export const CREATION_AUDIT_VERSION = 0x02;
 export const CREATION_AUDIT_SUITE_AES_GCM = 0x01;
 export const CREATION_AUDIT_SCHEMA_VERSION = 2;
@@ -26,7 +26,7 @@ export const CREATION_AUDIT_MAX_HEADER = 1024;
 export const CREATION_AUDIT_NONCE_SIZE = 12;
 export const CREATION_AUDIT_TAG_SIZE = 16;
 export const CREATION_AUDIT_KEY_SIZE = 32;
-export const CREATION_AUDIT_INFO_ENC = "ohb-creation-audit/v2/enc";
+export const CREATION_AUDIT_INFO_ENC = "openedbot-creation-audit/v2/enc";
 /** Plafond du clair côté connecteur (8 MiB) ; le chiffré y ajoute l'en-tête, le nonce et le tag. */
 export const CREATION_AUDIT_MAX_PLAINTEXT = 8 << 20;
 /** Ce qu'un export peut peser au plus : le clair, l'en-tête, le nonce, le tag et une marge. */

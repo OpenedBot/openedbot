@@ -12,7 +12,7 @@
  * garde un moyen de répondre à quelqu'un que le navigateur a oublié.
  */
 
-const STORAGE_KEY = "ohb:support";
+const STORAGE_KEY = "openedbot:support";
 
 export type SupportSession = {
   conversationId: string;

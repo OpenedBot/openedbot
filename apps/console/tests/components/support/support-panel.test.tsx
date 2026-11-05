@@ -152,7 +152,7 @@ afterEach(() => {
 /** Le miroir local de session, celui que lit `readCloudSession`. */
 function signIn(): void {
   window.localStorage.setItem(
-    "ohb:cloud-session",
+    "openedbot:cloud-session",
     JSON.stringify({ organizationId: "99999999-9999-4999-8999-999999999999", csrfToken: "csrf-de-test" }),
   );
 }
@@ -164,7 +164,7 @@ async function renderPanel(
   // `DEFAULT_LOCALE` est l'anglais : sans ce réglage, l'écran se rend en
   // anglais et les libellés attendus ici ne s'y trouvent pas. Même préambule
   // que `tests/screens/public/waitlist.test.tsx`.
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   if (options.identified) signIn();
   const panel = options.panel ?? { onClose: () => {} };
   const rootRoute = createRootRoute({

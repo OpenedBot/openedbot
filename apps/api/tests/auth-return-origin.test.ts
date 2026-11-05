@@ -14,7 +14,7 @@ import { HttpError } from "../src/interfaces/http/http-error";
 const WEB_ORIGIN = "http://localhost:1420";
 const LAN_ORIGIN = "http://172.16.0.50:1420";
 
-const DEV_SIGN_IN = { email: "dev@ohb.local", password: "generated-dev-password" };
+const DEV_SIGN_IN = { email: "dev@openedbot.local", password: "generated-dev-password" };
 
 function config(overrides: Partial<ApiConfig> = {}): ApiConfig {
   return {

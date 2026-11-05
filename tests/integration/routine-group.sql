@@ -1,8 +1,8 @@
--- OHB-24 : routines.group_id xor bot_id, index, RLS. Pas d apostrophe isolee.
+-- routines.group_id xor bot_id, index, RLS. Pas d apostrophe isolee.
 
 create temp table routine_group_proof (xor_both text, xor_none text, own int, other int);
 insert into routine_group_proof values ('-', '-', -1, -1);
-grant select, insert, update on routine_group_proof to ohb_api;
+grant select, insert, update on routine_group_proof to openedbot_api;
 
 insert into bots (id, organization_id, section_id, name, slug, hermes_profile, position) values
   ('10000000-0000-4000-8000-000000000023', '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000011', 'Bot A2', 'bot-a2', 'profile-a2', 1);
@@ -16,8 +16,8 @@ insert into group_members (organization_id, group_id, bot_id, position) values
   ('10000000-0000-4000-8000-000000000001', '93000000-0000-4000-8000-000000000301', '10000000-0000-4000-8000-000000000023', 1);
 
 insert into threads (id, organization_id, group_id, title, hermes_session_id) values
-  ('93000000-0000-4000-8000-000000000311', '10000000-0000-4000-8000-000000000001', '93000000-0000-4000-8000-000000000301', 'Salon A', 'ohb-group-a'),
-  ('93000000-0000-4000-8000-000000000312', '20000000-0000-4000-8000-000000000002', '93000000-0000-4000-8000-000000000302', 'Salon B', 'ohb-group-b');
+  ('93000000-0000-4000-8000-000000000311', '10000000-0000-4000-8000-000000000001', '93000000-0000-4000-8000-000000000301', 'Salon A', 'openedbot-group-a'),
+  ('93000000-0000-4000-8000-000000000312', '20000000-0000-4000-8000-000000000002', '93000000-0000-4000-8000-000000000302', 'Salon B', 'openedbot-group-b');
 
 do $$
 begin
@@ -63,14 +63,14 @@ insert into routines (
   'Stand-up B', '0 9 * * 1-5', 'UTC', 'Tour.', true
 );
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update routine_group_proof set own = (
   select count(*) from routines where group_id is not null
 );
 reset role;
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update routine_group_proof set other = (
   select count(*) from routines

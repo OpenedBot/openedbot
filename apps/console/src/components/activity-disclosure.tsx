@@ -8,7 +8,7 @@ import { cn } from "@openedbot/browser-ui-kit";
  *
  * The height animates through `grid-template-rows` (1fr / 0fr), never through
  * a measured pixel height: nothing reads the geometry in the commit, which
- * keeps the thread's send budget (OHB-88). A closed fold is `inert`: its
+ * keeps the thread's send budget. A closed fold is `inert`: its
  * controls leave the tab order and the accessibility tree.
  */
 export function ActivityDisclosure({
@@ -23,8 +23,8 @@ export function ActivityDisclosure({
   children: React.ReactNode;
 }) {
   return (
-    <div id={id} data-open={open ? "true" : "false"} inert={!open} className={cn("ohb-disclosure", className)}>
-      <div className="ohb-disclosure-inner">{children}</div>
+    <div id={id} data-open={open ? "true" : "false"} inert={!open} className={cn("openedbot-disclosure", className)}>
+      <div className="openedbot-disclosure-inner">{children}</div>
     </div>
   );
 }

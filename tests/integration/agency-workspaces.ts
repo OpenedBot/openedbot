@@ -106,7 +106,7 @@ installSubscriptionPort(billingPort);
 installOrganizationCreatingListener(welcomeHook);
 const root = resolve(import.meta.dir, "../..");
 const source = await adminUrl();
-const database = `ohb86_kinds_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot86_kinds_${crypto.randomUUID().replaceAll("-", "")}`;
 const admin = new SQL({ url: source.toString(), max: 1 });
 let created = false;
 let target: SQL | null = null;
@@ -181,9 +181,9 @@ try {
     (${AG}, ${MATE}, 'member'), (${AG}, ${ADMIN}, 'admin')`;
 
   api = new SQL({ url: destination.toString(), max: 1, idleTimeout: 0 });
-  await api`set role ohb_api`;
+  await api`set role openedbot_api`;
   apiSecond = new SQL({ url: destination.toString(), max: 1, idleTimeout: 0 });
-  await apiSecond`set role ohb_api`;
+  await apiSecond`set role openedbot_api`;
   const features86 = async () => ({ fleetWorkspaces: true, connectorOnlyEnrollment: true, fleetBilling: false, waitlist: true });
   // No DNS from the test: `nomail.example` is a domain that refuses mail (a
   // Null MX in production), everything else is deliverable.
@@ -205,7 +205,7 @@ try {
   };
   const server = mount(api, true);
   const req = (as: string, path: string, org?: string, method = "GET", body?: unknown, app = server, actingFleetId?: string) => app.request(`http://localhost${path}`, {
-    method, headers: { Cookie: `ohb_session=${as}`, "X-CSRF-Token": "csrf", "Content-Type": "application/json", ...(org ? { "X-OpenedBot-Organization": org } : {}),
+    method, headers: { Cookie: `openedbot_session=${as}`, "X-CSRF-Token": "csrf", "Content-Type": "application/json", ...(org ? { "X-OpenedBot-Organization": org } : {}),
       ...(actingFleetId ? { "X-OpenedBot-Fleet": actingFleetId } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -224,7 +224,7 @@ try {
   const createdId = (await personal.json()).organizationId;
   assert((await target`select organization_id as id from sessions where session_token_hash = ${hashCredential("newcomer")}`)[0].id === createdId, "The open web session attaches to its first organization");
   const race = await Promise.all([api, apiSecond].map((db) => mount(db, true).request("http://localhost/api/account/organizations", {
-    method: "POST", headers: { Cookie: "ohb_session=racer", "X-CSRF-Token": "csrf", "Content-Type": "application/json" },
+    method: "POST", headers: { Cookie: "openedbot_session=racer", "X-CSRF-Token": "csrf", "Content-Type": "application/json" },
     body: JSON.stringify({ kind: "personal", name: "Course" }),
   })));
   assert(race.map((r) => r.status).sort().join() === "201,409", `Concurrent personal creation yields one organization: ${race.map((r) => r.status)}`);
@@ -337,7 +337,7 @@ try {
   await target`update agency_grants set revoked_at = null, revoked_by_user_id = null
     where agency_organization_id = ${AG} and client_organization_id = ${B}`;
 
-  // A live SSE is reauthorized under ohb_api while a frame is buffered.
+  // A live SSE is reauthorized under openedbot_api while a frame is buffered.
   const streamHub = new EventHub();
   const accessCheckReached = deferred();
   const releaseAccessCheck = deferred();
@@ -401,7 +401,7 @@ try {
     accessCheckTick();
     await withTimeout(accessCheckReached.promise, 5_000, "The SSE mandate recheck did not reach PostgreSQL");
     const streamRevoke = await req("operator", `/api/pro/agency/clients/${B}`, AG, "DELETE", undefined, mount(apiSecond!, true));
-    assert(streamRevoke.status === 204, "A separate ohb_api connection revokes the selected SSE mandate");
+    assert(streamRevoke.status === 204, "A separate openedbot_api connection revokes the selected SSE mandate");
     streamHub.publish(sseProbeEvent(B, streamCursor + 2, "buffered-after-revocation"));
     releaseAccessCheck.resolve();
     const trailingFrames: string[] = [];
@@ -506,7 +506,7 @@ try {
   assert(memberLeave.status === 403 && await code(memberLeave) === "ROLE_REQUIRED", "An agency member cannot withdraw a client mandate");
   const csrfFailure = await server.request(`http://localhost/api/pro/agency/clients/${D}`, {
     method: "DELETE",
-    headers: { Cookie: "ohb_session=agency-admin", "X-CSRF-Token": "wrong", "Content-Type": "application/json", "X-OpenedBot-Organization": AG },
+    headers: { Cookie: "openedbot_session=agency-admin", "X-CSRF-Token": "wrong", "Content-Type": "application/json", "X-OpenedBot-Organization": AG },
   });
   assert(csrfFailure.status === 403 && await code(csrfFailure) === "CSRF_INVALID", "The real session middleware rejects an invalid CSRF token");
   assert((await target`select revoked_at from agency_grants where agency_organization_id = ${AG}
@@ -629,7 +629,7 @@ try {
 
   await target`update memberships set revoked_at = now() where organization_id = ${AG2} and user_id = ${memberRegistered.user.id}`;
   const reactivation = await server.request("http://localhost/api/organization/invitations", {
-    method: "POST", headers: { Cookie: "ohb_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
+    method: "POST", headers: { Cookie: "openedbot_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
     body: JSON.stringify({ email: "member-invite@example.com", role: "admin", locale: "en" }),
   });
   assert(reactivation.status === 201, `A revoked membership can be invited again: ${await reactivation.clone().text()}`);
@@ -648,13 +648,13 @@ try {
   assert(reactivationRow.status === "pending", "Reactivation invitation remains pending before acceptance");
 
   const unknownDomain = await server.request("http://localhost/api/organization/invitations", {
-    method: "POST", headers: { Cookie: "ohb_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
+    method: "POST", headers: { Cookie: "openedbot_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
     body: JSON.stringify({ email: "camille@nomail.example", role: "member" }),
   });
   assert(unknownDomain.status === 400 && await code(unknownDomain) === "EMAIL_DOMAIN_UNKNOWN",
     "A member invitation to a domain that receives no mail is refused before anything is written");
   const disposable = await server.request("http://localhost/api/organization/invitations", {
-    method: "POST", headers: { Cookie: "ohb_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
+    method: "POST", headers: { Cookie: "openedbot_session=owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": AG2 },
     body: JSON.stringify({ email: "camille@mailinator.com", role: "member" }),
   });
   assert(disposable.status === 400 && await code(disposable) === "EMAIL_DISPOSABLE",
@@ -662,12 +662,12 @@ try {
   assert((await target`select count(*)::int as count from organization_member_invitations where email in ('camille@nomail.example', 'camille@mailinator.com')`)[0].count === 0,
     "A refused invitation leaves no row");
   const memberLimitFirst = await server.request("http://localhost/api/organization/invitations", {
-    method: "POST", headers: { Cookie: "ohb_session=limit-owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": LIMIT_ORG },
+    method: "POST", headers: { Cookie: "openedbot_session=limit-owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": LIMIT_ORG },
     body: JSON.stringify({ email: "first-limit@example.com", role: "member" }),
   });
   assert(memberLimitFirst.status === 201, "A trialing organization can reserve its final member seat");
   const memberLimitSecond = await server.request("http://localhost/api/organization/invitations", {
-    method: "POST", headers: { Cookie: "ohb_session=limit-owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": LIMIT_ORG },
+    method: "POST", headers: { Cookie: "openedbot_session=limit-owner", "X-CSRF-Token": "csrf", "Content-Type": "application/json", "X-OpenedBot-Organization": LIMIT_ORG },
     body: JSON.stringify({ email: "second-limit@example.com", role: "member" }),
   });
   assert(memberLimitSecond.status === 409 && await code(memberLimitSecond) === "MEMBER_QUOTA_REACHED",

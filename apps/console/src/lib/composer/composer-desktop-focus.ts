@@ -12,7 +12,7 @@
  * une carte de gate ou l'éditeur d'agent gardent le focus clavier.
  */
 const OVERLAY = "[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[data-radix-popper-content-wrapper]";
-const NAVIGATION = "[data-board-icon-rail],[data-board-topbar],#ohb-board-sidebar";
+const NAVIGATION = "[data-board-icon-rail],[data-board-topbar],#openedbot-board-sidebar";
 
 export function composerMayTakeFocus(doc: Document, from: "open" | "return" = "open"): boolean {
   if (doc.querySelector('[role=dialog][data-state="open"],[role=alertdialog][data-state="open"]')) return false;

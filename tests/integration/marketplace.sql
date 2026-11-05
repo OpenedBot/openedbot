@@ -1,9 +1,9 @@
--- OHB-127 : the Marketplace catalogue (0103).
+-- The Marketplace catalogue (0103).
 --
 -- organization_agent_templates is tenant data: organization A never reads,
 -- writes or updates a template of organization B, and nothing is visible
 -- without app.organization_id. The worker has no access at all.
--- marketplace_entries is global (no RLS): ohb_api reads it, and an entry is
+-- marketplace_entries is global (no RLS): openedbot_api reads it, and an entry is
 -- withdrawn, never deleted.
 --
 -- Uses the two organizations seeded by the first proof of postgres-rls.sh.
@@ -21,7 +21,7 @@ create temp table marketplace_proof (
   entry_delete text
 );
 insert into marketplace_proof values ('unset', -1, -1, 'unset', -1, -1, 'unset', -1, 'unset');
-grant select, insert, update on marketplace_proof to ohb_api, ohb_worker;
+grant select, insert, update on marketplace_proof to openedbot_api, openedbot_worker;
 
 update marketplace_proof
    set rls = (select case when c.relrowsecurity and c.relforcerowsecurity then 'on' else 'off' end
@@ -35,7 +35,7 @@ insert into organization_agent_templates (id, organization_id, slug, title, docu
 insert into marketplace_entries (id, kind, slug, title, document, version, status) values
   ('60000000-0000-4000-8000-000000000073', 'agent_template', 'official-analyst', 'Official analyst', 'doc', '1.0.0', 'published');
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false);
 update marketplace_proof
    set own = (select count(*) from organization_agent_templates),
@@ -71,7 +71,7 @@ end;
 $proof$;
 reset role;
 
-set role ohb_worker;
+set role openedbot_worker;
 do $proof$
 begin
   perform count(*) from organization_agent_templates;

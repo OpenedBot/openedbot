@@ -12,6 +12,10 @@ dépôt, restent listées plus bas pour l'historique.
 
 ## Non publié
 
+### Changé
+
+- L'adresse d'openedbot se donne avec `--openedbot` (et `--insecure-openedbot` en développement). Le lien et l'audit de création changent de format : une machine déjà liée doit être liée à nouveau, avec un nouveau ticket, après la mise à jour.
+
 ### Ajouté
 
 - Les quotas d'un abonnement xAI (SuperGrok, Premium+) remontent dans openedbot, comme ceux d'Anthropic, d'OpenAI et d'OpenRouter.
@@ -102,7 +106,7 @@ Les mises à jour suivantes reprennent le geste habituel : `sudo edge-setup upgr
 
 ### Modifié
 
-- Sans `--ohb`, `edge-setup link` relie désormais l'hôte à l'origine de production `https://link.openedbot.app` ; une autre origine reste possible avec `--ohb`.
+- Sans `--openedbot`, `edge-setup link` relie désormais l'hôte à l'origine de production `https://link.openedbot.app` ; une autre origine reste possible avec `--openedbot`.
 - Les messages, l'aide et la documentation nomment désormais le produit openedbot. La commande s'appelle `edge-setup` ; un ancien alias `hermes-setup` déjà présent sur une machine reste mis à jour, mais les nouvelles installations n'en posent plus.
 - Les releases ne publient plus de copies des binaires sous l'ancien nom : la mise à jour automatique des versions publiées utilise déjà le nom `edge-setup`.
 
@@ -219,9 +223,9 @@ Mise à jour : `sudo edge-setup upgrade --yes`
 
 ## v1.0.0 (ancien dépôt) - 2026-10-17
 
-### Première version stable, alignée sur OHBot 1.0
+### Première version stable, alignée sur openedbot 1.0
 
-- Même code que v0.5.11 : le connecteur passe en 1.0.0 avec OHBot 1.0.0,
+- Même code que v0.5.11 : le connecteur passe en 1.0.0 avec openedbot 1.0.0,
   qui termine l'alpha privée et la bêta. Aucun changement de protocole ni
   de commande ; `edge-setup upgrade` monte depuis toute v0.5.x.
 
@@ -249,7 +253,7 @@ Mise à jour : `sudo edge-setup upgrade --yes`
   schémas d'outils de la plateforme `api_server` (par
   `model_tools.get_tool_definitions`) et les serveurs MCP qu'elle porte. La
   console s'en sert pour ventiler la fenêtre de contexte : sans lui, sa jauge
-  ne voyait que ce qu'OHB envoie et restait un plancher.
+  ne voyait que ce qu'openedbot envoie et restait un plancher.
 - Seuls des tailles (quatre caractères par jeton, comme l'amont) et des noms
   sortent de la sonde : jamais une ligne de SOUL, une entrée de mémoire, un
   corps de skill, un schéma, un chemin ni une valeur d'environnement. La route
@@ -602,7 +606,7 @@ Mise à jour : `sudo edge-setup upgrade --yes`
   crée dans `node_modules/.bin` : leur mode `lstat` vaut 0777 sans que la
   cible soit inscriptible.
 
-### Renommage en `edge-setup` (OHB-87)
+### Renommage en `edge-setup`
 
 - Le module et le binaire s'appellent `edge-setup` (module Go
   `github.com/MakFly/edge-setup`, `cmd/edge-setup`). Compatibilité d'un hôte
@@ -619,7 +623,7 @@ Mise à jour : `sudo edge-setup upgrade --yes`
   honorées si la nouvelle variable n'est pas définie. `DEPLOY_KEY_FILE`
   vaut désormais `~/.config/edge-setup/deploy.key` par défaut, avec repli
   sur `~/.config/hermes-setup/deploy.key` s'il existe seul.
-- Inchangé, gelé par l'ADR OHB-78 : les routes `/hermes-setup/*`,
+- Inchangé, gelé par l'ADR du renommage : les routes `/hermes-setup/*`,
   `connector.HostPrefix`, l'unité `hermes-setup-upgrade.{service,timer}`,
   les répertoires d'état `/etc/hermes`, `/var/lib/hermes-setup`, et le
   domaine HMAC `hermes-setup upgrade v1`. `RELEASES_REPO` reste
@@ -769,13 +773,13 @@ Mise à jour : `sudo edge-setup upgrade --yes`
   autre origine OpenHermesBot et n'a plus rien à déverrouiller : il écrit le
   lien de l'instance visée, quel qu'ait été le précédent. Basculer l'hôte du
   développement vers la production, ou l'inverse, est la même commande avec une
-  autre `--ohb`.
+  autre `--openedbot`.
 - Le refus n'a jamais été une frontière : `link` tourne en root sur l'hôte, et
   root réécrit `link.json` à la main de toute façon. Il n'était payé que par
   l'opérateur ayant une raison légitime de basculer. Ce qui borne réellement
   l'enrôlement reste en place et n'a pas bougé : le ticket à usage unique émis
   par un propriétaire authentifié dans OpenHermesBot, la restriction des
-  origines `http://` à la loopback derrière `--insecure-ohb`, et `reset` pour
+  origines `http://` à la loopback derrière `--insecure-openedbot`, et `reset` pour
   retirer le runtime pour de bon.
 - Ce que le garde protégeait devient un devoir de parole. Avant même la lecture
   du ticket, la reprise nomme l'origine quittée et le runtime qui va s'y figer :
@@ -820,18 +824,18 @@ automatique) a été retiré le 2026-09-07.
 
 - OpenHermesBot pousse `link.context` juste après la liaison (palier `dev` /
   `preprod` / `prod`, origine, organisation, propriétaire). L'enrôlement
-  l'écrit dans `link.json` (`ohb_environment`, `organization`, `owner`) ; le
+  l'écrit dans `link.json` (`openedbot_environment`, `organization`, `owner`) ; le
   démon le garde en mémoire et le rafraîchit dans
   `$STATE_DIRECTORY/link-context.json`, au mieux, comme le jeton tourné. Un
   hôte plus ancien ignore la trame.
 - La carte Discord titre `[<palier>] …` et porte **Environnement**,
-  **Instance** (`default` ou `--name`), **OHB** (hôte de l'origine) et
+  **Instance** (`default` ou `--name`), **openedbot** (hôte de l'origine) et
   **Utilisateur** (e-mail du propriétaire, organisation), `inconnu` tant
   qu'aucune session ne l'a déclaré. Plusieurs déploiements partagent un canal
   et un VPS porte un lien dev et un lien prod : une alerte qui ne dit pas
   d'où elle vient n'est pas actionnable.
 - `status` ajoute `env=<palier> owner=<e-mail>` par instance
-  (JSON `ohb_environment`, `organization`, `owner`).
+  (JSON `openedbot_environment`, `organization`, `owner`).
 
 ### Correctif : enrôlement avec clé device
 
@@ -841,9 +845,9 @@ automatique) a été retiré le 2026-09-07.
   enrôlement fait avec une clé device échouait en `LINK_POP_PENDING` →
   `LINK_PROBE_FAILED` (4003), quel que soit le broker.
 
-### Instances de connecteur nommées (OHB-69)
+### Instances de connecteur nommées
 
-- `link --ohb URL --name <name>` (`^[a-z][a-z0-9-]{0,31}$`) crée une
+- `link --openedbot URL --name <name>` (`^[a-z][a-z0-9-]{0,31}$`) crée une
   instance nommée : `/etc/hermes/connector/<name>/{link.json,device.key.cred}`,
   unité `hermes-connector@<name>.service` (template `hermes-connector@.service`,
   `StateDirectory=hermes-connector/%i`), journal des runs, spool et audit de
@@ -855,7 +859,7 @@ automatique) a été retiré le 2026-09-07.
   courante et propose `--name dev`. `--replace` force l'écrasement. C'est le
   cas mesuré : un `link` de développement écrasait le lien de production, et
   l'API locale répondait `503 RUNTIME_LINK_UNAVAILABLE`.
-- `status` liste chaque instance (origine `ohb`, `runtime_id`, unité active,
+- `status` liste chaque instance (origine `openedbot`, `runtime_id`, unité active,
   clé device scellée) ; JSON `connectors[]`. `link --rekey --name <name>`,
   `doctor` et `audit` couvrent les instances nommées. `up`/`upgrade`
   installent le template, scellent une clé pour chaque instance liée sans
@@ -877,7 +881,7 @@ automatique) a été retiré le 2026-09-07.
   écrit le même bloc à la création, dans le même try que le bearer
   (`API_SERVER_KEY`) : un échec nettoie le profil.
 
-### Skills et credential par profil (OHB-37)
+### Skills et credential par profil
 
 - `POST /hermes-setup/profiles/{slug}/skills/{skill}` `{enabled}` bascule une
   skill du dossier `skills/` du profil. La sonde `profile-skill-set` écrit
@@ -890,7 +894,7 @@ automatique) a été retiré le 2026-09-07.
   journal ni en réponse. Annoncé par `profile_credentials` sous les mêmes
   conditions que `profile_management`.
 - Le miroir racine → profils ne recouvre plus une clé marquée
-  `# ohb:profile-own` (fichier `.env.ohb-own`).
+  `# openedbot:profile-own` (fichier `.env.openedbot-own`).
 
 ### Mémoire par profil
 
@@ -963,7 +967,7 @@ automatique) a été retiré le 2026-09-07.
 - L'allowlist relaie désormais `DELETE /api/sessions/{id}`, la seule route
   destructive qu'elle porte vers le gateway. OpenHermesBot l'appelle quand un
   opérateur purge un bot qu'il avait mis à la corbeille : la session
-  `ohb:<org>:<thread>` et son transcript disparaissent du runtime. Elle ne
+  `openedbot:<org>:<thread>` et son transcript disparaissent du runtime. Elle ne
   peut viser aucun autre identifiant, et ne touche ni le profil, ni un fichier,
   ni l'hôte. Un connecteur antérieur à cette entrée la refuse en
   `HERMES_LINK_PATH_FORBIDDEN` : la purge côté SaaS le signale à l'opérateur
@@ -998,20 +1002,20 @@ automatique) a été retiré le 2026-09-07.
 - Après un `make deploy`, `hermes-connector` est redémarré et le runtime doit
   être retesté depuis OpenHermesBot avec « Tester » pour réannoncer le contrat
   de capacités.
-- En développement, `link --insecure-ohb` accepte une origine `http://` **de la
+- En développement, `link --insecure-openedbot` accepte une origine `http://` **de la
   loopback** : celle qu'un tunnel SSH inverse (`ssh -R 8790:127.0.0.1:8790`,
-  ou `make link-tunnel` côté OHB) place devant cet hôte. Le lien passe alors en
+  ou `make link-tunnel` côté openedbot) place devant cet hôte. Le lien passe alors en
   `ws://` sur cette loopback, dans SSH. Publier l'application de développement
   sur Internet pour la seule contrainte d'un schéma `https://` n'est plus
-  nécessaire. Sans le drapeau, et pour toute origine non-loopback avec, `--ohb`
+  nécessaire. Sans le drapeau, et pour toute origine non-loopback avec, `--openedbot`
   exige toujours `https://`.
-- L'origine `--ohb` est validée avant la barrière root : une faute de frappe se
+- L'origine `--openedbot` est validée avant la barrière root : une faute de frappe se
   voit sans `sudo`, et rien n'est muté dans les deux cas.
 - En développement, le connector peut aussi viser l'origine HTTPS/WSS de
-  l'application OHB locale publiée par Cloudflare Tunnel. Le tunnel reste côté
+  l'application openedbot locale publiée par Cloudflare Tunnel. Le tunnel reste côté
   application, jamais devant le gateway du VPS.
 - En production, une fois celle-ci déployée, le même connector vise l'origine
-  OHB stable.
+  openedbot stable.
 
 ### Secrets
 
@@ -1055,7 +1059,7 @@ automatique) a été retiré le 2026-09-07.
 
 - Nouvelle section « Développement » sur le site : appairer un VPS à une
   OpenHermesBot locale par tunnel SSH inverse, règle exacte de
-  `--insecure-ohb`, ce que le Quick Tunnel Cloudflare publie et quand il reste
+  `--insecure-openedbot`, ce que le Quick Tunnel Cloudflare publie et quand il reste
   justifié, dépannage. `getting-started`, `connector` et la table des commandes
   pointent dessus.
 - Site remanié : prérequis, installation, dépannage, sécurité,

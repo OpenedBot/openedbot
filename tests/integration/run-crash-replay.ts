@@ -216,7 +216,7 @@ async function runChild(_mode: ChildMode): Promise<void> {
     }
     phase = "connect-worker-database";
     db = new SQL({ url: databaseUrl, max: 1 });
-    await db.unsafe("set role ohb_worker");
+    await db.unsafe("set role openedbot_worker");
     const workerConfig = {
       workerId,
       apiInternalUrl,
@@ -298,8 +298,8 @@ async function parentMain(): Promise<void> {
       secondWorkerFallbackEnabled: false,
     };
 
-    await withDisposablePostgres("ohb115_crash", async ({ owner, url, connect }) => {
-      const apiDb = await connect("ohb_api");
+    await withDisposablePostgres("openedbot115_crash", async ({ owner, url, connect }) => {
+      const apiDb = await connect("openedbot_api");
       const observer = await connect();
       const workerOneId = `worker-${crypto.randomUUID()}`;
       const workerTwoId = `worker-${crypto.randomUUID()}`;
@@ -636,7 +636,7 @@ async function parentMain(): Promise<void> {
           });
           assert(stalePublish.status === 204 && staleFanouts === 0, "API published a provisional delta from a stale lease");
         } finally { unsubscribeStale(); }
-        const staleWorkerDb = await connect("ohb_worker");
+        const staleWorkerDb = await connect("openedbot_worker");
         let staleWriteRejected = false;
         try {
           await staleWorkerDb`insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at, lease_generation)
@@ -729,7 +729,7 @@ async function parentMain(): Promise<void> {
         const replayedLiveIndex = sseFrames.lastIndexOf(replayedLive);
         // run.completed never leaves before its commit, so it arrives as a
         // full committed frame. The committed row of the replayed message, on
-        // the contrary, already left live on this connection: DEV-OHB-112
+        // the contrary, already left live on this connection: the stream
         // reduces it to a cursor advance, never a second copy.
         const terminalFrame = await readUntilFrame(
           sseReader!, eventBuffer, sseFrames,

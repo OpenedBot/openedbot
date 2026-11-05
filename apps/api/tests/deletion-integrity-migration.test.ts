@@ -13,7 +13,7 @@ describe("contrat de la migration 0171_deletion_and_blob_integrity", () => {
 
   test("l'API n'inscrit en file que les clés org/ de l'organisation de sa transaction", () => {
     const policy = sql.slice(sql.indexOf("create policy tenant_blob_reservations_api"), sql.indexOf("-- 2."));
-    expect(policy).toContain("on tenant_blob_deletions to ohb_api");
+    expect(policy).toContain("on tenant_blob_deletions to openedbot_api");
     expect(policy.match(/organization_id = nullif\(current_setting\('app\.organization_id', true\), ''\)::uuid/g)).toHaveLength(2);
     expect(policy.match(/object_key like \('org\/' \|\| organization_id::text \|\| '\/%'\)/g)).toHaveLength(2);
   });

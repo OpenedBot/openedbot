@@ -14,7 +14,7 @@ const config = (env: Record<string, string> = {}) => readApiConfig({
   OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"), ...env,
 });
 
-describe("versions du connecteur OHB-72", () => {
+describe("versions du connecteur", () => {
   test("normalise major.minor.patch avec ou sans préfixe v", () => {
     expect(parseConnectorVersion("0.2.0")).toBe("v0.2.0");
     expect(parseConnectorVersion("v12.10.3")).toBe("v12.10.3");
@@ -44,7 +44,7 @@ describe("versions du connecteur OHB-72", () => {
     });
   });
 
-  test("le préfixe edge-setup (canonique OHB-87) est reconnu comme hermes-setup (agents déjà déployés)", () => {
+  test("le préfixe edge-setup (canonique depuis le renommage) est reconnu comme hermes-setup (agents déjà déployés)", () => {
     expect(runtimeConnector("edge-setup/v0.4.0", seenAt)).toMatchObject({ version: "v0.4.0" });
     expect(runtimeConnector("hermes-setup/v0.1.0", seenAt)).toMatchObject({ version: "v0.1.0" });
   });
@@ -146,7 +146,7 @@ describe("déclaration hello et migration", () => {
       expect(session.events.some(({ kind }) => kind === "agent_outdated")).toBe(false);
       expect(session.logs.some(({ event }) => event === "runtime_link.agent_outdated")).toBe(false);
       // Sans seuils : ni latestVersion ni minimumVersion ; seule la borne des features accompagne le palier et l'origine.
-      if (!Object.keys(env).length) expect(session.frames.find(({ t }) => t === "link.context")).toEqual({ t: "link.context", environment: "dev", ohb: config().publicUrl, limits: { features: RELAY_MAX_FEATURES }, accepts: ["inventory.changed"] });
+      if (!Object.keys(env).length) expect(session.frames.find(({ t }) => t === "link.context")).toEqual({ t: "link.context", environment: "dev", openedbot: config().publicUrl, limits: { features: RELAY_MAX_FEATURES }, accepts: ["inventory.changed"] });
     }
   });
 

@@ -1,4 +1,4 @@
-// The real Postgres snapshot store, as ohb_api. The route and module tests use
+// The real Postgres snapshot store, as openedbot_api. The route and module tests use
 // in-memory stores, so only this proves the SQL: a document round-trips as a
 // jsonb object (never a JSON string), only the tenant sees it, and the write
 // fence holds: an observation that began before the last invalidation, or
@@ -8,7 +8,7 @@ import { withDisposablePostgres } from "./disposable-postgres";
 import { postgresSnapshotStore } from "../../modules/runtimes/src/sql/runtime-read-snapshots";
 import type { Db } from "../../platform/db/src/db";
 
-await withDisposablePostgres("ohb122_read_snapshots", async ({ owner: db }) => {
+await withDisposablePostgres("openedbot122_read_snapshots", async ({ owner: db }) => {
   const organizationId = crypto.randomUUID();
   const otherOrganizationId = crypto.randomUUID();
   const runtimeId = crypto.randomUUID();
@@ -23,7 +23,7 @@ await withDisposablePostgres("ohb122_read_snapshots", async ({ owner: db }) => {
         (${otherOrganizationId}, ${`snapshot-${otherOrganizationId}`}, 'Other snapshot fixture')`;
       await tx`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active)
         values (${runtimeId}, ${organizationId}, 'Snapshot fixture', 'connector', 'snapshot-fixture-hash', false)`;
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       const scopedDb = { begin: (callback: (transaction: Bun.TransactionSQL) => Promise<unknown>) => callback(tx) } as unknown as Db;
       const store = postgresSnapshotStore(scopedDb);
       const documentOf = async (kind: "mcp" | "models") => (await store.read(organizationId, runtimeId, kind))?.document ?? null;

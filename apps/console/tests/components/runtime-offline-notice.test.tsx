@@ -48,7 +48,7 @@ test("since time is HH:MM, null when the link never showed up", () => {
 });
 
 test("offline: a status tab on the composer explains, retries now and opens the runtime settings", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   let retries = 0;
   let opened = 0;
   const { container } = render(view({
@@ -72,7 +72,7 @@ test("offline: a status tab on the composer explains, retries now and opens the 
 });
 
 test("retrying disables the retry; recovery is announced; online without history shows no tab", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   const { rerender, container } = render(view({ offline: false }));
   expect(container.querySelector("[data-composer-notice]")).toBeNull();
   rerender(view({ retrying: true }));
@@ -85,7 +85,7 @@ test("retrying disables the retry; recovery is announced; online without history
 });
 
 test("badge names the outage and opens the runtime settings", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   let opened = 0;
   render(
     <I18nProvider>
@@ -99,7 +99,7 @@ test("badge names the outage and opens the runtime settings", () => {
 });
 
 test("offline: the tab and the badge wear the destructive red of the delete button, white on it", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   const { container } = render(view());
   const tab = container.querySelector<HTMLElement>('[data-runtime-notice="offline"]')!;
   expect(tab.className).toContain("bg-[var(--btn-danger)]");
@@ -116,7 +116,7 @@ test("offline: the tab and the badge wear the destructive red of the delete butt
 });
 
 test("back online: the restored tab is Apple's system blue in both themes, white on it", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   const { container, rerender } = render(view());
   rerender(view({ offline: false }));
   const tab = container.querySelector<HTMLElement>('[data-runtime-notice="restored"]')!;

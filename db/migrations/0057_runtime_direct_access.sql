@@ -1,6 +1,6 @@
 begin;
 
--- OHB-74: encrypted Cloudflare Access credentials for direct runtimes only.
+-- Encrypted Cloudflare Access credentials for direct runtimes only.
 --
 -- Idempotent on purpose: the first version of this file recorded nothing in
 -- schema_migrations, so the alpha database already carries these columns
@@ -27,7 +27,7 @@ end $$;
 -- Historical host announcements must never enable administration over a public URL.
 update runtimes set link_features = '{}'::text[], last_probed_at = null
  where reachability = 'direct';
-comment on column organizations.runtime_mode is 'Retired by OHB-74; retained for compatibility, no longer read by API or worker.';
+comment on column organizations.runtime_mode is 'Retired; retained for compatibility, no longer read by API or worker.';
 
 insert into schema_migrations(version) values ('0057_runtime_direct_access') on conflict (version) do nothing;
 

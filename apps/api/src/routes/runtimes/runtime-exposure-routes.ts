@@ -68,7 +68,7 @@ const MANAGED_SLUG_ATTEMPTS = 5;
 export const EXPOSURE_CHECK_CACHE_MS = 10_000;
 
 /**
- * OHB-75 : le cycle de vie d'une publication de gateway direct.
+ * Le cycle de vie d'une publication de gateway direct.
  *
  * Créer provisionne le hostname chez le fournisseur (tunnel géré sur le compte
  * Cloudflare d'openedbot, ou Funnel sur le tailnet du client) et rend la commande à
@@ -378,7 +378,7 @@ async function funnelDraft(body: Record<string, unknown>, config: ApiConfig, tai
 }
 
 /**
- * Un sous-domaine que personne n'a choisi : `ohb-<hex>` sur la zone gérée.
+ * Un sous-domaine que personne n'a choisi : `openedbot-<hex>` sur la zone gérée.
  *
  * Rien à saisir côté client, donc rien à valider ni à disputer. Le tirage est
  * relu contre le DNS de la zone avant d'être retenu : la collision est
@@ -386,7 +386,7 @@ async function funnelDraft(body: Record<string, unknown>, config: ApiConfig, tai
  */
 async function pickManagedSlug(client: ReturnType<CloudflareClientFactory>, managed: ManagedTunnelConfig): Promise<string> {
   for (let attempt = 0; attempt < MANAGED_SLUG_ATTEMPTS; attempt++) {
-    const slug = `ohb-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+    const slug = `openedbot-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
     if (!(await client.findDnsRecord(managed.zoneId, `${slug}.${managed.hostSuffix}`))) return slug;
   }
   throw new HttpError(503, "EXPOSURE_HOSTNAME_TAKEN", "Aucun sous-domaine libre n’a été tiré ; réessayez.");
@@ -415,7 +415,7 @@ async function managedDraft(body: Record<string, unknown>, config: ApiConfig, cl
     }
     const result = await provisionDirectExposure(client, {
       accountId: managed.accountId, zoneId: managed.zoneId, hostname,
-      tunnelName: `ohb-managed-${slug}`, accessName: `openedbot managed ${slug}`,
+      tunnelName: `openedbot-managed-${slug}`, accessName: `openedbot managed ${slug}`,
     });
     return {
       hostname, endpoint: `https://${hostname}`,

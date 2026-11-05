@@ -140,7 +140,7 @@ func TestProfileToolsetsBatchFallsBackToSuppressionPerToolset(t *testing.T) {
 	suppressed := false
 	replies := map[string]string{
 		"toolsets":                 `{"platform":"api_server","settable":["x_search","web"]}`,
-		"profile-toolset-suppress": `{"profile":"ohb-reviewer","toolset":"x_search","suppressed":true}`,
+		"profile-toolset-suppress": `{"profile":"openedbot-reviewer","toolset":"x_search","suppressed":true}`,
 	}
 	// The platform list never moves x_search; the suppression does, as the
 	// real probe would.
@@ -156,7 +156,7 @@ func TestProfileToolsetsBatchFallsBackToSuppressionPerToolset(t *testing.T) {
 		}
 	})
 
-	status, out := call(t, srv, "POST", "/profiles/ohb-reviewer/toolsets", `{"toolsets":{"x_search":false,"web":false}}`)
+	status, out := call(t, srv, "POST", "/profiles/openedbot-reviewer/toolsets", `{"toolsets":{"x_search":false,"web":false}}`)
 	if status != 200 {
 		t.Fatalf("%d %v", status, out)
 	}

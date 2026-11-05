@@ -181,7 +181,7 @@ describe("selectFallbackSelection", () => {
     })).toBeNull();
   });
 
-  test("uses the OHB-selected model when it belongs to the fallback provider", () => {
+  test("uses the openedbot-selected model when it belongs to the fallback provider", () => {
     const chosen = selectFallbackSelection(catalog, [], {
       excludedProvider: "openai-codex",
       runtimeSelectedProvider: "opencode-free",
@@ -513,7 +513,7 @@ describe("applyFallbackProfileModel", () => {
   // Un profil explicite ou importé n'est pas « possédé » par openedbot, mais le
   // gateway route quand même ses runs sur son bloc `model` : le droit d'écrire
   // vient de la capacité hôte, jamais de `hermes_profile_managed`.
-  test("does not depend on OHB owning the profile", async () => {
+  test("does not depend on openedbot owning the profile", async () => {
     const { client, calls } = recordingClient();
     expect(await applyFallbackProfileModel(client, "imported-bot", able, selection)).toBe(true);
     expect(calls).toHaveLength(1);

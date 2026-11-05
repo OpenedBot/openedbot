@@ -9,9 +9,9 @@
 --   thread_compactions         : compact-thread.ts
 --   playbooks, bot_playbooks   : runner.ts (loadAssignedPlaybooks)
 --
--- La policy devient celle d'`ohb_api` : sans `app.organization_id`, aucune
+-- La policy devient celle d'`openedbot_api` : sans `app.organization_id`, aucune
 -- ligne. `tests/integration/worker-tenant-scope.ts` appelle ces fonctions sous
--- `ohb_worker` avec deux organisations.
+-- `openedbot_worker` avec deux organisations.
 --
 -- `message_reactions` et `support_messages` ne sont nommées par aucune requête
 -- du worker ; les suppressions en cascade d'une purge ne dépendent pas de ces
@@ -19,28 +19,28 @@
 begin;
 
 drop policy if exists runtime_provider_incidents_worker on runtime_provider_incidents;
-create policy runtime_provider_incidents_worker on runtime_provider_incidents to ohb_worker
+create policy runtime_provider_incidents_worker on runtime_provider_incidents to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 drop policy if exists thread_compactions_worker on thread_compactions;
-create policy thread_compactions_worker on thread_compactions to ohb_worker
+create policy thread_compactions_worker on thread_compactions to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 drop policy if exists playbooks_worker on playbooks;
-create policy playbooks_worker on playbooks to ohb_worker
+create policy playbooks_worker on playbooks to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 drop policy if exists bot_playbooks_worker on bot_playbooks;
-create policy bot_playbooks_worker on bot_playbooks to ohb_worker
+create policy bot_playbooks_worker on bot_playbooks to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 drop policy if exists message_reactions_worker on message_reactions;
 drop policy if exists support_messages_worker on support_messages;
-revoke all on message_reactions, support_messages from ohb_worker;
+revoke all on message_reactions, support_messages from openedbot_worker;
 
 insert into schema_migrations(version) values ('0082_worker_tenant_scope') on conflict (version) do nothing;
 

@@ -52,7 +52,7 @@ func TestDoctorNamesAConnectorStoppedOnRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	problem := linkRefusalProblem(mac)
-	for _, want := range []string{"hermes-connector@mac.service refused by openedbot since 2026-09-14T11:00:00Z", "10 times in a row", "link --ohb https://… --yes --name mac"} {
+	for _, want := range []string{"hermes-connector@mac.service refused by openedbot since 2026-09-14T11:00:00Z", "10 times in a row", "link --openedbot https://… --yes --name mac"} {
 		if !strings.Contains(problem, want) {
 			t.Fatalf("%q does not contain %q", problem, want)
 		}

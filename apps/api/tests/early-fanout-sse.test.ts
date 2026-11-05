@@ -15,7 +15,7 @@ const occurredAt = new Date("2026-10-03T12:00:00.000Z");
 const identity = {
   botId: "bot-1",
   turnId: "run-1",
-  sessionKey: `ohb:${organizationId}:dm:run-1`,
+  sessionKey: `openedbot:${organizationId}:dm:run-1`,
 };
 const base = {
   organizationId,
@@ -122,7 +122,7 @@ describe("SSE avant commit", () => {
     const hub = new EventHub();
     // A two-event window makes the cursor advance threshold one event: the
     // `stream.cursor` that replaces the committed replay of an already pushed
-    // frame (DEV-OHB-112) leaves at once instead of on the 15 s heartbeat.
+    // frame leaves at once instead of on the 15 s heartbeat.
     const app = sseApp(fakeRunEventsDb(rows), hub, 2);
     const live = await app.request("http://localhost/?cursor=0");
     const reader = live.body!.getReader();

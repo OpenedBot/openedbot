@@ -54,7 +54,7 @@ begin
   select t.tableowner into migrator
     from pg_catalog.pg_tables t
    where t.schemaname = 'public' and t.tablename = 'sessions';
-  if migrator in ('ohb_api', 'ohb_worker', 'ohb_staff') then
+  if migrator in ('openedbot_api', 'openedbot_worker', 'openedbot_staff') then
     raise exception 'retention purges: % is an application role, not the migration role', migrator;
   end if;
   execute pg_catalog.format('alter function public.purge_spent_email_login_codes() owner to %I', migrator);
@@ -64,13 +64,13 @@ $owner$;
 
 revoke all on function public.purge_spent_email_login_codes() from public;
 revoke all on function public.purge_dead_sessions() from public;
-grant execute on function public.purge_spent_email_login_codes() to ohb_worker;
-grant execute on function public.purge_dead_sessions() to ohb_worker;
+grant execute on function public.purge_spent_email_login_codes() to openedbot_worker;
+grant execute on function public.purge_dead_sessions() to openedbot_worker;
 
 comment on function public.purge_spent_email_login_codes() is
-  'Deletes e-mail login codes expired for more than one day; returns the count. ohb_worker only.';
+  'Deletes e-mail login codes expired for more than one day; returns the count. openedbot_worker only.';
 comment on function public.purge_dead_sessions() is
-  'Deletes sessions expired, and if revoked revoked, for more than thirty days; returns the count. ohb_worker only.';
+  'Deletes sessions expired, and if revoked revoked, for more than thirty days; returns the count. openedbot_worker only.';
 
 insert into schema_migrations(version) values ('0169_worker_retention_purges')
 on conflict (version) do nothing;

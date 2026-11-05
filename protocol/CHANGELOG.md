@@ -8,6 +8,12 @@ uses [semantic versioning](https://semver.org/) as described in
 ## [Unreleased]
 
 ### Changed
+- **Breaking.** `link.context` carries the public origin as `openedbot`
+  (was the product's former short name). The proof of possession signs a
+  message prefixed `openedbot-link-pop/v1`, and the creation audit file is
+  sealed with the magic `OBAUDIT2` and keys derived for
+  `openedbot-creation-audit/v2`: a host and an openedbot from before this
+  change no longer link, and an older audit file no longer opens.
 - Provider usage probe: `xai-oauth` joins the fixed providers (`anthropic`,
   `openai-codex`, `openrouter`); its quotas are read from xAI, Hermes does not
   report them.
@@ -37,9 +43,9 @@ uses [semantic versioning](https://semver.org/) as described in
   on the previous reference refused the media downloads openedbot asks for.
 
 ### Changed
-- `RELAY_STAGE_HEADER` is now `X-OpenedBot-Relay-Stage`. `relayStageOf`
-  still reads the former `X-OHB-Relay-Stage` (`LEGACY_RELAY_STAGE_HEADER`)
-  for one release. Hosts never read or set this header.
+- `RELAY_STAGE_HEADER` is `X-OpenedBot-Relay-Stage`, and `relayStageOf` reads
+  only that name: `LEGACY_RELAY_STAGE_HEADER` is removed. Hosts never read or
+  set this header.
 
 ## [1.0.0] - 2026-10-28
 

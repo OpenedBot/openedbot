@@ -8,12 +8,12 @@ set -euo pipefail
 # commentaires sans apostrophe.
 
 container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
-database="${OPENEDBOT_INTEGRATION_DATABASE:-ohb_integration}"
+database="${OPENEDBOT_INTEGRATION_DATABASE:-openedbot_integration}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 database_url="${INTEGRATION_DATABASE_URL:-}"
 admin_url="${INTEGRATION_ADMIN_DATABASE_URL:-}"
 
-# Les tables ou ohb_worker lit toutes les organisations (policy using (true)),
+# Les tables ou openedbot_worker lit toutes les organisations (policy using (true)),
 # puis le nombre de tables retirees au worker par 0080, 0082, 0148 et 0154. Retirer une table de
 # cette liste est le but ; en ajouter une demande une raison dans le commit.
 # organization_permission_policies (0142) : plafond et liste d interdiction de
@@ -31,21 +31,21 @@ admin_url="${INTEGRATION_ADMIN_DATABASE_URL:-}"
 worker_policy_exceptions_expected="alert_deliveries,apns_deliveries,approval_requests,attachments,bot_groups,bot_host_cleanups,bot_profile_provisions,bots,email_outbox,group_member_read_positions,group_members,memberships,message_ingress,message_versions,messages,operator_profiles,organization_permission_policies,organizations,profile_delete_jobs,profile_import_items,profile_import_jobs,push_deliveries,push_outbox,push_subscriptions,routine_executions,routines,run_events,run_steering_attempts,runs,runtime_bot_settings_tools,runtime_connector_notices,runtime_direct_exposures,runtime_enrollments,runtime_link_alerts,runtime_link_events,runtime_model_selection_proofs,runtime_review_profiles,runtime_routine_tools,runtimes,sections,subscriptions,support_attachments,support_conversations,support_events,tenant_blob_deletions,tenant_deletions,thread_message_counters,threads,tool_errors,workflows|10"
 
 # Preuve 0154 : audit_chain_for_purge(org), seul acces worker a la chaine.
-# Proprietaire ohb_migrator (BYPASSRLS), SECURITY DEFINER, STABLE, search_path
-# fige ; aucun EXECUTE pour PUBLIC, ohb_api ni ohb_staff ; org A ne rend rien
+# Proprietaire openedbot_migrator (BYPASSRLS), SECURITY DEFINER, STABLE, search_path
+# fige ; aucun EXECUTE pour PUBLIC, openedbot_api ni openedbot_staff ; org A ne rend rien
 # de B, NULL refuse en 22004, table directe et appel API refuses en 42501.
-purge_fn_expected="ohb_migrator/true/true/s/search_path=pg_catalog, pg_temp|false/false/false/true|api_call=42501,worker_a=2/0,worker_null=22004,worker_table=42501"
+purge_fn_expected="openedbot_migrator/true/true/s/search_path=pg_catalog, pg_temp|false/false/false/true|api_call=42501,worker_a=2/0,worker_null=22004,worker_table=42501"
 
 # Preuve 0092 : etape de workflow, DM, identite forgee ecrasee, bail perime,
 # rejeu sans doublon, ecriture API estampillee, puis rien pour un autre tenant.
-# Preuve 0169 : deux fonctions du role de migration, EXECUTE pour ohb_worker
+# Preuve 0169 : deux fonctions du role de migration, EXECUTE pour openedbot_worker
 # seul ; tables illisibles par le worker ; restent le code recent et le vivant,
 # la session vivante, la recente et la native dont le jeton vaut encore.
-retention_purges_expected="ohb_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true;ohb_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true|api_call=42501,codes_left=c2,c3,sessions_left=a3,a4,a5,worker_codes=42501,worker_sessions=42501"
+retention_purges_expected="openedbot_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true;openedbot_migrator/true/search_path=pg_catalog, pg_temp/false/false/false/true|api_call=42501,codes_left=c2,c3,sessions_left=a3,a4,a5,worker_codes=42501,worker_sessions=42501"
 
 run_events_identity_expected="step/dm/overwritten/denied/1/91000000-0000-4000-8000-000000000043|0/0"
 
-if [[ "$database" != "ohb_integration" ]]; then
+if [[ "$database" != "openedbot_integration" ]]; then
   printf 'Refusing integration database outside the exact disposable target.\n' >&2
   exit 1
 fi
@@ -68,26 +68,26 @@ SQL
   psql -v ON_ERROR_STOP=1 -v database_name="$database" "$admin_url" <<'SQL' >/dev/null
 do $$
 begin
-  if not exists (select from pg_roles where rolname = 'ohb_migrator') then
-    create role ohb_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
+  if not exists (select from pg_roles where rolname = 'openedbot_migrator') then
+    create role openedbot_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
   end if;
-  if not exists (select from pg_roles where rolname = 'ohb_api') then
-    create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = 'openedbot_api') then
+    create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = 'ohb_worker') then
-    create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = 'openedbot_worker') then
+    create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = 'ohb_staff') then
-    create role ohb_staff login password 'ohb_staff_dev' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = 'openedbot_staff') then
+    create role openedbot_staff login password 'openedbot_staff_dev' nosuperuser nocreatedb nocreaterole;
   end if;
 end $$;
-alter role ohb_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
-select format('create database %I owner ohb_migrator', :'database_name')\gexec
-select format('grant connect on database %I to ohb_api, ohb_worker, ohb_staff', :'database_name')\gexec
+alter role openedbot_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
+select format('create database %I owner openedbot_migrator', :'database_name')\gexec
+select format('grant connect on database %I to openedbot_api, openedbot_worker, openedbot_staff', :'database_name')\gexec
 SQL
 
   for migration in "$root"/db/migrations/*.sql; do
-    PGOPTIONS='-c role=ohb_migrator' \
+    PGOPTIONS='-c role=openedbot_migrator' \
       psql -v ON_ERROR_STOP=1 "$database_url" -f "$migration" >/dev/null
   done
 
@@ -106,7 +106,7 @@ insert into sections (id, organization_id, name, position) values
 insert into bots (id, organization_id, section_id, name, slug, hermes_profile, position) values
   ('10000000-0000-4000-8000-000000000021', '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000011', 'Bot A', 'bot-a', 'profile-a', 0),
   ('20000000-0000-4000-8000-000000000022', '20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000012', 'Bot B', 'bot-b', 'profile-b', 0);
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false);
 select count(*) from organizations;
 select count(*) from organizations where id = '20000000-0000-4000-8000-000000000002';
@@ -122,7 +122,7 @@ SQL
   staff_cross_tenant="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
     -f "$root/tests/integration/staff-cross-tenant.sql")"
   if [[ "$staff_cross_tenant" != "1/0/denied/2/login" ]]; then
-    printf 'Staff cross-tenant proof failed; expected tenant RLS 1/0, function denied without staff GUC, both tenants with staff GUC, and ohb_staff canlogin, got:\n%s\n' "$staff_cross_tenant" >&2
+    printf 'Staff cross-tenant proof failed; expected tenant RLS 1/0, function denied without staff GUC, both tenants with staff GUC, and openedbot_staff canlogin, got:\n%s\n' "$staff_cross_tenant" >&2
     exit 1
   fi
 
@@ -142,12 +142,12 @@ SQL
 
   # Cette preuve reproduit le propriétaire NOSUPERUSER de production. Elle
   # vérifie le BYPASSRLS qui permet aux gardes SECURITY DEFINER de lire
-  # staff_users, tout en appelant réellement les fonctions avec ohb_api.
+  # staff_users, tout en appelant réellement les fonctions avec openedbot_api.
   staff_definer_owner="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" <<'SQL'
 create temp table staff_owner_proof (counts_rows int);
 insert into staff_owner_proof values (-1);
-grant select, update on staff_owner_proof to ohb_api;
-set role ohb_api;
+grant select, update on staff_owner_proof to openedbot_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-000000000081', false) \g /dev/null
 do $proof$
 begin
@@ -165,16 +165,16 @@ select pg_get_userbyid(p.proowner) || '/' || r.rolbypassrls::text || '/'
  where p.oid = 'staff_user_counts()'::regprocedure;
 SQL
 )"
-  if [[ "$staff_definer_owner" != "ohb_migrator/true/1" ]]; then
-    printf 'Staff SECURITY DEFINER proof failed; expected ohb_migrator/true and one row from counts, got:\n%s\nProbable cause: the schema owner is not exempt from RLS.\n' "$staff_definer_owner" >&2
+  if [[ "$staff_definer_owner" != "openedbot_migrator/true/1" ]]; then
+    printf 'Staff SECURITY DEFINER proof failed; expected openedbot_migrator/true and one row from counts, got:\n%s\nProbable cause: the schema owner is not exempt from RLS.\n' "$staff_definer_owner" >&2
     exit 1
   fi
 
   operational_metrics="$(psql -v ON_ERROR_STOP=1 -At "$database_url" <<'SQL' | tail -n 3
-set role ohb_api;
+set role openedbot_api;
 select count(*) from internal_operational_metrics();
 select has_function_privilege(current_user, 'internal_operational_metrics()', 'execute');
-select has_function_privilege('ohb_worker', 'internal_operational_metrics()', 'execute');
+select has_function_privilege('openedbot_worker', 'internal_operational_metrics()', 'execute');
 SQL
 )"
   if [[ "$operational_metrics" != $'1\nt\nf' ]]; then
@@ -192,7 +192,7 @@ insert into memberships (organization_id, user_id, role) values
 insert into agency_client_invitations (id, agency_organization_id, email, token_hash, invited_by_user_id, expires_at) values
   ('40000000-0000-4000-8000-000000000041', '10000000-0000-4000-8000-000000000001', 'invited@example.test', 'hash-a', '30000000-0000-4000-8000-000000000031', now() + interval '7 days'),
   ('40000000-0000-4000-8000-000000000042', '20000000-0000-4000-8000-000000000002', 'ailleurs@example.test', 'hash-b', '30000000-0000-4000-8000-000000000032', now() + interval '7 days');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.agency_invitation_hash', 'hash-a', false);
 select count(*) from agency_client_invitations;
 select count(*) from organizations;
@@ -222,7 +222,7 @@ SQL
   ssh_columns_dropped="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
     -f "$root/tests/integration/runtime-ssh-columns-dropped.sql")"
   if [[ "$ssh_columns_dropped" != "3/0/0/idempotent" ]]; then
-    printf 'OHB-15 schema proof failed; expected the three SSH columns to exist, disappear with their constraints and survive a replay, got:\n%s\n' "$ssh_columns_dropped" >&2
+    printf 'SSH columns schema proof failed; expected the three SSH columns to exist, disappear with their constraints and survive a replay, got:\n%s\n' "$ssh_columns_dropped" >&2
     exit 1
   fi
 
@@ -318,7 +318,7 @@ SQL
   # backfill pose true au membre d un espace deja onboarde, false a l autre.
   # Le rejeu retire la colonne et sa ligne schema_migrations puis applique le
   # fichier livre tel quel : la preuve porte sur le SQL de la migration, pas
-  # sur une copie. ohb_api (sans GUC, users n est pas sous RLS) peut ensuite
+  # sur une copie. openedbot_api (sans GUC, users n est pas sous RLS) peut ensuite
   # remettre le flag a false : le chemin du reset de developpement.
   psql -v ON_ERROR_STOP=1 -q "$database_url" <<'SQL' >/dev/null
 update organizations set onboarded_at = now() where id = '10000000-0000-4000-8000-000000000001';
@@ -332,14 +332,14 @@ select (select onboarding_completed from users where id = '30000000-0000-4000-80
   || '/' || (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000032')::text
   || '/' || (select column_default from information_schema.columns
               where table_name = 'users' and column_name = 'onboarding_completed');
-set role ohb_api;
+set role openedbot_api;
 update users set onboarding_completed = false where id = '30000000-0000-4000-8000-000000000031';
 select onboarding_completed::text from users where id = '30000000-0000-4000-8000-000000000031';
 reset role;
 SQL
 )"
   if [[ "$user_onboarding" != $'true/false/false\nfalse' ]]; then
-    printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the ohb_api reset, got:\n%s\n' "$user_onboarding" >&2
+    printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
     exit 1
   fi
 
@@ -347,14 +347,14 @@ SQL
   # l organisation.
   playbooks="$(psql -v ON_ERROR_STOP=1 -At "$database_url" <<'SQL' | tail -n 1
 create temp table playbook_proof (own int, other int);
-grant insert, update, select on playbook_proof to ohb_api;
+grant insert, update, select on playbook_proof to openedbot_api;
 insert into playbooks (id, organization_id, key, name) values
   ('50000000-0000-4000-8000-000000000061', '10000000-0000-4000-8000-000000000001', 'brief', 'Brief A'),
   ('50000000-0000-4000-8000-000000000062', '20000000-0000-4000-8000-000000000002', 'brief', 'Brief B');
 insert into bot_playbooks (organization_id, bot_id, playbook_id) values
   ('10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000021', '50000000-0000-4000-8000-000000000061'),
   ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000022', '50000000-0000-4000-8000-000000000062');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false);
 insert into playbook_proof (own, other)
   select (select count(*) from playbooks),
@@ -442,7 +442,7 @@ SQL
     exit 1
   fi
 
-  # Les policies ohb_worker en using (true) sont une liste figee (0080) : une
+  # Les policies openedbot_worker en using (true) sont une liste figee (0080) : une
   # nouvelle table ouverte a toutes les organisations est une decision.
   worker_policy_exceptions="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
     -f "$root/tests/integration/worker-policy-exceptions.sql")"
@@ -477,7 +477,7 @@ SQL
   fi
 
   # La derniere connexion (0075) : aucun remplissage retroactif, ecriture sous
-  # ohb_api, rien de deduit de sessions.last_seen_at, et la colonne rendue par
+  # openedbot_api, rien de deduit de sessions.last_seen_at, et la colonne rendue par
   # la page comme par la fiche. Elle insere son propre espace et ses comptes,
   # donc elle vient apres tout comptage global.
   last_login="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
@@ -532,29 +532,29 @@ docker exec "$container" sh -ceu '
   psql -v ON_ERROR_STOP=1 -v database_name="$1" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<SQL
 do \$\$
 begin
-  if not exists (select from pg_roles where rolname = '\''ohb_migrator'\'') then
-    create role ohb_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
+  if not exists (select from pg_roles where rolname = '\''openedbot_migrator'\'') then
+    create role openedbot_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
   end if;
-  if not exists (select from pg_roles where rolname = '\''ohb_api'\'') then
-    create role ohb_api login password '\''ohb_api_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_api'\'') then
+    create role openedbot_api login password '\''openedbot_api_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = '\''ohb_worker'\'') then
-    create role ohb_worker login password '\''ohb_worker_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_worker'\'') then
+    create role openedbot_worker login password '\''openedbot_worker_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = '\''ohb_staff'\'') then
-    create role ohb_staff login password '\''ohb_staff_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_staff'\'') then
+    create role openedbot_staff login password '\''openedbot_staff_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
 end
 \$\$;
-alter role ohb_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
-select format('\''create database %I owner ohb_migrator'\'', :'\''database_name'\'')\gexec
-select format('\''grant connect on database %I to ohb_api, ohb_worker, ohb_staff'\'', :'\''database_name'\'')\gexec
+alter role openedbot_migrator nologin nosuperuser nocreatedb nocreaterole bypassrls;
+select format('\''create database %I owner openedbot_migrator'\'', :'\''database_name'\'')\gexec
+select format('\''grant connect on database %I to openedbot_api, openedbot_worker, openedbot_staff'\'', :'\''database_name'\'')\gexec
 SQL
 ' -- "$database"
 # Toutes les migrations, dans l'ordre : une liste tenue à la main finit toujours
 # par oublier la dernière, et la preuve tournerait alors sur un schéma périmé.
 for migration in "$root"/db/migrations/*.sql; do
-  docker exec -i "$container" sh -ceu 'PGOPTIONS="-c role=ohb_migrator" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' -- "$database" \
+  docker exec -i "$container" sh -ceu 'PGOPTIONS="-c role=openedbot_migrator" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' -- "$database" \
     < "$migration" >/dev/null
 done
 
@@ -569,7 +569,7 @@ insert into sections (id, organization_id, name, position) values
 insert into bots (id, organization_id, section_id, name, slug, hermes_profile, position) values
   ('\''10000000-0000-4000-8000-000000000021'\'', '\''10000000-0000-4000-8000-000000000001'\'', '\''10000000-0000-4000-8000-000000000011'\'', '\''Bot A'\'', '\''bot-a'\'', '\''profile-a'\'', 0),
   ('\''20000000-0000-4000-8000-000000000022'\'', '\''20000000-0000-4000-8000-000000000002'\'', '\''20000000-0000-4000-8000-000000000012'\'', '\''Bot B'\'', '\''bot-b'\'', '\''profile-b'\'', 0);
-set role ohb_api;
+set role openedbot_api;
 select set_config('\''app.organization_id'\'', '\''10000000-0000-4000-8000-000000000001'\'', false);
 select count(*) from organizations;
 select count(*) from organizations where id = '\''20000000-0000-4000-8000-000000000002'\'';
@@ -588,7 +588,7 @@ staff_cross_tenant="$(docker exec -i "$container" sh -ceu \
   'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
   < "$root/tests/integration/staff-cross-tenant.sql")"
 if [[ "$staff_cross_tenant" != "1/0/denied/2/login" ]]; then
-  printf 'Staff cross-tenant proof failed; expected tenant RLS 1/0, function denied without staff GUC, both tenants with staff GUC, and ohb_staff canlogin, got:\n%s\n' "$staff_cross_tenant" >&2
+  printf 'Staff cross-tenant proof failed; expected tenant RLS 1/0, function denied without staff GUC, both tenants with staff GUC, and openedbot_staff canlogin, got:\n%s\n' "$staff_cross_tenant" >&2
   exit 1
 fi
 
@@ -602,12 +602,12 @@ fi
 
 # Cette preuve reproduit le propriétaire NOSUPERUSER de production. Elle
 # vérifie le BYPASSRLS qui permet aux gardes SECURITY DEFINER de lire
-# staff_users, tout en appelant réellement les fonctions avec ohb_api.
+# staff_users, tout en appelant réellement les fonctions avec openedbot_api.
 staff_definer_owner="$(docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" <<'SQL'
 create temp table staff_owner_proof (counts_rows int);
 insert into staff_owner_proof values (-1);
-grant select, update on staff_owner_proof to ohb_api;
-set role ohb_api;
+grant select, update on staff_owner_proof to openedbot_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-000000000081', false) \g /dev/null
 do $proof$
 begin
@@ -625,16 +625,16 @@ select pg_get_userbyid(p.proowner) || '/' || r.rolbypassrls::text || '/'
  where p.oid = 'staff_user_counts()'::regprocedure;
 SQL
 )"
-if [[ "$staff_definer_owner" != "ohb_migrator/true/1" ]]; then
-  printf 'Staff SECURITY DEFINER proof failed; expected ohb_migrator/true and one row from counts, got:\n%s\nProbable cause: the schema owner is not exempt from RLS.\n' "$staff_definer_owner" >&2
+if [[ "$staff_definer_owner" != "openedbot_migrator/true/1" ]]; then
+  printf 'Staff SECURITY DEFINER proof failed; expected openedbot_migrator/true and one row from counts, got:\n%s\nProbable cause: the schema owner is not exempt from RLS.\n' "$staff_definer_owner" >&2
   exit 1
 fi
 
 operational_metrics="$(docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1"' -- "$database" <<'SQL' | tail -n 3
-set role ohb_api;
+set role openedbot_api;
 select count(*) from internal_operational_metrics();
 select has_function_privilege(current_user, 'internal_operational_metrics()', 'execute');
-select has_function_privilege('ohb_worker', 'internal_operational_metrics()', 'execute');
+select has_function_privilege('openedbot_worker', 'internal_operational_metrics()', 'execute');
 SQL
 )"
 if [[ "$operational_metrics" != $'1\nt\nf' ]]; then
@@ -653,7 +653,7 @@ insert into memberships (organization_id, user_id, role) values
 insert into agency_client_invitations (id, agency_organization_id, email, token_hash, invited_by_user_id, expires_at) values
   ('40000000-0000-4000-8000-000000000041', '10000000-0000-4000-8000-000000000001', 'invited@example.test', 'hash-a', '30000000-0000-4000-8000-000000000031', now() + interval '7 days'),
   ('40000000-0000-4000-8000-000000000042', '20000000-0000-4000-8000-000000000002', 'ailleurs@example.test', 'hash-b', '30000000-0000-4000-8000-000000000032', now() + interval '7 days');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.agency_invitation_hash', 'hash-a', false);
 select count(*) from agency_client_invitations;
 select count(*) from organizations;
@@ -686,7 +686,7 @@ ssh_columns_dropped="$(docker exec -i "$container" sh -ceu \
   'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
   < "$root/tests/integration/runtime-ssh-columns-dropped.sql")"
 if [[ "$ssh_columns_dropped" != "3/0/0/idempotent" ]]; then
-  printf 'OHB-15 schema proof failed; expected the three SSH columns to exist, disappear with their constraints and survive a replay, got:\n%s\n' "$ssh_columns_dropped" >&2
+  printf 'SSH columns schema proof failed; expected the three SSH columns to exist, disappear with their constraints and survive a replay, got:\n%s\n' "$ssh_columns_dropped" >&2
   exit 1
 fi
 
@@ -794,28 +794,28 @@ select (select onboarding_completed from users where id = '30000000-0000-4000-80
   || '/' || (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000032')::text
   || '/' || (select column_default from information_schema.columns
               where table_name = 'users' and column_name = 'onboarding_completed');
-set role ohb_api;
+set role openedbot_api;
 update users set onboarding_completed = false where id = '30000000-0000-4000-8000-000000000031';
 select onboarding_completed::text from users where id = '30000000-0000-4000-8000-000000000031';
 reset role;
 SQL
 )"
 if [[ "$user_onboarding" != $'true/false/false\nfalse' ]]; then
-  printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the ohb_api reset, got:\n%s\n' "$user_onboarding" >&2
+  printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
   exit 1
 fi
 
 # Playbooks structurés : même cloisonnement tenant que les bots.
 playbooks="$(docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1"' -- "$database" <<'SQL' | tail -n 1
 create temp table playbook_proof (own int, other int);
-grant insert, update, select on playbook_proof to ohb_api;
+grant insert, update, select on playbook_proof to openedbot_api;
 insert into playbooks (id, organization_id, key, name) values
   ('50000000-0000-4000-8000-000000000061', '10000000-0000-4000-8000-000000000001', 'brief', 'Brief A'),
   ('50000000-0000-4000-8000-000000000062', '20000000-0000-4000-8000-000000000002', 'brief', 'Brief B');
 insert into bot_playbooks (organization_id, bot_id, playbook_id) values
   ('10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000021', '50000000-0000-4000-8000-000000000061'),
   ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000022', '50000000-0000-4000-8000-000000000062');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false);
 insert into playbook_proof (own, other)
   select (select count(*) from playbooks),
@@ -888,7 +888,7 @@ if [[ "$staff_password_reset" != "reset|replaced|raised|2|password_change|1|goog
   exit 1
 fi
 
-# Les policies ohb_worker en using (true), meme preuve que la passe psql locale.
+# Les policies openedbot_worker en using (true), meme preuve que la passe psql locale.
 worker_policy_exceptions="$(docker exec -i "$container" sh -ceu \
   'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
   < "$root/tests/integration/worker-policy-exceptions.sql")"

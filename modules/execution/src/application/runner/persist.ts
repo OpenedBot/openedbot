@@ -170,8 +170,8 @@ export async function persistEvents(
     && !(quietTurn && (event.type === "agent.message" || event.type === "agent.reasoning")));
   await publishUncommittedEvents(config, context, earlyEvents);
   if (trace && earlyEvents.length > 0) {
-    trace.mark("ohb.first_event_published");
-    if (earlyEvents.some((event) => event.type === "agent.message")) trace.mark("ohb.first_text_published");
+    trace.mark("openedbot.first_event_published");
+    if (earlyEvents.some((event) => event.type === "agent.message")) trace.mark("openedbot.first_text_published");
   }
   // Le coût effectif se mesure hors transaction : appel réseau, aucun verrou.
   // Il ne retarde plus le fan-out ci-dessus.
@@ -537,9 +537,9 @@ export async function persistEvents(
   const hasText = envelopes.some((envelope) => envelope.type === "agent.message");
   const hasTerminal = envelopes.some((envelope) => envelope.type === "run.completed" || envelope.type === "run.error");
   if (trace && envelopes.length > 0) {
-    trace.mark("ohb.first_event_committed");
-    if (hasText) trace.mark("ohb.first_text_committed");
-    if (hasTerminal) trace.mark("ohb.terminal_committed");
+    trace.mark("openedbot.first_event_committed");
+    if (hasText) trace.mark("openedbot.first_text_committed");
+    if (hasTerminal) trace.mark("openedbot.terminal_committed");
   }
   // Lot dont chaque trame est déjà partie en pré-commit : le réveil du
   // poller n'a rien d'urgent (les clients ont le texte), il rejoint le POST
@@ -551,9 +551,9 @@ export async function persistEvents(
   // Le fan-out a déjà daté « publié ». Ces marques ne gagnent que si ce lot
   // n'avait rien à pousser avant le commit (première occurrence seulement).
   if (trace && envelopes.length > 0) {
-    trace.mark("ohb.first_event_published");
-    if (hasText) trace.mark("ohb.first_text_published");
-    if (hasTerminal) trace.mark("ohb.terminal_published");
+    trace.mark("openedbot.first_event_published");
+    if (hasText) trace.mark("openedbot.first_text_published");
+    if (hasTerminal) trace.mark("openedbot.terminal_published");
   }
   if (events.some((event) => event.type === "run.completed" || event.type === "run.error")) {
     await expireUnacknowledgedRunSteers(db, {

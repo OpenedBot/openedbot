@@ -61,16 +61,16 @@ func TestMCPOAuthLifecycleIsProvenByTheProgramNotByTheCallback(t *testing.T) {
 		t.Fatalf("features %v", got)
 	}
 
-	status, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/api/mcp-oauth/callback/rt-1/notion"}`)
+	status, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/api/mcp-oauth/callback/rt-1/notion"}`)
 	if status != 200 || out["status"] != StatusPending || out["authorizationUrl"] != "https://mcp.notion.com/authorize?state=abc&code_challenge=x" {
 		t.Fatalf("%d %v", status, out)
 	}
-	if started[0] != "notion https://ohb.example/api/mcp-oauth/callback/rt-1/notion" {
+	if started[0] != "notion https://openedbot.example/api/mcp-oauth/callback/rt-1/notion" {
 		t.Fatalf("started %v", started)
 	}
 	id := out["sessionId"].(string)
 	// A second start for the same server returns the pending one.
-	if st, dup := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb"}`); st != 409 || dup["session"].(map[string]any)["sessionId"] != id {
+	if st, dup := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/cb"}`); st != 409 || dup["session"].(map[string]any)["sessionId"] != id {
 		t.Fatalf("%d %v", st, dup)
 	}
 	// The callback names the server, not the session, and reaches the program's stdin verbatim.
@@ -130,7 +130,7 @@ func TestMCPOAuthFailsClosedOnAProgramErrorAndKeepsItsCode(t *testing.T) {
 		flow.lines <- `{"event":"error","code":"OAUTH_REGISTRATION_REFUSED","message":"the provider refused to register an OAuth client for this host"}`
 		flow.finish(nil)
 	}()
-	status, out := call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://ohb.example/cb"}`)
+	status, out := call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://openedbot.example/cb"}`)
 	if status != 200 || out["status"] != StatusFailed || out["errorCode"] != "OAUTH_REGISTRATION_REFUSED" || out["authorizationUrl"] != nil {
 		t.Fatalf("%d %v", status, out)
 	}
@@ -141,7 +141,7 @@ func TestMCPOAuthFailsClosedOnAProgramErrorAndKeepsItsCode(t *testing.T) {
 		flow2.lines <- `{"event":"error","code":"Traceback","message":"/home/hermes/.hermes/config.yaml: token=sk-live"}`
 		flow2.finish(nil)
 	}()
-	_, out = call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://ohb.example/cb"}`)
+	_, out = call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://openedbot.example/cb"}`)
 	if out["errorCode"] != "OAUTH_FAILED" || strings.Contains(out["error"].(string), "sk-live") {
 		t.Fatalf("%v", out)
 	}
@@ -152,7 +152,7 @@ func TestMCPOAuthFailsClosedOnAProgramErrorAndKeepsItsCode(t *testing.T) {
 		flow3.lines <- `{"event":"authorization_url","url":"https://auth.example/a?state=s"}`
 		flow3.finish(errors.New("exit 2"))
 	}()
-	_, out = call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://ohb.example/cb"}`)
+	_, out = call(t, srv, "POST", "/mcp/servers/figma/oauth", `{"redirectUri":"https://openedbot.example/cb"}`)
 	id := out["sessionId"].(string)
 	waitFor(t, func() bool {
 		_, v := call(t, srv, "GET", "/mcp/servers/figma/oauth/"+id, "")
@@ -167,17 +167,17 @@ func TestMCPOAuthRefusals(t *testing.T) {
 	if got := s.features(); len(got) != 6 || got[2] != "mcp_management" || got[3] != "profile_inventory" || got[4] != "model_context" || got[5] != SkillsInventoryFeature {
 		t.Fatalf("features %v", got)
 	}
-	if st, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb"}`); st != 503 || errorCode(out) != "OAUTH_UNAVAILABLE" {
+	if st, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/cb"}`); st != 503 || errorCode(out) != "OAUTH_UNAVAILABLE" {
 		t.Fatalf("%d %v", st, out)
 	}
 	flow := newFakeFlow()
 	s.StartMCPOAuth = func(context.Context, string, string, string) (OAuthFlow, error) { return flow, nil }
 	for _, c := range []struct{ path, body, code string }{
-		{"/mcp/servers/bad%20name/oauth", `{"redirectUri":"https://ohb.example/cb"}`, "NAME_INVALID"},
+		{"/mcp/servers/bad%20name/oauth", `{"redirectUri":"https://openedbot.example/cb"}`, "NAME_INVALID"},
 		{"/mcp/servers/notion/oauth", `{}`, "REDIRECT_INVALID"},
-		{"/mcp/servers/notion/oauth", `{"redirectUri":"http://ohb.example/cb"}`, "REDIRECT_INVALID"},
+		{"/mcp/servers/notion/oauth", `{"redirectUri":"http://openedbot.example/cb"}`, "REDIRECT_INVALID"},
 		{"/mcp/servers/notion/oauth", `{"redirectUri":"javascript:alert(1)"}`, "REDIRECT_INVALID"},
-		{"/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb x"}`, "REDIRECT_INVALID"},
+		{"/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/cb x"}`, "REDIRECT_INVALID"},
 		{"/mcp/servers/notion/oauth/callback", `{}`, "BODY_INVALID"},
 		{"/mcp/servers/notion/oauth/callback", `{"code":"c","state":"s"}`, "OAUTH_SESSION_NOT_FOUND"},
 	} {
@@ -206,7 +206,7 @@ func TestMCPOAuthCancelAndExpiryKillTheProgram(t *testing.T) {
 	}
 	srv := serve(t, s)
 	go func() { flow.lines <- `{"event":"authorization_url","url":"https://auth.example/a?state=s"}` }()
-	_, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb"}`)
+	_, out := call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/cb"}`)
 	id := out["sessionId"].(string)
 	if st, _ := call(t, srv, "DELETE", "/mcp/servers/notion/oauth/"+id, ""); st != 204 || flow.kills != 1 {
 		t.Fatalf("%d kills=%d", st, flow.kills)
@@ -218,7 +218,7 @@ func TestMCPOAuthCancelAndExpiryKillTheProgram(t *testing.T) {
 	flow2 := newFakeFlow()
 	s.StartMCPOAuth = func(context.Context, string, string, string) (OAuthFlow, error) { return flow2, nil }
 	go func() { flow2.lines <- `{"event":"authorization_url","url":"https://auth.example/a?state=s"}` }()
-	_, out = call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://ohb.example/cb"}`)
+	_, out = call(t, srv, "POST", "/mcp/servers/notion/oauth", `{"redirectUri":"https://openedbot.example/cb"}`)
 	id = out["sessionId"].(string)
 	now = now.Add(16 * time.Minute)
 	if _, v := call(t, srv, "GET", "/mcp/servers/notion/oauth/"+id, ""); v["status"] != StatusFailed || v["errorCode"] != "OAUTH_TIMEOUT" || flow2.kills != 1 {
@@ -243,9 +243,9 @@ func TestMCPOAuthCarriesTheNamedProfileAndRefusesAnInvalidOne(t *testing.T) {
 	}
 	srv := serve(t, s)
 	for _, body := range []string{
-		`{"redirectUri":"https://ohb.example/cb","profile":"default"}`,
-		`{"redirectUri":"https://ohb.example/cb","profile":"Dev"}`,
-		`{"redirectUri":"https://ohb.example/cb","profile":"../root"}`,
+		`{"redirectUri":"https://openedbot.example/cb","profile":"default"}`,
+		`{"redirectUri":"https://openedbot.example/cb","profile":"Dev"}`,
+		`{"redirectUri":"https://openedbot.example/cb","profile":"../root"}`,
 	} {
 		if status, out := call(t, srv, "POST", "/mcp/servers/linear/oauth", body); status != 400 || out["error"].(map[string]any)["code"] != "PROFILE_INVALID" {
 			t.Fatalf("%s: %d %v", body, status, out)
@@ -254,7 +254,7 @@ func TestMCPOAuthCarriesTheNamedProfileAndRefusesAnInvalidOne(t *testing.T) {
 	if len(profiles) != 0 {
 		t.Fatalf("a refused profile started the program: %v", profiles)
 	}
-	if status, out := call(t, srv, "POST", "/mcp/servers/linear/oauth", `{"redirectUri":"https://ohb.example/cb","profile":"dev"}`); status != 200 || out["status"] != StatusPending {
+	if status, out := call(t, srv, "POST", "/mcp/servers/linear/oauth", `{"redirectUri":"https://openedbot.example/cb","profile":"dev"}`); status != 200 || out["status"] != StatusPending {
 		t.Fatalf("%d %v", status, out)
 	}
 	if len(profiles) != 1 || profiles[0] != "dev" {

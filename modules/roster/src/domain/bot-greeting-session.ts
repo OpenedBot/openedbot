@@ -1,6 +1,6 @@
 /**
  * La session du run d'accueil des bots créés quand il partait sur le profil
- * par défaut, avant que le profil nommé du bot existe (DEV-OHB-244 ; l'accueil
+ * par défaut, avant que le profil nommé du bot existe (l'accueil
  * attend maintenant ce profil). Ces sessions vivent sur le profil par défaut,
  * pas sur celui du bot : le nettoyage hôte les y efface encore.
  */

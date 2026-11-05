@@ -1,6 +1,6 @@
 begin;
 
--- OHB-24 : une routine vise un bot (DM) XOR un salon. Meme xor que threads
+-- Une routine vise un bot (DM) XOR un salon. Meme xor que threads
 -- (`bot_id is not null <> group_id is not null`). Le tick ouvre un envoi de
 -- salon par le meme chemin qu'un message operateur (`initGroupSend`).
 

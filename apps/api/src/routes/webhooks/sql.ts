@@ -128,7 +128,7 @@ export async function readEndpointById(
 
 /** Serializes the quota check of an organization's endpoint creations. */
 export async function lockEndpointQuota(tx: TransactionDb, organizationId: string): Promise<void> {
-  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('ohb-webhook-endpoint-quota'))`;
+  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-webhook-endpoint-quota'))`;
 }
 
 export async function countLiveEndpoints(

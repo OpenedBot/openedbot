@@ -12,7 +12,7 @@ const realFetch = globalThis.fetch;
 const clients: QueryClient[] = [];
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/api/bots")) return Response.json({ bots: [], sections: [], groups: [], operator: null });

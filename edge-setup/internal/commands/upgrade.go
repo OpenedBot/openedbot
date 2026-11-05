@@ -345,7 +345,7 @@ func installedVersion(ctx context.Context, path string) string {
 // refreshes it; a symlink to another target is repointed), and forces the
 // pre-rename names (layout.ToolLegacyPathLink, layout.ToolAliasPath) to be a
 // symlink to it, so `hermes-setup status` still works after the edge-setup
-// rename (OHB-87). Unlike ToolPathLink, a regular file at one of these two
+// rename. Unlike ToolPathLink, a regular file at one of these two
 // is never an operator's copy to preserve: it is this tool's own pre-rename
 // binary (ToolInstallDir is tool-owned, and ToolLegacyPathLink shared the
 // exact path the old ensurePathLink already managed as a symlink), so
@@ -409,7 +409,7 @@ func adoptLegacyInstall(canonical, alias string) error {
 // promotedCanonicalCopies extends the canonical PATH copies written this
 // pass with a location that has nothing under the canonical name yet but
 // does have a regular file under the pre-rename name (an install from
-// before OHB-87, e.g. the bootstrap's `install … /usr/local/sbin/hermes-setup`):
+// before the edge-setup rename, e.g. the bootstrap's `install … /usr/local/sbin/hermes-setup`):
 // the canonical file is created there too, so legacyAliasTargets/
 // ensureLegacyPathAliases have something to alias the legacy name to,
 // instead of leaving it a stale copy of the old binary that never upgrades
@@ -458,7 +458,7 @@ func legacyAliasTargets(canonical, legacy []string, stat func(string) (fsx.Stat,
 // ensureLegacyPathAliases keeps each pre-rename PATH copy
 // (layout.ToolLegacyPathCopies) as a symlink to its edge-setup sibling
 // (layout.ToolPathCopies), so a script or a habit that still types
-// hermes-setup keeps running the same build (OHB-87). forceAliasAt (not
+// hermes-setup keeps running the same build. forceAliasAt (not
 // ensurePathLinkAt) converts a stale regular file left over from a
 // pre-rename install rather than leaving it in place.
 func ensureLegacyPathAliases() error {
@@ -491,7 +491,7 @@ func ensurePathLinkAt(link, target string) error {
 
 // forceAliasAt makes link a symlink to target unconditionally: unlike
 // ensurePathLinkAt, an existing regular file there is replaced rather than
-// left alone. Reserved for the OHB-87 legacy alias names, where a regular
+// left alone. Reserved for the edge-setup rename's legacy alias names, where a regular
 // file is never an operator's own copy to preserve, only this tool's stale
 // pre-rename binary left behind by an install that predates the rename.
 func forceAliasAt(link, target string) error {

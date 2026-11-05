@@ -213,9 +213,9 @@ describe("HermesClient over the relay transport", () => {
       ].join(""), { headers: { "content-type": "text/event-stream" } });
     });
     const client = new HermesClient({ transport });
-    const runId = await client.createRun({ input: "hi", instructions: "", sessionId: "s1", idempotencyKey: "ohb-run-1" });
+    const runId = await client.createRun({ input: "hi", instructions: "", sessionId: "s1", idempotencyKey: "openedbot-run-1" });
     expect(runId).toBe("run_1");
-    expect(requests[0]?.headers["idempotency-key"]).toBe("ohb-run-1");
+    expect(requests[0]?.headers["idempotency-key"]).toBe("openedbot-run-1");
     const events = [];
     for await (const event of client.events("run_1", new AbortController().signal)) events.push(event);
     expect(events.map((event) => event.sequence)).toEqual([1, undefined]);

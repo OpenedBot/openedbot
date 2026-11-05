@@ -148,7 +148,7 @@ describe("password sign-in e-mail code", () => {
       expect(accepted.status).toBe(200);
       if (door === "web") {
         expect(await accepted.json()).toMatchObject({ organizationId: "org-1", user: { id: "user-1", email: EMAIL } });
-        expect(accepted.headers.get("set-cookie")).toContain("ohb_session=");
+        expect(accepted.headers.get("set-cookie")).toContain("openedbot_session=");
         expect(f.sessions).toHaveLength(1);
       } else {
         const payload = await accepted.json() as { code?: string; redirectUri?: string };

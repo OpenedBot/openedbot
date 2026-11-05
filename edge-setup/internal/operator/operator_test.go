@@ -82,8 +82,8 @@ func call(t *testing.T, srv *httptest.Server, method, path, body string) (int, m
 
 func TestAddCredentialKeyOnStdinOnlyAndProvenOnCatalogue(t *testing.T) {
 	_, fake, srv := newServer(t, catalogueOK)
-	status, out := call(t, srv, "POST", "/providers/anthropic/credentials", `{"apiKey":"sk-secret-123","label":"ohb-test"}`)
-	if status != 200 || out["verification"] != "confirmed" || out["label"] != "ohb-test" {
+	status, out := call(t, srv, "POST", "/providers/anthropic/credentials", `{"apiKey":"sk-secret-123","label":"openedbot-test"}`)
+	if status != 200 || out["verification"] != "confirmed" || out["label"] != "openedbot-test" {
 		t.Fatalf("%d %v", status, out)
 	}
 	if len(fake.Calls) != 1 {
@@ -96,7 +96,7 @@ func TestAddCredentialKeyOnStdinOnlyAndProvenOnCatalogue(t *testing.T) {
 	if string(c.Stdin) != "sk-secret-123\n" {
 		t.Fatalf("stdin %q", c.Stdin)
 	}
-	for _, want := range []string{"/usr/sbin/runuser -u hermes", "hermes auth add anthropic --type api-key --label ohb-test"} {
+	for _, want := range []string{"/usr/sbin/runuser -u hermes", "hermes auth add anthropic --type api-key --label openedbot-test"} {
 		if !strings.Contains(c.String(), want) {
 			t.Fatalf("argv %s lacks %q", c, want)
 		}
@@ -106,7 +106,7 @@ func TestAddCredentialKeyOnStdinOnlyAndProvenOnCatalogue(t *testing.T) {
 func TestAddCredentialVerdicts(t *testing.T) {
 	_, _, srv := newServer(t, catalogueOK)
 	status, out := call(t, srv, "POST", "/providers/openai-codex/credentials", `{"apiKey":"k"}`)
-	if status != 200 || out["verification"] != "denied" || !strings.HasPrefix(out["label"].(string), "ohb-") {
+	if status != 200 || out["verification"] != "denied" || !strings.HasPrefix(out["label"].(string), "openedbot-") {
 		t.Fatalf("%d %v", status, out)
 	}
 	status, out = call(t, srv, "POST", "/providers/absent/credentials", `{"apiKey":"k"}`)

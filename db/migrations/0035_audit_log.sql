@@ -33,7 +33,7 @@ begin;
 -- quel tenant les lignes de tous les autres. `security_invoker = true`
 -- (PostgreSQL 15+, déjà requis par la syntaxe `on delete set null (col)` de
 -- 0011) rend la vue transparente : chaque table sous-jacente applique sa
--- propre politique à l'APPELANT, et `ohb_api` avec `app.organization_id` posé
+-- propre politique à l'APPELANT, et `openedbot_api` avec `app.organization_id` posé
 -- ne voit que ses propres lignes.
 create view audit_log
 with (security_invoker = true)
@@ -141,10 +141,10 @@ comment on view audit_log is
 -- `audit_log` ne verra donc AUCUNE ligne `staff_impersonation` ; seul le staff
 -- les voit, via la fonction ci-dessous. Ouvrir cette source aux admins du
 -- tenant est une décision distincte (elle rendrait la ligne, condensat inclus,
--- visible au rôle `ohb_api` sous `app.organization_id`), qui appartient à la
+-- visible au rôle `openedbot_api` sous `app.organization_id`), qui appartient à la
 -- migration propriétaire de cette table, pas à celle-ci.
 
-grant select on audit_log to ohb_api;
+grant select on audit_log to openedbot_api;
 
 -- Le backoffice staff lit le journal tous tenants confondus. Le préambule de
 -- garde est celui de `staff_operational_metrics()` (0023_staff.sql), mot pour
@@ -209,7 +209,7 @@ comment on function staff_audit_log(int, timestamptz) is
   'Journal d''audit unifié servi au backoffice staff, les plus récents d''abord. Pagination par curseur temporel : `p_before` reprend le `occurred_at` de la dernière ligne rendue. `p_limit` est borné à 1000.';
 
 revoke all on function staff_audit_log(int, timestamptz) from public;
-grant execute on function staff_audit_log(int, timestamptz) to ohb_api;
+grant execute on function staff_audit_log(int, timestamptz) to openedbot_api;
 
 insert into schema_migrations(version) values ('0035_audit_log')
 on conflict (version) do nothing;

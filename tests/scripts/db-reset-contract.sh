@@ -33,7 +33,7 @@ run_reset() {
   PATH="$fake_bin:/usr/bin:/bin" \
     FAKE_DOCKER_EVENTS="$docker_events" \
     OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
-    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/openedbot \
     /bin/bash scripts/db.sh --reset "$@"
 }
 
@@ -67,11 +67,11 @@ assert_no_docker_call "dry run"
 assert_plan_contains() {
   grep -qF -- "$1" "$plan_output" || fail "dry-run SQL must contain '$1'; got: $(cat "$plan_output")"
 }
-assert_plan_contains 'drop database if exists "ohb"'
-assert_plan_contains 'create database "ohb"'
+assert_plan_contains 'drop database if exists "openedbot"'
+assert_plan_contains 'create database "openedbot"'
 assert_plan_contains 'pg_terminate_backend'
-assert_plan_contains 'revoke connect on database "ohb"'
-assert_plan_contains 'grant connect on database "ohb"'
+assert_plan_contains 'revoke connect on database "openedbot"'
+assert_plan_contains 'grant connect on database "openedbot"'
 assert_plan_contains 'template template0'
 if grep -qF -- 'down -v' "$plan_output"; then
   fail "dry-run SQL must not contain 'down -v'."
@@ -85,7 +85,7 @@ if grep -qiE 'drop (role|database if exists "(devhub|postgres|template[01])")' "
 fi
 
 # 3. A system or malformed database name is refused before any docker call.
-for bad_name in postgres template0 'ohb"; drop database devhub; --' 'Weird Name'; do
+for bad_name in postgres template0 'openedbot"; drop database devhub; --' 'Weird Name'; do
   if PATH="$fake_bin:/usr/bin:/bin" FAKE_DOCKER_EVENTS="$docker_events" \
       API_DATABASE_URL="postgres://openedbot_api@127.0.0.1:5432/$bad_name" \
       /bin/bash scripts/db.sh --reset --yes --dry-run >/dev/null 2>&1; then

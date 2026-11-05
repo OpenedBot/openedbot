@@ -60,7 +60,7 @@ function renderTimeline(event: StoredProductEvent, run: Record<string, unknown> 
   return router;
 }
 
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(cleanup);
 
 describe("bulle d'un échec dans le fil", () => {

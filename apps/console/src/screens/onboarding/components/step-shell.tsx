@@ -13,7 +13,7 @@ import { StepProgressBar, StepSidebar } from "./step-sidebar";
  */
 export const STEP_COLUMN = "mx-auto flex min-h-full w-full max-w-[28rem] flex-col";
 export const STEP_GUTTER =
-  "px-6 pt-8 pb-[max(2rem,var(--ohb-safe-bottom))] sm:px-10 lg:px-14 lg:pt-10 lg:pb-[max(2.5rem,var(--ohb-safe-bottom))]";
+  "px-6 pt-8 pb-[max(2rem,var(--openedbot-safe-bottom))] sm:px-10 lg:px-14 lg:pt-10 lg:pb-[max(2.5rem,var(--openedbot-safe-bottom))]";
 
 /**
  * Le titre d'une étape et sa ligne d'appui.

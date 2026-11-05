@@ -72,19 +72,19 @@ mac:
   # enforces library validation, which rejects the Electron frameworks.
   identity: "-"
   hardenedRuntime: false
-  # Registers ohb:// with Launch Services so the Google return lands here.
+  # Registers openedbot:// with Launch Services so the Google return lands here.
   protocols:
     - name: openedbot
       schemes:
-        - ohb
+        - openedbot
   # The popup (openedbot Notch) is built in its own repository,
   # OpenedBot/openedbot-notch (`make -C $NOTCH_DIR bundle`), and embedded as
   # is, never as source: `make package-mac` checks it and stages it in
-  # popup-bundle/. src/main/popup-host.ts runs Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup
+  # popup-bundle/. src/main/popup-host.ts runs Contents/Helpers/OpenedbotPopup.app/Contents/MacOS/OpenedbotPopup
   # with --hosted. extraFiles is relative to Contents/ on macOS.
   extraFiles:
-    - from: popup-bundle/OHBPopup.app
-      to: Helpers/OHBPopup.app
+    - from: popup-bundle/OpenedbotPopup.app
+      to: Helpers/OpenedbotPopup.app
 
 # Linux x64: an AppImage (any distribution, nothing to install) and a .deb
 # (Debian, Ubuntu). Unsigned. The window, tray and menus follow the Windows
@@ -111,12 +111,12 @@ linux:
   # The .deb control file needs a maintainer; package.json has no author.
   maintainer: openedbot <no-reply@openedbot.app>
   vendor: openedbot
-  # The .desktop entry declares x-scheme-handler/ohb, so the desktop opens the
-  # Google return (ohb://auth/callback) with this app once it is installed
+  # The .desktop entry declares x-scheme-handler/openedbot, so the desktop opens the
+  # Google return (openedbot://auth/callback) with this app once it is installed
   # (.deb, or an AppImage integrated by the desktop). Otherwise
   # setAsDefaultProtocolClient fails and src/main/deep-link.ts falls back to the
   # loopback callback.
   protocols:
     - name: openedbot
       schemes:
-        - ohb
+        - openedbot

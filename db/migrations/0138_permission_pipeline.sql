@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-1 (DEV-OHB-251): the permission pipeline of US-PERM2 behind a flag.
+-- PERM2-1: the permission pipeline of US-PERM2 behind a flag.
 --
 -- `organizations.permission_pipeline` chooses who answers a gate: `legacy`
 -- keeps today's heuristic (`workerMayApproveGate`), `v2` runs the pipeline
@@ -226,7 +226,7 @@ comment on function staff_set_permission_pipeline(uuid, text) is
   'Switches an organization between the legacy permission heuristic and the v2 pipeline (PERM2-1). Refuses v2 (workers_not_ready, runs_in_flight) while an old worker or a leased run could answer a gate the old way; back to legacy, returns undelivered policy decisions to a human. Guarded by app.staff_user_id.';
 
 revoke all on function staff_set_permission_pipeline(uuid, text) from public;
-grant execute on function staff_set_permission_pipeline(uuid, text) to ohb_api;
+grant execute on function staff_set_permission_pipeline(uuid, text) to openedbot_api;
 
 insert into schema_migrations(version) values ('0138_permission_pipeline');
 commit;

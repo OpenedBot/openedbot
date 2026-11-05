@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { listMailpitMessageIds, readMailpitLoginCode } from "../../../scripts/lib/password-login";
 
 const ORIGIN = "http://localhost:1420";
-const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@ohb.local";
+const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@openedbot.local";
 const PASSWORD = process.env.E2E_PASSWORD || (() => { throw new Error("E2E_PASSWORD is not set: run `make setup` (it generates one in .env.local), or export it."); })();
 const OUT = join(import.meta.dir, "../../../tmp/pwa-chromium");
 
@@ -106,7 +106,7 @@ async function main() {
     (/Runtime enregistré/.test(runtimeText) || /Aucun Edge/.test(runtimeText));
   record(
     "settings/runtime",
-    runtimeIntro && !/n’est pas administrée par OHB/.test(runtimeText),
+    runtimeIntro && !/n’est pas administrée par openedbot/.test(runtimeText),
     `${/Runtime enregistré/.test(runtimeText) ? "runtime seed enregistré" : "intro vide"} ${runtimeShot}`,
   );
   await assertNoFleetCopy(page, "settings/runtime: copy");
@@ -120,7 +120,7 @@ async function main() {
   const installCardShot = await shot(page, "04-sidebar-install-card");
   const installCard = await page
     .locator('[data-slot="sidebar"] [role="alert"]')
-    .filter({ hasText: /Installer OHB|Déjà ouverte|Installation indisponible/ })
+    .filter({ hasText: /Installer openedbot|Déjà ouverte|Installation indisponible/ })
     .count();
   record(
     "barre latérale : la carte d'installation dit où en est l'installation",

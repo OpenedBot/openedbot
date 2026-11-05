@@ -386,7 +386,7 @@ function IndexPending() {
   const { t } = useT();
   const isMobile = useIsMobile();
   return (
-    <div className="ohb-salon-shell relative flex min-h-0 flex-1 flex-col">
+    <div className="openedbot-salon-shell relative flex min-h-0 flex-1 flex-col">
       <SiteHeader title={t("overviewPlaceholder.nav")} heading={isMobile} align="center" root />
     </div>
   );
@@ -445,7 +445,7 @@ function IndexRoute() {
   // L'en-tête vit dans l'écran : sur téléphone il porte le « + » qui ouvre la
   // même feuille « Nouveau bot » que la scène, et lit le défilement de celle-ci.
   return (
-    <div className="ohb-salon-shell relative flex min-h-0 flex-1 flex-col">
+    <div className="openedbot-salon-shell relative flex min-h-0 flex-1 flex-col">
       <OverviewScreen />
     </div>
   );
@@ -689,7 +689,7 @@ const teamSettingsRoute = createRoute({
   component: SETTINGS_SECTIONS["/settings/team"],
 });
 
-/** The agency's own pages: its clients (mandates, invitations) and its journal (DEV-OHB-238, DEV-OHB-239). */
+/** The agency's own pages: its clients (mandates, invitations) and its journal. */
 const fleetClientsSettingsRoute = createRoute({
   getParentRoute: () => settingsFrameRoute,
   path: "/clients",
@@ -1037,7 +1037,7 @@ const routeTree = rootRoute.addChildren([
   ]),
 ]);
 
-/** Le temps de la transition, `data-ohb-vt` sur <html> choisit push ou pop (`mobile.css`). */
+/** Le temps de la transition, `data-openedbot-vt` sur <html> choisit push ou pop (`mobile.css`). */
 const VIEW_TRANSITION_RESET_MS = 400;
 
 /**
@@ -1096,11 +1096,11 @@ export const router = createRouter({
       const direction = mobileTransition(fromLocation?.pathname, toLocation.pathname);
       if (direction === null) return false;
       const root = document.documentElement;
-      root.setAttribute("data-ohb-vt", direction);
+      root.setAttribute("data-openedbot-vt", direction);
       window.setTimeout(() => {
-        if (root.getAttribute("data-ohb-vt") === direction) root.removeAttribute("data-ohb-vt");
+        if (root.getAttribute("data-openedbot-vt") === direction) root.removeAttribute("data-openedbot-vt");
       }, VIEW_TRANSITION_RESET_MS);
-      return [`ohb-${direction}`];
+      return [`openedbot-${direction}`];
     },
   },
 });

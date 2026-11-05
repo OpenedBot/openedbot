@@ -83,7 +83,7 @@ function StepRow({ step, last }: { step: TaskStep; last: boolean }) {
           step.state === "failed" ? "text-destructive-text" : "text-muted-foreground",
         )}
       >
-        <span className={step.state === "running" ? "ohb-agent-label" : undefined}>{step.label}</span>
+        <span className={step.state === "running" ? "openedbot-agent-label" : undefined}>{step.label}</span>
         {step.chips?.map((chip, index) => <Chip key={index} chip={chip} />)}
         {step.meta ? (
           <span className="ml-2 shrink-0 tabular-nums text-muted-foreground/80">{step.meta}</span>
@@ -123,7 +123,7 @@ function TaskSection({ task }: { task: Task }) {
             {task.icon}
           </span>
         ) : null}
-        <span className={cn("min-w-0 truncate text-body-medium text-muted-foreground", task.state === "running" && "ohb-agent-label")}>
+        <span className={cn("min-w-0 truncate text-body-medium text-muted-foreground", task.state === "running" && "openedbot-agent-label")}>
           {task.title}
         </span>
         {task.meta ? (

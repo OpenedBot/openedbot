@@ -1,5 +1,5 @@
 /**
- * Dev-only performance probe for the conversation thread (OHB-88).
+ * Dev-only performance probe for the conversation thread.
  *
  * Framework-free measurement logic: no React, no DOM writes outside the
  * bookkeeping this file owns. `thread-perf-hud.tsx` is the only consumer
@@ -9,7 +9,7 @@
  * computed only through `refreshContext()`, called lazily by the HUD.
  *
  * Chromium's Long Animation Frames API (`long-animation-frame`) is what
- * proved the OHB-88 regression: a `forcedStyleAndLayoutDuration` of
+ * proved the send regression: a `forcedStyleAndLayoutDuration` of
  * 308 ms attributed to a specific script inside the Enter handler, which
  * a plain `longtask` entry cannot name. `PerformanceLongAnimationFrameTiming`
  * is not yet in TypeScript's `lib.dom.d.ts`, hence the local types below
@@ -31,11 +31,11 @@ export type ThreadPerfBudgets = {
   typingMutations: number;
   /** Worst long-frame duration per 10 s streaming window. */
   streamingFrameMs: number;
-  /** OHB-107: Send -> 202 (local admission, network included). */
+  /** Send -> 202 (local admission, network included). */
   acceptedMs: number;
-  /** OHB-107: Send -> first SSE event of the accepted run. */
+  /** Send -> first SSE event of the accepted run. */
   firstEventMs: number;
-  /** OHB-107: Send -> first `agent.message` of the accepted run. */
+  /** Send -> first `agent.message` of the accepted run. */
   firstTextMs: number;
 };
 
@@ -113,7 +113,7 @@ export type SendSample = {
   longFramesPass: boolean;
   /** Renders committed during the send's 2 s window, worst `actualMs` first. */
   renders: RenderSample[];
-  /** OHB-107 run marks, all ms from the same trigger. Null until observed. */
+  /** Run latency marks, all ms from the same trigger. Null until observed. */
   run: SendRunLatency;
 };
 
@@ -171,7 +171,7 @@ export type ThreadPerfSnapshot = {
 };
 
 /**
- * Shape published on `window.__ohbThreadPerf`: the snapshot, `reset()`, and
+ * Shape published on `window.__openedbotThreadPerf`: the snapshot, `reset()`, and
  * `recordRender` - the registry `DevRenderProfiler` writes to without ever
  * importing this module. `undefined` (optional chained away) whenever the
  * HUD isn't mounted, so wrapping a component in `DevRenderProfiler` costs
@@ -180,9 +180,9 @@ export type ThreadPerfSnapshot = {
 export type ThreadPerfGlobal = ThreadPerfSnapshot & {
   reset: () => void;
   recordRender: (id: string, phase: string, actualDuration: number, commitTime: number) => void;
-  /** Forwarded by `applySendAcceptedToCaches` (OHB-107). */
+  /** Forwarded by `applySendAcceptedToCaches`. */
   recordRunAccepted: (runId: string) => void;
-  /** Forwarded by the organization SSE stream on every received event (OHB-107). */
+  /** Forwarded by the organization SSE stream on every received event. */
   recordRunEvent: (runId: string, type: string) => void;
 };
 
@@ -489,7 +489,7 @@ export class ThreadPerfProbe {
     this.notify();
   }
 
-  /** Forwarded by `DevRenderProfiler` through `window.__ohbThreadPerf.recordRender`. */
+  /** Forwarded by `DevRenderProfiler` through `window.__openedbotThreadPerf.recordRender`. */
   recordRender(id: string, phase: string, actualDuration: number, commitTime: number): void {
     this.recentRenders.push({ id, phase, actualMs: actualDuration, commitTime });
     if (this.recentRenders.length > MAX_RENDERS) this.recentRenders.shift();
@@ -576,7 +576,7 @@ export class ThreadPerfProbe {
   private tryCompleteSend(pending: NonNullable<ThreadPerfProbe["pendingSend"]>): void {
     if (pending.resolved || pending.composerEmptiedAt === null || pending.bubbleInsertedAt === null) return;
     pending.resolved = true;
-    // Double rAF after the bubble insertion, per the OHB-88 budget definition
+    // Double rAF after the bubble insertion, per the send budget definition
     // (insertion + two frames = "painted").
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -607,7 +607,7 @@ export class ThreadPerfProbe {
     if (this.pendingSend?.id === id) this.pendingSend = null;
   }
 
-  // -- Run latency (OHB-107) -------------------------------------------------
+  // -- Run latency -------------------------------------------------
 
   recordRunAccepted(runId: string): void {
     const early = this.earlyRuns.get(runId);
@@ -775,24 +775,24 @@ export class ThreadPerfProbe {
 }
 
 // ---------------------------------------------------------------------------
-// window.__ohbThreadPerf wiring
+// window.__openedbotThreadPerf wiring
 // ---------------------------------------------------------------------------
 
 declare global {
   interface Window {
-    __ohbThreadPerf?: ThreadPerfGlobal;
+    __openedbotThreadPerf?: ThreadPerfGlobal;
   }
 }
 
 /**
  * Creates the probe, starts it, and publishes a plain JSON-serializable
- * snapshot on `window.__ohbThreadPerf` (kept fresh on every observer
+ * snapshot on `window.__openedbotThreadPerf` (kept fresh on every observer
  * notification) so browser automation can read it with one eval.
  */
 export function installThreadPerfProbe(win: Window = window): ThreadPerfProbe {
   const probe = new ThreadPerfProbe();
   const publish = () => {
-    win.__ohbThreadPerf = {
+    win.__openedbotThreadPerf = {
       ...probe.getSnapshot(),
       reset: () => probe.reset(),
       recordRender: (id, phase, actualDuration, commitTime) => probe.recordRender(id, phase, actualDuration, commitTime),

@@ -72,7 +72,7 @@ export function BotsDisclosure({
       aria-label={ariaLabel}
       aria-expanded={open}
       onClick={onToggle}
-      className="ohb-press -ms-1.5 mt-1 inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+      className="openedbot-press -ms-1.5 mt-1 inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
     >
       <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} aria-hidden />
       {label}

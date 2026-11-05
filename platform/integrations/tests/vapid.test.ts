@@ -6,7 +6,7 @@ const PUBLIC_KEY = Buffer.alloc(65, 7);
 PUBLIC_KEY[0] = 0x04;
 const PUBLIC_B64 = Buffer.from(PUBLIC_KEY).toString("base64url");
 const PRIVATE_B64 = Buffer.alloc(32, 9).toString("base64url");
-const SUBJECT = "mailto:ops@ohb.example";
+const SUBJECT = "mailto:ops@openedbot.example";
 
 describe("readVapidConfig", () => {
   test("absentes toutes les trois : fonctionnalité éteinte", () => {
@@ -68,16 +68,16 @@ describe("parseVapidConfig", () => {
     expect(() => parseVapidConfig({
       publicKey: PUBLIC_B64,
       privateKey: PRIVATE_B64,
-      subject: "http://ohb.example",
+      subject: "http://openedbot.example",
     })).toThrow(/mailto/);
   });
 });
 
 describe("isVapidSubject", () => {
   test("accepte mailto et https, refuse le reste", () => {
-    expect(isVapidSubject("mailto:ops@ohb.example")).toBe(true);
-    expect(isVapidSubject("https://ohb.example/push")).toBe(true);
-    expect(isVapidSubject("http://ohb.example")).toBe(false);
-    expect(isVapidSubject("ops@ohb.example")).toBe(false);
+    expect(isVapidSubject("mailto:ops@openedbot.example")).toBe(true);
+    expect(isVapidSubject("https://openedbot.example/push")).toBe(true);
+    expect(isVapidSubject("http://openedbot.example")).toBe(false);
+    expect(isVapidSubject("ops@openedbot.example")).toBe(false);
   });
 });

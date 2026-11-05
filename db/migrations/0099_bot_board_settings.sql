@@ -1,7 +1,7 @@
 -- The agent editor (BoardUI template): per-bot label, reply language,
 -- finish notification, speech rate and permission mode.
 --
--- permission_mode is an OHB policy, not the host's `approvals.mode` (the host
+-- permission_mode is an openedbot policy, not the host's `approvals.mode` (the host
 -- keeps `manual`, edge-setup SecurityDefaults): `manual` leaves every approval
 -- to the operator, `auto` and `bypass` let the worker answer them for this
 -- bot's runs, `plan` asks the bot for a plan before it acts.

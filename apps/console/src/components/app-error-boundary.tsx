@@ -96,7 +96,7 @@ export class AppErrorBoundary extends Component<BoundaryProps, BoundaryState> {
   override componentDidCatch(error: unknown, info: unknown) {
     // La pile complète va dans la console, jamais à l'écran : elle nomme nos
     // fichiers et nos composants, ce qui n'aide pas celui qui lit la page.
-    console.error("[ohb] rendu interrompu", error, info);
+    console.error("[openedbot] rendu interrompu", error, info);
   }
 
   override render() {

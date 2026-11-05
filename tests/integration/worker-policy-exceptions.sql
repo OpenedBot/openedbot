@@ -1,4 +1,4 @@
--- Les policies ohb_worker en using (true), livrees par 0001 a 0088 et reduites
+-- Les policies openedbot_worker en using (true), livrees par 0001 a 0088 et reduites
 -- par 0080_worker_least_privilege.
 --
 -- Piege du fichier appelant : pas d apostrophe isolee dans les commentaires.
@@ -17,7 +17,7 @@ select
   (select string_agg(tablename, ',' order by tablename)
      from pg_policies
     where schemaname = 'public'
-      and 'ohb_worker' = any (roles)
+      and 'openedbot_worker' = any (roles)
       and qual = 'true')
   || '|' ||
   (select count(*)
@@ -26,7 +26,7 @@ select
                        'message_reactions', 'support_messages',
                        'mobile_connect_tickets', 'audit_chain',
                        'audit_worm_orphans']) as t(name)
-    where not has_table_privilege('ohb_worker', 'public.' || t.name, 'select, insert, update, delete')
+    where not has_table_privilege('openedbot_worker', 'public.' || t.name, 'select, insert, update, delete')
       and not exists (select from pg_policies p
                        where p.schemaname = 'public' and p.tablename = t.name
-                         and 'ohb_worker' = any (p.roles)))::text;
+                         and 'openedbot_worker' = any (p.roles)))::text;

@@ -67,7 +67,7 @@ function renderLanding() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = href(input);
     if (url.includes("/api/bots")) {

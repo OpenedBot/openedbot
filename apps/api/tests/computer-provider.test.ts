@@ -46,7 +46,7 @@ describe("Computer providers", () => {
       if (url.pathname.endsWith("/boxes") && method === "GET") return json({ boxes: box ? [box] : [] });
       if (url.pathname.endsWith("/boxes") && method === "POST") {
         expect(JSON.parse(String(init?.body))).toEqual({ ttlSeconds: 28_800, noEnv: true });
-        expect(headers.get("Idempotency-Key")).toMatch(/^ohb-computer-/);
+        expect(headers.get("Idempotency-Key")).toMatch(/^openedbot-computer-/);
         box = { id: "box-1", name: "pending", state: "starting" };
         return json({ box });
       }
@@ -137,7 +137,7 @@ describe("Computer providers", () => {
     const provider = new BoxComputerProvider(config, async (input, init) => {
       const url = new URL(String(input));
       if ((init?.method ?? "GET") === "GET" && url.pathname.endsWith("/boxes")) {
-        return json({ boxes: [{ id: "box-1", name: "ohb-ignored", state: "ready" }] });
+        return json({ boxes: [{ id: "box-1", name: "openedbot-ignored", state: "ready" }] });
       }
       if ((init?.method ?? "GET") === "GET" && url.pathname.endsWith("/boxes/box-1")) {
         return json({ box: { id: "box-1", state: "ready" } });

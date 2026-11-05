@@ -4,7 +4,7 @@
  *
  * La production exigeait R2 et refusait le disque. Mais le provisionnement pose
  * des valeurs neutralisées tant que R2 n'est pas ouvert (`https://r2.invalid`,
- * `alpha-r2-not-provisioned`, rôle Ansible `ohb_alpha`) : l'API démarrait, puis
+ * `alpha-r2-not-provisioned`, rôle Ansible `openedbot_alpha`) : l'API démarrait, puis
  * chaque envoi de fichier finissait en 500 sur un échec DNS. Le repli par défaut
  * est donc le volume, annoncé à chaque démarrage (`fallbackReason`), jamais
  * silencieux. R2 reprend la main dès que ses quatre valeurs sont réelles.
@@ -13,8 +13,8 @@
 /** Les valeurs posées par le provisionnement tant que R2 n'est pas ouvert. */
 export const R2_PLACEHOLDER_VALUES: ReadonlySet<string> = new Set(["alpha-r2-not-provisioned"]);
 
-/** Le volume monté par la composition de production (`infra/shuttle/ohb-console`). */
-export const PRODUCTION_FILE_BLOB_ROOT = "/var/lib/ohb/blobs";
+/** Le volume monté par la composition de production (`infra/shuttle/openedbot-console`). */
+export const PRODUCTION_FILE_BLOB_ROOT = "/var/lib/openedbot/blobs";
 
 export type BlobDriverChoice = {
   driver: "file" | "r2";

@@ -40,8 +40,8 @@ begin
 end
 $$;
 
-grant select, insert, update on runtime_proof to ohb_api;
-set role ohb_api;
+grant select, insert, update on runtime_proof to openedbot_api;
+set role openedbot_api;
 -- \g /dev/null : le verdict doit rester la SEULE ligne de sortie.
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update runtime_proof set cross_tenant = (select count(*) from runtimes);

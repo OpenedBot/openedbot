@@ -16,7 +16,7 @@ import { threadQueryOptions } from "../stream/use-thread-stream";
  * saw for the bot. A stale hint costs one unused read: the screen still opens
  * the thread named by the roster, exactly as before.
  */
-const HINT_PREFIX = "ohb:bot-thread:";
+const HINT_PREFIX = "openedbot:bot-thread:";
 
 function hintKey(botId: string): string | null {
   const organizationId = activeOrganizationId();

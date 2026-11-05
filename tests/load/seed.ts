@@ -1,12 +1,12 @@
 /**
- * Seeds the disposable `ohb_load` database for one bench run: LOAD_ORGANIZATIONS
+ * Seeds the disposable `openedbot_load` database for one bench run: LOAD_ORGANIZATIONS
  * organizations, each with its owner, an active subscription, one direct
  * runtime pointed at the fake Hermes, LOAD_BOTS_PER_ORGANIZATION bots with one
  * thread each, and enough native sessions to reach the LOAD_SESSIONS tier.
  *
  * The runtime bearer is encrypted with the same RUNTIME_TOKEN_ENCRYPTION_KEY the
  * API and the workers receive from run.sh, under the key id they will look up.
- * Refuses any database that is not exactly `ohb_load`.
+ * Refuses any database that is not exactly `openedbot_load`.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { SQL } from "bun";
@@ -22,8 +22,8 @@ const tier = readTier(process.env.LOAD_SESSIONS);
 const organizations = Number(process.env.LOAD_ORGANIZATIONS ?? 50);
 const botsPerOrganization = Number(process.env.LOAD_BOTS_PER_ORGANIZATION ?? 4);
 
-if (!databaseUrl || new URL(databaseUrl).pathname !== "/ohb_load") {
-  throw new Error("LOAD_DATABASE_URL must target the exact ohb_load database.");
+if (!databaseUrl || new URL(databaseUrl).pathname !== "/openedbot_load") {
+  throw new Error("LOAD_DATABASE_URL must target the exact openedbot_load database.");
 }
 if (!manifestPath) throw new Error("LOAD_MANIFEST is required.");
 if (!endpoint || !token) throw new Error("LOAD_HERMES_URL and LOAD_HERMES_TOKEN are required.");
@@ -46,7 +46,7 @@ try {
       await tx`select set_config('app.organization_id', ${organizationId}, true)`;
       await tx`
         insert into users (id, email, display_name)
-        values (${userId}, ${`load-${index}@ohb.local`}, ${`Load ${index}`})
+        values (${userId}, ${`load-${index}@openedbot.local`}, ${`Load ${index}`})
       `;
       await tx`
         insert into organizations (id, slug, name, kind)

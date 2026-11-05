@@ -88,7 +88,7 @@ export function BoardFrame({ children, overlay, sidebar }: {
       </>
     );
   }
-  // `DevRenderProfiler` (dev only, OHB-141): the perf HUD attributes a render
+  // `DevRenderProfiler` (dev only): the perf HUD attributes a render
   // to the bar, the frame chrome or the agent editor, not only to the thread.
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 overflow-clip bg-background-full text-text-primary">

@@ -41,7 +41,7 @@ insert into password_reset_proof values (
   'unset', 'unset', 'unset', -1, 'unset', -1, 'unset', 'unset', 'unset', 'unset', -1, 'unset', 'unset'
 );
 
-grant select, insert, update on password_reset_proof to ohb_api;
+grant select, insert, update on password_reset_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('b0000000-0000-4000-8000-000000000001', 'reset-staff@example.test', 'x', 'Reset Staff');
@@ -80,7 +80,7 @@ insert into sessions (
   ('b3000000-0000-4000-8000-000000000004', 'b1000000-0000-4000-8000-000000000001',
    'b2000000-0000-4000-8000-000000000002', 'web', 'reset-session-4', now() + interval '1 day', null);
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', 'b0000000-0000-4000-8000-000000000001', false) \g /dev/null
 
 -- 1. Le geste passe : verdict, sessions fermees, hachage et drapeau.
@@ -93,7 +93,7 @@ update password_reset_proof
            )
        );
 
--- Les lectures qui suivent passent par le proprietaire des tables : ohb_api ne
+-- Les lectures qui suivent passent par le proprietaire des tables : openedbot_api ne
 -- peut pas relire sessions hors de ses portes RLS, et ce n est pas le sujet.
 reset role;
 update password_reset_proof
@@ -120,7 +120,7 @@ update password_reset_proof
            from users where id = 'b2000000-0000-4000-8000-000000000001'
        );
 
-set role ohb_api;
+set role openedbot_api;
 -- 3 et 4. Les deux refus, et ce qu ils n ont PAS ecrit.
 update password_reset_proof
    set google_status = (

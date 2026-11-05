@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { buildId } from "../../vite-build-id";
 
 function repo(): string {
-  const root = mkdtempSync(join(tmpdir(), "ohb-build-id-"));
+  const root = mkdtempSync(join(tmpdir(), "openedbot-build-id-"));
   execFileSync("git", ["init", "-q"], { cwd: root });
   mkdirSync(join(root, "apps/console/src"), { recursive: true });
   writeFileSync(join(root, "apps/console/src/main.ts"), "export const a = 1;\n");

@@ -401,18 +401,18 @@ cmd_modes() {
   fi
   printf '%s\n' "$remote_status" | awk '
     /^connector/ {
-      name = $2; active = ""; ohb = ""; runtime = "";
+      name = $2; active = ""; openedbot = ""; runtime = "";
       for (i = 3; i <= NF; i++) {
         eq = index($i, "=");
         if (eq == 0) continue;
         key = substr($i, 1, eq - 1); value = substr($i, eq + 1);
         if (key == "active") active = value;
-        else if (key == "ohb") ohb = value;
+        else if (key == "openedbot") openedbot = value;
         else if (key == "runtime") runtime = value;
       }
-      mode = (ohb ~ /^https:/) ? "production" : "dev (ce poste, par le tunnel)";
+      mode = (openedbot ~ /^https:/) ? "production" : "dev (ce poste, par le tunnel)";
       state = (active == "true") ? "unité active" : "unité arrêtée";
-      printf "  %-9s %-30s %-14s %s\n", name, mode, state, ohb;
+      printf "  %-9s %-30s %-14s %s\n", name, mode, state, openedbot;
       if (runtime != "") printf "  %-9s runtime %s\n", "", runtime;
     }'
 

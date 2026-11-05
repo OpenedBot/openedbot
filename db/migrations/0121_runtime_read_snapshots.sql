@@ -27,13 +27,13 @@ comment on table runtime_read_snapshots is
 
 alter table runtime_read_snapshots enable row level security;
 alter table runtime_read_snapshots force row level security;
-create policy runtime_read_snapshots_tenant on runtime_read_snapshots to ohb_api
+create policy runtime_read_snapshots_tenant on runtime_read_snapshots to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
 revoke all on runtime_read_snapshots from public;
-revoke all on runtime_read_snapshots from ohb_worker;
-grant select, insert, update, delete on runtime_read_snapshots to ohb_api;
+revoke all on runtime_read_snapshots from openedbot_worker;
+grant select, insert, update, delete on runtime_read_snapshots to openedbot_api;
 
 insert into schema_migrations(version) values ('0121_runtime_read_snapshots');
 commit;

@@ -22,7 +22,7 @@ export { PRODUCTION_API_ORIGIN, PRODUCTION_CONSOLE_URL };
 const DEFAULTS: DesktopConfig = {
   consoleUrl: PRODUCTION_CONSOLE_URL,
   apiOrigin: PRODUCTION_API_ORIGIN,
-  clientId: "ohb-desktop-windows",
+  clientId: "openedbot-desktop-windows",
   signinTemplate: "console-split",
 };
 

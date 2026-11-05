@@ -10,7 +10,7 @@ export type AccountLayout = "base" | "a" | "b" | "c";
 export const ACCOUNT_LAYOUTS: readonly AccountLayout[] = ["base", "a", "b", "c"];
 export const DEFAULT_ACCOUNT_LAYOUT: AccountLayout = "c";
 
-const STORAGE_KEY = "ohb:accountLayout";
+const STORAGE_KEY = "openedbot:accountLayout";
 
 function isAccountLayout(value: string | null): value is AccountLayout {
   return value !== null && ACCOUNT_LAYOUTS.includes(value as AccountLayout);

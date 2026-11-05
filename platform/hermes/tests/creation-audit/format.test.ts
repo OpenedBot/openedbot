@@ -95,7 +95,7 @@ describe("audit de création scellé : vecteurs partagés avec edge-setup", () =
   });
 
   test("un magic, une version ou une suite inconnus sont AUDIT_FORMAT_INVALID", () => {
-    expect(() => parseCreationAuditHeader(new TextEncoder().encode("OHBAUDT1garbage-garbage"))).toThrow(expect.objectContaining({ code: "AUDIT_FORMAT_INVALID" }));
+    expect(() => parseCreationAuditHeader(new TextEncoder().encode("OBAUDIT1garbage-garbage"))).toThrow(expect.objectContaining({ code: "AUDIT_FORMAT_INVALID" }));
     const suite2 = new Uint8Array(sealed);
     suite2[9] = 0x02;
     expect(() => parseCreationAuditHeader(suite2)).toThrow(expect.objectContaining({ code: "AUDIT_FORMAT_INVALID" }));

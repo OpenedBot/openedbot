@@ -51,7 +51,7 @@ end;
 $$;
 
 revoke all on function staff_list_users() from public;
-grant execute on function staff_list_users() to ohb_api;
+grant execute on function staff_list_users() to openedbot_api;
 
 -- La cible tenant reste un détail du runtime API. Comme la connexion web sans
 -- slug, l'impersonation retient le premier accès actif du compte. L'interface
@@ -112,7 +112,7 @@ end;
 $$;
 
 revoke all on function staff_issue_user_impersonation_claim(uuid, uuid, text, timestamptz) from public;
-grant execute on function staff_issue_user_impersonation_claim(uuid, uuid, text, timestamptz) to ohb_api;
+grant execute on function staff_issue_user_impersonation_claim(uuid, uuid, text, timestamptz) to openedbot_api;
 
 insert into schema_migrations(version) values ('0030_staff_users')
 on conflict (version) do nothing;

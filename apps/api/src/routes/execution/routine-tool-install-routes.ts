@@ -17,7 +17,7 @@ import { routineToolSecretHash } from "./routine-tool-routes";
  * Activer `routine_manage` pour un bot (DEV-209), depuis son panneau Routines.
  *
  * Tout passe par les verbes nommés que l'hôte annonce déjà, jamais par un
- * shell : `mcp_management` ajoute à la racine le serveur `ohb_routines` (https
+ * shell : `mcp_management` ajoute à la racine le serveur `openedbot_routines` (https
  * vers CETTE API, bearer propre au runtime), `profile_capabilities` l'active
  * sur le profil du bot. L'écriture est prouvée par relecture de l'inventaire
  * MCP de l'hôte, jamais par un code de sortie (règle 2 de la frontière).

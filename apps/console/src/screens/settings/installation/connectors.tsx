@@ -308,7 +308,7 @@ function ConnectorsMobile({
           </InsetGroupedSection>
         ) : null}
 
-        <p className="px-8 pt-4 pb-2 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+        <p className="px-8 pt-4 pb-2 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
           {t("connectorsSettings.configuredSignalNote")}
           {" · "}
           {t("connectorsSettings.observedAt", {

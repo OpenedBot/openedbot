@@ -1,6 +1,6 @@
 begin;
 
--- OHB-56 : audit de création scellé, preuve de possession du lien, journal de
+-- Audit de création scellé, preuve de possession du lien, journal de
 -- dispatch et verdicts signés.
 --
 -- Quatre tables et deux colonnes, toutes additives. Les clés d'audit sont
@@ -8,7 +8,7 @@ begin;
 -- les bearers des runtimes : ciphertext / nonce / tag / key id) ; les ancres
 -- et les dispatches sont des métadonnées ; les verdicts ne portent ni
 -- événement déchiffré ni clé. Les politiques RLS admettent DEUX contextes
--- côté `ohb_api` : le tenant (`app.organization_id`, routes de session) et le
+-- côté `openedbot_api` : le tenant (`app.organization_id`, routes de session) et le
 -- credential du lien (`app.session_credential_hash`, écritures du broker à la
 -- liaison : même porte que `runtimes` depuis 0027).
 
@@ -32,7 +32,7 @@ alter table runtime_link_events add constraint runtime_link_events_kind_check
   ));
 
 comment on constraint runtime_link_events_kind_check on runtime_link_events is
-  'pop_failed : preuve de possession refusée (4401). pop_missing : runtime sans clé device lié hors production. unattributed_session : session Hermes inconnue d''OHB relevée par la réconciliation. clock_skew : horloge du connecteur en désaccord avec les dispatches de l''API.';
+  'pop_failed : preuve de possession refusée (4401). pop_missing : runtime sans clé device lié hors production. unattributed_session : session Hermes inconnue d''openedbot relevée par la réconciliation. clock_skew : horloge du connecteur en désaccord avec les dispatches de l''API.';
 
 -- ─── Clés maîtresses d'audit ────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ comment on table runtime_audit_keys is
 
 alter table runtime_audit_keys enable row level security;
 alter table runtime_audit_keys force row level security;
-create policy runtime_audit_keys_api on runtime_audit_keys to ohb_api
+create policy runtime_audit_keys_api on runtime_audit_keys to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or exists (
@@ -81,7 +81,7 @@ create policy runtime_audit_keys_api on runtime_audit_keys to ohb_api
                and r.link_token_previous_expires_at > now()))
     )
   );
-grant select, insert, update on runtime_audit_keys to ohb_api;
+grant select, insert, update on runtime_audit_keys to openedbot_api;
 
 -- ─── Ancres : la position courante de la chaîne, par runtime ────────────────
 
@@ -102,7 +102,7 @@ comment on table runtime_audit_anchors is
 
 alter table runtime_audit_anchors enable row level security;
 alter table runtime_audit_anchors force row level security;
-create policy runtime_audit_anchors_api on runtime_audit_anchors to ohb_api
+create policy runtime_audit_anchors_api on runtime_audit_anchors to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or exists (
@@ -123,7 +123,7 @@ create policy runtime_audit_anchors_api on runtime_audit_anchors to ohb_api
                and r.link_token_previous_expires_at > now()))
     )
   );
-grant select, insert, update on runtime_audit_anchors to ohb_api;
+grant select, insert, update on runtime_audit_anchors to openedbot_api;
 
 -- ─── Journal de dispatch : ce que l'API a elle-même relayé ──────────────────
 
@@ -148,7 +148,7 @@ comment on table runtime_link_dispatches is
 
 alter table runtime_link_dispatches enable row level security;
 alter table runtime_link_dispatches force row level security;
-create policy runtime_link_dispatches_api on runtime_link_dispatches to ohb_api
+create policy runtime_link_dispatches_api on runtime_link_dispatches to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or exists (
@@ -169,7 +169,7 @@ create policy runtime_link_dispatches_api on runtime_link_dispatches to ohb_api
                and r.link_token_previous_expires_at > now()))
     )
   );
-grant select, insert on runtime_link_dispatches to ohb_api;
+grant select, insert on runtime_link_dispatches to openedbot_api;
 
 -- ─── Verdicts de vérification ───────────────────────────────────────────────
 
@@ -205,16 +205,16 @@ comment on table runtime_audit_verifications is
 
 alter table runtime_audit_verifications enable row level security;
 alter table runtime_audit_verifications force row level security;
-create policy runtime_audit_verifications_tenant on runtime_audit_verifications to ohb_api
+create policy runtime_audit_verifications_tenant on runtime_audit_verifications to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert on runtime_audit_verifications to ohb_api;
+grant select, insert on runtime_audit_verifications to openedbot_api;
 
 -- Le worker : rotation automatique du jeton et réconciliation des sessions.
 -- Il lit les runtimes et écrit le journal du lien comme avant (0027) ; il n'a
 -- rien à faire des clés, des ancres ni des verdicts.
-create policy runtime_link_dispatches_worker on runtime_link_dispatches to ohb_worker using (true) with check (true);
-grant select on runtime_link_dispatches to ohb_worker;
+create policy runtime_link_dispatches_worker on runtime_link_dispatches to openedbot_worker using (true) with check (true);
+grant select on runtime_link_dispatches to openedbot_worker;
 
 -- ─── La vue audit_log gagne une cinquième source ────────────────────────────
 
@@ -332,7 +332,7 @@ as
 comment on view audit_log is
   'Journal d''audit unifié : vue de lecture normalisée par-dessus les cinq journaux existants (assistance staff, lien connecteur, décisions d''approbation, management des webhooks, verdicts d''audit de création). Elle est lue par les ADMINS DU TENANT — `security_invoker` fait appliquer la RLS de chaque table sous-jacente à l''appelant, donc une organisation ne voit que ses propres lignes — ET par le STAFF, tous tenants confondus, via `staff_audit_log()`. Point de conception : la rétention d''un journal d''audit est LONGUE (au moins un an), volontairement distincte de la purge analytique à 90 jours de `analytics_events` ; ce ne sont pas les mêmes obligations, et la vue n''ajoute aucune rétention propre — elle hérite de celle de ses sources, qu''aucun purgeur ne doit raccourcir. Aucune donnée personnelle ni aucun secret ne transite : ni e-mail, ni contenu de message, ni jeton, ni condensat de credential, ni clé d''audit.';
 
-grant select on audit_log to ohb_api;
+grant select on audit_log to openedbot_api;
 
 insert into schema_migrations(version) values ('0052_runtime_audit') on conflict (version) do nothing;
 commit;

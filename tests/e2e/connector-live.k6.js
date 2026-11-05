@@ -34,7 +34,7 @@ export default function () {
 
 export function handleSummary(data) {
   return {
-    [__ENV.OPENEDBOT_K6_SUMMARY || "/tmp/ohb-live-connector-k6-summary.json"]: JSON.stringify(data, null, 2),
+    [__ENV.OPENEDBOT_K6_SUMMARY || "/tmp/openedbot-live-connector-k6-summary.json"]: JSON.stringify(data, null, 2),
     stdout: JSON.stringify({
       requests: data.metrics.http_reqs.values.count,
       failedRate: data.metrics.http_req_failed.values.rate,

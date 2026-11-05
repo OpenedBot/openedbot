@@ -1,5 +1,5 @@
 /**
- * PERM2-9 (DEV-OHB-260) against a disposable PostgreSQL database: a gate of a
+ * PERM2-9 against a disposable PostgreSQL database: a gate of a
  * run nobody attends. `persistEvents` writes the real `approval_requests`
  * row under the real guard trigger (0138) and stage check (0144):
  *
@@ -33,8 +33,8 @@ const WRITE_GATE = {
 };
 const CRON_GATE = { ...WRITE_GATE, toolKey: "cronjob", gateArgs: { ...WRITE_GATE.gateArgs, tool: "cronjob" } };
 
-await withDisposablePostgres("ohb260_unattended_gates", async ({ owner, connect }) => {
-  const worker = await connect("ohb_worker");
+await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, connect }) => {
+  const worker = await connect("openedbot_worker");
   await owner`insert into organizations (id, slug, name, permission_pipeline)
     values (${ORG_V2}, 'acme-unattended', 'Acme', 'v2'), (${ORG_LEGACY}, 'acme-legacy', 'Acme Legacy', 'legacy')`;
   const bots = new Map<string, string>();

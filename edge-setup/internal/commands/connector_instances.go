@@ -63,7 +63,7 @@ const linkAdmittedMarker = "link-admitted"
 // The wire hello says edge-setup/<version>, but a v0.4.0 binary proving its
 // own automatic upgrade to this release compares the marker with
 // "hermes-setup/<version>" verbatim, so the marker keeps the pre-rename
-// spelling until v0.6.0 (OHB-87). proveUpgrade accepts both (admittedAs).
+// spelling until v0.6.0. proveUpgrade accepts both (admittedAs).
 func admittedAgentMarker(agent string) string {
 	if v, ok := strings.CutPrefix(agent, "edge-setup/"); ok {
 		return "hermes-setup/" + v
@@ -130,7 +130,7 @@ func linkRefusalProblem(inst layout.ConnectorInstance) string {
 	if !inst.IsDefault() {
 		name = " --name " + string(inst)
 	}
-	return fmt.Sprintf("%s.service refused by openedbot since %s: %s. If the runtime was deleted there, run `edge-setup link --ohb https://… --yes%s` with a new ticket, or remove this instance", inst.Unit(), at, reason, name)
+	return fmt.Sprintf("%s.service refused by openedbot since %s: %s. If the runtime was deleted there, run `edge-setup link --openedbot https://… --yes%s` with a new ticket, or remove this instance", inst.Unit(), at, reason, name)
 }
 
 // readLinkFile decodes an instance's link.json; absent is (nil, nil).
@@ -188,7 +188,7 @@ func linkedInstances() []layout.ConnectorInstance {
 //
 // A host holds one link per instance and re-linking always wins: going from a
 // development openedbot to production, or back, is the same command with
-// another --ohb and never a refusal to argue with. What the old guard
+// another --openedbot and never a refusal to argue with. What the old guard
 // protected is kept as a duty to speak: the previous origin and runtime are
 // named out loud, because the openedbot being left keeps a runtime row
 // this host will never dial again, and only the operator can remove it there.
@@ -203,7 +203,7 @@ func linkTakeover(inst layout.ConnectorInstance, origin string) (previous *LinkF
 		// enrollment replaces it either way, and has nothing to announce.
 		return nil, false
 	}
-	return cur, cur.OHB != origin
+	return cur, cur.Openedbot != origin
 }
 
 // originTakenBy is the other linked instance, if any, that already dials
@@ -221,7 +221,7 @@ func originTakenBy(inst layout.ConnectorInstance, origin string) (layout.Connect
 			continue
 		}
 		lf, err := readLinkFile(other)
-		if err == nil && lf != nil && lf.OHB == origin {
+		if err == nil && lf != nil && lf.Openedbot == origin {
 			return other, lf
 		}
 	}
@@ -234,14 +234,14 @@ type instanceStatus struct {
 	Unit      string `json:"unit"`
 	Active    bool   `json:"active"`
 	Link      bool   `json:"link_present"`
-	OHB       string `json:"ohb,omitempty"`
+	Openedbot string `json:"openedbot,omitempty"`
 	RuntimeID string `json:"runtime_id,omitempty"`
 	DeviceKey bool   `json:"device_key_sealed"`
 	// Refused is true when the daemon stopped on openedbot refusals.
 	Refused bool `json:"link_refused"`
 	// Environment (dev, preprod, prod), Organization and Owner are what
 	// openedbot declared through link.context; empty until a session.
-	Environment  string `json:"ohb_environment,omitempty"`
+	Environment  string `json:"openedbot_environment,omitempty"`
 	Organization string `json:"organization,omitempty"`
 	Owner        string `json:"owner,omitempty"`
 }
@@ -257,7 +257,7 @@ func connectorStatus(ctx context.Context, sd systemd.Client) []instanceStatus {
 		s.Active, _ = sd.IsActive(ctx, inst.Unit())
 		_, _, s.Refused = linkRefusal(inst)
 		if lf, err := readLinkFile(inst); err == nil && lf != nil {
-			s.OHB, s.RuntimeID = lf.OHB, lf.RuntimeID
+			s.Openedbot, s.RuntimeID = lf.Openedbot, lf.RuntimeID
 			lc := lf.linkContext()
 			if stored, ok := loadLinkContext(filepath.Join(stateDirOf(inst), "link-context.json"), lf.RuntimeID); ok {
 				lc = stored
@@ -276,8 +276,8 @@ func connectorStatusLine(c term.Color, s instanceStatus) string {
 	if s.Refused {
 		line += " " + c.Red("refused")
 	}
-	if s.OHB != "" {
-		line += " ohb=" + s.OHB + " runtime=" + s.RuntimeID
+	if s.Openedbot != "" {
+		line += " openedbot=" + s.Openedbot + " runtime=" + s.RuntimeID
 	}
 	if s.Environment != "" {
 		line += " env=" + s.Environment

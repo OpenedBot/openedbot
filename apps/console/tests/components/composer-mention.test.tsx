@@ -6,7 +6,7 @@ import { Composer } from "../../src/components/composer";
 import { ComposerAttachmentTile } from "../../src/components/composer-attachment-tile";
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "en");
+  window.localStorage.setItem("openedbot:locale", "en");
 });
 afterEach(cleanup);
 

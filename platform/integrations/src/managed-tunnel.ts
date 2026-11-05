@@ -1,5 +1,5 @@
 /**
- * OHB-75 : le compte Cloudflare d'openedbot qui héberge les tunnels gérés.
+ * Le compte Cloudflare d'openedbot qui héberge les tunnels gérés.
  *
  * Lu par l'API (provisioning) et par le worker (réconciliation de l'état des
  * tunnels). Une seule variable, comme STORAGE_URL ou EMAIL_URL :

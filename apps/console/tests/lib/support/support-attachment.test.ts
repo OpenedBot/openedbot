@@ -5,7 +5,7 @@ const realFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
-  delete window.__OHB_NATIVE__;
+  delete window.__OPENEDBOT_NATIVE__;
 });
 
 function capture(): Array<{ url: string; init: RequestInit | undefined }> {
@@ -19,7 +19,7 @@ function capture(): Array<{ url: string; init: RequestInit | undefined }> {
 
 describe("api.support.attachment", () => {
   test("dans la coque, un fil retrouvé par le compte présente le bearer du pont, sans cookie", async () => {
-    window.__OHB_NATIVE__ = {
+    window.__OPENEDBOT_NATIVE__ = {
       readAccessToken: async () => "acces-natif",
       refresh: async () => null,
       openExternal: async () => undefined,

@@ -299,7 +299,7 @@ describe("modèle incrémental du fil", () => {
       {
         type: "attachment",
         id: "file-1",
-        name: "ohb-artifact-probe.html",
+        name: "openedbot-artifact-probe.html",
         contentType: "text/html",
         kind: "document",
         bytes: 59,
@@ -311,7 +311,7 @@ describe("modèle incrémental du fil", () => {
     expect(bubbles.slice(0, -1).every((entry) => entry.kind === "assistant" && !entry.attachments)).toBe(true);
     const last = bubbles[bubbles.length - 1];
     expect(last?.kind === "assistant" && last.attachments?.map((item) => item.name)).toEqual([
-      "ohb-artifact-probe.html",
+      "openedbot-artifact-probe.html",
     ]);
   });
 

@@ -203,10 +203,10 @@ export function InboxScreen() {
         <div
           data-mobile-scroll=""
           data-mobile-settings=""
-          className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto bg-[var(--ohb-grouped-canvas)] pb-[max(1.5rem,var(--ohb-safe-bottom))]"
+          className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto bg-[var(--openedbot-grouped-canvas)] pb-[max(1.5rem,var(--openedbot-safe-bottom))]"
         >
           <h1 className="sr-only">{t("inbox.title")}</h1>
-          <p className="px-8 pt-3 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <p className="px-8 pt-3 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {t("inbox.subtitle")}
           </p>
           <div data-inset-grouped="" className="px-4 pt-3">
@@ -222,7 +222,7 @@ export function InboxScreen() {
 
           <div id="inbox-list" role="tabpanel">
             {inbox.isPending ? (
-              <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--ohb-grouped-caption)]">
+              <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]">
                 {t("inbox.loading")}
               </p>
             ) : inbox.isError ? (
@@ -368,7 +368,7 @@ function InboxMobileRow({ item, onOpen }: { item: InboxItemDto; onOpen: () => vo
           <span
             aria-hidden
             className={cn(
-              "absolute -right-0.5 -bottom-0.5 flex size-[18px] items-center justify-center rounded-full ring-2 ring-[var(--ohb-grouped-card)]",
+              "absolute -right-0.5 -bottom-0.5 flex size-[18px] items-center justify-center rounded-full ring-2 ring-[var(--openedbot-grouped-card)]",
               tone,
             )}
           >
@@ -377,14 +377,14 @@ function InboxMobileRow({ item, onOpen }: { item: InboxItemDto; onOpen: () => vo
         </span>
         <span className="min-w-0 flex-1 py-2.5">
           <span className="flex items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate text-left text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+            <span className="min-w-0 flex-1 truncate text-left text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
               {item.botName ?? ":"}
             </span>
-            <span className="shrink-0 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+            <span className="shrink-0 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
               {formatDate(item.occurredAt)}
             </span>
           </span>
-          <span className="mt-0.5 line-clamp-2 block text-left text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 line-clamp-2 block text-left text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {detail}
           </span>
           {item.kind === "approval" ? (
@@ -394,7 +394,7 @@ function InboxMobileRow({ item, onOpen }: { item: InboxItemDto; onOpen: () => vo
             </span>
           ) : null}
         </span>
-        <ChevronRight aria-hidden className="size-5 shrink-0 self-center text-[var(--ohb-grouped-chevron)]" />
+        <ChevronRight aria-hidden className="size-5 shrink-0 self-center text-[var(--openedbot-grouped-chevron)]" />
       </button>
     </li>
   );

@@ -17,7 +17,7 @@ afterEach(async () => {
 
 describe("worker blob store", () => {
   test("deletes a valid file object idempotently", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
     const filePath = join(root, objectKey);
     await mkdir(dirname(filePath), { recursive: true });
@@ -35,7 +35,7 @@ describe("worker blob store", () => {
     // préfixe `org/`. Le garde a refusé cette forme dans sa première version,
     // et la file de suppression réessayait indéfiniment une ligne que rien ne
     // pouvait satisfaire : des octets payés pour toujours.
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
     const filePath = join(root, supportKey);
     await mkdir(dirname(filePath), { recursive: true });
@@ -46,7 +46,7 @@ describe("worker blob store", () => {
   });
 
   test("deletes where the row says, even after the driver switched to R2", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
     const filePath = join(root, objectKey);
     await mkdir(dirname(filePath), { recursive: true });
@@ -61,14 +61,14 @@ describe("worker blob store", () => {
   });
 
   test("never confirms a deletion on a store this worker cannot reach", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
     await expect(deleteBlob({ blob: { driver: "file", root }, blobOther: null }, objectKey, "r2"))
       .rejects.toThrow("Blob driver r2 is not configured on this worker.");
   });
 
   test("an unknown driver deletes on every reachable store", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
     const filePath = join(root, objectKey);
     await mkdir(dirname(filePath), { recursive: true });
@@ -78,7 +78,7 @@ describe("worker blob store", () => {
   });
 
   test("rejects a key outside the two known namespaces", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-worker-blob-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-worker-blob-"));
     temporaryRoots.push(root);
 
     for (const key of [

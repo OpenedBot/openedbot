@@ -50,7 +50,7 @@ run_migrate() {
     FAKE_ROOT="$root" \
     FAKE_DOCKER_STDIN="$stdin_log" \
     OPENEDBOT_POSTGRES_CONTAINER=infra-postgres \
-    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/ohb \
+    API_DATABASE_URL=postgres://openedbot_api@127.0.0.1:5432/openedbot \
     "$@" /bin/bash scripts/db.sh --migrate
 }
 
@@ -76,7 +76,7 @@ PLUGIN
 
 output="$(run_migrate env OPENEDBOT_PLUGINS="$plugin_dir/index.ts" FAKE_APPLIED="fixture:0001_first")" \
   || fail "pro migrate must succeed"
-printf '%s\n' "$output" | grep -qx 'Migration fixture:0002_second applied to ohb.' \
+printf '%s\n' "$output" | grep -qx 'Migration fixture:0002_second applied to openedbot.' \
   || fail "fixture:0002_second must be applied; got: $output"
 if printf '%s\n' "$output" | grep -q 'fixture:0001_first applied'; then fail "an applied <id>:<file> must be skipped"; fi
 grep -q 'fixture_first' "$stdin_log" && fail "0001_first was already recorded and must not be replayed"

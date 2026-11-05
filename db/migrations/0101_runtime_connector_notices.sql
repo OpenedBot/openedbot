@@ -2,7 +2,7 @@
 --
 -- The link gateway already records the version a connector announces in
 -- `hello` (`runtimes.link_agent`, 0055) and journals `agent_outdated` when it
--- is below `RUNTIME_CONNECTOR_MIN_VERSION`, but nobody was told. OHB never
+-- is below `RUNTIME_CONNECTOR_MIN_VERSION`, but nobody was told. openedbot never
 -- updates a customer host: it can only ask the owner to run
 -- `sudo edge-setup upgrade --yes`.
 --
@@ -12,9 +12,9 @@
 -- second notice and a failed e-mail insert leaves no row behind. The worker
 -- then fans the web push out to the owners' subscriptions, at most once.
 --
--- `ohb_api` inserts under the tenant without reading back (same shape as
+-- `openedbot_api` inserts under the tenant without reading back (same shape as
 -- `email_outbox`, 0064): `on conflict do nothing` without a target and the
--- written row count say whether the notice is new. `ohb_worker` reads every
+-- written row count say whether the notice is new. `openedbot_worker` reads every
 -- organization to drain the pending pushes, like `push_outbox` (0039):
 -- exception declared in tests/integration/postgres-rls.sh.
 begin;
@@ -47,13 +47,13 @@ alter table runtime_connector_notices enable row level security;
 alter table runtime_connector_notices force row level security;
 
 create policy runtime_connector_notices_api on runtime_connector_notices
-  for insert to ohb_api
+  for insert to openedbot_api
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_connector_notices_worker on runtime_connector_notices to ohb_worker
+create policy runtime_connector_notices_worker on runtime_connector_notices to openedbot_worker
   using (true) with check (true);
 
-grant insert on runtime_connector_notices to ohb_api;
-grant select, update on runtime_connector_notices to ohb_worker;
+grant insert on runtime_connector_notices to openedbot_api;
+grant select, update on runtime_connector_notices to openedbot_worker;
 
 -- SQL twin of TRANSACTIONAL_EMAIL_KINDS (contracts/api/src/email-kinds.ts).
 alter table email_outbox drop constraint if exists email_outbox_kind_check;

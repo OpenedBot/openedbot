@@ -5,7 +5,7 @@ import type { SQL } from "bun";
  *
  * La rétention de 90 jours n'est pas un réglage du worker : elle est écrite
  * dans les policies `api_errors_worker_*`, qui ne laissent voir et supprimer à
- * ohb_worker que les lignes plus vieilles. Le filtre ci-dessous dit la même
+ * openedbot_worker que les lignes plus vieilles. Le filtre ci-dessous dit la même
  * chose pour que la requête se lise seule ; s'ils divergeaient, la policy
  * gagnerait. Une référence citée au support est relue bien avant trois mois.
  */

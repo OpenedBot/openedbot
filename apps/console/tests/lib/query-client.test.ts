@@ -104,10 +104,10 @@ describe("shouldRetryQuery", () => {
 
 describe("queryKeys.globalSearch", () => {
   test("le même terme cherché dans deux espaces n'occupe pas la même entrée du cache", () => {
-    window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-a", csrfToken: "csrf", userId: "user-1" }));
+    window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-a", csrfToken: "csrf", userId: "user-1" }));
     window.sessionStorage.clear();
     const inA = queryKeys.globalSearch("budget");
-    window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-b", csrfToken: "csrf", userId: "user-1" }));
+    window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-b", csrfToken: "csrf", userId: "user-1" }));
     window.sessionStorage.clear();
     const inB = queryKeys.globalSearch("budget");
     expect(inA).toEqual(["organization", "org-a", "global-search", "budget"]);

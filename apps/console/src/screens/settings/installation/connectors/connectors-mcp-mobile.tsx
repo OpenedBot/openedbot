@@ -19,7 +19,7 @@ import { serverState } from "./connectors-mcp-shared";
 const TILE_TONE: Record<"success" | "warning" | "neutral", string> = {
   success: "bg-pos-700",
   warning: "bg-warn-700",
-  neutral: "bg-[var(--ohb-grouped-chevron)]",
+  neutral: "bg-[var(--openedbot-grouped-chevron)]",
 };
 
 /**
@@ -75,19 +75,19 @@ export function McpServerListRow({
           {server.name.slice(0, 1).toUpperCase()}
         </span>
         <span className="min-w-0 flex-1 py-3">
-          <span className="block truncate text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+          <span className="block truncate text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
             {server.name}
           </span>
           <span
             className={cn(
               "mt-0.5 block truncate text-[13px] leading-4",
-              state.tone === "warning" ? "text-warn-700" : "text-[var(--ohb-grouped-caption)]",
+              state.tone === "warning" ? "text-warn-700" : "text-[var(--openedbot-grouped-caption)]",
             )}
           >
             {host ? `${host} · ${detail}` : detail}
           </span>
         </span>
-        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--ohb-grouped-chevron)]" />
+        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--openedbot-grouped-chevron)]" />
       </button>
     </li>
   );
@@ -115,7 +115,7 @@ export function McpActionRow({
         onClick={onClick}
         className={cn(
           insetGroupedRowClassName,
-          "text-[var(--ohb-grouped-back)] disabled:opacity-45",
+          "text-[var(--openedbot-grouped-back)] disabled:opacity-45",
         )}
       >
         <Icon aria-hidden className="size-[22px] shrink-0 stroke-[1.5]" />
@@ -212,10 +212,10 @@ export function McpServerSheet({
             /* Une carte vide surmontée de « aucun outil » disait deux fois le
                même rien : il ne reste que la phrase, sous son titre. */
             <section data-inset-grouped="" className="px-4 pt-4">
-              <h2 className="px-4 pb-1 text-[13px] leading-4 font-normal text-[var(--ohb-grouped-caption)]">
+              <h2 className="px-4 pb-1 text-[13px] leading-4 font-normal text-[var(--openedbot-grouped-caption)]">
                 {t("connectorsSettings.mcpToolsTitle")}
               </h2>
-              <p className="px-4 text-[15px] leading-5 text-[var(--ohb-grouped-caption)]">
+              <p className="px-4 text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]">
                 {t("connectorsSettings.mcpToolsNone")}
               </p>
             </section>
@@ -321,13 +321,13 @@ export function McpCatalogSheet({
       bodyClassName="px-0 py-0"
       // Une feuille qui occupe l'écran : vingt-quatre entrées derrière un
       // champ de recherche méritent la hauteur, pas un tiers de vitre.
-      className="h-[calc(100dvh-var(--ohb-safe-top)-2.5rem)]"
+      className="h-[calc(100dvh-var(--openedbot-safe-top)-2.5rem)]"
     >
-      <div className="sticky top-0 z-10 bg-[var(--ohb-grouped-canvas)] px-4 pb-2">
+      <div className="sticky top-0 z-10 bg-[var(--openedbot-grouped-canvas)] px-4 pb-2">
         <div className="relative">
           <IconSearch
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ohb-grouped-caption)]"
+            className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--openedbot-grouped-caption)]"
           />
           <Input
             type="search"
@@ -343,7 +343,7 @@ export function McpCatalogSheet({
         </div>
       </div>
       {entries.length === 0 ? (
-        <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--ohb-grouped-caption)]">
+        <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]">
           {t("connectorsSettings.mcpCatalogNoMatch", { query: query.trim() })}
         </p>
       ) : (
@@ -390,7 +390,7 @@ function McpCatalogListRow({
           <span
             className={cn(
               "block truncate text-[17px] leading-[22px]",
-              installed ? "text-[var(--ohb-grouped-caption)]" : "text-[var(--ohb-grouped-label)]",
+              installed ? "text-[var(--openedbot-grouped-caption)]" : "text-[var(--openedbot-grouped-label)]",
             )}
           >
             {entry.name}
@@ -398,19 +398,19 @@ function McpCatalogListRow({
           {/* Pas de `block` ici : `line-clamp-2` pose `display: -webkit-box`,
               et les deux classes se disputaient la même propriété ; la phrase
               de `figma` tenait trois lignes et cassait le rythme de la liste. */}
-          <span className="mt-0.5 line-clamp-2 text-left text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 line-clamp-2 text-left text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {entry.description || t("connectorsSettings.noDescription")}
           </span>
         </span>
         {installed ? (
-          <span className="flex shrink-0 items-center gap-1 self-center text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="flex shrink-0 items-center gap-1 self-center text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             <IconCheck aria-hidden className="size-4 text-pos-700" stroke={2.25} />
             {t("connectorsSettings.mcpInstalled")}
           </span>
         ) : (
           <IconChevronRight
             aria-hidden
-            className="size-5 shrink-0 self-center text-[var(--ohb-grouped-chevron)]"
+            className="size-5 shrink-0 self-center text-[var(--openedbot-grouped-chevron)]"
           />
         )}
       </button>

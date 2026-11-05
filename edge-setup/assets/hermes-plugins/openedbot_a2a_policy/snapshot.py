@@ -148,7 +148,7 @@ class A2APolicySnapshotServer:
         self._home = Path(hermes_home)
         self._metadata_provider = metadata_provider
         self._guard_registered = guard_registered
-        self._path = self._home / ".ohb-a2a-policy" / "state.sock"
+        self._path = self._home / ".openedbot-a2a-policy" / "state.sock"
         self._generation = secrets.token_hex(16)
         self._listener: socket.socket | None = None
         self._thread: threading.Thread | None = None
@@ -183,7 +183,7 @@ class A2APolicySnapshotServer:
                 listener.settimeout(0.2)
                 self._listener = listener
                 self._stop.clear()
-                thread = threading.Thread(target=self._serve, name="ohb-a2a-policy", daemon=True)
+                thread = threading.Thread(target=self._serve, name="openedbot-a2a-policy", daemon=True)
                 self._thread = thread
                 thread.start()
                 return True

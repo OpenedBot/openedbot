@@ -8,7 +8,7 @@ import { alertWebhookBody, deployEnvironment } from "../src/alerting/monitor";
 describe("alertWebhookBody", () => {
   test("keeps the structured fields and adds a Discord-readable content line", () => {
     const body = alertWebhookBody({ status: "firing", reasons: ["API injoignable", "worker sans heartbeat"], occurredAt: "2026-09-06T18:00:00.000Z" }, { environment: "prod", host: "console.openedbot.app" });
-    expect(body.event).toBe("ohb.alert");
+    expect(body.event).toBe("openedbot.alert");
     expect(body.status).toBe("firing");
     expect(body.reasons).toEqual(["API injoignable", "worker sans heartbeat"]);
     expect(body.content).toBe("🔴 openedbot alerte [prod · console.openedbot.app] : API injoignable ; worker sans heartbeat (2026-09-06T18:00:00.000Z)");

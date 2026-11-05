@@ -22,13 +22,13 @@ describe("publicSiteUrl", () => {
   });
 
   test("ne dépend pas de l'hôte qui sert la console", () => {
-    const original = globalThis.window?.__OHB_PUBLIC_SITE_URL__;
+    const original = globalThis.window?.__OPENEDBOT_PUBLIC_SITE_URL__;
     if (!globalThis.window) return;
-    window.__OHB_PUBLIC_SITE_URL__ = "https://openedbot.app";
+    window.__OPENEDBOT_PUBLIC_SITE_URL__ = "https://openedbot.app";
     try {
       expect(publicSiteUrl()).toBe("https://openedbot.app");
     } finally {
-      window.__OHB_PUBLIC_SITE_URL__ = original;
+      window.__OPENEDBOT_PUBLIC_SITE_URL__ = original;
     }
   });
 });

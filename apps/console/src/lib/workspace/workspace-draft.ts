@@ -4,7 +4,7 @@ import type { MessageAttachmentInput } from "@openedbot/conversation/domain/atta
 
 export function workspaceDraftKey(scope: string): string | null {
   const session = readCloudSession();
-  return session?.userId && session.organizationId ? `ohb:draft:${session.userId}:${session.organizationId}:${scope}` : null;
+  return session?.userId && session.organizationId ? `openedbot:draft:${session.userId}:${session.organizationId}:${scope}` : null;
 }
 
 /**
@@ -38,7 +38,7 @@ export function clearWorkspaceDrafts(): void {
     const keys: string[] = [];
     for (let index = 0; index < store.length; index += 1) {
       const key = store.key(index);
-      if (key?.startsWith("ohb:draft:")) keys.push(key);
+      if (key?.startsWith("openedbot:draft:")) keys.push(key);
     }
     for (const key of keys) store.removeItem(key);
   } catch { /* Storage unavailable: nothing was kept there either. */ }

@@ -1,5 +1,5 @@
 /**
- * PERM2-7a (DEV-OHB-257) against a disposable PostgreSQL database: the
+ * PERM2-7a against a disposable PostgreSQL database: the
  * review profile queue (0139). Only an active connector runtime of a `v2`
  * organization whose link announces the needed features is queued; a claim
  * is exclusive; a stale lease writes nothing; the API reads its own tenant
@@ -30,9 +30,9 @@ async function asTenant<T>(sql: SQL, organizationId: string, run: (tx: SQL) => P
   }) as Promise<T>;
 }
 
-await withDisposablePostgres("ohb257_review_profiles", async ({ owner, connect }) => {
-  const worker = await connect("ohb_worker");
-  const api = await connect("ohb_api");
+await withDisposablePostgres("openedbot257_review_profiles", async ({ owner, connect }) => {
+  const worker = await connect("openedbot_worker");
+  const api = await connect("openedbot_api");
   for (const [org, slug, pipeline] of [[V2, "acme-review", "v2"], [LEGACY, "acme-legacy", "legacy"], [BARE, "acme-bare", "v2"]] as const) {
     await owner`insert into organizations (id, slug, name, permission_pipeline) values (${org}, ${slug}, 'Acme', ${pipeline})`;
   }

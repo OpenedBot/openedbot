@@ -10,7 +10,7 @@ let selected: BotPermissionMode[] = [];
 
 beforeEach(() => {
   selected = [];
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {

@@ -56,7 +56,7 @@ of the tailnet. The console wizard reminds you of them and opens both pages.
 
    ```json
    "tagOwners": {
-     "tag:ohb-hermes": ["autogroup:admin"]
+     "tag:openedbot-hermes": ["autogroup:admin"]
    }
    ```
 
@@ -76,7 +76,7 @@ of the tailnet. The console wizard reminds you of them and opens both pages.
    +--------------+--------+
    ```
 
-3. In the client's **Tags** field, select `tag:ohb-hermes`. Without this
+3. In the client's **Tags** field, select `tag:openedbot-hermes`. Without this
    tag, Tailscale refuses the auth key openedbot has to create.
 4. **Generate client**. Copy the **Client ID** and the **Client
    Secret** right away: Tailscale shows them only once.
@@ -114,7 +114,7 @@ During onboarding, the same screen opens at the **Link my machine** step.
 4. Paste the **Client ID** and the **Client Secret** from step 1, then click
    **Publish**.
 
-openedbot allows publishing for the `tag:ohb-hermes` tag in your
+openedbot allows publishing for the `tag:openedbot-hermes` tag in your
 policy file, then creates an auth key for that tag, valid for one
 day. It does not keep the OAuth client: you will revoke it at step 5.
 
@@ -139,7 +139,7 @@ Copy the three commands one by one, in order, on the machine:
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --auth-key <KEY> --hostname my-vps --advertise-tags tag:ohb-hermes && sudo tailscale funnel --bg 8642
+sudo tailscale up --auth-key <KEY> --hostname my-vps --advertise-tags tag:openedbot-hermes && sudo tailscale funnel --bg 8642
 tailscale funnel status
 ```
 

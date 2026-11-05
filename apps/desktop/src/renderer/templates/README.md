@@ -75,10 +75,10 @@ body[data-state="idle|waiting|submitting|error"][data-google="off"?]
 | `signin-galaxy.webp` | Painted night scene: the mascot and six bots orbiting above a planet (1536x1024, subject in the middle 55 %). |
 | `signin-galaxy-light.webp` | The same scene, light palette. |
 | `signin-galaxy-alt.webp` | Night variant: larger mascot, bots spiralling, planet top right. |
-| `ohb-icon.webp` | The mascot alone, transparent, 256 px. |
+| `openedbot-icon.webp` | The mascot alone, transparent, 256 px. |
 | `bots/{coral,crystal,ember,jelly,orbit,solar,wave,firefly}.webp` | The console's illustrated bots, 192 px, transparent background (their glow reads best on dark). |
 
 ## Checking a template
 
-`/tmp/ohb-e2e/gallery.ts <name>` renders it in Electron, both themes, at
+`/tmp/openedbot-e2e/gallery.ts <name>` renders it in Electron, both themes, at
 1280x820, 1000x560, 820x1000 and 800x560, and prints the layout checks.

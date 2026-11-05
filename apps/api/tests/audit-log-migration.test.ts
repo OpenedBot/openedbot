@@ -127,8 +127,8 @@ describe("contrat de la migration 0035_audit_log", () => {
 
   test("les droits sont fermés puis rouverts au seul rôle API", () => {
     expect(sql).toContain("revoke all on function staff_audit_log(int, timestamptz) from public;");
-    expect(sql).toContain("grant execute on function staff_audit_log(int, timestamptz) to ohb_api;");
-    expect(sql).toContain("grant select on audit_log to ohb_api;");
+    expect(sql).toContain("grant execute on function staff_audit_log(int, timestamptz) to openedbot_api;");
+    expect(sql).toContain("grant select on audit_log to openedbot_api;");
     // Le journal est en lecture seule : aucun droit d'écriture sur la vue.
     expect(sql).not.toMatch(/grant[^;]*\b(insert|update|delete)\b[^;]*on audit_log/u);
   });

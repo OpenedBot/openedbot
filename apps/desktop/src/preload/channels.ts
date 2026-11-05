@@ -6,13 +6,13 @@ import type { IpcChannel } from "../shared/bridge";
 // preload's own modules share it. \`satisfies\` pins the names to the shared
 // union; shared/bridge.ts stays type-only for the preload.
 export const CHANNEL = {
-  readAccessToken: "ohb:read-access-token",
-  refresh: "ohb:refresh",
-  openExternal: "ohb:open-external",
-  signOut: "ohb:sign-out",
-  theme: "ohb:theme",
-  textZoom: "ohb:text-zoom",
-  textZoomInitial: "ohb:text-zoom-initial",
+  readAccessToken: "openedbot:read-access-token",
+  refresh: "openedbot:refresh",
+  openExternal: "openedbot:open-external",
+  signOut: "openedbot:sign-out",
+  theme: "openedbot:theme",
+  textZoom: "openedbot:text-zoom",
+  textZoomInitial: "openedbot:text-zoom-initial",
   authStart: "auth:start",
   authPassword: "auth:password",
   authEmailCode: "auth:email-code",

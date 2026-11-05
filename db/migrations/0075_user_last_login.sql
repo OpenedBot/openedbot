@@ -17,9 +17,9 @@ begin;
 -- backoffice affiche comme tel : c'est l'aveu d'une mesure jeune, pas
 -- l'accusation d'un compte dormant.
 --
--- Comme `onboarding_completed` (0025) : `users` n'est pas sous RLS et `ohb_api`
+-- Comme `onboarding_completed` (0025) : `users` n'est pas sous RLS et `openedbot_api`
 -- porte déjà un grant table entier (0001), la colonne est donc lisible et
--- modifiable par l'API sans grant supplémentaire. `ohb_worker` ne lit que
+-- modifiable par l'API sans grant supplémentaire. `openedbot_worker` ne lit que
 -- (id, email) (0002) et n'a rien à faire de cette date.
 --
 -- Pas d'index : rien ne trie ni ne filtre sur cette colonne. L'ordre servi par
@@ -149,7 +149,7 @@ comment on function staff_search_users(text, text, int, timestamptz, text, uuid)
   'Page de comptes pour le backoffice staff : recherche e-mail / nom échappée, filtre d''assistance, borne plafonnée à 200 et curseur keyset (created_at, lower(email), id). Rend le total du filtre, le reste à partir du curseur et la dernière connexion du compte (null quand aucune n''a été vue depuis 0075) ; ne remplace jamais une borne par un offset.';
 
 revoke all on function staff_search_users(text, text, int, timestamptz, text, uuid) from public;
-grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to ohb_api;
+grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to openedbot_api;
 
 -- La fiche support rend la même date, par le même chemin que tous ses autres
 -- champs : dans le jsonb de `staff_get_user`, pas en SQL ad hoc dans la route.
@@ -399,7 +399,7 @@ comment on function staff_get_user(uuid) is
   'Fiche staff d''un compte utilisateur. Rend la dernière connexion du compte (users.last_login_at), distincte de l''activité de ses sessions. `organizationActivity` agrège les organisations du compte : `messages` et `runs` ne portent aucun auteur utilisateur, l''activité n''est donc PAS attribuable à un membre précis. N''expose ni secret runtime, ni ip / user-agent / hash de jeton de session, ni hash de code d''assistance.';
 
 revoke all on function staff_get_user(uuid) from public;
-grant execute on function staff_get_user(uuid) to ohb_api;
+grant execute on function staff_get_user(uuid) to openedbot_api;
 
 insert into schema_migrations(version) values ('0075_user_last_login')
 on conflict (version) do nothing;

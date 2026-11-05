@@ -114,8 +114,8 @@ export function deriveRunActivity(
 
   // Le chrono part de l'envoi du tour (`createdAt`, daté par le serveur dès la
   // 202), jamais de `startedAt` : le cache le pose à l'heure de RÉCEPTION du
-  // premier événement, et le chrono repartait à 0 quand le texte arrivait
-  // (DEV-OHB-245). L'accueil d'un bot neuf a sa propre origine (runClockStart).
+  // premier événement, et le chrono repartait à 0 quand le texte arrivait.
+  // L'accueil d'un bot neuf a sa propre origine (runClockStart).
   const clock = runClockStart(run);
   const base = { runId: run.id, startedAt: Number.isFinite(clock) ? new Date(clock).toISOString() : run.startedAt ?? null };
   const runEvents = events.filter((event) => event.runId === run.id && !SILENT_EVENT_TYPES.has(event.type));

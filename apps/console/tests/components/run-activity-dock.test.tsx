@@ -32,7 +32,7 @@ function shownLabel(container: HTMLElement): string | null | undefined {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(cleanup);
@@ -78,7 +78,7 @@ describe("RunActivityDock", () => {
     });
     // A new status mounts anew: it rises into place under the sweep.
     const label = container.querySelector("[data-run-activity] [data-thinking-label]")!;
-    expect(label.classList.contains("ohb-thinking-shimmer")).toBe(true);
+    expect(label.classList.contains("openedbot-thinking-shimmer")).toBe(true);
     expect(label.classList.contains("animate-in")).toBe(true);
   });
 });

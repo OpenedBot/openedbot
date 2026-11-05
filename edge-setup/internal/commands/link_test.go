@@ -27,7 +27,7 @@ func TestLinkRefusesPositionalTicket(t *testing.T) {
 	ticket := "3f2504e0-4f89-11d3-9a0c-0305e82c3301.aaaaaaaaaaaaaaaa"
 	var out, errb bytes.Buffer
 	env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}
-	code := runLink(env, []string{"--ohb", "https://ohb.example", "--yes", ticket})
+	code := runLink(env, []string{"--openedbot", "https://openedbot.example", "--yes", ticket})
 	if code != cli.ExitUsage {
 		t.Errorf("link: code=%d, want %d", code, cli.ExitUsage)
 	}
@@ -37,8 +37,8 @@ func TestLinkRefusesPositionalTicket(t *testing.T) {
 }
 
 func TestCloudflareDevelopmentOriginBecomesSecureWebSocket(t *testing.T) {
-	const origin = "https://ohb-dev.example.trycloudflare.com"
-	if got, want := wsURLOf(origin), "wss://ohb-dev.example.trycloudflare.com/api/runtime-links/ws"; got != want {
+	const origin = "https://openedbot-dev.example.trycloudflare.com"
+	if got, want := wsURLOf(origin), "wss://openedbot-dev.example.trycloudflare.com/api/runtime-links/ws"; got != want {
 		t.Fatalf("wsURLOf(%q) = %q, want %q", origin, got, want)
 	}
 }
@@ -52,21 +52,21 @@ func TestLoopbackDevelopmentOriginKeepsPlainWebSocket(t *testing.T) {
 	}
 }
 
-// Without --insecure-ohb the http origin is refused before anything is read,
+// Without --insecure-openedbot the http origin is refused before anything is read,
 // and the refusal names the flag that would accept it.
 func TestLinkRefusesPlainOriginWithoutTheDevelopmentFlag(t *testing.T) {
 	var out, errb bytes.Buffer
 	env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}
-	if code := runLink(env, []string{"--ohb", "http://127.0.0.1:8790", "--yes"}); code != cli.ExitUsage {
+	if code := runLink(env, []string{"--openedbot", "http://127.0.0.1:8790", "--yes"}); code != cli.ExitUsage {
 		t.Fatalf("code=%d, want %d (%q)", code, cli.ExitUsage, errb.String())
 	}
 	if !strings.Contains(errb.String(), "https://") {
 		t.Errorf("stderr=%q", errb.String())
 	}
-	if code := runLink(env, []string{"--ohb", "http://ohb.example", "--insecure-ohb", "--yes"}); code != cli.ExitUsage {
+	if code := runLink(env, []string{"--openedbot", "http://openedbot.example", "--insecure-openedbot", "--yes"}); code != cli.ExitUsage {
 		t.Fatalf("public http origin accepted: code=%d", code)
 	}
-	if !strings.Contains(errb.String(), "--insecure-ohb") {
+	if !strings.Contains(errb.String(), "--insecure-openedbot") {
 		t.Errorf("the refusal must name the loopback rule: %q", errb.String())
 	}
 }
@@ -164,7 +164,7 @@ func TestMovedLinkOriginIsDurableScopedAndValidated(t *testing.T) {
 func TestLinkContextCarriesTheFeatureBoundAcrossRestarts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "link-context.json")
 	now := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
-	announced := connector.LinkContext{Environment: "prod", OHB: "https://openedbot.app", Organization: connector.LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, FeatureLimit: 64}
+	announced := connector.LinkContext{Environment: "prod", Openedbot: "https://openedbot.app", Organization: connector.LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, FeatureLimit: 64}
 	if err := persistLinkContext(path, "rt-1", announced, now); err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestLinkContextCarriesTheFeatureBoundAcrossRestarts(t *testing.T) {
 	}
 
 	// The last announcement wins: none clears the bound and the key.
-	if err := persistLinkContext(path, "rt-1", connector.LinkContext{Environment: "prod", OHB: "https://openedbot.app"}, now); err != nil {
+	if err := persistLinkContext(path, "rt-1", connector.LinkContext{Environment: "prod", Openedbot: "https://openedbot.app"}, now); err != nil {
 		t.Fatal(err)
 	}
 	if raw, _ := os.ReadFile(path); strings.Contains(string(raw), "limits") {
@@ -212,7 +212,7 @@ func TestLinkContextCarriesTheFeatureBoundAcrossRestarts(t *testing.T) {
 	// A file from an older daemon has no limits; a bound that is not a positive
 	// integer is ignored and the rest of the context is kept.
 	for name, limits := range map[string]string{"absent": "", "zero": `,"limits":{"features":0}`, "negative": `,"limits":{"features":-4}`, "empty": `,"limits":{}`} {
-		body := `{"schema":1,"runtime_id":"rt-1","ohb_environment":"prod","ohb":"https://openedbot.app"` + limits + `,"received_at":"2026-10-01T00:00:00Z"}`
+		body := `{"schema":1,"runtime_id":"rt-1","openedbot_environment":"prod","openedbot":"https://openedbot.app"` + limits + `,"received_at":"2026-10-01T00:00:00Z"}`
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -227,8 +227,8 @@ func TestLinkContextCarriesTheFeatureBoundAcrossRestarts(t *testing.T) {
 // ws:// only toward loopback, and always the broker path.
 func TestValidateWSURLAcceptsSecureAndLoopbackOnly(t *testing.T) {
 	for _, ok := range []string{
-		"wss://ohb.example/api/runtime-links/ws",
-		"wss://ohb.example:8443/api/runtime-links/ws",
+		"wss://openedbot.example/api/runtime-links/ws",
+		"wss://openedbot.example:8443/api/runtime-links/ws",
 		"ws://127.0.0.1:8790/api/runtime-links/ws",
 		"ws://localhost:8790/api/runtime-links/ws",
 		"ws://[::1]:8790/api/runtime-links/ws",
@@ -240,7 +240,7 @@ func TestValidateWSURLAcceptsSecureAndLoopbackOnly(t *testing.T) {
 }
 
 func TestValidateWSURLRefusesPlainPublicOrigin(t *testing.T) {
-	err := validateWSURL("ws://ohb.example/api/runtime-links/ws")
+	err := validateWSURL("ws://openedbot.example/api/runtime-links/ws")
 	if err == nil || !strings.Contains(err.Error(), "wss://") {
 		t.Fatalf("plain public origin accepted or refusal does not name wss://: %v", err)
 	}
@@ -248,10 +248,10 @@ func TestValidateWSURLRefusesPlainPublicOrigin(t *testing.T) {
 
 func TestValidateWSURLRefusesWrongPathSchemeOrExtras(t *testing.T) {
 	for _, bad := range []string{
-		"wss://ohb.example/other",
-		"wss://ohb.example/api/runtime-links/ws?x=1",
-		"wss://user:pw@ohb.example/api/runtime-links/ws",
-		"https://ohb.example/api/runtime-links/ws",
+		"wss://openedbot.example/other",
+		"wss://openedbot.example/api/runtime-links/ws?x=1",
+		"wss://user:pw@openedbot.example/api/runtime-links/ws",
+		"https://openedbot.example/api/runtime-links/ws",
 		"wss:///api/runtime-links/ws",
 	} {
 		if err := validateWSURL(bad); err == nil {
@@ -262,9 +262,9 @@ func TestValidateWSURLRefusesWrongPathSchemeOrExtras(t *testing.T) {
 
 // writeLink persists a minimal link.json for an instance under the
 // redirected connector root (the token is a placeholder).
-func writeLink(t *testing.T, inst layout.ConnectorInstance, ohb, runtimeID string) {
+func writeLink(t *testing.T, inst layout.ConnectorInstance, openedbot, runtimeID string) {
 	t.Helper()
-	lf := LinkFile{Schema: 1, OHB: ohb, WSURL: wsURLOf(ohb), RuntimeID: runtimeID, LinkToken: "tok", LinkedAt: "2026-09-06T00:00:00Z"}
+	lf := LinkFile{Schema: 1, Openedbot: openedbot, WSURL: wsURLOf(openedbot), RuntimeID: runtimeID, LinkToken: "tok", LinkedAt: "2026-09-06T00:00:00Z"}
 	data, _ := json.Marshal(lf)
 	if err := os.MkdirAll(inst.DirUnder(connectorRoot), 0o700); err != nil {
 		t.Fatal(err)
@@ -276,7 +276,7 @@ func writeLink(t *testing.T, inst layout.ConnectorInstance, ohb, runtimeID strin
 
 // A host holds one link per instance and re-linking always wins: switching
 // between a development openedbot and production is the same command with
-// another --ohb. Nothing is refused, so what this pins is the duty to speak:
+// another --openedbot. Nothing is refused, so what this pins is the duty to speak:
 // the previous origin and runtime are reported, and a fresh ticket on the
 // origin already linked is a re-enrollment rather than a switch.
 func TestLinkTakeoverNamesWhatItReplaces(t *testing.T) {
@@ -292,7 +292,7 @@ func TestLinkTakeoverNamesWhatItReplaces(t *testing.T) {
 	if !switching {
 		t.Fatal("moving the production link to a development origin was not reported as a switch")
 	}
-	if previous == nil || previous.OHB != prod || previous.RuntimeID != "rt-prod" {
+	if previous == nil || previous.Openedbot != prod || previous.RuntimeID != "rt-prod" {
 		t.Fatalf("the takeover does not name the link it replaces: %+v", previous)
 	}
 
@@ -307,7 +307,7 @@ func TestLinkTakeoverNamesWhatItReplaces(t *testing.T) {
 	// A named instance is not a special case: it takes over the same way.
 	writeLink(t, "dev", dev, "rt-dev")
 	previous, switching = linkTakeover("dev", prod)
-	if !switching || previous == nil || previous.OHB != dev || previous.RuntimeID != "rt-dev" {
+	if !switching || previous == nil || previous.Openedbot != dev || previous.RuntimeID != "rt-dev" {
 		t.Fatalf("named instance takeover: previous=%+v switching=%v", previous, switching)
 	}
 }
@@ -343,7 +343,7 @@ func TestOriginTakenByFindsAnotherInstanceOnTheSameOrigin(t *testing.T) {
 func TestLinkRefusesAnInvalidInstanceName(t *testing.T) {
 	var out, errb bytes.Buffer
 	env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}
-	if code := runLink(env, []string{"--ohb", "https://ohb.example", "--yes", "--name", "Dev"}); code != cli.ExitUsage || !strings.Contains(errb.String(), "--name") {
+	if code := runLink(env, []string{"--openedbot", "https://openedbot.example", "--yes", "--name", "Dev"}); code != cli.ExitUsage || !strings.Contains(errb.String(), "--name") {
 		t.Fatalf("code=%d stderr=%q", code, errb.String())
 	}
 }
@@ -370,7 +370,7 @@ func TestConnectorStatusListsEveryInstance(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(stateRoot, "dev"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	devContext := connector.LinkContext{Environment: "dev", OHB: "http://127.0.0.1:8790", Organization: connector.LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, Owner: connector.LinkOwner{Email: "dev@example.com"}}
+	devContext := connector.LinkContext{Environment: "dev", Openedbot: "http://127.0.0.1:8790", Organization: connector.LinkOrganization{ID: "org-1", Name: "Acme", Slug: "acme"}, Owner: connector.LinkOwner{Email: "dev@example.com"}}
 	if err := persistLinkContext(filepath.Join(stateRoot, "dev", "link-context.json"), "rt-dev", devContext, time.Now()); err != nil {
 		t.Fatal(err)
 	}
@@ -382,30 +382,30 @@ func TestConnectorStatusListsEveryInstance(t *testing.T) {
 		On("/usr/bin/systemctl is-active --quiet hermes-connector@dev", exec.Result{})
 	got := connectorStatus(context.Background(), systemd.Client{Runner: fake})
 	want := []instanceStatus{
-		{Name: "default", Unit: "hermes-connector.service", Active: false, Link: true, OHB: "https://console.openedbot.app", RuntimeID: "rt-prod", DeviceKey: false},
-		{Name: "dev", Unit: "hermes-connector@dev.service", Active: true, Link: true, OHB: "http://127.0.0.1:8790", RuntimeID: "rt-dev", DeviceKey: true, Environment: "dev", Organization: "Acme", Owner: "dev@example.com"},
+		{Name: "default", Unit: "hermes-connector.service", Active: false, Link: true, Openedbot: "https://console.openedbot.app", RuntimeID: "rt-prod", DeviceKey: false},
+		{Name: "dev", Unit: "hermes-connector@dev.service", Active: true, Link: true, Openedbot: "http://127.0.0.1:8790", RuntimeID: "rt-dev", DeviceKey: true, Environment: "dev", Organization: "Acme", Owner: "dev@example.com"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)
 	}
 	line := connectorStatusLine(term.Color{}, got[1])
-	if !strings.Contains(line, "connector   dev      active=true link=true key=true ohb=http://127.0.0.1:8790 runtime=rt-dev env=dev owner=dev@example.com") || strings.Contains(line, "tok") {
+	if !strings.Contains(line, "connector   dev      active=true link=true key=true openedbot=http://127.0.0.1:8790 runtime=rt-dev env=dev owner=dev@example.com") || strings.Contains(line, "tok") {
 		t.Fatalf("line=%q", line)
 	}
 }
 
-// Without --ohb, link targets the production origin; an explicit one wins.
+// Without --openedbot, link targets the production origin; an explicit one wins.
 func TestLinkOriginDefaultsToProduction(t *testing.T) {
 	if got := linkOrigin(""); got != "https://link.openedbot.app" {
 		t.Fatalf("linkOrigin(\"\") = %q", got)
 	}
-	if got := linkOrigin("  "); got != DefaultOHBOrigin {
-		t.Fatalf("blank --ohb = %q", got)
+	if got := linkOrigin("  "); got != DefaultOpenedbotOrigin {
+		t.Fatalf("blank --openedbot = %q", got)
 	}
 	if got := linkOrigin("http://127.0.0.1:8790"); got != "http://127.0.0.1:8790" {
-		t.Fatalf("explicit --ohb overridden: %q", got)
+		t.Fatalf("explicit --openedbot overridden: %q", got)
 	}
-	if _, err := enroll.ParseOHBURL(DefaultOHBOrigin, false); err != nil {
+	if _, err := enroll.ParseOpenedbotURL(DefaultOpenedbotOrigin, false); err != nil {
 		t.Fatalf("the default origin must be a valid https origin: %v", err)
 	}
 }

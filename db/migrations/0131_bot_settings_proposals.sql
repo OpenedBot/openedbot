@@ -7,7 +7,7 @@ create table runtime_bot_settings_tools (
   runtime_id uuid not null,
   secret_hash text not null
     constraint runtime_bot_settings_tools_secret_hash_check check (secret_hash ~ '^[0-9a-f]{64}$'),
-  server_name text not null default 'ohb_bot_settings'
+  server_name text not null default 'openedbot_bot_settings'
     constraint runtime_bot_settings_tools_server_name_check check (server_name ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'),
   installed_at timestamptz,
   enabled_bot_ids uuid[] not null default '{}',
@@ -24,14 +24,14 @@ create table runtime_bot_settings_tools (
 alter table runtime_bot_settings_tools enable row level security;
 alter table runtime_bot_settings_tools force row level security;
 
-create policy runtime_bot_settings_tools_tenant on runtime_bot_settings_tools to ohb_api
+create policy runtime_bot_settings_tools_tenant on runtime_bot_settings_tools to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-create policy runtime_bot_settings_tools_worker on runtime_bot_settings_tools for select to ohb_worker using (true);
+create policy runtime_bot_settings_tools_worker on runtime_bot_settings_tools for select to openedbot_worker using (true);
 
-grant select, insert, update, delete on runtime_bot_settings_tools to ohb_api;
-grant select on runtime_bot_settings_tools to ohb_worker;
+grant select, insert, update, delete on runtime_bot_settings_tools to openedbot_api;
+grant select on runtime_bot_settings_tools to openedbot_worker;
 
 create table bot_setting_proposals (
   id uuid primary key,
@@ -61,11 +61,11 @@ create table bot_setting_proposals (
 alter table bot_setting_proposals enable row level security;
 alter table bot_setting_proposals force row level security;
 
-create policy bot_setting_proposals_tenant on bot_setting_proposals to ohb_api
+create policy bot_setting_proposals_tenant on bot_setting_proposals to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on bot_setting_proposals to ohb_api;
+grant select, insert, update, delete on bot_setting_proposals to openedbot_api;
 
 create index bot_setting_proposals_pending_bot_idx
   on bot_setting_proposals (organization_id, bot_id) where status = 'pending';

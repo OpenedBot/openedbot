@@ -105,7 +105,7 @@ function RailSkeleton() {
   return (
     <div aria-hidden data-board-icon-rail="" className={`flex h-full min-h-0 w-14 shrink-0 flex-col items-center pb-3 ${ON_SURFACE}`}>
       <div data-titlebar-rail-logo="" className="flex h-[46px] shrink-0 items-center justify-center">
-        <img src="/brand/ohb-icon.webp" alt="" className="size-7 shrink-0 object-contain" />
+        <img src="/brand/openedbot-icon.webp" alt="" className="size-7 shrink-0 object-contain" />
       </div>
       <div className="flex shrink-0 flex-col items-center gap-1.5">
         <span className={icon}><RiHome5Line /></span>
@@ -195,7 +195,7 @@ function TopBarSkeleton({ conversation, organization, title }: {
         <span aria-hidden className="flex h-[30px] items-center gap-2 px-1.5">
           {/* The fixed organization face and the label recorded on the last
               visit (`lib/session/boot-identity.ts`): only an unknown label pulses. */}
-          <BotFace name="openedbot" seed="ohb-organization" face={null} animated={false} className="size-[18px] shrink-0" />
+          <BotFace name="openedbot" seed="openedbot-organization" face={null} animated={false} className="size-[18px] shrink-0" />
           {bootLabel
             ? <span className="truncate text-body-2-medium font-semibold text-text-primary">{bootLabel}</span>
             : <Skeleton className="h-3.5 w-16" />}

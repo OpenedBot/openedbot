@@ -84,7 +84,7 @@ export function handoffEligible(run: {
 }
 
 /**
- * Tour de DM simple (OHB-113) : un tour racine d'opérateur que l'API a admis
+ * Tour de DM simple : un tour racine d'opérateur que l'API a admis
  * sans workflow, faute d'état durable (ni salon, ni hand-off, ni autonomie).
  * Les runs historiques sans `step_kind` gardent leur ancien chemin.
  */

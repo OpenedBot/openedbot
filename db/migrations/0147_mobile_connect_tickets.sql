@@ -2,7 +2,7 @@ begin;
 
 -- Connexion d'un téléphone par QR (« Mobile Connect »), comme OpenBot et Grok Bot :
 -- un membre déjà authentifié dans la console demande un ticket ; la console
--- l'affiche en QR (`ohb://join?api=…&ticket=<id>.<secret>`) ; l'app le scanne et
+-- l'affiche en QR (`openedbot://join?api=…&ticket=<id>.<secret>`) ; l'app le scanne et
 -- l'échange, une seule fois et avant son expiration, contre un code natif PKCE
 -- (le même que celui de la connexion par mot de passe), puis contre une session.
 --
@@ -27,7 +27,7 @@ alter table mobile_connect_tickets force row level security;
 -- Deux portes : l'organisation de la session qui crée le ticket, ou le hash du
 -- secret présenté par le téléphone, qui n'a pas encore de session. Sans le hash
 -- exact, aucune ligne n'est visible.
-create policy mobile_connect_tickets_credential on mobile_connect_tickets to ohb_api
+create policy mobile_connect_tickets_credential on mobile_connect_tickets to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or secret_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -37,11 +37,11 @@ create policy mobile_connect_tickets_credential on mobile_connect_tickets to ohb
     or secret_hash = nullif(current_setting('app.session_credential_hash', true), '')
   );
 
-create policy mobile_connect_tickets_worker on mobile_connect_tickets to ohb_worker
+create policy mobile_connect_tickets_worker on mobile_connect_tickets to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on mobile_connect_tickets to ohb_api;
-grant select, delete on mobile_connect_tickets to ohb_worker;
+grant select, insert, update, delete on mobile_connect_tickets to openedbot_api;
+grant select, delete on mobile_connect_tickets to openedbot_worker;
 
 insert into schema_migrations(version) values ('0147_mobile_connect_tickets')
 on conflict (version) do nothing;

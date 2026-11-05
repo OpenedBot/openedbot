@@ -48,7 +48,7 @@ func fakeOperator(t *testing.T) (string, *[]string) {
 		case r.Method == "GET" && r.URL.Path == "/usage":
 			_, _ = w.Write([]byte(`{"fetchedAt":"2026-09-02T09:41:12Z","providers":[]}`))
 		case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/credentials"):
-			_, _ = w.Write([]byte(`{"provider":"anthropic","label":"ohb-1","verification":"confirmed","detail":null}`))
+			_, _ = w.Write([]byte(`{"provider":"anthropic","label":"openedbot-1","verification":"confirmed","detail":null}`))
 		case r.Method == "DELETE":
 			w.WriteHeader(204)
 		default:

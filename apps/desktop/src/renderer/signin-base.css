@@ -56,7 +56,7 @@ html[data-theme="light"] {
   color-scheme: light;
 }
 
-html[data-theme="dark"] img[src$="/ohb-icon.webp"] {
+html[data-theme="dark"] img[src$="/openedbot-icon.webp"] {
   filter: invert(1) hue-rotate(180deg);
 }
 

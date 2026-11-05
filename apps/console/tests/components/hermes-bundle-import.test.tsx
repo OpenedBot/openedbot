@@ -13,7 +13,7 @@ const job: HermesBundleImportJobDto = {
   result: { imported: [{ slug: "scout", botId: "bot-1", threadId: "thread-1", name: "Scout" }], skipped: [], routines: [], groups: [], limitations: [], capabilities: [] },
 };
 function mount() {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(<I18nProvider><QueryClientProvider client={client}><HermesBundleImport /></QueryClientProvider></I18nProvider>);
   return { ...rendered, client };

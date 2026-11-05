@@ -1025,12 +1025,12 @@
   List and menu rows switch their highlight at once. With a 120-150 ms colour
   fade, a pointer sweeping a list left every row it crossed fading in then out:
   a grey flash trailing the cursor. Native menus (and Grok Bot) never fade a
-  row. Covers every ARIA row and anything tagged `.ohb-row`; the press feedback
+  row. Covers every ARIA row and anything tagged `.openedbot-row`; the press feedback
   (scale, opacity) keeps its timing. Unlayered, so it wins over
-  `transition-colors`; the `.ohb-press` line outranks that class's own fade.
+  `transition-colors`; the `.openedbot-press` line outranks that class's own fade.
 */
-:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .ohb-row),
-:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .ohb-row).ohb-press {
+:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .openedbot-row),
+:is([role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="option"], [role="treeitem"], .openedbot-row).openedbot-press {
   transition-property: transform, translate, scale, opacity;
 }
 
@@ -1194,9 +1194,9 @@ html.theme-transitioning *::after {
 
   Le libellé qui travaille : un reflet traverse le texte. Base et pointe
   dérivent toutes deux de la teinte posée par le composant sur
-  `--ohb-agent-tone`, pour que chaque ton scintille pareil.
+  `--openedbot-agent-tone`, pour que chaque ton scintille pareil.
 */
-@keyframes ohb-agent-shimmer {
+@keyframes openedbot-agent-shimmer {
   from {
     background-position: 200% center;
   }
@@ -1204,26 +1204,26 @@ html.theme-transitioning *::after {
     background-position: -100% center;
   }
 }
-.ohb-agent-label {
+.openedbot-agent-label {
   /* Les deux teintes du reflet vivent dans leurs propres variables. Un
      `color-mix()` écrit directement parmi les arrêts du dégradé se fait
      aplatir par le minifieur en production : les trois arrêts retombent sur
      la même couleur et le reflet disparaît. Dans une propriété custom, la
      valeur est transportée telle quelle. */
-  --ohb-agent-tone: var(--color-muted-foreground);
-  --ohb-agent-tone-soft: color-mix(in oklab, var(--ohb-agent-tone) 55%, transparent);
+  --openedbot-agent-tone: var(--color-muted-foreground);
+  --openedbot-agent-tone-soft: color-mix(in oklab, var(--openedbot-agent-tone) 55%, transparent);
   color: transparent;
   background-image: linear-gradient(
     100deg,
-    var(--ohb-agent-tone-soft) 30%,
-    var(--ohb-agent-tone) 50%,
-    var(--ohb-agent-tone-soft) 70%
+    var(--openedbot-agent-tone-soft) 30%,
+    var(--openedbot-agent-tone) 50%,
+    var(--openedbot-agent-tone-soft) 70%
   );
   background-position: 200% center;
   background-size: 300% 100%;
   background-clip: text;
   -webkit-background-clip: text;
-  animation: ohb-agent-shimmer 2.6s linear infinite;
+  animation: openedbot-agent-shimmer 2.6s linear infinite;
   will-change: background-position;
   /* `background-position` sur `background-clip: text` repeint à chaque
      frame (une propriété de fond ne se compose jamais sur le GPU comme le
@@ -1233,7 +1233,7 @@ html.theme-transitioning *::after {
      le repeint à cette étiquette : il ne peut jamais déborder sa boîte, donc
      ça ne change rien à l'affichage, mais ça évite qu'il invalide la peinture
      d'un voisin. Ça ne supprime pas le coût du repeint lui-même : le libellé
-     d'`AgentThinking` (`RollText`) passe par `ShineText` / `.ohb-shine`
+     d'`AgentThinking` (`RollText`) passe par `ShineText` / `.openedbot-shine`
      (`transform` seul); cette classe reste pour les libellés qui peuvent
      passer à la ligne (`TaskList` étapes, `WebSearch`, `ShimmerLabel`). */
   contain: paint;
@@ -1251,7 +1251,7 @@ html.theme-transitioning *::after {
   (-1 L), l'exact opposé. Même durée et même courbe, sinon les glyphes
   glissent.
 */
-@keyframes ohb-shine-band {
+@keyframes openedbot-shine-band {
   from {
     transform: translate3d(-100%, 0, 0);
   }
@@ -1259,7 +1259,7 @@ html.theme-transitioning *::after {
     transform: translate3d(200%, 0, 0);
   }
 }
-@keyframes ohb-shine-text {
+@keyframes openedbot-shine-text {
   from {
     transform: translate3d(50%, 0, 0);
   }
@@ -1267,14 +1267,14 @@ html.theme-transitioning *::after {
     transform: translate3d(-100%, 0, 0);
   }
 }
-.ohb-shine {
-  /* Mêmes variables que `.ohb-agent-label` (voir la note sur `color-mix()`). */
-  --ohb-agent-tone: var(--color-muted-foreground);
-  --ohb-agent-tone-soft: color-mix(in oklab, var(--ohb-agent-tone) 55%, transparent);
+.openedbot-shine {
+  /* Mêmes variables que `.openedbot-agent-label` (voir la note sur `color-mix()`). */
+  --openedbot-agent-tone: var(--color-muted-foreground);
+  --openedbot-agent-tone-soft: color-mix(in oklab, var(--openedbot-agent-tone) 55%, transparent);
   position: relative;
-  color: var(--ohb-agent-tone-soft);
+  color: var(--openedbot-agent-tone-soft);
 }
-.ohb-shine-band {
+.openedbot-shine-band {
   position: absolute;
   inset-block: -0.2em;
   left: 0;
@@ -1285,21 +1285,21 @@ html.theme-transitioning *::after {
   pointer-events: none;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 50%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 50%, transparent);
-  animation: ohb-shine-band 2.6s linear infinite;
+  animation: openedbot-shine-band 2.6s linear infinite;
   will-change: transform;
 }
-.ohb-shine-text {
+.openedbot-shine-text {
   flex: none;
   width: 200%;
   white-space: nowrap;
-  color: var(--ohb-agent-tone);
-  animation: ohb-shine-text 2.6s linear infinite;
+  color: var(--openedbot-agent-tone);
+  animation: openedbot-shine-text 2.6s linear infinite;
   will-change: transform;
 }
 
 /* Étoile qui scintille : elle grandit, se pose, disparaît. La durée et le
    décalage de chaque étoile arrivent en style inline. */
-@keyframes ohb-agent-star {
+@keyframes openedbot-agent-star {
   0%,
   100% {
     transform: scale(0);
@@ -1314,39 +1314,39 @@ html.theme-transitioning *::after {
     opacity: 0.9;
   }
 }
-.ohb-agent-star {
+.openedbot-agent-star {
   transform: scale(0);
-  animation-name: ohb-agent-star;
+  animation-name: openedbot-agent-star;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
 
 /* Comète d'infini : le segment de tiret fait un tour du huit normalisé
    (`pathLength=100`) par durée d'animation. */
-@keyframes ohb-agent-dash {
+@keyframes openedbot-agent-dash {
   to {
     stroke-dashoffset: -100;
   }
 }
-.ohb-agent-comet {
-  animation-name: ohb-agent-dash;
+.openedbot-agent-comet {
+  animation-name: openedbot-agent-dash;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
 
 /* Les glyphes d'étoile pèsent un peu plus que les grilles de points sur fond
    clair : on les adoucit, elles seules, jamais le libellé. */
-.ohb-agent-stars {
+.openedbot-agent-stars {
   color: color-mix(in oklab, currentColor 75%, transparent);
 }
-.dark .ohb-agent-stars {
+.dark .openedbot-agent-stars {
   color: inherit;
 }
 
 /* La coche d'une étape franchie se dessine comme si on la cochait à la main.
    Le tracé pose `pathLength=1`, le calcul de tirets est donc indépendant de
    la résolution. */
-@keyframes ohb-agent-check {
+@keyframes openedbot-agent-check {
   from {
     stroke-dashoffset: 1;
   }
@@ -1354,34 +1354,34 @@ html.theme-transitioning *::after {
     stroke-dashoffset: 0;
   }
 }
-.ohb-agent-check {
+.openedbot-agent-check {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: ohb-agent-check 200ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation: openedbot-agent-check 200ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-agent-label {
-    color: var(--ohb-agent-tone);
+  .openedbot-agent-label {
+    color: var(--openedbot-agent-tone);
     background-image: none;
     animation: none;
   }
-  .ohb-shine {
-    color: var(--ohb-agent-tone);
+  .openedbot-shine {
+    color: var(--openedbot-agent-tone);
   }
-  .ohb-shine-band {
+  .openedbot-shine-band {
     display: none;
   }
   /* Les étoiles se posent visibles plutôt que figées à `scale(0)`. */
-  .ohb-agent-star {
+  .openedbot-agent-star {
     animation: none;
     transform: none;
     opacity: 0.7;
   }
-  .ohb-agent-comet {
+  .openedbot-agent-comet {
     animation: none;
   }
-  .ohb-agent-check {
+  .openedbot-agent-check {
     animation: none;
     stroke-dashoffset: 0;
   }
@@ -1393,7 +1393,7 @@ html.theme-transitioning *::after {
   one grid cell; the slot clips them vertically only, so a long label still
   truncates on the side.
 */
-.ohb-roll {
+.openedbot-roll {
   position: relative;
   display: inline-grid;
   min-width: 0;
@@ -1404,37 +1404,37 @@ html.theme-transitioning *::after {
   padding-block: 0.08em;
   clip-path: inset(0 -999px);
 }
-.ohb-roll-line {
+.openedbot-roll-line {
   grid-area: 1 / 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-@keyframes ohb-roll-in {
+@keyframes openedbot-roll-in {
   from {
     opacity: 0;
     transform: translateY(90%);
     filter: blur(3px);
   }
 }
-@keyframes ohb-roll-out {
+@keyframes openedbot-roll-out {
   to {
     opacity: 0;
     transform: translateY(-90%);
     filter: blur(3px);
   }
 }
-.ohb-roll-in {
-  animation: ohb-roll-in 0.32s cubic-bezier(0.34, 1.32, 0.64, 1) both;
+.openedbot-roll-in {
+  animation: openedbot-roll-in 0.32s cubic-bezier(0.34, 1.32, 0.64, 1) both;
 }
-.ohb-roll-out {
-  animation: ohb-roll-out 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+.openedbot-roll-out {
+  animation: openedbot-roll-out 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .ohb-roll-in {
+  .openedbot-roll-in {
     animation: none;
   }
-  .ohb-roll-out {
+  .openedbot-roll-out {
     display: none;
   }
 }
@@ -1635,22 +1635,22 @@ html.theme-transitioning *::after {
 }
 
 /*
-  Une lettre de l'arc-en-ciel. La teinte vient du composant (`--ohb-mcp-hue`,
+  Une lettre de l'arc-en-ciel. La teinte vient du composant (`--openedbot-mcp-hue`,
   répartie sur le mot) ; la clarté et le chroma sont fixés ici en `oklch`, qui
   garde la MÊME clarté perçue d'une teinte à l'autre, en `hsl`, le jaune
   sortait délavé et le bleu presque noir sur le même mot.
 */
-.ohb-mcp-letter {
-  color: oklch(0.58 0.19 var(--ohb-mcp-hue));
+.openedbot-mcp-letter {
+  color: oklch(0.58 0.19 var(--openedbot-mcp-hue));
 }
-.dark .ohb-mcp-letter {
-  color: oklch(0.78 0.17 var(--ohb-mcp-hue));
+.dark .openedbot-mcp-letter {
+  color: oklch(0.78 0.17 var(--openedbot-mcp-hue));
 }
 
 /* Une ligne du roster en cours de glissement (`roster-drag.tsx`) : la souris
    tient une carte, pas du texte, rien ne se sélectionne, et le curseur le dit. */
-body.ohb-roster-dragging,
-body.ohb-roster-dragging * {
+body.openedbot-roster-dragging,
+body.openedbot-roster-dragging * {
   cursor: grabbing !important;
   user-select: none;
   -webkit-user-select: none;
@@ -1662,7 +1662,7 @@ body.ohb-roster-dragging * {
   relevées en styles calculés le 2026-09-12, thème par thème. Elles ne suivent
   pas les jetons de l'app : la carte est un objet shadcn posé sur la page.
 */
-.ohb-support-card {
+.openedbot-support-card {
   --sc-card: #ffffff;
   --sc-fg: #0a0a0a;
   --sc-muted-fg: #737373;
@@ -1675,7 +1675,7 @@ body.ohb-roster-dragging * {
   --sc-ring: 0 0 0 1px rgba(10, 10, 10, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
 }
 
-.dark .ohb-support-card {
+.dark .openedbot-support-card {
   --sc-card: #171717;
   --sc-fg: #fafafa;
   --sc-muted-fg: #a1a1a1;

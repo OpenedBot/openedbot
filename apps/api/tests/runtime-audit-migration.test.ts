@@ -12,12 +12,12 @@ describe("contrat de la migration 0052_runtime_audit", () => {
     expect(sql).not.toMatch(/drop table/i);
   });
 
-  test("chaque table nouvelle est sous RLS forcée avec une politique ohb_api", () => {
+  test("chaque table nouvelle est sous RLS forcée avec une politique openedbot_api", () => {
     for (const table of ["runtime_audit_keys", "runtime_audit_anchors", "runtime_link_dispatches", "runtime_audit_verifications"]) {
       expect(sql).toContain(`create table ${table} (`);
       expect(sql).toContain(`alter table ${table} enable row level security;`);
       expect(sql).toContain(`alter table ${table} force row level security;`);
-      expect(sql).toMatch(new RegExp(`create policy \\w+ on ${table} to ohb_api`));
+      expect(sql).toMatch(new RegExp(`create policy \\w+ on ${table} to openedbot_api`));
     }
   });
 

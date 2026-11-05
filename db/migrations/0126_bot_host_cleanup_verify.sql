@@ -1,7 +1,7 @@
 begin;
 
 -- Hermes can re-create a session row after DELETE: the background title
--- writer of the run that just ended upserts it (lab, 2026-10-23, DEV-OHB-244).
+-- writer of the run that just ended upserts it (lab, 2026-10-23).
 -- A deleted session whose host profile survives is re-read after a delay and
 -- deleted again until it stays absent.
 alter table bot_host_cleanups

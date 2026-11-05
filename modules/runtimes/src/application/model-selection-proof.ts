@@ -13,7 +13,7 @@ export type ModelProofJob = RuntimeModelSelectionProof & {
   edge_auth_ciphertext: string | null; edge_auth_nonce: string | null; edge_auth_tag: string | null; edge_auth_key_id: string | null;
   link_features: string[];
 };
-export const MODEL_CHECK_PROFILE = "ohb-model-check";
+export const MODEL_CHECK_PROFILE = "openedbot-model-check";
 export type ModelProofSpans = { inventoryMs: number; createProfileMs: number; setModelMs: number; isolationMs: number; createRunMs: number; runMs: number; cleanupMs: number; totalMs: number };
 
 export function isTransientProofError(error: unknown): boolean {
@@ -46,7 +46,7 @@ export async function readRuntimeModelSelection(db: SQL, organizationId: string,
 }
 
 export async function proveRuntimeModelSelection(client: ModelProofClient, selection: ModelSelection, spans?: ModelProofSpans): Promise<void> {
-  const sessionId = `ohb-model-canary-${crypto.randomUUID()}`;
+  const sessionId = `openedbot-model-canary-${crypto.randomUUID()}`;
   let runId: string | null = null;
   try {
     const createStarted = performance.now();
@@ -218,7 +218,7 @@ async function finishRuntimeModelSelectionProof(
   spans.totalMs = Math.round(Date.now() - started);
   console.info(JSON.stringify({ event: `runtime_model_selection.${result}`, runtimeId: job.runtime_id, organizationId: job.organization_id, attempt, spans }));
   if (result === "promoted") {
-    // No snapshot invalidation here: ohb_worker has no access to
+    // No snapshot invalidation here: openedbot_worker has no access to
     // runtime_read_snapshots (0121, asserted by tests/integration). The
     // promotion bumps runtimes.updated_at and the catalogue route reads its
     // snapshot with notOlderThan = updated_at, so the next read is live.

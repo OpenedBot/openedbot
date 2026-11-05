@@ -17,7 +17,7 @@ export type ClaimedRun = {
   id: string;
   organizationId: string;
   leaseGeneration: number;
-  /** Création du run → réclamation, mesuré par la seule horloge PostgreSQL (OHB-107). */
+  /** Création du run → réclamation, mesuré par la seule horloge PostgreSQL. */
   queuedMs?: number;
 };
 
@@ -87,7 +87,7 @@ async function reapExpiredApprovalSends(db: SQL): Promise<void> {
          returning workflow.organization_id, workflow.id
       ), cursor_locks as materialized (
         select organization_id,
-               pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('ohb-run-events-cursor')) as locked
+               pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked
           from (select distinct organization_id from ambiguous_runs) organizations
          order by organization_id
       ), event_rows as (
@@ -457,8 +457,8 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
 }
 
 /**
- * Cheap fingerprint of the queued set, read from the partial `runs_queue_idx`
- * (OHB-139). It is only a wake-up hint for a worker without LISTEN: a changed
+ * Cheap fingerprint of the queued set, read from the partial `runs_queue_idx`.
+ * It is only a wake-up hint for a worker without LISTEN: a changed
  * value means "claim now", never "this run is yours". `claimRun` stays the only
  * claim authority.
  */

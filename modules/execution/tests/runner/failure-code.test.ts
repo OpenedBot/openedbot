@@ -29,7 +29,7 @@ describe("failureCode", () => {
   });
 });
 
-describe("the gateway's concurrent-run cap (DEV-OHB-244)", () => {
+describe("the gateway's concurrent-run cap", () => {
   const cap = new HermesClientError("Hermes a atteint sa limite de runs simultanés.", 429, "HERMES_LIMIT_REACHED", { requestDelivery: "response_received" });
 
   test("requeues the run while attempts remain, then gives up", () => {

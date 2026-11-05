@@ -1,11 +1,11 @@
--- The console Marketplace catalogue (OHB-127, docs/cloud/MARKETPLACE_ADR.md §3).
+-- The console Marketplace catalogue (docs/cloud/MARKETPLACE_ADR.md §3).
 --
 -- Two tables, because the repository has no pattern for a table that mixes
 -- global rows and per-organization rows under RLS:
 --
 --   marketplace_entries           global, kept by staff, modeled on
 --                                 product_features (0084): no RLS, read by
---                                 ohb_api, written by the staff API only and
+--                                 openedbot_api, written by the staff API only and
 --                                 re-read as the proof of the write;
 --   organization_agent_templates  per organization, modeled on playbooks
 --                                 (0018): tenant policy on app.organization_id.
@@ -54,9 +54,9 @@ create table marketplace_entries (
 
 create index marketplace_entries_published_idx on marketplace_entries (kind, title) where status = 'published';
 
--- Staff writes go through ohb_api (staffMiddleware), like product_features
+-- Staff writes go through openedbot_api (staffMiddleware), like product_features
 -- (0086). No delete: an entry is withdrawn, never erased.
-grant select, insert, update on marketplace_entries to ohb_api;
+grant select, insert, update on marketplace_entries to openedbot_api;
 
 create table organization_agent_templates (
   id uuid primary key,
@@ -92,11 +92,11 @@ create table organization_agent_templates (
 alter table organization_agent_templates enable row level security;
 alter table organization_agent_templates force row level security;
 
-create policy organization_agent_templates_tenant on organization_agent_templates to ohb_api
+create policy organization_agent_templates_tenant on organization_agent_templates to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on organization_agent_templates to ohb_api;
+grant select, insert, update, delete on organization_agent_templates to openedbot_api;
 
 insert into schema_migrations(version) values ('0103_marketplace')
 on conflict (version) do nothing;

@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { SQL } from "bun";
 import {
   assertDevResetAllowed,
@@ -12,7 +11,7 @@ import {
  * `make db-reset-keep-users CONFIRM=yes`. Il n'a AUCUNE liste à lui : tout
  * vient de `src/application/dev-reset.ts`, comme la route.
  *
- * La DSN doit pouvoir `truncate` : `ohb_api` ne le peut pas (il ne possède pas
+ * La DSN doit pouvoir `truncate` : `openedbot_api` ne le peut pas (il ne possède pas
  * les tables et n'a pas `delete` sur les tables append-only). À défaut de
  * `DEV_RESET_DATABASE_URL`, on la reconstruit depuis le conteneur PostgreSQL
  * partagé, exactement comme `scripts/db.sh` qui s'y exécute en `$POSTGRES_USER`.
@@ -26,9 +25,9 @@ function fail(message: string): never {
 function databaseOfApiUrl(value: string | undefined): { database: string; port: string } {
   try {
     const url = new URL(value?.trim() ?? "");
-    return { database: decodeURIComponent(url.pathname.replace(/^\//u, "")) || "ohb", port: url.port || "5432" };
+    return { database: decodeURIComponent(url.pathname.replace(/^\//u, "")) || "openedbot", port: url.port || "5432" };
   } catch {
-    return { database: "ohb", port: "5432" };
+    return { database: "openedbot", port: "5432" };
   }
 }
 

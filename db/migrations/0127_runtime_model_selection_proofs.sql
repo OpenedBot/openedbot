@@ -23,12 +23,12 @@ create index runtime_model_selection_proof_claim_idx on runtime_model_selection_
   where status in ('queued','running');
 alter table runtime_model_selection_proofs enable row level security;
 alter table runtime_model_selection_proofs force row level security;
-create policy runtime_model_selection_proofs_tenant on runtime_model_selection_proofs to ohb_api
+create policy runtime_model_selection_proofs_tenant on runtime_model_selection_proofs to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_model_selection_proofs_worker on runtime_model_selection_proofs to ohb_worker using (true) with check (true);
-grant select, insert, update, delete on runtime_model_selection_proofs to ohb_api;
-grant select, insert, update, delete on runtime_model_selection_proofs to ohb_worker;
+create policy runtime_model_selection_proofs_worker on runtime_model_selection_proofs to openedbot_worker using (true) with check (true);
+grant select, insert, update, delete on runtime_model_selection_proofs to openedbot_api;
+grant select, insert, update, delete on runtime_model_selection_proofs to openedbot_worker;
 comment on table runtime_model_selection_proofs is 'Pending runtime model selections awaiting a worker canary proof.';
 insert into schema_migrations(version) values ('0127_runtime_model_selection_proofs') on conflict (version) do nothing;
 commit;

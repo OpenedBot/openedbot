@@ -29,13 +29,13 @@ alter table sessions
 create index sessions_owner_idx on sessions (user_id, created_at desc);
 
 create policy sessions_owner_read on sessions
-  for select to ohb_api
+  for select to openedbot_api
   using (user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid);
 
 -- `for update`, pas `for all` : cette porte ne doit ouvrir ni `insert` ni
 -- `delete`, seulement la révocation (un update sur `revoked_at`).
 create policy sessions_owner_revoke on sessions
-  for update to ohb_api
+  for update to openedbot_api
   using (user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid)
   with check (user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid);
 

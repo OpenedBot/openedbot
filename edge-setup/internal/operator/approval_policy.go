@@ -21,7 +21,7 @@ import (
 //go:embed approval_policy_plugin/* approval_policy_config.py
 var approvalPolicyFiles embed.FS
 
-const approvalPolicyPlugin = "ohb_approval_policy"
+const approvalPolicyPlugin = "openedbot_approval_policy"
 const approvalPolicyFeature = "approval_policy"
 
 var approvalPolicyWriteTools = [...]string{"write_file", "patch", "skill_manage", "execute_code", "send_message", "cronjob"}

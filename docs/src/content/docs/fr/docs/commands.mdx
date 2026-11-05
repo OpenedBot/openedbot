@@ -29,7 +29,7 @@ ne demandent jamais root.
 | `doctor` | oui | Contrôle le runtime de bout en bout (gateway loopback, refus anonyme, catalogue) ; signale une instance de lien inactive. |
 | `export [--json\|--md]` | oui | Coordonnées non secrètes pour openedbot ; le bearer n'y figure jamais. |
 | `help` | oui | Liste les commandes (`-h` et `--help` aussi). Pas de root. |
-| `link --ohb URL` | | Handshake du lien connector, jeton persisté 0600, clé device scellée, démon démarré. Voir les drapeaux ci-dessous. |
+| `link --openedbot URL` | | Handshake du lien connector, jeton persisté 0600, clé device scellée, démon démarré. Voir les drapeaux ci-dessous. |
 | `mcp list\|add\|remove` | `list` | Jumeau console des verbes MCP que porte le lien : `add --url https://… --yes <nom>`, `remove --yes <nom>`. Le jeton passe par un fichier 0600 (`--auth header --token-file F`). |
 | `plan` | oui | Ce que `up` ferait, sans rien écrire. |
 | `reset --yes …` | | Retire ce que l'outil a posé, puis échoue s'il reste un résidu. `--plan` liste ce qui serait retiré sans rien toucher (sans `--yes`). `--purge-data --i-understand-data-loss` retire aussi les données runtime (bearer, identifiants, espaces de travail). `--purge-packages` purge aussi `docker-ce` et `containerd.io`. `--remove-admin` retire le compte `hermes-admin` et son fichier sudoers (refusé depuis sa propre session). `--restore-cloud-user` restaure le compte cloud-init mis en quarantaine depuis ses sauvegardes. `--legacy` purge l'ancien namespace `openhermesbot-*` ; avec lui, tailscale n'est retiré qu'avec `--purge-tailscale` (il est souvent votre accès). Voir [Remise à zéro](/fr/docs/reset). |
@@ -49,9 +49,9 @@ ne demandent jamais root.
 
 | Drapeau | Effet |
 |---|---|
-| `--ohb URL` | Origine openedbot, `https://` obligatoire. |
+| `--openedbot URL` | Origine openedbot, `https://` obligatoire. |
 | `--ticket-file F` | Fichier `0600` portant le ticket ; par défaut stdin, ou une invite sans écho. |
-| `--insecure-ohb` | Accepte en plus une origine `http://` **de la loopback** (développement, derrière un tunnel SSH inverse) ; toute autre origine `http://` reste refusée. |
+| `--insecure-openedbot` | Accepte en plus une origine `http://` **de la loopback** (développement, derrière un tunnel SSH inverse) ; toute autre origine `http://` reste refusée. |
 | `--name <name>` | Instance nommée (`^[a-z][a-z0-9-]{0,31}$`) : son propre lien, sa propre clé device et son unité `hermes-connector@<name>.service`, à côté du lien par défaut. C'est ce qui permet à un hôte de servir une prod et un dev à la fois. Voir [Instances nommées](#instances-nommées). |
 | `--rekey` | Régénère la clé device d'un runtime déjà lié, sans ticket ; la nouvelle clé publique est présentée sur une session. |
 

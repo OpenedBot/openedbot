@@ -223,8 +223,8 @@ jobs:
           echo "APPIMAGE=apps/desktop/$appimage" >> "$GITHUB_ENV"
           dpkg-deb --info "$deb"
           [ "$(dpkg-deb --field "$deb" Version)" = "$VERSION" ]
-          # The Google return (ohb://auth/callback) needs the scheme handler.
-          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/ohb'
+          # The Google return (openedbot://auth/callback) needs the scheme handler.
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
           [ -x "$appimage" ]
       - name: Smoke launch
         # The packaged app must stay up for 20 s on a virtual display (timeout

@@ -183,7 +183,7 @@ export const TurnActivity = memo(function TurnActivity({
       data-thinking={rolling ? "" : undefined}
       aria-label={t("threadTimeline.activityFeed")}
       aria-busy={live}
-      className={cn("flex w-full min-w-0 max-w-full flex-col self-start", settled && "ohb-turn-contain")}
+      className={cn("flex w-full min-w-0 max-w-full flex-col self-start", settled && "openedbot-turn-contain")}
     >
       <GrokAgentsHeader
         agents={agents}
@@ -214,7 +214,7 @@ export const TurnActivity = memo(function TurnActivity({
         style={{ transitionTimingFunction: "var(--grok-ease)" }}
       >
         <div className="min-h-0 overflow-hidden" inert={!logOpen} aria-hidden={!logOpen}>
-          <div role="list" data-activity-list="" className="ohb-activity-list flex flex-col gap-0.5 py-1">
+          <div role="list" data-activity-list="" className="openedbot-activity-list flex flex-col gap-0.5 py-1">
             {children}
           </div>
         </div>

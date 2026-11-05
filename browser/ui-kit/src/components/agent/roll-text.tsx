@@ -11,13 +11,13 @@ export type RollTextProps = {
   className?: string;
   /**
    * Classes on each rolling line rather than on the slot: a shimmer
-   * (`ohb-agent-label`) clips its gradient to its OWN text, so it has to sit
+   * (`openedbot-agent-label`) clips its gradient to its OWN text, so it has to sit
    * on the line that moves, not on a parent.
    */
   itemClassName?: string;
   /**
    * The working shimmer, animated with `transform` only (`ShineText`). Prefer
-   * it to `itemClassName="ohb-agent-label"`, which repaints every frame.
+   * it to `itemClassName="openedbot-agent-label"`, which repaints every frame.
    */
   shimmer?: boolean;
 };
@@ -51,16 +51,16 @@ export function RollText({ value, className, itemClassName, shimmer }: RollTextP
   }, [previous, generation]);
 
   return (
-    <span data-roll-text="" className={cn("ohb-roll", className)}>
+    <span data-roll-text="" className={cn("openedbot-roll", className)}>
       {previous !== null ? (
-        <span key={`out:${generation}`} aria-hidden="true" data-roll-out="" className={cn("ohb-roll-line ohb-roll-out", itemClassName)}>
+        <span key={`out:${generation}`} aria-hidden="true" data-roll-out="" className={cn("openedbot-roll-line openedbot-roll-out", itemClassName)}>
           {shimmer ? <ShineText>{previous}</ShineText> : previous}
         </span>
       ) : null}
       <span
         key={`in:${generation}`}
         data-roll-in={generation > 0 ? "" : undefined}
-        className={cn("ohb-roll-line", generation > 0 && "ohb-roll-in", itemClassName)}
+        className={cn("openedbot-roll-line", generation > 0 && "openedbot-roll-in", itemClassName)}
       >
         {shimmer ? <ShineText>{state.current}</ShineText> : state.current}
       </span>

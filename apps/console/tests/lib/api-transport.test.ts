@@ -56,7 +56,7 @@ describe("échéance des appels", () => {
   });
 
   test("une écriture sans réponse le dit : elle a peut-être abouti", async () => {
-    window.localStorage.setItem("ohb:locale", "fr");
+    window.localStorage.setItem("openedbot:locale", "fr");
     globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
     })) as typeof fetch;

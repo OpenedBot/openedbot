@@ -1,7 +1,7 @@
 import { CloudflareApiError, type CloudflareApiClient } from "@openedbot/platform-integrations/cloudflare-api";
 
 /**
- * OHB-75 : publier un gateway direct sur Cloudflare, en une passe.
+ * Publier un gateway direct sur Cloudflare, en une passe.
  *
  * Tunnel nommé (config côté Cloudflare), ingress vers le loopback du gateway,
  * CNAME proxifié, application Access self-hosted avec une politique Service

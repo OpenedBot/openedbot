@@ -1,7 +1,7 @@
 begin;
 
 -- Registre des instances API pour le routage instance-aware du lien
--- connecteur (OHB-25). Le broker WebSocket reste en mémoire du processus ;
+-- connecteur. Le broker WebSocket reste en mémoire du processus ;
 -- cette table dit quelle instance tient le tuyau, et comment les autres la
 -- joignent en interne.
 --
@@ -22,7 +22,7 @@ create table api_instances (
 );
 
 comment on table api_instances is
-  'Répliques API vivantes. Table d''exploitation hors RLS : instance_id (celui posé dans runtimes.link_instance_id), URL interne joignable par les autres répliques, heartbeat. Une ligne sans heartbeat depuis 60 s, ou avec stopped_at, est morte. ohb_api écrit, ohb_worker lit.';
+  'Répliques API vivantes. Table d''exploitation hors RLS : instance_id (celui posé dans runtimes.link_instance_id), URL interne joignable par les autres répliques, heartbeat. Une ligne sans heartbeat depuis 60 s, ou avec stopped_at, est morte. openedbot_api écrit, openedbot_worker lit.';
 comment on column api_instances.instance_id is
   'Identifiant de processus API, le même que runtimes.link_instance_id.';
 comment on column api_instances.internal_url is
@@ -70,11 +70,11 @@ comment on function runtime_link_owner(uuid) is
   'Instance qui tient le lien connecteur de ce runtime, et si elle est vivante (heartbeat < 60 s, pas d''arrêt propre). Traverse la RLS de runtimes : le relais interne n''a pas de tenant. Ne rend aucune donnée d''organisation.';
 
 revoke all on function runtime_link_owner(uuid) from public;
-grant execute on function runtime_link_owner(uuid) to ohb_api;
-grant execute on function runtime_link_owner(uuid) to ohb_worker;
+grant execute on function runtime_link_owner(uuid) to openedbot_api;
+grant execute on function runtime_link_owner(uuid) to openedbot_worker;
 
-grant select, insert, update, delete on api_instances to ohb_api;
-grant select on api_instances to ohb_worker;
+grant select, insert, update, delete on api_instances to openedbot_api;
+grant select on api_instances to openedbot_worker;
 
 insert into schema_migrations(version) values ('0040_api_instances')
 on conflict (version) do nothing;

@@ -253,7 +253,7 @@ export function isTitleLine(text: string): boolean {
 
 /**
  * The overridden block components drop the hast `className`; the stream's
- * `ohb-reveal` (`rehypeStreamWords`, on code) would never reach the DOM. This hands it to
+ * `openedbot-reveal` (`rehypeStreamWords`, on code) would never reach the DOM. This hands it to
  * the root element of whatever they render.
  */
 function carryingClassName<Props extends { className?: string; children?: ReactNode }, Rendered>(
@@ -338,7 +338,7 @@ function MermaidDiagram({ source }: { source: string }) {
             fontFamily: "Inter, sans-serif",
           },
         });
-        return mermaid.render(`ohb-mermaid-${id}`, source);
+        return mermaid.render(`openedbot-mermaid-${id}`, source);
       })
       .then(({ svg: rendered }) => {
         if (!cancelled) setSvg(rendered);
@@ -525,7 +525,7 @@ export const CodeBlock = memo(function CodeBlock({
       </button>
       {html ? (
         <div
-          className="scrollbar-subtle ohb-code overflow-x-auto px-3.5 py-3 text-xs leading-5"
+          className="scrollbar-subtle openedbot-code overflow-x-auto px-3.5 py-3 text-xs leading-5"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
@@ -630,11 +630,11 @@ export const documentMarkdownComponents: Components = {
 const stepComponents: Components = {
   ...proseComponents,
   ol: ({ children }) => (
-    <ol className="my-1 flex list-none flex-col gap-1.5 p-0 [counter-reset:ohb-step]">{children}</ol>
+    <ol className="my-1 flex list-none flex-col gap-1.5 p-0 [counter-reset:openedbot-step]">{children}</ol>
   ),
   li: ({ children }) => (
-    <li className="flex items-start gap-2 rounded-lg bg-background/50 px-2.5 py-1.5 [counter-increment:ohb-step]">
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium tabular-nums text-muted-foreground before:content-[counter(ohb-step)]" />
+    <li className="flex items-start gap-2 rounded-lg bg-background/50 px-2.5 py-1.5 [counter-increment:openedbot-step]">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium tabular-nums text-muted-foreground before:content-[counter(openedbot-step)]" />
       <div className="min-w-0 flex-1 [&_p]:my-0">{children}</div>
     </li>
   ),

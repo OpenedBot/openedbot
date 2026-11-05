@@ -82,7 +82,7 @@ export function createHermesClientContext(options: {
       const retryAfterMs = parseRetryAfterHeader(response.headers.get("Retry-After"));
       // L'extrait upstream reste CAPTURÉ (un 400 gateway opaque est indéboguable
       // sans lui), mais il quitte `message` : mesuré le 25-08, un fil affichait
-      // « Title already in use by session ohb:<org>:workflow:<id>:bot:<id> »,
+      // « Title already in use by session openedbot:<org>:workflow:<id>:bot:<id> »,
       // c'est-à-dire du JSON machine et des identifiants internes, à l'utilisateur.
       const diagnostic = parseUpstreamDiagnostic(text);
       const reference = diagnostic ? diagnosticReferenceParser(response.status, diagnostic) : null;

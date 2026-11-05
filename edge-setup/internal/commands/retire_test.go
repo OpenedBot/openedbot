@@ -23,7 +23,7 @@ import (
 
 func writeRetireLink(t *testing.T, inst layout.ConnectorInstance) {
 	t.Helper()
-	data, err := json.Marshal(LinkFile{Schema: 1, OHB: "https://openedbot.example", WSURL: "wss://openedbot.example/api/runtime-links/ws", RuntimeID: "rt-1", LinkToken: "test-link-token"})
+	data, err := json.Marshal(LinkFile{Schema: 1, Openedbot: "https://openedbot.example", WSURL: "wss://openedbot.example/api/runtime-links/ws", RuntimeID: "rt-1", LinkToken: "test-link-token"})
 	if err != nil {
 		t.Fatal(err)
 	}

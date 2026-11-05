@@ -3,7 +3,7 @@
 <!--
   Hardened runtime entitlements of every nested executable (Developer ID
   build): the Electron helpers, which run V8, and the notch popup
-  (Contents/Helpers/OHBPopup.app), which needs none of them: its Dock
+  (Contents/Helpers/OpenedbotPopup.app), which needs none of them: its Dock
   reading goes through Accessibility, a user grant, not an entitlement.
   electron-builder applies one file to all nested code; this one is the
   smallest set the helpers accept.

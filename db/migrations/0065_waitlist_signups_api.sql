@@ -4,7 +4,7 @@
 -- (« permission denied for table waitlist_signups »), sur une base à jour
 -- comme sur une base neuve.
 --
--- `ohb_api` obtient l'insertion, et rien d'autre : ni `select`, ni `update`,
+-- `openedbot_api` obtient l'insertion, et rien d'autre : ni `select`, ni `update`,
 -- ni `delete`, exactement comme 0064 le lui accorde sur `email_outbox`. Cette
 -- table porte des adresses en clair et aucune route ne la lit.
 --
@@ -18,7 +18,7 @@
 -- encore d'organisation au moment de l'inscription.
 begin;
 
-grant insert on waitlist_signups to ohb_api;
+grant insert on waitlist_signups to openedbot_api;
 
 insert into schema_migrations(version) values ('0065_waitlist_signups_api') on conflict (version) do nothing;
 

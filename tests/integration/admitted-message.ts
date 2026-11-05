@@ -15,7 +15,7 @@ type FixtureApp = {
 
 export type AdmittedMessage = { runId: string; messageId: string };
 
-/** Exercise the production admission route under ohb_api RLS, without a provider. */
+/** Exercise the production admission route under openedbot_api RLS, without a provider. */
 export async function admitFixtureMessage(
   db: Db,
   auth: AppVariables["auth"],

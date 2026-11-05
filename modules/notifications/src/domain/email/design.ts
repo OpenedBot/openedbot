@@ -117,7 +117,7 @@ const CONTENT_WIDTH = 520;
  * console : une URL que Vite ne hache pas, donc valable pour toujours dans les
  * boîtes déjà servies. Le fichier fait trois fois la taille affichée.
  */
-export const EMAIL_BRAND_MARK_URL = "https://openedbot.app/email/ohb-mark.png";
+export const EMAIL_BRAND_MARK_URL = "https://openedbot.app/email/openedbot-mark.png";
 
 /** La signature du pied de page, dans la langue du message. */
 const SIGNATURE: Record<EmailDocument["locale"], string> = {
@@ -147,11 +147,11 @@ export function renderEmailHtml(document: EmailDocument): string {
     `  ${preheaderHtml(document.preheader)}`,
     `  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${EMAIL_COLORS.page};">`,
     "    <tr>",
-    '      <td align="center" style="padding:48px 16px 40px 16px;" class="ohb-outer">',
+    '      <td align="center" style="padding:48px 16px 40px 16px;" class="openedbot-outer">',
     `        <table role="presentation" width="${CONTENT_WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${CONTENT_WIDTH}px;text-align:left;">`,
     "          <tr>",
     // La carte : le panneau blanc de BoardUI, filet clair, coins de 20 px.
-    `            <td style="background-color:${EMAIL_COLORS.card};border:1px solid ${EMAIL_COLORS.cardEdge};border-radius:20px;padding:40px 40px 32px 40px;" class="ohb-card">`,
+    `            <td style="background-color:${EMAIL_COLORS.card};border:1px solid ${EMAIL_COLORS.cardEdge};border-radius:20px;padding:40px 40px 32px 40px;" class="openedbot-card">`,
     `              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">`,
     ...brandHtml().map(indent(16)),
     ...document.blocks.flatMap((block) => renderBlockHtml(block)).map(indent(16)),
@@ -211,7 +211,7 @@ function renderBlockHtml(block: EmailBlock): string[] {
       );
     case "heading":
       return row(
-        `<h1 style="margin:0;padding:0;color:${EMAIL_COLORS.ink};font-family:${FONT_STACK};font-size:22px;line-height:1.3;font-weight:600;letter-spacing:-0.02em;" class="ohb-h1">${escapeHtml(block.text)}</h1>`,
+        `<h1 style="margin:0;padding:0;color:${EMAIL_COLORS.ink};font-family:${FONT_STACK};font-size:22px;line-height:1.3;font-weight:600;letter-spacing:-0.02em;" class="openedbot-h1">${escapeHtml(block.text)}</h1>`,
         "0 0 12px 0",
       );
     case "paragraph":
@@ -311,7 +311,7 @@ function codeHtml(label: string, code: string): string[] {
   return panelHtml(
     [
       "<tr>",
-      `  <td align="center" style="padding:0;color:${EMAIL_COLORS.ink};font-family:${FONT_STACK};font-size:34px;line-height:1.15;font-weight:600;letter-spacing:0.28em;font-variant-numeric:tabular-nums;" class="ohb-code" aria-label="${escapeHtml(label)}">${escapeHtml(code)}</td>`,
+      `  <td align="center" style="padding:0;color:${EMAIL_COLORS.ink};font-family:${FONT_STACK};font-size:34px;line-height:1.15;font-weight:600;letter-spacing:0.28em;font-variant-numeric:tabular-nums;" class="openedbot-code" aria-label="${escapeHtml(label)}">${escapeHtml(code)}</td>`,
       "</tr>",
     ],
     "24px 18px 24px 26px",
@@ -348,10 +348,10 @@ function footerHtml(document: EmailDocument): string[] {
     .join(`<span style="color:${EMAIL_COLORS.faint};">&nbsp;&nbsp;|&nbsp;&nbsp;</span>`);
   return [
     "<tr>",
-    `  <td style="padding:20px 40px 0 40px;color:${EMAIL_COLORS.dim};font-family:${FONT_STACK};font-size:12px;line-height:1.6;" class="ohb-foot">${escapeHtml(document.footerReason)}</td>`,
+    `  <td style="padding:20px 40px 0 40px;color:${EMAIL_COLORS.dim};font-family:${FONT_STACK};font-size:12px;line-height:1.6;" class="openedbot-foot">${escapeHtml(document.footerReason)}</td>`,
     "</tr>",
     "<tr>",
-    `  <td style="padding:6px 40px 0 40px;color:${EMAIL_COLORS.faint};font-family:${FONT_STACK};font-size:12px;line-height:1.6;" class="ohb-foot">${escapeHtml(SIGNATURE[document.locale])}${links ? `<br />${links}` : ""}</td>`,
+    `  <td style="padding:6px 40px 0 40px;color:${EMAIL_COLORS.faint};font-family:${FONT_STACK};font-size:12px;line-height:1.6;" class="openedbot-foot">${escapeHtml(SIGNATURE[document.locale])}${links ? `<br />${links}` : ""}</td>`,
     "</tr>",
   ];
 }
@@ -376,11 +376,11 @@ function styleSheet(): string[] {
     "table{border-collapse:separate;}",
     "img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}",
     "@media only screen and (max-width:560px){",
-    "  .ohb-outer{padding:20px 10px 28px 10px!important;}",
-    "  .ohb-card{padding:28px 22px 22px 22px!important;border-radius:16px!important;}",
-    "  .ohb-foot{padding-left:22px!important;padding-right:22px!important;}",
-    "  .ohb-h1{font-size:20px!important;}",
-    "  .ohb-code{font-size:28px!important;letter-spacing:0.2em!important;}",
+    "  .openedbot-outer{padding:20px 10px 28px 10px!important;}",
+    "  .openedbot-card{padding:28px 22px 22px 22px!important;border-radius:16px!important;}",
+    "  .openedbot-foot{padding-left:22px!important;padding-right:22px!important;}",
+    "  .openedbot-h1{font-size:20px!important;}",
+    "  .openedbot-code{font-size:28px!important;letter-spacing:0.2em!important;}",
     "}",
   ];
 }

@@ -25,16 +25,16 @@ insert into runtime_enrollments (
   'https://hermes-a.example.test', 'Runtime A', 'ABC234', now() + interval '5 minutes'
 );
 
-grant select, insert, update on enrollment_proof to ohb_api;
+grant select, insert, update on enrollment_proof to openedbot_api;
 
 -- 1. Une session du tenant A, sans le secret : rien.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update enrollment_proof set blind = (select count(*) from runtime_enrollments);
 reset role;
 
 -- 2. Le runtime, qui presente le secret : sa ligne, et seulement la sienne.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '', false) \g /dev/null
 select set_config('app.session_credential_hash', 'secret-hash-a', false) \g /dev/null
 update enrollment_proof set by_secret = (select count(*) from runtime_enrollments);
@@ -46,7 +46,7 @@ update runtime_enrollments
  where id = '70000000-0000-4000-8000-000000000071';
 
 -- 3. Le tenant B, sans le secret : toujours rien, meme apres reclamation.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.session_credential_hash', '', false) \g /dev/null
 select set_config('app.organization_id', '20000000-0000-4000-8000-000000000002', false) \g /dev/null
 update enrollment_proof set foreign_tenant = (select count(*) from runtime_enrollments);

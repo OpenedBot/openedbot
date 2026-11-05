@@ -192,9 +192,9 @@ function deliverOrganizationEvent(event: OrganizationEvent, organizationId: stri
   const accepted = acceptLiveEvent(liveDedupe, event, organizationId, streamCursor);
   streamCursor = accepted.streamCursor;
   if (!accepted.deliver) return;
-  // Réception, pas rendu : le HUD (OHB-107) date l'événement avant la file par frame.
+  // Réception, pas rendu : le HUD date l'événement avant la file par frame.
   if (event.type !== "message.admitted" && event.type !== "run.steering") {
-    globalThis.window?.__ohbThreadPerf?.recordRunEvent(event.runId, event.type);
+    globalThis.window?.__openedbotThreadPerf?.recordRunEvent(event.runId, event.type);
   }
   for (const listener of listeners) listener(event);
 }
@@ -499,7 +499,7 @@ export function useThreadStream(threadId: string | undefined) {
           ) proposalRuns.add(event.runId);
           if (terminal && proposalRuns.delete(event.runId)) invalidateThread = true;
         }
-        // One notification tick for both keys (OHB-135): the conversation
+        // One notification tick for both keys: the conversation
         // screen observes the roster and the thread, and two separate
         // `setQueryData` calls rendered it twice per flush.
         notifyManager.batch(() => {

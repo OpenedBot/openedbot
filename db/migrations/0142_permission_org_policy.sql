@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-8 (DEV-OHB-259): the organization permission policy of US-PERM2.
+-- PERM2-8: the organization permission policy of US-PERM2.
 --
 -- A dedicated table owned by `identity`, not columns on `organizations`:
 --   * `organizations` is a hot row written by several contexts (runtime-link
@@ -63,14 +63,14 @@ alter table organization_permission_policies enable row level security;
 alter table organization_permission_policies force row level security;
 -- The API reads its own tenant (members included) and never writes: every
 -- write goes through the definer function, which checks the role.
-create policy organization_permission_policies_tenant on organization_permission_policies for select to ohb_api
+create policy organization_permission_policies_tenant on organization_permission_policies for select to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 -- The worker reads the policy of the gate it decides, filtering on
 -- `organization_id` explicitly (`readOrganizationPermissionPolicy`).
-create policy organization_permission_policies_worker on organization_permission_policies for select to ohb_worker
+create policy organization_permission_policies_worker on organization_permission_policies for select to openedbot_worker
   using (true);
-grant select on organization_permission_policies to ohb_api;
-grant select on organization_permission_policies to ohb_worker;
+grant select on organization_permission_policies to openedbot_api;
+grant select on organization_permission_policies to openedbot_worker;
 comment on table organization_permission_policies is
   'PERM2-8: ceiling, enforced review, rules mode and command blocklist of an organization. Written only by set_organization_permission_policy (owner or admin); read by the API tenant and the worker pipeline.';
 
@@ -237,7 +237,7 @@ comment on function set_organization_permission_policy(uuid, uuid, text, boolean
   'PERM2-8: the only write of organization_permission_policies. Requires app.organization_id = p_organization_id and a live owner or admin membership of p_actor_user_id (agencies refused, D-5). Answers saved, unchanged, conflict (stale p_expected_version) or pipeline_legacy.';
 
 revoke all on function set_organization_permission_policy(uuid, uuid, text, boolean, text, text[], bigint) from public;
-grant execute on function set_organization_permission_policy(uuid, uuid, text, boolean, text, text[], bigint) to ohb_api;
+grant execute on function set_organization_permission_policy(uuid, uuid, text, boolean, text, text[], bigint) to openedbot_api;
 revoke all on function bots_permission_ceiling_guard() from public;
 revoke all on function organization_permission_policies_revision() from public;
 

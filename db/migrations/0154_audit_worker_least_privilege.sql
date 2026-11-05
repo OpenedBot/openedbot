@@ -1,6 +1,6 @@
 -- The worker no longer reads every tenant's audit (least privilege).
 --
--- 0152 and 0153 gave ohb_worker a `using (true)` SELECT on `audit_chain` and
+-- 0152 and 0153 gave openedbot_worker a `using (true)` SELECT on `audit_chain` and
 -- `audit_worm_orphans`. Neither is needed that wide:
 --
 -- * `audit_worm_orphans` has no worker reader at all (core or plug-in): the
@@ -14,16 +14,16 @@
 --   `audit_chain_for_purge(org)` instead: one organization, never NULL,
 --   only the columns the archive copies.
 --
--- The ohb_api policies of both tables are unchanged: tenant
+-- The openedbot_api policies of both tables are unchanged: tenant
 -- (`app.organization_id`) or link credential of a runtime of that same
 -- organization, never `using (true)`.
 begin;
 
 drop policy if exists audit_worm_orphans_worker on audit_worm_orphans;
-revoke all on audit_worm_orphans from ohb_worker;
+revoke all on audit_worm_orphans from openedbot_worker;
 
 drop policy if exists audit_chain_worker on audit_chain;
-revoke all on audit_chain from ohb_worker;
+revoke all on audit_chain from openedbot_worker;
 
 -- SECURITY DEFINER, owned by the migration role (BYPASSRLS, schema owner),
 -- never by an application role: it reads past the forced RLS, so the
@@ -61,7 +61,7 @@ begin
 end;
 $$;
 
--- Owner: the role that owns audit_chain, i.e. the migration role (ohb_migrator
+-- Owner: the role that owns audit_chain, i.e. the migration role (openedbot_migrator
 -- in prod and in the RLS proof, the local superuser on a dev database). It
 -- reads the table past the forced RLS; an application role never owns it.
 do $owner$
@@ -71,7 +71,7 @@ begin
   select t.tableowner into migrator
     from pg_catalog.pg_tables t
    where t.schemaname = 'public' and t.tablename = 'audit_chain';
-  if migrator in ('ohb_api', 'ohb_worker', 'ohb_staff') then
+  if migrator in ('openedbot_api', 'openedbot_worker', 'openedbot_staff') then
     raise exception 'audit_chain_for_purge: % is an application role, not the migration role', migrator;
   end if;
   execute pg_catalog.format('alter function public.audit_chain_for_purge(uuid) owner to %I', migrator);
@@ -79,10 +79,10 @@ end;
 $owner$;
 
 revoke all on function public.audit_chain_for_purge(uuid) from public;
-grant execute on function public.audit_chain_for_purge(uuid) to ohb_worker;
+grant execute on function public.audit_chain_for_purge(uuid) to openedbot_worker;
 
 comment on function public.audit_chain_for_purge(uuid) is
-  'The local audit chain of ONE organization, for the tenant purge archive (audit plug-in, onTenantDeleting). ohb_worker only; NULL raises 22004.';
+  'The local audit chain of ONE organization, for the tenant purge archive (audit plug-in, onTenantDeleting). openedbot_worker only; NULL raises 22004.';
 
 insert into schema_migrations(version) values ('0154_audit_worker_least_privilege')
 on conflict (version) do nothing;

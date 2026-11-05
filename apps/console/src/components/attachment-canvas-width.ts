@@ -16,7 +16,7 @@ export const CANVAS_MIN_WIDTH = 320;
 /** Ce que le fil garde au moins à côté du canevas : un composer utilisable. */
 export const CANVAS_THREAD_MIN_WIDTH = 360;
 const CANVAS_KEY_STEP = 32;
-const CANVAS_WIDTH_KEY = "ohb:attachment-canvas-width";
+const CANVAS_WIDTH_KEY = "openedbot:attachment-canvas-width";
 
 /** La largeur bornée : jamais sous le minimum, jamais au point d'écraser le fil. */
 export function clampCanvasWidth(width: number, rowWidth: number | null): number {

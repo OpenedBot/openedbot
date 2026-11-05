@@ -23,7 +23,7 @@ function shortId(id: string): string {
 
 export function moduleReport(path: string | undefined): Plugin {
   return {
-    name: "ohb-module-report",
+    name: "openedbot-module-report",
     apply: "build",
     writeBundle(_options, bundle) {
       if (!path) return;

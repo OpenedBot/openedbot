@@ -18,7 +18,7 @@ import type { AppVariables } from "../identity/auth";
 import { requestOrigin, requireOperator } from "../identity/auth";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
-import { connectorOHBOrigin } from "./runtime-enrollment-routes";
+import { connectorOpenedbotOrigin } from "./runtime-enrollment-routes";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import {
   catalogEnv,
@@ -113,7 +113,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
       throw new HttpError(409, "BOT_PROFILE_REQUIRED", "Ce bot n’a pas de profil Hermes : créez-le avant de connecter un serveur MCP.");
     }
     const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, MCP_OAUTH_PROFILE_FEATURE);
-    const origin = connectorOHBOrigin(config, requestOrigin(context) ?? undefined);
+    const origin = connectorOpenedbotOrigin(config, requestOrigin(context) ?? undefined);
     const redirectUri = `${origin}/api/mcp-oauth/callback/${encodeURIComponent(auth.organizationId)}/${encodeURIComponent(runtimeId)}/${encodeURIComponent(entry.id)}`;
     const rootServer = async () => {
       const inventory = await withDeadline(client.mcpInventory(), MCP_INVENTORY_TIMEOUT_MS);

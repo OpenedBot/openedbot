@@ -31,7 +31,7 @@
     <script>
       (function () {
         try {
-          var raw = localStorage.getItem("ohb:theme");
+          var raw = localStorage.getItem("openedbot:theme");
           // « light » et non « system » : le même défaut que DEFAULT_MODE dans
           // `browser/ui-kit/src/theme/config.ts`. Les deux doivent bouger ensemble, sinon
           // la page est peinte dans une couleur que React remplace aussitôt.
@@ -50,32 +50,32 @@
       (function () {
         var size = 11;
         try {
-          var stored = Number(localStorage.getItem("ohb:settings-text-size"));
+          var stored = Number(localStorage.getItem("openedbot:settings-text-size"));
           if ([10, 11, 12, 13, 14].indexOf(stored) >= 0) size = stored;
         } catch (e) {
           // Stockage refusé : la taille par défaut.
         }
-        document.documentElement.setAttribute("data-ohb-text-zoom", String(size / 14));
+        document.documentElement.setAttribute("data-openedbot-text-zoom", String(size / 14));
       })();
-      // La silhouette du cadre (`#ohb-boot`, plus bas) ne se montre qu'à qui
+      // La silhouette du cadre (`#openedbot-boot`, plus bas) ne se montre qu'à qui
       // entre DANS l'application : une session existe (navigateur, ou pont de
       // la coque native posé par son preload avant ce script) et le chemin
       // n'est pas une page publique ni un parcours sans barre latérale.
       // `main.tsx` la retire au premier rendu du routeur.
       (function () {
         // Match nativeTitlebarFor without setting the app's titlebar attribute.
-        if (window.__OHB_NATIVE__) {
+        if (window.__OPENEDBOT_NATIVE__) {
           var nativeTitlebar = /^Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent) ? "mac"
             : /^Win/.test(navigator.platform) || /Windows/.test(navigator.userAgent) ? "windows" : null;
-          if (nativeTitlebar) document.documentElement.setAttribute("data-ohb-boot-titlebar", nativeTitlebar);
+          if (nativeTitlebar) document.documentElement.setAttribute("data-openedbot-boot-titlebar", nativeTitlebar);
         }
         try {
           var path = location.pathname;
           var outside = /(^|\/)(login|legal|change-password|onboarding)(\/|$)/.test(path);
-          var session = !!window.__OHB_NATIVE__ || !!localStorage.getItem("ohb:cloud-session");
+          var session = !!window.__OPENEDBOT_NATIVE__ || !!localStorage.getItem("openedbot:cloud-session");
           // `/` is the app on every host (the public page lives on the public
           // site, `src/lib/session/public-site.ts`): it gets the app silhouette too.
-          if (session && !outside) document.documentElement.setAttribute("data-ohb-booting", "");
+          if (session && !outside) document.documentElement.setAttribute("data-openedbot-booting", "");
           // Fleet addresses (twin of FLEET_ADDRESS in the agency console module)
           // and client addresses share the agency frame (rail, bar, client list).
           var fleet = /^\/(?:fleets|(?:o\/[^/]+\/)?fleet)(?:\/|$)/.test(path);
@@ -83,7 +83,7 @@
           // `/` opens an agency's fleet when the tab's organization is an own
           // agency (`route-tree.tsx`, index route): read it from the same
           // stores as `lib/session/cloud-session.ts` and `lib/workspace/workspace-directory.ts`.
-          var directory = JSON.parse(sessionStorage.getItem("ohb:workspace-directory") || "{}");
+          var directory = JSON.parse(sessionStorage.getItem("openedbot:workspace-directory") || "{}");
           function ownFleet(key) {
             var wanted = String(key).toLowerCase();
             var found = (directory.workspaces || []).filter(function (w) {
@@ -91,8 +91,8 @@
             })[0];
             return !!found && found.kind === "agency" && found.role !== "agency";
           }
-          var stored = JSON.parse(localStorage.getItem("ohb:cloud-session") || "{}");
-          var tabOrganization = sessionStorage.getItem("ohb:workspace:" + (stored.userId || stored.csrfToken));
+          var stored = JSON.parse(localStorage.getItem("openedbot:cloud-session") || "{}");
+          var tabOrganization = sessionStorage.getItem("openedbot:workspace:" + (stored.userId || stored.csrfToken));
           var activeOrganization = tabOrganization || stored.organizationId;
           if (!fleet && path === "/" && session) fleet = ownFleet(activeOrganization);
           // Any other app address of an own agency draws the agency frame too:
@@ -104,24 +104,24 @@
           var framed = path.match(/^\/o\/([^/]+)(\/.*)?$/i);
           var fleetAccount = !fleet && !fleetClient && session && !outside
             && (framed ? !!framed[2] && framed[2] !== "/" && ownFleet(framed[1]) : path !== "/" && ownFleet(activeOrganization));
-          if (fleet || fleetClient || fleetAccount) document.documentElement.setAttribute("data-ohb-boot-fleet", "");
+          if (fleet || fleetClient || fleetAccount) document.documentElement.setAttribute("data-openedbot-boot-fleet", "");
           // No fleet board cards in the main card: it holds a client or account page.
-          if (fleetClient || fleetAccount) document.documentElement.setAttribute("data-ohb-boot-fleet-client", "");
+          if (fleetClient || fleetAccount) document.documentElement.setAttribute("data-openedbot-boot-fleet-client", "");
           // L'accent choisi, posé dès le décor : le premier rendu React l'a déjà
           // (`paintStoredTheme` le repose ensuite, même attribut, même valeur).
-          var theme = JSON.parse(localStorage.getItem("ohb:theme") || "{}");
+          var theme = JSON.parse(localStorage.getItem("openedbot:theme") || "{}");
           if (typeof theme.accent === "string") document.documentElement.setAttribute("data-accent", theme.accent);
           // La barre latérale repliée (`board-chrome.tsx`) : la silhouette aussi.
-          if (localStorage.getItem("ohb:sidebar-collapsed") === "1") document.documentElement.setAttribute("data-ohb-sidebar-collapsed", "");
+          if (localStorage.getItem("openedbot:sidebar-collapsed") === "1") document.documentElement.setAttribute("data-openedbot-sidebar-collapsed", "");
           // La disposition C, celle par défaut : le rail d'icônes de
           // `BoardIconRail`. Jumeau de `readAccountLayout` dans
           // `src/lib/shell/account-layout.ts` (clé, valeurs, défaut) : une valeur
           // absente ou inconnue vaut « c ». L'ancienne clé de dev
-          // (`ohb.dev.accountLayout`) dessinait la coque sans rail alors que
+          // (`openedbot.dev.accountLayout`) dessinait la coque sans rail alors que
           // l'application, elle, en avait un.
-          var layout = localStorage.getItem("ohb:accountLayout");
+          var layout = localStorage.getItem("openedbot:accountLayout");
           if (["base", "a", "b", "c"].indexOf(layout) < 0) layout = "c";
-          if (layout === "c" && !(fleet || fleetClient || fleetAccount)) document.documentElement.setAttribute("data-ohb-boot-rail", "");
+          if (layout === "c" && !(fleet || fleetClient || fleetAccount)) document.documentElement.setAttribute("data-openedbot-boot-rail", "");
         } catch (e) {
           // Sans localStorage : pas de silhouette, la page reste unie.
         }
@@ -152,7 +152,7 @@
         - Barre latérale de 272 px (marge gauche de 12 px) : une carte grise
           au rayon 24 et au liseré blanc (`BOARD_SIDEBAR_CARD`), ses trois
           boutons, les liens Salon et À traiter avec leur libellé, puis le
-          roster dessiné d'après sa dernière forme (`ohb:boot-sidebar`,
+          roster dessiné d'après sa dernière forme (`openedbot:boot-sidebar`,
           `lib/session/boot-shape.ts`) : tuiles épinglées, intitulés de section,
           rangées de 44 px. La ligne du compte de 50 px en bas.
         - Carte principale grise au rayon 24, sans bord ni ombre ; sur
@@ -171,10 +171,10 @@
         (boutons, icônes, libellés de navigation, accent choisi) est peint tel
         qu'il sera (`b`).
       */
-      #ohb-boot {
+      #openedbot-boot {
         display: none;
       }
-      html[data-ohb-booting] #ohb-boot {
+      html[data-openedbot-booting] #openedbot-boot {
         --boot-full: #fff;
         --boot-surface: #f7f7f7;
         --boot-card-edge: #fff;
@@ -189,7 +189,7 @@
         --boot-tile: #fff;
         --boot-tile-edge: #e5e5e5;
         --boot-tile-shape: #f7f7f7;
-        /* The thread lane (`--ohb-thread-column`, thread-timeline.css). */
+        /* The thread lane (`--openedbot-thread-column`, thread-timeline.css). */
         --boot-column: 44rem;
         --boot-composer: #f2f1ef;
         --boot-composer-edge: rgb(13 13 13 / 0.08);
@@ -202,7 +202,7 @@
         background: var(--boot-full);
         font-family: ui-sans-serif, system-ui, sans-serif;
       }
-      html.dark[data-ohb-booting] #ohb-boot {
+      html.dark[data-openedbot-booting] #openedbot-boot {
         --boot-full: #121212;
         --boot-surface: lab(7.78201% 0 0);
         --boot-card-edge: lab(15.7305% 0.613764 -2.16959);
@@ -217,24 +217,24 @@
         --boot-composer: #201f1d;
         --boot-composer-edge: rgba(252, 252, 252, 0.06);
       }
-      #ohb-boot * {
+      #openedbot-boot * {
         box-sizing: border-box;
       }
-      #ohb-boot i {
+      #openedbot-boot i {
         display: block;
         flex-shrink: 0;
         background: var(--boot-shape);
         border-radius: 6px;
-        animation: ohb-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        animation: openedbot-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
-      #ohb-boot svg {
+      #openedbot-boot svg {
         fill: currentColor;
       }
-      #ohb-boot .round {
+      #openedbot-boot .round {
         border-radius: 999px;
       }
       /* La barre du haut (`BoardTopBar`). */
-      #ohb-boot .bar {
+      #openedbot-boot .bar {
         position: relative;
         display: flex;
         flex: 0 0 46px;
@@ -243,30 +243,30 @@
         padding: 0 12px;
       }
       /* Reserve the same corners as native-titlebar.css before app CSS loads. */
-      html[data-ohb-boot-titlebar="mac"] #ohb-boot .bar::before {
+      html[data-openedbot-boot-titlebar="mac"] #openedbot-boot .bar::before {
         content: "";
         flex: 0 0 72px;
       }
-      html[data-ohb-boot-titlebar="windows"] #ohb-boot .bar {
+      html[data-openedbot-boot-titlebar="windows"] #openedbot-boot .bar {
         padding-inline-end: calc(
           100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)) + 12px
         );
       }
-      #ohb-boot .org {
+      #openedbot-boot .org {
         display: flex;
         align-items: center;
         gap: 8px;
         height: 30px;
         padding: 0 6px;
       }
-      /* The organization face is fixed artwork (seed "ohb-organization" in
+      /* The organization face is fixed artwork (seed "openedbot-organization" in
          BotFace), the label the one recorded on the last visit
-         (`ohb:boot-identity`, `src/lib/session/boot-identity.ts`): neither pulses. */
-      #ohb-boot .org .orgface {
+         (`openedbot:boot-identity`, `src/lib/session/boot-identity.ts`): neither pulses. */
+      #openedbot-boot .org .orgface {
         flex: 0 0 18px;
         object-fit: contain;
       }
-      #ohb-boot .org .orgname {
+      #openedbot-boot .org .orgname {
         max-width: 160px;
         overflow: hidden;
         font-size: 13px;
@@ -276,7 +276,7 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      #ohb-boot .ico {
+      #openedbot-boot .ico {
         display: inline-flex;
         flex: 0 0 30px;
         align-items: center;
@@ -284,41 +284,41 @@
         height: 30px;
         color: var(--boot-icon);
       }
-      #ohb-boot .ico svg {
+      #openedbot-boot .ico svg {
         width: 18px;
         height: 18px;
       }
       /* Le « + » de Grok Bot : un rond gris, pas un aplat d'accent. */
-      #ohb-boot .ico.create {
+      #openedbot-boot .ico.create {
         margin-inline-start: 4px;
         border-radius: 999px;
         background: var(--boot-shape);
         color: var(--boot-icon);
       }
       /* 8 px entre le repli et Précédent, comme `BoardTopBar`. */
-      #ohb-boot .history {
+      #openedbot-boot .history {
         display: flex;
         margin-inline-start: 4px;
         opacity: 0.35;
       }
-      #ohb-boot .bartools,
-      #ohb-boot .crumb,
-      #ohb-boot .acts,
-      #ohb-boot .thread,
-      #ohb-boot .composer {
+      #openedbot-boot .bartools,
+      #openedbot-boot .crumb,
+      #openedbot-boot .acts,
+      #openedbot-boot .thread,
+      #openedbot-boot .composer {
         display: none;
       }
-      #ohb-boot .bartools {
+      #openedbot-boot .bartools {
         align-items: center;
         gap: 4px;
       }
-      #ohb-boot .bartools .sep {
+      #openedbot-boot .bartools .sep {
         width: 1px;
         height: 18px;
         margin: 0 4px 0 8px;
         background: var(--boot-divider);
       }
-      #ohb-boot .crumb {
+      #openedbot-boot .crumb {
         flex: 1;
         align-items: center;
         gap: 6px;
@@ -328,88 +328,88 @@
         line-height: 18px;
         font-weight: 500;
       }
-      #ohb-boot .crumb .salon {
+      #openedbot-boot .crumb .salon {
         padding: 0 4px;
         color: var(--boot-text-2);
         white-space: nowrap;
       }
-      #ohb-boot .crumb .chev {
+      #openedbot-boot .crumb .chev {
         color: var(--boot-text-3);
       }
-      #ohb-boot .crumb .title {
+      #openedbot-boot .crumb .title {
         display: flex;
         align-items: center;
         gap: 8px;
         height: 30px;
         padding: 0 6px;
       }
-      #ohb-boot .crumb .title .name {
+      #openedbot-boot .crumb .title .name {
         width: 160px;
         height: 14px;
       }
       /* A bot's thread (`ConversationHeader`, `centered`): the title alone,
          without « Salon › », centred on the whole bar from `xl`. */
-      #ohb-boot.conv .crumb .salon,
-      #ohb-boot.conv .crumb .chev {
+      #openedbot-boot.conv .crumb .salon,
+      #openedbot-boot.conv .crumb .chev {
         display: none;
       }
-      #ohb-boot.conv .crumb .title .name {
+      #openedbot-boot.conv .crumb .title .name {
         width: 48px;
       }
       @media (min-width: 1280px) {
-        #ohb-boot.conv .crumb .title {
+        #openedbot-boot.conv .crumb .title {
           position: absolute;
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
         }
       }
-      #ohb-boot .acts {
+      #openedbot-boot .acts {
         align-items: center;
         gap: 4px;
       }
       /* The model (30 px round), the context gauge (ring and percent), options. */
-      #ohb-boot .acts .model {
+      #openedbot-boot .acts .model {
         width: 30px;
         height: 30px;
       }
-      #ohb-boot .acts .ctx {
+      #openedbot-boot .acts .ctx {
         width: 71px;
         height: 26px;
       }
-      #ohb-boot.conv .crumb,
-      #ohb-boot.conv .acts,
-      #ohb-boot.conv .thread,
-      #ohb-boot.conv .composer {
+      #openedbot-boot.conv .crumb,
+      #openedbot-boot.conv .acts,
+      #openedbot-boot.conv .thread,
+      #openedbot-boot.conv .composer {
         display: flex;
       }
       /* La flotte d'agence (module console de l'agence) : rail, navigation
          interne, synthèse et cartes clients, sans barre latérale personnelle. */
-      #ohb-boot > .fleet {
+      #openedbot-boot > .fleet {
         display: none;
       }
-      html[data-ohb-boot-fleet] #ohb-boot > .bar,
-      html[data-ohb-boot-fleet] #ohb-boot > .body {
+      html[data-openedbot-boot-fleet] #openedbot-boot > .bar,
+      html[data-openedbot-boot-fleet] #openedbot-boot > .body {
         display: none;
       }
-      html[data-ohb-boot-fleet] #ohb-boot > .fleet {
+      html[data-openedbot-boot-fleet] #openedbot-boot > .fleet {
         display: flex;
         flex: 1;
         flex-direction: column;
         min-height: 0;
       }
-      #ohb-boot .fleet .fbar {
+      #openedbot-boot .fleet .fbar {
         display: flex;
         flex: 0 0 46px;
         align-items: center;
         gap: 8px;
         padding: 0 12px;
       }
-      html[data-ohb-boot-titlebar="mac"] #ohb-boot .fleet .fbar::before {
+      html[data-openedbot-boot-titlebar="mac"] #openedbot-boot .fleet .fbar::before {
         content: "";
         flex: 0 0 72px;
       }
-      #ohb-boot .fleet .fbar .search {
+      #openedbot-boot .fleet .fbar .search {
         width: 320px;
         height: 30px;
         margin: 0 auto;
@@ -418,14 +418,14 @@
         border: 1px solid var(--boot-divider);
         animation: none;
       }
-      #ohb-boot .fleet .fbody {
+      #openedbot-boot .fleet .fbody {
         display: flex;
         flex: 1;
         min-height: 0;
         padding: 0 12px 12px 12px;
       }
       /* The desktop agency frame has no rail: sections are client tabs. */
-      #ohb-boot .fleet .rail {
+      #openedbot-boot .fleet .rail {
         display: none;
         flex: 0 0 63px;
         flex-direction: column;
@@ -433,7 +433,7 @@
         gap: 18px;
         padding-top: 14px;
       }
-      #ohb-boot .fleet .fnav {
+      #openedbot-boot .fleet .fnav {
         display: flex;
         flex: 0 0 256px;
         flex-direction: column;
@@ -443,7 +443,7 @@
         border-radius: 14px;
         background: var(--boot-surface);
       }
-      #ohb-boot .fleet .fmain {
+      #openedbot-boot .fleet .fmain {
         display: flex;
         flex: 1;
         flex-direction: column;
@@ -453,18 +453,18 @@
         background: var(--boot-full);
         overflow: hidden;
       }
-      #ohb-boot .fleet .cards {
+      #openedbot-boot .fleet .cards {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
       }
-      html[data-ohb-boot-fleet-client] #ohb-boot .fleet .cards {
+      html[data-openedbot-boot-fleet-client] #openedbot-boot .fleet .cards {
         display: none;
       }
-      #ohb-boot .fleet .cards.clients {
+      #openedbot-boot .fleet .cards.clients {
         align-items: start;
       }
-      #ohb-boot .fleet .tile {
+      #openedbot-boot .fleet .tile {
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -473,36 +473,36 @@
         border-radius: 16px;
         background: var(--boot-surface);
       }
-      #ohb-boot .fleet .clients .tile {
+      #openedbot-boot .fleet .clients .tile {
         min-height: 260px;
       }
       @media (max-width: 767px) {
-        #ohb-boot .fleet .rail,
-        #ohb-boot .fleet .fnav,
-        #ohb-boot .fleet .fbar .search {
+        #openedbot-boot .fleet .rail,
+        #openedbot-boot .fleet .fnav,
+        #openedbot-boot .fleet .fbar .search {
           display: none;
         }
-        #ohb-boot .fleet .fbody {
+        #openedbot-boot .fleet .fbody {
           padding-inline-start: 12px;
         }
-        #ohb-boot .fleet .cards {
+        #openedbot-boot .fleet .cards {
           grid-template-columns: minmax(0, 1fr);
         }
       }
       /* Sous la barre : la colonne de la barre latérale et la carte principale. */
-      #ohb-boot .body {
+      #openedbot-boot .body {
         display: flex;
         flex: 1;
         min-height: 0;
       }
-      #ohb-boot .side {
+      #openedbot-boot .side {
         display: flex;
         flex: 0 0 272px;
         min-width: 0;
         min-height: 0;
         padding: 0 0 12px 12px;
       }
-      #ohb-boot .card {
+      #openedbot-boot .card {
         display: flex;
         flex: 1;
         flex-direction: column;
@@ -513,12 +513,12 @@
         border-radius: 24px;
         background: var(--boot-surface);
       }
-      #ohb-boot .top {
+      #openedbot-boot .top {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 8px;
       }
-      #ohb-boot .top b {
+      #openedbot-boot .top b {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -527,21 +527,21 @@
         background: var(--boot-shape);
         color: var(--boot-icon);
       }
-      #ohb-boot .top b.create {
+      #openedbot-boot .top b.create {
         background: var(--boot-shape);
         color: var(--boot-icon);
       }
-      #ohb-boot .top svg {
+      #openedbot-boot .top svg {
         width: 20px;
         height: 20px;
       }
-      #ohb-boot .nav {
+      #openedbot-boot .nav {
         display: flex;
         flex-direction: column;
         gap: 1px;
         margin-top: 12px;
       }
-      #ohb-boot .nav b {
+      #openedbot-boot .nav b {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -552,12 +552,12 @@
         line-height: 18px;
         font-weight: 500;
       }
-      #ohb-boot .nav svg {
+      #openedbot-boot .nav svg {
         flex: 0 0 16px;
         height: 16px;
         color: var(--boot-icon);
       }
-      #ohb-boot .rows {
+      #openedbot-boot .rows {
         display: flex;
         flex: 1;
         flex-direction: column;
@@ -566,14 +566,14 @@
         margin-top: 0;
         overflow: hidden;
       }
-      #ohb-boot .pins {
+      #openedbot-boot .pins {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
         gap: 12px;
         padding: 8px 4px 12px;
       }
-      #ohb-boot .pin {
+      #openedbot-boot .pin {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -581,22 +581,22 @@
         width: 116px;
         padding: 6px 4px;
       }
-      #ohb-boot .pin .face {
+      #openedbot-boot .pin .face {
         width: 64px;
         height: 64px;
       }
-      #ohb-boot .block {
+      #openedbot-boot .block {
         display: flex;
         flex-direction: column;
         gap: 2px;
       }
-      #ohb-boot .label {
+      #openedbot-boot .label {
         display: flex;
         align-items: center;
         height: 30px;
         padding: 8px 8px 6px;
       }
-      #ohb-boot .row {
+      #openedbot-boot .row {
         display: flex;
         flex-shrink: 0;
         align-items: center;
@@ -604,42 +604,42 @@
         height: 54px;
         padding: 8px;
       }
-      #ohb-boot .face {
+      #openedbot-boot .face {
         flex: 0 0 36px;
         height: 36px;
         border-radius: 999px;
       }
-      #ohb-boot .lines {
+      #openedbot-boot .lines {
         display: grid;
         flex: 1;
         gap: 6px;
       }
-      #ohb-boot .l1 {
+      #openedbot-boot .l1 {
         width: 66%;
         height: 16px;
       }
-      #ohb-boot .l2 {
+      #openedbot-boot .l2 {
         width: 92%;
         height: 12px;
       }
-      #ohb-boot .foot {
+      #openedbot-boot .foot {
         margin-top: 6px;
       }
-      #ohb-boot .foot .row {
+      #openedbot-boot .foot .row {
         height: 50px;
         padding: 8px 10px;
       }
-      #ohb-boot .foot .face {
+      #openedbot-boot .foot .face {
         flex-basis: 26px;
         height: 26px;
       }
-      #ohb-boot .main {
+      #openedbot-boot .main {
         display: flex;
         flex: 1;
         min-width: 0;
         padding: 0 12px 12px;
       }
-      #ohb-boot .scene {
+      #openedbot-boot .scene {
         position: relative;
         display: flex;
         flex: 1;
@@ -654,7 +654,7 @@
          bubble on the right, the answer's bubble on the left (rounded 18,
          `min(80%, 560px)`), its action row and its duration; rows anchored on
          the composer, in the 44rem lane. */
-      #ohb-boot .thread {
+      #openedbot-boot .thread {
         flex: 1;
         flex-direction: column;
         justify-content: flex-end;
@@ -663,52 +663,52 @@
         padding: 16px 16px 24px;
         overflow: hidden;
       }
-      #ohb-boot .turn {
+      #openedbot-boot .turn {
         display: flex;
         flex-direction: column;
         width: 100%;
         max-width: var(--boot-column);
         margin-inline: auto;
       }
-      #ohb-boot .ask {
+      #openedbot-boot .ask {
         align-self: flex-end;
         max-width: min(560px, 100%);
         height: 36px;
         margin-bottom: 44px;
         border-radius: 18px;
       }
-      #ohb-boot .answer {
+      #openedbot-boot .answer {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
       }
-      #ohb-boot .answer .bubble {
+      #openedbot-boot .answer .bubble {
         max-width: min(80%, 560px);
         border-radius: 18px;
       }
-      #ohb-boot .answer .acts4 {
+      #openedbot-boot .answer .acts4 {
         display: flex;
         align-items: center;
         gap: 16px;
         height: 32px;
         padding: 0 8px;
       }
-      #ohb-boot .answer .acts4 i {
+      #openedbot-boot .answer .acts4 i {
         width: 16px;
         height: 16px;
         border-radius: 4px;
       }
-      #ohb-boot .answer .dur {
+      #openedbot-boot .answer .dur {
         width: 40px;
         height: 11px;
         margin: 4px 0 0 4px;
       }
       /* The turn rail (`thread-turn-rail.tsx`): one tick per question, on the
          thread's left edge, halfway down the reading area. */
-      #ohb-boot .trail {
+      #openedbot-boot .trail {
         display: none;
       }
-      #ohb-boot.conv .trail {
+      #openedbot-boot.conv .trail {
         position: absolute;
         top: calc(50% - 64px);
         left: 20px;
@@ -716,16 +716,16 @@
         flex-direction: column;
         gap: 6px;
       }
-      #ohb-boot .trail i {
+      #openedbot-boot .trail i {
         width: 16px;
         height: 2px;
         border-radius: 1px;
       }
       /* grok's composer (`max-w-[752px]`, 104 px, rounded 24, its own fill). */
-      #ohb-boot .composer {
+      #openedbot-boot .composer {
         padding: 8px 16px 20px;
       }
-      #ohb-boot .shell {
+      #openedbot-boot .shell {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -738,16 +738,16 @@
         border-radius: 24px;
         background: var(--boot-composer);
       }
-      #ohb-boot .shell .line {
+      #openedbot-boot .shell .line {
         width: 120px;
         height: 14px;
         margin: 21px 0 0 9px;
       }
-      #ohb-boot .shell .tools {
+      #openedbot-boot .shell .tools {
         display: flex;
         align-items: center;
       }
-      #ohb-boot .shell .plus {
+      #openedbot-boot .shell .plus {
         display: flex;
         width: 40px;
         height: 40px;
@@ -755,35 +755,35 @@
         justify-content: center;
         color: var(--boot-icon);
       }
-      #ohb-boot .shell .plus svg {
+      #openedbot-boot .shell .plus svg {
         width: 20px;
         height: 20px;
       }
-      #ohb-boot .shell .send {
+      #openedbot-boot .shell .send {
         width: 40px;
         height: 40px;
       }
-      #ohb-boot .shell .gap {
+      #openedbot-boot .shell .gap {
         flex: 1;
       }
       /* Barre latérale repliée : sa rangée d'outils monte dans la barre du haut. */
-      html[data-ohb-sidebar-collapsed] #ohb-boot .side,
-      html[data-ohb-sidebar-collapsed] #ohb-boot .org {
+      html[data-openedbot-sidebar-collapsed] #openedbot-boot .side,
+      html[data-openedbot-sidebar-collapsed] #openedbot-boot .org {
         display: none;
       }
-      html[data-ohb-sidebar-collapsed] #ohb-boot .bartools {
+      html[data-openedbot-sidebar-collapsed] #openedbot-boot .bartools {
         display: flex;
       }
       /* Variante C (dev) : le rail de 56 px sur toute la hauteur (`BoardIconRail`,
          board-rails.tsx), sans organisation dans la barre ; en tête de liste,
          la recherche et le « + », Salon et À traiter passent dans le rail. */
-      #ohb-boot .brail {
+      #openedbot-boot .brail {
         display: none;
       }
-      html[data-ohb-boot-rail] #ohb-boot {
+      html[data-openedbot-boot-rail] #openedbot-boot {
         padding-inline-start: 56px;
       }
-      html[data-ohb-boot-rail] #ohb-boot .brail {
+      html[data-openedbot-boot-rail] #openedbot-boot .brail {
         position: absolute;
         inset-block: 0;
         inset-inline-start: 0;
@@ -793,7 +793,7 @@
         align-items: center;
         padding-bottom: 12px;
       }
-      #ohb-boot .brail .logo {
+      #openedbot-boot .brail .logo {
         display: flex;
         flex: 0 0 46px;
         align-items: center;
@@ -801,18 +801,18 @@
       /* macOS : les feux couvrent la rangée du logo du rail, l'application le
          masque (native-titlebar.css) et la barre ne leur réserve que ce qui
          dépasse du rail (16 px, plus 4 px d'écart jusqu'au repli). */
-      html[data-ohb-boot-titlebar="mac"] #ohb-boot .brail .logo img {
+      html[data-openedbot-boot-titlebar="mac"] #openedbot-boot .brail .logo img {
         visibility: hidden;
       }
-      html[data-ohb-boot-titlebar="mac"][data-ohb-boot-rail] #ohb-boot .bar::before {
+      html[data-openedbot-boot-titlebar="mac"][data-openedbot-boot-rail] #openedbot-boot .bar::before {
         flex-basis: 16px;
       }
       /* Le bloub passe juste après les feux, avant le repli (`TitlebarLogo`,
          native-titlebar.css). */
-      #ohb-boot .bar .tlogo {
+      #openedbot-boot .bar .tlogo {
         display: none;
       }
-      html[data-ohb-boot-titlebar="mac"][data-ohb-boot-rail] #ohb-boot .bar .tlogo {
+      html[data-openedbot-boot-titlebar="mac"][data-openedbot-boot-rail] #openedbot-boot .bar .tlogo {
         display: block;
         flex: 0 0 22px;
         width: 22px;
@@ -820,20 +820,20 @@
         margin-inline-end: 8px;
         object-fit: contain;
       }
-      html.dark #ohb-boot .bar .tlogo {
+      html.dark #openedbot-boot .bar .tlogo {
         filter: invert(1) hue-rotate(180deg);
       }
       /* Match the loaded app before its brand stylesheet arrives. */
-      html.dark #ohb-boot .brail .logo img {
+      html.dark #openedbot-boot .brail .logo img {
         filter: invert(1) hue-rotate(180deg);
       }
-      #ohb-boot .brail .grp {
+      #openedbot-boot .brail .grp {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 6px;
       }
-      #ohb-boot .brail .grp b {
+      #openedbot-boot .brail .grp b {
         position: relative;
         display: flex;
         width: 36px;
@@ -842,12 +842,12 @@
         justify-content: center;
         color: var(--boot-icon);
       }
-      #ohb-boot .brail svg {
+      #openedbot-boot .brail svg {
         width: 18px;
         height: 18px;
       }
       /* Le runtime : pastille neutre, comme pendant sa première lecture. */
-      #ohb-boot .brail .runtime .dot {
+      #openedbot-boot .brail .runtime .dot {
         position: absolute;
         right: 4px;
         bottom: 4px;
@@ -859,10 +859,10 @@
       }
       /* The LLM quotas (`RailLlmQuotasLoading`): each brand mark, dimmed, in a
          neutral ring, until the first reading fills them. */
-      #ohb-boot .brail .quota {
-        animation: ohb-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      #openedbot-boot .brail .quota {
+        animation: openedbot-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
-      #ohb-boot .brail .quota .ring {
+      #openedbot-boot .brail .quota .ring {
         position: absolute;
         inset: 4px;
         width: 28px;
@@ -872,44 +872,44 @@
         stroke-width: 2;
         opacity: 0.15;
       }
-      #ohb-boot .brail .quota .mark {
+      #openedbot-boot .brail .quota .mark {
         width: 14px;
         height: 14px;
         opacity: 0.35;
       }
-      #ohb-boot .brail .sep {
+      #openedbot-boot .brail .sep {
         width: 20px;
         height: 1px;
         margin: 2px 0;
         background: var(--boot-divider);
       }
-      #ohb-boot svg.tb {
+      #openedbot-boot svg.tb {
         fill: none;
         stroke: currentColor;
         stroke-width: 2;
         stroke-linecap: round;
         stroke-linejoin: round;
       }
-      #ohb-boot .brail .gap {
+      #openedbot-boot .brail .gap {
         flex: 1;
       }
-      html[data-ohb-boot-rail] #ohb-boot .org,
-      html[data-ohb-boot-rail] #ohb-boot .nav,
-      html[data-ohb-boot-rail] #ohb-boot .foot {
+      html[data-openedbot-boot-rail] #openedbot-boot .org,
+      html[data-openedbot-boot-rail] #openedbot-boot .nav,
+      html[data-openedbot-boot-rail] #openedbot-boot .foot {
         display: none;
       }
-      html[data-ohb-boot-rail] #ohb-boot .side {
+      html[data-openedbot-boot-rail] #openedbot-boot .side {
         padding-inline-start: 0;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top {
+      html[data-openedbot-boot-rail] #openedbot-boot .top {
         display: flex;
         margin-bottom: 4px;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top b {
+      html[data-openedbot-boot-rail] #openedbot-boot .top b {
         height: 32px;
         border-radius: 8px;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top b.search {
+      html[data-openedbot-boot-rail] #openedbot-boot .top b.search {
         flex: 1;
         justify-content: flex-start;
         gap: 6px;
@@ -917,13 +917,13 @@
         overflow: hidden;
         padding-inline-start: 10px;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top > span {
+      html[data-openedbot-boot-rail] #openedbot-boot .top > span {
         display: none;
       }
-      #ohb-boot .top .ph {
+      #openedbot-boot .top .ph {
         display: none;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top .ph {
+      html[data-openedbot-boot-rail] #openedbot-boot .top .ph {
         display: block;
         overflow: hidden;
         font-size: 13px;
@@ -933,11 +933,11 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top b.create {
+      html[data-openedbot-boot-rail] #openedbot-boot .top b.create {
         flex: 0 0 32px;
         border-radius: 999px;
       }
-      html[data-ohb-boot-rail] #ohb-boot .top svg {
+      html[data-openedbot-boot-rail] #openedbot-boot .top svg {
         width: 16px;
         height: 16px;
       }
@@ -947,29 +947,29 @@
          Activité (`OverviewBodySkeleton`), une carte ailleurs
          (`SettingsBodySkeleton`). Mêmes mesures que le vrai menu : boutons de
          36 px, groupes espacés de 20 px, intitulé de 20 px. */
-      #ohb-boot .snav,
-      #ohb-boot .pane {
+      #openedbot-boot .snav,
+      #openedbot-boot .pane {
         display: none;
       }
-      html[data-ohb-booting] #ohb-boot.settings .top,
-      html[data-ohb-booting] #ohb-boot.settings .nav,
-      html[data-ohb-booting] #ohb-boot.settings .rows,
-      html[data-ohb-booting] #ohb-boot.settings .foot {
+      html[data-openedbot-booting] #openedbot-boot.settings .top,
+      html[data-openedbot-booting] #openedbot-boot.settings .nav,
+      html[data-openedbot-booting] #openedbot-boot.settings .rows,
+      html[data-openedbot-booting] #openedbot-boot.settings .foot {
         display: none;
       }
       /* Le menu des réglages reste ouvert même barre repliée, avec sa marge de 12 px. */
-      html[data-ohb-booting] #ohb-boot.settings .side {
+      html[data-openedbot-booting] #openedbot-boot.settings .side {
         display: flex;
         padding-inline-start: 12px;
       }
-      #ohb-boot.settings .snav {
+      #openedbot-boot.settings .snav {
         display: flex;
         flex-direction: column;
         gap: 20px;
         min-height: 0;
         overflow: hidden;
       }
-      #ohb-boot .sitem {
+      #openedbot-boot .sitem {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -981,57 +981,57 @@
         line-height: 20px;
         font-weight: 500;
       }
-      #ohb-boot .sitem.on {
+      #openedbot-boot .sitem.on {
         background: var(--boot-shape);
         color: var(--boot-text);
       }
-      #ohb-boot .sitem svg {
+      #openedbot-boot .sitem svg {
         flex: 0 0 20px;
         height: 20px;
         color: var(--boot-icon);
       }
-      #ohb-boot .sitem span {
+      #openedbot-boot .sitem span {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      #ohb-boot .sgrp {
+      #openedbot-boot .sgrp {
         display: flex;
         flex-direction: column;
         gap: 6px;
         padding-top: 4px;
       }
-      #ohb-boot .sgrp > span {
+      #openedbot-boot .sgrp > span {
         padding-inline-start: 8px;
         color: var(--boot-text-2);
         font-size: 14px;
         line-height: 20px;
         font-weight: 500;
       }
-      #ohb-boot .sgrp > div {
+      #openedbot-boot .sgrp > div {
         display: flex;
         flex-direction: column;
         gap: 4px;
       }
-      #ohb-boot.settings .crumb {
+      #openedbot-boot.settings .crumb {
         display: flex;
       }
-      #ohb-boot.settings .crumb .title {
+      #openedbot-boot.settings .crumb .title {
         color: var(--boot-text);
         font-weight: 600;
         white-space: nowrap;
       }
-      #ohb-boot.settings .pane.section,
-      #ohb-boot.settings.overview .pane.overview {
+      #openedbot-boot.settings .pane.section,
+      #openedbot-boot.settings.overview .pane.overview {
         display: flex;
       }
-      #ohb-boot.settings.overview .pane.section {
+      #openedbot-boot.settings.overview .pane.section {
         display: none;
       }
       /* `SettingsPane` dans `SettingsPage` (24 px en haut ; 12 px de côté, 16 px dès 1024 px) ; les tuiles et les graphiques suivent la
          largeur de la page, comme `@container/main` : 2 colonnes dès 36rem,
          4 tuiles et 2 graphiques dès 64rem. */
-      #ohb-boot .pane {
+      #openedbot-boot .pane {
         flex: 1;
         flex-direction: column;
         gap: 24px;
@@ -1041,42 +1041,42 @@
         container-type: inline-size;
       }
       @media (min-width: 1024px) {
-        #ohb-boot .pane {
+        #openedbot-boot .pane {
           padding-inline: 16px;
         }
       }
       /* Activité déborde toujours (tableau des bots, configuration) : la vraie
          page porte une barre de défilement fine, sa place est réservée ici. */
-      #ohb-boot .pane.overview {
+      #openedbot-boot .pane.overview {
         scrollbar-width: thin;
         scrollbar-gutter: stable;
       }
-      #ohb-boot .tiles {
+      #openedbot-boot .tiles {
         display: grid;
         grid-template-columns: 1fr;
         gap: 16px;
       }
-      #ohb-boot .charts {
+      #openedbot-boot .charts {
         display: grid;
         grid-template-columns: 1fr;
         gap: 24px;
       }
       @container (min-width: 36rem) {
-        #ohb-boot .tiles {
+        #openedbot-boot .tiles {
           grid-template-columns: repeat(2, 1fr);
         }
       }
       @container (min-width: 64rem) {
-        #ohb-boot .tiles {
+        #openedbot-boot .tiles {
           grid-template-columns: repeat(4, 1fr);
         }
-        #ohb-boot .charts {
+        #openedbot-boot .charts {
           grid-template-columns: repeat(2, 1fr);
         }
       }
-      #ohb-boot .tile,
-      #ohb-boot .chart,
-      #ohb-boot .scard {
+      #openedbot-boot .tile,
+      #openedbot-boot .chart,
+      #openedbot-boot .scard {
         display: flex;
         flex-direction: column;
         border: 1px solid var(--boot-tile-edge);
@@ -1084,120 +1084,120 @@
         background: var(--boot-tile);
       }
       /* Les barres d'une carte, d'un cran plus claires (`ON_CARD`, overview-skeleton.tsx). */
-      #ohb-boot .tile i,
-      #ohb-boot .chart i,
-      #ohb-boot .scard i {
+      #openedbot-boot .tile i,
+      #openedbot-boot .chart i,
+      #openedbot-boot .scard i {
         background: var(--boot-tile-shape);
       }
-      #ohb-boot .tile {
+      #openedbot-boot .tile {
         justify-content: space-between;
         height: 140px;
         padding: 16px;
       }
-      #ohb-boot .tile .head,
-      #ohb-boot .chart .head {
+      #openedbot-boot .tile .head,
+      #openedbot-boot .chart .head {
         display: flex;
         justify-content: space-between;
         gap: 12px;
       }
       /* Titre de 14 px, puis des lignes de description de 20 px. */
-      #ohb-boot .chart .head > div {
+      #openedbot-boot .chart .head > div {
         display: flex;
         flex-direction: column;
       }
-      #ohb-boot .chart .head .d {
+      #openedbot-boot .chart .head .d {
         height: 14px;
         margin: 3px 0;
       }
-      #ohb-boot .chart .head > div > i:first-child {
+      #openedbot-boot .chart .head > div > i:first-child {
         margin-bottom: 5px;
       }
-      #ohb-boot .tile .foot2 {
+      #openedbot-boot .tile .foot2 {
         display: grid;
         gap: 6px;
       }
-      #ohb-boot .chart {
+      #openedbot-boot .chart {
         gap: 24px;
         min-height: 390px;
         padding: 24px;
       }
-      #ohb-boot .chart.tokens {
+      #openedbot-boot .chart.tokens {
         min-height: 410px;
       }
-      #ohb-boot .chart .plot {
+      #openedbot-boot .chart .plot {
         display: flex;
         flex-direction: column;
         gap: 8px;
         height: 250px;
         margin-top: auto;
       }
-      #ohb-boot .chart .plot > i {
+      #openedbot-boot .chart .plot > i {
         flex: 1;
       }
-      #ohb-boot .chart .ticks {
+      #openedbot-boot .chart .ticks {
         display: flex;
         justify-content: space-between;
         padding: 0 8px;
       }
-      #ohb-boot .chart .ticks i {
+      #openedbot-boot .chart .ticks i {
         width: 40px;
         height: 12px;
       }
-      #ohb-boot .scard {
+      #openedbot-boot .scard {
         gap: 12px;
         border-radius: 12px;
         padding: 16px;
       }
-      #ohb-boot .scard .row40 {
+      #openedbot-boot .scard .row40 {
         height: 40px;
         border-radius: 8px;
       }
       /* Téléphone : `MobileFrame` range la barre dans un tiroir, la scène occupe tout. */
       @media (max-width: 767px) {
-        #ohb-boot .bar,
-        #ohb-boot .side,
-        html[data-ohb-boot-rail] #ohb-boot .brail {
+        #openedbot-boot .bar,
+        #openedbot-boot .side,
+        html[data-openedbot-boot-rail] #openedbot-boot .brail {
           display: none;
         }
-        html[data-ohb-boot-rail] #ohb-boot {
+        html[data-openedbot-boot-rail] #openedbot-boot {
           padding-inline-start: 0;
         }
-        #ohb-boot .main {
+        #openedbot-boot .main {
           padding: 0;
         }
-        #ohb-boot .scene {
+        #openedbot-boot .scene {
           border-radius: 0;
         }
-        #ohb-boot.conv .thread,
-        #ohb-boot.conv .composer,
-        #ohb-boot.conv .trail {
+        #openedbot-boot.conv .thread,
+        #openedbot-boot.conv .composer,
+        #openedbot-boot.conv .trail {
           display: none;
         }
       }
-      @keyframes ohb-boot-pulse {
+      @keyframes openedbot-boot-pulse {
         50% {
           opacity: 0.5;
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        #ohb-boot i,
-        #ohb-boot .brail .quota {
+        #openedbot-boot i,
+        #openedbot-boot .brail .quota {
           animation: none;
         }
       }
     </style>
   </head>
   <body>
-    <div id="ohb-boot" role="status" aria-busy="true" aria-label="Chargement">
+    <div id="openedbot-boot" role="status" aria-busy="true" aria-label="Chargement">
       <!-- Remix Icon (Apache 2.0) : les icônes de `BoardTopBar`, `BoardSidebar` et `ConversationHeader` ; Tabler Icons (MIT, `svg.tb`) : celles du runtime et du menu des réglages. -->
       <div class="brail" aria-hidden="true">
-        <div class="logo"><img src="/brand/ohb-icon.webp" alt="" width="28" height="28"></div>
+        <div class="logo"><img src="/brand/openedbot-icon.webp" alt="" width="28" height="28"></div>
         <div class="grp"><b><svg viewBox="0 0 24 24"><path d="M13 19H19V9.97815L12 4.53371L5 9.97815V19H11V13H13V19ZM21 20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V9.48907C3 9.18048 3.14247 8.88917 3.38606 8.69972L11.3861 2.47749C11.7472 2.19663 12.2528 2.19663 12.6139 2.47749L20.6139 8.69972C20.8575 8.88917 21 9.18048 21 9.48907V20Z"/></svg></b><b><svg viewBox="0 0 24 24"><path d="M21 3C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3H21ZM7.41604 14H4V19H20V14H16.584C15.8124 15.7659 14.0503 17 12 17C9.94968 17 8.1876 15.7659 7.41604 14ZM20 5H4V12H9C9 13.6569 10.3431 15 12 15C13.6569 15 15 13.6569 15 12H20V5Z"/></svg></b></div>
         <span class="gap"></span>
         <div class="grp"><b class="quota"><svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5"/></svg><svg class="mark" viewBox="0 0 24 24" fill-rule="evenodd"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/></svg></b><b class="quota"><svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5"/></svg><svg class="mark" viewBox="0 0 24 24" fill-rule="evenodd"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg></b><b class="quota"><svg class="ring" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5"/></svg><svg class="mark" viewBox="0 0 24 24" fill-rule="evenodd"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"/></svg></b><b class="runtime"><svg class="tb" viewBox="0 0 24 24"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M15 20h-9a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h12"/><path d="M7 8v.01"/><path d="M7 16v.01"/><path d="M20 15l-2 3h3l-2 3"/></svg><span class="dot"></span></b><span class="sep"></span><b><svg viewBox="0 0 24 24"><path d="M3.33946 17.0002C2.90721 16.2515 2.58277 15.4702 2.36133 14.6741C3.3338 14.1779 3.99972 13.1668 3.99972 12.0002C3.99972 10.8345 3.3348 9.824 2.36353 9.32741C2.81025 7.71651 3.65857 6.21627 4.86474 4.99001C5.7807 5.58416 6.98935 5.65534 7.99972 5.072C9.01009 4.48866 9.55277 3.40635 9.4962 2.31604C11.1613 1.8846 12.8847 1.90004 14.5031 2.31862C14.4475 3.40806 14.9901 4.48912 15.9997 5.072C17.0101 5.65532 18.2187 5.58416 19.1346 4.99007C19.7133 5.57986 20.2277 6.25151 20.66 7.00021C21.0922 7.7489 21.4167 8.53025 21.6381 9.32628C20.6656 9.82247 19.9997 10.8336 19.9997 12.0002C19.9997 13.166 20.6646 14.1764 21.6359 14.673C21.1892 16.2839 20.3409 17.7841 19.1347 19.0104C18.2187 18.4163 17.0101 18.3451 15.9997 18.9284C14.9893 19.5117 14.4467 20.5941 14.5032 21.6844C12.8382 22.1158 11.1148 22.1004 9.49633 21.6818C9.55191 20.5923 9.00929 19.5113 7.99972 18.9284C6.98938 18.3451 5.78079 18.4162 4.86484 19.0103C4.28617 18.4205 3.77172 17.7489 3.33946 17.0002ZM8.99972 17.1964C10.0911 17.8265 10.8749 18.8227 11.2503 19.9659C11.7486 20.0133 12.2502 20.014 12.7486 19.9675C13.1238 18.8237 13.9078 17.8268 14.9997 17.1964C16.0916 16.5659 17.347 16.3855 18.5252 16.6324C18.8146 16.224 19.0648 15.7892 19.2729 15.334C18.4706 14.4373 17.9997 13.2604 17.9997 12.0002C17.9997 10.74 18.4706 9.5632 19.2729 8.6665C19.1688 8.4405 19.0538 8.21822 18.9279 8.00021C18.802 7.78219 18.667 7.57148 18.5233 7.36842C17.3457 7.61476 16.0911 7.43414 14.9997 6.80405C13.9083 6.17395 13.1246 5.17768 12.7491 4.03455C12.2509 3.98714 11.7492 3.98646 11.2509 4.03292C10.8756 5.17671 10.0916 6.17364 8.99972 6.80405C7.9078 7.43447 6.65245 7.61494 5.47428 7.36803C5.18485 7.77641 4.93463 8.21117 4.72656 8.66637C5.52881 9.56311 5.99972 10.74 5.99972 12.0002C5.99972 13.2604 5.52883 14.4372 4.72656 15.3339C4.83067 15.5599 4.94564 15.7822 5.07152 16.0002C5.19739 16.2182 5.3324 16.4289 5.47612 16.632C6.65377 16.3857 7.90838 16.5663 8.99972 17.1964ZM11.9997 15.0002C10.3429 15.0002 8.99972 13.6571 8.99972 12.0002C8.99972 10.3434 10.3429 9.00021 11.9997 9.00021C13.6566 9.00021 14.9997 10.3434 14.9997 12.0002C14.9997 13.6571 13.6566 15.0002 11.9997 15.0002ZM11.9997 13.0002C12.552 13.0002 12.9997 12.5525 12.9997 12.0002C12.9997 11.4479 12.552 11.0002 11.9997 11.0002C11.4474 11.0002 10.9997 11.4479 10.9997 12.0002C10.9997 12.5525 11.4474 13.0002 11.9997 13.0002Z"/></svg></b></div>
       </div>
       <div class="bar" aria-hidden="true">
-        <img class="tlogo" src="/brand/ohb-icon.webp" alt="" width="22" height="22">
+        <img class="tlogo" src="/brand/openedbot-icon.webp" alt="" width="22" height="22">
         <div class="org"><img class="orgface" src="/bots/bot-comet.webp" alt="" width="18" height="18"><i style="width:64px;height:14px"></i></div>
         <b class="ico"><svg viewBox="0 0 24 24"><path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM8 5H4V19H8V5ZM10 5V19H20V5H10Z"/></svg></b>
         <div class="bartools"><b class="ico"><svg viewBox="0 0 24 24"><path d="M18.031 16.6168L22.3137 20.8995L20.8995 22.3137L16.6168 18.031C15.0769 19.263 13.124 20 11 20C6.032 20 2 15.968 2 11C2 6.032 6.032 2 11 2C15.968 2 20 6.032 20 11C20 13.124 19.263 15.0769 18.031 16.6168ZM16.0247 15.8748C17.2475 14.6146 18 12.8956 18 11C18 7.1325 14.8675 4 11 4C7.1325 4 4 7.1325 4 11C4 14.8675 7.1325 18 11 18C12.8956 18 14.6146 17.2475 15.8748 16.0247L16.0247 15.8748Z"/></svg></b><b class="ico"><svg viewBox="0 0 24 24"><path d="M21 13.2422V20H22V22H2V20H3V13.2422C1.79401 12.435 1 11.0602 1 9.5C1 8.67286 1.22443 7.87621 1.63322 7.19746L4.3453 2.5C4.52393 2.1906 4.85406 2 5.21132 2H18.7887C19.1459 2 19.4761 2.1906 19.6547 2.5L22.3575 7.18172C22.7756 7.87621 23 8.67286 23 9.5C23 11.0602 22.206 12.435 21 13.2422ZM19 13.9725C18.8358 13.9907 18.669 14 18.5 14C17.2409 14 16.0789 13.478 15.25 12.6132C14.4211 13.478 13.2591 14 12 14C10.7409 14 9.5789 13.478 8.75 12.6132C7.9211 13.478 6.75911 14 5.5 14C5.331 14 5.16417 13.9907 5 13.9725V20H19V13.9725ZM5.78865 4L3.35598 8.21321C3.12409 8.59843 3 9.0389 3 9.5C3 10.8807 4.11929 12 5.5 12C6.53096 12 7.44467 11.3703 7.82179 10.4295C8.1574 9.59223 9.3426 9.59223 9.67821 10.4295C10.0553 11.3703 10.969 12 12 12C13.031 12 13.9447 11.3703 14.3218 10.4295C14.6574 9.59223 15.8426 9.59223 16.1782 10.4295C16.5553 11.3703 17.469 12 18.5 12C19.8807 12 21 10.8807 21 9.5C21 9.0389 20.8759 8.59843 20.6347 8.19746L18.2113 4H5.78865Z"/></svg></b><b class="ico create"><svg viewBox="0 0 24 24"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"/></svg></b><span class="sep"></span></div>
@@ -1262,10 +1262,10 @@
       // la forme du dernier roster (`lib/session/boot-shape.ts`, mêmes bornes) et si
       // l'adresse est une conversation (`isConversationPath`).
       (function () {
-        var boot = document.getElementById("ohb-boot");
+        var boot = document.getElementById("openedbot-boot");
         if (!boot) return;
         try {
-          var locale = localStorage.getItem("ohb:locale") || (navigator.language || "").slice(0, 2).toLowerCase();
+          var locale = localStorage.getItem("openedbot:locale") || (navigator.language || "").slice(0, 2).toLowerCase();
           if (locale === "en") {
             boot.setAttribute("aria-label", "Loading");
             boot.querySelector(".inbox").textContent = "Inbox";
@@ -1300,8 +1300,8 @@
             });
           }
           try {
-            var identity = JSON.parse(localStorage.getItem("ohb:boot-identity") || "null");
-            var session = JSON.parse(localStorage.getItem("ohb:cloud-session") || "null");
+            var identity = JSON.parse(localStorage.getItem("openedbot:boot-identity") || "null");
+            var session = JSON.parse(localStorage.getItem("openedbot:cloud-session") || "null");
             var orgSlot = boot.querySelector(".org i");
             if (orgSlot && identity && session && typeof identity.label === "string" && identity.label
               && typeof identity.userId === "string" && identity.userId === session.userId) {
@@ -1312,7 +1312,7 @@
             }
           } catch (e) { /* the label keeps pulsing */ }
           var shape = null;
-          try { shape = JSON.parse(localStorage.getItem("ohb:boot-sidebar") || "null"); } catch (e) { shape = null; }
+          try { shape = JSON.parse(localStorage.getItem("openedbot:boot-sidebar") || "null"); } catch (e) { shape = null; }
           if (!shape || typeof shape.pins !== "number" || !Array.isArray(shape.blocks)) shape = { pins: 0, blocks: [{ label: true, rows: 5 }] };
           var rows = boot.querySelector(".rows");
           var html = "";

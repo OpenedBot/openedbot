@@ -69,7 +69,7 @@ func saveMacStatusLink(t *testing.T, inst layout.ConnectorInstance, p layout.Mac
 		t.Fatal("could not create temporary connector directory")
 	}
 	data, err := json.Marshal(LinkFile{
-		Schema: 1, OHB: "https://ohb.fixture.invalid", WSURL: "wss://link.fixture.invalid/ws",
+		Schema: 1, Openedbot: "https://openedbot.fixture.invalid", WSURL: "wss://link.fixture.invalid/ws",
 		RuntimeID: runtimeID, LinkToken: "fixture-link-token-never-return-this",
 	})
 	if err != nil {

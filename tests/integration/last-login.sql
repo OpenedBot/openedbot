@@ -7,7 +7,7 @@
 --                          sans date les gardent nulles, donc la colonne ne
 --                          promet rien sur le passe ;
 --   2. api_write         : le chemin d authentification (recordUserLogin)
---                          ecrit la date sous le role ohb_api, par le seul
+--                          ecrit la date sous le role openedbot_api, par le seul
 --                          grant table de 0001. users n est pas sous RLS, il n
 --                          y a aucune policy a ouvrir ;
 --   3. session_untouched : un compte dont une session VIVANTE porte une
@@ -36,7 +36,7 @@ insert into last_login_proof values (
   'unset', 'unset', 'unset', 'unset', 'unset', 'unset', 'unset'
 );
 
-grant select, insert, update on last_login_proof to ohb_api;
+grant select, insert, update on last_login_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('c0000000-0000-4000-8000-000000000001', 'lastlogin-staff@example.test', 'x', 'Last Login Staff');
@@ -76,7 +76,7 @@ update last_login_proof
           where email like '%@lastlogin.test'
        );
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', 'c0000000-0000-4000-8000-000000000001', false) \g /dev/null
 
 -- 2. Ce que fait recordUserLogin, avec le role de l API et rien de plus.

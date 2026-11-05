@@ -29,14 +29,14 @@ create table thread_compactions (
 alter table thread_compactions enable row level security;
 alter table thread_compactions force row level security;
 
-create policy thread_compactions_tenant on thread_compactions to ohb_api
+create policy thread_compactions_tenant on thread_compactions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy thread_compactions_worker on thread_compactions to ohb_worker
+create policy thread_compactions_worker on thread_compactions to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on thread_compactions to ohb_api;
-grant select, insert, update, delete on thread_compactions to ohb_worker;
+grant select, insert, update, delete on thread_compactions to openedbot_api;
+grant select, insert, update, delete on thread_compactions to openedbot_worker;
 
 insert into schema_migrations(version) values ('0020_thread_compactions')
 on conflict (version) do nothing;

@@ -72,7 +72,7 @@ describe("apnsPayload", () => {
         sound: "default",
         "thread-id": "thread-1",
       },
-      ohb: { kind: "approval", threadId: "thread-1", organizationId: "org-1" },
+      openedbot: { kind: "approval", threadId: "thread-1", organizationId: "org-1" },
     });
   });
 
@@ -85,7 +85,7 @@ describe("apnsPayload", () => {
     expect(body("run.error", "group")).toBe("Échec dans le salon");
     expect(body("run.completed", "dm")).toBe("Workflow terminé");
     expect(body("run.error", "dm")).toBe("Échec du workflow");
-    expect(apnsPayload({ eventType: "run.error", workflowKind: "dm", name: "x", threadId: "t", organizationId: "o" }).ohb.kind)
+    expect(apnsPayload({ eventType: "run.error", workflowKind: "dm", name: "x", threadId: "t", organizationId: "o" }).openedbot.kind)
       .toBe("workflow");
   });
 

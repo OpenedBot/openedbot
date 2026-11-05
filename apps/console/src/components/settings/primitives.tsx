@@ -43,7 +43,7 @@ export const ALIVE_BADGE =
  * `flex-wrap` : à 768 px (la largeur minimale de la fenêtre, `lib.rs`), deux
  * boutons plus un libellé long débordaient sans lui.
  */
-export const ACTIONS = "ohb-settings-actions flex flex-wrap items-center justify-end gap-2";
+export const ACTIONS = "openedbot-settings-actions flex flex-wrap items-center justify-end gap-2";
 
 /** Une pastille d'état. Un fait, jamais un bouton. */
 export function ToneBadge({
@@ -84,7 +84,7 @@ export function SectionHeading({
       <div data-settings-caption="" className="px-4 pb-1">
         <h1 className="sr-only">{title}</h1>
         {description ? (
-          <p className="text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">{description}</p>
+          <p className="text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">{description}</p>
         ) : null}
         {action ? <div className={`mt-3 ${ACTIONS}`}>{action}</div> : null}
       </div>
@@ -188,7 +188,7 @@ export function SettingsCard({
   const card = (
     <section
       data-settings-card=""
-      className={cn("rounded-[20px] bg-[var(--ohb-grouped-card)]", padded && "p-4", className)}
+      className={cn("rounded-[20px] bg-[var(--openedbot-grouped-card)]", padded && "p-4", className)}
       {...rest}
     >
       {body}
@@ -204,7 +204,7 @@ export function SettingsCard({
       {groupCaption || groupAction ? (
         <div className="flex min-h-5 items-center justify-between gap-3 px-4 pb-2">
           {groupCaption ? (
-            <h2 className="min-w-0 flex-1 truncate text-[13px] leading-4 font-normal text-[var(--ohb-grouped-caption)]">
+            <h2 className="min-w-0 flex-1 truncate text-[13px] leading-4 font-normal text-[var(--openedbot-grouped-caption)]">
               {groupCaption}
             </h2>
           ) : null}
@@ -217,7 +217,7 @@ export function SettingsCard({
       ) : null}
       {card}
       {groupFooter ? (
-        <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+        <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
           {groupFooter}
         </p>
       ) : null}
@@ -242,7 +242,7 @@ export function CardHeading({ title, description, action, id }: CardHeadingProps
           id={id}
           className={
             isMobile
-              ? "text-[13px] leading-4 font-normal text-[var(--ohb-grouped-caption)]"
+              ? "text-[13px] leading-4 font-normal text-[var(--openedbot-grouped-caption)]"
               : "text-sm font-medium text-foreground"
           }
         >
@@ -252,7 +252,7 @@ export function CardHeading({ title, description, action, id }: CardHeadingProps
           <p
             className={
               isMobile
-                ? "mt-1 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]"
+                ? "mt-1 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]"
                 : "mt-1 max-w-[68ch] text-xs leading-5 text-muted-foreground"
             }
           >
@@ -313,12 +313,12 @@ export function StatusRow({
     const wraps = statusValueWraps(value);
     return (
       <div className={cn("flex min-h-12 gap-3 px-4", wraps ? "flex-col justify-center py-3" : "items-center")}>
-        <dt className="shrink-0 text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+        <dt className="shrink-0 text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
           {label}
         </dt>
         <dd
           className={cn(
-            "min-w-0 text-[var(--ohb-grouped-caption)]",
+            "min-w-0 text-[var(--openedbot-grouped-caption)]",
             wraps
               ? "text-[15px] leading-5 break-words"
               : "flex-1 truncate text-right text-[17px] leading-[22px]",
@@ -353,7 +353,7 @@ export function StatusList({ children, className }: { children: ReactNode; class
   return (
     <dl
       className={cn(
-        isMobile ? "ohb-status-list -mx-4" : "divide-y divide-border",
+        isMobile ? "openedbot-status-list -mx-4" : "divide-y divide-border",
         className,
       )}
     >
@@ -385,7 +385,7 @@ export function StatusGrid({
   className?: string;
 }) {
   const isMobile = useIsMobile();
-  if (isMobile) return <dl className={cn("ohb-status-list -mx-4", className)}>{children}</dl>;
+  if (isMobile) return <dl className={cn("openedbot-status-list -mx-4", className)}>{children}</dl>;
   return (
     <dl
       className={cn(
@@ -466,14 +466,14 @@ export function ListSection({
     return (
       <section data-settings-list="" data-settings-group="" data-inset-grouped="" className={className}>
         <div className="flex min-h-5 items-center justify-between gap-3 px-4 pb-2">
-          <h2 className="min-w-0 flex-1 truncate text-[13px] leading-4 font-normal text-[var(--ohb-grouped-caption)]">
+          <h2 className="min-w-0 flex-1 truncate text-[13px] leading-4 font-normal text-[var(--openedbot-grouped-caption)]">
             {title}
           </h2>
           {action ? <div data-settings-group-action="" className="shrink-0">{action}</div> : null}
         </div>
-        <ul className="ohb-status-list overflow-hidden rounded-[20px] bg-[var(--ohb-grouped-card)]">{children}</ul>
+        <ul className="openedbot-status-list overflow-hidden rounded-[20px] bg-[var(--openedbot-grouped-card)]">{children}</ul>
         {description ? (
-          <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">{description}</p>
+          <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">{description}</p>
         ) : null}
         {footer ? <div className="space-y-2 pt-2">{footer}</div> : null}
       </section>
@@ -548,7 +548,7 @@ export function ListRow({
         <div
           className={
             isMobile
-              ? "text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]"
+              ? "text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]"
               : "text-sm font-medium text-foreground"
           }
         >
@@ -559,7 +559,7 @@ export function ListRow({
             id={descriptionId}
             className={
               isMobile
-                ? "mt-0.5 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]"
+                ? "mt-0.5 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]"
                 : "mt-0.5 text-xs leading-5 text-muted-foreground"
             }
           >
@@ -581,7 +581,7 @@ export function ListRow({
               className={cn(
                 "min-w-0 truncate",
                 isMobile
-                  ? "text-[17px] leading-[22px] text-[var(--ohb-grouped-caption)]"
+                  ? "text-[17px] leading-[22px] text-[var(--openedbot-grouped-caption)]"
                   : "text-sm font-medium text-foreground",
                 mono && "font-mono text-[13px] font-normal",
               )}
@@ -679,19 +679,19 @@ export function Note({
  */
 /** La pilule de Grok Bot (`sand-kit-button` md, 32 px) ; couleurs : jetons `--btn-*` (ui-kit `app.css`). */
 const BUTTON_SHAPE =
-  "ohb-settings-action inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 text-center text-sm font-medium cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed";
+  "openedbot-settings-action inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full px-3 text-center text-sm font-medium cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed";
 
 /** Le bouton d'action des réglages, une variante par nature de geste, jamais grisé pour de faux. */
 export const BUTTON = {
   /** Le geste principal d'un écran ou d'une modale : enregistrer, valider. Neutre plein. */
-  primary: `${BUTTON_SHAPE} ohb-settings-action-primary bg-[var(--btn-neutral)] text-[var(--btn-neutral-fg)] hover:bg-[var(--btn-neutral-hover)] disabled:bg-[var(--btn-neutral-disabled)] disabled:text-foreground/30`,
+  primary: `${BUTTON_SHAPE} openedbot-settings-action-primary bg-[var(--btn-neutral)] text-[var(--btn-neutral-fg)] hover:bg-[var(--btn-neutral-hover)] disabled:bg-[var(--btn-neutral-disabled)] disabled:text-foreground/30`,
   /** Un geste ordinaire, sans enjeu : changer, annuler, modifier. Voile neutre. */
   secondary: `${BUTTON_SHAPE} bg-[var(--btn-veil)] text-foreground hover:bg-[var(--btn-veil-hover)] disabled:text-foreground/30`,
   /** Un geste qui AJOUTE ou relie, moins fort que `primary` : voile bleu. */
   soft: `${BUTTON_SHAPE} bg-[var(--btn-accent)]/10 text-[var(--btn-accent)] hover:bg-[var(--btn-accent)]/15 disabled:opacity-40`,
   /** La petite pilule (sm, 24 px) : un geste secondaire dans une ligne ou une liste. */
   small:
-    "ohb-settings-action inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--btn-veil)] px-2 text-center text-xs font-medium text-foreground cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out hover:bg-[var(--btn-veil-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-foreground/30",
+    "openedbot-settings-action inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[var(--btn-veil)] px-2 text-center text-xs font-medium text-foreground cursor-pointer outline-none transition-[background-color,color] duration-[120ms] ease-out hover:bg-[var(--btn-veil-hover)] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:text-foreground/30",
   /** Un geste qui retire, supprime ou délie. Rouge plein. */
   danger: `${BUTTON_SHAPE} bg-[var(--btn-danger)] text-white hover:bg-[var(--btn-danger-hover)] disabled:opacity-40`,
   /** La confirmation bleue d'une modale : valider un geste non destructif. */
@@ -703,7 +703,7 @@ export const BUTTON = {
 } as const;
 
 export const FIELD =
-  "ohb-settings-field rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "openedbot-settings-field rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /**
  * L'état vide d'un écran : centré dans le panneau, une seule voix.
@@ -733,7 +733,7 @@ export function EmptyState({
         className={cn(
           "flex w-full max-w-sm flex-col items-center gap-3 px-6 py-10 text-center",
           isMobile
-            ? "rounded-[20px] bg-[var(--ohb-grouped-card)]"
+            ? "rounded-[20px] bg-[var(--openedbot-grouped-card)]"
             : "rounded-xl border border-dashed border-border",
         )}
       >

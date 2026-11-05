@@ -35,10 +35,10 @@ comment on table analytics_events is
 alter table analytics_events enable row level security;
 alter table analytics_events force row level security;
 
-create policy analytics_events_tenant on analytics_events to ohb_api
+create policy analytics_events_tenant on analytics_events to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy analytics_events_worker on analytics_events to ohb_worker
+create policy analytics_events_worker on analytics_events to openedbot_worker
   using (true) with check (true);
 -- L'émetteur de l'API vide sa file HORS de toute transaction métier, donc sans
 -- `app.organization_id` posé : un lot mélange plusieurs organisations. Cette
@@ -46,13 +46,13 @@ create policy analytics_events_worker on analytics_events to ohb_worker
 -- la lecture reste strictement bornée par `analytics_events_tenant`, et
 -- `organization_id` est une FK non nulle : on ne peut pas fabriquer un fait
 -- pour un tenant qui n'existe pas.
-create policy analytics_events_api_append on analytics_events for insert to ohb_api
+create policy analytics_events_api_append on analytics_events for insert to openedbot_api
   with check (true);
 
-grant select, insert, update, delete on analytics_events to ohb_api;
-grant select, insert, update, delete on analytics_events to ohb_worker;
-grant usage, select on sequence analytics_events_cursor_seq to ohb_api;
-grant usage, select on sequence analytics_events_cursor_seq to ohb_worker;
+grant select, insert, update, delete on analytics_events to openedbot_api;
+grant select, insert, update, delete on analytics_events to openedbot_worker;
+grant usage, select on sequence analytics_events_cursor_seq to openedbot_api;
+grant usage, select on sequence analytics_events_cursor_seq to openedbot_worker;
 
 insert into schema_migrations(version) values ('0032_analytics_events')
 on conflict (version) do nothing;

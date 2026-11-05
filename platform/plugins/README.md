@@ -52,7 +52,7 @@ logic: billing loaded but refused by the role guard answers
 
 `manifest.env` declares deployment variables a plug-in reads under their
 deployed name, for names that already are a deploy contract (step 11.5).
-The loader refuses `OPENEDBOT_*` names (and the retired `OHB_*` prefix), names of the core environment schema and
+The loader refuses `OPENEDBOT_*` names, names of the core environment schema and
 duplicates; the hooks and mounts get the declared values that are set as
 `context.env`, and in production the API does not start while a loaded
 plug-in misses one marked `requiredInProduction`.

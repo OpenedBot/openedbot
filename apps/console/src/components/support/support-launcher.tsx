@@ -15,7 +15,7 @@ import { SupportPanel } from "./support-panel";
 import { SupportUnreadDot } from "./support-unread-dot";
 
 const LAUNCHER_CLASS =
-  "ohb-support-launcher fixed right-[max(1.5rem,var(--ohb-safe-right))] bottom-[max(1.5rem,var(--ohb-safe-bottom))] z-40 flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-[var(--shadow-elevated)] transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95";
+  "openedbot-support-launcher fixed right-[max(1.5rem,var(--openedbot-safe-right))] bottom-[max(1.5rem,var(--openedbot-safe-bottom))] z-40 flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-[var(--shadow-elevated)] transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95";
 
 /**
  * La bulle du guichet, montée par la racine de l'arbre de routes.

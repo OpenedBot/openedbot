@@ -22,7 +22,7 @@ The public binaries, their `SHA256SUMS` and its signature are served by
 directory. `edge-setup`, the link
 protocol and the openedbot core are open source under the Apache-2.0 license
 (repository publication planned).
-`link` targets `https://link.openedbot.app` by default: `--ohb` is only
+`link` targets `https://link.openedbot.app` by default: `--openedbot` is only
 needed for another openedbot origin.
 If that origin does not respond, installation and `upgrade` fail without
 installing anything, with no fallback to GitHub.
@@ -134,7 +134,7 @@ minutes and can be used only once.
 ### Production
 
 ```bash
-edge-setup link --ohb https://link.openedbot.app --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 # Paste the ticket at the hidden prompt.
 ```
 
@@ -162,10 +162,10 @@ make link-dev-up HOST=hermes-admin@203.0.113.10
 ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:8790:127.0.0.1:8790 hermes-admin@203.0.113.10
 
 # VPS, in another session
-edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb --name dev
+edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot --name dev
 ```
 
-`--insecure-ohb` opens `http://` only on the host loopback; a public or LAN
+`--insecure-openedbot` opens `http://` only on the host loopback; a public or LAN
 origin in clear text is still refused. `--name dev` creates a **named
 instance** next to the production link created above: without it, this `link`
 would target the same instance and replace the production link (it reports

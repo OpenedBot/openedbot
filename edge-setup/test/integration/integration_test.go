@@ -239,7 +239,7 @@ func TestUpConnectorNoSSHHardening(t *testing.T) {
 	}
 	// A linked instance whose origin is unreachable: uninstall must ask for
 	// its revocation, say it was not confirmed, and remove the host anyway.
-	b.writeFile("/tmp/it-link.json", `{"schema":1,"ohb":"http://127.0.0.1:9","ws_url":"ws://127.0.0.1:9/api/runtime-links/ws","runtime_id":"00000000-0000-4000-8000-0000000000aa","link_token":"it-placeholder","linked_at":"2026-10-30T00:00:00Z"}`, "0600")
+	b.writeFile("/tmp/it-link.json", `{"schema":1,"openedbot":"http://127.0.0.1:9","ws_url":"ws://127.0.0.1:9/api/runtime-links/ws","runtime_id":"00000000-0000-4000-8000-0000000000aa","link_token":"it-placeholder","linked_at":"2026-10-30T00:00:00Z"}`, "0600")
 	if out, code := b.exec(time.Minute, "sh", "-c", "install -d -m 0700 /etc/hermes/connector/it && install -m 0600 /tmp/it-link.json /etc/hermes/connector/it/link.json && touch /tmp/it-mark && sleep 1"); code != 0 {
 		t.Fatalf("synthetic link: %s", out)
 	}

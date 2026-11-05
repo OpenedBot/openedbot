@@ -7,8 +7,8 @@ import { workspaceFrameInPath } from "../workspace/workspace-location";
  * the cross never lands in another organization's or client's frame.
  */
 
-const LAST_APP_PATH = "ohb.boardui.lastAppPath";
-const SETTINGS_RETURN = "ohb.boardui.settingsReturn";
+const LAST_APP_PATH = "openedbot.boardui.lastAppPath";
+const SETTINGS_RETURN = "openedbot.boardui.settingsReturn";
 
 /** A public address and the frame it belongs to (`workspaceFrameInPath`). */
 type FramedAddress = { frame: string; href: string };

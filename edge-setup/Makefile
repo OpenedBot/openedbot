@@ -24,9 +24,6 @@ SIGNED_DIR ?= dist-signed
 # Monorepo OpenedBot/openedbot : la racine (application openedbot, qui porte la
 # moitié TypeScript du contrat du lien) et docs/ (site de documentation, que
 # check-docs compare à docs/ d'ici). Surchargeables, jamais devinés ailleurs.
-ifneq ($(origin OHB_DIR),undefined)
-$(error OHB_DIR is no longer read: set OPENEDBOT_MAIN_DIR instead, and unset OHB_DIR)
-endif
 OPENEDBOT_MAIN_DIR ?= ..
 DOCS_DIR ?= ../docs
 
@@ -138,7 +135,7 @@ deploy-host: ## (interne) échoue si HOST est vide, avant toute compilation
 
 # La clé de déploiement partagée poste/VPS : `upgrade --from` n'accepte qu'un
 # binaire tagué HMAC-SHA256 sous cette clé (edge-setup deploy-key set).
-# Chemin canonique depuis OHB-87 ; un poste qui n'a que l'ancien chemin
+# Chemin canonique depuis le renommage en edge-setup ; un poste qui n'a que l'ancien chemin
 # (créé avant le renommage) continue de le lire sans y toucher.
 DEPLOY_KEY_FILE ?= $(shell d="$(HOME)/.config/edge-setup/deploy.key"; l="$(HOME)/.config/hermes-setup/deploy.key"; if [[ -f "$$d" || ! -f "$$l" ]]; then echo "$$d"; else echo "$$l"; fi)
 

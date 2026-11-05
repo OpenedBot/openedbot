@@ -12,7 +12,7 @@
  * checked by the API, and the cached data is that user's own. Sign out and a
  * lost or replaced session clear it with the persisted queries.
  */
-const STORAGE_KEY = "ohb:app-access:v1";
+const STORAGE_KEY = "openedbot:app-access:v1";
 
 export function markAppAccess(userId: string | undefined): void {
   if (!userId) return;

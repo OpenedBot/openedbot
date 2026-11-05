@@ -85,7 +85,7 @@ describe("runtime model selection proof", () => {
       } as unknown as HermesClient, { provider: "anthropic", model: "claude-sonnet-4", reasoningEffort: null }))
         .rejects.toMatchObject({ status: 409, code: "RUNTIME_MODEL_CANARY_FAILED" });
       expect(deleted).toHaveLength(1);
-      expect(deleted[0]).toStartWith("ohb-model-canary-");
+      expect(deleted[0]).toStartWith("openedbot-model-canary-");
     }
   });
 
@@ -104,7 +104,7 @@ describe("runtime model selection proof", () => {
   });
 
   test("a promotion never touches runtime_read_snapshots and always aligns followers", async () => {
-    // ohb_worker has no access to that table (0121): an invalidation there threw
+    // openedbot_worker has no access to that table (0121): an invalidation there threw
     // after every promotion on preprod and skipped the follower alignment.
     const fake = fakeDb({ request_id: "request-a", lease_token: "lease-a", attempts: 1, requested_at: new Date() });
     const { client } = canaryClient();
@@ -209,7 +209,7 @@ describe("runtime model selection proof", () => {
     const events: string[] = [];
     let present = false;
     const fake = {
-      hostProfileInventory: async () => ({ profiles: present ? [{ name: "ohb-model-check" }] : [] }),
+      hostProfileInventory: async () => ({ profiles: present ? [{ name: "openedbot-model-check" }] : [] }),
       hostCreateProfile: async () => { events.push("profile:create"); present = true; },
       hostSetProfileModel: async () => { events.push("profile:model"); return { applied: true }; },
       probeProfileIsolation: async () => "isolated",

@@ -26,9 +26,9 @@ const vapidPrivate = Buffer.alloc(32, 9).toString("base64url");
 
 const production = {
   OPENEDBOT_ENV: "production",
-  API_PUBLIC_URL: "https://api.ohb.example",
-  WEB_APP_URL: "https://app.ohb.example",
-  API_DATABASE_URL: "postgres://api:secret@db/ohb",
+  API_PUBLIC_URL: "https://api.openedbot.example",
+  WEB_APP_URL: "https://app.openedbot.example",
+  API_DATABASE_URL: "postgres://api:secret@db/openedbot",
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
   WORKER_INTERNAL_TOKEN: "worker-secret",
   METRICS_INTERNAL_TOKEN: "metrics-secret",
@@ -37,20 +37,20 @@ const production = {
   R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
   R2_ACCESS_KEY_ID: "key",
   R2_SECRET_ACCESS_KEY: "secret",
-  FILES_CDN_URL: "https://files.ohb.example",
+  FILES_CDN_URL: "https://files.openedbot.example",
   FILES_CDN_SIGNING_KEY: "signing-secret",
   API_TRUST_PROXY: "1",
   PUSH_VAPID_PUBLIC_KEY: vapidPublic,
   PUSH_VAPID_PRIVATE_KEY: vapidPrivate,
-  PUSH_VAPID_SUBJECT: "mailto:ops@ohb.example",
-  // OHB-56 : la preuve de possession du lien et la clé de verdict sont des
+  PUSH_VAPID_SUBJECT: "mailto:ops@openedbot.example",
+  // La preuve de possession du lien et la clé de verdict sont des
   // gardes de production ; la fixture les satisfait pour que les gardes
   // suivants (documents légaux…) restent atteignables.
   RUNTIME_LINK_REQUIRE_POP: "1",
   AUDIT_VERDICT_SIGNING_KEY: Buffer.alloc(32, 3).toString("base64"),
-  // OHB-57 : le bucket WORM est un garde de production lui aussi.
+  // Le bucket WORM est un garde de production lui aussi.
   AUDIT_WORM_MODE: "r2",
-  AUDIT_WORM_BUCKET: "ohb-audit-worm",
+  AUDIT_WORM_BUCKET: "openedbot-audit-worm",
   AUDIT_WORM_ENDPOINT: "https://account.r2.cloudflarestorage.com",
   AUDIT_WORM_WRITE_ACCESS_KEY_ID: "worm-write",
   AUDIT_WORM_WRITE_SECRET_ACCESS_KEY: "worm-write-secret",
@@ -63,12 +63,12 @@ const development = {
   RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
 };
 
-describe("ancrage WORM (OHB-57)", () => {
+describe("ancrage WORM", () => {
   test("hors production, disabled par défaut ; r2 lit ses deux paires et sa rétention", () => {
     expect(readApiConfig(development).auditWorm).toEqual({ mode: "disabled" });
     const worm = readApiConfig(production).auditWorm;
     expect(worm).toEqual({
-      mode: "r2", bucket: "ohb-audit-worm", endpoint: "https://account.r2.cloudflarestorage.com",
+      mode: "r2", bucket: "openedbot-audit-worm", endpoint: "https://account.r2.cloudflarestorage.com",
       write: { accessKeyId: "worm-write", secretAccessKey: "worm-write-secret" },
       read: { accessKeyId: "worm-read", secretAccessKey: "worm-read-secret" },
       retentionDays: 365,
@@ -90,7 +90,7 @@ describe("ancrage WORM (OHB-57)", () => {
   });
 });
 
-describe("sécurité du lien et clé de verdict (OHB-56)", () => {
+describe("sécurité du lien et clé de verdict", () => {
   test("hors production, la preuve de possession n'est pas exigée et la clé de verdict est éphémère", () => {
     const config = readApiConfig(development);
     expect(config.linkSecurity.requirePop).toBe(false);
@@ -105,8 +105,8 @@ describe("sécurité du lien et clé de verdict (OHB-56)", () => {
   });
 
   test("en production, NATIVE_API_PUBLIC_URL (origine du QR mobile) est en HTTPS", () => {
-    expect(() => assertProductionConfig(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "http://api.ohb.example" }))).toThrow(/NATIVE_API_PUBLIC_URL must use HTTPS/);
-    expect(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "https://native.ohb.example/" }).nativeApiPublicUrl).toBe("https://native.ohb.example");
+    expect(() => assertProductionConfig(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "http://api.openedbot.example" }))).toThrow(/NATIVE_API_PUBLIC_URL must use HTTPS/);
+    expect(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "https://native.openedbot.example/" }).nativeApiPublicUrl).toBe("https://native.openedbot.example");
   });
 
   test("en production, une clé de verdict éphémère est refusée ; une graine mal formée aussi", () => {
@@ -126,7 +126,7 @@ describe("production configuration", () => {
   });
 
   test("falls back to the server volume when R2 is not configured, and says why", () => {
-    // Les valeurs neutralisées du provisionnement (rôle Ansible ohb_alpha) : avant, chaque envoi finissait en 500.
+    // Les valeurs neutralisées du provisionnement (rôle Ansible openedbot_alpha) : avant, chaque envoi finissait en 500.
     const neutralized = readApiConfig({
       ...production,
       R2_ENDPOINT: "https://r2.invalid",
@@ -134,7 +134,7 @@ describe("production configuration", () => {
       R2_ACCESS_KEY_ID: "alpha-r2-not-provisioned",
       R2_SECRET_ACCESS_KEY: "alpha-r2-not-provisioned",
     });
-    expect(neutralized.blob).toMatchObject({ driver: "file", root: "/var/lib/ohb/blobs" });
+    expect(neutralized.blob).toMatchObject({ driver: "file", root: "/var/lib/openedbot/blobs" });
     expect(neutralized.blob.driver === "file" && neutralized.blob.fallbackReason).toMatch(/R2 non configuré/);
     const missing = readApiConfig({ ...production, R2_SECRET_ACCESS_KEY: undefined });
     expect(missing.blob.driver).toBe("file");
@@ -148,7 +148,7 @@ describe("production configuration", () => {
     expect(() => assertProductionConfig(readApiConfig(production))).toThrow(/LEGAL_MENTIONS_FILE/);
   });
 
-  // OHB-15 : le canal SSH sortant n'existe plus du tout, et la variable qui
+  // Le canal SSH sortant n'existe plus du tout, et la variable qui
   // réglait l'administration est retirée : en production comme ailleurs, sa
   // valeur est ignorée et aucun canal ne s'ouvre.
   test("OPENEDBOT_ENV=preprod runs on production rules with the preprod label", () => {
@@ -166,18 +166,16 @@ describe("production configuration", () => {
     expect(readApiConfig({ ...withoutEnv, NODE_ENV: "production" }).environment).toBe("production");
   });
 
-  test("ignores the retired administration variable in production, whatever its value", () => {
-    for (const value of ["ssh", "local", "disabled"]) {
-      const config = readApiConfig({ ...production, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
-      expect(config.runtimeAdminChannels).toEqual({ local: false });
-      expect(() => assertProductionConfig(config)).not.toThrow(/administration|ADMIN_MODE/i);
-    }
+  test("opens no administration channel in production", () => {
+    const config = readApiConfig(production);
+    expect(config.runtimeAdminChannels).toEqual({ local: false });
+    expect(() => assertProductionConfig(config)).not.toThrow(/administration|ADMIN_MODE/i);
   });
 
   test("requires an HTTPS web URL: the payment provider returns the browser there", () => {
     expect(() => assertProductionConfig(readApiConfig({
       ...production,
-      WEB_APP_URL: "http://app.ohb.example",
+      WEB_APP_URL: "http://app.openedbot.example",
     }))).toThrow(/WEB_APP_URL/);
   });
 
@@ -187,28 +185,28 @@ describe("production configuration", () => {
   test("keeps the canonical origin independent of the extra CORS origins", () => {
     const config = readApiConfig({
       ...production,
-      CORS_ALLOWED_ORIGINS: "https://legacy.ohb.example,https://old.ohb.example",
+      CORS_ALLOWED_ORIGINS: "https://legacy.openedbot.example,https://old.openedbot.example",
     });
-    expect(config.webUrl).toBe("https://app.ohb.example");
+    expect(config.webUrl).toBe("https://app.openedbot.example");
     expect(config.webOrigins).toEqual([
-      "https://app.ohb.example",
-      "https://legacy.ohb.example",
-      "https://old.ohb.example",
+      "https://app.openedbot.example",
+      "https://legacy.openedbot.example",
+      "https://old.openedbot.example",
     ]);
   });
 
   test("never lists the canonical origin twice when it is repeated in CORS_ALLOWED_ORIGINS", () => {
     const config = readApiConfig({
       ...production,
-      CORS_ALLOWED_ORIGINS: "https://app.ohb.example,https://legacy.ohb.example",
+      CORS_ALLOWED_ORIGINS: "https://app.openedbot.example,https://legacy.openedbot.example",
     });
-    expect(config.webOrigins).toEqual(["https://app.ohb.example", "https://legacy.ohb.example"]);
+    expect(config.webOrigins).toEqual(["https://app.openedbot.example", "https://legacy.openedbot.example"]);
   });
 
   test("rejects the development worker token in production", () => {
     expect(() => assertProductionConfig(readApiConfig({
       ...production,
-      WORKER_INTERNAL_TOKEN: "ohb-worker-dev-token",
+      WORKER_INTERNAL_TOKEN: "openedbot-worker-dev-token",
     }))).toThrow(/WORKER_INTERNAL_TOKEN/);
   });
 
@@ -257,15 +255,6 @@ describe("canaux d’administration du déploiement", () => {
   // avec le code qui l'ouvrait.
   test("sans identifiants de Dashboard, aucun canal n’existe", () => {
     expect(readApiConfig(development).runtimeAdminChannels).toEqual({ local: false });
-  });
-
-  // L'ancienne variable d'administration est retirée : aucune valeur, même
-  // `ssh` ou `local`, n'ouvre de canal, développement compris.
-  test("la variable d’administration retirée n’ouvre aucun canal", () => {
-    for (const value of ["local", "ssh", "auto", "disabled"]) {
-      expect(readApiConfig({ ...development, OHB_RUNTIME_ADMIN_MODE: value }) // rename:keep
-        .runtimeAdminChannels).toEqual({ local: false });
-    }
   });
 
   test("requires a strong runtime token encryption key in development", () => {
@@ -395,14 +384,14 @@ describe("development web origins", () => {
   test("requires HTTPS for ADMIN_PUBLIC_URL in production", () => {
     expect(() => assertProductionConfig(readApiConfig({
       ...production,
-      ADMIN_PUBLIC_URL: "http://admin.ohb.example",
+      ADMIN_PUBLIC_URL: "http://admin.openedbot.example",
     }))).toThrow(/ADMIN_PUBLIC_URL/);
   });
 });
 
 describe("Hermes endpoint configuration", () => {
   test("loads one process-wide mTLS identity for every API runtime client", () => {
-    const directory = mkdtempSync(join(tmpdir(), "ohb-api-mtls-"));
+    const directory = mkdtempSync(join(tmpdir(), "openedbot-api-mtls-"));
     try {
       const cert = join(directory, "client.pem");
       const key = join(directory, "client.key");
@@ -466,7 +455,7 @@ describe("flux d'événements", () => {
 describe("production start: payment keys only with the billing plug-in (step 11.5)", () => {
   const PROVIDER_KEYS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"] as const;
   const withLegalDocuments = <T,>(run: (env: Record<string, string>) => T): T => {
-    const directory = mkdtempSync(join(tmpdir(), "ohb-legal-"));
+    const directory = mkdtempSync(join(tmpdir(), "openedbot-legal-"));
     try {
       for (const slug of LEGAL_SLUGS) writeFileSync(join(directory, `${slug}.md`), `# ${slug}\n\nDocument de déploiement.\n`);
       return run({ ...production, LEGAL_DOCUMENTS_DIR: directory });
@@ -527,7 +516,7 @@ describe("production start: payment keys only with the billing plug-in (step 11.
   });
 
   test("the API loader refuses a plug-in declaring a core variable", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "ohb-plugin-env-"));
+    const directory = mkdtempSync(join(tmpdir(), "openedbot-plugin-env-"));
     try {
       // Written before any import: the module resolver caches the directory.
       const names = ["API_DATABASE_URL", "BILLING_PRICE_EUR", "WEB_ORIGINS"];
@@ -549,22 +538,22 @@ describe("production start: payment keys only with the billing plug-in (step 11.
 describe("QR Mobile Connect en production (NATIVE_API_PUBLIC_URL)", () => {
   // Prod: console on console.openedbot.app, iOS build on api.openedbot.app
   // (Release.xcconfig OPENEDBOT_API_ORIGIN). The QR must name the latter.
-  const split = { ...production, API_PUBLIC_URL: "https://console.ohb.example", NATIVE_API_PUBLIC_URL: "https://api.ohb.example/" };
+  const split = { ...production, API_PUBLIC_URL: "https://console.openedbot.example", NATIVE_API_PUBLIC_URL: "https://api.openedbot.example/" };
   const qrApi = (env: Record<string, string | undefined>) =>
     new URL(mobileConnectJoinUrl(readApiConfig(env).nativeApiPublicUrl, "a.b")).searchParams.get("api");
 
   test("set, it is the origin the QR carries, not API_PUBLIC_URL", () => {
-    expect(qrApi(split)).toBe("https://api.ohb.example");
+    expect(qrApi(split)).toBe("https://api.openedbot.example");
     expect(() => assertProductionConfig(readApiConfig(split))).not.toThrow(/NATIVE_API_PUBLIC_URL/);
   });
 
   test("unset, the QR carries API_PUBLIC_URL (single-name deployment)", () => {
-    expect(qrApi({ ...production, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://api.ohb.example");
-    expect(qrApi({ ...split, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://console.ohb.example");
+    expect(qrApi({ ...production, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://api.openedbot.example");
+    expect(qrApi({ ...split, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://console.openedbot.example");
   });
 
   test("a non-HTTPS value is refused at production startup", () => {
-    for (const value of ["http://api.ohb.example", "ohb://api.ohb.example"]) {
+    for (const value of ["http://api.openedbot.example", "openedbot://api.openedbot.example"]) {
       expect(() => assertProductionConfig(readApiConfig({ ...split, NATIVE_API_PUBLIC_URL: value }))).toThrow(/NATIVE_API_PUBLIC_URL must use HTTPS in production/);
     }
   });

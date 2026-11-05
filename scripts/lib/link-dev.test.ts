@@ -77,15 +77,15 @@ test("remoteShell survives the second parse of the remote login shell", async ()
 describe("remoteLinkState", () => {
   const plan = planLinkDev({ LINK_TUNNEL_PORT: "8790" }, { instance: "mac" });
   test("linked to this tunnel: no ticket is spent", () => {
-    const status = { connectors: [{ name: "default", link_present: true, ohb: "https://console.openedbot.app" }, { name: "mac", link_present: true, ohb: "http://127.0.0.1:8790/" }] };
+    const status = { connectors: [{ name: "default", link_present: true, openedbot: "https://console.openedbot.app" }, { name: "mac", link_present: true, openedbot: "http://127.0.0.1:8790/" }] };
     expect(remoteLinkState(status, plan)).toBe("linked");
   });
   test("absent or unlinked instance enrolls", () => {
-    expect(remoteLinkState({ connectors: [{ name: "default", link_present: true, ohb: "https://console.openedbot.app" }] }, plan)).toBe("absent");
+    expect(remoteLinkState({ connectors: [{ name: "default", link_present: true, openedbot: "https://console.openedbot.app" }] }, plan)).toBe("absent");
     expect(remoteLinkState({ connectors: [{ name: "mac", link_present: false }] }, plan)).toBe("absent");
   });
   test("linked elsewhere is a takeover, not a refusal", () => {
-    expect(remoteLinkState({ connectors: [{ name: "mac", link_present: true, ohb: "https://other.example" }] }, plan)).toBe("elsewhere");
+    expect(remoteLinkState({ connectors: [{ name: "mac", link_present: true, openedbot: "https://other.example" }] }, plan)).toBe("elsewhere");
   });
   test("a pre-instance binary is refused", () => {
     expect(() => remoteLinkState({ connector_active: true }, plan)).toThrow(/upgrade/u);
@@ -94,11 +94,11 @@ describe("remoteLinkState", () => {
 
 test("remoteLinkCommand keeps the ticket out of argv and never asks for --replace", () => {
   const argv = remoteLinkCommand(planLinkDev({ LINK_TUNNEL_PORT: "8790" }, { instance: "dev" }));
-  expect(argv).toEqual(["sudo", "-n", "edge-setup", "link", "--ohb", "http://127.0.0.1:8790", "--yes", "--insecure-ohb", "--name", "dev"]);
+  expect(argv).toEqual(["sudo", "-n", "edge-setup", "link", "--openedbot", "http://127.0.0.1:8790", "--yes", "--insecure-openedbot", "--name", "dev"]);
   // `default` is the instance edge-setup targets without --name: the slot
   // an operator flips between a development openedbot and production.
   expect(remoteLinkCommand(planLinkDev({ LINK_TUNNEL_PORT: "8790" }, { instance: "default" }))).toEqual(
-    ["sudo", "-n", "edge-setup", "link", "--ohb", "http://127.0.0.1:8790", "--yes", "--insecure-ohb"],
+    ["sudo", "-n", "edge-setup", "link", "--openedbot", "http://127.0.0.1:8790", "--yes", "--insecure-openedbot"],
   );
   expect(argv).not.toContain("--replace");
   expect(argv.join(" ")).not.toMatch(/ticket/u);
@@ -106,9 +106,9 @@ test("remoteLinkCommand keeps the ticket out of argv and never asks for --replac
 
 test("localCredentials prefers explicit overrides over the seeded account", () => {
   expect(() => localCredentials({})).toThrow(/E2E_PASSWORD/u);
-  expect(localCredentials({ E2E_PASSWORD: "generated" })).toEqual({ email: "dev@ohb.local", password: "generated" });
-  expect(localCredentials({ E2E_EMAIL: "e2e@ohb.local", E2E_PASSWORD: "x" }).email).toBe("e2e@ohb.local");
-  expect(localCredentials({ E2E_EMAIL: "e2e@ohb.local", LINK_DEV_EMAIL: "me@ohb.local", LINK_DEV_PASSWORD: "y" })).toEqual({ email: "me@ohb.local", password: "y" });
+  expect(localCredentials({ E2E_PASSWORD: "generated" })).toEqual({ email: "dev@openedbot.local", password: "generated" });
+  expect(localCredentials({ E2E_EMAIL: "e2e@openedbot.local", E2E_PASSWORD: "x" }).email).toBe("e2e@openedbot.local");
+  expect(localCredentials({ E2E_EMAIL: "e2e@openedbot.local", LINK_DEV_EMAIL: "me@openedbot.local", LINK_DEV_PASSWORD: "y" })).toEqual({ email: "me@openedbot.local", password: "y" });
 });
 
 describe("gatewayStaleness", () => {

@@ -9,7 +9,7 @@ begin;
 
 create temp table connectors_proof (without_guc text, listed text, owner text, agent text, connected text);
 insert into connectors_proof values ('unset', '', '', '', '');
-grant select, update on connectors_proof to ohb_api;
+grant select, update on connectors_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('80000000-0000-4000-8000-000000000102', 'staff-connectors@example.test', 'x', 'Staff');
@@ -36,7 +36,7 @@ insert into runtimes (
    'Deleted tenant host', 'connector', 'connectors-hash-4', 'edge-setup/v0.5.7', null, null, false);
 
 -- 1. Sans GUC staff, la fonction avorte.
-set local role ohb_api;
+set local role openedbot_api;
 select set_config('app.staff_user_id', '', true) \g /dev/null
 do $proof$
 begin

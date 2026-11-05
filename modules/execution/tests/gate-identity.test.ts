@@ -9,14 +9,14 @@ const DIGEST = "a".repeat(64);
 function pluginMessage(descriptor: Record<string, unknown>, tamper?: (text: string) => string): string {
   const text = JSON.stringify(descriptor);
   const digest = createHash("sha256").update(text, "utf8").digest("hex");
-  return `Approve write-capable tool ${String(descriptor.tool)}.\nohb-gate/v1 ${digest} ${tamper ? tamper(text) : text}`;
+  return `Approve write-capable tool ${String(descriptor.tool)}.\nopenedbot-gate/v1 ${digest} ${tamper ? tamper(text) : text}`;
 }
 
 function pluginGate(toolKey: string, descriptor: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   return {
     request_id: "req-1",
-    pattern_key: `plugin_rule:ohb/v1/${toolKey}`,
-    pattern_keys: [`plugin_rule:ohb/v1/${toolKey}`],
+    pattern_key: `plugin_rule:openedbot/v1/${toolKey}`,
+    pattern_keys: [`plugin_rule:openedbot/v1/${toolKey}`],
     command: `<${toolKey}> (plugin approval rule)`,
     description: pluginMessage({ v: 1, tool: toolKey, digest: DIGEST, ...descriptor }),
     ...overrides,
@@ -53,17 +53,17 @@ describe("gate identity", () => {
   });
 
   test.each([
-    ["a pattern key outside the OHB namespace", { pattern_key: "plugin_rule:write_file" }],
-    ["a malformed tool key", { pattern_key: "plugin_rule:ohb/v1/Write File" }],
-    ["a tool outside the closed table", { pattern_key: "plugin_rule:ohb/v1/browser_click" }],
+    ["a pattern key outside the openedbot namespace", { pattern_key: "plugin_rule:write_file" }],
+    ["a malformed tool key", { pattern_key: "plugin_rule:openedbot/v1/Write File" }],
+    ["a tool outside the closed table", { pattern_key: "plugin_rule:openedbot/v1/browser_click" }],
     ["no descriptor line", { description: "Approve write-capable tool write_file." }],
-    ["two descriptor lines", { description: `${pluginMessage({ v: 1, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "a", size: 1 } })}\nohb-gate/v1 ${DIGEST} {}` }],
+    ["two descriptor lines", { description: `${pluginMessage({ v: 1, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "a", size: 1 } })}\nopenedbot-gate/v1 ${DIGEST} {}` }],
     ["a descriptor Hermes redacted", { description: pluginMessage({ v: 1, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "a", size: 1 } }, (text) => text.replace("\"a\"", "\"***\"")) }],
     ["a descriptor for another tool", { description: pluginMessage({ v: 1, tool: "patch", deletes: "no", opaque: false, digest: DIGEST, args: { paths: [], ops: [] } }) }],
     ["an unknown descriptor version", { description: pluginMessage({ v: 2, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "a", size: 1 } }) }],
     ["an extra descriptor field", { description: pluginMessage({ v: 1, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "a", size: 1, content: "x" } }) }],
     ["a write_file that cannot say whether it deletes", { description: pluginMessage({ v: 1, tool: "write_file", deletes: "unknown", opaque: false, digest: DIGEST, args: { path: "a", size: 1 } }) }],
-    ["a skill delete not flagged as a deletion", { pattern_key: "plugin_rule:ohb/v1/skill_manage", description: pluginMessage({ v: 1, tool: "skill_manage", deletes: "no", opaque: false, digest: DIGEST, args: { action: "delete", name: "plan" } }) }],
+    ["a skill delete not flagged as a deletion", { pattern_key: "plugin_rule:openedbot/v1/skill_manage", description: pluginMessage({ v: 1, tool: "skill_manage", deletes: "no", opaque: false, digest: DIGEST, args: { action: "delete", name: "plan" } }) }],
     ["an oversized descriptor", { description: pluginMessage({ v: 1, tool: "write_file", deletes: "no", opaque: false, digest: DIGEST, args: { path: "p".repeat(GATE_DESCRIPTOR_MAX_BYTES), size: 1 } }) }],
   ])("%s is unknown", (_label, overrides) => {
     const gate = readGateIdentity(pluginGate("write_file", { deletes: "no", opaque: false, args: { path: "a", size: 1 } }, overrides));

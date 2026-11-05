@@ -14,7 +14,7 @@ import { replyPreviewSnippet } from "@openedbot/conversation/domain/message-repl
  * tour) : il lit le DOM par `data-thread-find-target`, et demande au fil de
  * monter un tour sorti de la fenêtre par l'événement `THREAD_REVEAL_EVENT`.
  */
-export const THREAD_REVEAL_EVENT = "ohb:thread-reveal";
+export const THREAD_REVEAL_EVENT = "openedbot:thread-reveal";
 
 export type ThreadRevealDetail = { targetId: string };
 

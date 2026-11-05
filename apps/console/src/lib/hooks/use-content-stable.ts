@@ -8,7 +8,7 @@ import type { MessageAuthorBot } from "@openedbot/contracts-api";
  * rebuilds the whole `RosterDto`, so a `useMemo` keyed on it hands the thread a
  * new Map or array with the same content. `ThreadTimeline` and its model
  * builder compare those props by reference: each new identity re-ran the
- * block plan and every turn signature (OHB-135).
+ * block plan and every turn signature.
  */
 export function useContentStable<T>(next: T, equal: (previous: T, next: T) => boolean): T {
   const kept = useRef(next);

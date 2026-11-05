@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
-import type { OhbNativeBridge } from "../shared/bridge";
+import type { OpenedbotNativeBridge } from "../shared/bridge";
 import { CHANNEL } from "./channels";
 import { createNativeAuthBridge } from "./native-auth";
 import { wireSigninPage } from "./signin-page";
@@ -7,7 +7,7 @@ import { wireSigninPage } from "./signin-page";
 // The main process passes its app version on the renderer command line
 // (webPreferences.additionalArguments): no synchronous IPC needed at preload time.
 function shellVersion(): string {
-  const prefix = "--ohb-shell-version=";
+  const prefix = "--openedbot-shell-version=";
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length) ?? "0.0.0";
 }
 
@@ -21,7 +21,7 @@ if (window.location.protocol === "file:") {
   // Contract in src/shared/bridge.ts: the four calls are frozen, `auth` is
   // optional (a console checks it before use). The refresh token stays in the
   // main process: nothing here can read it, and no channel returns it.
-  const bridge: OhbNativeBridge = {
+  const bridge: OpenedbotNativeBridge = {
     readAccessToken: () => ipcRenderer.invoke(CHANNEL.readAccessToken) as Promise<string | null>,
     refresh: () => ipcRenderer.invoke(CHANNEL.refresh) as Promise<string | null>,
     openExternal: (url) => ipcRenderer.invoke(CHANNEL.openExternal, url) as Promise<void>,
@@ -29,7 +29,7 @@ if (window.location.protocol === "file:") {
     shell: { platform: "windows", version: shellVersion() },
     auth: createNativeAuthBridge(),
   };
-  contextBridge.exposeInMainWorld("__OHB_NATIVE__", bridge);
+  contextBridge.exposeInMainWorld("__OPENEDBOT_NATIVE__", bridge);
 }
 
 // Observe the existing theme attributes instead of extending the frozen public bridge.
@@ -54,11 +54,11 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 // The console's text size (Réglages › Apparence, ../.. apps/console/src/lib/shell/text-size.ts)
-// zooms the whole window, read from `<html data-ohb-text-zoom>` like the theme
+// zooms the whole window, read from `<html data-openedbot-text-zoom>` like the theme
 // above, without extending the frozen bridge. Applied here first
 // (webFrame, before the page paints at 100 %), then told to the main process,
 // which keeps it for View › Actual Size and lines the system buttons up with
-// the zoomed top bar. Once applied, `data-native-zoom` and `--ohb-native-zoom`
+// the zoomed top bar. Once applied, `data-native-zoom` and `--openedbot-native-zoom`
 // tell the console's CSS (its own settings-modal zoom steps aside, the room
 // kept for the traffic lights follows). Mirror of TEXT_ZOOM_FACTORS
 // (src/shared/bridge.ts): a sandboxed preload cannot import it.
@@ -80,10 +80,10 @@ if (window.location.protocol !== "file:") {
     let lastZoom: number | null = null;
     const clear = (): void => {
       root.removeAttribute("data-native-zoom");
-      root.style.removeProperty("--ohb-native-zoom");
+      root.style.removeProperty("--openedbot-native-zoom");
     };
     const sync = (): void => {
-      const zoom = Number(root.getAttribute("data-ohb-text-zoom"));
+      const zoom = Number(root.getAttribute("data-openedbot-text-zoom"));
       if (!TEXT_ZOOM_FACTORS.includes(zoom)) {
         lastZoom = null;
         clear();
@@ -94,7 +94,7 @@ if (window.location.protocol !== "file:") {
       lastZoom = zoom;
       webFrame.setZoomFactor(zoom);
       root.setAttribute("data-native-zoom", "");
-      root.style.setProperty("--ohb-native-zoom", String(zoom));
+      root.style.setProperty("--openedbot-native-zoom", String(zoom));
       void ipcRenderer.invoke(CHANNEL.textZoom, zoom).catch(() => {
         // The page stays zoomed (webFrame); only Actual Size and the system
         // buttons' position miss the change. Retried on the next change.
@@ -102,7 +102,7 @@ if (window.location.protocol !== "file:") {
       });
     };
     const observer = new MutationObserver(sync);
-    observer.observe(root, { attributes: true, attributeFilter: ["data-ohb-text-zoom"] });
+    observer.observe(root, { attributes: true, attributeFilter: ["data-openedbot-text-zoom"] });
     sync();
     window.addEventListener("pagehide", () => observer.disconnect(), { once: true });
   });

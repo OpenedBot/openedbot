@@ -7,7 +7,7 @@ import { AttachmentTile } from "../../src/components/thread-attachment-tile";
 
 const original = api.attachment;
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   api.attachment = mock(async () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }));
 });
 afterEach(() => {

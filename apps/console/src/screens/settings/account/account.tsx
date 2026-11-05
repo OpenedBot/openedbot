@@ -51,7 +51,7 @@ type T = ReturnType<typeof useT>["t"];
  * (36 px) et un `BUTTON` (32 px) côte à côte donnaient trois hauteurs pour
  * trois gestes du même rang : la rangée se lisait comme un défaut d'alignement.
  * Sur téléphone c'est 44 pt, la cible tactile que la coque impose déjà aux
- * commandes de réglages (`.ohb-settings-action`, `mobile.css`).
+ * commandes de réglages (`.openedbot-settings-action`, `mobile.css`).
  */
 const CONTROL_DESKTOP = "h-9";
 const CONTROL_MOBILE = "h-11 w-full";

@@ -259,10 +259,10 @@ function renderConversation(initialPath: string) {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   window.sessionStorage.clear();
   clearCloudSession();
-  document.cookie = "ohb_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+  document.cookie = "openedbot_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (url.endsWith("/api/auth/me")) {

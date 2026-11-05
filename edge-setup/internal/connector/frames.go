@@ -331,7 +331,7 @@ type Text struct {
 	// ignores it, like latestVersion and minimumVersion, because DecodeText does
 	// not reject unknown fields.
 	Environment  string            `json:"environment,omitempty"`
-	OHB          string            `json:"ohb,omitempty"`
+	Openedbot    string            `json:"openedbot,omitempty"`
 	Organization *LinkOrganization `json:"organization,omitempty"`
 	Owner        *LinkOwner        `json:"owner,omitempty"`
 	Limits       *LinkLimits       `json:"limits,omitempty"`
@@ -387,7 +387,7 @@ type LinkLimits struct {
 // alerts and `status`. Environment is dev, preprod or prod.
 type LinkContext struct {
 	Environment  string
-	OHB          string
+	Openedbot    string
 	Organization LinkOrganization
 	Owner        LinkOwner
 	// FeatureLimit is limits.features as announced, zero when the frame did not
@@ -481,7 +481,7 @@ func DecodeText(b []byte) (Text, error) {
 		if f.Environment != "dev" && f.Environment != "preprod" && f.Environment != "prod" {
 			return f, errors.New("link.context requires environment dev, preprod or prod")
 		}
-		texts := []string{f.OHB}
+		texts := []string{f.Openedbot}
 		if f.Organization != nil {
 			texts = append(texts, f.Organization.ID, f.Organization.Name, f.Organization.Slug)
 		}

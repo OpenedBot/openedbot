@@ -41,7 +41,7 @@ const occurredAt = new Date("2026-10-03T12:00:00.000Z");
 const identity = {
   botId: "bot-1",
   turnId: "run-root",
-  sessionKey: `ohb:${organizationId}:workflow:wf-1:bot:bot-1`,
+  sessionKey: `openedbot:${organizationId}:workflow:wf-1:bot:bot-1`,
 };
 const base = {
   organizationId, threadId: "thread-1", runId: "run-step", sequence: 4,

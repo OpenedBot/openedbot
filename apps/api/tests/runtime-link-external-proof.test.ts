@@ -62,10 +62,10 @@ test("browser proof binds actual resumed requests, ordered persisted cursors and
 
 test("observer passes actual consumed SSE bytes through and captures metadata on PWA proxy origin", async () => {
   const priorFetch = globalThis.fetch, priorLocation = Object.getOwnPropertyDescriptor(globalThis, "location"), priorDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
-  const host = globalThis as typeof globalThis & { __ohbContinuityEvidence?: { snapshot(stop?: boolean): unknown } };
-  const observer = (): { snapshot(stop?: boolean): unknown } | undefined => host.__ohbContinuityEvidence;
-  const priorObserver = host.__ohbContinuityEvidence;
-  delete host.__ohbContinuityEvidence;
+  const host = globalThis as typeof globalThis & { __openedbotContinuityEvidence?: { snapshot(stop?: boolean): unknown } };
+  const observer = (): { snapshot(stop?: boolean): unknown } | undefined => host.__openedbotContinuityEvidence;
+  const priorObserver = host.__openedbotContinuityEvidence;
+  delete host.__openedbotContinuityEvidence;
   Object.defineProperty(globalThis, "location", { configurable: true, value: { origin: "http://localhost:1420", href: "http://localhost:1420/bot/test", pathname: "/bot/test" } });
   Object.defineProperty(globalThis, "document", { configurable: true, value: { querySelectorAll: () => [] } });
   const raw = 'id: 7\nevent: run.completed\ndata: {"threadId":"thread","runId":"run","cursor":7,"sequence":1,"type":"run.completed","payload":{"text":"private"}}\n\n';
@@ -80,7 +80,7 @@ test("observer passes actual consumed SSE bytes through and captures metadata on
     expect(JSON.stringify(evidence)).not.toContain("private");
   } finally {
     observer()?.snapshot(true); globalThis.fetch = priorFetch;
-    if (priorObserver) host.__ohbContinuityEvidence = priorObserver; else delete host.__ohbContinuityEvidence;
+    if (priorObserver) host.__openedbotContinuityEvidence = priorObserver; else delete host.__openedbotContinuityEvidence;
     if (priorLocation) Object.defineProperty(globalThis, "location", priorLocation); else Reflect.deleteProperty(globalThis, "location");
     if (priorDocument) Object.defineProperty(globalThis, "document", priorDocument); else Reflect.deleteProperty(globalThis, "document");
   }

@@ -10,10 +10,10 @@ describe("0039 push subscriptions migration", () => {
       expect(sql).toContain(`alter table ${table} enable row level security`);
       expect(sql).toContain(`alter table ${table} force row level security`);
     }
-    expect(sql).toContain("grant select, insert, update, delete on push_subscriptions to ohb_api");
-    expect(sql).toContain("grant select, insert, update, delete on push_subscriptions to ohb_worker");
-    expect(sql).toContain("grant select, insert, update, delete on push_outbox to ohb_worker");
-    expect(sql).toContain("grant select, insert, update, delete on push_deliveries to ohb_worker");
+    expect(sql).toContain("grant select, insert, update, delete on push_subscriptions to openedbot_api");
+    expect(sql).toContain("grant select, insert, update, delete on push_subscriptions to openedbot_worker");
+    expect(sql).toContain("grant select, insert, update, delete on push_outbox to openedbot_worker");
+    expect(sql).toContain("grant select, insert, update, delete on push_deliveries to openedbot_worker");
     expect(sql).toContain("references organizations(id) on delete cascade");
     expect(sql).toContain("references memberships(organization_id, user_id) on delete cascade");
     expect(sql).toContain("unique (workflow_id, notification_sequence, subscription_id)");

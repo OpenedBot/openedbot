@@ -148,7 +148,7 @@ describe("durable bot profile provisioning", () => {
     expect(statements.filter((statement) => statement.sql.includes("update bot_profile_provisions")).every((statement) => statement.sql.includes("lease_generation ="))).toBe(true);
   });
 
-  test("a host that read the created profile back spares the inventory read (DEV-OHB-244)", async () => {
+  test("a host that read the created profile back spares the inventory read", async () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false], readBack: "profile" });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
@@ -172,7 +172,7 @@ describe("durable bot profile provisioning", () => {
     expect(statements.at(-1)?.values[0]).toBe("succeeded");
   });
 
-  test("succeeds only once the gateway serves the new profile (DEV-OHB-244)", async () => {
+  test("succeeds only once the gateway serves the new profile", async () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [false, true], served: ["missing", "error", "isolated"] });
     const slept: number[] = [];
@@ -416,7 +416,7 @@ describe("durable bot profile provisioning", () => {
     expect(again.statements.some((sql) => sql.includes("set status = 'cancelled'"))).toBe(false);
   });
 
-  test("deleting during a live profile creation waits for it, then owns the created profile (DEV-OHB-244)", async () => {
+  test("deleting during a live profile creation waits for it, then owns the created profile", async () => {
     const rows = [
       { status: "running", live: true, attempted: true, ownership: "unknown" },
       { status: "running", live: true, attempted: true, ownership: "unknown" },

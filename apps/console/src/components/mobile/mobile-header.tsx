@@ -8,7 +8,7 @@ import { insetBackClassName } from "./inset-grouped";
 import { useMobileDrawer } from "./mobile-drawer-shell";
 
 const HEADER_ICON_CLASS =
-  "ohb-press flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "openedbot-press flex size-11 shrink-0 items-center justify-center rounded-lg text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /** Action d'en-tête, 44 pt, comme le hamburger. Pas un `Button` BoardUI. */
 export function ChromeIconButton({
@@ -97,7 +97,7 @@ export function MobileHeader({
       data-mobile-header=""
       data-align={centered ? "center" : undefined}
       className={cn(
-        "shrink-0 border-b border-border/70 bg-background pt-[var(--ohb-safe-top)] pr-[var(--ohb-safe-right)] pl-[var(--ohb-safe-left)] select-none",
+        "shrink-0 border-b border-border/70 bg-background pt-[var(--openedbot-safe-top)] pr-[var(--openedbot-safe-right)] pl-[var(--openedbot-safe-left)] select-none",
         className,
       )}
     >

@@ -11,7 +11,7 @@ import {
 import "../../styles/components/thread-perf-hud.css";
 
 /**
- * Dev-only perf HUD for the conversation thread (OHB-88). See
+ * Dev-only perf HUD for the conversation thread. See
  * `docs/cloud/THREAD_PERF_HUD.md` for the budgets and
  * how to enable it (`?perf=1`). `mountThreadPerfHud` is the only export
  * meant to be called (from `main.tsx`, inside an `import.meta.env.DEV`
@@ -19,7 +19,7 @@ import "../../styles/components/thread-perf-hud.css";
  * production build).
  */
 
-const STORAGE_KEY = "ohb.dev.threadPerf";
+const STORAGE_KEY = "openedbot.dev.threadPerf";
 const CONTEXT_REFRESH_MS = 1_000;
 
 function readPerfQueryParam(): "1" | "0" | null {
@@ -41,8 +41,8 @@ function resolveEnabled(): boolean {
   return localStorage.getItem(STORAGE_KEY) === "1";
 }
 
-const COLLAPSED_KEY = "ohb.dev.threadPerf.collapsed";
-const POSITION_KEY = "ohb.dev.threadPerf.position";
+const COLLAPSED_KEY = "openedbot.dev.threadPerf.collapsed";
+const POSITION_KEY = "openedbot.dev.threadPerf.position";
 /** Below the conversation header, clear of the composer and its Send button. */
 const DEFAULT_TOP = 64;
 const EDGE = 8;
@@ -147,19 +147,19 @@ function toneForBudget(value: number, budget: number): Tone {
 function toneClass(tone: Tone): string {
   switch (tone) {
     case "pass":
-      return "ohb-thread-perf-hud-pass";
+      return "openedbot-thread-perf-hud-pass";
     case "warn":
-      return "ohb-thread-perf-hud-warn";
+      return "openedbot-thread-perf-hud-warn";
     case "fail":
-      return "ohb-thread-perf-hud-fail";
+      return "openedbot-thread-perf-hud-fail";
     default:
-      return "ohb-thread-perf-hud-muted";
+      return "openedbot-thread-perf-hud-muted";
   }
 }
 
 function LongFrameList({ frames, budgetMs }: { frames: LongFrame[]; budgetMs: number }) {
   if (frames.length === 0) {
-    return <div className="ohb-thread-perf-hud-muted">no long frame</div>;
+    return <div className="openedbot-thread-perf-hud-muted">no long frame</div>;
   }
   return (
     <div>
@@ -177,7 +177,7 @@ function LongFrameList({ frames, budgetMs }: { frames: LongFrame[]; budgetMs: nu
           {msFmt(frame.paintMs)}
           {frame.scripts.map((script, scriptIndex) => (
             <div
-              className="ohb-thread-perf-hud-script"
+              className="openedbot-thread-perf-hud-script"
               // eslint-disable-next-line react/no-array-index-key -- scripts have no stable id
               key={scriptIndex}
             >
@@ -198,13 +198,13 @@ function LongFrameList({ frames, budgetMs }: { frames: LongFrame[]; budgetMs: nu
 
 function RenderList({ renders }: { renders: RenderSample[] }) {
   if (renders.length === 0) {
-    return <div className="ohb-thread-perf-hud-muted">no render recorded (wrap a component in DevRenderProfiler)</div>;
+    return <div className="openedbot-thread-perf-hud-muted">no render recorded (wrap a component in DevRenderProfiler)</div>;
   }
   return (
     <div>
       {renders.slice(0, 3).map((render, index) => (
         // eslint-disable-next-line react/no-array-index-key -- renders have no stable id
-        <div key={index} className="ohb-thread-perf-hud-row">
+        <div key={index} className="openedbot-thread-perf-hud-row">
           <span>
             {render.id} ({render.phase})
           </span>
@@ -218,7 +218,7 @@ function RenderList({ renders }: { renders: RenderSample[] }) {
 function RunMarkRow({ label, value, budget }: { label: string; value: number | null; budget: number | null }) {
   const tone: Tone = value === null || budget === null ? "muted" : toneForBudget(value, budget);
   return (
-    <div className="ohb-thread-perf-hud-row">
+    <div className="openedbot-thread-perf-hud-row">
       <span>
         {label}
         {budget === null ? "" : ` (${budget} ms)`}
@@ -252,12 +252,12 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
   }, [lastSend]);
 
   return (
-    <div ref={panel} className="ohb-thread-perf-hud" style={style} onPointerDown={onDragStart}>
-      <div className="ohb-thread-perf-hud-header" onDoubleClick={resetPosition} title="Drag the panel to move it, double-click here to put it back">
+    <div ref={panel} className="openedbot-thread-perf-hud" style={style} onPointerDown={onDragStart}>
+      <div className="openedbot-thread-perf-hud-header" onDoubleClick={resetPosition} title="Drag the panel to move it, double-click here to put it back">
         <span className={toneClass(summaryTone)}>
-          OHB-88 thread perf
+          thread perf
           {collapsed && lastSend ? (
-            <span className="ohb-thread-perf-hud-summary">
+            <span className="openedbot-thread-perf-hud-summary">
               {" "}
               {lastSend.latencyMs === null ? "..." : msFmt(lastSend.latencyMs)}
               {" / text "}
@@ -275,12 +275,12 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
         </span>
       </div>
       {collapsed ? null : (
-        <div className="ohb-thread-perf-hud-body">
-          <div className="ohb-thread-perf-hud-section">
-            <div className="ohb-thread-perf-hud-title">send latency (budget {snapshot.budgets.sendLatencyMs} ms)</div>
+        <div className="openedbot-thread-perf-hud-body">
+          <div className="openedbot-thread-perf-hud-section">
+            <div className="openedbot-thread-perf-hud-title">send latency (budget {snapshot.budgets.sendLatencyMs} ms)</div>
             {lastSend ? (
               <>
-                <div className="ohb-thread-perf-hud-row">
+                <div className="openedbot-thread-perf-hud-row">
                   <span>latency</span>
                   <span
                     className={toneClass(
@@ -292,11 +292,11 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
                     {lastSend.latencyMs === null ? "pending..." : msFmt(lastSend.latencyMs)}
                   </span>
                 </div>
-                <div className="ohb-thread-perf-hud-row ohb-thread-perf-hud-muted">
+                <div className="openedbot-thread-perf-hud-row openedbot-thread-perf-hud-muted">
                   <span>composer emptied</span>
                   <span>{lastSend.composerEmptiedMs === null ? "pending..." : msFmt(lastSend.composerEmptiedMs)}</span>
                 </div>
-                <div className="ohb-thread-perf-hud-row ohb-thread-perf-hud-muted">
+                <div className="openedbot-thread-perf-hud-row openedbot-thread-perf-hud-muted">
                   <span>bubble painted</span>
                   <span>{lastSend.bubblePaintedMs === null ? "pending..." : msFmt(lastSend.bubblePaintedMs)}</span>
                 </div>
@@ -304,12 +304,12 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
                 <RenderList renders={lastSend.renders} />
               </>
             ) : (
-              <div className="ohb-thread-perf-hud-muted">no send observed yet</div>
+              <div className="openedbot-thread-perf-hud-muted">no send observed yet</div>
             )}
           </div>
 
-          <div className="ohb-thread-perf-hud-section">
-            <div className="ohb-thread-perf-hud-title">run latency (OHB-107, from send)</div>
+          <div className="openedbot-thread-perf-hud-section">
+            <div className="openedbot-thread-perf-hud-title">run latency (from send)</div>
             {lastSend ? (
               <>
                 <RunMarkRow label="api accepted" value={lastSend.run.acceptedMs} budget={snapshot.budgets.acceptedMs} />
@@ -322,15 +322,15 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
                 <RunMarkRow label="full reply" value={lastSend.run.completedMs} budget={null} />
               </>
             ) : (
-              <div className="ohb-thread-perf-hud-muted">no send observed yet</div>
+              <div className="openedbot-thread-perf-hud-muted">no send observed yet</div>
             )}
           </div>
 
-          <div className="ohb-thread-perf-hud-section">
-            <div className="ohb-thread-perf-hud-title">typing (budget {snapshot.budgets.typingMutations} mutation)</div>
+          <div className="openedbot-thread-perf-hud-section">
+            <div className="openedbot-thread-perf-hud-title">typing (budget {snapshot.budgets.typingMutations} mutation)</div>
             {lastTyping ? (
               <>
-                <div className="ohb-thread-perf-hud-row">
+                <div className="openedbot-thread-perf-hud-row">
                   <span>mutations</span>
                   <span className={toneClass(lastTyping.mutations <= snapshot.budgets.typingMutations ? "pass" : "fail")}>
                     {lastTyping.mutations}
@@ -339,44 +339,44 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
                 <LongFrameList frames={lastTyping.longFrames} budgetMs={snapshot.budgets.longFrameMs} />
               </>
             ) : (
-              <div className="ohb-thread-perf-hud-muted">no typing window closed yet</div>
+              <div className="openedbot-thread-perf-hud-muted">no typing window closed yet</div>
             )}
           </div>
 
-          <div className="ohb-thread-perf-hud-section">
-            <div className="ohb-thread-perf-hud-title">streaming (budget {snapshot.budgets.streamingFrameMs} ms)</div>
+          <div className="openedbot-thread-perf-hud-section">
+            <div className="openedbot-thread-perf-hud-title">streaming (budget {snapshot.budgets.streamingFrameMs} ms)</div>
             {lastStreaming ? (
               <>
-                <div className="ohb-thread-perf-hud-row">
+                <div className="openedbot-thread-perf-hud-row">
                   <span>worst / p95</span>
                   <span className={toneClass(toneForBudget(lastStreaming.worstMs, snapshot.budgets.streamingFrameMs))}>
                     {msFmt(lastStreaming.worstMs)} / {msFmt(lastStreaming.p95Ms)}
                   </span>
                 </div>
-                <div className="ohb-thread-perf-hud-muted">{lastStreaming.sampleCount} long frames in window</div>
+                <div className="openedbot-thread-perf-hud-muted">{lastStreaming.sampleCount} long frames in window</div>
                 <RenderList renders={lastStreaming.renders} />
               </>
             ) : (
-              <div className="ohb-thread-perf-hud-muted">no streaming window observed yet</div>
+              <div className="openedbot-thread-perf-hud-muted">no streaming window observed yet</div>
             )}
           </div>
 
-          <div className="ohb-thread-perf-hud-section">
-            <div className="ohb-thread-perf-hud-title">context</div>
-            <div className="ohb-thread-perf-hud-row">
+          <div className="openedbot-thread-perf-hud-section">
+            <div className="openedbot-thread-perf-hud-title">context</div>
+            <div className="openedbot-thread-perf-hud-row">
               <span>thread nodes</span>
               <span>{snapshot.context.threadNodeCount ?? "-"}</span>
             </div>
-            <div className="ohb-thread-perf-hud-row">
+            <div className="openedbot-thread-perf-hud-row">
               <span>document nodes</span>
               <span>{snapshot.context.documentNodeCount ?? "-"}</span>
             </div>
-            <div className="ohb-thread-perf-hud-row">
+            <div className="openedbot-thread-perf-hud-row">
               <span>turns mounted</span>
               <span>{snapshot.context.turnsMounted ?? "-"}</span>
             </div>
             {!snapshot.supportsLongAnimationFrame ? (
-              <div className="ohb-thread-perf-hud-warn">
+              <div className="openedbot-thread-perf-hud-warn">
                 long-animation-frame unsupported, falling back to longtask (no script attribution)
               </div>
             ) : null}
@@ -391,7 +391,7 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
  * Mounts the HUD in its own root appended to `document.body`, outside
  * `[data-thread-messages]` so it never enters the thread's find/anchor
  * logic. No-op (and never mounts a DOM node) when `?perf=1` was not set
- * this session or in a previous one (`localStorage["ohb.dev.threadPerf"]`).
+ * this session or in a previous one (`localStorage["openedbot.dev.threadPerf"]`).
  */
 export function mountThreadPerfHud(): void {
   if (typeof window === "undefined") return;
@@ -399,7 +399,7 @@ export function mountThreadPerfHud(): void {
 
   const probe = installThreadPerfProbe(window);
   const container = document.createElement("div");
-  container.id = "ohb-thread-perf-hud-root";
+  container.id = "openedbot-thread-perf-hud-root";
   document.body.appendChild(container);
   createRoot(container).render(<ThreadPerfPanel probe={probe} />);
 }

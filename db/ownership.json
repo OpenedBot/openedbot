@@ -182,7 +182,7 @@
     "owner": "staff",
     "debt": {
       "until": "2026-12-31",
-      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée. Le rôle ohb_staff reste aussi au cœur."
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée. Le rôle openedbot_staff reste aussi au cœur."
     }
   },
   "stripe_events": {

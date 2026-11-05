@@ -348,10 +348,9 @@ describe("manifest.env: deployment variables a plug-in declares (step 11.5)", ()
     }
   });
 
-  test("refuses an OPENEDBOT_* or retired OHB_* name, a reserved core name and a duplicate", () => {
+  test("refuses an OPENEDBOT_* name, a reserved core name and a duplicate", () => {
     expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_PLUGINS" }]))).toBe('manifest.env "OPENEDBOT_PLUGINS" is a core variable');
     expect(invalidPluginReason(declaring([{ name: "OPENEDBOT_BILLING_KEY" }]))).toBe('manifest.env "OPENEDBOT_BILLING_KEY" is a core variable');
-    expect(invalidPluginReason(declaring([{ name: "OHB_BILLING_KEY" }]))).toBe('manifest.env "OHB_BILLING_KEY" is a core variable'); // rename:keep
     const reservedEnv = (name: string) => name === "API_DATABASE_URL";
     expect(invalidPluginReason(declaring([{ name: "API_DATABASE_URL" }]), { reservedEnv })).toBe('manifest.env "API_DATABASE_URL" is a core variable');
     expect(invalidPluginReason(declaring([{ name: "API_DATABASE_URL" }]))).toBeNull();

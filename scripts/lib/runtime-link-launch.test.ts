@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 async function fixture(explicitUrl = false) {
-  const root = await mkdtemp(join(tmpdir(), "ohb-link-launch-"));
+  const root = await mkdtemp(join(tmpdir(), "openedbot-link-launch-"));
   await mkdir(join(root, "scripts"));
   await mkdir(join(root, "apps/link-gateway"), { recursive: true });
   await copyFile(resolve(import.meta.dir, "../runtime-link-launch.sh"), join(root, "scripts/runtime-link-launch.sh"));

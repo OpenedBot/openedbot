@@ -58,8 +58,7 @@ const frame = decodeTextFrame(raw);          // throws RelayFrameError on any in
 const route = matchRelayRoute("GET", "/health");
 ```
 
-`@openedbot/contracts-connector`, the `/hermes-setup/` routes and the `X-OpenedBot-Relay-Stage` header are
-technical identifiers kept for wire compatibility.
+The `/hermes-setup/` routes are technical identifiers kept for wire compatibility.
 
 ## Implementing the protocol
 

@@ -187,7 +187,7 @@ describe("steering Hermes", () => {
     expect(receipts.map((query) => (query.values[4] as { status: string }).status)).toEqual(["sending", "ambiguous"]);
   });
 
-  test("le repli d'un DM simple, sans workflow, se steere puis se confirme (OHB-113)", async () => {
+  test("le repli d'un DM simple, sans workflow, se steere puis se confirme", async () => {
     const { db, queries } = fakeDb((sql) => {
       if (sql.includes("select id from runs") && sql.includes("status = 'running' and external_state = 'streaming'")) return [{ id: target }];
       if (sql.includes("from run_steering_attempts steer")) {
@@ -504,7 +504,7 @@ describe("rejeu des steers non lus", () => {
   });
 });
 
-describe("file d'un tour occupé (OHB-117)", () => {
+describe("file d'un tour occupé", () => {
   test("le plafond d'un steer est 3, celui d'un run empoisonné reste celui de la file", () => {
     expect(MAX_RUN_STEER_ATTEMPTS).toBe(3);
     expect(STEER_TARGET_POISON_ATTEMPTS).toBe(MAX_RUN_ATTEMPTS);

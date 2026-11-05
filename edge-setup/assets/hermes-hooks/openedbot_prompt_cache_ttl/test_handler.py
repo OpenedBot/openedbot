@@ -26,10 +26,10 @@ def _fake_adapter(agent):
 
 class PromptCacheTtlHookTests(unittest.TestCase):
     def setUp(self):
-        spec = importlib.util.spec_from_file_location("ohb_prompt_cache_ttl_hook_test", Path(__file__).with_name("handler.py"))
+        spec = importlib.util.spec_from_file_location("openedbot_prompt_cache_ttl_hook_test", Path(__file__).with_name("handler.py"))
         self.module = importlib.util.module_from_spec(spec)
         # Outside Hermes the import-time install finds no API server: it warns and stays off.
-        with self.assertLogs("ohb.prompt_cache_ttl", level="WARNING"):
+        with self.assertLogs("openedbot.prompt_cache_ttl", level="WARNING"):
             spec.loader.exec_module(self.module)
         self.assertFalse(self.module._installed)
 
@@ -70,7 +70,7 @@ class PromptCacheTtlHookTests(unittest.TestCase):
     def test_missing_factory_leaves_hermes_untouched(self):
         class Bare:
             pass
-        with self.assertLogs("ohb.prompt_cache_ttl", level="WARNING"):
+        with self.assertLogs("openedbot.prompt_cache_ttl", level="WARNING"):
             self.assertFalse(self.module.install(Bare))
         self.assertFalse(hasattr(Bare, "_create_agent"))
 

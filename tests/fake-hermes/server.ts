@@ -16,7 +16,7 @@
  * Nothing here talks to a model. Every run answers `OPENEDBOT_CANARY_OK <input>`.
  * Its address and bearer come from ./defaults.ts, never from a literal here.
  *
- * Approval gates (PERM2-A, DEV-OHB-250): a run whose input carries
+ * Approval gates (PERM2-A): a run whose input carries
  * `FAKE_APPROVAL:<gate>` tokens pauses on one `approval.request` per token, in
  * order, until `POST /v1/runs/{id}/approval` resolves it. `<gate>` is
  * `terminal` (a Hermes dangerous-command gate) or `plugin:<tool_key>` (a gate
@@ -46,7 +46,7 @@ export type FakeHermesOptions = {
   /**
    * Extra `message.delta` frames between the first delta and the terminal
    * event, each `streamIntervalMs` apart: what a model streaming for a few
-   * seconds looks like to the worker (one flush per 100 ms, OHB-133). Zero by
+   * seconds looks like to the worker (one flush per 100 ms). Zero by
    * default so every other caller keeps the two-delta instant run.
    */
   streamDeltas?: number;
@@ -132,7 +132,7 @@ export function fakeApprovalGate(gate: string, requestId: string): Record<string
   const mcp = /^mcp:([^:]+):([^:]+)$/.exec(toolKey);
   // Hermes names an MCP tool `mcp__<server>__<tool>` (`tools/mcp_tool_schema.py`).
   const tool = mcp ? `mcp__${mcp[1]}__${mcp[2]}` : toolKey;
-  const patternKey = `plugin_rule:ohb/v1/${toolKey}`;
+  const patternKey = `plugin_rule:openedbot/v1/${toolKey}`;
   const described = mcp
     ? { deletes: "unknown", opaque: false, args: { server: mcp[1], tool: mcp[2], arguments: {} } }
     : FAKE_GATE_DESCRIPTORS[toolKey] ?? { deletes: "unknown", opaque: true, args: {} };
@@ -144,7 +144,7 @@ export function fakeApprovalGate(gate: string, requestId: string): Record<string
     command: `<${tool}> (plugin approval rule)`,
     pattern_key: patternKey,
     pattern_keys: [patternKey],
-    description: `Approve write-capable tool ${tool}.\nohb-gate/v1 ${digest} ${text}`,
+    description: `Approve write-capable tool ${tool}.\nopenedbot-gate/v1 ${digest} ${text}`,
     allow_permanent: true,
     allow_session: true,
     request_id: requestId,
@@ -275,7 +275,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
       if (path === "/v1/skills" && method === "GET") return json(host.skillsDocument(scopedProfile ?? null));
       if (path === "/api/model/options" && method === "GET") return json(MODEL_OPTIONS);
 
-      // The host operator's bounded inventory (OHB-55): identifiers only, never
+      // The host operator's bounded inventory: identifiers only, never
       // a title, a model or a message. Served by the fake gateway so the worker
       // reconciliation can be exercised without a real edge-setup host.
       if (path === "/hermes-setup/sessions-inventory" && method === "GET") {

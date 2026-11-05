@@ -49,7 +49,7 @@ create index apns_device_user_active_idx
 
 alter table apns_device_registrations enable row level security;
 alter table apns_device_registrations force row level security;
-create policy apns_device_user on apns_device_registrations to ohb_api
+create policy apns_device_user on apns_device_registrations to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.user_id', true), '')::uuid
@@ -58,11 +58,11 @@ create policy apns_device_user on apns_device_registrations to ohb_api
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.user_id', true), '')::uuid
   );
-create policy apns_device_worker on apns_device_registrations to ohb_worker
+create policy apns_device_worker on apns_device_registrations to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on apns_device_registrations to ohb_api;
-grant select, insert, update, delete on apns_device_registrations to ohb_worker;
+grant select, insert, update, delete on apns_device_registrations to openedbot_api;
+grant select, insert, update, delete on apns_device_registrations to openedbot_worker;
 
 -- Une réinstallation ou un changement de compte peut conserver le même token
 -- Apple. L'ancien rattachement est rendu inutilisable et son secret effacé
@@ -133,10 +133,10 @@ create index apns_notification_claimable_idx
 
 alter table apns_notification_outbox enable row level security;
 alter table apns_notification_outbox force row level security;
-create policy apns_notification_worker on apns_notification_outbox to ohb_worker
+create policy apns_notification_worker on apns_notification_outbox to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on apns_notification_outbox to ohb_worker;
-grant usage, select on sequence apns_notification_outbox_id_seq to ohb_worker;
+grant select, insert, update, delete on apns_notification_outbox to openedbot_worker;
+grant usage, select on sequence apns_notification_outbox_id_seq to openedbot_worker;
 
 -- Le compteur vit sur la ligne workflow verrouillée par l'UPDATE. PostgreSQL
 -- sérialise donc deux transitions concurrentes avant que l'outbox soit écrite.
@@ -271,7 +271,7 @@ create index apns_live_activity_workflow_active_idx
 
 alter table apns_live_activity_registrations enable row level security;
 alter table apns_live_activity_registrations force row level security;
-create policy apns_live_activity_user on apns_live_activity_registrations to ohb_api
+create policy apns_live_activity_user on apns_live_activity_registrations to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.user_id', true), '')::uuid
@@ -280,10 +280,10 @@ create policy apns_live_activity_user on apns_live_activity_registrations to ohb
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.user_id', true), '')::uuid
   );
-create policy apns_live_activity_worker on apns_live_activity_registrations to ohb_worker
+create policy apns_live_activity_worker on apns_live_activity_registrations to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on apns_live_activity_registrations to ohb_api;
-grant select, insert, update, delete on apns_live_activity_registrations to ohb_worker;
+grant select, insert, update, delete on apns_live_activity_registrations to openedbot_api;
+grant select, insert, update, delete on apns_live_activity_registrations to openedbot_worker;
 
 create or replace function end_previous_live_activity_token()
 returns trigger
@@ -396,9 +396,9 @@ create index apns_delivery_claimable_idx
 
 alter table apns_notification_deliveries enable row level security;
 alter table apns_notification_deliveries force row level security;
-create policy apns_delivery_worker on apns_notification_deliveries to ohb_worker
+create policy apns_delivery_worker on apns_notification_deliveries to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on apns_notification_deliveries to ohb_worker;
+grant select, insert, update, delete on apns_notification_deliveries to openedbot_worker;
 
 create or replace function protect_apns_delivery_identity()
 returns trigger

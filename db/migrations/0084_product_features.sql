@@ -6,7 +6,7 @@ create table product_features (
   updated_at timestamptz not null default now()
 );
 
-grant select on product_features to ohb_api;
+grant select on product_features to openedbot_api;
 
 -- Workspace agency and connector-only enrollment are distinct product gates.
 -- Both ship enabled by default for the current Cloud and Edge contract.

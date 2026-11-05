@@ -33,7 +33,7 @@ const encryptionKey = Buffer.alloc(32, 7).toString("base64");
 const config = readApiConfig({ OPENEDBOT_ENV: "test", RUNTIME_TOKEN_ENCRYPTION_KEY: encryptionKey });
 const keyring = secretEncryptionKey(new Uint8Array(Buffer.from(encryptionKey, "base64")));
 const master = new Uint8Array(Buffer.alloc(32, 5));
-const RUN_KEY = "ohb-run-1";
+const RUN_KEY = "openedbot-run-1";
 const RUN_HASH = hashCredential(RUN_KEY);
 
 type Statement = { sql: string; values: unknown[] };
@@ -83,7 +83,7 @@ type MountOptions = {
   dispatches?: Array<{ hash: string; dispatchedAt: Date }>;
   runs?: string[];
   pushFrame?: (runtimeId: string, frame: RelayTextFrame) => boolean;
-  /** Le bucket WORM (OHB-57) ; absent = `worm: disabled`. */
+  /** Le bucket WORM ; absent = `worm: disabled`. */
   worm?: AuditWormStore | null;
   /** `audit.anchor` de l'organisation (AuditAnchor bloquant). */
   anchorBlocking?: (organizationId: string) => Promise<boolean>;
@@ -383,7 +383,7 @@ async function settle(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-describe("ancrage WORM (OHB-57)", () => {
+describe("ancrage WORM", () => {
   const state = snapshot(events());
   const anchor = { keyId: "k-1", writeSeq: 3, eventCount: 2, dropped: 0, tail: state.tail, receivedAt: new Date() };
   const archived = (overrides: Partial<{ keyId: string; tail: string; count: number }> = {}) =>

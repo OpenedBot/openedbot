@@ -2,7 +2,7 @@
 export const PERSONA_DRAFT_HISTORY = 12;
 
 export function personaDraftSessionKey(organizationId: string, botId: string): string {
-  return `ohb:${organizationId}:persona-draft:bot:${botId}`;
+  return `openedbot:${organizationId}:persona-draft:bot:${botId}`;
 }
 
 export function buildPersonaDraftInstructions(name: string): string {

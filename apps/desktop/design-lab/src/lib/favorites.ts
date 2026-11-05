@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 // The shortlist while choosing: starred templates, kept in this browser.
-const KEY = "ohb-lab:favorites";
+const KEY = "openedbot-lab:favorites";
 const listeners = new Set<() => void>();
 
 function read(): string {

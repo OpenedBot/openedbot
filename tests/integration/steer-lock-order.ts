@@ -64,7 +64,7 @@ async function main(): Promise<Report> {
   };
 
   try {
-    await withDisposablePostgres("ohb117_steer_lock_order", async ({ owner, connect }) => {
+    await withDisposablePostgres("openedbot117_steer_lock_order", async ({ owner, connect }) => {
       report.stage = 1;
       const organizationId = randomUUID();
       const sectionId = randomUUID();
@@ -74,9 +74,9 @@ async function main(): Promise<Report> {
       const sourceRunId = "00000000-0000-4000-8000-000000000001";
       const targetRunId = "00000000-0000-4000-8000-000000000002";
       const attemptId = randomUUID();
-      const steerWorkerId = `ohb117-steer-${randomUUID()}`;
-      const claimWorkerId = `ohb117-claim-${randomUUID()}`;
-      const hermesSessionId = `ohb117-${randomUUID()}`;
+      const steerWorkerId = `openedbot117-steer-${randomUUID()}`;
+      const claimWorkerId = `openedbot117-claim-${randomUUID()}`;
+      const hermesSessionId = `openedbot117-${randomUUID()}`;
       const leaseGeneration = 7;
       const postEntered = deferred();
       const releasePost = deferred();
@@ -133,8 +133,8 @@ async function main(): Promise<Report> {
         )`;
         report.stage = 2;
 
-        const steerDb = await connect("ohb_worker");
-        const queueDb = await connect("ohb_worker");
+        const steerDb = await connect("openedbot_worker");
+        const queueDb = await connect("openedbot_worker");
         await steerDb`select set_config('app.organization_id', ${organizationId}, false)`;
         await queueDb`select set_config('app.organization_id', ${organizationId}, false)`;
         await steerDb`set statement_timeout = '5s'`;

@@ -13,7 +13,7 @@ export type BootSidebarShape = {
   blocks: Array<{ label: boolean; rows: number }>;
 };
 
-export const BOOT_SIDEBAR_KEY = "ohb:boot-sidebar";
+export const BOOT_SIDEBAR_KEY = "openedbot:boot-sidebar";
 
 const MAX_PINS = 6;
 const MAX_ROWS = 18;

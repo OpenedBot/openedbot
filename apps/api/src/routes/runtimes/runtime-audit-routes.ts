@@ -50,7 +50,7 @@ import { assertString, HttpError } from "../../interfaces/http/http-error";
 import { readRuntimeRowById } from "./runtime-routes";
 
 /**
- * Vérification d'un export d'audit de création (OHB-56).
+ * Vérification d'un export d'audit de création.
  *
  * L'opérateur recopie `snapshot.bin` à l'octet près et le soumet ici ; il ne
  * détient aucune clé. L'API lit l'en-tête clair, retrouve la clé maîtresse
@@ -70,7 +70,7 @@ export const AUDIT_VERIFICATIONS_PAGE_LIMIT = 200;
 
 type AnchorState = "matches" | "behind" | "none" | "stale" | "db_only";
 /**
- * Ce que le bucket WORM (OHB-57) dit de l'export : `disabled` (aucun store),
+ * Ce que le bucket WORM dit de l'export : `disabled` (aucun store),
  * `missing` (l'ancre de cette position n'y a jamais été déposée), `matches`
  * (l'objet archivé décrit la même position que l'export ET que la base),
  * `tampered` (il en décrit une autre : la base ou l'export a été réécrit).
@@ -121,7 +121,7 @@ type VerificationRow = {
 export type RuntimeAuditRouteDeps = {
   links?: RuntimeLinks;
   signer?: VerdictSigner;
-  /** Le bucket WORM (OHB-57) ; `null` ou absent : vérification sur la base seule, `worm: disabled`. */
+  /** Le bucket WORM ; `null` ou absent : vérification sur la base seule, `worm: disabled`. */
   worm?: AuditWormStore | null;
   /** `audit.anchor` de l'organisation : un ancrage externe en échec devient bloquant. */
   anchorBlocking?: AnchorBlockingCheck;

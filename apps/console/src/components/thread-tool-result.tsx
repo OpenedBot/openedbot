@@ -124,7 +124,7 @@ export const ToolResult = memo(function ToolResult({
 
   // A folded panel holds no log lines: every past turn keeps its Tool Results
   // mounted (folded, `inert`), and up to TOOL_LOG_MAX_LINES lines each would
-  // swell the thread's node count (OHB-88). The lines mount with the open and
+  // swell the thread's node count. The lines mount with the open and
   // leave once the close animation has played.
   const [linesMounted, setLinesMounted] = useState(open);
   useEffect(() => {
@@ -259,7 +259,7 @@ export const ToolResult = memo(function ToolResult({
         <ChevronDown
           aria-hidden
           className={cn(
-            "ohb-activity-chevron size-3.5 shrink-0 text-text-tertiary group-hover:text-text-secondary",
+            "openedbot-activity-chevron size-3.5 shrink-0 text-text-tertiary group-hover:text-text-secondary",
             open && "rotate-180",
           )}
         />
@@ -290,7 +290,7 @@ export const ToolResult = memo(function ToolResult({
                 // Focusable: a keyboard reader scrolls the log with the arrows.
                 tabIndex={0}
                 onScroll={onLogScroll}
-                className="ohb-tool-log no-scrollbar overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring"
+                className="openedbot-tool-log no-scrollbar overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring"
               >
                 <pre className="m-0 overflow-x-auto whitespace-pre-wrap break-words p-3 font-mono text-xs leading-5 text-text-secondary">
                   {hasLog ? (showLines ? lines.map((line, index) => (

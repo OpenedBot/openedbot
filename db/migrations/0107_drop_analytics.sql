@@ -233,11 +233,11 @@ begin
 end;
 $$;
 revoke all on function staff_get_user(uuid) from public;
-grant execute on function staff_get_user(uuid) to ohb_api;
+grant execute on function staff_get_user(uuid) to openedbot_api;
 
 drop function if exists staff_analytics_timeseries(date, date);
 
--- Les politiques et les droits d'`ohb_worker` partent avec les tables.
+-- Les politiques et les droits d'`openedbot_worker` partent avec les tables.
 drop table if exists analytics_daily_global;
 drop table if exists analytics_daily;
 drop table if exists analytics_events;

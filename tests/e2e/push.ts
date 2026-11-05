@@ -1,6 +1,6 @@
 import { createECDH, randomBytes } from "node:crypto";
 /**
- * OHB-20 / OHB-33 — Web Push prouvable contre un serveur push simulé.
+ * Web Push prouvable contre un serveur push simulé.
  * Exige l'API locale déjà lancée (`make e2e-api`). N'appelle jamais FCM ni Mozilla.
  */
 import { mkdirSync } from "node:fs";
@@ -9,7 +9,7 @@ import { startFakePush } from "../fake-push/server";
 import { passwordLogin } from "../../scripts/lib/password-login";
 
 const baseUrl = (process.env.E2E_API_URL ?? "http://127.0.0.1:8790").replace(/\/+$/, "");
-const email = process.env.E2E_EMAIL ?? "dev@ohb.local";
+const email = process.env.E2E_EMAIL ?? "dev@openedbot.local";
 const password = process.env.E2E_PASSWORD || (() => { throw new Error("E2E_PASSWORD is not set: run `make setup` (it generates one in .env.local), or export it."); })();
 
 const health = await fetch(`${baseUrl}/api/health`);

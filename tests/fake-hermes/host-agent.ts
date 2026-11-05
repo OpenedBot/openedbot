@@ -5,7 +5,7 @@
  * `hermes-connector` on a customer host, against `tests/fake-hermes/server.ts`
  * as the local gateway:
  *
- *   - dials `wss://<ohb>/api/runtime-links/ws` with an enrollment ticket or a
+ *   - dials `wss://<openedbot>/api/runtime-links/ws` with an enrollment ticket or a
  *     link token, sends `hello` first;
  *   - serves `req` frames by forwarding them to the local gateway with the
  *     LOCAL bearer (the bearer never crosses the wire);

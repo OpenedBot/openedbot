@@ -16,7 +16,7 @@ import {
 import { createLinkLivenessStore, type LinkIdentity } from "../src/application/broker";
 
 /**
- * Le bucket WORM (OHB-57) : un objet se dépose une fois et ne se réécrit
+ * Le bucket WORM : un objet se dépose une fois et ne se réécrit
  * jamais ; une ancre enregistrée en base y part dans sa transaction ; un dépôt
  * qui échoue se journalise sans casser le lien.
  */
@@ -64,7 +64,7 @@ describe("ancre archivée", () => {
   test("createAuditWormStore : null quand disabled, un store r2 sinon", () => {
     expect(createAuditWormStore({ mode: "disabled" })).toBeNull();
     const store = createAuditWormStore({
-      mode: "r2", bucket: "ohb-audit-worm", endpoint: "https://account.r2.cloudflarestorage.com",
+      mode: "r2", bucket: "openedbot-audit-worm", endpoint: "https://account.r2.cloudflarestorage.com",
       write: { accessKeyId: "w", secretAccessKey: "ws" }, read: { accessKeyId: "r", secretAccessKey: "rs" }, retentionDays: 365,
     });
     expect(store?.mode).toBe("r2");

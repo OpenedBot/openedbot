@@ -50,7 +50,7 @@ alter table audit_worm_orphans enable row level security;
 alter table audit_worm_orphans force row level security;
 -- Same two contexts as audit_chain (0152): the tenant (verdict routes) and
 -- the link credential (anchors received by the broker).
-create policy audit_worm_orphans_api on audit_worm_orphans to ohb_api
+create policy audit_worm_orphans_api on audit_worm_orphans to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or exists (
@@ -71,11 +71,11 @@ create policy audit_worm_orphans_api on audit_worm_orphans to ohb_api
                and r.link_token_previous_expires_at > now()))
     )
   );
-grant select, insert on audit_worm_orphans to ohb_api;
+grant select, insert on audit_worm_orphans to openedbot_api;
 
 -- The worker reads the marks (reconciliation, tenant purge archive).
-create policy audit_worm_orphans_worker on audit_worm_orphans for select to ohb_worker using (true);
-grant select on audit_worm_orphans to ohb_worker;
+create policy audit_worm_orphans_worker on audit_worm_orphans for select to openedbot_worker using (true);
+grant select on audit_worm_orphans to openedbot_worker;
 
 insert into schema_migrations(version) values ('0153_audit_worm_orphans')
 on conflict (version) do nothing;

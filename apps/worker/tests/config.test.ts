@@ -27,7 +27,7 @@ function productionEnvironment(overrides: Record<string, string> = {}): Record<s
     PUSH_VAPID_PUBLIC_KEY: publicKey.toString("base64url"),
     PUSH_VAPID_PRIVATE_KEY: Buffer.alloc(32, 7).toString("base64url"),
     PUSH_VAPID_SUBJECT: "mailto:ops@example.test",
-    TRANSACTIONAL_EMAIL_FROM: "OHB <ops@ohb.example>",
+    TRANSACTIONAL_EMAIL_FROM: "openedbot <ops@openedbot.example>",
     WORKER_INTERNAL_TOKEN: "worker-secret",
     ...overrides,
   });
@@ -35,7 +35,7 @@ function productionEnvironment(overrides: Record<string, string> = {}): Record<s
 
 describe("worker instance identity", () => {
   test("loads the same process-wide mTLS identity boundary", () => {
-    const directory = mkdtempSync(join(tmpdir(), "ohb-worker-mtls-"));
+    const directory = mkdtempSync(join(tmpdir(), "openedbot-worker-mtls-"));
     try {
       const cert = join(directory, "client.pem");
       const key = join(directory, "client.key");
@@ -81,22 +81,22 @@ describe("OPENEDBOT_ENV", () => {
 describe("transactional email transports", () => {
   test("two transports together are refused, whichever pair", () => {
     expect(() => readWorkerConfig(testEnvironment({
-      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.ohb.example/send",
+      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.openedbot.example/send",
       TRANSACTIONAL_EMAIL_SMTP_URL: "smtp://127.0.0.1:1025",
-      TRANSACTIONAL_EMAIL_FROM: "ohb@ohb.local",
+      TRANSACTIONAL_EMAIL_FROM: "openedbot@openedbot.local",
       TRANSACTIONAL_EMAIL_TOKEN: "token",
     }))).toThrow(/exactly one transport/);
     expect(() => readWorkerConfig(testEnvironment({
       TRANSACTIONAL_EMAIL_BREVO_API_KEY: "xkeysib-secret",
       TRANSACTIONAL_EMAIL_SMTP_URL: "smtp://127.0.0.1:1025",
-      TRANSACTIONAL_EMAIL_FROM: "ohb@ohb.local",
+      TRANSACTIONAL_EMAIL_FROM: "openedbot@openedbot.local",
     }))).toThrow(/exactly one transport/);
   });
 
   test("SMTP alone is accepted outside production", () => {
     const config = readWorkerConfig(testEnvironment({
       TRANSACTIONAL_EMAIL_SMTP_URL: "smtp://127.0.0.1:1025",
-      TRANSACTIONAL_EMAIL_FROM: "ohb@ohb.local",
+      TRANSACTIONAL_EMAIL_FROM: "openedbot@openedbot.local",
     }));
     expect(config.transactionalEmail.smtpUrl).toBe("smtp://127.0.0.1:1025");
     expect(config.transactionalEmail.endpoint).toBeNull();
@@ -106,7 +106,7 @@ describe("transactional email transports", () => {
   test("Brevo alone is read as the transport", () => {
     const config = readWorkerConfig(testEnvironment({
       TRANSACTIONAL_EMAIL_BREVO_API_KEY: "xkeysib-secret",
-      TRANSACTIONAL_EMAIL_FROM: "ohb@ohb.local",
+      TRANSACTIONAL_EMAIL_FROM: "openedbot@openedbot.local",
     }));
     expect(config.transactionalEmail.brevoApiKey).toBe("xkeysib-secret");
     expect(config.transactionalEmail.smtpUrl).toBeNull();
@@ -119,7 +119,7 @@ describe("transactional email transports", () => {
     }));
     expect(config.transactionalEmail.resendApiKey).toBe("re_test-secret");
     expect(config.transactionalEmail.resendBaseUrl).toBe("https://api.resend.com");
-    expect(config.transactionalEmail.from).toBe("OHB <ops@ohb.example>");
+    expect(config.transactionalEmail.from).toBe("openedbot <ops@openedbot.example>");
     expect(config.environment).toBe("production");
   });
 
@@ -147,7 +147,7 @@ describe("transactional email transports", () => {
           R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
           R2_ACCESS_KEY_ID: "key",
           R2_SECRET_ACCESS_KEY: "secret",
-          TRANSACTIONAL_EMAIL_FROM: "OHB <ops@ohb.example>",
+          TRANSACTIONAL_EMAIL_FROM: "openedbot <ops@openedbot.example>",
           WORKER_INTERNAL_TOKEN: "worker-secret",
         }));
         return null;
@@ -173,16 +173,16 @@ describe("web push VAPID", () => {
       R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
       R2_ACCESS_KEY_ID: "key",
       R2_SECRET_ACCESS_KEY: "secret",
-      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.ohb.example/send",
+      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.openedbot.example/send",
       TRANSACTIONAL_EMAIL_TOKEN: "token",
-      TRANSACTIONAL_EMAIL_FROM: "OHB <ops@ohb.example>",
+      TRANSACTIONAL_EMAIL_FROM: "openedbot <ops@openedbot.example>",
       WORKER_INTERNAL_TOKEN: "worker-secret",
     }))).toThrow(/PUSH_VAPID/);
   });
 
   test("production : l'opt-in boucle locale du Web Push est refusé", () => {
     expect(() => readWorkerConfig(productionEnvironment({
-      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.ohb.example/send",
+      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.openedbot.example/send",
       TRANSACTIONAL_EMAIL_TOKEN: "token",
       PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
     })))
@@ -229,7 +229,7 @@ test("separate link mode refuses a missing gateway URL", () => {
   expect(readWorkerConfig(testEnvironment({ RUNTIME_LINK_MODE: "separate", RUNTIME_LINK_INTERNAL_URL: "http://links:8792" })).runtimeLinkInternalUrl).toBe("http://links:8792");
 });
 
-describe("rotation automatique du jeton de lien (OHB-56)", () => {
+describe("rotation automatique du jeton de lien", () => {
   test("24 h en production, 168 h ailleurs, réglable par LINK_TOKEN_MAX_AGE_HOURS", () => {
     expect(readWorkerConfig(testEnvironment()).linkTokenMaxAgeHours).toBe(168);
     expect(readWorkerConfig(testEnvironment({ LINK_TOKEN_MAX_AGE_HOURS: "12" })).linkTokenMaxAgeHours).toBe(12);

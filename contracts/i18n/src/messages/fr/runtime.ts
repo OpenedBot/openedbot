@@ -84,7 +84,7 @@ export const runtimeDirect = {
   pathManagedHint: "Aucun domaine à posséder : un nom suffit, openedbot publie le gateway sous son propre domaine. Il vous reste une commande à coller sur l’hôte.",
   pathFunnel: "Tailscale Funnel",
   pathFunnelHint: "Aucun domaine à posséder : vous collez un client OAuth de votre tailnet, openedbot y pose l’attribut funnel et la clé d’appairage, et Tailscale publie le gateway en HTTPS sous une adresse ts.net. Il vous reste une commande à coller sur l’hôte.",
-  managedAutoHint: "Rien à saisir : openedbot publie le gateway sur son propre domaine, sous un sous-domaine qu’il tire lui-même (ohb-xxxxxxxx). Cliquez sur Publier ; le hostname s’affiche à l’étape suivante.",
+  managedAutoHint: "Rien à saisir : openedbot publie le gateway sur son propre domaine, sous un sous-domaine qu’il tire lui-même (openedbot-xxxxxxxx). Cliquez sur Publier ; le hostname s’affiche à l’étape suivante.",
   guideLink: "Guide pas à pas, avec chaque commande à taper sur l’hôte",
   exposureStepPublish: "Publier",
   exposureStepInstall: "Installer sur l’hôte",

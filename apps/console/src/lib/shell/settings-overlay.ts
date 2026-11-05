@@ -39,7 +39,7 @@ const DEV_ONLY_PATHS: ReadonlySet<string> = new Set(["/settings/billing", "/sett
 const OVERLAY_PATHS: ReadonlySet<string> = new Set(OVERLAY_SETTINGS_PATHS);
 
 /** La clé d'état d'historique qui porte la rubrique ouverte en surcouche. */
-export const SETTINGS_OVERLAY_STATE_KEY = "ohbSettingsOverlay";
+export const SETTINGS_OVERLAY_STATE_KEY = "openedbotSettingsOverlay";
 
 export function isOverlaySettingsPath(path: string): path is OverlaySettingsPath {
   return OVERLAY_PATHS.has(path) && (SHOW_DEV_SETTINGS || !DEV_ONLY_PATHS.has(path));

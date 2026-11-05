@@ -90,8 +90,8 @@ SKILL_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 MODEL_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 ENV_KEY_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 ESSENTIAL_SKILLS = {"hermes-agent"}
-OWN_MARKER = "ohb:profile-own"
-OWN_KEYS_FILE = ".env.ohb-own"
+OWN_MARKER = "openedbot:profile-own"
+OWN_KEYS_FILE = ".env.openedbot-own"
 PROVIDER_KEY_ENV = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
@@ -1054,14 +1054,14 @@ def install_profile_a2a_guard(name):
     """Carry the fixed root guard into a newly cloned managed profile."""
     require_profile_slug(name)
     root = os.path.abspath(hermes_home())
-    source = os.path.join(root, "plugins", "ohb_a2a_policy")
+    source = os.path.join(root, "plugins", "openedbot_a2a_policy")
     if not os.path.lexists(source):
         from hermes_cli.config import load_config
 
         config = load_config()
         plugins = config.get("plugins") if isinstance(config, dict) else None
-        if (isinstance(plugins, dict) and "ohb_a2a_policy" in (plugins.get("enabled") or [])
-                and "ohb_a2a_policy" not in (plugins.get("disabled") or [])):
+        if (isinstance(plugins, dict) and "openedbot_a2a_policy" in (plugins.get("enabled") or [])
+                and "openedbot_a2a_policy" not in (plugins.get("disabled") or [])):
             raise Refused("PROFILE_CONFIG_REFUSED", "the enabled managed A2A guard is missing")
         return
     target_home = os.path.join(root, "profiles", name)
@@ -1096,16 +1096,16 @@ def install_profile_a2a_guard(name):
             files[filename] = data
     files["runtime-home"] = (root + "\n").encode("utf-8")
     for directory in (os.path.join(target_home, "plugins"),
-                      os.path.join(target_home, "plugins", "ohb_a2a_policy")):
+                      os.path.join(target_home, "plugins", "openedbot_a2a_policy")):
         private_directory(directory, create=True)
-    target = os.path.join(target_home, "plugins", "ohb_a2a_policy")
+    target = os.path.join(target_home, "plugins", "openedbot_a2a_policy")
     for filename, data in files.items():
         destination = os.path.join(target, filename)
         if os.path.lexists(destination):
             info = os.lstat(destination)
             if not stat.S_ISREG(info.st_mode) or info.st_uid != uid:
                 raise Refused("PROFILE_CONFIG_REFUSED", "the managed A2A guard destination is unsafe")
-        descriptor, temporary = tempfile.mkstemp(prefix=".ohb-a2a-", dir=target)
+        descriptor, temporary = tempfile.mkstemp(prefix=".openedbot-a2a-", dir=target)
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 os.fchmod(handle.fileno(), 0o600)
@@ -1837,7 +1837,7 @@ def write_own_keys(name, keys):
         lines.append("# " + OWN_MARKER + "\n")
         lines.append(key + "\n")
     encoded = "".join(lines).encode("utf-8")
-    fd, temporary = tempfile.mkstemp(prefix=".env.ohb-own.", dir=directory)
+    fd, temporary = tempfile.mkstemp(prefix=".env.openedbot-own.", dir=directory)
     try:
         with os.fdopen(fd, "wb") as handle:
             os.fchmod(handle.fileno(), 0o600)
@@ -2935,7 +2935,7 @@ def preamble_tools(home, config):
     if not toolsets:
         return None
     saved_env = dict(os.environ)
-    scratch = tempfile.mkdtemp(prefix="ohb-preamble-")
+    scratch = tempfile.mkdtemp(prefix="openedbot-preamble-")
     try:
         for key, value in load_env_file(os.path.join(home, ".env")).items():
             os.environ.setdefault(key, value)

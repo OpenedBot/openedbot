@@ -288,9 +288,9 @@ async function main(): Promise<void> {
       mtls: null,
     });
 
-    await withDisposablePostgres("ohb117_followup", async ({ owner, connect }) => {
-      const apiDb = await connect("ohb_api");
-      const workerDb = await connect("ohb_worker");
+    await withDisposablePostgres("openedbot117_followup", async ({ owner, connect }) => {
+      const apiDb = await connect("openedbot_api");
+      const workerDb = await connect("openedbot_worker");
       const hub = new EventHub();
       const workerOneId = "worker-" + crypto.randomUUID();
       const workerTwoId = "worker-" + crypto.randomUUID();
@@ -588,7 +588,7 @@ async function main(): Promise<void> {
         // microseconds, and a JavaScript Date truncated to the millisecond
         // could call the backoff expired while the claim's now() still sees
         // it pending, so the forward returned "none" and nothing reached
-        // fake Hermes (OHB-123).
+        // fake Hermes.
         await waitUntil(async () => {
           const available = await rows<{ ready: boolean }>(owner,
             "select available_at <= now() as ready from run_steering_attempts where organization_id = $1 and id = $2",

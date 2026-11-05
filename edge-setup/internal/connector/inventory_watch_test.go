@@ -75,7 +75,7 @@ func watchingClient(t *testing.T, broker *fakeBroker, socket string) *Client {
 }
 
 func linkContext(accepts ...string) Text {
-	return Text{T: TLinkContext, Environment: "dev", OHB: "http://localhost:1420", Accepts: accepts}
+	return Text{T: TLinkContext, Environment: "dev", Openedbot: "http://localhost:1420", Accepts: accepts}
 }
 
 // nextInventoryChanged waits for an inventory.changed frame, skipping the

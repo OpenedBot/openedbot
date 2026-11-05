@@ -25,7 +25,7 @@ comment on column runtimes.link_token_previous_expires_at is
 -- visible au connecteur qui n'a pas encore reçu `link.rotate`. La borne
 -- temporelle est vérifiée par la requête de montée, pas par la politique.
 drop policy runtimes_link_credential on runtimes;
-create policy runtimes_link_credential on runtimes to ohb_api
+create policy runtimes_link_credential on runtimes to openedbot_api
   using (
     link_token_hash = nullif(current_setting('app.session_credential_hash', true), '')
     or link_token_previous_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -57,14 +57,14 @@ comment on table runtime_link_events is
 alter table runtime_link_events enable row level security;
 alter table runtime_link_events force row level security;
 
-create policy runtime_link_events_tenant on runtime_link_events to ohb_api
+create policy runtime_link_events_tenant on runtime_link_events to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_link_events_worker on runtime_link_events to ohb_worker
+create policy runtime_link_events_worker on runtime_link_events to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on runtime_link_events to ohb_api;
-grant select, insert, update, delete on runtime_link_events to ohb_worker;
+grant select, insert, update, delete on runtime_link_events to openedbot_api;
+grant select, insert, update, delete on runtime_link_events to openedbot_worker;
 
 insert into schema_migrations(version) values ('0027_runtime_link_rotation')
 on conflict (version) do nothing;

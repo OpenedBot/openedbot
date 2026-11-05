@@ -1,4 +1,3 @@
-import "./legacy-env-guard"; // first: refuses a retired OHB_* variable
 import { app, dialog, Menu } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -39,7 +38,7 @@ function start(): void {
     contents.on("will-attach-webview", (event) => event.preventDefault());
   });
 
-  // A second launch (Start menu, or the OS handing us an ohb:// URL on Windows)
+  // A second launch (Start menu, or the OS handing us an openedbot:// URL on Windows)
   // lands here instead of opening a second window.
   let handleCommandLine = (_argv: readonly string[]): void => {};
   app.on("second-instance", (_event, argv) => {
@@ -274,7 +273,7 @@ function start(): void {
       reloadOnChange([path.join(__dirname, "..", "preload"), path.join(app.getAppPath(), "src", "renderer")], () => window.reload());
     }
 
-    // Cold start through an ohb:// link (Windows passes it in argv).
+    // Cold start through an openedbot:// link (Windows passes it in argv).
     deepLink.handleCommandLine(process.argv);
     log.info(`ready, console ${config.consoleUrl}`);
   });

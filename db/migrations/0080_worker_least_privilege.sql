@@ -1,6 +1,6 @@
 -- Le worker perd ce qu'il n'a jamais lu.
 --
--- Chaque table tenant ouvre au rôle `ohb_worker` une policy `using (true)` :
+-- Chaque table tenant ouvre au rôle `openedbot_worker` une policy `using (true)` :
 -- le worker traverse les organisations (file de runs, maintenance) et ne pose
 -- jamais `app.organization_id`. Pour les tables qu'il consulte, c'est la dette
 -- que la suite rembourse table par table. Pour les cinq ci-dessous, ce n'est
@@ -25,7 +25,7 @@ drop policy if exists decisions_worker on decisions;
 drop policy if exists runtime_link_dispatches_worker on runtime_link_dispatches;
 
 revoke all on sessions, native_auth_codes, organization_invitations, decisions,
-  runtime_link_dispatches from ohb_worker;
+  runtime_link_dispatches from openedbot_worker;
 
 insert into schema_migrations(version) values ('0080_worker_least_privilege') on conflict (version) do nothing;
 

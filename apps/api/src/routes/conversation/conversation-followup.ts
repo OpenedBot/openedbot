@@ -67,7 +67,7 @@ export async function activeRunSteerTargetTx(
 }
 
 /**
- * Moitié API du traceur OHB-107 : de la réception du POST au commit, en
+ * Moitié API du traceur De la réception du POST au commit, en
  * noms et durées seulement. Le worker reprend à la réclamation, relié par
  * `runId` et par `queuedMs` (horloge PostgreSQL).
  */
@@ -126,7 +126,7 @@ export async function followupDispositionTx(
   if (input.groupId) {
     if (!plainText) return { kind: "fifo" };
     // Un salon ne se steere pas. Le second message rejoint le seul run de
-    // salon encore en file : pas un workflow de plus par frappe (OHB-117).
+    // salon encore en file : pas un workflow de plus par frappe.
     const queuedGroup = await tx<Array<{ id: string; workflowId: string | null; workflowAutonomyEnabled: boolean | null }>>`
       select queued.id, queued.workflow_id as "workflowId",
              workflow.autonomy_enabled as "workflowAutonomyEnabled"
@@ -388,7 +388,7 @@ export async function settleCancelledHandoffsTx(
     await tx`
       select pg_advisory_xact_lock(
         hashtext(${organizationId}),
-        hashtext('ohb-run-events-cursor')
+        hashtext('openedbot-run-events-cursor')
       )
     `;
     const sequenceRows = await tx<Array<{ next: number }>>`

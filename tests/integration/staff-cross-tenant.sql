@@ -15,10 +15,10 @@ insert into staff_proof values (-1, -1, 'unset', -1, 'missing');
 insert into staff_users (id, email, password_hash, display_name) values
   ('80000000-0000-4000-8000-000000000081', 'staff@example.test', 'x', 'Staff');
 
-grant select, insert, update on staff_proof to ohb_api;
+grant select, insert, update on staff_proof to openedbot_api;
 
 -- 1-2. Tenant GUC alone: still one own org, zero of the other.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 select set_config('app.staff_user_id', '', false) \g /dev/null
 update staff_proof
@@ -32,7 +32,7 @@ reset role;
 -- staff_list_organizations() a ete supprimee avec sa derniere route, parce qu
 -- une liste d organisations EST la navigation par organisation que le
 -- backoffice n a pas. Le detail par identifiant reste, il porte la meme garde.
-set role ohb_api;
+set role openedbot_api;
 do $staff$
 begin
   perform staff_get_organization('10000000-0000-4000-8000-000000000001');
@@ -45,7 +45,7 @@ $staff$;
 reset role;
 
 -- 4. Live staff user: both tenants.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-000000000081', false) \g /dev/null
 update staff_proof
    set with_guc = (
@@ -58,10 +58,10 @@ update staff_proof
    );
 reset role;
 
--- 5. Role exists for later use; V1 still executes definers as ohb_api.
+-- 5. Role exists for later use; V1 still executes definers as openedbot_api.
 update staff_proof
    set staff_role = case
-     when exists (select 1 from pg_roles where rolname = 'ohb_staff' and rolcanlogin) then 'login'
+     when exists (select 1 from pg_roles where rolname = 'openedbot_staff' and rolcanlogin) then 'login'
      else 'missing'
    end;
 

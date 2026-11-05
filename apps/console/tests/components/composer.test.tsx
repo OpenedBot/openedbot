@@ -7,7 +7,7 @@ import { Composer } from "../../src/components/composer";
 // Ces cas vérifient une copie FRANÇAISE : la langue est posée explicitement,
 // le défaut du produit étant désormais l'anglais (`DEFAULT_LOCALE`).
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(cleanup);
@@ -356,11 +356,11 @@ test("un nom approché se colore aussi, à un degré distinct", () => {
 test("chaque lettre du plugin porte sa propre teinte", () => {
   const { container } = renderWithPlugins("ouvre notion", ["notion"]);
 
-  const letters = container.querySelectorAll("[data-composer-mcp-plugin] .ohb-mcp-letter");
+  const letters = container.querySelectorAll("[data-composer-mcp-plugin] .openedbot-mcp-letter");
   expect(letters.length).toBe(6);
   expect([...letters].map((letter) => letter.textContent).join("")).toBe("notion");
   const hues = [...letters].map((letter) =>
-    (letter as HTMLElement).style.getPropertyValue("--ohb-mcp-hue"),
+    (letter as HTMLElement).style.getPropertyValue("--openedbot-mcp-hue"),
   );
   expect(hues[0]).toBe("0deg");
   expect(hues[5]).toBe("300deg");

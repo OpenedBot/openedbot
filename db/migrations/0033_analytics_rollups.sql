@@ -50,10 +50,10 @@ comment on column analytics_daily_global.actors is
 alter table analytics_daily enable row level security;
 alter table analytics_daily force row level security;
 
-create policy analytics_daily_tenant on analytics_daily to ohb_api
+create policy analytics_daily_tenant on analytics_daily to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy analytics_daily_worker on analytics_daily to ohb_worker using (true) with check (true);
+create policy analytics_daily_worker on analytics_daily to openedbot_worker using (true) with check (true);
 
 -- `analytics_daily_global` n'est pas une table tenant : il n'existe aucun
 -- prédicat de tenant à écrire dessus. Comme `service_instances` (0002), elle
@@ -61,10 +61,10 @@ create policy analytics_daily_worker on analytics_daily to ohb_worker using (tru
 -- cross-tenant du backoffice passe par une fonction `security definer` qui
 -- vérifie le staff, pas par une politique de ligne.
 
-grant select, insert, update, delete on analytics_daily to ohb_api;
-grant select, insert, update, delete on analytics_daily to ohb_worker;
-grant select on analytics_daily_global to ohb_api;
-grant select, insert, update, delete on analytics_daily_global to ohb_worker;
+grant select, insert, update, delete on analytics_daily to openedbot_api;
+grant select, insert, update, delete on analytics_daily to openedbot_worker;
+grant select on analytics_daily_global to openedbot_api;
+grant select, insert, update, delete on analytics_daily_global to openedbot_worker;
 
 insert into schema_migrations(version) values ('0033_analytics_rollups')
 on conflict (version) do nothing;

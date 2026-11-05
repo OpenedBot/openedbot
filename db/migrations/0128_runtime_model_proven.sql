@@ -10,14 +10,14 @@ create table runtime_model_proven (
 );
 alter table runtime_model_proven enable row level security;
 alter table runtime_model_proven force row level security;
-create policy runtime_model_proven_tenant on runtime_model_proven to ohb_api
+create policy runtime_model_proven_tenant on runtime_model_proven to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_model_proven_worker on runtime_model_proven to ohb_worker
+create policy runtime_model_proven_worker on runtime_model_proven to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert, update, delete on runtime_model_proven to ohb_api;
-grant select, insert, update, delete on runtime_model_proven to ohb_worker;
+grant select, insert, update, delete on runtime_model_proven to openedbot_api;
+grant select, insert, update, delete on runtime_model_proven to openedbot_worker;
 comment on table runtime_model_proven is 'Runtime model selections that completed a successful inference proof.';
 insert into schema_migrations(version) values ('0128_runtime_model_proven') on conflict (version) do nothing;
 commit;

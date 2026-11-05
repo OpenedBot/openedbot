@@ -50,7 +50,7 @@ export function proveRemoteCreations(audit: CreationAudit, expected: { runtimeId
     check(time(outcome.occurredAt) >= time(attempt.occurredAt) && outcome.outcome === "response" && outcome.status! >= 200 && outcome.status! < 300 && outcome.remoteId === run.remoteId, "Remote creation unresolved, ambiguous or mismatched");
   }
   return { attempts: attempts.size, successfulResponses: remotes.size, verdict: audit.verdict, anchor: audit.anchor, verdictId: audit.id, findings: audit.findings.map((finding) => finding.kind),
-    scope: "Every connector-dispatched creation in the owned profile during the scenario, as decrypted and cross-checked by OHB" };
+    scope: "Every connector-dispatched creation in the owned profile during the scenario, as decrypted and cross-checked by openedbot" };
 }
 export type BrowserEvidence = { schemaVersion: number; source: string; phase: string; nonce: string; threadId: string; apiOrigin: string; eventOrigin: string; pageOrigin: string; pagePath: string; installedAt: string; exportedAt: string; dropped: number;
   requests: Array<{ id: number; at: string; cursor: number; status?: number }>;

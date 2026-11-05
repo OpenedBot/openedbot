@@ -59,7 +59,7 @@ func TestRootCredentialWriteUsesInjectedRuntimeStoreAndMirrorsOnlyChangedProvide
 	store := hermes.EnvStore{Root: root, Owner: fsx.Current()}
 	writeCredentialFixture(t, filepath.Join(root, ".env"), "API_SERVER_KEY=local-runtime-token\nANTHROPIC_API_KEY=root-old\n")
 	writeCredentialFixture(t, filepath.Join(root, "profiles", "personal", ".env"), "ANTHROPIC_API_KEY=personal-owned\nKEEP=personal\n")
-	writeCredentialFixture(t, filepath.Join(root, "profiles", "personal", ".env.ohb-own"), "ANTHROPIC_API_KEY\n")
+	writeCredentialFixture(t, filepath.Join(root, "profiles", "personal", ".env.openedbot-own"), "ANTHROPIC_API_KEY\n")
 	writeCredentialFixture(t, filepath.Join(root, "profiles", "team", ".env"), "KEEP=team\n")
 
 	const submittedKey = "fixture-api-key-not-a-real-credential"
@@ -87,7 +87,7 @@ func TestRootCredentialWriteUsesInjectedRuntimeStoreAndMirrorsOnlyChangedProvide
 			return []byte(`{"providers":[{"slug":"anthropic","authenticated":true}]}`), nil
 		},
 	}
-	status, result := postOperatorJSON(t, server, "/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"ohb-scope"}`)
+	status, result := postOperatorJSON(t, server, "/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"openedbot-scope"}`)
 	if status != http.StatusOK || result["verification"] != "confirmed" || calls != 1 {
 		t.Fatal("root credential write was not confirmed through the configured runtime")
 	}
@@ -133,11 +133,11 @@ func TestProfileCredentialWriteMarksItsOwnKeyInInjectedRuntimeStore(t *testing.T
 			return []byte(`{"providers":[{"slug":"anthropic","authenticated":true}]}`), nil
 		},
 	}
-	status, result := postOperatorJSON(t, server, "/profiles/scout/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"ohb-profile"}`)
+	status, result := postOperatorJSON(t, server, "/profiles/scout/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"openedbot-profile"}`)
 	if status != http.StatusOK || result["verification"] != "confirmed" || calls != 1 {
 		t.Fatal("profile credential write was not confirmed on the named profile")
 	}
-	marker := readCredentialFixture(t, filepath.Join(root, "profiles", "scout", ".env.ohb-own"))
+	marker := readCredentialFixture(t, filepath.Join(root, "profiles", "scout", ".env.openedbot-own"))
 	if !strings.Contains(marker, "ANTHROPIC_API_KEY") {
 		t.Fatal("profile credential write did not mark the changed key as profile-owned")
 	}
@@ -220,7 +220,7 @@ func TestCredentialEnvironmentErrorsFailClosedWithoutLeakingKeys(t *testing.T) {
 	}
 	assertGenericFailure := func(t *testing.T, server *Server, path string, calls *int, wantCalls int) {
 		t.Helper()
-		status, result := postOperatorJSON(t, server, path, `{"apiKey":"`+submittedKey+`","label":"ohb-fail"}`)
+		status, result := postOperatorJSON(t, server, path, `{"apiKey":"`+submittedKey+`","label":"openedbot-fail"}`)
 		encoded, err := json.Marshal(result)
 		if err != nil {
 			t.Fatal("operator error response could not be inspected")
@@ -239,7 +239,7 @@ func TestCredentialEnvironmentErrorsFailClosedWithoutLeakingKeys(t *testing.T) {
 		env := &credentialEnvStub{rootSnapshots: []map[string]string{{"ANTHROPIC_API_KEY": "old"}, {"ANTHROPIC_API_KEY": "new"}}, mirrorErr: errors.New("fixture mirror refusal")}
 		calls := 0
 		server := newServer(env, &calls)
-		status, result := postOperatorJSON(t, server, "/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"ohb-fail"}`)
+		status, result := postOperatorJSON(t, server, "/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"openedbot-fail"}`)
 		encoded, _ := json.Marshal(result)
 		if status != http.StatusBadGateway || strings.Contains(string(encoded), submittedKey) || calls != 1 || env.mirrorCalls != 1 {
 			t.Fatal("root mirror error did not fail closed with a generic response")
@@ -254,7 +254,7 @@ func TestCredentialEnvironmentErrorsFailClosedWithoutLeakingKeys(t *testing.T) {
 		env := &credentialEnvStub{profileSnapshots: []map[string]string{{"ANTHROPIC_API_KEY": "old"}, {"ANTHROPIC_API_KEY": "new"}}, preserveErr: errors.New("fixture marker refusal")}
 		calls := 0
 		server := newServer(env, &calls)
-		status, result := postOperatorJSON(t, server, "/profiles/scout/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"ohb-fail"}`)
+		status, result := postOperatorJSON(t, server, "/profiles/scout/providers/anthropic/credentials", `{"apiKey":"`+submittedKey+`","label":"openedbot-fail"}`)
 		encoded, _ := json.Marshal(result)
 		if status != http.StatusBadGateway || strings.Contains(string(encoded), submittedKey) || calls != 1 || env.preserveCalls != 1 {
 			t.Fatal("profile ownership marker error did not fail closed with a generic response")

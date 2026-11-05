@@ -233,14 +233,14 @@ create index run_events_tenant_cursor_idx on run_events (organization_id, cursor
 create index run_events_thread_occurred_idx
   on run_events (organization_id, thread_id, occurred_at desc);
 
-create or replace function notify_ohb_event() returns trigger language plpgsql as $$
+create or replace function notify_openedbot_event() returns trigger language plpgsql as $$
 begin
-  perform pg_notify('ohb_events', new.organization_id::text || ':' || new.cursor::text);
+  perform pg_notify('openedbot_events', new.organization_id::text || ':' || new.cursor::text);
   return new;
 end;
 $$;
 create trigger run_events_notify after insert on run_events
-for each row execute function notify_ohb_event();
+for each row execute function notify_openedbot_event();
 
 -- Un follow-up reste un workflow ordinaire en file tant qu'Hermes n'a pas
 -- confirmé son injection dans le run actif. Cet outbox durable est la
@@ -350,43 +350,43 @@ alter table run_steering_attempts force row level security;
 alter table message_ingress enable row level security;
 alter table message_ingress force row level security;
 
-create policy runs_tenant on runs to ohb_api
+create policy runs_tenant on runs to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runs_worker on runs to ohb_worker using (true) with check (true);
+create policy runs_worker on runs to openedbot_worker using (true) with check (true);
 
-create policy workflows_tenant on workflows to ohb_api
+create policy workflows_tenant on workflows to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy workflows_worker on workflows to ohb_worker using (true) with check (true);
+create policy workflows_worker on workflows to openedbot_worker using (true) with check (true);
 
-create policy run_events_tenant on run_events to ohb_api
+create policy run_events_tenant on run_events to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy run_events_worker on run_events to ohb_worker using (true) with check (true);
+create policy run_events_worker on run_events to openedbot_worker using (true) with check (true);
 
-create policy run_steering_attempts_api on run_steering_attempts to ohb_api
+create policy run_steering_attempts_api on run_steering_attempts to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy run_steering_attempts_worker on run_steering_attempts to ohb_worker
+create policy run_steering_attempts_worker on run_steering_attempts to openedbot_worker
   using (true) with check (true);
 
-create policy message_ingress_tenant on message_ingress to ohb_api
+create policy message_ingress_tenant on message_ingress to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy message_ingress_worker on message_ingress to ohb_worker
+create policy message_ingress_worker on message_ingress to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on runs, run_events to ohb_api;
-grant select, insert, update, delete on runs, run_events to ohb_worker;
-grant select, insert, update, delete on workflows to ohb_api;
-grant select, insert, update, delete on workflows to ohb_worker;
-grant select, insert, update, delete on run_steering_attempts to ohb_api;
-grant select, insert, update, delete on run_steering_attempts to ohb_worker;
-grant select, insert, update, delete on message_ingress to ohb_api;
-grant select, insert, update, delete on message_ingress to ohb_worker;
-grant usage, select on sequence run_events_cursor_seq to ohb_api;
-grant usage, select on sequence run_events_cursor_seq to ohb_worker;
+grant select, insert, update, delete on runs, run_events to openedbot_api;
+grant select, insert, update, delete on runs, run_events to openedbot_worker;
+grant select, insert, update, delete on workflows to openedbot_api;
+grant select, insert, update, delete on workflows to openedbot_worker;
+grant select, insert, update, delete on run_steering_attempts to openedbot_api;
+grant select, insert, update, delete on run_steering_attempts to openedbot_worker;
+grant select, insert, update, delete on message_ingress to openedbot_api;
+grant select, insert, update, delete on message_ingress to openedbot_worker;
+grant usage, select on sequence run_events_cursor_seq to openedbot_api;
+grant usage, select on sequence run_events_cursor_seq to openedbot_worker;
 
 insert into schema_migrations(version) values ('0005_runs_workflows')
 on conflict (version) do nothing;

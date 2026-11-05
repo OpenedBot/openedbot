@@ -5,7 +5,7 @@ import { join } from "node:path";
 /**
  * Migration 0154 : le worker ne lit plus l'audit de toutes les organisations.
  * Ni policy ni SELECT sur `audit_chain` et `audit_worm_orphans` ; la purge
- * lit la chaîne via `audit_chain_for_purge(org)`, EXECUTE pour ohb_worker
+ * lit la chaîne via `audit_chain_for_purge(org)`, EXECUTE pour openedbot_worker
  * seul. La preuve sur base réelle (propriétaire, ACL, NULL, org A/B) est dans
  * `tests/integration/audit-chain-for-purge.sql`.
  */
@@ -20,9 +20,9 @@ const fn = "public.audit_chain_for_purge(uuid)";
 describe("migration 0154", () => {
   test("retire la policy et tout privilège worker sur les deux tables", () => {
     expect(statements).toContain("drop policy if exists audit_chain_worker on audit_chain");
-    expect(statements).toContain("revoke all on audit_chain from ohb_worker");
+    expect(statements).toContain("revoke all on audit_chain from openedbot_worker");
     expect(statements).toContain("drop policy if exists audit_worm_orphans_worker on audit_worm_orphans");
-    expect(statements).toContain("revoke all on audit_worm_orphans from ohb_worker");
+    expect(statements).toContain("revoke all on audit_worm_orphans from openedbot_worker");
     expect(sql).not.toMatch(/create policy/i);
     expect(sql).not.toMatch(/grant\s[^;]*\bon\s+(table\s+)?(public\.)?audit_(chain|worm_orphans)\b/i);
   });
@@ -38,14 +38,14 @@ describe("migration 0154", () => {
     // Owner = the owner of audit_chain (the migration role), never an application role.
     expect(sql).toContain("alter function public.audit_chain_for_purge(uuid) owner to %I', migrator");
     expect(sql).toContain("where t.schemaname = 'public' and t.tablename = 'audit_chain'");
-    expect(sql).toContain("if migrator in ('ohb_api', 'ohb_worker', 'ohb_staff') then");
-    expect(sql).not.toMatch(/owner to ohb_(api|worker|staff)\b/);
+    expect(sql).toContain("if migrator in ('openedbot_api', 'openedbot_worker', 'openedbot_staff') then");
+    expect(sql).not.toMatch(/owner to openedbot_(api|worker|staff)\b/);
   });
 
-  test("EXECUTE : révoqué à PUBLIC, accordé à ohb_worker seul", () => {
+  test("EXECUTE : révoqué à PUBLIC, accordé à openedbot_worker seul", () => {
     expect(statements).toContain(`revoke all on function ${fn} from public`);
     const grants = statements.filter((statement) => statement.startsWith("grant "));
-    expect(grants).toEqual([`grant execute on function ${fn} to ohb_worker`]);
+    expect(grants).toEqual([`grant execute on function ${fn} to openedbot_worker`]);
     const revoke = statements.indexOf(`revoke all on function ${fn} from public`);
     expect(revoke).toBeLessThan(statements.indexOf(grants[0]!));
   });

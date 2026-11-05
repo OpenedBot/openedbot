@@ -1,7 +1,7 @@
 /**
  * Compatibility aliases declared by the loaded plug-ins (`CompatAliases`,
- * open-core step 11.2), plus the core's own header renames below. Beyond
- * those, in solo, every table is empty and an old name is simply unknown.
+ * open-core step 11.2). In solo every table is empty and an old name is
+ * simply unknown.
  *
  * - headers and query parameters: `requestHeader` / `requestQuery` read the
  *   current name, then the old names a plug-in maps onto it;
@@ -16,23 +16,12 @@ import type { CompatAlias, CompatAliases } from "@openedbot/platform-plugins";
 
 type Installed = { readonly headers: readonly CompatAlias[]; readonly queries: readonly CompatAlias[] };
 
-/**
- * The request headers renamed X-OHB-* -> X-OpenedBot-*. A desktop app
- * already installed, or a console still cached in a browser, sends the old
- * name: read for one release, then delete this table.
- */
-export const CORE_HEADER_RENAMES: readonly CompatAlias[] = [
-  { from: "X-OHB-Organization", to: "X-OpenedBot-Organization" },
-  { from: "X-OHB-Fleet", to: "X-OpenedBot-Fleet" },
-  { from: "X-OHB-Support-Token", to: "X-OpenedBot-Support-Token" },
-];
-
-const NONE: Installed = { headers: CORE_HEADER_RENAMES, queries: [] };
+const NONE: Installed = { headers: [], queries: [] };
 let installed: Installed = NONE;
 
 /** Installed once by the composition root; tests reset it with `installCompatAliases({})`. */
 export function installCompatAliases(aliases: CompatAliases): void {
-  installed = { headers: [...CORE_HEADER_RENAMES, ...(aliases.headers ?? [])], queries: aliases.queries ?? [] };
+  installed = { headers: aliases.headers ?? [], queries: aliases.queries ?? [] };
 }
 
 /** The old header names the CORS preflight must also allow. */

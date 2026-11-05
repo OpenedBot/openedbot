@@ -357,7 +357,7 @@ export function ComposerModelPicker({
             disabled={unavailable}
             aria-label={pickerAria}
             title={fallbackTitle}
-            className="ohb-press inline-flex min-h-11 min-w-0 max-w-[14rem] cursor-pointer items-center gap-1 rounded-full bg-background-tertiary-default px-2.5 text-[13px] leading-4 text-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="openedbot-press inline-flex min-h-11 min-w-0 max-w-[14rem] cursor-pointer items-center gap-1 rounded-full bg-background-tertiary-default px-2.5 text-[13px] leading-4 text-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className={cn("truncate whitespace-nowrap", (unchosen || fallback) && "text-warn-700")}>{triggerLabel}</span>
             {fallbackBadge}
@@ -369,7 +369,7 @@ export function ComposerModelPicker({
         </DrawerTrigger>
         <DrawerContent
           aria-label={t("composer.modelSettings")}
-          className="flex h-[min(88svh,720px)] max-h-[88svh] flex-col border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--ohb-safe-bottom))] text-text-primary"
+          className="flex h-[min(88svh,720px)] max-h-[88svh] flex-col border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--openedbot-safe-bottom))] text-text-primary"
           style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
         >
           <DrawerTitle className="sr-only">{t("composer.modelSettings")}</DrawerTitle>
@@ -513,7 +513,7 @@ export function ComposerModelPicker({
       aria-label={pickerAria}
       title={fallbackTitle}
       className={inline
-        ? "ohb-press inline-flex min-w-0 max-w-[12rem] cursor-pointer items-center gap-0.5 rounded-md text-[13px] leading-4 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        ? "openedbot-press inline-flex min-w-0 max-w-[12rem] cursor-pointer items-center gap-0.5 rounded-md text-[13px] leading-4 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         : header
         ? cn(
             "flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-button-default bg-background-primary-default outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50",

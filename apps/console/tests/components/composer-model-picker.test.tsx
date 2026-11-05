@@ -10,7 +10,7 @@ import { settledBotModelSaves } from "../../src/lib/bots/bot-model-saves";
 
 const realFetch = globalThis.fetch;
 
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;

@@ -131,7 +131,7 @@ export function assemblePackedHistory(
 }
 
 export function compactionSessionKey(organizationId: string, threadId: string): string {
-  return `ohb:${organizationId}:compact:thread:${threadId}`;
+  return `openedbot:${organizationId}:compact:thread:${threadId}`;
 }
 
 export function buildCompactionInstructions(): string {

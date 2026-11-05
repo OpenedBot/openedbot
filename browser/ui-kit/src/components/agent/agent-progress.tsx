@@ -36,7 +36,7 @@ function StepCheck({ animate }: { animate: boolean }) {
         strokeWidth="1.5"
         strokeLinecap="round"
         pathLength={1}
-        className={animate ? "ohb-agent-check" : undefined}
+        className={animate ? "openedbot-agent-check" : undefined}
       />
     </svg>
   );

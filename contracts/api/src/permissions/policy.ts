@@ -1,5 +1,5 @@
 /**
- * PERM2-8 (DEV-OHB-259): the organization permission policy. Owners and
+ * PERM2-8: the organization permission policy. Owners and
  * admins write it; every member reads it; agencies never reach it (D-5).
  * The same rules are checked by `permission_command_blocklist_valid`
  * (migration 0142): this module only produces the canonical form.

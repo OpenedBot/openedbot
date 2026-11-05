@@ -69,7 +69,7 @@ jobs:
     # Migrations, tenant RLS, replays and queues against a throwaway
     # PostgreSQL, same major and image as the dev-infra container. With
     # INTEGRATION_DATABASE_URL set, `make test-integration` skips db-up (no
-    # docker), postgres-rls.sh creates the roles and the ohb_integration
+    # docker), postgres-rls.sh creates the roles and the openedbot_integration
     # database through the admin URL and drops it on exit, and every bun
     # script creates and drops its own uniquely named database. Trust auth
     # keeps any password out of this file: the service lives only as long as
@@ -91,7 +91,7 @@ jobs:
           --health-retries 30
     env:
       INTEGRATION_ADMIN_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
-      INTEGRATION_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/ohb_integration
+      INTEGRATION_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/openedbot_integration
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0

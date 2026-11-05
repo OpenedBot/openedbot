@@ -37,10 +37,10 @@ export type RuntimePublicDto = {
   /** Le runtime qui sert les runs. Au plus un par organisation, garanti en base. */
   isActive: boolean;
   tokenConfigured: boolean;
-  /** OHB-74 : un service token Cloudflare Access est enregistré pour ce runtime `direct`. Absent sur les serveurs antérieurs. */
+  /** Un service token Cloudflare Access est enregistré pour ce runtime `direct`. Absent sur les serveurs antérieurs. */
   edgeAuthConfigured?: boolean;
   /**
-   * OHB-75 : la publication qui a produit cette ligne `direct`, si elle est passée
+   * La publication qui a produit cette ligne `direct`, si elle est passée
    * par l'assistant ; `null` pour un accès déclaré à la main ou un `connector`.
    */
   exposure?: { id: string; kind: RuntimeExposureStoredKind; hostname: string; lastTunnelStatus: string | null } | null;
