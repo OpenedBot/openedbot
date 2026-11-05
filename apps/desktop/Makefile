@@ -155,7 +155,7 @@ popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, wher
 #                 of a downloaded copy until Open Anyway. Pull requests, forks.
 #   developer-id  electron-builder.developer-id.yml: Developer ID, hardened
 #                 runtime, app and dmg notarised and stapled. Needs the
-#                 certificate (login keychain, or CSC_LINK + CSC_KEY_PASSWORD)
+#                 certificate (login keychain, or CSC_KEYCHAIN in the CI)
 #                 and APPLE_API_KEY (.p8 path), APPLE_API_KEY_ID, APPLE_API_ISSUER.
 MAC_SIGN ?= adhoc
 
