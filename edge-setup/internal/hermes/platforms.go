@@ -82,7 +82,7 @@ func (i *Installer) preparePlatforms(ctx context.Context, info *account.Info) []
 // once `npm ci` has succeeded. node_modules existing proves nothing: npm ci
 // creates it before it can fail, and a pass that trusted it would never
 // retry a broken install.
-const depsMarker = ".ohb-deps-ok"
+const depsMarker = ".openedbot-deps-ok"
 
 // prepareBridge mirrors one bridge and installs its dependencies unless the
 // marker vouches for them. It returns a warning, or "" when the bridge is ready.

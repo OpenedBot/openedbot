@@ -6,7 +6,7 @@ import { jsonBody } from "../../interfaces/http/http-error";
 import { readPermissionPolicyInput, readPermissionPolicyView, savePermissionPolicy } from "@openedbot/identity/application/permission-policy";
 
 /**
- * PERM2-8 (DEV-OHB-259): `/api/organization/permissions`. Every member
+ * PERM2-8: `/api/organization/permissions`. Every member
  * reads the policy its bots run under; owners and admins write it. An agency
  * never reaches these routes (`agencyRequestAllowed` refuses every
  * `/api/organization*` path, D-5).

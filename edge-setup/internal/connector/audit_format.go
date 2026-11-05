@@ -21,7 +21,7 @@ import (
 // création chiffré »). Every integer is big-endian.
 //
 //	offset  size  field
-//	0       8     magic "OHBAUDT2"
+//	0       8     magic "OBAUDIT2"
 //	8       1     version 0x02
 //	9       1     suite   0x01 = AES-256-GCM, HKDF-SHA256, SHA-256
 //	10      2     hlen
@@ -33,15 +33,15 @@ import (
 // The associated data is every byte before the ciphertext, so a header or a
 // nonce that was touched fails authentication instead of being trusted.
 const (
-	auditMagic         = "OHBAUDT2"
+	auditMagic         = "OBAUDIT2"
 	auditVersion       = 0x02
 	auditSuiteAESGCM   = 0x01
 	auditSchemaVersion = 2
 	auditMaxHeader     = 1024
 	auditNonceSize     = 12
 	auditKeySize       = 32
-	auditInfoEnc       = "ohb-creation-audit/v2/enc"
-	auditGenesisPrefix = "ohb-creation-audit/v2/genesis"
+	auditInfoEnc       = "openedbot-creation-audit/v2/enc"
+	auditGenesisPrefix = "openedbot-creation-audit/v2/genesis"
 )
 
 // Errors a verifier distinguishes. ErrAuditPlaintext names the file a

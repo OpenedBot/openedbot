@@ -1,5 +1,5 @@
 /**
- * PERM2-7 (DEV-OHB-258) against a disposable PostgreSQL database: the
+ * PERM2-7 against a disposable PostgreSQL database: the
  * reviewer loop on real rows, the model replaced by a scripted client. A gate
  * born `reviewing` is never offered to a human until the reviewer lets go;
  * the verdict is written once, under the claim token; every failure ends
@@ -30,7 +30,7 @@ function scriptedDeps(script: Script, clock: { now: number }): ReviewDeps & { in
     sleep: async (ms) => { clock.now += ms; },
     client: () => ({
       mcpInventory: async () => ({ platform: "api_server", servers: [{ name: "linear" }], catalog: [] }) as never,
-      hostProfileInventory: async () => ({ profiles: [{ name: "ohb-reviewer", mcpServers: [{ name: "linear", enabled: script.mcpStale === true }] }] }) as never,
+      hostProfileInventory: async () => ({ profiles: [{ name: "openedbot-reviewer", mcpServers: [{ name: "linear", enabled: script.mcpStale === true }] }] }) as never,
       createRun: async (input) => {
         if (script.busy) throw new HermesClientError("busy", 429, "HERMES_LIMIT_REACHED");
         inputs.push(input.input);
@@ -46,8 +46,8 @@ function scriptedDeps(script: Script, clock: { now: number }): ReviewDeps & { in
   };
 }
 
-await withDisposablePostgres("ohb258_approval_review", async ({ owner, connect }) => {
-  const worker = await connect("ohb_worker");
+await withDisposablePostgres("openedbot258_approval_review", async ({ owner, connect }) => {
+  const worker = await connect("openedbot_worker");
   await owner`insert into organizations (id, slug, name, permission_pipeline) values (${ORG}, 'acme-review', 'Acme', 'v2')`;
   await owner`insert into sections (id, organization_id, name, position) values (${SECTION}, ${ORG}, 'Review', 0)`;
   await owner`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active, capacity, link_features)

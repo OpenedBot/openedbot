@@ -110,7 +110,7 @@ function disable(reason: string): void {
     // Already unusable: nothing more to release.
   }
   state.db = null;
-  console.warn("[ohb-desktop]", `diagnostics journal disabled (${reason}); logs go to the console only`);
+  console.warn("[openedbot-desktop]", `diagnostics journal disabled (${reason}); logs go to the console only`);
 }
 
 function insert(db: DatabaseSync, entry: Entry): void {

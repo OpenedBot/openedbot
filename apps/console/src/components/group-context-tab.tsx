@@ -396,7 +396,7 @@ export function GroupContextTab({
           aria-label={t("threadContext.groupOpen")}
           data-alert={alertLabel ? "model-unavailable" : undefined}
           title={title}
-          className={`ohb-press inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl text-[13px] leading-4 ${alertLabel ? "text-destructive" : "text-muted-foreground"} outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring`}
+          className={`openedbot-press inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl text-[13px] leading-4 ${alertLabel ? "text-destructive" : "text-muted-foreground"} outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring`}
         >
           <BotFace name={busiest.member.name} seed={busiest.member.id} face={busiest.member.face} className="size-4" />
           <span className="truncate tabular-nums">{label}</span>

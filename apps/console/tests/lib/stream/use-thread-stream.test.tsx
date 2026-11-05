@@ -228,8 +228,8 @@ test("fresh receipts refresh the thread, ambiguous steering wakes inbox, and rec
     return Promise.resolve();
   });
   const hudEvents: string[] = [];
-  const previousHud = Object.getOwnPropertyDescriptor(window, "__ohbThreadPerf");
-  Object.defineProperty(window, "__ohbThreadPerf", {
+  const previousHud = Object.getOwnPropertyDescriptor(window, "__openedbotThreadPerf");
+  Object.defineProperty(window, "__openedbotThreadPerf", {
     configurable: true,
     value: { recordRunEvent: (_id: string, type: string) => hudEvents.push(type) },
   });
@@ -239,8 +239,8 @@ test("fresh receipts refresh the thread, ambiguous steering wakes inbox, and rec
     () => rosterFetch.mockRestore(),
     () => invalidate.mockRestore(),
     () => {
-      if (previousHud) Object.defineProperty(window, "__ohbThreadPerf", previousHud);
-      else Reflect.deleteProperty(window, "__ohbThreadPerf");
+      if (previousHud) Object.defineProperty(window, "__openedbotThreadPerf", previousHud);
+      else Reflect.deleteProperty(window, "__openedbotThreadPerf");
     },
   );
   queryClient.setQueryData(queryKeys.thread(threadId), snapshot);

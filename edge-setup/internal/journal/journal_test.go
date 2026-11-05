@@ -47,7 +47,7 @@ func records(t *testing.T, path string) []Record {
 
 func TestJournalRecordsRedactedLinesOwnerOnly(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "journal.jsonl")
-	j, err := Open(path, "link", "v1.2.3", []string{"--ohb", "https://link.example", "--yes"})
+	j, err := Open(path, "link", "v1.2.3", []string{"--openedbot", "https://link.example", "--yes"})
 	if err != nil {
 		t.Fatal(err)
 	}

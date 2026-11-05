@@ -3,7 +3,7 @@ import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import { RUNTIME_LINK_WS_PATH } from "../domain/ws-path";
 
 /**
- * Preuve de possession du lien connecteur (OHB-54 côté hôte, OHB-56 ici).
+ * Preuve de possession du lien connecteur, côté API.
  *
  * À l'enrôlement l'hôte génère une paire Ed25519 dont la clé privée reste
  * dans un credential systemd chiffré ; la clé publique est enregistrée avec
@@ -11,7 +11,7 @@ import { RUNTIME_LINK_WS_PATH } from "../domain/ws-path";
  * `hello` et avant la liaison, le broker envoie `link.challenge {nonce}` et
  * attend `link.proof {signature}` :
  *
- *   message = "ohb-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n"
+ *   message = "openedbot-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n"
  *
  * `wsURL` est l'URL que le connecteur a réellement dialée : la signature lie
  * la session à CE serveur, un relais qui rejouerait le défi vers un autre
@@ -19,7 +19,7 @@ import { RUNTIME_LINK_WS_PATH } from "../domain/ws-path";
  * accepte depuis `API_PUBLIC_URL` ; hors production, le tunnel de
  * développement (`ws://127.0.0.1:<port>`) est accepté aussi.
  */
-export const LINK_POP_PREFIX = "ohb-link-pop/v1";
+export const LINK_POP_PREFIX = "openedbot-link-pop/v1";
 export const LINK_POP_NONCE_BYTES = 32;
 /** `link.proof` doit arriver vite : au-delà, la montée est refusée 4401. */
 export const LINK_POP_TIMEOUT_MS = 10_000;

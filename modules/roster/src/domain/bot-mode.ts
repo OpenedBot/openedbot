@@ -78,7 +78,7 @@ export function buildBotModeInstructions(input: {
     "- Mentions (`@slug`) are the only way to reach another bot. Your own tools stay available in this run, including web_search and web_extract. Never claim you looked something up unless a tool result in this run shows it. Memory is not a source for a recipe, a current fact, or a citation.",
     "- NEVER use delegation or background tools (delegate_task, async delegation, subagents): the platform does not track them, so their results are lost. Do the work NOW, inside this run, and never promise to \"come back later\" or to follow up: no follow-up of yours can reach this conversation.",
     FILE_DELIVERY_RULE,
-    // OHB-105 : Nova affirmait avoir écrit `profiles/nova/cron/jobs.json`.
+    // Nova affirmait avoir écrit `profiles/nova/cron/jobs.json`.
     // `cronjob` est refusé par contrat (runtime-contract.ts) et ce store n'est
     // pas monté dans le sandbox : rien ne se déclenchait. Les routines openedbot
     // sont le seul planificateur, réglées par l'opérateur dans le menu du bot.
@@ -87,7 +87,7 @@ export function buildBotModeInstructions(input: {
     // d'openedbot) ; un fichier cron reste lettre morte. La clé de run voyage dans
     // l'entrée, jamais ici : ce bloc reste identique d'un run à l'autre.
     input.routineToolEnabled
-      ? "- Recurring or timed tasks: use your `routine_manage` tool (`mcp_ohb_routines_routine_manage`). It creates real routines: each one sends you its prompt at the chosen times, in this conversation. Call `list` before changing one and never guess a `job_id`. Pass the run key from the `[routine_manage run_key: …]` line at the end of the user's message. Report exactly what the tool returned (a routine may be saved paused for the user to switch on). Nothing else schedules anything: no cron, no job file, no background tool. Never claim a routine exists without a successful call."
+      ? "- Recurring or timed tasks: use your `routine_manage` tool (`mcp_openedbot_routines_routine_manage`). It creates real routines: each one sends you its prompt at the chosen times, in this conversation. Call `list` before changing one and never guess a `job_id`. Pass the run key from the `[routine_manage run_key: …]` line at the end of the user's message. Report exactly what the tool returned (a routine may be saved paused for the user to switch on). Nothing else schedules anything: no cron, no job file, no background tool. Never claim a routine exists without a successful call."
       : "- You cannot schedule anything: there is no cron, scheduler, reminder or recurring-job tool here, and writing a cron or job file schedules nothing. When asked for a recurring or timed task, say so plainly and tell them to add it from your menu, \"Routines…\": a routine sends you the request at the times they choose, in this conversation. Never claim a schedule exists.",
     ...(input.webToolsEnabled ? [WEB_ANSWER_RULE] : []),
   ].join("\n");
@@ -95,7 +95,7 @@ export function buildBotModeInstructions(input: {
 
 /**
  * Comment répondre à une question sur le monde (prix, météo, actualité,
- * score). Mesuré le 25-10 (docs/reports/2026-10-25-grokbot-vs-ohb-bench.md) :
+ * score). Mesuré le 25-10 (docs/reports/2026-10-25-grokbot-vs-openedbot-bench.md) :
  * un bot neuf a pris `execute_code` pour un cours (porte « opaque », fil figé),
  * lu une seule page pour la météo puis demandé la permission de chercher, et
  * cité des pages d'accueil. Hermes dit déjà « Current facts → use a retrieval/

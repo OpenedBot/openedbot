@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 /** Renders the label through the real provider, so the FR and EN dictionaries are the shipped ones. */
 function label(locale: Locale, tool: string, preview?: string): string {
-  window.localStorage.setItem("ohb:locale", locale);
+  window.localStorage.setItem("openedbot:locale", locale);
   let out = "";
   function Probe() {
     out = toolProgressLabel(useT().t, tool, preview);

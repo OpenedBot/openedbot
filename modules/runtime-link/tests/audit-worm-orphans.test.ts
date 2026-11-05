@@ -132,8 +132,8 @@ describe("migration 0153", () => {
   test("append-only (trigger, aucune grant update/delete), RLS forcée, enregistrée et attribuée", () => {
     expect(sql).toContain("create trigger audit_worm_orphans_no_update before update on audit_worm_orphans");
     expect(sql).toContain("alter table audit_worm_orphans force row level security;");
-    expect(sql).toContain("grant select, insert on audit_worm_orphans to ohb_api;");
-    expect(sql).toContain("grant select on audit_worm_orphans to ohb_worker;"); // retirée par 0154
+    expect(sql).toContain("grant select, insert on audit_worm_orphans to openedbot_api;");
+    expect(sql).toContain("grant select on audit_worm_orphans to openedbot_worker;"); // retirée par 0154
     expect(sql).not.toMatch(/grant[^;]*\b(update|delete)\b[^;]*audit_worm_orphans/i);
     expect(sql).toContain("('0153_audit_worm_orphans')");
     const ownership = JSON.parse(readFileSync(join(root, "db/ownership.json"), "utf8")) as Record<string, string>;

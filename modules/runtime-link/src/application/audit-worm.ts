@@ -3,7 +3,7 @@ import { canonicalJson } from "@openedbot/hermes";
 import type { AuditWormConfig } from "@openedbot/platform-config/api-config";
 
 /**
- * L'ancrage WORM (write once, read many) de l'audit de création (OHB-57).
+ * L'ancrage WORM (write once, read many) de l'audit de création.
  *
  * La base openedbot tient la dernière ancre de chaque runtime et les verdicts ;
  * une compromission de cette base peut les réécrire. Chaque ancre reçue et

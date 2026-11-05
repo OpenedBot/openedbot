@@ -12,7 +12,7 @@ begin;
 --
 -- Pourquoi la supprimer plutôt que la laisser dormir : c'est une fonction
 -- `security definer` qui lit TOUTES les organisations, tous tenants
--- confondus, en contournant la RLS, et dont `ohb_api` garde l'EXECUTE. Tant
+-- confondus, en contournant la RLS, et dont `openedbot_api` garde l'EXECUTE. Tant
 -- qu'elle existe, il suffit d'une injection ou d'un handler ajouté sans
 -- réfléchir pour ramener la base entière dans une réponse HTTP. Une surface
 -- cross-tenant qui ne sert plus est une surface d'attaque gratuite : elle se
@@ -123,7 +123,7 @@ comment on function staff_audit_scope(uuid, uuid, int, timestamptz) is
   'Journal d''audit cadré, servi au dossier support du backoffice staff : les lignes d''`audit_log` d''une organisation, d''un sujet (acteur ou sujet de la ligne), ou des deux. Même préambule de garde que `staff_audit_log()`, même vue source, aucune colonne de plus : ni contenu de message, ni titre de fil, ni jeton, ni condensat. Refuse `22023` sans cadre : le journal global est le travail de `staff_audit_log()`. Pagination par curseur temporel `p_before`, borne plafonnée à 500.';
 
 revoke all on function staff_audit_scope(uuid, uuid, int, timestamptz) from public;
-grant execute on function staff_audit_scope(uuid, uuid, int, timestamptz) to ohb_api;
+grant execute on function staff_audit_scope(uuid, uuid, int, timestamptz) to openedbot_api;
 
 insert into schema_migrations(version) values ('0060_staff_support_dossier')
 on conflict (version) do nothing;

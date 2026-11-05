@@ -79,7 +79,7 @@ func Register(c Command) {
 // arg0: hermes-setup when its file name carries the pre-rename name,
 // edge-setup otherwise. A v0.4.0 binary checking a candidate runs it as
 // `.hermes-setup.candidate version` and accepts only "hermes-setup <version>",
-// so this keeps existing hosts able to upgrade to this release (OHB-87).
+// so this keeps existing hosts able to upgrade to this release.
 func VersionName(arg0 string) string {
 	if strings.Contains(filepath.Base(arg0), "hermes-setup") {
 		return "hermes-setup"

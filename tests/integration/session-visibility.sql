@@ -32,11 +32,11 @@ insert into sessions (
   '30000000-0000-4000-8000-000000000031', 'web', 'session-proof-hash-a', now() + interval '30 days'
 );
 
-grant select, insert, update on session_proof to ohb_api;
+grant select, insert, update on session_proof to openedbot_api;
 
 -- 1. La porte tenant seule : sessions n a pas de policy organization_id en
 --    lecture, cette porte reste fermee.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 select set_config('app.authenticating_user_id', '', false) \g /dev/null
 update session_proof
@@ -44,7 +44,7 @@ update session_proof
 reset role;
 
 -- 2. Le proprietaire de la session : sa ligne, et seulement la sienne.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '', false) \g /dev/null
 select set_config('app.authenticating_user_id', '30000000-0000-4000-8000-000000000031', false) \g /dev/null
 update session_proof
@@ -52,7 +52,7 @@ update session_proof
 reset role;
 
 -- 3. Un autre utilisateur, meme membre d un autre tenant : rien.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.authenticating_user_id', '30000000-0000-4000-8000-000000000032', false) \g /dev/null
 update session_proof
    set by_other = (select count(*) from sessions where user_id = '30000000-0000-4000-8000-000000000031');
@@ -60,7 +60,7 @@ reset role;
 
 -- 4. Le meme autre utilisateur tente une revocation : zero ligne touchee, la
 --    session du proprietaire reste vivante.
-set role ohb_api;
+set role openedbot_api;
 with attempt as (
   update sessions set revoked_at = now()
    where id = '90000000-0000-4000-8000-000000000091'

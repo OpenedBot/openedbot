@@ -1,6 +1,6 @@
 begin;
 
--- OHB-20 : Web Push VAPID pour les routines et les approbations.
+-- Web Push VAPID pour les routines et les approbations.
 --
 -- L'abonnement vit chez l'utilisateur (un navigateur, un endpoint). La
 -- livraison est un fan-out d'organisation : chaque transition eligible
@@ -56,7 +56,7 @@ alter table push_subscriptions force row level security;
 -- l'organisation courante. `app.user_id` n'est plus pose (retire avec
 -- APNs) ; la porte utilisateur est `app.authenticating_user_id`, la
 -- meme que les sessions (0019).
-create policy push_subscriptions_owner on push_subscriptions to ohb_api
+create policy push_subscriptions_owner on push_subscriptions to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
@@ -65,11 +65,11 @@ create policy push_subscriptions_owner on push_subscriptions to ohb_api
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
   );
-create policy push_subscriptions_worker on push_subscriptions to ohb_worker
+create policy push_subscriptions_worker on push_subscriptions to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on push_subscriptions to ohb_api;
-grant select, insert, update, delete on push_subscriptions to ohb_worker;
+grant select, insert, update, delete on push_subscriptions to openedbot_api;
+grant select, insert, update, delete on push_subscriptions to openedbot_worker;
 
 -- Un endpoint Push est un identifiant de livraison. S'il change de
 -- compte (meme navigateur, autre session), l'ancien rattachement disparait
@@ -133,9 +133,9 @@ comment on table push_outbox is
 
 alter table push_outbox enable row level security;
 alter table push_outbox force row level security;
-create policy push_outbox_worker on push_outbox to ohb_worker
+create policy push_outbox_worker on push_outbox to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on push_outbox to ohb_worker;
+grant select, insert, update, delete on push_outbox to openedbot_worker;
 
 create table push_deliveries (
   id uuid primary key default gen_random_uuid(),
@@ -164,9 +164,9 @@ comment on table push_deliveries is
 
 alter table push_deliveries enable row level security;
 alter table push_deliveries force row level security;
-create policy push_deliveries_worker on push_deliveries to ohb_worker
+create policy push_deliveries_worker on push_deliveries to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on push_deliveries to ohb_worker;
+grant select, insert, update, delete on push_deliveries to openedbot_worker;
 
 -- Meme eligibilite que workflowNotificationEligible : salon, routine, ou
 -- DM avec autonomie. Seules les transitions que la SPA notifie deja
@@ -205,7 +205,7 @@ begin
     event_type, bot_id, bot_name
   ) values (
     new.organization_id, new.id, new.notification_sequence,
-    event_type, new.root_bot_id, left(coalesce(nullif(snapshot_name, ''), 'OHB'), 200)
+    event_type, new.root_bot_id, left(coalesce(nullif(snapshot_name, ''), 'openedbot'), 200)
   ) on conflict (organization_id, workflow_id, notification_sequence) do nothing;
   return new;
 end;

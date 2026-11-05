@@ -24,7 +24,7 @@ const LINK = 'https://link.openedbot.app';
 const COMMANDS = [
   "curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh",
   'sudo edge-setup up --yes',
-  `edge-setup link --ohb ${LINK} --yes`,
+  `edge-setup link --openedbot ${LINK} --yes`,
 ] as const;
 /** The copy button takes the whole panel, one command per line. */
 const ALL_COMMANDS = COMMANDS.join('\n');
@@ -115,7 +115,7 @@ const t = COPY[lang];
 <header class="site-header">
   <nav class="site-nav" aria-label={lang === 'en' ? 'Main navigation' : 'Navigation principale'}>
     <a href={`${base}/`} class="brand">
-      <img src="/brand/ohb-icon.webp" alt="" width="24" height="24" />
+      <img src="/brand/openedbot-icon.webp" alt="" width="24" height="24" />
       <span>openedbot</span>
     </a>
     <div class="site-nav-links">
@@ -201,7 +201,7 @@ const t = COPY[lang];
 <footer class="site-footer">
   <div class="shell site-footer-inner">
     <a href={`${base}/`} class="brand">
-      <img src="/brand/ohb-icon.webp" alt="" width="20" height="20" />
+      <img src="/brand/openedbot-icon.webp" alt="" width="20" height="20" />
       <span>openedbot</span>
     </a>
     <span>© 2026 openedbot. {t.footerTag}</span>

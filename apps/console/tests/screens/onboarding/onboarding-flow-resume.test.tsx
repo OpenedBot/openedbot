@@ -86,7 +86,7 @@ afterEach(() => {
   cleanup();
   clearCloudSession();
   window.localStorage.clear();
-  // `saveCloudSession` pose aussi l'espace de l'onglet (`ohb:workspace:<csrf>`)
+  // `saveCloudSession` pose aussi l'espace de l'onglet (`openedbot:workspace:<csrf>`)
   // en sessionStorage, que `clearCloudSession` ne retire pas : il primerait sur
   // l'organisation des fichiers joués ensuite dans le même lot.
   window.sessionStorage.clear();

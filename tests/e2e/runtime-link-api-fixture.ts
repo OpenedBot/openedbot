@@ -1,4 +1,4 @@
-// Ephemeral API facade process for OHB-50; production internal routes, fixture
+// Ephemeral API facade process for the runtime link continuity proof; production internal routes, fixture
 // ownership lookup. Its lifecycle must never own the connector WebSocket.
 import { Hono } from "hono";
 import { readApiConfig } from "../../apps/api/src/infrastructure/config";

@@ -14,41 +14,41 @@
   valeurs réelles (59 / 34) alors que Chromium rend `env()` toujours nul.
 */
 :root {
-  --ohb-safe-top: env(safe-area-inset-top, 0px);
-  --ohb-safe-right: env(safe-area-inset-right, 0px);
-  --ohb-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --ohb-safe-left: env(safe-area-inset-left, 0px);
+  --openedbot-safe-top: env(safe-area-inset-top, 0px);
+  --openedbot-safe-right: env(safe-area-inset-right, 0px);
+  --openedbot-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --openedbot-safe-left: env(safe-area-inset-left, 0px);
 
   /* Inset Grouped : voir apps/console/DESIGN.md. Sur :root : le Dialog porte
      dans document.body, hors [data-mobile-shell]. */
-  --ohb-grouped-canvas: #f2f2f7;
-  --ohb-grouped-card: #ffffff;
-  --ohb-grouped-separator: rgba(60, 60, 67, 0.12);
-  --ohb-grouped-label: #000000;
-  --ohb-grouped-caption: #6d6d72;
-  --ohb-grouped-chevron: #c7c7cc;
-  --ohb-grouped-close: rgba(120, 120, 128, 0.16);
-  --ohb-grouped-press: rgba(0, 0, 0, 0.04);
-  --ohb-grouped-back: #007aff;
-  --ohb-nav-back: #007aff;
+  --openedbot-grouped-canvas: #f2f2f7;
+  --openedbot-grouped-card: #ffffff;
+  --openedbot-grouped-separator: rgba(60, 60, 67, 0.12);
+  --openedbot-grouped-label: #000000;
+  --openedbot-grouped-caption: #6d6d72;
+  --openedbot-grouped-chevron: #c7c7cc;
+  --openedbot-grouped-close: rgba(120, 120, 128, 0.16);
+  --openedbot-grouped-press: rgba(0, 0, 0, 0.04);
+  --openedbot-grouped-back: #007aff;
+  --openedbot-nav-back: #007aff;
 }
 html:root.dark {
-  --ohb-grouped-canvas: #000000;
-  --ohb-grouped-card: #1c1c1e;
-  --ohb-grouped-separator: rgba(84, 84, 88, 0.65);
-  --ohb-grouped-label: #f5f5f7;
-  --ohb-grouped-caption: #8e8e93;
-  --ohb-grouped-chevron: #636366;
-  --ohb-grouped-close: rgba(120, 120, 128, 0.24);
-  --ohb-grouped-press: #2c2c2e;
-  --ohb-grouped-back: #0a84ff;
-  --ohb-nav-back: #0a84ff;
+  --openedbot-grouped-canvas: #000000;
+  --openedbot-grouped-card: #1c1c1e;
+  --openedbot-grouped-separator: rgba(84, 84, 88, 0.65);
+  --openedbot-grouped-label: #f5f5f7;
+  --openedbot-grouped-caption: #8e8e93;
+  --openedbot-grouped-chevron: #636366;
+  --openedbot-grouped-close: rgba(120, 120, 128, 0.24);
+  --openedbot-grouped-press: #2c2c2e;
+  --openedbot-grouped-back: #0a84ff;
+  --openedbot-nav-back: #0a84ff;
 }
 
 @media (pointer: coarse) {
   html {
     /* Pas de flash gris au tap : le retour visuel, c'est `:active` (voir
-       `.ohb-press`), comme le `pressed` d'un `Pressable`. */
+       `.openedbot-press`), comme le `pressed` d'un `Pressable`. */
     -webkit-tap-highlight-color: transparent;
     /* Un appui long sur un lien ne doit pas ouvrir la fiche de prévisualisation. */
     -webkit-touch-callout: none;
@@ -77,15 +77,15 @@ html:root.dark {
 }
 
 /* Le retour de pression : l'équivalent de `pressed` d'un `Pressable`. */
-.ohb-press {
+.openedbot-press {
   transition: background-color 120ms ease-out, opacity 120ms ease-out, transform 120ms ease-out,
     scale 120ms ease-out;
 }
-.ohb-press:active {
+.openedbot-press:active {
   background-color: var(--surface-hover);
 }
 @media (prefers-reduced-motion: reduce) {
-  .ohb-press {
+  .openedbot-press {
     transition: none;
   }
 }
@@ -99,9 +99,9 @@ html:root.dark {
   enfant en `100vh` dans un parent trop court se faisait rogner pile sur
   l'indicateur d'accueil : capsule collée, ou bande morte sous la coque.
 */
-html[data-ohb-shell="mobile"],
-html[data-ohb-shell="mobile"] body,
-html[data-ohb-shell="mobile"] #root {
+html[data-openedbot-shell="mobile"],
+html[data-openedbot-shell="mobile"] body,
+html[data-openedbot-shell="mobile"] #root {
   width: 100%;
   height: 100dvh;
   overflow: hidden;
@@ -109,14 +109,14 @@ html[data-ohb-shell="mobile"] #root {
 /* Une app native ne se pince pas : Safari iOS ignore `user-scalable=no`
    mais honore `touch-action` sans `pinch-zoom`. Dézoomée, la coque
    flottait au milieu de l'écran avec le fond du manifeste autour. */
-html[data-ohb-shell="mobile"] {
+html[data-openedbot-shell="mobile"] {
   touch-action: pan-x pan-y;
 }
 /* iOS installé : `100vh` est le plein écran, y compris la zone de l'indicateur.
    La coque se cale dessus (`height: 100%`), le composer pad lui-même. */
-html[data-ohb-ios-device][data-ohb-pwa-standalone],
-html[data-ohb-ios-device][data-ohb-pwa-standalone] body,
-html[data-ohb-ios-device][data-ohb-pwa-standalone] #root {
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone],
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone] body,
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone] #root {
   height: 100vh;
 }
 
@@ -152,7 +152,7 @@ html[data-ohb-ios-device][data-ohb-pwa-standalone] #root {
 */
 [data-mobile-shell] [data-mobile-overview],
 [data-mobile-shell] [data-mobile-scroll] {
-  padding-bottom: calc(var(--ohb-safe-bottom) + 1rem);
+  padding-bottom: calc(var(--openedbot-safe-bottom) + 1rem);
 }
 
 /*
@@ -176,13 +176,13 @@ html[data-ohb-ios-device][data-ohb-pwa-standalone] #root {
 }
 
 [data-mobile-shell] [data-thread-composer] {
-  padding-inline: max(0.75rem, var(--ohb-safe-left)) max(0.75rem, var(--ohb-safe-right));
+  padding-inline: max(0.75rem, var(--openedbot-safe-left)) max(0.75rem, var(--openedbot-safe-right));
   padding-top: 0.375rem;
   /* Clavier RENTRÉ : la capsule respire au-dessus de l'indicateur d'accueil.
      À 21 px elle paraissait posée dessus ; on ne retire plus que la barre
      elle-même (~6 px) de l'inset, soit ~28 px sur un iPhone à encoche et 12 px
      sur un appareil sans inset. Le clavier déployé reprend ses 2 px plus bas. */
-  padding-bottom: max(0.75rem, calc(var(--ohb-safe-bottom) - 6px));
+  padding-bottom: max(0.75rem, calc(var(--openedbot-safe-bottom) - 6px));
   border-top: none;
   background-color: var(--background);
 }
@@ -196,7 +196,7 @@ html[data-ohb-ios-device][data-ohb-pwa-standalone] #root {
 [data-shell="mobile"][data-keyboard-open] [data-thread-composer] {
   padding-bottom: 2px;
 }
-/* Pas de hover sur doigt : le retour, c'est `:active` (`.ohb-press`). */
+/* Pas de hover sur doigt : le retour, c'est `:active` (`.openedbot-press`). */
 [data-mobile-shell] [data-composer-attachment]:hover,
 [data-mobile-shell] [data-composer-voice]:hover,
 [data-mobile-shell] [data-composer-action]:hover {
@@ -466,23 +466,23 @@ html[data-ohb-ios-device][data-ohb-pwa-standalone] #root {
   est la MÊME feuille, et sans ce sélecteur elle s'affichait sans fond : le
   titre et la phrase se lisaient par-dessus la feuille du dessous.
 */
-[role="dialog"].ohb-inset-sheet,
-[role="alertdialog"].ohb-inset-sheet {
-  background-color: var(--ohb-grouped-canvas);
+[role="dialog"].openedbot-inset-sheet,
+[role="alertdialog"].openedbot-inset-sheet {
+  background-color: var(--openedbot-grouped-canvas);
   border-color: transparent;
   border-top-left-radius: 32px;
   border-top-right-radius: 32px;
   box-shadow: none;
   padding-bottom: 0;
-  color: var(--ohb-grouped-label);
+  color: var(--openedbot-grouped-label);
   /* Le pop in-sheet, pas le swipe-back d'historique. */
   overscroll-behavior-x: none;
 }
 [data-sheet-stack] {
   overscroll-behavior-x: none;
 }
-html.dark [role="dialog"].ohb-inset-sheet,
-html.dark [role="alertdialog"].ohb-inset-sheet {
+html.dark [role="dialog"].openedbot-inset-sheet,
+html.dark [role="alertdialog"].openedbot-inset-sheet {
   background-color: #000000;
 }
 [data-inset-grouped] ul {
@@ -496,10 +496,10 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
   right: 0;
   left: 3.375rem;
   height: 1px;
-  background-color: var(--ohb-grouped-separator);
+  background-color: var(--openedbot-grouped-separator);
 }
 [data-inset-grouped-row]:active {
-  background-color: var(--ohb-grouped-press);
+  background-color: var(--openedbot-grouped-press);
 }
 [data-inset-grouped-row]:disabled,
 [data-inset-grouped-row][aria-disabled="true"] {
@@ -510,11 +510,11 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
   background-color: transparent;
 }
 [data-inset-close] {
-  color: var(--ohb-grouped-label);
-  background-color: var(--ohb-grouped-close);
+  color: var(--openedbot-grouped-label);
+  background-color: var(--openedbot-grouped-close);
 }
 [data-inset-close]:active {
-  background-color: var(--ohb-grouped-close);
+  background-color: var(--openedbot-grouped-close);
   opacity: 0.7;
 }
 [data-inset-close]::before {
@@ -523,7 +523,7 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
   inset: -6px;
 }
 [data-inset-back] {
-  color: var(--ohb-grouped-back);
+  color: var(--openedbot-grouped-back);
   background: none;
   border: none;
   box-shadow: none;
@@ -535,27 +535,27 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
 
 [data-mobile-settings],
 [data-operator-settings] {
-  --ohb-grouped-inset: 1.25rem; /* 20px : cartes inset, jamais flush */
+  --openedbot-grouped-inset: 1.25rem; /* 20px : cartes inset, jamais flush */
 }
 [data-mobile-settings] {
-  background-color: var(--ohb-grouped-canvas);
-  color: var(--ohb-grouped-label);
+  background-color: var(--openedbot-grouped-canvas);
+  color: var(--openedbot-grouped-label);
 }
 
 /* Inset Grouped : le canvas se voit sur les côtés. Pas le padding interne
    de la carte. Header / ‹ Retour restent pleine largeur. */
 [data-mobile-settings] [data-inset-grouped],
 [data-operator-settings] [data-inset-grouped] {
-  padding-inline: var(--ohb-grouped-inset);
+  padding-inline: var(--openedbot-grouped-inset);
 }
 [data-mobile-settings] [data-settings-card] {
-  margin-inline: var(--ohb-grouped-inset);
+  margin-inline: var(--openedbot-grouped-inset);
 }
 [data-mobile-settings] [data-settings-caption] {
-  padding-inline: var(--ohb-grouped-inset);
+  padding-inline: var(--openedbot-grouped-inset);
 }
 [data-mobile-settings] [data-mobile-action-footer] {
-  padding-inline: var(--ohb-grouped-inset);
+  padding-inline: var(--openedbot-grouped-inset);
 }
 
 /*
@@ -564,75 +564,75 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
   sur `pointer: coarse` : une fenêtre < 768 est déjà la coque, et
   Playwright n'émet pas toujours coarse. `!important` bat gradient / h-8.
 */
-  html[data-ohb-shell="mobile"] [data-slot="button"] {
+  html[data-openedbot-shell="mobile"] [data-slot="button"] {
     min-height: 2.75rem;
     min-width: 2.75rem;
     border-radius: 12px;
     box-shadow: none !important;
     background-image: none !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"]:hover {
+  html[data-openedbot-shell="mobile"] [data-slot="button"]:hover {
     background-image: none !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="primary"],
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="default"] {
-    background-color: var(--ohb-grouped-back) !important;
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="primary"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="default"] {
+    background-color: var(--openedbot-grouped-back) !important;
     color: #ffffff !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="primary"]:active,
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="default"]:active {
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="primary"]:active,
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="default"]:active {
     opacity: 0.72;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="secondary"],
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="outline"] {
-    background-color: var(--ohb-grouped-card) !important;
-    border-color: var(--ohb-grouped-separator) !important;
-    color: var(--ohb-grouped-label) !important;
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="secondary"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="outline"] {
+    background-color: var(--openedbot-grouped-card) !important;
+    border-color: var(--openedbot-grouped-separator) !important;
+    color: var(--openedbot-grouped-label) !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="ghost"] {
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="ghost"] {
     background-color: transparent !important;
-    color: var(--ohb-grouped-label) !important;
+    color: var(--openedbot-grouped-label) !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="ghost"]:active {
-    background-color: var(--ohb-grouped-press) !important;
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="ghost"]:active {
+    background-color: var(--openedbot-grouped-press) !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="danger"],
-  html[data-ohb-shell="mobile"] [data-slot="button"][data-variant="destructive"] {
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="danger"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="destructive"] {
     background-color: transparent !important;
     background-image: none !important;
     color: var(--destructive, #ff3b30) !important;
     box-shadow: none !important;
   }
-  html[data-ohb-shell="mobile"] [data-slot="input"],
-  html[data-ohb-shell="mobile"] [data-slot="select-trigger"],
-  html[data-ohb-shell="mobile"] textarea:not([data-composer]) {
+  html[data-openedbot-shell="mobile"] [data-slot="input"],
+  html[data-openedbot-shell="mobile"] [data-slot="select-trigger"],
+  html[data-openedbot-shell="mobile"] textarea:not([data-composer]) {
     min-height: 2.75rem;
     height: auto;
     border-radius: 12px;
     font-size: 1.0625rem;
     line-height: 1.375rem;
     box-shadow: none !important;
-    background-color: var(--ohb-grouped-card);
+    background-color: var(--openedbot-grouped-card);
   }
-  html[data-ohb-shell="mobile"] .ohb-settings-action {
+  html[data-openedbot-shell="mobile"] .openedbot-settings-action {
     min-height: 2.75rem;
     border-radius: 12px;
     box-shadow: none;
     justify-content: center;
     text-align: center;
   }
-  html[data-ohb-shell="mobile"] .ohb-settings-action-primary {
-    background-color: var(--ohb-grouped-back);
+  html[data-openedbot-shell="mobile"] .openedbot-settings-action-primary {
+    background-color: var(--openedbot-grouped-back);
     color: #ffffff;
   }
-  html[data-ohb-shell="mobile"] .ohb-settings-field {
+  html[data-openedbot-shell="mobile"] .openedbot-settings-field {
     min-height: 2.75rem;
     border-radius: 12px;
     font-size: 1.0625rem;
     line-height: 1.375rem;
-    background-color: var(--ohb-grouped-card);
+    background-color: var(--openedbot-grouped-card);
   }
-  html[data-ohb-shell="mobile"] .ohb-settings-actions {
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions {
     width: 100%;
   }
   /*
@@ -641,10 +641,10 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
     sur toute la largeur, en pilule bleue de 430 pt : elle se lisait comme un
     bouton qu'on ne peut pas appuyer.
   */
-  html[data-ohb-shell="mobile"] .ohb-settings-actions > [data-slot="button"],
-  html[data-ohb-shell="mobile"] .ohb-settings-actions > .ohb-settings-action,
-  html[data-ohb-shell="mobile"] .ohb-settings-actions > button,
-  html[data-ohb-shell="mobile"] .ohb-settings-actions > a {
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > [data-slot="button"],
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > .openedbot-settings-action,
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > button,
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > a {
     min-height: 2.75rem;
     flex: 1 1 auto;
   }
@@ -654,14 +654,14 @@ html.dark [role="alertdialog"].ohb-inset-sheet {
   pas `position: fixed` (clavier Safari). Pilules 44 pt, label centré.
   `justify-end` / `ml-auto` du desktop ne doivent rien laisser fuir.
 */
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] {
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] {
   justify-content: stretch;
   align-items: stretch;
 }
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] [data-slot="button"],
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] .ohb-settings-action,
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] a,
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] button {
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] [data-slot="button"],
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] .openedbot-settings-action,
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] a,
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] button {
   flex: 1 1 0;
   min-width: 0;
   width: auto;
@@ -673,63 +673,63 @@ html[data-ohb-shell="mobile"] [data-mobile-action-footer] button {
   justify-content: center;
   text-align: center;
 }
-html[data-ohb-shell="mobile"] [data-mobile-action-footer] [data-slot="button"] > span {
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] [data-slot="button"] > span {
   flex: 0 1 auto;
   padding-inline: 0;
   justify-content: center;
   text-align: center;
 }
 /* Les CTA ont quitté le scroll : la rangée in-card ne doit plus s'afficher. */
-[data-mobile-settings][data-has-action-footer] .ohb-settings-actions {
+[data-mobile-settings][data-has-action-footer] .openedbot-settings-actions {
   display: none;
 }
 
 /*
   La pile : push / pop d'une rubrique de réglages, par l'API View Transitions.
-  `data-ohb-vt` est posé sur <html> par le routeur (voir `route-tree.tsx`) le
+  `data-openedbot-vt` est posé sur <html> par le routeur (voir `route-tree.tsx`) le
   temps de la transition ; le reste du temps la bascule de thème garde son
   fondu (`::view-transition-*(root)` de `app.css`).
 */
-@keyframes ohb-vt-in-from-right {
+@keyframes openedbot-vt-in-from-right {
   from {
     transform: translateX(100%);
   }
 }
-@keyframes ohb-vt-out-to-left {
+@keyframes openedbot-vt-out-to-left {
   to {
     transform: translateX(-28%);
     opacity: 0.55;
   }
 }
-@keyframes ohb-vt-in-from-left {
+@keyframes openedbot-vt-in-from-left {
   from {
     transform: translateX(-28%);
     opacity: 0.55;
   }
 }
-@keyframes ohb-vt-out-to-right {
+@keyframes openedbot-vt-out-to-right {
   to {
     transform: translateX(100%);
   }
 }
-html[data-ohb-vt="push"]::view-transition-old(root) {
-  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both ohb-vt-out-to-left;
+html[data-openedbot-vt="push"]::view-transition-old(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-out-to-left;
 }
-html[data-ohb-vt="push"]::view-transition-new(root) {
-  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both ohb-vt-in-from-right;
+html[data-openedbot-vt="push"]::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-in-from-right;
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
 }
-html[data-ohb-vt="pop"]::view-transition-old(root) {
-  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both ohb-vt-out-to-right;
+html[data-openedbot-vt="pop"]::view-transition-old(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-out-to-right;
   box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
   z-index: 1;
 }
-html[data-ohb-vt="pop"]::view-transition-new(root) {
-  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both ohb-vt-in-from-left;
+html[data-openedbot-vt="pop"]::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-in-from-left;
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-ohb-vt]::view-transition-old(root),
-  html[data-ohb-vt]::view-transition-new(root) {
+  html[data-openedbot-vt]::view-transition-old(root),
+  html[data-openedbot-vt]::view-transition-new(root) {
     animation: none !important;
   }
 }
@@ -741,17 +741,17 @@ html[data-ohb-vt="pop"]::view-transition-new(root) {
   droit. `divide-y` posait un trait pleine largeur, qui coupe la carte en deux
   au lieu de séparer deux lignes.
 */
-.ohb-status-list > * + * {
+.openedbot-status-list > * + * {
   position: relative;
 }
-.ohb-status-list > * + *::before {
+.openedbot-status-list > * + *::before {
   content: "";
   position: absolute;
   top: 0;
   right: 0;
   left: 1rem;
   height: 1px;
-  background-color: var(--ohb-grouped-separator);
+  background-color: var(--openedbot-grouped-separator);
 }
 
 /*
@@ -768,8 +768,8 @@ html[data-ohb-vt="pop"]::view-transition-new(root) {
   une pilule bordée. La cible garde ses 44 pt par un ::before, comme les
   autres commandes fines de la coque.
 */
-html[data-ohb-shell="mobile"] [data-settings-group-action] [data-slot="button"],
-html[data-ohb-shell="mobile"] [data-settings-group-action] .ohb-settings-action {
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"],
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action {
   position: relative;
   min-height: 0;
   min-width: 0;
@@ -780,19 +780,19 @@ html[data-ohb-shell="mobile"] [data-settings-group-action] .ohb-settings-action 
   background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
-  color: var(--ohb-grouped-back) !important;
+  color: var(--openedbot-grouped-back) !important;
   font-size: 13px;
   line-height: 1rem;
   font-weight: 400;
 }
-html[data-ohb-shell="mobile"] [data-settings-group-action] [data-slot="button"]::before,
-html[data-ohb-shell="mobile"] [data-settings-group-action] .ohb-settings-action::before {
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"]::before,
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action::before {
   content: "";
   position: absolute;
   inset: -14px -8px;
 }
-html[data-ohb-shell="mobile"] [data-settings-group-action] [data-slot="button"]:active,
-html[data-ohb-shell="mobile"] [data-settings-group-action] .ohb-settings-action:active {
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"]:active,
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action:active {
   opacity: 0.5;
 }
 
@@ -805,7 +805,7 @@ html[data-ohb-shell="mobile"] [data-settings-group-action] .ohb-settings-action:
   lit gris : la même géométrie que `MobileSegmented`, pour que deux commutateurs
   de la même app ne se ressemblent pas de loin seulement.
 */
-html[data-ohb-shell="mobile"] [data-slot="tabs-list"] {
+html[data-openedbot-shell="mobile"] [data-slot="tabs-list"] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -814,10 +814,10 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-list"] {
   gap: 0;
   padding: 2px;
   border-radius: 9px;
-  background-color: var(--ohb-grouped-close);
+  background-color: var(--openedbot-grouped-close);
   box-shadow: none;
 }
-html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"] {
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] {
   min-height: 2.75rem;
   height: auto;
   min-width: 0;
@@ -827,20 +827,20 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"] {
   font-size: 13px;
   line-height: 1rem;
   font-weight: 500;
-  color: var(--ohb-grouped-caption);
+  color: var(--openedbot-grouped-caption);
   background: transparent;
   background-image: none;
   box-shadow: none;
 }
-html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"] > span,
-html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"] {
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] > span,
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
-  background-color: var(--ohb-grouped-card);
-  color: var(--ohb-grouped-label);
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
+  background-color: var(--openedbot-grouped-card);
+  color: var(--openedbot-grouped-label);
   background-image: none;
   box-shadow: none;
 }
@@ -854,10 +854,10 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
   1.5 rem au-dessus d'un corps de 14 px est une échelle d'écran large.
 */
 [data-mobile-settings] .legal-markdown {
-  padding-inline: var(--ohb-grouped-inset);
+  padding-inline: var(--openedbot-grouped-inset);
   font-size: 17px;
   line-height: 1.6;
-  color: var(--ohb-grouped-label);
+  color: var(--openedbot-grouped-label);
 }
 [data-mobile-settings] .legal-markdown h1 {
   margin-top: 1.5rem;
@@ -881,20 +881,20 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
   padding-block: 0.15rem;
 }
 [data-mobile-settings] .legal-markdown pre,
-[data-mobile-settings] .ohb-md-scroll {
+[data-mobile-settings] .openedbot-md-scroll {
   margin-top: 1rem;
   overflow-x: auto;
   border-radius: 12px;
-  background: var(--ohb-grouped-card);
+  background: var(--openedbot-grouped-card);
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 [data-mobile-settings] .legal-markdown pre::-webkit-scrollbar,
-[data-mobile-settings] .ohb-md-scroll::-webkit-scrollbar {
+[data-mobile-settings] .openedbot-md-scroll::-webkit-scrollbar {
   display: none;
 }
-[data-mobile-settings] .ohb-md-scroll > table {
+[data-mobile-settings] .openedbot-md-scroll > table {
   width: max-content;
   min-width: 100%;
   margin-top: 0;
@@ -902,7 +902,7 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
 [data-mobile-settings] .legal-markdown th,
 [data-mobile-settings] .legal-markdown td {
   white-space: nowrap;
-  border-color: var(--ohb-grouped-separator);
+  border-color: var(--openedbot-grouped-separator);
   font-size: 15px;
 }
 
@@ -922,9 +922,9 @@ html[data-ohb-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
  *    bande au-dessus du clavier, et une bulle flottante y mangerait une ligne
  *    du contenu sans que personne ne l'ait demandée.
  * ------------------------------------------------------------------------- */
-[data-shell="mobile"]:has([data-mobile-action-footer]) .ohb-support-launcher {
-  bottom: calc(max(1.5rem, var(--ohb-safe-bottom)) + 3.25rem);
+[data-shell="mobile"]:has([data-mobile-action-footer]) .openedbot-support-launcher {
+  bottom: calc(max(1.5rem, var(--openedbot-safe-bottom)) + 3.25rem);
 }
-[data-shell="mobile"][data-keyboard-open] .ohb-support-launcher {
+[data-shell="mobile"][data-keyboard-open] .openedbot-support-launcher {
   display: none;
 }

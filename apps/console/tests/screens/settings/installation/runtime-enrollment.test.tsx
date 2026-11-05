@@ -18,13 +18,13 @@ const CONNECTOR_TICKET = {
   endpoint: null,
   runtimeName: "Boîtier atelier",
   ticket: "7d2f5a10-4242-4e2e-9c3a-52f2a5d0c001.s3cr3t-lien",
-  command: "edge-setup link --ohb https://api.example.com --yes",
+  command: "edge-setup link --openedbot https://api.example.com --yes",
   expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
 };
 
 const DEV_CONNECTOR_TICKET = {
   ...CONNECTOR_TICKET,
-  command: "edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb",
+  command: "edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot",
 };
 
 function stubFetch(ticket = CONNECTOR_TICKET) {
@@ -98,7 +98,7 @@ beforeEach(() => {
   statusCalls = 0;
   statusState = "claimed";
   declared = [];
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {

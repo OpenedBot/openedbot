@@ -42,26 +42,26 @@ func TestPoPMessageIsExactAndBoundToNonceRuntimeAndURL(t *testing.T) {
 	priv, _ := GenerateDeviceKey()
 	pub := priv.Public().(ed25519.PublicKey)
 	nonce := bytes.Repeat([]byte{7}, PoPNonceSize)
-	want := append([]byte("ohb-link-pop/v1\n"), nonce...)
-	want = append(want, []byte("\nrt-1\nwss://ohb.example/api/runtime-links/ws\n")...)
-	if got := PoPMessage(nonce, "rt-1", "wss://ohb.example/api/runtime-links/ws"); !bytes.Equal(got, want) {
+	want := append([]byte("openedbot-link-pop/v1\n"), nonce...)
+	want = append(want, []byte("\nrt-1\nwss://openedbot.example/api/runtime-links/ws\n")...)
+	if got := PoPMessage(nonce, "rt-1", "wss://openedbot.example/api/runtime-links/ws"); !bytes.Equal(got, want) {
 		t.Fatalf("message %q", got)
 	}
-	sig := SignPoP(priv, nonce, "rt-1", "wss://ohb.example/api/runtime-links/ws")
-	if !VerifyPoP(pub, nonce, "rt-1", "wss://ohb.example/api/runtime-links/ws", sig) {
+	sig := SignPoP(priv, nonce, "rt-1", "wss://openedbot.example/api/runtime-links/ws")
+	if !VerifyPoP(pub, nonce, "rt-1", "wss://openedbot.example/api/runtime-links/ws", sig) {
 		t.Fatal("valid proof refused")
 	}
 	other := bytes.Repeat([]byte{8}, PoPNonceSize)
-	if VerifyPoP(pub, other, "rt-1", "wss://ohb.example/api/runtime-links/ws", sig) {
+	if VerifyPoP(pub, other, "rt-1", "wss://openedbot.example/api/runtime-links/ws", sig) {
 		t.Fatal("proof accepted under another nonce")
 	}
-	if VerifyPoP(pub, nonce, "rt-2", "wss://ohb.example/api/runtime-links/ws", sig) {
+	if VerifyPoP(pub, nonce, "rt-2", "wss://openedbot.example/api/runtime-links/ws", sig) {
 		t.Fatal("proof accepted for another runtime")
 	}
 	if VerifyPoP(pub, nonce, "rt-1", "wss://evil.example/api/runtime-links/ws", sig) {
 		t.Fatal("proof accepted toward another broker")
 	}
-	if VerifyPoP(pub, nonce, "rt-1", "wss://ohb.example/api/runtime-links/ws", "AAAA") {
+	if VerifyPoP(pub, nonce, "rt-1", "wss://openedbot.example/api/runtime-links/ws", "AAAA") {
 		t.Fatal("malformed signature accepted")
 	}
 	if _, err := ParsePoPNonce(base64.StdEncoding.EncodeToString(nonce[:16])); err == nil {

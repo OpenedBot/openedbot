@@ -394,7 +394,7 @@ svg { display: block; }
       <div class="threads" id="threads"></div>
       <div class="me">
         <span class="bot" style="background:#3b82f6"></span>
-        <div class="t"><b>@kev</b><small>dev@ohb.local</small></div>
+        <div class="t"><b>@kev</b><small>dev@openedbot.local</small></div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="color:var(--muted)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
       </div>
     </aside>
@@ -432,7 +432,7 @@ svg { display: block; }
     <div class="card">
       <h3>Côté shell</h3>
       <ul>
-        <li>Windows : <code>titleBarStyle: "hidden"</code> + <code>titleBarOverlay</code> (couleurs suivant <code>ohb:theme</code>), ou boutons de la page via IPC.</li>
+        <li>Windows : <code>titleBarStyle: "hidden"</code> + <code>titleBarOverlay</code> (couleurs suivant <code>openedbot:theme</code>), ou boutons de la page via IPC.</li>
         <li>Zones de glisser : <code>-webkit-app-region: drag</code> sur les deux en-têtes, <code>no-drag</code> sur chaque bouton (case « Zones de glisser »).</li>
         <li>La barre elle-même vit dans la console (<code>html[data-native-titlebar]</code>), comme sur macOS aujourd'hui.</li>
       </ul>
@@ -442,12 +442,12 @@ svg { display: block; }
 
 <script>
 const threads = [
-  ["#7c3aed", "Recette OHB-105 témoin A", "Je n'ai pas pu la planifier, il manque…", "17:02"],
-  ["#111827", "Recette OHB-105 témoin B", "Je ne peux pas la planifier sans…", "16:48"],
-  ["#0ea5e9", "Recette OHB-105 règle 1", "Voici une recette classique de…", "15:30"],
-  ["#14b8a6", "Recette OHB-105 règle 2", "Je ne peux pas le planifier…", "14:11"],
-  ["#f97316", "Recette OHB-119 après-2", "Je ne peux pas exécuter…", "hier"],
-  ["#ec4899", "Recette OHB-119 avant-2", "Re kev.", "hier"],
+  ["#7c3aed", "Recette 105 témoin A", "Je n'ai pas pu la planifier, il manque…", "17:02"],
+  ["#111827", "Recette 105 témoin B", "Je ne peux pas la planifier sans…", "16:48"],
+  ["#0ea5e9", "Recette 105 règle 1", "Voici une recette classique de…", "15:30"],
+  ["#14b8a6", "Recette 105 règle 2", "Je ne peux pas le planifier…", "14:11"],
+  ["#f97316", "Recette 119 après-2", "Je ne peux pas exécuter…", "hier"],
+  ["#ec4899", "Recette 119 avant-2", "Re kev.", "hier"],
   ["#22c55e", "Audit mémoire Hermes", "Les 794 éléments en attente…", "lun."],
   ["#6366f1", "Notes de version 0.9", "Brouillon prêt pour relecture.", "lun."],
 ];

@@ -54,8 +54,8 @@ export function isGlobalSearchSchemaMissing(error: unknown): boolean {
   const details = error as Error & { code?: unknown; errno?: unknown };
   const sqlState = details.errno ?? details.code;
   return sqlState === "42883" && (
-    error.message.includes("ohb_visible_message_search_text") ||
-    error.message.includes("ohb_global_search_normalize")
+    error.message.includes("openedbot_visible_message_search_text") ||
+    error.message.includes("openedbot_global_search_normalize")
   );
 }
 
@@ -82,7 +82,7 @@ export function searchRoutes(db: Db): Hono<{ Variables: AppVariables }> {
             with search_query as (
               select plainto_tsquery(
                 'simple'::regconfig,
-                public.ohb_global_search_normalize(${query})
+                public.openedbot_global_search_normalize(${query})
               ) as value
             ), candidates as (
               select 'conversation'::text as kind,
@@ -100,7 +100,7 @@ export function searchRoutes(db: Db): Hono<{ Variables: AppVariables }> {
                  and coalesce(thread.hermes_session_id, '') not like '%:persona-draft:%'
                  and to_tsvector(
                    'simple'::regconfig,
-                   public.ohb_global_search_normalize(coalesce(thread.title, ''))
+                   public.openedbot_global_search_normalize(coalesce(thread.title, ''))
                  ) @@ search_query.value
                  and not exists (
                    select 1 from thread_hides hidden
@@ -113,7 +113,7 @@ export function searchRoutes(db: Db): Hono<{ Variables: AppVariables }> {
                      message.content, bot.slug as "botSlug", thread.group_id as "groupId",
                      thread.title as "conversationName",
                      coalesce(message.original_author_name, author.name) as "authorName",
-                     public.ohb_visible_message_search_text(message.content) as "searchText",
+                     public.openedbot_visible_message_search_text(message.content) as "searchText",
                      message.created_at as "occurredAt"
                 from messages message
                 join threads thread
@@ -131,7 +131,7 @@ export function searchRoutes(db: Db): Hono<{ Variables: AppVariables }> {
                  )
                  and to_tsvector(
                    'simple'::regconfig,
-                   public.ohb_visible_message_search_text(message.content)
+                   public.openedbot_visible_message_search_text(message.content)
                  ) @@ search_query.value
                  and not exists (
                    select 1 from thread_hides hidden

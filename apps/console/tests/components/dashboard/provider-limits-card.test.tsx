@@ -55,7 +55,7 @@ beforeEach(() => {
   catalogHttpFailure = false;
   includeIntegratedProvider = false;
   seen.length = 0;
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     seen.push(url);
@@ -254,7 +254,7 @@ test("lien fermé : affiche chaque fournisseur authentifié, ses bots dépliés,
   expect(await within(dialog).findByText("Reconnectez le lien Hermes pour lire les limites.")).toBeTruthy();
   const openLink = within(dialog).getByRole("link", { name: "Ouvrir les réglages du lien" });
   expect(openLink.getAttribute("href")).toBe("/settings/runtime");
-  expect(openLink.className).toContain("ohb-settings-action");
+  expect(openLink.className).toContain("openedbot-settings-action");
   expect(openLink.className).toContain("justify-center");
   // Un bloc par fournisseur authentifié, chacun déplié d'office.
   // Pas de jauge : un fournisseur sans relevé n'a pas de valeur à représenter,

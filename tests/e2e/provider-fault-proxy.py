@@ -60,7 +60,7 @@ def main():
     import yaml
 
     profile, mode = sys.argv[1:]
-    if not re.fullmatch(r"recette-ohb-119-[a-z0-9-]{1,100}", profile) or mode not in ("slow", "error_after_dispatch"):
+    if not re.fullmatch(r"recette-openedbot-119-[a-z0-9-]{1,100}", profile) or mode not in ("slow", "error_after_dispatch"):
         raise SystemExit(2)
     root = Path("/srv/hermes/data")
     profile_dir = root / "profiles" / profile
@@ -86,7 +86,7 @@ def main():
     proof = {"mode": mode, "requests": 0, "forwardedPosts": 0, "upstreamStatuses": [],
              "dummyAuthorizationSeen": False, "delayMs": 0, "errorAfterRealDispatch": False}
     lock = threading.Lock()
-    dummy = "ohb-owner-fault-" + uuid.uuid4().hex
+    dummy = "openedbot-owner-fault-" + uuid.uuid4().hex
 
 
     class Proxy(http.server.BaseHTTPRequestHandler):
@@ -96,7 +96,7 @@ def main():
             pass
 
         def failure(self, status=503):
-            body = b'{"error":{"message":"Owner recipe provider fault","type":"server_error","code":"ohb_owner_fault"}}'
+            body = b'{"error":{"message":"Owner recipe provider fault","type":"server_error","code":"openedbot_owner_fault"}}'
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -195,7 +195,7 @@ def main():
             raise ValueError("profile_auth_unavailable")
         auth.setdefault("credential_pool", {})["openai-api"] = [{
             "id": str(uuid.uuid4()), "label": "Owner provider fault", "auth_type": "api_key", "priority": 0,
-            "source": "manual:ohb-fault-proxy", "access_token": dummy, "base_url": "https://api.openai.com/v1",
+            "source": "manual:openedbot-fault-proxy", "access_token": dummy, "base_url": "https://api.openai.com/v1",
         }]
         auth_path.write_text(json.dumps(auth))
         os.chmod(auth_path, 0o600)

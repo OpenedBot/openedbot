@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 function renderLab(onLaunch = (_prompt: string) => {}, disabledReason?: string) {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   render(
     <I18nProvider>
       <FeatureLabDialog

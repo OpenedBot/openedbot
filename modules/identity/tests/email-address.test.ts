@@ -67,7 +67,7 @@ describe("isDomainValid", () => {
     expect(isDomainValid("example.com")).toBe(true);
     expect(isDomainValid("a.example.co.uk")).toBe(true);
     expect(isDomainValid("localhost")).toBe(false);
-    expect(isDomainValid("ohb.local")).toBe(true);
+    expect(isDomainValid("openedbot.local")).toBe(true);
   });
 });
 

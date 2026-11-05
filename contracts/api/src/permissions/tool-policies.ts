@@ -1,5 +1,5 @@
 /**
- * PERM2-5 (DEV-OHB-255): the per-tool policy of a bot, iso Grok Bot. A tool
+ * PERM2-5: the per-tool policy of a bot, iso Grok Bot. A tool
  * without a stored value follows the bot's mode (`inherit`); `always`
  * pre-approves it, `ask` sends it to a human, `block` refuses it in the
  * pipeline AND in the host plugin (`blocked_tools`), proven by re-read.

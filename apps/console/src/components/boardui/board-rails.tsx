@@ -79,7 +79,7 @@ export function BoardIconRail() {
           haut (`native-titlebar.css`). */}
       <div data-titlebar-rail-logo="" className="flex h-[46px] shrink-0 items-center justify-center">
         <RailTip label={`openedbot v${packageJson.version}`}>
-          <img src="/brand/ohb-icon.webp" alt={`openedbot v${packageJson.version}`} className="size-7 shrink-0 object-contain" />
+          <img src="/brand/openedbot-icon.webp" alt={`openedbot v${packageJson.version}`} className="size-7 shrink-0 object-contain" />
         </RailTip>
       </div>
       <nav className="flex shrink-0 flex-col items-center gap-1.5">

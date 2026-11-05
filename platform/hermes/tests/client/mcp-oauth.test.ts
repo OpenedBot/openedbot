@@ -24,14 +24,14 @@ function clientFor() {
 describe("mcpOauthStart", () => {
   test("sans profil, le corps reste celui d'un hôte ancien : l'URL de retour seule", async () => {
     const { client, sent } = clientFor();
-    await client.mcpOauthStart("linear", "https://ohb.example/cb");
-    expect(sent).toEqual([{ path: "/hermes-setup/mcp/servers/linear/oauth", method: "POST", kind: "mutation", body: JSON.stringify({ redirectUri: "https://ohb.example/cb" }) }]);
+    await client.mcpOauthStart("linear", "https://openedbot.example/cb");
+    expect(sent).toEqual([{ path: "/hermes-setup/mcp/servers/linear/oauth", method: "POST", kind: "mutation", body: JSON.stringify({ redirectUri: "https://openedbot.example/cb" }) }]);
   });
 
   test("avec un profil, l'autorisation est demandée pour ce profil nommé", async () => {
     const { client, sent } = clientFor();
-    const started = await client.mcpOauthStart("linear", "https://ohb.example/cb", "dev");
+    const started = await client.mcpOauthStart("linear", "https://openedbot.example/cb", "dev");
     expect(started.status).toBe("pending");
-    expect(JSON.parse(sent[0]!.body!)).toEqual({ redirectUri: "https://ohb.example/cb", profile: "dev" });
+    expect(JSON.parse(sent[0]!.body!)).toEqual({ redirectUri: "https://openedbot.example/cb", profile: "dev" });
   });
 });

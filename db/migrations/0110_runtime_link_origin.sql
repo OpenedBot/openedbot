@@ -6,7 +6,7 @@
 -- can never come back, and nothing in the database said which name it was:
 -- the signed URL existed only in the pop_verified log. This column keeps the
 -- HTTPS origin (http loopback in development), written on every accepted
--- proof. It is not an address OHB dials.
+-- proof. It is not an address openedbot dials.
 begin;
 
 alter table runtimes
@@ -21,7 +21,7 @@ alter table runtimes add constraint runtimes_link_origin_check check (
 );
 
 comment on column runtimes.link_origin is
-  'HTTPS origin (http loopback in development) the connector signed at its last proof of possession. Not dialed by OHB.';
+  'HTTPS origin (http loopback in development) the connector signed at its last proof of possession. Not dialed by openedbot.';
 
 insert into schema_migrations(version) values ('0110_runtime_link_origin')
 on conflict (version) do nothing;

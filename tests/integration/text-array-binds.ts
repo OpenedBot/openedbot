@@ -39,10 +39,10 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-await withDisposablePostgres("ohb133_text_arrays", async ({ owner: target, connect }) => {
-  const api = await connect("ohb_api");
-  const worker = await connect("ohb_worker");
-  await target`insert into users (id, email) values (${USER}, 'ohb133@example.com')`;
+await withDisposablePostgres("openedbot133_text_arrays", async ({ owner: target, connect }) => {
+  const api = await connect("openedbot_api");
+  const worker = await connect("openedbot_worker");
+  await target`insert into users (id, email) values (${USER}, 'openedbot133@example.com')`;
   await target`insert into organizations (id, slug, name) values (${ORG}, 'acme-arrays', 'Acme')`;
   await target`insert into memberships (organization_id, user_id, role) values (${ORG}, ${USER}, 'owner')`;
   await target`insert into sections (id, organization_id, name, position) values (${SECTION}, ${ORG}, 'Arrays', 0)`;
@@ -76,7 +76,7 @@ await withDisposablePostgres("ohb133_text_arrays", async ({ owner: target, conne
   };
   const options = {
     apiInternalUrl: "http://link.invalid",
-    apiInternalToken: "ohb133",
+    apiInternalToken: "openedbot133",
     fetchImpl: async () => Response.json(inventory),
   };
   const first = await reconcileRuntimeSessions(worker, options);
@@ -119,7 +119,7 @@ await withDisposablePostgres("ohb133_text_arrays", async ({ owner: target, conne
   // `jsonb_typeof(meta) = 'object'`); a failed model proof must store and
   // read back its error as an object, or the console has no code to show.
   await enqueueModelSelectionProof(api, { organizationId: ORG, runtimeId: RUNTIME, provider: null, model: null, reasoningEffort: null });
-  const proofJob = await claimRuntimeModelSelectionProof(worker, "ohb133-worker");
+  const proofJob = await claimRuntimeModelSelectionProof(worker, "openedbot133-worker");
   assert(proofJob, "the model proof was not claimed");
   const refusing = {
     createRun: async () => { throw new Error("refused by the fixture"); },

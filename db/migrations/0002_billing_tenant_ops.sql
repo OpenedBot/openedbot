@@ -150,38 +150,38 @@ alter table email_outbox force row level security;
 alter table runtimes enable row level security;
 alter table runtimes force row level security;
 
-create policy subscriptions_tenant on subscriptions to ohb_api
+create policy subscriptions_tenant on subscriptions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy subscriptions_worker on subscriptions to ohb_worker using (true) with check (true);
+create policy subscriptions_worker on subscriptions to openedbot_worker using (true) with check (true);
 
-create policy tenant_deletions_tenant on tenant_deletions to ohb_api
+create policy tenant_deletions_tenant on tenant_deletions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy tenant_deletions_worker on tenant_deletions to ohb_worker using (true) with check (true);
+create policy tenant_deletions_worker on tenant_deletions to openedbot_worker using (true) with check (true);
 
-create policy runtimes_tenant on runtimes to ohb_api
+create policy runtimes_tenant on runtimes to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtimes_worker on runtimes to ohb_worker using (true) with check (true);
+create policy runtimes_worker on runtimes to openedbot_worker using (true) with check (true);
 
-create policy tenant_blob_deletions_worker on tenant_blob_deletions to ohb_worker
+create policy tenant_blob_deletions_worker on tenant_blob_deletions to openedbot_worker
   using (true) with check (true);
-create policy email_outbox_worker on email_outbox to ohb_worker
+create policy email_outbox_worker on email_outbox to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on subscriptions, runtimes, tenant_deletions to ohb_api;
-grant select, insert, update on stripe_events to ohb_api;
-grant select, insert, update, delete on service_instances to ohb_api;
-grant select, insert, update, delete on subscriptions, runtimes, tenant_deletions to ohb_worker;
-grant select, insert, update, delete on service_instances to ohb_worker;
-grant select, insert, update, delete on tenant_blob_deletions to ohb_worker;
-grant select, insert, update, delete on email_outbox to ohb_worker;
+grant select, insert, update, delete on subscriptions, runtimes, tenant_deletions to openedbot_api;
+grant select, insert, update on stripe_events to openedbot_api;
+grant select, insert, update, delete on service_instances to openedbot_api;
+grant select, insert, update, delete on subscriptions, runtimes, tenant_deletions to openedbot_worker;
+grant select, insert, update, delete on service_instances to openedbot_worker;
+grant select, insert, update, delete on tenant_blob_deletions to openedbot_worker;
+grant select, insert, update, delete on email_outbox to openedbot_worker;
 
 -- Le worker ne touche aux identités que pour la purge de compte finale et
 -- explicite. Lectures bornées aux colonnes ; DELETE reste table entière.
-grant select (id, email) on users to ohb_worker;
-grant delete on users to ohb_worker;
+grant select (id, email) on users to openedbot_worker;
+grant delete on users to openedbot_worker;
 
 insert into schema_migrations(version) values ('0002_billing_tenant_ops')
 on conflict (version) do nothing;

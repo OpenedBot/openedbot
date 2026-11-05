@@ -9,7 +9,7 @@ import type { BotPermissionMode } from "@openedbot/contracts-api";
 import { PROFILE_CAPABILITIES_FEATURE } from "./bot-capabilities";
 
 /**
- * Socle « bot léger » (DEV-OHB-247) : version courante. Un bot dont
+ * Socle « bot léger » : version courante. Un bot dont
  * `bots.capability_baseline_version` est plus bas reçoit le socle du worker,
  * qui n'estampille la version qu'une fois toutes les écritures relues.
  * Incrémenter cette constante rejoue le socle partout.
@@ -22,7 +22,7 @@ import { PROFILE_CAPABILITIES_FEATURE } from "./bot-capabilities";
 export const CAPABILITY_BASELINE_VERSION = 2;
 
 /**
- * The light set (DEV-OHB-247), kept only for a runtime that does not hold the
+ * The light set, kept only for a runtime that does not hold the
  * approval policy: there, file, code and browser would act without a gate.
  * `skills` stays: it is how a bot learns.
  */

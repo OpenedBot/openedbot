@@ -4,14 +4,14 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { PRO_CONSOLE_VIRTUAL_ID, proConsoleEntries, proConsoleModuleSource } from "./vite-pro-console";
 
 /**
- * `virtual:ohb-pro-console` as Vite builds it (`vite-pro-console.ts`):
+ * `virtual:openedbot-pro-console` as Vite builds it (`vite-pro-console.ts`):
  * `OPENEDBOT_CONSOLE_PLUGINS` empty is a solo console, the pro pass of `make test-dual`
  * lists the pro modules. They import the console's host surface as
  * `@openedbot/console/*`, which the external plug-in checkout links to `src/pro-console`
  * (`make link-core` there).
  */
 plugin({
-  name: "ohb-pro-console",
+  name: "openedbot-pro-console",
   setup(build) {
     build.module(PRO_CONSOLE_VIRTUAL_ID, () => ({
       contents: proConsoleModuleSource(proConsoleEntries(process.env.OPENEDBOT_CONSOLE_PLUGINS)),

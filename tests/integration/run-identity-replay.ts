@@ -98,10 +98,10 @@ async function main(): Promise<void> {
       statusPolls: 0,
     };
 
-    await withDisposablePostgres("ohb118_replay", async ({ owner, connect }) => {
+    await withDisposablePostgres("openedbot118_replay", async ({ owner, connect }) => {
       currentPhase = "open-worker-connections";
-      const workerDb = await connect("ohb_worker");
-      const apiDb = await connect("ohb_api");
+      const workerDb = await connect("openedbot_worker");
+      const apiDb = await connect("openedbot_api");
       const observer = await connect();
       const streamShutdown = new AbortController();
       const streamTasks = new Set<Promise<void>>();

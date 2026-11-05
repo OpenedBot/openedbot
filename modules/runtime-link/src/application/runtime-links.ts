@@ -148,7 +148,7 @@ export async function failRunsOnDisconnectedRuntimes(db: SQL, timeoutMs: number)
        returning workflow.organization_id, workflow.id
     ), cursor_locks as materialized (
       select organization_id,
-             pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('ohb-run-events-cursor')) as locked
+             pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked
         from (select distinct organization_id from failed_runs) organizations
        order by organization_id
     ), event_rows as (
@@ -220,7 +220,7 @@ function linkOrigin(options: LinkControlOptions): string {
 }
 
 /**
- * Rotation automatique du jeton de lien (OHB-56). Un runtime `connector`
+ * Rotation automatique du jeton de lien. Un runtime `connector`
  * connecté dont le jeton a plus de `maxAgeHours` reçoit un nouveau jeton en
  * mode maintenance : l'ancien hash glisse en `link_token_previous_hash` pour
  * dix minutes, le nouveau part par `link.rotate` sur le lien via la route de
@@ -316,14 +316,14 @@ type HostSessionsInventory = { sessions: Array<{ id: string; profile: string; cr
 /**
  * Un identifiant de session tel que le gateway l'accepte sur le lien (même
  * alphabet que `HERMES_SESSION_SEGMENT`, deux-points compris) : les sessions
- * d'openedbot s'appellent `ohb:<org>:<thread>`.
+ * d'openedbot s'appellent `openedbot:<org>:<thread>`.
  */
 const SESSION_ID_PATTERN = /^[A-Za-z0-9._~:-]{1,256}$/;
 /** Runtimes lus par passe : 100 x `LINK_SESSIONS_INVENTORY_TIMEOUT_MS` reste sous `LINK_SECURITY_TICK_MS`. */
 export const SESSION_RECONCILIATION_BATCH = 100;
 
 /**
- * Réconciliation des sessions (OHB-55 côté hôte, OHB-56 ici). Pour chaque
+ * Réconciliation des sessions, côté API. Pour chaque
  * runtime connecté qui annonce `sessions_inventory`, la liste bornée des
  * identifiants de session de l'hôte est comparée à ce qu'openedbot a lui-même
  * créé (`threads.hermes_session_id`, `runs.execution_session_key`). Une

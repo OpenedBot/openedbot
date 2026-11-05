@@ -65,7 +65,7 @@ alter table apns_devices force row level security;
 
 -- API : le membre ne voit que SES appareils dans l organisation courante,
 -- par la meme porte que push_subscriptions (0039).
-create policy apns_devices_owner on apns_devices to ohb_api
+create policy apns_devices_owner on apns_devices to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
@@ -76,12 +76,12 @@ create policy apns_devices_owner on apns_devices to ohb_api
   );
 -- Worker : sous le tenant de la livraison seulement (withTenant), jamais en
 -- using (true) : la table porte un secret chiffre.
-create policy apns_devices_worker on apns_devices to ohb_worker
+create policy apns_devices_worker on apns_devices to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on apns_devices to ohb_api;
-grant select, update on apns_devices to ohb_worker;
+grant select, insert, update, delete on apns_devices to openedbot_api;
+grant select, update on apns_devices to openedbot_worker;
 
 -- Une reinstallation ou un changement de compte peut garder le meme token
 -- Apple. L ancien rattachement est rendu inutilisable et son secret efface
@@ -113,7 +113,7 @@ for each row execute function revoke_moved_apns_token();
 
 -- Depart d un membre : la membership est revoquee (revoked_at), pas
 -- supprimee, donc la FK ne cascade pas. Ce trigger est la cascade. Il vit en
--- base plutot que dans removeMember parce que la policy ohb_api ne laisse
+-- base plutot que dans removeMember parce que la policy openedbot_api ne laisse
 -- voir que les appareils de l utilisateur authentifie (l acteur, pas le
 -- membre retire) : un DELETE applicatif y serait un no-op silencieux.
 create or replace function drop_apns_devices_of_revoked_member()
@@ -179,9 +179,9 @@ alter table apns_deliveries force row level security;
 -- File de reclamation du worker, comme push_deliveries : elle traverse les
 -- organisations et ne porte aucun secret. Le token se relit sous le tenant
 -- de la ligne.
-create policy apns_deliveries_worker on apns_deliveries to ohb_worker
+create policy apns_deliveries_worker on apns_deliveries to openedbot_worker
   using (true) with check (true);
-grant select, insert, update, delete on apns_deliveries to ohb_worker;
+grant select, insert, update, delete on apns_deliveries to openedbot_worker;
 
 insert into schema_migrations(version) values ('0108_apns_devices')
 on conflict (version) do nothing;

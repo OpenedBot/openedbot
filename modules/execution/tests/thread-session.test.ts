@@ -31,7 +31,7 @@ function row(overrides: Partial<ThreadSessionRow> = {}): ThreadSessionRow {
   return {
     organizationId: "org-1",
     threadId: "thread-1",
-    threadSessionId: "ohb:org-1:thread-1",
+    threadSessionId: "openedbot:org-1:thread-1",
     threadSessionGeneration: 0,
     threadSessionOpenedAt: new Date("2026-11-02T10:00:00Z"),
     threadCreatedAt: new Date("2026-11-01T00:00:00Z"),
@@ -44,7 +44,7 @@ function row(overrides: Partial<ThreadSessionRow> = {}): ThreadSessionRow {
 describe("pinThreadSession (0163)", () => {
   test("rien n'a changé : la session du fil, sans écriture", async () => {
     const calls: Call[] = [];
-    expect(await pinThreadSession(fakeDb({ generation: 0 }, calls), claimed, "worker-1", row())).toBe("ohb:org-1:thread-1");
+    expect(await pinThreadSession(fakeDb({ generation: 0 }, calls), claimed, "worker-1", row())).toBe("openedbot:org-1:thread-1");
     expect(calls).toEqual([]);
   });
 
@@ -54,11 +54,11 @@ describe("pinThreadSession (0163)", () => {
     const session = await pinThreadSession(fakeDb(state, calls), claimed, "worker-1", row({
       profileCapabilitiesChangedAt: "2026-11-02T10:05:00+00:00",
     }));
-    expect(session).toBe("ohb:org-1:thread-1:gen1");
+    expect(session).toBe("openedbot:org-1:thread-1:gen1");
     expect(calls[0]!.sql).toContain("and hermes_session_generation =");
     expect(calls[0]!.values).toContain(0);
     const pin = calls.find((call) => call.sql.startsWith("update runs set execution_session_key"));
-    expect(pin?.values).toEqual(["ohb:org-1:thread-1:gen1", "run-1", "org-1", "worker-1", 1]);
+    expect(pin?.values).toEqual(["openedbot:org-1:thread-1:gen1", "run-1", "org-1", "worker-1", 1]);
   });
 
   test("un changement de la racine compte aussi pour un bot à profil", async () => {
@@ -67,7 +67,7 @@ describe("pinThreadSession (0163)", () => {
       threadSessionGeneration: 2,
       rootCapabilitiesChangedAt: new Date("2026-11-02T11:00:00Z"),
     }));
-    expect(session).toBe("ohb:org-1:thread-1:gen3");
+    expect(session).toBe("openedbot:org-1:thread-1:gen3");
   });
 
   test("un autre run a déjà fait avancer le fil : on prend sa génération, sans avancer deux fois", async () => {
@@ -76,14 +76,14 @@ describe("pinThreadSession (0163)", () => {
     const session = await pinThreadSession(fakeDb(state, calls), claimed, "worker-1", row({
       rootCapabilitiesChangedAt: new Date("2026-11-02T11:00:00Z"),
     }));
-    expect(session).toBe("ohb:org-1:thread-1:gen1");
+    expect(session).toBe("openedbot:org-1:thread-1:gen1");
     expect(calls.filter((call) => call.sql.includes("hermes_session_generation + 1"))).toHaveLength(1);
   });
 
   test("première ouverture d'une génération : l'instant est noté, la clé reste celle du fil", async () => {
     const calls: Call[] = [];
     const session = await pinThreadSession(fakeDb({ generation: 0 }, calls), claimed, "worker-1", row({ threadSessionOpenedAt: null }));
-    expect(session).toBe("ohb:org-1:thread-1");
+    expect(session).toBe("openedbot:org-1:thread-1");
     expect(calls).toHaveLength(1);
     expect(calls[0]!.sql).toContain("set hermes_session_opened_at = now()");
     expect(calls[0]!.sql).toContain("hermes_session_opened_at is null");
@@ -102,6 +102,6 @@ describe("pinThreadSession (0163)", () => {
     const session = await pinThreadSession(fakeDb({ generation: 0 }, calls), claimed, "worker-1", row({
       profileCapabilitiesChangedAt: "pas une date",
     }));
-    expect(session).toBe("ohb:org-1:thread-1");
+    expect(session).toBe("openedbot:org-1:thread-1");
   });
 });

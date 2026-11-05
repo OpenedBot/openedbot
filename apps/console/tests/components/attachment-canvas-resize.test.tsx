@@ -11,10 +11,10 @@ import {
   writeCanvasWidth,
 } from "../../src/components/attachment-canvas";
 
-const KEY = "ohb:attachment-canvas-width";
+const KEY = "openedbot:attachment-canvas-width";
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   window.localStorage.removeItem(KEY);
 });
 afterEach(cleanup);

@@ -43,7 +43,7 @@ export async function appendDecisionTx(
   await tx`
     select pg_advisory_xact_lock(
       hashtext(${input.organizationId}),
-      hashtext('ohb-decisions-chain')
+      hashtext('openedbot-decisions-chain')
     )
   `;
   const previousRows = await tx<Array<{ entryHash: string; chainSequence: string | number }>>`

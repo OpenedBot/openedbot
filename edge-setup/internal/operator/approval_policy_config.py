@@ -45,9 +45,9 @@ try:
         raise ValueError("plugins.enabled must be a list of strings")
     if not isinstance(disabled, list) or not all(isinstance(item, str) for item in disabled):
         raise ValueError("plugins.disabled must be a list of strings")
-    if enable and ("ohb_approval_policy" in disabled or "ohb_approval_policy" not in enabled):
-        disabled = [item for item in disabled if item != "ohb_approval_policy"]
-        enabled = [*enabled, "ohb_approval_policy"] if "ohb_approval_policy" not in enabled else enabled
+    if enable and ("openedbot_approval_policy" in disabled or "openedbot_approval_policy" not in enabled):
+        disabled = [item for item in disabled if item != "openedbot_approval_policy"]
+        enabled = [*enabled, "openedbot_approval_policy"] if "openedbot_approval_policy" not in enabled else enabled
         plugins["disabled"] = disabled
         plugins["enabled"] = enabled
         data["plugins"] = plugins
@@ -58,20 +58,20 @@ try:
     # load is proven by a re-read. A profile the gateway does not serve yet has
     # no plugin manager: its first use discovers the plugin on its own.
     load = None
-    if os.environ.get("OPENEDBOT_APPROVAL_RELOAD") == "1" and "ohb_approval_policy" in enabled:
+    if os.environ.get("OPENEDBOT_APPROVAL_RELOAD") == "1" and "openedbot_approval_policy" in enabled:
         try:
             from gateway.control_socket import reload_gateway_plugins
             answer = reload_gateway_plugins(root, profile_home=home, timeout=20.0)
         except Exception:
             answer = None
-        if isinstance(answer, dict) and answer.get("reloaded") is True and "ohb_approval_policy" in (answer.get("plugins") or []):
+        if isinstance(answer, dict) and answer.get("reloaded") is True and "openedbot_approval_policy" in (answer.get("plugins") or []):
             load = "loaded"
         elif isinstance(answer, dict) and answer.get("reloaded") is False and answer.get("error") == "home is not served by this gateway":
             load = "lazy"
         else:
             load = "pending"
-    print(json.dumps({"enabled": "ohb_approval_policy" in enabled,
-                      "disabled": "ohb_approval_policy" in disabled,
+    print(json.dumps({"enabled": "openedbot_approval_policy" in enabled,
+                      "disabled": "openedbot_approval_policy" in disabled,
                       "load": load}, separators=(",", ":")))
 except Exception:
     raise SystemExit(2)

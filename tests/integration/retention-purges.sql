@@ -4,14 +4,14 @@
 --
 -- Une ligne, dans cet ordre :
 --   1. definition : deux fonctions du role de migration, SECURITY DEFINER,
---      search_path fige, EXECUTE pour ohb_worker seul ;
---   2. ohb_worker : les deux tables restent illisibles en direct (42501) ;
+--      search_path fige, EXECUTE pour openedbot_worker seul ;
+--   2. openedbot_worker : les deux tables restent illisibles en direct (42501) ;
 --   3. codes      : seul le code expire depuis plus d un jour part ;
 --   4. sessions   : seules partent la session web expiree depuis 40 jours et
 --      la session native expiree et revoquee depuis plus de 30 jours ; restent
 --      la session vivante, celle expiree depuis 10 jours et celle revoquee il
 --      y a 40 jours dont le jeton de rafraichissement vaut encore 5 jours ;
---   5. ohb_api    : appel refuse (42501).
+--   5. openedbot_api    : appel refuse (42501).
 -- Reutilise tenant-a/owner-a crees plus haut dans postgres-rls.sh. Tout se
 -- joue dans une transaction annulee : la base sort intacte.
 begin;
@@ -35,9 +35,9 @@ insert into sessions (id, organization_id, user_id, kind, session_token_hash, re
    'native', null, 'p0169-native-rotated', now() - interval '40 days', now() + interval '5 days', now() - interval '40 days');
 
 create temp table retention_proof (step text primary key, outcome text);
-grant select, insert, update on retention_proof to ohb_worker, ohb_api;
+grant select, insert, update on retention_proof to openedbot_worker, openedbot_api;
 
-set local role ohb_worker;
+set local role openedbot_worker;
 select purge_spent_email_login_codes() \g /dev/null
 select purge_dead_sessions() \g /dev/null
 do $proof$
@@ -58,7 +58,7 @@ end;
 $proof$;
 reset role;
 
-set local role ohb_api;
+set local role openedbot_api;
 do $proof$
 begin
   perform purge_dead_sessions();
@@ -82,9 +82,9 @@ select
             || '/' || coalesce(array_to_string(p.proconfig, ';'), '-')
             || '/' || exists (select from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                                where a.grantee = 0 and a.privilege_type = 'EXECUTE')::text
-            || '/' || has_function_privilege('ohb_api', p.oid, 'execute')::text
-            || '/' || has_function_privilege('ohb_staff', p.oid, 'execute')::text
-            || '/' || has_function_privilege('ohb_worker', p.oid, 'execute')::text,
+            || '/' || has_function_privilege('openedbot_api', p.oid, 'execute')::text
+            || '/' || has_function_privilege('openedbot_staff', p.oid, 'execute')::text
+            || '/' || has_function_privilege('openedbot_worker', p.oid, 'execute')::text,
             ';' order by p.proname)
      from pg_proc p
     where p.oid in ('public.purge_dead_sessions()'::regprocedure,

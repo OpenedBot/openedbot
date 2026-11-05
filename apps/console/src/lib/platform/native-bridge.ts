@@ -2,7 +2,7 @@ import type { AuthStore } from "@openedbot/browser-api-client";
 
 /**
  * Le pont que la coque native (dépôt voisin `openedbot-desktop`, Electron) expose au
- * renderer par `contextBridge.exposeInMainWorld("__OHB_NATIVE__", ...)`.
+ * renderer par `contextBridge.exposeInMainWorld("__OPENEDBOT_NATIVE__", ...)`.
  *
  * Dans un navigateur il n'existe pas : la console garde son cookie de session
  * HttpOnly et son jeton CSRF. Dans la coque, c'est le pont qui porte l'identité
@@ -12,7 +12,7 @@ import type { AuthStore } from "@openedbot/browser-api-client";
  * CSRF que sur une session cookie). Le contrat est tenu par `apps/desktop`
  * (`src/shared/bridge.ts`) : ces quatre fonctions, plus `auth`, optionnel.
  */
-export type OhbNativeBridge = {
+export type OpenedbotNativeBridge = {
   /** Le jeton courant, rafraîchi par la coque s'il expire ; `null` déconnecté. */
   readAccessToken(): Promise<string | null>;
   /** Force une rotation ; `null` si le refresh est refusé (la coque rouvre sa page de connexion). */
@@ -53,7 +53,7 @@ export type NativeAuthBridge = {
 declare global {
   // Fusion de déclaration voulue : `Window` est le type global du DOM.
   interface Window {
-    __OHB_NATIVE__?: OhbNativeBridge;
+    __OPENEDBOT_NATIVE__?: OpenedbotNativeBridge;
   }
 }
 
@@ -64,8 +64,8 @@ declare global {
  */
 export const NATIVE_SESSION_MARK = "native";
 
-export function nativeBridge(): OhbNativeBridge | null {
-  const bridge = globalThis.window?.__OHB_NATIVE__;
+export function nativeBridge(): OpenedbotNativeBridge | null {
+  const bridge = globalThis.window?.__OPENEDBOT_NATIVE__;
   return bridge && typeof bridge.readAccessToken === "function" ? bridge : null;
 }
 

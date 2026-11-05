@@ -107,9 +107,9 @@ function rainbowLetters(word: string): ReactNode[] {
   return letters.map((letter, index) => (
     <span
       key={index}
-      className="ohb-mcp-letter"
+      className="openedbot-mcp-letter"
       style={{
-        "--ohb-mcp-hue": `${
+        "--openedbot-mcp-hue": `${
           letters.length === 1
             ? RAINBOW_ARC_DEGREES / 2
             : (index / (letters.length - 1)) * RAINBOW_ARC_DEGREES
@@ -692,7 +692,7 @@ export function Composer({
     <ComposerDisabledSurface disabled={disabled && !notice} reason={disabledReason} coarse={coarse}>
       <div
       data-thread-composer=""
-      className="shrink-0 px-4 pt-2 pb-[max(1rem,var(--ohb-safe-bottom))] sm:p-1"
+      className="shrink-0 px-4 pt-2 pb-[max(1rem,var(--openedbot-safe-bottom))] sm:p-1"
       >
       <div ref={column} className="relative w-full">
         {atOpen ? (
@@ -907,7 +907,7 @@ export function Composer({
                         disabled={disabled || preparing}
                         aria-label={t("composer.addAttachment")}
                         title={t("composer.addAttachment")}
-                        className="ohb-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
+                        className="openedbot-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
                       >
                         {addOpen
                           ? <svg width="10.8" height="10.8" viewBox="0 0 10.8 10.8" fill="none" aria-hidden><path d="M2 2L8.8 8.8M8.8 2L2 8.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -916,7 +916,7 @@ export function Composer({
                     </DrawerTrigger>
                     <DrawerContent
                       aria-label={t("boardui.addToChat")}
-                      className="border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--ohb-safe-bottom))] text-text-primary"
+                      className="border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--openedbot-safe-bottom))] text-text-primary"
                       style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
                     >
                       <DrawerTitle className="sr-only">{t("boardui.addToChat")}</DrawerTitle>
@@ -947,7 +947,7 @@ export function Composer({
                       disabled={disabled || preparing}
                       aria-label={t("composer.addAttachment")}
                       title={t("composer.addAttachment")}
-                      className="ohb-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40 sm:order-1 sm:mb-0 sm:size-7 sm:bg-composer-panel-add-background sm:p-1 sm:text-foreground-icon-primary sm:hover:bg-composer-panel-add-hover-background sm:active:scale-[0.96]"
+                      className="openedbot-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40 sm:order-1 sm:mb-0 sm:size-7 sm:bg-composer-panel-add-background sm:p-1 sm:text-foreground-icon-primary sm:hover:bg-composer-panel-add-hover-background sm:active:scale-[0.96]"
                     >
                       {addOpen
                         ? <svg width="10.8" height="10.8" viewBox="0 0 10.8 10.8" fill="none" aria-hidden><path d="M2 2L8.8 8.8M8.8 2L2 8.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -1174,7 +1174,7 @@ export function Composer({
                 type="button"
                 onPointerDown={keepSoftKeyboard}
                 onClick={onCancel}
-                className={cn("ohb-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-primary outline-none transition-colors hover:bg-background-tertiary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring sm:order-6 sm:mb-0 sm:size-7", primaryAnchor)}
+                className={cn("openedbot-press mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-background-tertiary-default text-foreground-icon-primary outline-none transition-colors hover:bg-background-tertiary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring sm:order-6 sm:mb-0 sm:size-7", primaryAnchor)}
                 aria-label={t("composer.stopGeneration")}
                 aria-keyshortcuts={coarse || !escapeStopsRun ? undefined : "Escape"}
                 title={coarse || !escapeStopsRun ? undefined : t("composer.stopGenerationShortcut")}
@@ -1193,7 +1193,7 @@ export function Composer({
                 onPointerDown={keepSoftKeyboard}
                 onClick={onPlanLaunch}
                 disabled={disabled || preparing || sending}
-                className={cn("ohb-press bg-button-primary mb-0.5 flex h-11 min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-full px-3.5 text-[15px] font-semibold text-white outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 sm:order-6 sm:mb-0 sm:h-7 sm:min-h-7 sm:px-2.5 sm:text-[13px]", primaryAnchor)}
+                className={cn("openedbot-press bg-button-primary mb-0.5 flex h-11 min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-full px-3.5 text-[15px] font-semibold text-white outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 sm:order-6 sm:mb-0 sm:h-7 sm:min-h-7 sm:px-2.5 sm:text-[13px]", primaryAnchor)}
                 aria-label={t("planCard.launch")}
               >
                 {t("planCard.launch")}
@@ -1219,7 +1219,7 @@ export function Composer({
                   submit();
                 }}
                 disabled={sendBlocked}
-                className={cn("ohb-press bg-button-primary mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-white outline-none transition-[opacity,scale] duration-200 focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 sm:order-6 sm:mb-0 sm:size-7 sm:p-1 sm:active:scale-95", primaryAnchor)}
+                className={cn("openedbot-press bg-button-primary mb-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-white outline-none transition-[opacity,scale] duration-200 focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-30 sm:order-6 sm:mb-0 sm:size-7 sm:p-1 sm:active:scale-95", primaryAnchor)}
                 aria-label={planPending ? t("planCard.sendCorrection") : t("composer.send")}
               >
                 <SwapIcon ready={motionReady}>
@@ -1384,7 +1384,7 @@ function AddMenuRow({
 /** La pastille d'un plugin MCP : son initiale sur une tuile de 24 px. */
 function PluginBadge({ name }: { name: string }) {
   return (
-    <span aria-hidden className="ohb-mcp-letter flex size-6 shrink-0 items-center justify-center rounded-md bg-background-tertiary-default text-caption-1-semibold text-text-primary">
+    <span aria-hidden className="openedbot-mcp-letter flex size-6 shrink-0 items-center justify-center rounded-md bg-background-tertiary-default text-caption-1-semibold text-text-primary">
       {name.trim().charAt(0).toUpperCase()}
     </span>
   );
@@ -1397,5 +1397,5 @@ function PluginBadge({ name }: { name: string }) {
  */
 function SwapIcon({ ready, children }: { ready: RefObject<boolean>; children: ReactNode }) {
   const [swap] = useState(() => ready.current === true);
-  return <span className={cn("relative inline-flex", swap && "ohb-icon-swap")}>{children}</span>;
+  return <span className={cn("relative inline-flex", swap && "openedbot-icon-swap")}>{children}</span>;
 }

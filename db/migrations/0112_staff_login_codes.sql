@@ -24,7 +24,7 @@ alter table staff_login_codes force row level security;
 
 -- Same door as staff_users during login: app.staff_email before a session
 -- exists, app.staff_user_id once the account is known.
-create policy staff_login_codes_api on staff_login_codes to ohb_api
+create policy staff_login_codes_api on staff_login_codes to openedbot_api
   using (
     staff_user_id = nullif(current_setting('app.staff_user_id', true), '')::uuid
     or staff_user_id in (
@@ -40,7 +40,7 @@ create policy staff_login_codes_api on staff_login_codes to ohb_api
     )
   );
 
-grant select, insert, update on staff_login_codes to ohb_api;
+grant select, insert, update on staff_login_codes to openedbot_api;
 
 -- SQL twin of TRANSACTIONAL_EMAIL_KINDS (contracts/api/src/email-kinds.ts).
 alter table email_outbox drop constraint if exists email_outbox_kind_check;

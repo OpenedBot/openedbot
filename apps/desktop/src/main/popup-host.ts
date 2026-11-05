@@ -23,8 +23,8 @@ import { log } from "./log";
 // no socket to authenticate, and the popup's life is tied to ours (EOF on its
 // stdin makes it quit, even if we crash).
 
-const BUNDLE_NAME = "OHBPopup.app";
-const EXECUTABLE = path.join("Contents", "MacOS", "OHBPopup");
+const BUNDLE_NAME = "OpenedbotPopup.app";
+const EXECUTABLE = path.join("Contents", "MacOS", "OpenedbotPopup");
 /** The popup announces itself right after launch; silence past this is a hung start. */
 const READY_TIMEOUT_MS = 10_000;
 /** After asking it to stop (stdin closed), the popup gets this long before SIGTERM. */
@@ -82,7 +82,7 @@ export function locatePopupBundle(): string | null {
 type PopupProcess = ChildProcessByStdio<Writable, Readable, null>;
 
 /**
- * The host protocol a bundle declares (`OHBHostedProtocol` in its Info.plist,
+ * The host protocol a bundle declares (`OpenedbotHostedProtocol` in its Info.plist,
  * written as XML by `make bundle` in openedbot-notch). null when absent: a build
  * from before hosted mode, which would ignore --hosted and start on its own
  * (its own sign-in, its own Keychain) instead of talking to us.
@@ -90,7 +90,7 @@ type PopupProcess = ChildProcessByStdio<Writable, Readable, null>;
 export function readHostedProtocol(bundle: string): number | null {
   try {
     const plist = readFileSync(path.join(bundle, "Contents", "Info.plist"), "utf8");
-    const match = /<key>OHBHostedProtocol<\/key>\s*<integer>(\d+)<\/integer>/.exec(plist);
+    const match = /<key>OpenedbotHostedProtocol<\/key>\s*<integer>(\d+)<\/integer>/.exec(plist);
     return match ? Number(match[1]) : null;
   } catch {
     return null;

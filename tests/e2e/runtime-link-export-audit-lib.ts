@@ -22,7 +22,7 @@ export function inspectSealedExport(data: Uint8Array): SealedExportInspection {
     return { header, sha256: createHash("sha256").update(data).digest("hex"), bytes: data.byteLength };
   } catch (error) {
     if (error instanceof CreationAuditError && error.code === "AUDIT_PLAINTEXT_EXPORT") {
-      throw new Error("Plaintext snapshot.json from a connector older than audit v2: upgrade edge-setup and export snapshot.bin; OHB never accepts this file.");
+      throw new Error("Plaintext snapshot.json from a connector older than audit v2: upgrade edge-setup and export snapshot.bin; openedbot never accepts this file.");
     }
     if (error instanceof CreationAuditError) throw new Error(`Not a sealed creation audit (${error.code}): ${error.message}`);
     throw error;

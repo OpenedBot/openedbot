@@ -551,7 +551,7 @@ export function ThreadContextTab({
           onClick={toggleDetail}
           aria-label={t("threadContext.open")}
           title={readout}
-          className="ohb-press -me-2 flex shrink-0 cursor-pointer items-center rounded-[40px] outline-none transition-colors duration-150 hover:bg-background-tertiary-default/60 focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+          className="openedbot-press -me-2 flex shrink-0 cursor-pointer items-center rounded-[40px] outline-none transition-colors duration-150 hover:bg-background-tertiary-default/60 focus-visible:ring-2 focus-visible:ring-border-focus-ring"
         >
           {/* Plafond inconnu : la piste reste nue et le compte de jetons
               s'écrit, comme dans les autres variantes. */}
@@ -576,7 +576,7 @@ export function ThreadContextTab({
           // les deux contrôles du composer se lisent comme cliquables. La
           // hauteur et le rembourrage restent au bureau : en sous-titre de
           // l'en-tête mobile, le texte garde son alignement.
-          className="ohb-press inline-flex shrink-0 cursor-pointer items-center rounded-xl text-[13px] leading-4 text-muted-foreground outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring sm:h-8 sm:px-2"
+          className="openedbot-press inline-flex shrink-0 cursor-pointer items-center rounded-xl text-[13px] leading-4 text-muted-foreground outline-none transition-colors duration-150 hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring sm:h-8 sm:px-2"
         >
           <span className="truncate tabular-nums">
             {window > 0
@@ -595,7 +595,7 @@ export function ThreadContextTab({
         data-thread-context-tab=""
         onClick={toggleDetail}
         aria-label={t("threadContext.open")}
-        className="ohb-press -mb-px flex h-[34px] w-full min-w-0 items-center justify-between gap-3 rounded-t-[16px] bg-[#ebebeb] px-2 py-1 text-[13px] font-medium text-[#737373] outline-none transition-colors hover:bg-[#e3e3e3] focus-visible:ring-2 focus-visible:ring-ring md:cursor-pointer dark:bg-muted/60 dark:text-muted-foreground dark:hover:bg-muted"
+        className="openedbot-press -mb-px flex h-[34px] w-full min-w-0 items-center justify-between gap-3 rounded-t-[16px] bg-[#ebebeb] px-2 py-1 text-[13px] font-medium text-[#737373] outline-none transition-colors hover:bg-[#e3e3e3] focus-visible:ring-2 focus-visible:ring-ring md:cursor-pointer dark:bg-muted/60 dark:text-muted-foreground dark:hover:bg-muted"
       >
         {/* À gauche le profil qui exécute, à droite ce que le tour a coûté.
             Le MODÈLE n'est pas répété ici : le sélecteur du composer le porte
@@ -657,7 +657,7 @@ export function ThreadContextTab({
           <div
             className={cn(
               "scrollbar-subtle min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3",
-              isMobile && "pb-[max(0.75rem,var(--ohb-safe-bottom))]",
+              isMobile && "pb-[max(0.75rem,var(--openedbot-safe-bottom))]",
             )}
           >
             {detailLoading ? <ThreadContextSkeleton label={t("common.loading")} /> : detailBody}

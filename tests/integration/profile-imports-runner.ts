@@ -27,7 +27,7 @@ async function adminUrl(): Promise<URL> {
 
 const root = resolve(import.meta.dir, "../..");
 const source = await adminUrl();
-const database = `ohb56_import_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot56_import_${crypto.randomUUID().replaceAll("-", "")}`;
 const admin = new SQL({ url: source.toString(), max: 1 });
 let created = false;
 let target: SQL | null = null;
@@ -35,9 +35,9 @@ try {
   // Role definitions match the existing PostgreSQL integration harness. Existing
   // roles are never altered; the fixture uses SET ROLE, not their passwords.
   await admin.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_staff') then create role ohb_staff login password 'ohb_staff_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_staff') then create role openedbot_staff login password 'openedbot_staff_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await admin.unsafe(`create database "${database}"`);
   created = true;

@@ -830,7 +830,7 @@ export function RuntimeDirectWizard({
     }
   };
 
-  // OHB-75 : la publication assistée est un parcours à part entière.
+  // La publication assistée est un parcours à part entière.
   if (!runtime && publishing && path) {
     return <RuntimeExposureFlow kind={path} onDone={onDone} onCancel={onCancel} onBack={() => setPublishing(false)} />;
   }

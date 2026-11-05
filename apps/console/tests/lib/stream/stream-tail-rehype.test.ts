@@ -26,9 +26,9 @@ describe("rehypeStreamTail", () => {
       type: "root",
       children: [element("p", [text("Premier")]), element("p", [text("La réponse arrive")])],
     });
-    const [tail] = spans(tree, "ohb-stream-tail");
+    const [tail] = spans(tree, "openedbot-stream-tail");
     expect(textOf(tail!)).toBe("arrive".slice(-STREAM_TAIL_CHARS));
-    expect(spans(tree, "ohb-stream-caret")).toHaveLength(1);
+    expect(spans(tree, "openedbot-stream-caret")).toHaveLength(1);
     expect(textOf(tree)).toBe("PremierLa réponse arrive");
   });
 
@@ -37,8 +37,8 @@ describe("rehypeStreamTail", () => {
       type: "root",
       children: [element("p", [text("Voici le code")]), element("pre", [element("code", [text("x = 1")])])],
     });
-    expect(spans(tree, "ohb-stream-tail")).toEqual([]);
-    expect(tree.children?.at(-1)).toMatchObject({ tagName: "span", properties: { className: ["ohb-stream-caret"] } });
+    expect(spans(tree, "openedbot-stream-tail")).toEqual([]);
+    expect(tree.children?.at(-1)).toMatchObject({ tagName: "span", properties: { className: ["openedbot-stream-caret"] } });
     expect(textOf(tree)).toBe("Voici le codex = 1");
   });
 
@@ -47,12 +47,12 @@ describe("rehypeStreamTail", () => {
       type: "root",
       children: [element("p", [text("Principes :")]), text("\n"), element("ul", [element("li", [])])],
     });
-    expect(spans(tree, "ohb-stream-tail")).toEqual([]);
-    expect(tree.children?.at(-1)).toMatchObject({ properties: { className: ["ohb-stream-caret"] } });
+    expect(spans(tree, "openedbot-stream-tail")).toEqual([]);
+    expect(tree.children?.at(-1)).toMatchObject({ properties: { className: ["openedbot-stream-caret"] } });
   });
 
   test("an empty tree still gets its caret", () => {
     const tree = run(rehypeStreamTail, { type: "root", children: [] });
-    expect(spans(tree, "ohb-stream-caret")).toHaveLength(1);
+    expect(spans(tree, "openedbot-stream-caret")).toHaveLength(1);
   });
 });

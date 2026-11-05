@@ -56,8 +56,8 @@ try {
   if (!model) throw new Error(`Provider ${provider.slug} exposes no model for the live canary.`);
   if (profile) await client.probeProfileIsolation(profile);
   const canaryId = crypto.randomUUID();
-  const sessionId = `ohb-canary-${canaryId}`;
-  await client.ensureSession(sessionId, `OHB canary ${canaryId.slice(0, 8)}`);
+  const sessionId = `openedbot-canary-${canaryId}`;
+  await client.ensureSession(sessionId, `openedbot canary ${canaryId.slice(0, 8)}`);
   const runId = await client.createRun({
     input: "Réponds exactement OPENEDBOT_CANARY_OK.",
     instructions: "Réponds sans outil et sans modifier le système.",

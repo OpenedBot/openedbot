@@ -8,11 +8,11 @@ import { cn } from "@openedbot/browser-ui-kit";
  */
 
 export const insetGroupedRowClassName =
-  "ohb-press relative flex min-h-12 w-full items-center gap-3 px-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
+  "openedbot-press relative flex min-h-12 w-full items-center gap-3 px-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
 
 /** Le chevron « ‹ » de la barre de nav iOS : bleu système, pas une pastille ghost. */
 export const insetBackClassName =
-  "relative flex size-11 shrink-0 items-center justify-center text-[var(--ohb-grouped-back)] outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "relative flex size-11 shrink-0 items-center justify-center text-[var(--openedbot-grouped-back)] outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 type InsetIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
@@ -37,13 +37,13 @@ export function InsetGroupedSection({
   return (
     <section data-inset-grouped="" className={cn("px-4 pt-4", className)}>
       {caption ? (
-        <h2 className="px-4 pb-2 text-[13px] leading-4 font-normal text-[var(--ohb-grouped-caption)]">
+        <h2 className="px-4 pb-2 text-[13px] leading-4 font-normal text-[var(--openedbot-grouped-caption)]">
           {caption}
         </h2>
       ) : null}
-      <ul className="overflow-hidden rounded-[20px] bg-[var(--ohb-grouped-card)]">{children}</ul>
+      <ul className="overflow-hidden rounded-[20px] bg-[var(--openedbot-grouped-card)]">{children}</ul>
       {footer ? (
-        <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">{footer}</p>
+        <p className="px-4 pt-2 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">{footer}</p>
       ) : null}
     </section>
   );
@@ -72,7 +72,7 @@ export function InsetGroupedRowInner({
    */
   wrap?: boolean;
 }) {
-  const tone = disabled ? "text-[var(--ohb-grouped-caption)]" : "text-[var(--ohb-grouped-label)]";
+  const tone = disabled ? "text-[var(--openedbot-grouped-caption)]" : "text-[var(--openedbot-grouped-label)]";
   return (
     <>
       {Icon ? (
@@ -81,27 +81,27 @@ export function InsetGroupedRowInner({
       <span className="min-w-0 flex-1 py-3">
         <span className={cn("block truncate text-[17px] leading-[22px]", tone)}>{label}</span>
         {subtitle ? (
-          <span className="mt-0.5 block truncate text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 block truncate text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {subtitle}
           </span>
         ) : null}
         {wrap && value ? (
-          <span className="mt-0.5 block whitespace-normal break-words text-[15px] leading-5 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 block whitespace-normal break-words text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]">
             {value}
           </span>
         ) : null}
       </span>
       {!wrap && value ? (
-        <span className="max-w-[42%] shrink-0 truncate text-right text-[17px] leading-[22px] text-[var(--ohb-grouped-caption)]">
+        <span className="max-w-[42%] shrink-0 truncate text-right text-[17px] leading-[22px] text-[var(--openedbot-grouped-caption)]">
           {value}
         </span>
       ) : null}
       {selected ? (
-        <IconCheck aria-hidden className="size-5 shrink-0 text-[var(--ohb-grouped-back)]" stroke={2} />
+        <IconCheck aria-hidden className="size-5 shrink-0 text-[var(--openedbot-grouped-back)]" stroke={2} />
       ) : chevron && !disabled ? (
         <IconChevronRight
           aria-hidden
-          className="size-5 shrink-0 text-[var(--ohb-grouped-chevron)]"
+          className="size-5 shrink-0 text-[var(--openedbot-grouped-chevron)]"
         />
       ) : null}
     </>
@@ -203,7 +203,7 @@ export function InsetCloseButton({
       onClick={onClick}
       data-inset-close=""
       className={cn(
-        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--ohb-grouped-close)] text-[var(--ohb-grouped-label)] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--openedbot-grouped-close)] text-[var(--openedbot-grouped-label)] outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >
@@ -228,7 +228,7 @@ export function MobileActionFooter({
     <footer
       data-mobile-action-footer=""
       className={cn(
-        "shrink-0 bg-[var(--ohb-grouped-canvas)] px-4 pt-2 pb-[max(0.75rem,var(--ohb-safe-bottom))]",
+        "shrink-0 bg-[var(--openedbot-grouped-canvas)] px-4 pt-2 pb-[max(0.75rem,var(--openedbot-safe-bottom))]",
         className,
       )}
     >
@@ -304,7 +304,7 @@ export function MobileSegmented<T extends string>({
       role="tablist"
       aria-label={label}
       data-mobile-segmented=""
-      className={cn("grid rounded-[9px] bg-[var(--ohb-grouped-close)] p-0.5", className)}
+      className={cn("grid rounded-[9px] bg-[var(--openedbot-grouped-close)] p-0.5", className)}
       style={{ gridTemplateColumns: `repeat(${segments.length}, minmax(0, 1fr))` }}
     >
       {segments.map((segment) => {
@@ -318,10 +318,10 @@ export function MobileSegmented<T extends string>({
             aria-selected={selected}
             aria-controls={controls}
             className={cn(
-              "ohb-press relative min-h-11 truncate rounded-[7px] px-2 text-[13px] leading-4 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+              "openedbot-press relative min-h-11 truncate rounded-[7px] px-2 text-[13px] leading-4 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
               selected
-                ? "bg-[var(--ohb-grouped-card)] text-[var(--ohb-grouped-label)]"
-                : "text-[var(--ohb-grouped-caption)]",
+                ? "bg-[var(--openedbot-grouped-card)] text-[var(--openedbot-grouped-label)]"
+                : "text-[var(--openedbot-grouped-caption)]",
             )}
             onClick={() => onChange(segment.id)}
           >

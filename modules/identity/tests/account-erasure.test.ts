@@ -35,7 +35,7 @@ describe("effacement du compte après la purge", () => {
     expect(fn).toContain("delete from public.sessions where user_id = p_user_id");
     // Les adhésions révoquées et l'historique des autres tenants restent.
     expect(fn).not.toMatch(/delete from public\.memberships/);
-    expect(migration).toMatch(/grant execute on function public\.erase_account_user\(uuid\) to ohb_worker;/);
+    expect(migration).toMatch(/grant execute on function public\.erase_account_user\(uuid\) to openedbot_worker;/);
     expect(migration).not.toMatch(/grant [^;]* on (table )?(users|sessions)\b/);
   });
 });

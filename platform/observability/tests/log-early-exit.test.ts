@@ -9,7 +9,7 @@ describe("a process that exits right after opening the log files", () => {
   test("exits cleanly, its line already on disk", async () => {
     // Before: the file was opened asynchronously, and pino's exit flush threw
     // « sonic boom is not ready yet » (exit 1 for a test that meant to skip).
-    const dir = mkdtempSync(join(tmpdir(), "ohb-log-exit-"));
+    const dir = mkdtempSync(join(tmpdir(), "openedbot-log-exit-"));
     try {
       const script = `
         import pino from "pino";

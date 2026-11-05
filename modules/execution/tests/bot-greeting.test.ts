@@ -32,12 +32,12 @@ describe("bot greeting input", () => {
 });
 
 describe("greetingRunsOnDefaultProfile", () => {
-  const thread = "ohb:org:thread";
+  const thread = "openedbot:org:thread";
   const base = { origin: "bot_greeting", threadSessionId: thread, executionSessionKey: null };
 
   test("a new greeting waits for the bot's profile and runs on it", () => {
     expect(greetingRunsOnDefaultProfile(base)).toBe(false);
-    expect(greetingRunsOnDefaultProfile({ ...base, executionSessionKey: "ohb:org:thread:g1" })).toBe(false);
+    expect(greetingRunsOnDefaultProfile({ ...base, executionSessionKey: "openedbot:org:thread:g1" })).toBe(false);
   });
 
   test("a greeting pinned to its own session by an earlier version stays on the default profile", () => {

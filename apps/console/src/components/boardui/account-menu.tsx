@@ -319,7 +319,7 @@ export const AccountMenu = memo(function AccountMenu({
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
         <DrawerContent
           aria-label={t("boardui.accountMenu", { name })}
-          className="border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--ohb-safe-bottom))] text-text-primary"
+          className="border-0 bg-background-primary-default px-3 pb-[max(0.75rem,var(--openedbot-safe-bottom))] text-text-primary"
           style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
         >
           <DrawerTitle className="sr-only">{t("boardui.accountMenu", { name })}</DrawerTitle>

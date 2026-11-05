@@ -156,7 +156,7 @@ create table group_member_read_positions (
 -- ligatures : le repli est indépendant de la locale et des extensions : NFKD
 -- pour les diacritiques latins, remplacements explicites pour ce que NFKD ne
 -- décompose pas, translation ASCII fixe pour la casse.
-create or replace function public.ohb_global_search_normalize(input text)
+create or replace function public.openedbot_global_search_normalize(input text)
 returns text
 language sql
 immutable
@@ -195,14 +195,14 @@ $$;
 -- la route. C'est une allow-list : texte et noms publics de pièces jointes
 -- uniquement : un nouveau type de part persisté ne peut jamais rendre les
 -- arguments de reasoning/outils cherchables par accident.
-create or replace function public.ohb_visible_message_search_text(content jsonb)
+create or replace function public.openedbot_visible_message_search_text(content jsonb)
 returns text
 language sql
 immutable
 parallel safe
 set search_path = pg_catalog, public
 as $$
-  select public.ohb_global_search_normalize(coalesce(string_agg(
+  select public.openedbot_global_search_normalize(coalesce(string_agg(
     case
       when part.value->>'type' = 'text' then coalesce(part.value->>'text', '')
       when part.value->>'type' = 'attachment' then coalesce(part.value->>'name', '')
@@ -217,14 +217,14 @@ $$;
 
 create index messages_global_search_idx
   on messages using gin (
-    to_tsvector('simple'::regconfig, public.ohb_visible_message_search_text(content))
+    to_tsvector('simple'::regconfig, public.openedbot_visible_message_search_text(content))
   );
 
 create index threads_global_search_idx
   on threads using gin (
     to_tsvector(
       'simple'::regconfig,
-      public.ohb_global_search_normalize(coalesce(title, ''))
+      public.openedbot_global_search_normalize(coalesce(title, ''))
     )
   );
 
@@ -239,42 +239,42 @@ alter table message_reactions force row level security;
 alter table group_member_read_positions enable row level security;
 alter table group_member_read_positions force row level security;
 
-create policy messages_tenant on messages to ohb_api
+create policy messages_tenant on messages to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy messages_worker on messages to ohb_worker using (true) with check (true);
+create policy messages_worker on messages to openedbot_worker using (true) with check (true);
 
-create policy thread_message_counters_tenant on thread_message_counters to ohb_api
+create policy thread_message_counters_tenant on thread_message_counters to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy thread_message_counters_worker on thread_message_counters to ohb_worker
+create policy thread_message_counters_worker on thread_message_counters to openedbot_worker
   using (true) with check (true);
 
-create policy attachments_tenant on attachments to ohb_api
+create policy attachments_tenant on attachments to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy attachments_worker on attachments to ohb_worker using (true) with check (true);
+create policy attachments_worker on attachments to openedbot_worker using (true) with check (true);
 
-create policy message_reactions_tenant on message_reactions to ohb_api
+create policy message_reactions_tenant on message_reactions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy message_reactions_worker on message_reactions to ohb_worker
+create policy message_reactions_worker on message_reactions to openedbot_worker
   using (true) with check (true);
 
-create policy group_member_read_positions_tenant on group_member_read_positions to ohb_api
+create policy group_member_read_positions_tenant on group_member_read_positions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy group_member_read_positions_worker on group_member_read_positions to ohb_worker
+create policy group_member_read_positions_worker on group_member_read_positions to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on messages, attachments to ohb_api;
-grant select, insert, update, delete on messages, attachments to ohb_worker;
-grant select, insert, update, delete on thread_message_counters to ohb_api;
-grant select, insert, update, delete on thread_message_counters to ohb_worker;
-grant select, insert, update, delete on message_reactions to ohb_api;
-grant select, insert, update, delete on message_reactions to ohb_worker;
-grant select, insert, update, delete on group_member_read_positions to ohb_api;
-grant select, insert, update, delete on group_member_read_positions to ohb_worker;
+grant select, insert, update, delete on messages, attachments to openedbot_api;
+grant select, insert, update, delete on messages, attachments to openedbot_worker;
+grant select, insert, update, delete on thread_message_counters to openedbot_api;
+grant select, insert, update, delete on thread_message_counters to openedbot_worker;
+grant select, insert, update, delete on message_reactions to openedbot_api;
+grant select, insert, update, delete on message_reactions to openedbot_worker;
+grant select, insert, update, delete on group_member_read_positions to openedbot_api;
+grant select, insert, update, delete on group_member_read_positions to openedbot_worker;
 
 insert into schema_migrations(version) values ('0006_messaging_search')
 on conflict (version) do nothing;

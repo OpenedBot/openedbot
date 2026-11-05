@@ -6,7 +6,7 @@ import { effectiveAdminMode } from "@openedbot/runtimes/application/runtime-mode
 import type { ApiConfig } from "../src/infrastructure/config";
 
 /**
- * OHB-15. La frontière produit est « on n'administre pas le Hermes du client ».
+ * La frontière produit est « on n'administre pas le Hermes du client ».
  * Elle était tenue par une variable d'environnement au-dessus de 794 lignes de
  * code privilégié : une session SSH depuis l'hôte API vers la machine de chaque
  * client. Ces tests la tiennent par le code.
@@ -44,7 +44,7 @@ function sourceFiles(root: string): string[] {
 
 const allSources = sourceRoots.flatMap(sourceFiles);
 
-describe("OHB-15 : aucun canal shell vers un hôte client", () => {
+describe("Aucun canal shell vers un hôte client", () => {
   test("aucune source n'ouvre de session SSH", () => {
     const offenders = allSources.filter((path) => {
       if (path.endsWith("runtime-admin-ssh-removal.test.ts")) return false;
@@ -68,16 +68,16 @@ describe("OHB-15 : aucun canal shell vers un hôte client", () => {
     )).toThrow();
   });
 
-  test("aucune source ne parle encore d'une clé d'administration OHB", () => {
+  test("aucune source ne parle encore d'une clé d'administration openedbot", () => {
     const offenders = allSources.filter((path) => {
       if (path.endsWith("runtime-admin-ssh-removal.test.ts")) return false;
-      return readFileSync(path, "utf8").includes("ohb_admin");
+      return readFileSync(path, "utf8").includes("openedbot_admin");
     });
     expect(offenders).toEqual([]);
   });
 });
 
-describe("OHB-15 : la configuration n'ouvre aucun canal SSH", () => {
+describe("La configuration n'ouvre aucun canal SSH", () => {
   const base = {
     OPENEDBOT_ENV: "development",
     RUNTIME_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
@@ -85,19 +85,15 @@ describe("OHB-15 : la configuration n'ouvre aucun canal SSH", () => {
     METRICS_INTERNAL_TOKEN: "metrics-secret",
   };
 
-  // La variable qui réglait l'administration est retirée : `ssh`, `local`
-  // ou toute autre valeur est ignorée et aucun canal ne s'ouvre.
-  test("l'ancienne variable d'administration est ignorée, `ssh` compris", () => {
+  test("aucun canal d'administration ne s'ouvre, quel que soit l'environnement", () => {
     for (const environment of ["development", "test"]) {
-      for (const value of ["ssh", "local"]) {
-        const config = readApiConfig({ ...base, OPENEDBOT_ENV: environment, OHB_RUNTIME_ADMIN_MODE: value }); // rename:keep
-        expect(config.runtimeAdminChannels.local).toBe(false);
-      }
+      const config = readApiConfig({ ...base, OPENEDBOT_ENV: environment });
+      expect(config.runtimeAdminChannels.local).toBe(false);
     }
   });
 });
 
-describe("OHB-15 : un runtime externe n'a plus de canal d'administration", () => {
+describe("Un runtime externe n'a plus de canal d'administration", () => {
   const config = { runtimeAdminChannels: { local: true } } as unknown as ApiConfig;
 
   test("le mode externe retombe sur disabled", () => {
@@ -106,7 +102,7 @@ describe("OHB-15 : un runtime externe n'a plus de canal d'administration", () =>
 
 });
 
-describe("OHB-15 : la cible SSH quitte le schéma", () => {
+describe("La cible SSH quitte le schéma", () => {
   test("la migration retire les trois colonnes et s'enregistre", () => {
     const sql = readFileSync(
       new URL("../../../db/migrations/0022_drop_runtime_ssh.sql", import.meta.url),

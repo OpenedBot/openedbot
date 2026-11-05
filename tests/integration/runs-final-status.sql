@@ -2,7 +2,7 @@
 --
 -- Piege du fichier appelant : pas d apostrophe isolee dans les commentaires.
 --
--- Ce qui est prouve ici, sous le role ohb_worker qui porte la plupart des
+-- Ce qui est prouve ici, sous le role openedbot_worker qui porte la plupart des
 -- ecritures de runs :
 --   1. completed_reopen : un run completed ne repasse pas en file ;
 --   2. failed_cancel    : un run failed ne devient pas cancelled ;
@@ -38,9 +38,9 @@ create temp table runs_final_status_proof (
   failed_cancel text default 'allowed'
 );
 insert into runs_final_status_proof default values;
-grant select, update on runs_final_status_proof to ohb_worker;
+grant select, update on runs_final_status_proof to openedbot_worker;
 
-set role ohb_worker;
+set role openedbot_worker;
 do $proof$
 begin
   update runs set status = 'queued' where id = '81000000-0000-4000-8000-000000000041';

@@ -12,10 +12,10 @@ import type { RuntimeRow } from "../src/routes/runtimes/runtime-routes";
 import { EXPOSURE_CHECK_CACHE_MS, reachabilityVerdict, runtimeExposureRoutes } from "../src/routes/runtimes/runtime-exposure-routes";
 
 const key = secretEncryptionKey(new Uint8Array(32).fill(9));
-const managed = { accountId: "ohb-acct", apiToken: "ohb-".padEnd(40, "k"), zoneId: "ohb-zone", hostSuffix: "rt.openedbot.app" };
+const managed = { accountId: "openedbot-acct", apiToken: "openedbot-".padEnd(40, "k"), zoneId: "openedbot-zone", hostSuffix: "rt.openedbot.app" };
 const baseConfig = { tokenEncryption: { current: key, previous: [] }, hermesEndpointPolicy: { environment: "test" }, hermesMtls: null, billingEnforced: false, environment: "test", publicUrl: "https://api.example.com", linkPublicUrl: undefined, linkLegacyPublicUrls: [], connectorVersions: {}, managedTunnel: null, tailscaleFunnelEnabled: false } as unknown as ApiConfig;
 const auth = { organizationId: "org-1", role: "owner", userId: "user-1" } as AuthContext;
-const OAUTH = { oauthClientId: "ohb-client-id", oauthClientSecret: "ohb-".padEnd(40, "s") };
+const OAUTH = { oauthClientId: "openedbot-client-id", oauthClientSecret: "openedbot-".padEnd(40, "s") };
 /** Le déploiement qui a ouvert Funnel ; fermé, la voie répond 404. */
 const funnelOpen = { tailscaleFunnelEnabled: true } as Partial<ApiConfig>;
 
@@ -153,28 +153,28 @@ function mount(options: { config?: Partial<ApiConfig>; role?: AuthContext["role"
 }
 const body = (value: unknown, method = "POST") => ({ method, headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
 
-describe("OHB-75 runtime exposure routes", () => {
-  test("managed tunnel: hidden without OHB credentials, published under the managed suffix, taken names refused", async () => {
+describe("runtime exposure routes", () => {
+  test("managed tunnel: hidden without openedbot credentials, published under the managed suffix, taken names refused", async () => {
     const hidden = await mount().app.request("/", body({ kind: "managed_cloudflare", slug: "mon-vps" }));
     expect(hidden.status).toBe(404);
     const { app, cloudflare } = mount({ config: { managedTunnel: managed } as Partial<ApiConfig> });
     const response = await app.request("/", body({ kind: "managed_cloudflare", slug: "Mon-VPS" }));
     expect(response.status).toBe(201);
     expect((await response.json()).exposure.hostname).toBe("mon-vps.rt.openedbot.app");
-    expect(cloudflare.log).toContain("tunnel:ohb-managed-mon-vps");
+    expect(cloudflare.log).toContain("tunnel:openedbot-managed-mon-vps");
     cloudflare.dns.add("taken.rt.openedbot.app");
     const taken = await app.request("/", body({ kind: "managed_cloudflare", slug: "taken" }));
     expect(taken.status).toBe(409);
     expect((await app.request("/", body({ kind: "managed_cloudflare", slug: "a" }))).status).toBe(400);
   });
 
-  test("managed tunnel sans nom : OHB tire ohb-<hex> et évite un sous-domaine déjà publié", async () => {
+  test("managed tunnel sans nom : openedbot tire openedbot-<hex> et évite un sous-domaine déjà publié", async () => {
     const { app, cloudflare } = mount({ config: { managedTunnel: managed } as Partial<ApiConfig> });
     const response = await app.request("/", body({ kind: "managed_cloudflare" }));
     expect(response.status).toBe(201);
     const hostname = (await response.json()).exposure.hostname as string;
-    expect(hostname).toMatch(/^ohb-[0-9a-f]{8}\.rt\.openedbot\.app$/);
-    expect(cloudflare.log).toContain(`tunnel:ohb-managed-${hostname.split(".")[0]}`);
+    expect(hostname).toMatch(/^openedbot-[0-9a-f]{8}\.rt\.openedbot\.app$/);
+    expect(cloudflare.log).toContain(`tunnel:openedbot-managed-${hostname.split(".")[0]}`);
 
     // Chaque tirage est relu contre le DNS ; une zone saturée finit en 503 plutôt qu'en écrasement.
     const full = mount({ config: { managedTunnel: managed } as Partial<ApiConfig> });
@@ -194,12 +194,12 @@ describe("OHB-75 runtime exposure routes", () => {
     expect(response.status).toBe(201);
     const dto = await response.json() as { exposure: Record<string, unknown>; installCommand: string };
     expect(dto.exposure).toMatchObject({ kind: "tailscale_funnel", status: "awaiting_install", hostname: "mon-vps.tail1234.ts.net", edgeAuthProvisioned: false });
-    expect(dto.installCommand).toContain("--advertise-tags tag:ohb-hermes");
+    expect(dto.installCommand).toContain("--advertise-tags tag:openedbot-hermes");
     expect(dto.installCommand).toContain("tailscale funnel --bg 8642");
-    expect(tailscale.log).toEqual(["read:ohb-client-id", "write:etag-1", "key:tag:ohb-hermes"]);
-    expect(tailscale.policy()).toMatchObject({ tagOwners: { "tag:ohb-hermes": ["autogroup:admin"] }, nodeAttrs: [{ target: ["tag:ohb-hermes"], attr: ["funnel"] }] });
+    expect(tailscale.log).toEqual(["read:openedbot-client-id", "write:etag-1", "key:tag:openedbot-hermes"]);
+    expect(tailscale.policy()).toMatchObject({ tagOwners: { "tag:openedbot-hermes": ["autogroup:admin"] }, nodeAttrs: [{ target: ["tag:openedbot-hermes"], attr: ["funnel"] }] });
     // Ni le client OAuth ni la clé d'appairage ne sont écrits en clair.
-    expect(JSON.stringify(dto.exposure)).not.toMatch(/tskey-|ohb-client-id|ciphertext/);
+    expect(JSON.stringify(dto.exposure)).not.toMatch(/tskey-|openedbot-client-id|ciphertext/);
     expect(JSON.stringify(exposures[0])).not.toContain("tskey-auth-");
     expect(exposures[0]!.tailscaleAuthKeyId).toBe("key-1");
     expect(cloudflare.log).toEqual([]);
@@ -282,7 +282,7 @@ describe("OHB-75 runtime exposure routes", () => {
     expect(exposures.find((row) => row.id === second)!.edgeAuthCiphertext).not.toBeNull();
   });
 
-  test("revoke: le tunnel géré part avec le token d’OHB, Funnel attend le client OAuth du tailnet", async () => {
+  test("revoke: le tunnel géré part avec le token d’openedbot, Funnel attend le client OAuth du tailnet", async () => {
     const managedSite = mount({ config: { managedTunnel: managed } as Partial<ApiConfig> });
     const managedId = (await (await managedSite.app.request("/", body({ kind: "managed_cloudflare", slug: "mon-vps" }))).json()).exposure.id as string;
     const removed = await managedSite.app.request(`/${managedId}`, { method: "DELETE" });

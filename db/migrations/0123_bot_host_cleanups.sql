@@ -28,12 +28,12 @@ create index bot_host_cleanup_claim_idx on bot_host_cleanups (next_attempt_at, i
   where status in ('queued','running');
 alter table bot_host_cleanups enable row level security;
 alter table bot_host_cleanups force row level security;
-create policy bot_host_cleanups_tenant on bot_host_cleanups to ohb_api
+create policy bot_host_cleanups_tenant on bot_host_cleanups to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_host_cleanups_worker on bot_host_cleanups to ohb_worker using (true) with check (true);
-grant select, insert, update on bot_host_cleanups to ohb_api;
-grant select, insert, update on bot_host_cleanups to ohb_worker;
+create policy bot_host_cleanups_worker on bot_host_cleanups to openedbot_worker using (true) with check (true);
+grant select, insert, update on bot_host_cleanups to openedbot_api;
+grant select, insert, update on bot_host_cleanups to openedbot_worker;
 comment on table bot_host_cleanups is 'Durable cleanup of bot sessions and owned profiles on client runtimes.';
 insert into schema_migrations(version) values ('0123_bot_host_cleanups') on conflict (version) do nothing;
 commit;

@@ -40,7 +40,7 @@ export function botGreetingInput(input: {
 }
 
 /**
- * DEV-OHB-244 faisait partir l'accueil sur le profil par défaut, dans sa
+ * L'accueil partait autrefois sur le profil par défaut, dans sa
  * propre session, tant que le profil du bot se clonait. L'accueil attend
  * désormais ce profil comme tout autre run (queue.ts) ; reste le cas d'un
  * accueil déjà collé à cette session (`execution_session_key`) par une version

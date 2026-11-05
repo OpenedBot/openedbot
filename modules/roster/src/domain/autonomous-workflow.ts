@@ -232,5 +232,5 @@ export const delegationRefusalMessage = (reason: DelegationRefusal): string => {
 
 /** Stable per workflow+bot session shared by delegated runs and their continuations. */
 export function workflowSessionKey(organizationId: string, workflowId: string, botId: string): string {
-  return `ohb:${organizationId}:workflow:${workflowId}:bot:${botId}`;
+  return `openedbot:${organizationId}:workflow:${workflowId}:bot:${botId}`;
 }

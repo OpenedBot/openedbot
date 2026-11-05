@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-4 (DEV-OHB-254): "Always for this tool on this bot", and the
+-- PERM2-4: "Always for this tool on this bot", and the
 -- runtime switch "dangerous commands: always allow" (decisions D-3, D-4).
 --
 -- `bot_permission_grants`: one active grant per (bot, tool_key) at most, no
@@ -117,13 +117,13 @@ execute function bot_permission_grants_revision();
 
 alter table bot_permission_grants enable row level security;
 alter table bot_permission_grants force row level security;
-create policy bot_permission_grants_tenant on bot_permission_grants to ohb_api
+create policy bot_permission_grants_tenant on bot_permission_grants to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_permission_grants_worker on bot_permission_grants for select to ohb_worker
+create policy bot_permission_grants_worker on bot_permission_grants for select to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert, update on bot_permission_grants to ohb_api;
-grant select on bot_permission_grants to ohb_worker;
+grant select, insert, update on bot_permission_grants to openedbot_api;
+grant select on bot_permission_grants to openedbot_worker;
 comment on table bot_permission_grants is
   'PERM2-4: "Always for this tool on this bot". No expiry; active -> revoked only (trigger); one active row per (bot, tool_key). Read by the worker under its run''s organization.';
 
@@ -168,13 +168,13 @@ execute function runtime_permission_settings_revision();
 
 alter table runtime_permission_settings enable row level security;
 alter table runtime_permission_settings force row level security;
-create policy runtime_permission_settings_tenant on runtime_permission_settings to ohb_api
+create policy runtime_permission_settings_tenant on runtime_permission_settings to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_permission_settings_worker on runtime_permission_settings for select to ohb_worker
+create policy runtime_permission_settings_worker on runtime_permission_settings for select to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert, update on runtime_permission_settings to ohb_api;
-grant select on runtime_permission_settings to ohb_worker;
+grant select, insert, update on runtime_permission_settings to openedbot_api;
+grant select on runtime_permission_settings to openedbot_worker;
 comment on table runtime_permission_settings is
   'PERM2-4 (D-3): per runtime, the switch that answers dangerous-command gates once for every bot of the runtime. Read by the worker under its run''s organization.';
 

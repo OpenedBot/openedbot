@@ -8,7 +8,7 @@ begin;
 -- lequel s'est arrêté en route. Aucun changement de schéma ici, seulement la
 -- colonne qui sort de la fonction de lecture cross-tenant.
 --
--- Aucun grant supplémentaire : `users` n'est pas sous RLS et `ohb_api` porte
+-- Aucun grant supplémentaire : `users` n'est pas sous RLS et `openedbot_api` porte
 -- déjà un grant table entier (0001), exactement le raisonnement de 0025 et de
 -- 0075.
 --
@@ -138,7 +138,7 @@ comment on function staff_search_users(text, text, int, timestamptz, text, uuid)
   'Page de comptes pour le backoffice staff : recherche e-mail / nom échappée, filtre d''assistance, borne plafonnée à 200 et curseur keyset (created_at, lower(email), id). Rend le total du filtre, le reste à partir du curseur, la dernière connexion du compte (null quand aucune n''a été vue depuis 0075) et l''état de son accueil (users.onboarding_completed, 0025) ; ne remplace jamais une borne par un offset.';
 
 revoke all on function staff_search_users(text, text, int, timestamptz, text, uuid) from public;
-grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to ohb_api;
+grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to openedbot_api;
 
 insert into schema_migrations(version) values ('0077_staff_user_onboarding_in_list')
 on conflict (version) do nothing;

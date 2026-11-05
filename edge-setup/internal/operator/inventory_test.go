@@ -1147,7 +1147,7 @@ func TestProfileToolsetDisableFallsBackToSuppression(t *testing.T) {
 				return []byte(`{"platform":"api_server","settable":["x_search","web"]}`), nil
 			case "profile-toolset-suppress":
 				suppressed = true
-				return []byte(`{"profile":"ohb-reviewer","toolset":"x_search","suppressed":true}`), nil
+				return []byte(`{"profile":"openedbot-reviewer","toolset":"x_search","suppressed":true}`), nil
 			}
 			return []byte(`{"error":{"code":"HOST_FAILED","message":"no reply"}}`), nil
 		},
@@ -1159,7 +1159,7 @@ func TestProfileToolsetDisableFallsBackToSuppression(t *testing.T) {
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
-	status, out := call(t, srv, "POST", "/profiles/ohb-reviewer/toolsets/x_search", `{"enabled":false}`)
+	status, out := call(t, srv, "POST", "/profiles/openedbot-reviewer/toolsets/x_search", `{"enabled":false}`)
 	if status != 200 || out["enabled"] != false || out["applied"] != true {
 		t.Fatalf("suppressed disable %d %v", status, out)
 	}
@@ -1168,7 +1168,7 @@ func TestProfileToolsetDisableFallsBackToSuppression(t *testing.T) {
 	}
 
 	verbs = nil
-	status, out = call(t, srv, "POST", "/profiles/ohb-reviewer/toolsets/web", `{"enabled":false}`)
+	status, out = call(t, srv, "POST", "/profiles/openedbot-reviewer/toolsets/web", `{"enabled":false}`)
 	if status != 200 || out["applied"] != true || slices.Contains(verbs, "profile-toolset-suppress") {
 		t.Fatalf("plain disable %d %v %v", status, out, verbs)
 	}

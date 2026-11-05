@@ -4,7 +4,7 @@ import { sharedFileBlobRoot } from "../src/config";
 
 describe("sharedFileBlobRoot", () => {
   test("un chemin absolu reste le magasin commun", () => {
-    expect(sharedFileBlobRoot("/var/ohb/blobs", "/srv/apps/worker")).toBe("/var/ohb/blobs");
+    expect(sharedFileBlobRoot("/var/openedbot/blobs", "/srv/apps/worker")).toBe("/var/openedbot/blobs");
   });
 
   test("depuis apps/worker, un chemin relatif vise le magasin de l'API", () => {

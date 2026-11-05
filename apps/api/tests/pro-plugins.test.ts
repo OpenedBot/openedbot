@@ -259,7 +259,7 @@ describe("plug-in context", () => {
     expect(JSON.stringify(Object.keys((received as { config: object }).config))).not.toContain("STRIPE");
   });
 
-  const appRole: DbRoleFacts = { role: "ohb_api", superuser: false, bypassRls: false, ownsTables: false };
+  const appRole: DbRoleFacts = { role: "openedbot_api", superuser: false, bypassRls: false, ownsTables: false };
   type Row = Omit<DbRoleFacts, "memberOf"> & { current?: boolean };
   /** Rows as the catalog query returns them: the pool's role flagged `current`, then its granted roles. */
   const fakeDb = (rows: Row[] | Error) => (async () => {
@@ -270,19 +270,19 @@ describe("plug-in context", () => {
   test("the database handle must stay under row-level security: superuser, BYPASSRLS and table owners are refused", () => {
     expect(tenantRoleProblem(appRole)).toBeNull();
     expect(tenantRoleProblem({ ...appRole, role: "postgres", superuser: true })).toBe("role postgres is a superuser");
-    expect(tenantRoleProblem({ ...appRole, bypassRls: true })).toBe("role ohb_api has BYPASSRLS");
-    expect(tenantRoleProblem({ ...appRole, role: "ohb_migrator", ownsTables: true })).toBe("role ohb_migrator owns tables");
+    expect(tenantRoleProblem({ ...appRole, bypassRls: true })).toBe("role openedbot_api has BYPASSRLS");
+    expect(tenantRoleProblem({ ...appRole, role: "openedbot_migrator", ownsTables: true })).toBe("role openedbot_migrator owns tables");
   });
 
   test("an inherited membership counts: a granted owner, superuser or BYPASSRLS role is refused", () => {
     const granted = (role: string, attributes: Partial<DbRoleFacts>) => ({ ...appRole, role, ...attributes });
-    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("ohb_readers", {})] })).toBeNull();
-    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("ohb_readers", {}), granted("ohb_migrator", { ownsTables: true })] }))
-      .toBe("role ohb_api is a member of ohb_migrator, which owns tables");
+    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("openedbot_readers", {})] })).toBeNull();
+    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("openedbot_readers", {}), granted("openedbot_migrator", { ownsTables: true })] }))
+      .toBe("role openedbot_api is a member of openedbot_migrator, which owns tables");
     expect(tenantRoleProblem({ ...appRole, memberOf: [granted("postgres", { superuser: true })] }))
-      .toBe("role ohb_api is a member of postgres, which is a superuser");
-    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("ohb_ops", { bypassRls: true })] }))
-      .toBe("role ohb_api is a member of ohb_ops, which has BYPASSRLS");
+      .toBe("role openedbot_api is a member of postgres, which is a superuser");
+    expect(tenantRoleProblem({ ...appRole, memberOf: [granted("openedbot_ops", { bypassRls: true })] }))
+      .toBe("role openedbot_api is a member of openedbot_ops, which has BYPASSRLS");
   });
 
   test("readDbRoleFacts follows pg_auth_members and splits the pool's role from the granted ones", async () => {
@@ -291,29 +291,29 @@ describe("plug-in context", () => {
     const db = (async (strings: TemplateStringsArray) => {
       query = strings.join(" ");
       return [
-        { role: "ohb_api", superuser: false, bypassRls: false, ownsTables: false, current: true },
-        { role: "ohb_migrator", superuser: false, bypassRls: false, ownsTables: true, current: false },
+        { role: "openedbot_api", superuser: false, bypassRls: false, ownsTables: false, current: true },
+        { role: "openedbot_migrator", superuser: false, bypassRls: false, ownsTables: true, current: false },
       ];
     }) as unknown as Db;
     const facts = await readDbRoleFacts(db);
-    expect(facts).toEqual({ ...appRole, memberOf: [{ ...appRole, role: "ohb_migrator", ownsTables: true }] });
+    expect(facts).toEqual({ ...appRole, memberOf: [{ ...appRole, role: "openedbot_migrator", ownsTables: true }] });
     expect(query).toContain("with recursive");
     expect(query).toContain("pg_auth_members");
     expect(query).not.toMatch(/\b(insert|update|delete|create|alter|drop|grant|revoke|set role)\b/i);
-    expect(tenantRoleProblem(facts)).toBe("role ohb_api is a member of ohb_migrator, which owns tables");
+    expect(tenantRoleProblem(facts)).toBe("role openedbot_api is a member of openedbot_migrator, which owns tables");
   });
 
   test("guardProPlugins keeps the plug-ins under the app role, and drops them all otherwise", async () => {
     const plugins = [fixturePlugin()];
     const refused: string[] = [];
     expect(await guardProPlugins(plugins, fakeDb([appRole]), (reason) => refused.push(reason))).toBe(plugins);
-    expect(await guardProPlugins(plugins, fakeDb([{ ...appRole, role: "ohb_migrator", ownsTables: true }]), (reason) => refused.push(reason))).toEqual([]);
-    expect(await guardProPlugins(plugins, fakeDb([appRole, { ...appRole, role: "ohb_migrator", ownsTables: true }]), (reason) => refused.push(reason))).toEqual([]);
+    expect(await guardProPlugins(plugins, fakeDb([{ ...appRole, role: "openedbot_migrator", ownsTables: true }]), (reason) => refused.push(reason))).toEqual([]);
+    expect(await guardProPlugins(plugins, fakeDb([appRole, { ...appRole, role: "openedbot_migrator", ownsTables: true }]), (reason) => refused.push(reason))).toEqual([]);
     expect(await guardProPlugins(plugins, fakeDb(new Error("connection refused")), (reason) => refused.push(reason))).toEqual([]);
     expect(await guardProPlugins(plugins, fakeDb([]), (reason) => refused.push(reason))).toEqual([]);
     expect(refused).toEqual([
-      "role ohb_migrator owns tables",
-      "role ohb_api is a member of ohb_migrator, which owns tables",
+      "role openedbot_migrator owns tables",
+      "role openedbot_api is a member of openedbot_migrator, which owns tables",
       "role check failed: connection refused",
       "role check failed: current_user has no pg_roles row",
     ]);

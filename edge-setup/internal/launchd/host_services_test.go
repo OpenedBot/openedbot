@@ -36,7 +36,7 @@ func newHostServiceClient(t *testing.T, home string, kind Kind, instance layout.
 		NodeBin:              filepath.Join(root, "node", "v22", "bin"),
 	})
 	if err != nil {
-		t.Fatal("could not construct temporary OHB host service")
+		t.Fatal("could not construct temporary openedbot host service")
 	}
 	return client
 }
@@ -97,7 +97,7 @@ func programArguments(t *testing.T, plist []byte) []string {
 	}
 }
 
-func TestGatewayAndOperatorUseDistinctOHBLabelsAndPinnedRuntimeArguments(t *testing.T) {
+func TestGatewayAndOperatorUseDistinctOpenedbotLabelsAndPinnedRuntimeArguments(t *testing.T) {
 	home := t.TempDir()
 	root := filepath.Join(home, "Library", "Application Support", "OpenHermesBot", "edge-setup", "runtime")
 	python := filepath.Join(root, "releases", "fixture", "hermes-agent", "venv", "bin", "python")
@@ -116,7 +116,7 @@ func TestGatewayAndOperatorUseDistinctOHBLabelsAndPinnedRuntimeArguments(t *test
 		t.Run(string(tc.kind), func(t *testing.T) {
 			client := newHostServiceClient(t, home, tc.kind, layout.DefaultConnectorInstance)
 			if client.Label() != tc.label || client.Label() == "ai.hermes.gateway" {
-				t.Fatal("OHB host service label is not distinct from the personal Hermes gateway")
+				t.Fatal("openedbot host service label is not distinct from the personal Hermes gateway")
 			}
 			plist, err := client.RenderPlist()
 			if err != nil {
@@ -184,7 +184,7 @@ func TestHostServiceKindsAreOnePerUserAndRejectUnknownKinds(t *testing.T) {
 	}
 }
 
-func TestInstallingOHBGatewayPreservesPersonalHermesGatewayPlist(t *testing.T) {
+func TestInstallingOpenedbotGatewayPreservesPersonalHermesGatewayPlist(t *testing.T) {
 	home := t.TempDir()
 	launchAgents := filepath.Join(home, "Library", "LaunchAgents")
 	if err := os.MkdirAll(launchAgents, 0o755); err != nil {
@@ -197,16 +197,16 @@ func TestInstallingOHBGatewayPreservesPersonalHermesGatewayPlist(t *testing.T) {
 	}
 	client := newHostServiceClient(t, home, Gateway, layout.DefaultConnectorInstance)
 	if err := client.Install(); err != nil {
-		t.Fatal("could not install the temporary OHB gateway plist")
+		t.Fatal("could not install the temporary openedbot gateway plist")
 	}
 	got, err := os.ReadFile(personalPath)
 	if err != nil || string(got) != string(personalPlist) {
-		t.Fatal("installing OHB replaced the personal Hermes gateway plist")
+		t.Fatal("installing openedbot replaced the personal Hermes gateway plist")
 	}
 	if client.PlistPath() == personalPath || client.Label() == "ai.hermes.gateway" {
-		t.Fatal("OHB gateway targets the personal Hermes LaunchAgent")
+		t.Fatal("openedbot gateway targets the personal Hermes LaunchAgent")
 	}
 	if _, err := os.Stat(client.PlistPath()); err != nil {
-		t.Fatal("OHB did not write its own separate gateway plist")
+		t.Fatal("openedbot did not write its own separate gateway plist")
 	}
 }

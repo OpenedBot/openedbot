@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 async function diskWith(key: string, text: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "ohb-api-blob-"));
+  const root = await mkdtemp(join(tmpdir(), "openedbot-api-blob-"));
   roots.push(root);
   await mkdir(dirname(join(root, key)), { recursive: true });
   await Bun.write(join(root, key), text);

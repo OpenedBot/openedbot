@@ -29,10 +29,10 @@ export function formatElapsed(
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
-/** Grok Bot's typing mark, three dots in the bot's colour (`.ohb-thinking-dots`). */
+/** Grok Bot's typing mark, three dots in the bot's colour (`.openedbot-thinking-dots`). */
 export function ThinkingDots({ className }: { className?: string }) {
   return (
-    <span aria-hidden data-thinking-dots="" className={cn("ohb-thinking-dots shrink-0", className)}>
+    <span aria-hidden data-thinking-dots="" className={cn("openedbot-thinking-dots shrink-0", className)}>
       {Array.from({ length: DOT_COUNT }, (_, index) => <i key={index} />)}
     </span>
   );
@@ -94,7 +94,7 @@ export const ThinkingStatus = memo(function ThinkingStatus({ since, label, class
         data-thinking-label=""
         data-first={firstLabel.current === held ? "" : undefined}
         data-enter={entering ? "" : undefined}
-        className="ohb-thinking-shimmer ohb-status-swap min-w-0 truncate"
+        className="openedbot-thinking-shimmer openedbot-status-swap min-w-0 truncate"
       >
         {held}
       </span>

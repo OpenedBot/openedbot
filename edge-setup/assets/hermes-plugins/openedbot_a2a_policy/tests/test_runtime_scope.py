@@ -9,7 +9,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from ohb_a2a_policy.runtime_scope import RuntimeHomeError, managed_profile_guards_ready, resolve_runtime_home, root_home_scope
+from openedbot_a2a_policy.runtime_scope import RuntimeHomeError, managed_profile_guards_ready, resolve_runtime_home, root_home_scope
 
 
 class RuntimeHomeScopeTests(unittest.TestCase):
@@ -27,11 +27,11 @@ class RuntimeHomeScopeTests(unittest.TestCase):
             names = ("plugin.yaml", "__init__.py", "policy.py", "snapshot.py", "runtime_scope.py")
             for home in (root, profile):
                 for name in names:
-                    path = home / "plugins" / "ohb_a2a_policy" / name
+                    path = home / "plugins" / "openedbot_a2a_policy" / name
                     path.write_bytes(b"same shipped companion")
                     path.chmod(0o600)
             config = types.ModuleType("hermes_cli.config")
-            config.load_config = lambda: {"plugins": {"enabled": ["ohb_a2a_policy"], "disabled": []}}
+            config.load_config = lambda: {"plugins": {"enabled": ["openedbot_a2a_policy"], "disabled": []}}
             constants = types.ModuleType("hermes_constants")
             scope: ContextVar[str | None] = ContextVar("coverage_home", default=None)
             constants.set_hermes_home_override = scope.set
@@ -39,10 +39,10 @@ class RuntimeHomeScopeTests(unittest.TestCase):
             with patch.dict(sys.modules, {"hermes_cli.config": config, "hermes_constants": constants}):
                 self.assertTrue(managed_profile_guards_ready(root))
                 self.assertIsNone(scope.get())
-                config.load_config = lambda: {"plugins": {"enabled": ["ohb_a2a_policy"], "disabled": ["ohb_a2a_policy"]}}
+                config.load_config = lambda: {"plugins": {"enabled": ["openedbot_a2a_policy"], "disabled": ["openedbot_a2a_policy"]}}
                 self.assertFalse(managed_profile_guards_ready(root))
-                config.load_config = lambda: {"plugins": {"enabled": ["ohb_a2a_policy"]}}
-                (profile / "plugins" / "ohb_a2a_policy" / "policy.py").write_bytes(b"different code")
+                config.load_config = lambda: {"plugins": {"enabled": ["openedbot_a2a_policy"]}}
+                (profile / "plugins" / "openedbot_a2a_policy" / "policy.py").write_bytes(b"different code")
                 self.assertFalse(managed_profile_guards_ready(root))
 
     def test_root_and_profile_homes_resolve_to_same_installed_root(self) -> None:
@@ -56,7 +56,7 @@ class RuntimeHomeScopeTests(unittest.TestCase):
 
             self.assertEqual(resolve_runtime_home(root, root_marker), root)
             self.assertEqual(resolve_runtime_home(profile, profile_marker), root)
-            self.assertEqual(resolve_runtime_home(profile_link, profile_link / "plugins" / "ohb_a2a_policy" / "runtime-home"), root)
+            self.assertEqual(resolve_runtime_home(profile_link, profile_link / "plugins" / "openedbot_a2a_policy" / "runtime-home"), root)
 
     def test_missing_symlink_loose_hardlinked_and_noncanonical_markers_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,7 +70,7 @@ class RuntimeHomeScopeTests(unittest.TestCase):
 
             marker.write_text(str(root) + "\n", encoding="utf-8")
             os.chmod(marker, 0o600)
-            target = profile / "plugins" / "ohb_a2a_policy" / "target"
+            target = profile / "plugins" / "openedbot_a2a_policy" / "target"
             target.write_text(str(root) + "\n", encoding="utf-8")
             os.chmod(target, 0o600)
             marker.unlink()
@@ -165,7 +165,7 @@ def _make_directory(path: Path) -> Path:
 
 def _install_marker(active_home: Path, runtime_root: Path) -> Path:
     plugins = _make_directory(active_home / "plugins")
-    plugin = _make_directory(plugins / "ohb_a2a_policy")
+    plugin = _make_directory(plugins / "openedbot_a2a_policy")
     marker = plugin / "runtime-home"
     marker.write_text(str(runtime_root) + "\n", encoding="utf-8")
     os.chmod(marker, 0o600)

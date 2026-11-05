@@ -36,7 +36,7 @@ describe("Hermes mTLS configuration", () => {
   });
 
   test("fails closed without a readable file and never reveals its path", () => {
-    const privatePath = join(tmpdir(), `ohb-private-${crypto.randomUUID()}.pem`);
+    const privatePath = join(tmpdir(), `openedbot-private-${crypto.randomUUID()}.pem`);
     let message = "";
     try {
       readHermesMtlsIdentity({
@@ -95,7 +95,7 @@ describe("Hermes mTLS configuration", () => {
 });
 
 function identityFiles() {
-  const directory = mkdtempSync(join(tmpdir(), "ohb-hermes-mtls-"));
+  const directory = mkdtempSync(join(tmpdir(), "openedbot-hermes-mtls-"));
   temporaryDirectories.push(directory);
   const certPath = join(directory, "client.crt");
   const keyPath = join(directory, "client.key");

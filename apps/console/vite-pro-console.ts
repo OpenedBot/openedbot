@@ -1,5 +1,5 @@
 /**
- * `virtual:ohb-pro-console`: the pro console modules of this build
+ * `virtual:openedbot-pro-console`: the pro console modules of this build
  * (open-core step 9, `src/pro-console/contract.ts`).
  *
  * `OPENEDBOT_CONSOLE_PLUGINS` lists them, comma-separated, like `OPENEDBOT_PLUGINS` for
@@ -14,7 +14,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
-export const PRO_CONSOLE_VIRTUAL_ID = "virtual:ohb-pro-console";
+export const PRO_CONSOLE_VIRTUAL_ID = "virtual:openedbot-pro-console";
 const RESOLVED_ID = `\0${PRO_CONSOLE_VIRTUAL_ID}`;
 
 /** `@openedbot/console/<name>`: what the core lends a pro module (`host`, `contract`, the seams). */
@@ -40,7 +40,7 @@ export function proConsoleStyleSources(entries: readonly string[]): string[] {
 export function proConsole(entries: readonly string[]): Plugin {
   const absolute = entries.filter((entry) => isAbsolute(entry));
   return {
-    name: "ohb-pro-console",
+    name: "openedbot-pro-console",
     enforce: "pre",
     config: () => ({
       resolve: {

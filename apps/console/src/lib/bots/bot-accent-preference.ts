@@ -11,7 +11,7 @@ export const BOT_ACCENT_MODES = ["bot", "app"] as const;
 export type BotAccentMode = (typeof BOT_ACCENT_MODES)[number];
 
 export const DEFAULT_BOT_ACCENT_MODE: BotAccentMode = "bot";
-const STORAGE_KEY = "ohb:bot-accent";
+const STORAGE_KEY = "openedbot:bot-accent";
 
 const listeners = new Set<() => void>();
 

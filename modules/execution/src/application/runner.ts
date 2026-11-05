@@ -475,7 +475,7 @@ export async function executeRun(
     // steer déjà en base (ou un client ancien) ne doit jamais entrer dans une
     // session d'extraction. Il reste dans sa file : le run de repli répond.
     if (isServiceStepKind(activeContext.stepKind)) return;
-    // OHB-117 : livraison bornée (MAX_RUN_STEER_ATTEMPTS) et idempotente sur
+    // Livraison bornée (MAX_RUN_STEER_ATTEMPTS) et idempotente sur
     // l'id de tentative. Un `sending` de crash n'est pas rejoué ici.
     const steerContext = {
       id: activeContext.id,
@@ -617,7 +617,7 @@ export async function executeRun(
     // Inventory and scope reads run in parallel. Session creation waits for
     // their capability gate; model, history and createRun consume the result.
     // The model catalogue read rides with the inventory and the replay probe
-    // starts at the gate (OHB-137): neither is serial before the event stream.
+    // starts at the gate: neither is serial before the event stream.
     const warmModelKey = hermesRunId ? null : warmModelSelectionKey({
       organizationId: context.organizationId,
       runtimeId: context.runtimeId,
@@ -958,7 +958,7 @@ export async function executeRun(
         ...(replaySupported ? { since: rawSequence } : {}),
         // Over the relay this is time to first BYTE, not to the head: Bun.serve
         // (the API internal relay) sends a streamed response head with its first
-        // body chunk, so it lands with `hermes.first_event` (OHB-137).
+        // body chunk, so it lands with `hermes.first_event`.
         onOpen: () => trace.mark("hermes.stream_open"),
       },
     )[Symbol.asyncIterator]();

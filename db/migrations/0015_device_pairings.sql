@@ -44,7 +44,7 @@ alter table device_pairings force row level security;
 --   - l'organisation de la session, pour le poste qui crée et surveille ;
 --   - le hash du secret présenté, pour le téléphone qui n'a pas encore de
 --     session, c'est justement ce qu'il vient chercher.
-create policy device_pairings_credential on device_pairings to ohb_api
+create policy device_pairings_credential on device_pairings to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or secret_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -54,11 +54,11 @@ create policy device_pairings_credential on device_pairings to ohb_api
     or secret_hash = nullif(current_setting('app.session_credential_hash', true), '')
   );
 
-create policy device_pairings_worker on device_pairings to ohb_worker
+create policy device_pairings_worker on device_pairings to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on device_pairings to ohb_api;
-grant select, delete on device_pairings to ohb_worker;
+grant select, insert, update, delete on device_pairings to openedbot_api;
+grant select, delete on device_pairings to openedbot_worker;
 
 insert into schema_migrations(version) values ('0015_device_pairings')
 on conflict (version) do nothing;

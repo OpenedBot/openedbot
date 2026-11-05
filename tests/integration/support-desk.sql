@@ -60,10 +60,10 @@ insert into support_events (conversation_id, type, payload) values
   ('30000000-0000-4000-8000-000000000031', 'support.opened', '{}'::jsonb),
   ('30000000-0000-4000-8000-000000000032', 'support.opened', '{}'::jsonb);
 
-grant select, insert, update on support_proof to ohb_api;
+grant select, insert, update on support_proof to openedbot_api;
 
 -- 1. Porte invitee A : son fil, son message, son evenement. Et rien du fil B.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.support_guest_token_hash', repeat('a', 64), false) \g /dev/null
 select set_config('app.staff_user_id', '', false) \g /dev/null
 update support_proof
@@ -77,7 +77,7 @@ update support_proof
 reset role;
 
 -- 2. Ecriture croisee : le with check de la policy du parent la refuse.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.support_guest_token_hash', repeat('a', 64), false) \g /dev/null
 do $support$
 begin
@@ -92,7 +92,7 @@ $support$;
 reset role;
 
 -- 3. Aucune porte : rien.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.support_guest_token_hash', '', false) \g /dev/null
 select set_config('app.staff_user_id', '', false) \g /dev/null
 update support_proof set no_gate = (select count(*) from support_conversations);
@@ -100,13 +100,13 @@ reset role;
 
 -- 4. Un identifiant staff qui ne designe personne n ouvre rien : la fonction
 --    support_staff_session() exige un compte existant et non desactive.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-0000000000ff', false) \g /dev/null
 update support_proof set fake_staff = (select count(*) from support_conversations);
 reset role;
 
 -- 5. Session staff vivante : les deux fils, et les destinataires de l avis.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', '80000000-0000-4000-8000-000000000081', false) \g /dev/null
 update support_proof
    set live_staff = (select count(*) from support_conversations),
@@ -125,7 +125,7 @@ reset role;
 -- 6. Porte COMPTE (0078) : les fils de ce compte, et rien d autre. Ni le fil
 --    anonyme, ni celui d un autre compte. C est ce qui rend l historique
 --    possible depuis une autre machine, sans elargir quoi que ce soit.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.support_guest_token_hash', '', false) \g /dev/null
 select set_config('app.staff_user_id', '', false) \g /dev/null
 select set_config('app.support_user_id', '32000000-0000-4000-8000-000000000051', false) \g /dev/null

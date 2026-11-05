@@ -182,13 +182,13 @@ export const API_ENV: readonly EnvVar[] = [
     scope: "web",
     tier: "local",
     doc: "Account seeded by `make db-seed`; in OPENEDBOT_ENV=development /login pre-fills it.",
-    example: "dev@ohb.local",
+    example: "dev@openedbot.local",
   },
   {
     name: "E2E_PASSWORD",
     scope: "web",
     tier: "local",
-    doc: "Password of the seeded development accounts (dev@ohb.local; development autofill only). Generated at random by `make setup` or the first `make db-seed`; never commit a value.",
+    doc: "Password of the seeded development accounts (dev@openedbot.local; development autofill only). Generated at random by `make setup` or the first `make db-seed`; never commit a value.",
     example: "",
     secret: true,
   },
@@ -258,7 +258,7 @@ export const API_ENV: readonly EnvVar[] = [
     name: "LINK_DEV_EMAIL",
     scope: "scripts",
     tier: "default_only",
-    doc: "Local openedbot account `make link-dev-up` logs in as to open an enrollment ticket (default E2E_EMAIL, then dev@ohb.local).",
+    doc: "Local openedbot account `make link-dev-up` logs in as to open an enrollment ticket (default E2E_EMAIL, then dev@openedbot.local).",
   },
   {
     name: "LINK_DEV_ORGANIZATION_SLUG",
@@ -289,7 +289,7 @@ export const API_ENV: readonly EnvVar[] = [
     name: "DEV_STAFF_EMAIL",
     scope: "admin",
     tier: "default_only",
-    doc: "Seeded staff account pre-filled by the backoffice /login in development (default staff@ohb.dev).",
+    doc: "Seeded staff account pre-filled by the backoffice /login in development (default staff@openedbot.dev).",
   },
   {
     name: "DEV_STAFF_PASSWORD",

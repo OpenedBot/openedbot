@@ -1,5 +1,5 @@
 /**
- * Named coordination A/B/A (OHB-102): a coordinator delegates once to a named
+ * Named coordination A/B/A: a coordinator delegates once to a named
  * reviewer, the platform resumes the coordinator, all in the coordinator's
  * thread; the specialists' own threads stay empty.
  */

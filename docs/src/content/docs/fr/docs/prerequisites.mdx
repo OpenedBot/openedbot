@@ -62,7 +62,7 @@ Préparer avant `up` : une clé publique SSH pour le compte admin
 ### Connector sortant
 
 - **Sortant** : une connexion WebSocket (`wss://`, port 443) vers
-  l'origine openedbot donnée à `--ohb`, les binaires `edge-setup` depuis
+  l'origine openedbot donnée à `--openedbot`, les binaires `edge-setup` depuis
   `https://releases.openedbot.app/edge-setup`, Hermes (installeur et dépôt
   épinglés) et `uv` depuis GitHub, Node.js depuis `nodejs.org`, les dépôts de
   la distribution et les fournisseurs de modèles. Avec `--sandbox`, s'y
@@ -75,9 +75,9 @@ Préparer avant `up` : une clé publique SSH pour le compte admin
   refusée par les unités gateway, connector et operator, et par UFW lorsque
   cette option est sélectionnée.
 
-En production, `--ohb` reçoit `https://link.openedbot.app`, l'origine du lien
+En production, `--openedbot` reçoit `https://link.openedbot.app`, l'origine du lien
 (un hôte appairé sur `https://openedbot.app` la
-suit seul). En développement, `--ohb`
+suit seul). En développement, `--openedbot`
 reçoit la loopback du VPS posée par un tunnel SSH inverse ; l'origine HTTPS
 d'un tunnel Cloudflare lancé à la main reste une option avancée.
 Dans tous les cas, le tunnel éventuel est côté application : le gateway du VPS

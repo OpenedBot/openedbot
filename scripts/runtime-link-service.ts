@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
-export const serviceName = "ohb-runtime-link-gateway.service";
+export const serviceName = "openedbot-runtime-link-gateway.service";
 function unitPath(value: string, expandVariables = false): string {
   if (!isAbsolute(value) || /[\r\n\0]/.test(value)) throw new Error("Expected an absolute single-line service path");
   return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("%", "%%").replaceAll("$", () => expandVariables ? "$$" : "$")}"`;
@@ -27,7 +27,7 @@ TimeoutStopSec=330
 UMask=0077
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=ohb-runtime-link-gateway
+SyslogIdentifier=openedbot-runtime-link-gateway
 
 [Install]
 WantedBy=default.target

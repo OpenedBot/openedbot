@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-5 (DEV-OHB-255): the per-tool policy of a bot, iso Grok Bot.
+-- PERM2-5: the per-tool policy of a bot, iso Grok Bot.
 --
 -- One row per (bot, tool key) that does not follow the mode. No row, or
 -- `inherit`, follows the mode; a stored value the pipeline does not know
@@ -37,17 +37,17 @@ create table bot_permission_tool_policies (
 alter table bot_permission_tool_policies enable row level security;
 alter table bot_permission_tool_policies force row level security;
 
-create policy bot_permission_tool_policies_tenant on bot_permission_tool_policies to ohb_api
+create policy bot_permission_tool_policies_tenant on bot_permission_tool_policies to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 -- The worker reads one organization at a time, under the tenant setting it
 -- sets for that read (`modules/roster/src/sql/tool-policies.ts`): no
 -- `using (true)`, no write.
-create policy bot_permission_tool_policies_worker on bot_permission_tool_policies for select to ohb_worker
+create policy bot_permission_tool_policies_worker on bot_permission_tool_policies for select to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on bot_permission_tool_policies to ohb_api;
-grant select on bot_permission_tool_policies to ohb_worker;
+grant select, insert, update, delete on bot_permission_tool_policies to openedbot_api;
+grant select on bot_permission_tool_policies to openedbot_worker;
 
 -- Any write can change a decision: the bot's revision goes up (0138), so a
 -- policy decision taken before it is redone at the forwarding claim.

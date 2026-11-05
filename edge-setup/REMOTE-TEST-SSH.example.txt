@@ -12,7 +12,7 @@ Hôte de test
 Configuration recommandée dans ~/.ssh/config
 ---------------------------------------------
 
-  Host ohb-hermes-test
+  Host openedbot-hermes-test
       HostName 203.0.113.10
       User hermes-admin
       IdentityFile ~/.ssh/id_ed25519
@@ -21,7 +21,7 @@ Configuration recommandée dans ~/.ssh/config
 Tester la connexion
 -------------------
 
-  ssh ohb-hermes-test
+  ssh openedbot-hermes-test
 
 Déployer le connecteur openedbot depuis ce dépôt
 -------------------------------------------

@@ -39,7 +39,7 @@ export const fleet = {
     "orgSetupError": "Unable to create the organization."
 } as const;
 
-/** Agency settings, Clients page (DEV-OHB-238). */
+/** Agency settings, Clients page. */
 export const fleetClients = {
   title: "Clients",
   teamLinkDescription: "View active mandates and client invitations.",

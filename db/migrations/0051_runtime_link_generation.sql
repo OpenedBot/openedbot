@@ -3,7 +3,7 @@ begin;
 -- A reservation belongs to one WebSocket for its entire lifetime. Keeping the
 -- last generation after release prevents delayed writes from resurrecting it.
 create sequence runtime_link_generation_seq as bigint;
-grant usage on sequence runtime_link_generation_seq to ohb_api;
+grant usage on sequence runtime_link_generation_seq to openedbot_api;
 alter table runtimes add column link_generation bigint not null default 0
   check (link_generation >= 0);
 comment on column runtimes.link_generation is

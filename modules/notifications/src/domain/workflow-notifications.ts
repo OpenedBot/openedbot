@@ -11,7 +11,7 @@ export type WorkflowNotificationEligibility = {
  *
  * Le plan APNs / Live Activity de 0009 qui accompagnait cette éligibilité a
  * été retiré le 2026-08-28 avec le client Expo. La même règle alimente
- * l'outbox `push_outbox` (trigger 0039), consommée par Web Push (OHB-20) et,
+ * l'outbox `push_outbox` (trigger 0039), consommée par Web Push et,
  * depuis DEV-308, par APNs pour l'app native iOS (0108, sans Live Activity),
  * plus les notifications de page tant que la SPA reste chargée.
  */

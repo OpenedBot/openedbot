@@ -266,7 +266,7 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      additionalArguments: [`--ohb-shell-version=${app.getVersion()}`],
+      additionalArguments: [`--openedbot-shell-version=${app.getVersion()}`],
     },
   });
 
@@ -381,10 +381,10 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
   });
 
   // The caption buttons follow the theme (nativeTheme follows the page
-  // through "ohb:theme") and the view (solid on the console, see-through on
+  // through "openedbot:theme") and the view (solid on the console, see-through on
   // the sign-in page).
   // Réglages › Apparence › Taille du texte of the console, sent by the
-  // preload ("ohb:text-zoom"); /login is the console and zooms too. The local
+  // preload ("openedbot:text-zoom"); /login is the console and zooms too. The local
   // sign-in page keeps 100 %.
   let textZoom = preferences.textZoom;
   const viewZoom = (): number => (view === "signin" ? 1 : textZoom);
@@ -444,7 +444,7 @@ export function createShellWindow(options: ShellWindowOptions): ShellWindow {
       // only this account-derived shape while the console origin is loaded.
       if (!contents.isDestroyed() && !contents.isLoading() && isConsoleOrigin(contents.getURL())) {
         try {
-          await contents.executeJavaScript(`if (${JSON.stringify(trustedOrigins)}.includes(location.origin)) localStorage.removeItem("ohb:boot-sidebar");`);
+          await contents.executeJavaScript(`if (${JSON.stringify(trustedOrigins)}.includes(location.origin)) localStorage.removeItem("openedbot:boot-sidebar");`);
         } catch (error) {
           log.warn(`could not clear the boot sidebar (${error instanceof Error ? error.message : "error"})`);
         }

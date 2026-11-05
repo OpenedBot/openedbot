@@ -468,7 +468,7 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
           onClick={limits.refresh}
           disabled={limits.busy || !canRefresh}
           aria-label={t("providerLimits.refresh")}
-          className="ohb-press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+          className="openedbot-press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         >
           <RefreshCw className={cn("size-3.5", limits.busy && "animate-spin")} aria-hidden />
           {t("providerLimits.refreshShort")}

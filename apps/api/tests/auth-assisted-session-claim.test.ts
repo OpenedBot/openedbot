@@ -7,8 +7,8 @@ import { hashCredential } from "../src/infrastructure/crypto";
 import { authRoutes, type AppVariables } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
 
-const ADMIN_ORIGIN = "https://backoffice.ohb.test";
-const WEB_ORIGIN = "https://app.ohb.test";
+const ADMIN_ORIGIN = "https://backoffice.openedbot.test";
+const WEB_ORIGIN = "https://app.openedbot.test";
 const CLAIM_CODE = "a-one-shot-claim-code-with-enough-entropy";
 const db = {} as SQL;
 
@@ -77,8 +77,8 @@ describe("assisted session claim (core route, ImpersonationSource port)", () => 
     expect(first.status).toBe(303);
     expect(first.headers.get("Location")).toBe(WEB_ORIGIN);
     const cookies = first.headers.getSetCookie();
-    expect(cookies.some((cookie) => cookie.startsWith("ohb_session=session-token") && cookie.includes("Max-Age=3600"))).toBe(true);
-    expect(cookies.some((cookie) => cookie.startsWith("ohb_csrf=csrf-token") && cookie.includes("Max-Age=3600"))).toBe(true);
+    expect(cookies.some((cookie) => cookie.startsWith("openedbot_session=session-token") && cookie.includes("Max-Age=3600"))).toBe(true);
+    expect(cookies.some((cookie) => cookie.startsWith("openedbot_csrf=csrf-token") && cookie.includes("Max-Age=3600"))).toBe(true);
     expect(calls).toEqual([{ db, claimHash: hashCredential(CLAIM_CODE), device: { userAgent: "Support browser", ip: null } }]);
 
     const second = await claim(app);

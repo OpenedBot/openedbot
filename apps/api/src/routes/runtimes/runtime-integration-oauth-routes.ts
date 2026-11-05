@@ -7,7 +7,7 @@ import { requestOrigin, requireOperator } from "../identity/auth";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { HttpError } from "../../interfaces/http/http-error";
-import { connectorOHBOrigin } from "./runtime-enrollment-routes";
+import { connectorOpenedbotOrigin } from "./runtime-enrollment-routes";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import {
   FEATURE_MCP_OAUTH,
@@ -49,7 +49,7 @@ export function runtimeMcpOauthRoutes(ctx: IntegrationRouteContext): Hono<{ Vari
       throw new HttpError(400, "NAME_INVALID", "Ce nom de serveur n’est pas valide.");
     }
     const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, FEATURE_MCP_OAUTH);
-    const origin = connectorOHBOrigin(config, requestOrigin(context) ?? undefined);
+    const origin = connectorOpenedbotOrigin(config, requestOrigin(context) ?? undefined);
     const redirectUri = `${origin}/api/mcp-oauth/callback/${encodeURIComponent(auth.organizationId)}/${encodeURIComponent(runtimeId)}/${encodeURIComponent(name)}`;
     let session: HermesMcpOauthSession;
     try {

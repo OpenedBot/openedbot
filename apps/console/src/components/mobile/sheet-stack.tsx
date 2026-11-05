@@ -277,7 +277,7 @@ export function MobileSheetStack({
       {live ? (
         <div
           data-sheet-panel=""
-          className="absolute inset-0 flex min-h-0 flex-col bg-[var(--ohb-grouped-canvas)]"
+          className="absolute inset-0 flex min-h-0 flex-col bg-[var(--openedbot-grouped-canvas)]"
           style={panelStyle}
           onTransitionEnd={onPanelTransitionEnd}
         >

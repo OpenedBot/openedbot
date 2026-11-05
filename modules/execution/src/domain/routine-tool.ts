@@ -1,6 +1,6 @@
 /**
  * `routine_manage` : l'outil par lequel un bot gère SES routines depuis la
- * conversation (DEV-209, ex OHB-132). Ce module est pur : le schéma vu par le
+ * conversation (DEV-209). Ce module est pur : le schéma vu par le
  * modèle, la lecture stricte de ses arguments et la normalisation de la
  * planification. L'écriture vit côté API, sur le chemin des routes Routines.
  *
@@ -14,7 +14,7 @@
 import { isValidCron, isValidTimeZone, nextOccurrence, ROUTINE_LIMITS } from "./routines";
 
 /** Nom du serveur MCP sur l'hôte : un par runtime, jamais un par bot. */
-export const ROUTINE_TOOL_SERVER = "ohb_routines";
+export const ROUTINE_TOOL_SERVER = "openedbot_routines";
 export const ROUTINE_TOOL_NAME = "routine_manage";
 /** Le nom que Hermes donne à l'outil dans un run (`mcp_<serveur>_<outil>`). */
 export const ROUTINE_TOOL_RUNTIME_NAME = `mcp_${ROUTINE_TOOL_SERVER}_${ROUTINE_TOOL_NAME}`;

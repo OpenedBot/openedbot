@@ -58,7 +58,7 @@
   {
     "name": "delegation",
     "label": "Delegation",
-    "description": "Second scheduler; disabled by the OHB contract.",
+    "description": "Second scheduler; disabled by the openedbot contract.",
     "enabled": false,
     "configured": false,
     "tools": ["delegate_task"]
@@ -82,7 +82,7 @@
   {
     "name": "cronjob",
     "label": "Cron jobs",
-    "description": "Runtime-side scheduler; disabled by the OHB contract.",
+    "description": "Runtime-side scheduler; disabled by the openedbot contract.",
     "enabled": false,
     "configured": false,
     "tools": ["cronjob_manage"]

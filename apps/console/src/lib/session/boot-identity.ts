@@ -9,7 +9,7 @@
  * is shown only to the user it was recorded for, and sign out or a lost
  * session clears it with the persisted queries (`query-persister.ts`).
  */
-export const BOOT_IDENTITY_KEY = "ohb:boot-identity";
+export const BOOT_IDENTITY_KEY = "openedbot:boot-identity";
 
 const MAX_LABEL = 64;
 

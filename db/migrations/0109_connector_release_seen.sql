@@ -30,7 +30,7 @@ comment on table runtime_connector_release_seen is
 alter table runtime_connector_release_seen enable row level security;
 alter table runtime_connector_release_seen force row level security;
 
-create policy runtime_connector_release_seen_member on runtime_connector_release_seen to ohb_api
+create policy runtime_connector_release_seen_member on runtime_connector_release_seen to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
@@ -40,7 +40,7 @@ create policy runtime_connector_release_seen_member on runtime_connector_release
     and user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
   );
 
-grant select, insert on runtime_connector_release_seen to ohb_api;
+grant select, insert on runtime_connector_release_seen to openedbot_api;
 
 insert into schema_migrations(version) values ('0109_connector_release_seen')
 on conflict (version) do nothing;

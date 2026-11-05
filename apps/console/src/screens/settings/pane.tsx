@@ -34,7 +34,7 @@ export function SettingsPane({
     <div
       data-mobile-settings=""
       data-has-action-footer={footer ? "" : undefined}
-      className="flex min-h-0 flex-1 flex-col bg-[var(--ohb-grouped-canvas)]"
+      className="flex min-h-0 flex-1 flex-col bg-[var(--openedbot-grouped-canvas)]"
     >
       <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-0 py-2">
         <div className="flex flex-col gap-2">{children}</div>

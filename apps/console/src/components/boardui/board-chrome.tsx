@@ -27,7 +27,7 @@ import { BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
  * cette barre : rien ne disparaît avec elle.
  */
 
-const COLLAPSED_KEY = "ohb:sidebar-collapsed";
+const COLLAPSED_KEY = "openedbot:sidebar-collapsed";
 
 function readCollapsed(): boolean {
   try {
@@ -76,7 +76,7 @@ export const BAR_ICON_BUTTON =
   "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-icon-secondary outline-none transition-colors hover:bg-background-secondary-hover hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:pointer-events-none disabled:opacity-35";
 
 /** La colonne repliable de la barre latérale (`BoardFrame`), cible d'`aria-controls`. */
-export const BOARD_SIDEBAR_ID = "ohb-board-sidebar";
+export const BOARD_SIDEBAR_ID = "openedbot-board-sidebar";
 
 /**
  * Les transitions du repli, celles de la barre du Dashboard de boardui.com :
@@ -94,7 +94,7 @@ type SidebarControl = { id: string; collapsed: boolean; onToggle: () => void };
  * reste une poignée de la fenêtre.
  */
 export function TitlebarLogo() {
-  return <img data-titlebar-logo="" src="/brand/ohb-icon.webp" alt="" aria-hidden className="size-[22px] shrink-0 object-contain" />;
+  return <img data-titlebar-logo="" src="/brand/openedbot-icon.webp" alt="" aria-hidden className="size-[22px] shrink-0 object-contain" />;
 }
 
 export function SidebarToggle({ className, control }: { className?: string; control?: SidebarControl }) {
@@ -147,7 +147,7 @@ export function CreateMenu({
       <BuiPopoverTrigger asChild>{trigger}</BuiPopoverTrigger>
       <BuiPopoverContent align={align} alignOffset={alignOffset} sideOffset={4} className="w-[323px] gap-1" aria-label={t("boardui.create")}>
         <CreateOption
-          icon={<BotFace name={t("boardui.createBot")} seed="ohb-new-bot" face={null} className="size-8" />}
+          icon={<BotFace name={t("boardui.createBot")} seed="openedbot-new-bot" face={null} className="size-8" />}
           title={t("boardui.createBot")}
           hint={t("boardui.createBotHint")}
           onSelect={() => { setOpen(false); ask("createBot"); }}
@@ -168,7 +168,7 @@ function CreateOption({ icon, title, hint, onSelect }: { icon: ReactNode; title:
     <button
       type="button"
       onClick={onSelect}
-      className="group flex w-full cursor-pointer items-center gap-2 rounded-[14px] p-2 text-start text-text-primary outline-none ohb-row hover:bg-background-primary-hover focus-visible:bg-background-primary-hover"
+      className="group flex w-full cursor-pointer items-center gap-2 rounded-[14px] p-2 text-start text-text-primary outline-none openedbot-row hover:bg-background-primary-hover focus-visible:bg-background-primary-hover"
     >
       <span className="size-8 shrink-0" aria-hidden>{icon}</span>
       <span className="flex min-w-0 flex-1 flex-col">

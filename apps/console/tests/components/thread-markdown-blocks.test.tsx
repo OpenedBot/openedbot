@@ -132,8 +132,8 @@ function render(node: React.ReactNode) {
   // none, so they are not part of the DOM shape compared here.
   return renderToStaticMarkup(<I18nProvider>{node}</I18nProvider>)
     .replace(/<span class="grok-w">([^<]*)<\/span>/g, "$1")
-    .replace(/ class="ohb-reveal"/g, "")
-    .replace(/ ohb-reveal(?=")/g, "");
+    .replace(/ class="openedbot-reveal"/g, "")
+    .replace(/ openedbot-reveal(?=")/g, "");
 }
 
 /**

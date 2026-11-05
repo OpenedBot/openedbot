@@ -25,14 +25,14 @@ const allowed: Array<[string, "events" | "host" | ""]> = [
   ["POST /api/sessions", ""],
   ["DELETE /api/sessions/s1", ""],
   ["DELETE /p/prod-1/api/sessions/s1", ""],
-  // Les VRAIS noms de session d'openedbot : `ohb:<org>:<...>`, dont
+  // Les VRAIS noms de session d'openedbot : `openedbot:<org>:<...>`, dont
   // `encodeURIComponent` écrit chaque deux-points `%3A`. Les tests d'origine
   // ne connaissaient que `s1`, un nom qu'openedbot ne produit jamais, et la liste
   // refusait donc, en production, les trois routes de session.
-  ["DELETE /api/sessions/ohb%3A00000000-0000-4000-8000-000000000201%3A57cc181a-554c-41e4-bdd1-b6d360290ddb", ""],
-  ["GET /api/sessions/ohb%3Aorg-1%3Acompact%3Athread%3At-1", ""],
-  ["GET /api/sessions/ohb%3Aorg-1%3Amemory%3Abot%3Ab-1/messages", ""],
-  ["DELETE /p/prod-1/api/sessions/ohb%3aorg-1%3aworkflow%3aw-1%3abot%3ab-1", ""],
+  ["DELETE /api/sessions/openedbot%3A00000000-0000-4000-8000-000000000201%3A57cc181a-554c-41e4-bdd1-b6d360290ddb", ""],
+  ["GET /api/sessions/openedbot%3Aorg-1%3Acompact%3Athread%3At-1", ""],
+  ["GET /api/sessions/openedbot%3Aorg-1%3Amemory%3Abot%3Ab-1/messages", ""],
+  ["DELETE /p/prod-1/api/sessions/openedbot%3aorg-1%3aworkflow%3aw-1%3abot%3ab-1", ""],
   ["GET /api/mcp/servers", ""],
   // Routes hôte : la sonde de capacités et les quatre verbes fournisseur,
   // servis par le connecteur.
@@ -77,7 +77,7 @@ const allowed: Array<[string, "events" | "host" | ""]> = [
   ["POST /hermes-setup/profiles/scout/skills/hermes-agent", "host"],
   ["POST /hermes-setup/profiles/scout/skills/research", "host"],
   ["POST /hermes-setup/profiles/scout/bundled-skills", "host"],
-  // Hub de skills (DEV-OHB-99, MARKETPLACE_ADR section 6) : l'identifiant
+  // Hub de skills (MARKETPLACE_ADR section 6) : l'identifiant
   // voyage dans le corps, le chemin ne porte que le profil et un UUID.
   ["POST /hermes-setup/skills/hub/search", "host"],
   ["POST /hermes-setup/skills/hub/inspect", "host"],
@@ -109,9 +109,9 @@ const refused = [
   "DELETE /api/sessions/s1/messages",
   // `%3A` est le seul échappement admis : un `/` ou un `.` déguisé en
   // pourcentage redeviendrait un chemin une fois décodé par le gateway.
-  "DELETE /api/sessions/ohb%2Fetc%2Fpasswd",
+  "DELETE /api/sessions/openedbot%2Fetc%2Fpasswd",
   "DELETE /api/sessions/%2e%2e%2fadmin",
-  "DELETE /api/sessions/ohb%3Aorg%25",
+  "DELETE /api/sessions/openedbot%3Aorg%25",
   `DELETE /api/sessions/${"a".repeat(257)}`,
   "POST /api/mcp/servers",
   "GET /v1/browser-control/x",

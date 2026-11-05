@@ -27,7 +27,7 @@ import (
 // root-owned and hands a copy to systemd; macOS keeps it user-owned.
 type LinkFile struct {
 	Schema    int    `json:"schema"`
-	OHB       string `json:"ohb"`
+	Openedbot string `json:"openedbot"`
 	WSURL     string `json:"ws_url"`
 	RuntimeID string `json:"runtime_id"`
 	LinkToken string `json:"link_token"`
@@ -36,7 +36,7 @@ type LinkFile struct {
 	// display data for alerts and status, refreshed by the daemon in its
 	// state directory (linkContextFile) since link.json is a read-only
 	// credential for it.
-	Environment  string                      `json:"ohb_environment,omitempty"`
+	Environment  string                      `json:"openedbot_environment,omitempty"`
 	Organization *connector.LinkOrganization `json:"organization,omitempty"`
 	Owner        *connector.LinkOwner        `json:"owner,omitempty"`
 }
@@ -44,7 +44,7 @@ type LinkFile struct {
 // linkContext is what link.json (enrollment) or the overlay (daemon) holds
 // of the last link.context, as a connector value.
 func (lf LinkFile) linkContext() connector.LinkContext {
-	lc := connector.LinkContext{Environment: lf.Environment, OHB: lf.OHB}
+	lc := connector.LinkContext{Environment: lf.Environment, Openedbot: lf.Openedbot}
 	if lf.Organization != nil {
 		lc.Organization = *lf.Organization
 	}
@@ -68,8 +68,8 @@ func (lf LinkFile) linkContext() connector.LinkContext {
 type linkContextFile struct {
 	Schema       int                         `json:"schema"`
 	RuntimeID    string                      `json:"runtime_id"`
-	Environment  string                      `json:"ohb_environment"`
-	OHB          string                      `json:"ohb"`
+	Environment  string                      `json:"openedbot_environment"`
+	Openedbot    string                      `json:"openedbot"`
 	Organization *connector.LinkOrganization `json:"organization,omitempty"`
 	Owner        *connector.LinkOwner        `json:"owner,omitempty"`
 	Limits       *linkContextLimits          `json:"limits,omitempty"`
@@ -89,7 +89,7 @@ func loadLinkContext(path, runtimeID string) (connector.LinkContext, bool) {
 	if err := json.Unmarshal(data, &f); err != nil || f.Schema != 1 || f.RuntimeID != runtimeID || f.Environment == "" {
 		return connector.LinkContext{}, false
 	}
-	lc := LinkFile{OHB: f.OHB, Environment: f.Environment, Organization: f.Organization, Owner: f.Owner}.linkContext()
+	lc := LinkFile{Openedbot: f.Openedbot, Environment: f.Environment, Organization: f.Organization, Owner: f.Owner}.linkContext()
 	if f.Limits != nil && f.Limits.Features > 0 {
 		lc.FeatureLimit = f.Limits.Features
 	}
@@ -109,7 +109,7 @@ func restoreLinkContext(c *connector.Client, contextPath string, lf LinkFile) co
 }
 
 func persistLinkContext(path, runtimeID string, lc connector.LinkContext, now time.Time) error {
-	f := linkContextFile{Schema: 1, RuntimeID: runtimeID, Environment: lc.Environment, OHB: lc.OHB, ReceivedAt: now.UTC().Format(time.RFC3339)}
+	f := linkContextFile{Schema: 1, RuntimeID: runtimeID, Environment: lc.Environment, Openedbot: lc.Openedbot, ReceivedAt: now.UTC().Format(time.RFC3339)}
 	if lc.Organization != (connector.LinkOrganization{}) {
 		org := lc.Organization
 		f.Organization = &org
@@ -130,7 +130,7 @@ func persistLinkContext(path, runtimeID string, lc connector.LinkContext, now ti
 
 // alertContextOf is what the Discord card names for this instance.
 func alertContextOf(inst layout.ConnectorInstance, lc connector.LinkContext) connector.AlertContext {
-	return connector.AlertContext{Environment: lc.Environment, Instance: inst.Label(), OHB: lc.OHB, OwnerEmail: lc.Owner.Email, Organization: lc.Organization.Name}
+	return connector.AlertContext{Environment: lc.Environment, Instance: inst.Label(), Openedbot: lc.Openedbot, OwnerEmail: lc.Owner.Email, Organization: lc.Organization.Name}
 }
 
 // rotatedLinkCredential is the connector-owned durable overlay for the
@@ -228,13 +228,13 @@ func persistMovedLinkOrigin(path, runtimeID, wsURL string, now time.Time) error 
 	return fsx.WriteAtomic(path, append(data, '\n'), 0o600, fsx.Current())
 }
 
-// wsURLOf derives the link endpoint from the origin ParseOHBURL accepted, so
+// wsURLOf derives the link endpoint from the origin ParseOpenedbotURL accepted, so
 // an https origin stays wss and the loopback development origin stays ws.
-func wsURLOf(ohb string) string {
-	if rest, ok := strings.CutPrefix(ohb, "http://"); ok {
+func wsURLOf(openedbot string) string {
+	if rest, ok := strings.CutPrefix(openedbot, "http://"); ok {
 		return "ws://" + rest + "/api/runtime-links/ws"
 	}
-	return "wss://" + strings.TrimPrefix(ohb, "https://") + "/api/runtime-links/ws"
+	return "wss://" + strings.TrimPrefix(openedbot, "https://") + "/api/runtime-links/ws"
 }
 
 // wsPath is the only broker path a link may target.
@@ -269,24 +269,24 @@ func validateWSURL(raw string) error {
 	}
 }
 
-// DefaultOHBOrigin is the production openedbot origin `link` targets when
-// --ohb is omitted. Development and self-hosted origins are always explicit.
-const DefaultOHBOrigin = "https://link.openedbot.app"
+// DefaultOpenedbotOrigin is the production openedbot origin `link` targets when
+// --openedbot is omitted. Development and self-hosted origins are always explicit.
+const DefaultOpenedbotOrigin = "https://link.openedbot.app"
 
-// linkOrigin is the origin `link` enrolls against: the --ohb value, or the
+// linkOrigin is the origin `link` enrolls against: the --openedbot value, or the
 // production default when the flag is absent or blank.
 func linkOrigin(flagValue string) string {
 	if strings.TrimSpace(flagValue) == "" {
-		return DefaultOHBOrigin
+		return DefaultOpenedbotOrigin
 	}
 	return flagValue
 }
 
 func runLink(env cli.Env, args []string) int {
 	fs := newFlagSet("link", env)
-	ohb := fs.String("ohb", "", "openedbot origin, https://… (default "+DefaultOHBOrigin+")")
+	openedbot := fs.String("openedbot", "", "openedbot origin, https://… (default "+DefaultOpenedbotOrigin+")")
 	ticketFile := fs.String("ticket-file", "", "0600 file holding the enrollment ticket (default: stdin, or a prompt without echo)")
-	insecureOHB := fs.Bool("insecure-ohb", false, "development only: also accept an http:// loopback origin, reached through an SSH reverse tunnel (never a public origin)")
+	insecureOpenedbot := fs.Bool("insecure-openedbot", false, "development only: also accept an http:// loopback origin, reached through an SSH reverse tunnel (never a public origin)")
 	rekey := fs.Bool("rekey", false, "regenerate the device key of an already linked runtime, without a ticket; the new public key is presented to openedbot on one session")
 	name := fs.String("name", "", "named connector instance (^[a-z][a-z0-9-]{0,31}$): its own link, device key and native service, next to the default link; e.g. --name dev for a development openedbot")
 	yes := fs.Bool("yes", false, "confirm the mutation")
@@ -298,8 +298,8 @@ func runLink(env cli.Env, args []string) int {
 		return fail(env, cli.ExitUsage, "%v", err)
 	}
 	if *rekey {
-		if fs.NArg() != 0 || *ohb != "" || *ticketFile != "" {
-			return fail(env, cli.ExitUsage, "--rekey takes no ticket and no --ohb: it reuses the link already persisted on this host")
+		if fs.NArg() != 0 || *openedbot != "" || *ticketFile != "" {
+			return fail(env, cli.ExitUsage, "--rekey takes no ticket and no --openedbot: it reuses the link already persisted on this host")
 		}
 		if !*yes {
 			return fail(env, cli.ExitRefused, "link --rekey replaces the device key and re-presents it to openedbot; add --yes (nothing was changed)")
@@ -307,14 +307,14 @@ func runLink(env cli.Env, args []string) int {
 		return runLinkRekey(env, inst)
 	}
 	if fs.NArg() != 0 {
-		return fail(env, cli.ExitUsage, "the ticket is a secret: it never travels in argv. Run `edge-setup link --ohb https://… --yes` and paste it at the hidden prompt, or use --ticket-file <0600 file>")
+		return fail(env, cli.ExitUsage, "the ticket is a secret: it never travels in argv. Run `edge-setup link --openedbot https://… --yes` and paste it at the hidden prompt, or use --ticket-file <0600 file>")
 	}
 	if !*yes {
 		return fail(env, cli.ExitRefused, "link opens an outbound connection to openedbot and stores a link token; add --yes (nothing was changed)")
 	}
 	// The origin is validated before the root gate: a typo is a usage error,
 	// and reading it costs nothing. Nothing is mutated either way.
-	u, err := enroll.ParseOHBURL(linkOrigin(*ohb), *insecureOHB)
+	u, err := enroll.ParseOpenedbotURL(linkOrigin(*openedbot), *insecureOpenedbot)
 	if err != nil {
 		return fail(env, cli.ExitUsage, "%v", err)
 	}
@@ -329,7 +329,7 @@ func runLink(env cli.Env, args []string) int {
 	// switch. The real boundaries are elsewhere and unchanged: an enrollment
 	// needs a ticket issued by an authenticated owner in openedbot, an
 	// http:// origin is accepted on the loopback only and only behind
-	// --insecure-ohb, and `reset` is what removes the runtime for good.
+	// --insecure-openedbot, and `reset` is what removes the runtime for good.
 	//
 	st, err := loadConnectorState()
 	if err != nil {
@@ -362,23 +362,23 @@ func runLink(env cli.Env, args []string) int {
 		}
 	}
 	if other, lf := originTakenBy(inst, u.String()); lf != nil {
-		relink := "edge-setup link --ohb " + u.String() + " --yes"
+		relink := "edge-setup link --openedbot " + u.String() + " --yes"
 		if !other.IsDefault() {
 			relink += " --name " + string(other)
 		}
 		return fail(env, cli.ExitRefused,
 			"the %s instance already links this host to %s (runtime %s): a second link to the same openedbot would share this Hermes gateway, its profiles and sessions, with another organization. "+
 				"One gateway serves one organization; to move this host to another one, re-link that instance instead: `%s` (the ticket was not spent)",
-			other.Label(), lf.OHB, lf.RuntimeID, relink)
+			other.Label(), lf.Openedbot, lf.RuntimeID, relink)
 	}
 	// What is owed instead is the truth, before the ticket is spent: which
 	// origin this host leaves, and which runtime goes stale there.
 	previous, switching := linkTakeover(inst, u.String())
 	switch {
 	case switching:
-		printf(env.Stdout, "%s", env.Color.Yellow(fmt.Sprintf("replacing the link to %s (runtime %s): that openedbot keeps a runtime this host will never dial again, remove it there", previous.OHB, previous.RuntimeID)))
+		printf(env.Stdout, "%s", env.Color.Yellow(fmt.Sprintf("replacing the link to %s (runtime %s): that openedbot keeps a runtime this host will never dial again, remove it there", previous.Openedbot, previous.RuntimeID)))
 	case previous != nil:
-		printf(env.Stdout, "re-linking to %s: this ticket issues a new runtime, replacing %s", previous.OHB, previous.RuntimeID)
+		printf(env.Stdout, "re-linking to %s: this ticket issues a new runtime, replacing %s", previous.Openedbot, previous.RuntimeID)
 	}
 	if u.Scheme == "http" {
 		printf(env.Stdout, "%s", env.Color.Yellow("development link: "+u.String()+" is plain HTTP on this host's loopback. Keep the SSH reverse tunnel open from the workstation (make link-dev-up HOST=user@vps, closed by make link-dev-down). The link dials that port now, and the connector reconnects to it and stops when the tunnel closes."))
@@ -427,7 +427,7 @@ func runLink(env cli.Env, args []string) int {
 		return nil
 	}
 	c.OnLinkIssued = func(runtimeID, linkToken string) error {
-		lf := LinkFile{Schema: 1, OHB: u.String(), WSURL: wsURLOf(u.String()), RuntimeID: runtimeID, LinkToken: linkToken, LinkedAt: time.Now().UTC().Format(time.RFC3339)}
+		lf := LinkFile{Schema: 1, Openedbot: u.String(), WSURL: wsURLOf(u.String()), RuntimeID: runtimeID, LinkToken: linkToken, LinkedAt: time.Now().UTC().Format(time.RFC3339)}
 		if received.Environment != "" {
 			lf.Environment = received.Environment
 			if received.Organization != (connector.LinkOrganization{}) {
@@ -506,9 +506,9 @@ func runLinkRekey(env cli.Env, inst layout.ConnectorInstance) int {
 	}
 	if lf == nil {
 		if inst.IsDefault() {
-			return fail(env, cli.ExitRefused, "this host is not linked (%s absent); run `edge-setup link --ohb https://… --yes` with a ticket", linkPathOf(inst))
+			return fail(env, cli.ExitRefused, "this host is not linked (%s absent); run `edge-setup link --openedbot https://… --yes` with a ticket", linkPathOf(inst))
 		}
-		return fail(env, cli.ExitRefused, "instance %s is not linked (%s absent); run `edge-setup link --ohb https://… --name %s --yes` with a ticket", inst.Label(), linkPathOf(inst), inst.Label())
+		return fail(env, cli.ExitRefused, "instance %s is not linked (%s absent); run `edge-setup link --openedbot https://… --name %s --yes` with a ticket", inst.Label(), linkPathOf(inst), inst.Label())
 	}
 	if err := validateWSURL(lf.WSURL); err != nil {
 		return fail(env, cli.ExitRefused, "link.json: %v (nothing was changed)", err)

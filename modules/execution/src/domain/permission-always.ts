@@ -1,5 +1,5 @@
 /**
- * PERM2-4 (DEV-OHB-254): which "Always" a human may answer a gate with.
+ * PERM2-4: which "Always" a human may answer a gate with.
  *
  *   always_bot_tool          a grant for this tool on this bot (plugin gate)
  *   always_runtime_terminal  the runtime switch for dangerous commands (D-3)

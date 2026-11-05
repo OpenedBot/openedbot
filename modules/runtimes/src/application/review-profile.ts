@@ -3,7 +3,7 @@ import { REVIEW_PROFILE } from "../domain/runtime-contract";
 import type { ReviewProfileOutcome } from "../sql/review-profiles";
 
 /**
- * PERM2-7a: prepares the `ohb-reviewer` profile of one runtime and proves it
+ * PERM2-7a: prepares the `openedbot-reviewer` profile of one runtime and proves it
  * has no tool. The reviewer only reads a gate and answers in JSON; any tool
  * it could reach would let a prompt in the gate act on the host.
  *

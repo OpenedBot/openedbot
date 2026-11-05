@@ -74,11 +74,11 @@ describe("relay frames: validation identical to Go DecodeText", () => {
       { t: "capabilities", features: ["provider_management"] },
       { t: "link.issued", runtimeId: "rt", linkToken: "tok" },
       { t: "link.rotate", runtimeId: "rt", linkToken: "tok2" },
-      { t: "link.context", environment: "prod", ohb: "https://console.openedbot.app", organization: { id: "org", name: "Acme", slug: "acme" }, owner: { email: "o@example.com" } },
-      { t: "link.context", environment: "dev", ohb: "http://127.0.0.1:8790" },
-      { t: "link.context", environment: "prod", ohb: "https://console.openedbot.app", latestVersion: "v0.2.0", minimumVersion: "v0.1.0" },
-      { t: "link.context", environment: "prod", ohb: "https://console.openedbot.app", limits: { features: 64 } },
-      { t: "link.context", environment: "prod", ohb: "https://console.openedbot.app", limits: {} },
+      { t: "link.context", environment: "prod", openedbot: "https://console.openedbot.app", organization: { id: "org", name: "Acme", slug: "acme" }, owner: { email: "o@example.com" } },
+      { t: "link.context", environment: "dev", openedbot: "http://127.0.0.1:8790" },
+      { t: "link.context", environment: "prod", openedbot: "https://console.openedbot.app", latestVersion: "v0.2.0", minimumVersion: "v0.1.0" },
+      { t: "link.context", environment: "prod", openedbot: "https://console.openedbot.app", limits: { features: 64 } },
+      { t: "link.context", environment: "prod", openedbot: "https://console.openedbot.app", limits: {} },
       { t: "req", id: 7, method: "POST", path: "/v1/runs", headers: { "content-type": "application/json" }, body: "stream" },
       { t: "res", id: 7, status: 200, headers: { "content-type": "text/event-stream" } },
       { t: "end", id: 7 },
@@ -112,7 +112,7 @@ describe("relay frames: validation identical to Go DecodeText", () => {
   });
 
   test("link.context carries the feature bound in limits and validates it like the Go test", () => {
-    const base = { t: "link.context", environment: "prod", ohb: "https://openedbot.app" } as const;
+    const base = { t: "link.context", environment: "prod", openedbot: "https://openedbot.app" } as const;
     expect(decodeTextFrame(JSON.stringify({ ...base, limits: { features: 64 } }))).toEqual({ ...base, limits: { features: 64 } });
     // A bound the host does not know, and a limits object without features, announce nothing.
     expect(decodeTextFrame(JSON.stringify({ ...base, limits: { features: 64, requests: 10 } }))).toEqual({ ...base, limits: { features: 64 } });
@@ -140,9 +140,9 @@ describe("relay frames: validation identical to Go DecodeText", () => {
       '{"t":"res","id":"1","status":200}',
       '{"t":"link.rotate","runtimeId":"rt"}',
       '{"t":"link.rotate","linkToken":"tok"}',
-      '{"t":"link.context","environment":"staging","ohb":"https://x"}',
+      '{"t":"link.context","environment":"staging","openedbot":"https://x"}',
       '{"t":"link.context","environment":"prod"}',
-      '{"t":"link.context","environment":"prod","ohb":"https://x","owner":{"displayName":"no email"}}',
+      '{"t":"link.context","environment":"prod","openedbot":"https://x","owner":{"displayName":"no email"}}',
     ];
     for (const raw of bad) {
       expect(() => decodeTextFrame(raw), raw).toThrow(RelayFrameError);

@@ -2,8 +2,6 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-# shellcheck source=lib/legacy-env.sh
-. "$root/scripts/lib/legacy-env.sh" # refuses a retired OHB_* variable
 
 usage() {
   printf 'usage: scripts/db.sh --up | --migrate | --reset [--yes] [--dry-run]\n' >&2
@@ -62,14 +60,14 @@ db_up() {
 }
 
 # The development database is the one API_DATABASE_URL names (the path of
-# the DSN, before any query string); ohb when the DSN is unset or names none.
+# the DSN, before any query string); openedbot when the DSN is unset or names none.
 database_of_url() {
   local rest="${1#*://}"
-  if [ -z "$1" ] || [ "$rest" = "$1" ]; then printf 'ohb'; return; fi
+  if [ -z "$1" ] || [ "$rest" = "$1" ]; then printf 'openedbot'; return; fi
   rest="${rest##*@}"
   case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
   rest="${rest%%\?*}"
-  printf '%s' "${rest:-ohb}"
+  printf '%s' "${rest:-openedbot}"
 }
 
 db_migrate() {
@@ -87,18 +85,18 @@ select format('\''create database %I'\'', :'\''database_name'\'')
 where not exists (select from pg_database where datname = :'\''database_name'\'')\gexec
 do \$\$
 begin
-  if not exists (select from pg_roles where rolname = '\''ohb_api'\'') then
-    create role ohb_api login password '\''ohb_api_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_api'\'') then
+    create role openedbot_api login password '\''openedbot_api_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = '\''ohb_worker'\'') then
-    create role ohb_worker login password '\''ohb_worker_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_worker'\'') then
+    create role openedbot_worker login password '\''openedbot_worker_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
-  if not exists (select from pg_roles where rolname = '\''ohb_staff'\'') then
-    create role ohb_staff login password '\''ohb_staff_dev'\'' nosuperuser nocreatedb nocreaterole;
+  if not exists (select from pg_roles where rolname = '\''openedbot_staff'\'') then
+    create role openedbot_staff login password '\''openedbot_staff_dev'\'' nosuperuser nocreatedb nocreaterole;
   end if;
 end
 \$\$;
-select format('\''grant connect on database %I to ohb_api, ohb_worker, ohb_staff'\'', :'\''database_name'\'')\gexec
+select format('\''grant connect on database %I to openedbot_api, openedbot_worker, openedbot_staff'\'', :'\''database_name'\'')\gexec
 SQL
   ' -- "$database"
 
@@ -211,7 +209,7 @@ begin
   if exists (select from pg_database where datname = '__DATABASE__') then
     execute 'revoke connect on database "__DATABASE__" from public';
     for role_name in
-      select rolname from pg_roles where rolname in ('ohb_api', 'ohb_worker', 'ohb_staff')
+      select rolname from pg_roles where rolname in ('openedbot_api', 'openedbot_worker', 'openedbot_staff')
     loop
       execute format('revoke connect on database "__DATABASE__" from %I', role_name);
     end loop;
@@ -227,7 +225,7 @@ declare
   role_name text;
 begin
   for role_name in
-    select rolname from pg_roles where rolname in ('ohb_api', 'ohb_worker', 'ohb_staff')
+    select rolname from pg_roles where rolname in ('openedbot_api', 'openedbot_worker', 'openedbot_staff')
   loop
     execute format('grant connect on database "__DATABASE__" to %I', role_name);
   end loop;

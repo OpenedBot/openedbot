@@ -19,7 +19,7 @@ export type StreamGap = { organizationId: string; from: number; to: number; reas
 export type StreamCursor = { organizationId: string; cursor: number };
 
 /**
- * Version de l'enveloppe. Absente : trame d'avant OHB-116/118, sans identité
+ * Version de l'enveloppe. Absente : ancienne trame, sans identité
  * bot/turn/session/bail. Un client tolère toute version et ignore les champs
  * qu'il ne connaît pas.
  */
@@ -31,7 +31,7 @@ export const EVENT_ENVELOPE_VERSION = 1;
  * `organizationEventEnvelope` et nulle part ailleurs.
  *
  * - `cursor` : position dans le flux de l'ORGANISATION, allouée au commit sous
- *   le verrou `ohb-run-events-cursor` ; c'est le curseur de reprise
+ *   le verrou `openedbot-run-events-cursor` ; c'est le curseur de reprise
  *   (`?cursor=` / `Last-Event-ID`), strictement croissant par connexion.
  *   Absent tant que la ligne n'est pas commitée : une trame poussée avant
  *   l'INSERT n'a pas de curseur, et le SSE ne lui met pas de champ `id:`.
@@ -40,7 +40,7 @@ export const EVENT_ENVELOPE_VERSION = 1;
  *   un terminal. C'est la clé d'idempotence avant qu'un curseur existe.
  * - `turnId` : le tour utilisateur. `workflows.root_run_id` pour une étape de
  *   workflow, sinon l'id du run lui-même (voir `runTurnId`).
- * - `sessionKey` : la clé de session Hermes du run (`ohb:{org}:…`), un
+ * - `sessionKey` : la clé de session Hermes du run (`openedbot:{org}:…`), un
  *   identifiant structurel, jamais un secret.
  * - `leaseGeneration` : le bail sous lequel la ligne a été écrite ; `null` pour
  *   une ligne antérieure à 0092.
@@ -118,7 +118,7 @@ export function organizationEventEnvelope<T>(record: RunEventRecord<T>): Organiz
  * Le tour d'un run, même règle que le trigger `run_events_stamp_identity`
  * (0092) : `coalesce(workflows.root_run_id, runs.id)`. L'id du run racine
  * plutôt que celui du message d'ingress : routines, hand-offs et courriers
- * n'ont pas de message, et un DM sans workflow (OHB-113) a pour run racine le
+ * n'ont pas de message, et un DM sans workflow a pour run racine le
  * run même que réserve `message_ingress.run_id`, donc le tour ne change pas
  * quand le workflow disparaît.
  */

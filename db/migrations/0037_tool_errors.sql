@@ -57,14 +57,14 @@ comment on table tool_errors is
 alter table tool_errors enable row level security;
 alter table tool_errors force row level security;
 
-create policy tool_errors_tenant on tool_errors to ohb_api
+create policy tool_errors_tenant on tool_errors to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy tool_errors_worker on tool_errors to ohb_worker
+create policy tool_errors_worker on tool_errors to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on tool_errors to ohb_api;
-grant select, insert, update, delete on tool_errors to ohb_worker;
+grant select, insert, update, delete on tool_errors to openedbot_api;
+grant select, insert, update, delete on tool_errors to openedbot_worker;
 
 insert into schema_migrations(version) values ('0037_tool_errors')
 on conflict (version) do nothing;

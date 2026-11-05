@@ -1,6 +1,6 @@
 begin;
 
--- OHB-75: how a direct runtime's gateway got published, before the runtime row exists.
+-- How a direct runtime's gateway got published, before the runtime row exists.
 --
 -- One exposure per publication attempt. It is created first (tunnel, DNS and Access
 -- provisioned on Cloudflare, or a Tailscale Funnel hostname declared), then the
@@ -54,7 +54,7 @@ create table runtime_direct_exposures (
   )
 );
 
--- A managed hostname is global on OHB's zone: two organizations never share one.
+-- A managed hostname is global on openedbot's zone: two organizations never share one.
 create unique index runtime_direct_exposures_managed_hostname_idx on runtime_direct_exposures (hostname)
   where kind = 'managed_cloudflare' and revoked_at is null;
 create index runtime_direct_exposures_org_idx on runtime_direct_exposures (organization_id, created_at desc);
@@ -63,14 +63,14 @@ create index runtime_direct_exposures_reconcile_idx on runtime_direct_exposures 
 
 alter table runtime_direct_exposures enable row level security;
 alter table runtime_direct_exposures force row level security;
-create policy runtime_direct_exposures_tenant on runtime_direct_exposures to ohb_api
+create policy runtime_direct_exposures_tenant on runtime_direct_exposures to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_direct_exposures_worker on runtime_direct_exposures to ohb_worker using (true) with check (true);
-grant select, insert, update on runtime_direct_exposures to ohb_api;
-grant select, update on runtime_direct_exposures to ohb_worker;
+create policy runtime_direct_exposures_worker on runtime_direct_exposures to openedbot_worker using (true) with check (true);
+grant select, insert, update on runtime_direct_exposures to openedbot_api;
+grant select, update on runtime_direct_exposures to openedbot_worker;
 
-comment on table runtime_direct_exposures is 'OHB-75: publication of a direct gateway (customer Cloudflare, OHB-managed Cloudflare, Tailscale Funnel). Never a customer API token.';
+comment on table runtime_direct_exposures is 'Publication of a direct gateway (customer Cloudflare, openedbot-managed Cloudflare, Tailscale Funnel). Never a customer API token.';
 comment on column runtime_direct_exposures.install_token_ciphertext is 'cloudflared connector token, encrypted; erased once the runtime is declared.';
 
 insert into schema_migrations(version) values ('0058_runtime_direct_exposure') on conflict (version) do nothing;

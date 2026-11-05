@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
  * ne dit rien au modèle, la carte se replie seulement en une ligne. Le choix
  * vit dans ce navigateur, par run, borné aux plus récents.
  */
-const STORAGE_KEY = "ohb.askUser.dismissedRuns";
+const STORAGE_KEY = "openedbot.askUser.dismissedRuns";
 const MAX_RUNS = 200;
 
 const listeners = new Set<() => void>();

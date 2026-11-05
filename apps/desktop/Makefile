@@ -3,7 +3,6 @@
 
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
-include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/legacy-env.mk
 .PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer mac-sign-check package-mac check-mac package-linux clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
@@ -138,12 +137,12 @@ package-win-installer: defaults ## Unsigned Windows x64 NSIS installer (.exe) in
 # then staged in POPUP_STAGE, the fixed path electron-builder embeds
 # (mac.extraFiles), whatever NOTCH_DIR is.
 NOTCH_DIR ?= ../../../openedbot-notch
-POPUP_APP := $(NOTCH_DIR)/dist/OHBPopup.app
-POPUP_STAGE := popup-bundle/OHBPopup.app
+POPUP_APP := $(NOTCH_DIR)/dist/OpenedbotPopup.app
+POPUP_STAGE := popup-bundle/OpenedbotPopup.app
 
-popup-check: ## Check that the popup bundle to embed exists (NOTCH_DIR/dist/OHBPopup.app; NOTCH_DIR defaults to ../../../openedbot-notch)
-	@[ -x "$(POPUP_APP)/Contents/MacOS/OHBPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] clone OpenedBot/openedbot-notch next to this repository (or set NOTCH_DIR), then: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
-	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OHBHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OHBHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
+popup-check: ## Check that the popup bundle to embed exists (NOTCH_DIR/dist/OpenedbotPopup.app; NOTCH_DIR defaults to ../../../openedbot-notch)
+	@[ -x "$(POPUP_APP)/Contents/MacOS/OpenedbotPopup" ] || { printf "$(C_ERR)[make] popup bundle missing: $(POPUP_APP)\n[make] clone OpenedBot/openedbot-notch next to this repository (or set NOTCH_DIR), then: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
+	@[ "$$(/usr/libexec/PlistBuddy -c 'Print :OpenedbotHostedProtocol' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null)" = "1" ] || { printf "$(C_ERR)[make] $(POPUP_APP) predates hosted mode (no OpenedbotHostedProtocol 1 in its Info.plist)\n[make] rebuild it: make -C $(NOTCH_DIR) bundle$(C_RESET)\n"; exit 1; }
 	@printf "$(C_OK)[make] popup bundle: $(POPUP_APP) (version %s, hosted protocol 1)$(C_RESET)\n" "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' '$(POPUP_APP)/Contents/Info.plist' 2>/dev/null || echo '?')"
 
 popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, where electron-builder embeds it

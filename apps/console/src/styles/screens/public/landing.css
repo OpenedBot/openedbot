@@ -11,7 +11,7 @@
   perforation d'un carnet à souches : une session s'arrache et s'archive.
 */
 
-.ohb-mode {
+.openedbot-mode {
   --mode-gutter: clamp(1.25rem, 5vw, 3rem);
   --mode-rule: color-mix(in oklab, var(--border) 90%, transparent);
   --mode-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -19,18 +19,18 @@
   color: var(--foreground);
 }
 
-.ohb-mode-guide {
+.openedbot-mode-guide {
   width: min(100%, 46rem);
   margin-inline: auto;
   padding: clamp(2rem, 6vw, 4.5rem) var(--mode-gutter) clamp(3rem, 8vw, 6rem);
 }
 
 /* Le lanceur porte un champ, des pastilles et un bouton sur la même ligne. */
-.ohb-mode-guide[data-kind="chat"] {
+.openedbot-mode-guide[data-kind="chat"] {
   width: min(100%, 52rem);
 }
 
-.ohb-mode-head {
+.openedbot-mode-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -38,7 +38,7 @@
   gap: 0.75rem;
 }
 
-.ohb-mode-eyebrow {
+.openedbot-mode-eyebrow {
   margin: 0;
   color: var(--muted-foreground);
   font-family: var(--font-mono);
@@ -53,7 +53,7 @@
   que c'est l'accent que l'opérateur a choisi dans ses réglages : la page ne
   ramène pas un vert à elle.
 */
-.ohb-mode-cta {
+.openedbot-mode-cta {
   display: inline-flex;
   min-height: 40px;
   align-items: center;
@@ -73,12 +73,12 @@
   transition: background 160ms var(--mode-ease);
 }
 
-.ohb-mode-cta:hover {
+.openedbot-mode-cta:hover {
   background: var(--accent-700);
 }
 
-:root[data-keyboard-focus] .ohb-mode-cta:focus-visible,
-:root[data-keyboard-focus] .ohb-mode-row-target:focus-visible {
+:root[data-keyboard-focus] .openedbot-mode-cta:focus-visible,
+:root[data-keyboard-focus] .openedbot-mode-row-target:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
@@ -88,7 +88,7 @@
   italique de la même fonte : dit ce qu'il en coûte. L'italique porte la
   distinction entre les deux modes ; aucun surligneur ne s'en charge.
 */
-.ohb-mode-title {
+.openedbot-mode-title {
   margin: 1.5rem 0 0;
   max-width: 16ch;
   font-family: var(--font-serif);
@@ -99,14 +99,14 @@
   text-wrap: balance;
 }
 
-.ohb-mode-title em {
+.openedbot-mode-title em {
   display: block;
   color: var(--muted-foreground);
   font-style: italic;
   font-weight: 500;
 }
 
-.ohb-mode-lead {
+.openedbot-mode-lead {
   margin: 1.15rem 0 0;
   max-width: 46ch;
   color: var(--muted-foreground);
@@ -115,7 +115,7 @@
   text-wrap: pretty;
 }
 
-.ohb-mode-facts {
+.openedbot-mode-facts {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem 1.1rem;
@@ -127,18 +127,18 @@
   text-transform: uppercase;
 }
 
-.ohb-mode-facts span + span::before {
+.openedbot-mode-facts span + span::before {
   content: "·";
   margin-right: 1.1rem;
   opacity: 0.55;
 }
 
-.ohb-mode-index {
+.openedbot-mode-index {
   margin-top: clamp(2.5rem, 6vw, 4rem);
   border-top: 1px solid var(--mode-rule);
 }
 
-.ohb-mode-index-title {
+.openedbot-mode-index-title {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -153,14 +153,14 @@
   text-transform: uppercase;
 }
 
-.ohb-mode-index-title span {
+.openedbot-mode-index-title span {
   color: var(--muted-foreground);
   font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: none;
 }
 
-.ohb-mode-rows {
+.openedbot-mode-rows {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -171,15 +171,15 @@
   ligne est une souche détachable. C'est le seul endroit où les deux pages
   divergent visuellement, et il dit exactement ce qui les sépare.
 */
-.ohb-mode-row + .ohb-mode-row {
+.openedbot-mode-row + .openedbot-mode-row {
   border-top: 1px solid var(--mode-rule);
 }
 
-[data-kind="chat"] .ohb-mode-row + .ohb-mode-row {
+[data-kind="chat"] .openedbot-mode-row + .openedbot-mode-row {
   border-top-style: dashed;
 }
 
-.ohb-mode-row-target {
+.openedbot-mode-row-target {
   display: flex;
   width: 100%;
   min-height: 62px;
@@ -197,23 +197,23 @@
   transition: background 140ms var(--mode-ease);
 }
 
-.ohb-mode-row-target:hover {
+.openedbot-mode-row-target:hover {
   background: var(--surface-hover);
 }
 
-.ohb-mode-row-target:disabled {
+.openedbot-mode-row-target:disabled {
   cursor: default;
   opacity: 0.55;
 }
 
-.ohb-mode-row-text {
+.openedbot-mode-row-text {
   display: grid;
   min-width: 0;
   flex: 1;
   gap: 0.15rem;
 }
 
-.ohb-mode-row-text strong {
+.openedbot-mode-row-text strong {
   overflow: hidden;
   font-size: 0.9375rem;
   font-weight: 550;
@@ -222,7 +222,7 @@
   white-space: nowrap;
 }
 
-.ohb-mode-row-text > span {
+.openedbot-mode-row-text > span {
   overflow: hidden;
   color: var(--muted-foreground);
   font-size: 0.8125rem;
@@ -230,7 +230,7 @@
   white-space: nowrap;
 }
 
-.ohb-mode-row-meta {
+.openedbot-mode-row-meta {
   flex-shrink: 0;
   color: var(--muted-foreground);
   font-family: var(--font-mono);
@@ -238,7 +238,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.ohb-mode-row-go {
+.openedbot-mode-row-go {
   flex-shrink: 0;
   color: var(--muted-foreground);
   opacity: 0;
@@ -248,48 +248,48 @@
     transform 140ms var(--mode-ease);
 }
 
-.ohb-mode-row-target:hover .ohb-mode-row-go,
-:root[data-keyboard-focus] .ohb-mode-row-target:focus-visible .ohb-mode-row-go {
+.openedbot-mode-row-target:hover .openedbot-mode-row-go,
+:root[data-keyboard-focus] .openedbot-mode-row-target:focus-visible .openedbot-mode-row-go {
   opacity: 1;
   transform: none;
 }
 
-.ohb-mode-empty {
+.openedbot-mode-empty {
   display: grid;
   justify-items: start;
   gap: 0.4rem;
   padding: 1.75rem 0.5rem 0.5rem;
 }
 
-.ohb-mode-empty p {
+.openedbot-mode-empty p {
   margin: 0;
   max-width: 42ch;
 }
 
-.ohb-mode-empty p:first-child {
+.openedbot-mode-empty p:first-child {
   font-family: var(--font-serif);
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.ohb-mode-empty p + p {
+.openedbot-mode-empty p + p {
   color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.55;
 }
 
-.ohb-mode-empty .ohb-mode-cta {
+.openedbot-mode-empty .openedbot-mode-cta {
   margin-top: 0.75rem;
 }
 
 /* Apparition au montage : les lignes se posent, décalées par leur rang. */
-.ohb-mode-row {
+.openedbot-mode-row {
   opacity: 0;
   transform: translateY(8px);
 }
 
-.ohb-mode-guide.in .ohb-mode-row {
+.openedbot-mode-guide.in .openedbot-mode-row {
   opacity: 1;
   transform: none;
   transition:
@@ -299,20 +299,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-mode-row {
+  .openedbot-mode-row {
     opacity: 1;
     transform: none;
   }
 
-  .ohb-mode-guide.in .ohb-mode-row,
-  .ohb-mode-cta,
-  .ohb-mode-row-target,
-  .ohb-mode-row-go {
+  .openedbot-mode-guide.in .openedbot-mode-row,
+  .openedbot-mode-cta,
+  .openedbot-mode-row-target,
+  .openedbot-mode-row-go {
     transition-duration: 0.01ms;
     transition-delay: 0ms;
   }
 
-  .ohb-mode-row-go {
+  .openedbot-mode-row-go {
     opacity: 1;
     transform: none;
   }
@@ -320,32 +320,32 @@
 
 /* Au doigt, aucun survol ne révèle la flèche : elle reste posée. */
 @media (pointer: coarse) {
-  .ohb-mode-row-go {
+  .openedbot-mode-row-go {
     opacity: 1;
     transform: none;
   }
 
-  .ohb-mode-row-target:hover {
+  .openedbot-mode-row-target:hover {
     background: none;
   }
 }
 
-.ohb-mode-cta:disabled {
+.openedbot-mode-cta:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-.ohb-mode-cta:disabled:hover {
+.openedbot-mode-cta:disabled:hover {
   background: var(--accent-600);
 }
 
 /* Au doigt : 44 pt sur ce qui se tape (HIG / WCAG 2.5.8), aucun survol ne porte d'information. */
 @media (pointer: coarse) {
-  .ohb-mode-cta {
+  .openedbot-mode-cta {
     min-height: 44px;
   }
 
-  .ohb-mode-cta:hover {
+  .openedbot-mode-cta:hover {
     background: var(--accent-600);
   }
 }

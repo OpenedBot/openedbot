@@ -561,7 +561,7 @@ func (s *Server) addCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	label := body.Label
 	if label == "" {
-		label = "ohb-" + s.now().UTC().Format("20060102") + "-" + randomHex(2)
+		label = "openedbot-" + s.now().UTC().Format("20060102") + "-" + randomHex(2)
 	}
 	if !labelRe.MatchString(label) {
 		writeError(w, http.StatusBadRequest, "LABEL_INVALID", "the label is invalid")

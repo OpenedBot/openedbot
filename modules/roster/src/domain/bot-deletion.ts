@@ -34,7 +34,7 @@ export function botRuntimeSessionIds(
     // Chaque génération de la session du fil (0163) est une session de l'hôte.
     for (const key of threadSessionKeys(thread.sessionId, Number(thread.sessionGeneration ?? 0))) ids.add(key);
     ids.add(compactionSessionKey(organizationId, thread.threadId));
-    // Lives on the default profile (DEV-OHB-244); a missing one is a 404.
+    // Lives on the default profile; a missing one is a 404.
     ids.add(greetingSessionKey(thread.sessionId));
   }
   for (const workflow of scope.workflows) {

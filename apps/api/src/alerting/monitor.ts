@@ -195,7 +195,7 @@ export function alertWebhookBody(notification: AlertNotification, context: Alert
   const reasons = notification.reasons.length > 0 ? notification.reasons.join(" ; ") : "aucune raison";
   const where = `[${context.environment} · ${context.host}]`;
   return {
-    event: "ohb.alert",
+    event: "openedbot.alert",
     environment: context.environment,
     host: context.host,
     ...notification,

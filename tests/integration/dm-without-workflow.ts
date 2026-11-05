@@ -1,5 +1,5 @@
 /**
- * OHB-113 against a disposable PostgreSQL database, the real send route, the
+ * Proved against a disposable PostgreSQL database, the real send route, the
  * real queue and the real runner (loopback fake Hermes). A plain DM turn must
  * leave `runs.workflow_id` null, insert no workflow and never read the Hermes
  * session counters; rooms, explicit handoffs and autonomy keep their
@@ -52,18 +52,18 @@ const recorder = Bun.serve({
 
 
 try {
-  await withDisposablePostgres("ohb113_dm", async ({ owner: target, connect }) => {
-    const api = await connect("ohb_api");
-    const worker = await connect("ohb_worker");
+  await withDisposablePostgres("openedbot113_dm", async ({ owner: target, connect }) => {
+    const api = await connect("openedbot_api");
+    const worker = await connect("openedbot_worker");
     const key = secretEncryptionKey(new Uint8Array(32).fill(13));
     const endpoint = recorder.url.toString().replace(/\/$/, "");
     const bearer = encryptSecret(FAKE_HERMES_TOKEN, key.value);
-    await target`insert into users (id, email) values (${USER}, 'ohb113@example.test')`;
-    for (const [org, slug] of [[ORG, "ohb113"], [FIFO_ORG, "ohb113-fifo"]] as const) {
+    await target`insert into users (id, email) values (${USER}, 'openedbot113@example.test')`;
+    for (const [org, slug] of [[ORG, "openedbot113"], [FIFO_ORG, "openedbot113-fifo"]] as const) {
       await target`insert into organizations (id, slug, name) values (${org}, ${slug}, ${slug})`;
       await target`insert into memberships (organization_id, user_id, role) values (${org}, ${USER}, 'owner')`;
       await target`insert into sections (id, organization_id, name, position)
-        values (${org === ORG ? id(401) : id(402)}, ${org}, 'OHB-113', 0)`;
+        values (${org === ORG ? id(401) : id(402)}, ${org}, 'DM without workflow', 0)`;
       await target`insert into runtimes (
           id, organization_id, name, reachability, endpoint, token_ciphertext, token_nonce, token_tag, token_key_id,
           is_active, capacity, last_health_status, last_probed_at
@@ -84,19 +84,19 @@ try {
       [threads.fifo, bots.fifo, FIFO_ORG],
     ] as const) {
       await target`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-        values (${threadId}, ${org}, ${botId}, 'DM', ${`ohb113-${threadId}`}, true)`;
+        values (${threadId}, ${org}, ${botId}, 'DM', ${`openedbot113-${threadId}`}, true)`;
     }
     await target`insert into bot_groups (id, organization_id, section_id, name, position)
       values (${groupId}, ${ORG}, ${id(401)}, 'Salon', 0)`;
     await target`insert into group_members (organization_id, group_id, bot_id, position)
       values (${ORG}, ${groupId}, ${bots.neo}, 0), (${ORG}, ${groupId}, ${bots.trinity}, 1)`;
     await target`insert into threads (id, organization_id, group_id, title, hermes_session_id)
-      values (${threads.group}, ${ORG}, ${groupId}, 'Salon', 'ohb113-group')`;
+      values (${threads.group}, ${ORG}, ${groupId}, 'Salon', 'openedbot113-group')`;
 
     const workerConfig: WorkerConfig = {
-      workerId: "ohb113-worker",
+      workerId: "openedbot113-worker",
       apiInternalUrl: "http://127.0.0.1:9",
-      apiInternalToken: "ohb113",
+      apiInternalToken: "openedbot113",
       tokenEncryption: { current: key, previous: [] },
       hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],
@@ -186,9 +186,9 @@ try {
       `review workflow moved the turn or the lease: ${JSON.stringify({ beforeReview, afterReview })}`);
     await target`update runs set status = 'failed', updated_at = now() where id = ${uncertain}`;
 
-    // 2. The real send route, as ohb_api under RLS.
+    // 2. The real send route, as openedbot_api under RLS.
     const auth: AuthContext = {
-      sessionId: "ohb113-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "ohb113",
+      sessionId: "openedbot113-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "openedbot113",
     };
     const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", async (context, next) => { context.set("auth", auth); await next(); });
@@ -295,7 +295,7 @@ try {
 
     console.table(proof);
     console.log(`workflows: ${before} before, ${await workflowCount()} after (salon + handoff + autonomie; DM simple et repli: 0)`);
-    console.log("OHB-113 PostgreSQL proof passed: plain DM without workflow nor session counters, fold, FIFO per thread, deadline expiry, review workflow on uncertainty, turn = run under the lease fence; room, handoff and autonomy keep their workflow.");
+    console.log("DM without workflow PostgreSQL proof passed: plain DM without workflow nor session counters, fold, FIFO per thread, deadline expiry, review workflow on uncertainty, turn = run under the lease fence; room, handoff and autonomy keep their workflow.");
   });
 } finally {
   recorder.stop(true);

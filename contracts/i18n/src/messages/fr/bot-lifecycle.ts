@@ -128,7 +128,7 @@ export const botManage = {
     webhooks: "Webhooks",
   },
   profile: {
-    managedByOhb: "Profil Hermes « {profile} » · géré par openedbot",
+    managedByOpenedbot: "Profil Hermes « {profile} » · géré par openedbot",
     imported: "Profil Hermes « {profile} » · importé",
     unassigned: "Aucun profil Hermes attribué.",
   },

@@ -81,7 +81,7 @@ sudo edge-setup up --yes
 Ensuite, ouvrez le ticket dans la console (il est valable cinq minutes) et reliez la machine :
 
 ```bash
-edge-setup link --ohb https://link.openedbot.app --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 ```
 
 `https://link.openedbot.app` est l’origine par défaut : `edge-setup link --yes` fait la même chose. `edge-setup` demande le ticket sans l’afficher : collez-le à l’invite. Il ne figure ni dans la ligne de commande ni dans l’historique du shell, et ne sert qu’une fois.
@@ -155,7 +155,7 @@ sudo edge-setup up \
 Puis, dans les 600 s, `verify-access` depuis une nouvelle session. Ensuite :
 
 ```bash
-edge-setup link --ohb https://link.openedbot.app --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 edge-setup doctor
 edge-setup audit --strict
 ```

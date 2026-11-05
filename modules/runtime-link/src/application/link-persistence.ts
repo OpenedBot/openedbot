@@ -49,7 +49,7 @@ function requiredGeneration(link: LinkIdentity): string {
 
 export type LinkLivenessStoreOptions = {
   /**
-   * Le bucket WORM (OHB-57), installation legacy de l'`AuditAnchor` jusqu'à
+   * Le bucket WORM, installation legacy de l'`AuditAnchor` jusqu'à
    * l'étape 8 : chaque ancre enregistrée y est déposée une fois ; `null` =
    * chaîne locale seule.
    */

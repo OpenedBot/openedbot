@@ -62,7 +62,7 @@ Prepare before `up`: an SSH public key for the admin account
 ### Outbound connector
 
 - **Outbound**: a WebSocket connection (`wss://`, port 443) to the
-  openedbot origin given to `--ohb`, the `edge-setup` binaries from
+  openedbot origin given to `--openedbot`, the `edge-setup` binaries from
   `https://releases.openedbot.app/edge-setup`, Hermes (pinned installer and
   repository) and `uv` from GitHub, Node.js from `nodejs.org`, the
   distribution repositories and the model providers. With `--sandbox`, the
@@ -75,9 +75,9 @@ Prepare before `up`: an SSH public key for the admin account
   gateway, connector and operator units, and by UFW when that option is
   selected.
 
-In production, `--ohb` receives `https://link.openedbot.app`, the link origin
+In production, `--openedbot` receives `https://link.openedbot.app`, the link origin
 (a host paired on `https://openedbot.app`
-follows it on its own). In development, `--ohb`
+follows it on its own). In development, `--openedbot`
 receives the VPS loopback set up by a reverse SSH tunnel; the HTTPS origin
 of a Cloudflare tunnel started by hand remains an advanced option.
 In every case, any tunnel is on the application side: the VPS gateway

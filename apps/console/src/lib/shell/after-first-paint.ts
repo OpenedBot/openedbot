@@ -11,7 +11,7 @@ import { create } from "zustand";
 const FALLBACK_MS = 1_500;
 
 /** `performance.mark` set once, when the first thread messages are painted. */
-export const THREAD_FIRST_PAINT_MARK = "ohb:thread-first-paint";
+export const THREAD_FIRST_PAINT_MARK = "openedbot:thread-first-paint";
 
 type AfterFirstPaint = {
   ready: boolean;

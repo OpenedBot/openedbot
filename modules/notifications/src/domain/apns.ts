@@ -5,7 +5,7 @@ import type { PushEventType } from "./push-payload";
 export type ApnsEnvironment = "sandbox" | "production";
 
 /**
- * `kind` of the `ohb` block the iOS client routes on. v1 produces only
+ * `kind` of the `openedbot` block the iOS client routes on. v1 produces only
  * `approval` and `workflow` (the transitions `push_outbox` already carries);
  * `needs_you` and `needs_review` are part of the client contract and reserved
  * until an outbox producer emits them.
@@ -18,7 +18,7 @@ export type ApnsPayload = {
     sound: "default";
     "thread-id": string;
   };
-  ohb: {
+  openedbot: {
     kind: ApnsNotificationKind;
     threadId: string;
     organizationId: string;
@@ -112,7 +112,7 @@ export function apnsPayload(input: {
       sound: "default",
       "thread-id": input.threadId,
     },
-    ohb: {
+    openedbot: {
       kind: apnsKind(input.eventType),
       threadId: input.threadId,
       organizationId: input.organizationId,

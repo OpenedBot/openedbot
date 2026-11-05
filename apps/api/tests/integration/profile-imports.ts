@@ -14,10 +14,10 @@ import { withProfileNamesLock, withBotProfileLock } from "@openedbot/portability
 import { startFakeHermes } from "../../../../tests/fake-hermes/server";
 
 const url = process.env.INTEGRATION_ADMIN_DATABASE_URL;
-if (!url || !/^\/ohb56_import_[a-z0-9_]+$/.test(new URL(url).pathname)) throw new Error("Explicit disposable ohb56_import_* database required");
+if (!url || !/^\/openedbot56_import_[a-z0-9_]+$/.test(new URL(url).pathname)) throw new Error("Explicit disposable openedbot56_import_* database required");
 const db = new SQL({ url, max: 5 });
 const api = new SQL({ url, max: 1 });
-const worker = new SQL({ url, max: 3, connection: { options: "-c role=ohb_worker" } });
+const worker = new SQL({ url, max: 3, connection: { options: "-c role=openedbot_worker" } });
 const fake = startFakeHermes({ port: 0, token: "import-fixture" });
 const origin = `127.0.0.1:${fake.port}`;
 const client = new HermesClient({ endpoint: `http://${origin}`, token: "import-fixture", policy: { environment: "development", insecureOrigins: new Set([origin]) }, mtls: null });
@@ -42,7 +42,7 @@ try {
   await db`insert into sections (id, organization_id, name, position) values (${section}, ${org}, 'Import', 0)`;
   await db`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active, link_features, selected_provider, selected_model)
     values (${runtime}, ${org}, 'Import fixture', 'connector', ${runtime}, true, array['profile_management', 'profile_capabilities'], 'fake', 'fake/hermes')`;
-  await api`set role ohb_api`;
+  await api`set role openedbot_api`;
   // Actual runtime INSERT proves column alignment, unmanaged ownership and rollback.
   await withImportTenant(api, org, async (tx) => {
     await importHermesProfile(tx, { organizationId: org, userId: user, sectionId: section, position: 0, managed: false, model: null }, input("runtime-adopted").profiles[0]!, null);
@@ -172,7 +172,7 @@ try {
 
   // The shared lock serializes an actual adoption against a simultaneous bundle.
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
-  const concurrentApi = new SQL({ url, max: 1, connection: { options: "-c role=ohb_api" } });
+  const concurrentApi = new SQL({ url, max: 1, connection: { options: "-c role=openedbot_api" } });
   try {
     const adoption = withProfileNamesLock(api, org, ["race-adopted"], async (connection) => {
       await withImportTenant(connection, org, async (tx) => {

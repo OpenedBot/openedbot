@@ -6,7 +6,7 @@ import { BotProfileRepair } from "../../src/components/bot-profile-repair";
 import { api } from "../../src/lib/api";
 import { I18nProvider } from "../../src/lib/i18n";
 
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(() => { cleanup(); window.localStorage.clear(); });
 
 const status: BotProfileStatusDto = {

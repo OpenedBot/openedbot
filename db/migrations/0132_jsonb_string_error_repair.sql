@@ -11,7 +11,7 @@
 -- Each string is parsed on its own: one that is not a JSON object (truncated,
 -- plain text) is left as it is rather than failing the whole migration.
 --
--- The three tables FORCE row level security; the schema owner ohb_migrator
+-- The three tables FORCE row level security; the schema owner openedbot_migrator
 -- carries BYPASSRLS (docs/cloud/PRODUCTION.md), so this update sees every
 -- tenant's rows.
 begin;

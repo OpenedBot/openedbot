@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { HermesToolset } from "./contracts";
 
 /**
- * Métadonnées de préflight Hermes (OHB-114).
+ * Métadonnées de préflight Hermes.
  *
  * Une seule carte, dans le processus qui sonde. La clé est l'organisation, le
  * runtime ET le profil : deux bots, deux hôtes ou deux tenants ne partagent
@@ -10,7 +10,7 @@ import type { HermesToolset } from "./contracts";
  * ou de modèle, ou une erreur de lecture, jettent l'entrée plutôt que de
  * servir une capacité périmée.
  *
- * OHB-137: `features.event_replay` is injected by the connector process
+ * `features.event_replay` is injected by the connector process
  * (journal present or not), so it cannot change without a new hello, which
  * moves `link_connected_at`. An entry anchored on that instant therefore lives
  * `HERMES_PREFLIGHT_LINK_TTL_MS`, long enough that consecutive turns on the
@@ -252,7 +252,7 @@ export function rememberCachedEventReplay(
 }
 
 /**
- * OHB-138: the toolset inventory (`/v1/toolsets`) reused across runs.
+ * The toolset inventory (`/v1/toolsets`) reused across runs.
  *
  * The worker paid a relay round trip for it on every run (225-253 ms on the
  * lab runtime) though it rarely changes. An entry is keyed by organization,

@@ -18,7 +18,7 @@ import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/sql/model-sel
 /**
  * Dépôt d'un credential fournisseur (clé API, session OAuth) sur un runtime.
  *
- * OHB-15 reste vrai : l'API n'ouvre aucune session shell vers la machine d'un
+ * Toujours vrai : l'API n'ouvre aucune session shell vers la machine d'un
  * client et ne détient aucune clé qui en ouvrirait une. Le runtime connector
  * offre l'opérateur edge-setup
  *     (`provider_management`, annoncé dans `hello` par le lien ou relu sur
@@ -50,7 +50,7 @@ export function runtimeAdminRoutes(db: Db, config: ApiConfig, dependencies: { sn
     const body = await jsonBody(context.req.raw);
     const apiKey = providerApiKey(body.apiKey);
     const { row, client } = await resolveRuntime(db, config, auth.organizationId, runtimeId);
-    const label = `ohb-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    const label = `openedbot-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
     const management = await managementOf(auth.organizationId, row);
 
     if (management.kind === "host") {

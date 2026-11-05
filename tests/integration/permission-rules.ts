@@ -1,5 +1,5 @@
 /**
- * PERM2-6 (DEV-OHB-256) against a disposable PostgreSQL database: the
+ * PERM2-6 against a disposable PostgreSQL database: the
  * natural-language permission rules of 0145. The API writes its own tenant
  * only, through the real use cases; every write raises the revision of the
  * bots it concerns (the bot, or every bot of the organization) and of no
@@ -48,10 +48,10 @@ async function failure(run: () => Promise<unknown>): Promise<string | null> {
   }
 }
 
-await withDisposablePostgres("ohb256_permission_rules", async ({ owner, connect }) => {
-  const api = await connect("ohb_api");
-  const api2 = await connect("ohb_api");
-  const worker = await connect("ohb_worker");
+await withDisposablePostgres("openedbot256_permission_rules", async ({ owner, connect }) => {
+  const api = await connect("openedbot_api");
+  const api2 = await connect("openedbot_api");
+  const worker = await connect("openedbot_worker");
   await owner`insert into users (id, email) values (${OWNER}, 'camille.lefevre@example.com'), (${MEMBER}, 'member@example.com')`;
   for (const [org, slug, pipeline] of [[ORG_A, "acme", "v2"], [ORG_B, "acme-other", "v2"], [AGENCY, "acme-agency", "v2"], [LEGACY, "acme-legacy", "legacy"]] as const) {
     await owner`insert into organizations (id, slug, name, permission_pipeline) values (${org}, ${slug}, 'Acme', ${pipeline})`;
@@ -206,7 +206,7 @@ await withDisposablePostgres("ohb256_permission_rules", async ({ owner, connect 
     sleep: async (ms) => { clock.now += ms; },
     client: () => ({
       mcpInventory: async () => ({ platform: "api_server", servers: [], catalog: [] }) as never,
-      hostProfileInventory: async () => ({ profiles: [{ name: "ohb-reviewer", mcpServers: [] }] }) as never,
+      hostProfileInventory: async () => ({ profiles: [{ name: "openedbot-reviewer", mcpServers: [] }] }) as never,
       createRun: async (input) => { inputs.push(input.input); return "review-run"; },
       getRunStatus: async () => ({ status: "completed", output: '{"verdict":"escalate","reason":"An ask first rule matches."}' }) as never,
       stopRun: async () => undefined,

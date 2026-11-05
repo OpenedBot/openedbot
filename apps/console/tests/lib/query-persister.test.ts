@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { capturePersistedReadScope, clearPersistedQueries } from "../../src/lib/query-persister";
 
 function signIn(userId: string) {
-  window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: `csrf-${userId}`, userId }));
+  window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: `csrf-${userId}`, userId }));
 }
 
 describe("capturePersistedReadScope", () => {

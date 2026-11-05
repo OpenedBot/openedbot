@@ -1,15 +1,15 @@
 begin;
 
--- Comment OHB atteint un runtime Hermes.
+-- Comment openedbot atteint un runtime Hermes.
 --
 -- Jusqu'ici une ligne `runtimes` portait toujours une URL publique et un
 -- bearer chiffré : le mode `direct`. Le connecteur (docs/CONNECTOR.md côté
 -- hermes-setup) inverse le sens : c'est l'hôte du client qui ouvre UNE
--- connexion sortante vers OHB, et les requêtes gateway transitent
+-- connexion sortante vers openedbot, et les requêtes gateway transitent
 -- par ce tuyau. Aucun port entrant, aucun domaine, aucun certificat côté
 -- client ; le bearer du gateway ne quitte jamais l'hôte.
 --
--- Invariant central : OHB ne compose AUCUNE URL vers un hôte joint
+-- Invariant central : openedbot ne compose AUCUNE URL vers un hôte joint
 -- par le connecteur. Une ligne `connector` a donc `endpoint` NULL par
 -- contrainte, et jamais de bearer : `token_*` sont NULL. Réciproquement une
 -- ligne `direct` garde ses quatre colonnes obligatoires et ne porte aucun
@@ -73,7 +73,7 @@ alter table runtimes add constraint runtimes_reachability_shape_check check (
 -- n'est visible, pas même son existence. La porte de l'organisation
 -- (`runtimes_tenant`) reste inchangée ; les politiques étant permissives,
 -- l'une OU l'autre suffit.
-create policy runtimes_link_credential on runtimes to ohb_api
+create policy runtimes_link_credential on runtimes to openedbot_api
   using (link_token_hash = nullif(current_setting('app.session_credential_hash', true), ''));
 
 -- Un enrôlement peut désormais préparer un runtime connector : il n'a alors

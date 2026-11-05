@@ -12,7 +12,7 @@ import { FAKE_HOST_FEATURES, FAKE_MCP_CATALOG, FAKE_SKILLS } from "./host-operat
 import { startFakeHermes } from "./server";
 
 const token = "fake-host-test-token";
-const redirectUri = "https://ohb.example.test/api/mcp-oauth/callback/runtime";
+const redirectUri = "https://openedbot.example.test/api/mcp-oauth/callback/runtime";
 let server: Server<undefined> | null = null;
 
 function boot(restartReads?: number): { client: HermesClient; profileClient: (slug: string) => HermesClient } {

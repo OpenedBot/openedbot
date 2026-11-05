@@ -7,7 +7,7 @@ import {
 const VAPID = {
   publicKey: Buffer.concat([Buffer.from([0x04]), Buffer.alloc(64, 3)]).toString("base64url"),
   privateKey: Buffer.alloc(32, 5).toString("base64url"),
-  subject: "mailto:ops@ohb.example",
+  subject: "mailto:ops@openedbot.example",
 };
 
 const OUTBOX = {

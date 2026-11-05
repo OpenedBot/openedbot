@@ -12,7 +12,7 @@ const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 
 test("an image the reply delivered is stored as an attachment, with no write in the transcript", async () => {
-  const root = await mkdtemp(join(tmpdir(), "ohb-output-media-"));
+  const root = await mkdtemp(join(tmpdir(), "openedbot-output-media-"));
   roots.push(root);
   const config = { blob: { driver: "file", root } } as unknown as WorkerConfig;
   const context = {

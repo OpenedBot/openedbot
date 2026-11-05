@@ -8,7 +8,7 @@ import { createLogFileStream, logFileStem, logsDirectory } from "../src/log/file
 import { logRedact } from "../src/log/redact";
 
 async function tmpLogs(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "ohb-logs-"));
+  return mkdtemp(join(tmpdir(), "openedbot-logs-"));
 }
 
 describe("log files", () => {

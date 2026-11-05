@@ -3,7 +3,7 @@ import { useAgentEditor } from "../../../src/lib/bots/agent-editor";
 
 afterEach(() => {
   useAgentEditor.getState().close();
-  window.localStorage.removeItem("ohb.agentEditor.open");
+  window.localStorage.removeItem("openedbot.agentEditor.open");
 });
 
 test("the editor starts closed instead of opening its canvas on arrival", () => {

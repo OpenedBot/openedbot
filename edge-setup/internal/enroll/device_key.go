@@ -22,7 +22,7 @@ const PoPNonceSize = 32
 
 // popPrefix separates the proof of possession from every other signature a
 // key could be asked for.
-const popPrefix = "ohb-link-pop/v1\n"
+const popPrefix = "openedbot-link-pop/v1\n"
 
 // GenerateDeviceKey draws a fresh Ed25519 key pair.
 func GenerateDeviceKey() (ed25519.PrivateKey, error) {
@@ -79,7 +79,7 @@ func ParsePoPNonce(s string) ([]byte, error) {
 }
 
 // PoPMessage is the exact byte string both sides sign and verify:
-// "ohb-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n".
+// "openedbot-link-pop/v1\n" || nonce || "\n" || runtimeId || "\n" || wsURL || "\n".
 // runtimeId is empty during enrollment (the host has none yet); wsURL is the
 // URL as dialed, so a proof cannot be replayed toward another broker.
 func PoPMessage(nonce []byte, runtimeID, wsURL string) []byte {

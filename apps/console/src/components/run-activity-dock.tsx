@@ -85,7 +85,7 @@ function activityLabel(
 /**
  * The thinking line itself, as « Thinking Shimmer » (streaming-ui.pulseview.app,
  * Stream collection): the status alone, a gradient sweeping it every 1.8 s
- * (`.ohb-thinking-shimmer`, agent-activity.css), a new status rising 3 px into
+ * (`.openedbot-thinking-shimmer`, agent-activity.css), a new status rising 3 px into
  * place. Its label is held at least 800 ms: a burst of tools reads as a
  * sequence of steps instead of a flicker.
  */
@@ -97,12 +97,12 @@ function RunActivityLine({ kind, label, inset }: {
   const held = useHeldValue(label, RUN_ACTIVITY_HOLD_MS);
   return (
     <div data-run-activity={kind} className={`flex min-h-7 w-full shrink-0 items-center ${inset}`}>
-      {/* Sans compteur de secondes, par décision opérateur (DEV-OHB-245). */}
+      {/* Sans compteur de secondes, par décision opérateur. */}
       <span role="status" className="flex min-w-0 items-center text-body-medium">
         <span
           key={held}
           data-thinking-label=""
-          className="ohb-thinking-shimmer min-w-0 truncate animate-in duration-200 fade-in-0 slide-in-from-bottom-[3px] motion-reduce:animate-none"
+          className="openedbot-thinking-shimmer min-w-0 truncate animate-in duration-200 fade-in-0 slide-in-from-bottom-[3px] motion-reduce:animate-none"
         >
           {held}
         </span>

@@ -2,8 +2,8 @@
  * eval tool. This file never starts/connects to a browser or contacts a service. */
 export type ObserverManifest = { nonce: string; threadId: string; apiOrigin: string; pageOrigin: string; eventOrigin?: string; botId?: string; observationSeconds: number };
 export function installContinuityObserver(config: ObserverManifest) {
-  const host = globalThis as typeof globalThis & { __ohbContinuityEvidence?: { snapshot: (stop?: boolean) => unknown } };
-  if (location.origin !== config.pageOrigin || host.__ohbContinuityEvidence) throw new Error("Wrong page origin or observer already installed");
+  const host = globalThis as typeof globalThis & { __openedbotContinuityEvidence?: { snapshot: (stop?: boolean) => unknown } };
+  if (location.origin !== config.pageOrigin || host.__openedbotContinuityEvidence) throw new Error("Wrong page origin or observer already installed");
   const original = globalThis.fetch;
   const evidence = { schemaVersion: 1, source: "ghostchrome-mcp-page-fetch", phase: "observing", nonce: config.nonce, threadId: config.threadId,
     apiOrigin: config.apiOrigin, eventOrigin: config.eventOrigin ?? config.pageOrigin, pageOrigin: location.origin, pagePath: location.pathname, installedAt: new Date().toISOString(), exportedAt: "", dropped: 0,
@@ -57,8 +57,8 @@ export function installContinuityObserver(config: ObserverManifest) {
     return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
   };
   globalThis.fetch = wrapped as typeof fetch;
-  const timer = setTimeout(() => { fail("Observer expired before final export"); host.__ohbContinuityEvidence?.snapshot(true); }, Math.min(90_000, Math.max(60, config.observationSeconds + 3600)) * 1000);
-  host.__ohbContinuityEvidence = { snapshot(stop = false) {
+  const timer = setTimeout(() => { fail("Observer expired before final export"); host.__openedbotContinuityEvidence?.snapshot(true); }, Math.min(90_000, Math.max(60, config.observationSeconds + 3600)) * 1000);
+  host.__openedbotContinuityEvidence = { snapshot(stop = false) {
     if (stop) { stopped = true; clearTimeout(timer); if (globalThis.fetch === wrapped) globalThis.fetch = original; evidence.phase = "complete"; }
     const nodes = new Map<string, { target: string; count: number; nonempty: boolean }>();
     for (const node of Array.from(document.querySelectorAll<HTMLElement>("[data-thread-messages] [data-thread-find-target]"))) {
@@ -70,7 +70,7 @@ export function installContinuityObserver(config: ObserverManifest) {
     evidence.rendered = [...nodes.values()]; evidence.pagePath = location.pathname; evidence.exportedAt = new Date().toISOString();
     return JSON.parse(JSON.stringify(evidence));
   } };
-  return host.__ohbContinuityEvidence.snapshot();
+  return host.__openedbotContinuityEvidence.snapshot();
 }
 if (import.meta.main) {
   const path = process.argv[2];

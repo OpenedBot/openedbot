@@ -168,7 +168,7 @@ export function eventRoutes(
     const sentCursors = new Set<number>();
     // Trames live (sans curseur) déjà écrites sur CETTE connexion, par
     // identité de ligne. Le rejeu commité d'une de ces trames se réduit à
-    // l'avance du curseur (DEV-OHB-112). Propre à la connexion : une reprise
+    // l'avance du curseur. Propre à la connexion : une reprise
     // ou une connexion ouverte entre le push et le commit n'en a aucune et
     // reçoit la trame complète. Borné ; une entrée évincée coûte un doublon
     // que la console absorbe, jamais une perte.

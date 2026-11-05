@@ -13,7 +13,7 @@ import type { Db } from "@openedbot/platform-db";
  * même événement. Zéro ligne écrite n'est pas une erreur SQL, c'est la réponse
  * que l'appelant doit observer et journaliser.
  *
- * L'insertion ne lit RIEN, et c'est la contrainte qui la dessine : `ohb_api`
+ * L'insertion ne lit RIEN, et c'est la contrainte qui la dessine : `openedbot_api`
  * dépose dans la file sans jamais pouvoir la relire (0064), or cette
  * file porte des adresses en clair jusqu'à l'envoi. D'où deux formes qui
  * sautent aux yeux :
@@ -22,7 +22,7 @@ import type { Db } from "@openedbot/platform-db";
  *   `select` sur cette colonne. C'est la seule contrainte unique en dehors de
  *   la clé primaire, l'inférence désigne donc la même ;
  * - pas de `returning` : sous RLS, rendre une ligne insérée exige une
- *   politique `select`, que `ohb_api` n'a pas. Le nombre de lignes écrites
+ *   politique `select`, que `openedbot_api` n'a pas. Le nombre de lignes écrites
  *   (`count`) dit la même chose sans rien lire.
  *
  * `payload` est passé en OBJET, pas en texte : le `SQL` de Bun sérialise

@@ -45,7 +45,7 @@ function policyProbe(offset: number) {
   };
 }
 
-await withDisposablePostgres("ohb81_a2a_audit", async ({ owner, connect }) => {
+await withDisposablePostgres("openedbot81_a2a_audit", async ({ owner, connect }) => {
   const user = "81000000-0000-4000-8000-000000000001";
   const clientOwner = "81000000-0000-4000-8000-000000000002";
   const agency = "81000000-0000-4000-8000-000000000003";
@@ -76,8 +76,8 @@ await withDisposablePostgres("ohb81_a2a_audit", async ({ owner, connect }) => {
       values (${runtimeId}, ${organizationId}, 'fixture runtime', 'http://127.0.0.1:8123', 'cipher', 'nonce', 'tag')`;
   }
 
-  const api = await connect("ohb_api");
-  const worker = await connect("ohb_worker");
+  const api = await connect("openedbot_api");
+  const worker = await connect("openedbot_worker");
   const scopeA = { userId: user, agencyId: agency, clientId: clientA };
   const scopeB = { userId: user, agencyId: agency, clientId: clientB };
   const firstSnapshot = snapshot([upstream(100, {
@@ -206,7 +206,7 @@ await withDisposablePostgres("ohb81_a2a_audit", async ({ owner, connect }) => {
 
   console.log(JSON.stringify({
     database: "disposable",
-    role: "ohb_api",
+    role: "openedbot_api",
     inserted: first.insertedRecords + mixed.insertedRecords + clientBResult.insertedRecords,
     duplicates: repeated.duplicateRecords,
     dropped: mixed.droppedRecords,

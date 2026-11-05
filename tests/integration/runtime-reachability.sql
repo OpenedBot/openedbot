@@ -77,40 +77,40 @@ begin
 end
 $$;
 
-grant select, insert, update on reachability_proof to ohb_api, ohb_worker;
+grant select, insert, update on reachability_proof to openedbot_api, openedbot_worker;
 
 -- Le connecteur, sans session, avec le hash exact : sa ligne et seulement elle.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '', false) \g /dev/null
 select set_config('app.session_credential_hash', 'link-hash-a', false) \g /dev/null
 update reachability_proof set by_link = (select count(*) from runtimes);
 reset role;
 
 -- Ni session ni hash : rien, pas meme l existence de la ligne.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '', false) \g /dev/null
 select set_config('app.session_credential_hash', '', false) \g /dev/null
 update reachability_proof set blind = (select count(*) from runtimes);
 reset role;
 
 -- Le worker lit le dernier signe de vie du lien.
-set role ohb_worker;
+set role openedbot_worker;
 update reachability_proof set worker_seen = (
   select case when link_last_seen_at is not null then 'visible' else 'null' end
     from runtimes where id = '60000000-0000-4000-8000-000000000071'
 );
 reset role;
 
--- OHB-138 : le broker incremente toolset_epoch sous la porte du tenant apres
+-- Le broker incremente toolset_epoch sous la porte du tenant apres
 -- une ecriture d inventaire relayee ; le worker le relit avec le contexte du run.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.session_credential_hash', '', false) \g /dev/null
 select set_config('app.organization_id', '20000000-0000-4000-8000-000000000002', false) \g /dev/null
 update runtimes set toolset_epoch = toolset_epoch + 1
  where id = '60000000-0000-4000-8000-000000000071' and link_token_hash = 'link-hash-a';
 select set_config('app.organization_id', '', false) \g /dev/null
 reset role;
-set role ohb_worker;
+set role openedbot_worker;
 update reachability_proof set worker_epoch = (
   select toolset_epoch::text from runtimes where id = '60000000-0000-4000-8000-000000000071'
 );

@@ -29,7 +29,7 @@ never require root.
 | `doctor` | yes | Checks the runtime end to end (loopback gateway, anonymous refusal, catalog); reports an inactive link instance. |
 | `export [--json\|--md]` | yes | Non-secret coordinates for openedbot; the bearer never appears in them. |
 | `help` | yes | Lists the commands (`-h` and `--help` too). No root. |
-| `link --ohb URL` | | Connector link handshake, token persisted 0600, device key sealed, daemon started. See the flags below. |
+| `link --openedbot URL` | | Connector link handshake, token persisted 0600, device key sealed, daemon started. See the flags below. |
 | `mcp list\|add\|remove` | `list` | CLI equivalent of the MCP actions the console runs over the link: `add --url https://… --yes <name>`, `remove --yes <name>`. The token goes through a 0600 file (`--auth header --token-file F`). |
 | `plan` | yes | What `up` would do, without writing anything. |
 | `reset --yes …` | | Removes what the tool installed, then fails if any residue remains. `--plan` lists what would be removed without touching anything (no `--yes`). `--purge-data --i-understand-data-loss` also removes the runtime data (bearer, credentials, workspaces). `--purge-packages` also purges `docker-ce` and `containerd.io`. `--remove-admin` removes the `hermes-admin` account and its sudoers file (refused from its own session). `--restore-cloud-user` restores the quarantined cloud-init account from its backups. `--legacy` purges the old `openhermesbot-*` namespace; with it, tailscale is removed only with `--purge-tailscale` (it is often your access). See [Reset](/docs/reset). |
@@ -49,9 +49,9 @@ never require root.
 
 | Flag | Effect |
 |---|---|
-| `--ohb URL` | openedbot origin, `https://` required. |
+| `--openedbot URL` | openedbot origin, `https://` required. |
 | `--ticket-file F` | `0600` file holding the ticket; by default stdin, or a prompt without echo. |
-| `--insecure-ohb` | Also accepts an `http://` origin **on the loopback** (development, behind a reverse SSH tunnel); any other `http://` origin is still refused. |
+| `--insecure-openedbot` | Also accepts an `http://` origin **on the loopback** (development, behind a reverse SSH tunnel); any other `http://` origin is still refused. |
 | `--name <name>` | Named instance (`^[a-z][a-z0-9-]{0,31}$`): its own link, its own device key and its `hermes-connector@<name>.service` unit, next to the default link. This is what lets one host serve a prod and a dev at the same time. See [Named instances](#named-instances). |
 | `--rekey` | Regenerates the device key of an already linked runtime, without a ticket; the new public key is presented on a session. |
 

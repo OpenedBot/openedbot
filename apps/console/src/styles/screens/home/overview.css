@@ -4,8 +4,8 @@
   mesurés du galet, pas dans une palette de CTAs.
 */
 
-.ohb-salon-shell,
-.ohb-salon {
+.openedbot-salon-shell,
+.openedbot-salon {
   --salon-paper: #f5f5f6;
   --salon-hole: #f9f9f9;
   --salon-ink: #17203a;
@@ -22,8 +22,8 @@
   color: var(--salon-ink);
 }
 
-.dark .ohb-salon-shell,
-.dark .ohb-salon {
+.dark .openedbot-salon-shell,
+.dark .openedbot-salon {
   /* The main card's grey (OpenBot's canvas): the home is not a darker hole in it. */
   --salon-paper: #1a1a1a;
   --salon-hole: #f5f4ef;
@@ -34,8 +34,8 @@
   --salon-accent-ink: #11130a;
 }
 
-.ohb-salon-shell header,
-.ohb-salon-shell [data-mobile-header] {
+.openedbot-salon-shell header,
+.openedbot-salon-shell [data-mobile-header] {
   background: var(--salon-paper);
   border-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
 }
@@ -50,7 +50,7 @@
   posé par l'écran). Le rembourrage haut du scroller est de la course de
   défilement : le galet part sous la barre, il ne naît pas dessous.
 */
-[data-mobile-shell] .ohb-salon-shell [data-mobile-header] {
+[data-mobile-shell] .openedbot-salon-shell [data-mobile-header] {
   position: absolute;
   top: 0;
   inset-inline: 0;
@@ -62,15 +62,15 @@
   transition: border-color 180ms ease;
 }
 
-[data-mobile-shell] .ohb-salon-shell:has(.ohb-salon[data-scrolled]) [data-mobile-header] {
+[data-mobile-shell] .openedbot-salon-shell:has(.openedbot-salon[data-scrolled]) [data-mobile-header] {
   border-bottom-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
 }
 
-[data-mobile-shell] .ohb-salon-shell .ohb-salon {
-  padding-top: calc(var(--ohb-safe-top) + 2.75rem);
+[data-mobile-shell] .openedbot-salon-shell .openedbot-salon {
+  padding-top: calc(var(--openedbot-safe-top) + 2.75rem);
 }
 
-.ohb-salon {
+.openedbot-salon {
   position: relative;
   isolation: isolate;
   /* La page tient dans la fenêtre : rien à faire défiler, donc pas de barre. */
@@ -84,7 +84,7 @@
   d'accueil (ni cartes explicatives ni filigrane, repris du skin de la coque
   openedbot-desktop le 2026-10-13).
 */
-.ohb-salon-guide {
+.openedbot-salon-guide {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -99,7 +99,7 @@
 }
 
 /* La mascotte est une présence, pas un héros : petite, entière, au-dessus du titre. */
-.ohb-salon-blob {
+.openedbot-salon-blob {
   position: relative;
   display: flex;
   flex: none;
@@ -123,14 +123,14 @@
   overflow: visible;
 }
 
-.ohb-salon-copy {
+.openedbot-salon-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: center;
 }
 
-.ohb-salon-eyebrow {
+.openedbot-salon-eyebrow {
   --a: 0deg;
   display: inline-flex;
   align-items: center;
@@ -156,7 +156,7 @@
   initial-value: 0deg;
 }
 
-.ohb-salon-title {
+.openedbot-salon-title {
   margin: 0.75rem 0 0;
   color: var(--salon-ink);
   font-family: var(--font-sans);
@@ -168,7 +168,7 @@
   text-wrap: balance;
 }
 
-.ohb-salon-lead {
+.openedbot-salon-lead {
   margin: 0.6rem 0 0;
   max-width: 34ch;
   color: var(--salon-muted);
@@ -178,7 +178,7 @@
   text-wrap: pretty;
 }
 
-.ohb-salon-actions {
+.openedbot-salon-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -187,8 +187,8 @@
   margin-top: 1.5rem;
 }
 
-.ohb-salon-cta,
-.ohb-salon-ghost {
+.openedbot-salon-cta,
+.openedbot-salon-ghost {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -205,33 +205,33 @@
     border-color var(--salon-dur-hover) var(--salon-ease-io);
 }
 
-.ohb-salon-cta {
+.openedbot-salon-cta {
   border: 1px solid transparent;
   background: var(--salon-accent);
   color: var(--salon-accent-ink);
 }
 
-.ohb-salon-cta:hover {
+.openedbot-salon-cta:hover {
   transform: translateY(-2px);
 }
 
-.ohb-salon-cta:active {
+.openedbot-salon-cta:active {
   transform: translateY(1px);
 }
 
-.ohb-salon-ghost {
+.openedbot-salon-ghost {
   border: 1px solid var(--salon-line);
   background: transparent;
   color: var(--salon-ink);
 }
 
-.ohb-salon-ghost:hover {
+.openedbot-salon-ghost:hover {
   background: color-mix(in srgb, var(--salon-ink) 5%, transparent);
   transform: translateY(-2px);
 }
 
-:root[data-keyboard-focus] .ohb-salon-cta:focus-visible,
-:root[data-keyboard-focus] .ohb-salon-ghost:focus-visible {
+:root[data-keyboard-focus] .openedbot-salon-cta:focus-visible,
+:root[data-keyboard-focus] .openedbot-salon-ghost:focus-visible {
   outline: 2px solid var(--salon-ink);
   outline-offset: 3px;
 }
@@ -246,7 +246,7 @@
   et le bas du salon disparaissait sans défilement possible.
 */
 @media (max-width: 767px), ((pointer: coarse) and (max-height: 767px)) {
-  .ohb-salon {
+  .openedbot-salon {
     height: auto;
     overflow-y: auto;
     /* Le rubber-band reste dans la scène, jamais sur le document. */
@@ -254,7 +254,7 @@
     scrollbar-width: none;
   }
 
-  .ohb-salon::-webkit-scrollbar {
+  .openedbot-salon::-webkit-scrollbar {
     display: none;
   }
 
@@ -266,7 +266,7 @@
     contenu) absorbait tout le rétrécissement : 0 px sur un iPhone 15 Pro
     Max, un galet « rogné sous l'en-tête » sur un écran plus haut.
   */
-  .ohb-salon-guide {
+  .openedbot-salon-guide {
     display: flex;
     flex: none;
     height: auto;
@@ -283,32 +283,32 @@
     text-align: center;
   }
 
-  .ohb-salon-blob {
+  .openedbot-salon-blob {
     flex: none;
     width: 100%;
     height: min(70vw, 20rem);
   }
 
-  .ohb-salon-copy {
+  .openedbot-salon-copy {
     display: flex;
     flex-direction: column;
     align-items: center;
   }
 
-  .ohb-salon-title,
-  .ohb-salon-lead {
+  .openedbot-salon-title,
+  .openedbot-salon-lead {
     text-align: center;
   }
 
   /* Corps iOS : 17 pt, une phrase courte, pas un chapeau de page. */
-  .ohb-salon-lead {
+  .openedbot-salon-lead {
     margin: 0;
     max-width: 28ch;
     font-size: 17px;
     line-height: 1.45;
   }
 
-  .ohb-salon-actions {
+  .openedbot-salon-actions {
     flex-direction: row;
     justify-content: center;
   }
@@ -334,9 +334,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-salon-eyebrow,
-  .ohb-salon-cta,
-  .ohb-salon-ghost,
+  .openedbot-salon-eyebrow,
+  .openedbot-salon-cta,
+  .openedbot-salon-ghost,
   [data-reveal] {
     animation: none !important;
     transition-duration: 0.01ms !important;
@@ -348,28 +348,28 @@
   }
 }
 
-/* Au doigt : pas de survol, un retour de pression (`pressed`), comme `.ohb-press`. */
+/* Au doigt : pas de survol, un retour de pression (`pressed`), comme `.openedbot-press`. */
 @media (pointer: coarse) {
-  .ohb-salon-cta:hover,
-  .ohb-salon-ghost:hover {
+  .openedbot-salon-cta:hover,
+  .openedbot-salon-ghost:hover {
     transform: none;
     box-shadow: none;
   }
 
-  .ohb-salon-cta,
-  .ohb-salon-ghost {
+  .openedbot-salon-cta,
+  .openedbot-salon-ghost {
     transition:
       transform 120ms ease-out,
       opacity 120ms ease-out,
       background-color 120ms ease-out;
   }
 
-  .ohb-salon-cta:active {
+  .openedbot-salon-cta:active {
     transform: scale(0.97);
     opacity: 0.85;
   }
 
-  .ohb-salon-ghost:active {
+  .openedbot-salon-ghost:active {
     transform: scale(0.97);
     background: color-mix(in srgb, var(--salon-ink) 8%, transparent);
   }

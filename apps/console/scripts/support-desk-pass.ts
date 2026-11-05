@@ -30,9 +30,9 @@ import { listMailpitMessageIds, readMailpitLoginCode } from "../../../scripts/li
 const WEB = process.env.E2E_ORIGIN?.trim() || "http://localhost:1420";
 const ADMIN = process.env.E2E_ADMIN_ORIGIN?.trim() || "http://localhost:1421";
 const API = process.env.E2E_API_URL?.trim() || "http://127.0.0.1:8790";
-const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@ohb.local";
+const EMAIL = process.env.E2E_EMAIL?.trim() || "dev@openedbot.local";
 const PASSWORD = process.env.E2E_PASSWORD || (() => { throw new Error("E2E_PASSWORD is not set: run `make setup` (it generates one in .env.local), or export it."); })();
-const STAFF_EMAIL = process.env.DEV_STAFF_EMAIL?.trim() || "staff@ohb.dev";
+const STAFF_EMAIL = process.env.DEV_STAFF_EMAIL?.trim() || "staff@openedbot.dev";
 const OUT = join(import.meta.dir, "../../../tmp/support-desk");
 
 /**
@@ -65,7 +65,7 @@ async function shot(page: Page, name: string): Promise<string> {
 async function french(page: Page, origin: string): Promise<void> {
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem("ohb:locale", "fr");
+      window.localStorage.setItem("openedbot:locale", "fr");
     } catch {
       // Stockage refusé : la passe se jouera en anglais, et le dira.
     }

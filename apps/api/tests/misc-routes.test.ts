@@ -373,7 +373,7 @@ describe("POST /onboarding/reset", () => {
     for (const init of [{}, { headers: { "content-type": "application/json" }, body: JSON.stringify({ scope: "flag" }) }]) {
       const opened: string[] = [];
       const { app, statements } = mountOnboarding([onboardedWorkspace], "development", {
-        devResetDatabaseUrl: "postgres://owner:secret@127.0.0.1:5432/ohb",
+        devResetDatabaseUrl: "postgres://owner:secret@127.0.0.1:5432/openedbot",
         openDevResetDb: (url) => {
           opened.push(url);
           return {} as never;
@@ -391,7 +391,7 @@ describe("POST /onboarding/reset", () => {
     const truncated: string[] = [];
     let closed = false;
     const { app, statements } = mountOnboarding([onboardedWorkspace], "development", {
-      devResetDatabaseUrl: "postgres://owner:secret@127.0.0.1:5432/ohb",
+      devResetDatabaseUrl: "postgres://owner:secret@127.0.0.1:5432/openedbot",
       openDevResetDb: (url) => {
         opened.push(url);
         return fakeResetDb(truncated, () => {
@@ -406,7 +406,7 @@ describe("POST /onboarding/reset", () => {
     });
     expect(response.status).toBe(200);
     expect((await response.json()).completed).toBe(false);
-    expect(opened).toEqual(["postgres://owner:secret@127.0.0.1:5432/ohb"]);
+    expect(opened).toEqual(["postgres://owner:secret@127.0.0.1:5432/openedbot"]);
     expect(truncated).toEqual(['truncate table "bots" restart identity cascade']);
     expect(closed).toBe(true);
     expect(statements.some((statement) => statement.includes("organizationReset"))).toBe(true);

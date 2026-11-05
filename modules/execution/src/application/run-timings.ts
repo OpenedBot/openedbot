@@ -1,7 +1,7 @@
 import type { SQL } from "bun";
 
 /**
- * Garde la latence d'un run (`runLatencyRecord`, OHB-107) sur sa ligne, pour
+ * Garde la latence d'un run (`runLatencyRecord`) sur sa ligne, pour
  * l'analyse (0151). Le worker n'attend pas cette écriture : le run est déjà
  * terminé, et un échec ne coûte qu'une ligne de journal. Le relevé ne porte
  * que des noms et des durées (`RunTrace` écarte le reste) ; l'identifiant du

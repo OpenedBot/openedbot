@@ -7,7 +7,7 @@ import { ConversationAvailability } from "../../src/components/conversation-avai
 afterEach(cleanup);
 
 test.each(["button", "backdrop"])("dismissal via %s enables the composer and allows another alert", (method) => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   function Conversation() {
     const [blocked, setBlocked] = useState(true);
     return (
@@ -39,7 +39,7 @@ test.each([
   "HTTP 400 : requête refusée.",
   "HTTP 500 : service indisponible.",
 ])("opens a modal for a blocked send: %s", (message) => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   const view = (blocked: boolean) => (
     <I18nProvider>
       <ConversationAvailability modal blocked={blocked} message={message} retrying={false} onRetry={() => {}}>
@@ -56,7 +56,7 @@ test.each([
   expect(screen.queryByRole("alert")).toBeNull();
   expect(dialog.textContent).not.toContain("L’envoi est suspendu");
   expect(dialog.textContent).not.toContain("Votre brouillon est conservé");
-  expect(screen.getByRole("button", { name: "Fermer" }).className).toContain("ohb-settings-action");
+  expect(screen.getByRole("button", { name: "Fermer" }).className).toContain("openedbot-settings-action");
   expect((screen.getByRole("textbox", { hidden: true }) as HTMLTextAreaElement).value).toBe("Mon message");
   fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
   expect(screen.queryByRole("alert")).toBeNull();
@@ -65,7 +65,7 @@ test.each([
 });
 
 test("blocks the cached conversation, retries, and preserves the draft after recovery", () => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   let retries = 0;
   const view = (blocked: boolean, retrying = false) => (
     <I18nProvider>
@@ -85,7 +85,7 @@ test("blocks the cached conversation, retries, and preserves the draft after rec
   expect(screen.getByRole("alert").textContent).toContain("La connexion avec le runtime");
   expect(draft.parentElement?.hasAttribute("inert")).toBe(true);
   expect(draft.parentElement?.getAttribute("aria-hidden")).toBe("true");
-  expect(screen.getByRole("button", { name: "Réessayer" }).className).toContain("ohb-settings-action");
+  expect(screen.getByRole("button", { name: "Réessayer" }).className).toContain("openedbot-settings-action");
   fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
   expect(retries).toBe(1);
   rerender(view(true, true));

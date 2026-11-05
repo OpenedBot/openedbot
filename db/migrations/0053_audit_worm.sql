@@ -1,6 +1,6 @@
 begin;
 
--- OHB-57 : ancrage WORM externe des ancres et des verdicts.
+-- Ancrage WORM externe des ancres et des verdicts.
 --
 -- Additive. La base garde son rôle (dernière ancre par runtime, verdicts) ;
 -- chaque ancre enregistrée et chaque verdict rendu sont AUSSI déposés une fois
@@ -17,7 +17,7 @@ alter table runtime_link_events add constraint runtime_link_events_kind_check
   ));
 
 comment on constraint runtime_link_events_kind_check on runtime_link_events is
-  'pop_failed : preuve de possession refusée (4401). pop_missing : runtime sans clé device lié hors production. unattributed_session : session Hermes inconnue d''OHB relevée par la réconciliation. clock_skew : horloge du connecteur en désaccord avec les dispatches de l''API. worm_write_failed : une ancre ou un verdict n''a pas pu être déposé dans le bucket WORM (meta.reason = anchor | verdict). anchor_tampered : l''ancre archivée hors base ne décrit pas l''export vérifié ni l''ancre en base — la base ou l''export a été réécrit.';
+  'pop_failed : preuve de possession refusée (4401). pop_missing : runtime sans clé device lié hors production. unattributed_session : session Hermes inconnue d''openedbot relevée par la réconciliation. clock_skew : horloge du connecteur en désaccord avec les dispatches de l''API. worm_write_failed : une ancre ou un verdict n''a pas pu être déposé dans le bucket WORM (meta.reason = anchor | verdict). anchor_tampered : l''ancre archivée hors base ne décrit pas l''export vérifié ni l''ancre en base — la base ou l''export a été réécrit.';
 
 alter table runtime_audit_verifications
   add column worm_state text not null default 'disabled'

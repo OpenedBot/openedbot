@@ -28,10 +28,10 @@ def _fake_prompt_builder():
 
 class BackendProbeHookTests(unittest.TestCase):
     def setUp(self):
-        spec = importlib.util.spec_from_file_location("ohb_backend_probe_hook_test", Path(__file__).with_name("handler.py"))
+        spec = importlib.util.spec_from_file_location("openedbot_backend_probe_hook_test", Path(__file__).with_name("handler.py"))
         self.module = importlib.util.module_from_spec(spec)
         # Outside Hermes the import-time install finds no prompt builder: it warns and stays off.
-        with self.assertLogs("ohb.backend_probe", level="WARNING"):
+        with self.assertLogs("openedbot.backend_probe", level="WARNING"):
             spec.loader.exec_module(self.module)
         self.assertFalse(self.module._installed)
 
@@ -63,7 +63,7 @@ class BackendProbeHookTests(unittest.TestCase):
 
     def test_missing_upstream_probe_leaves_hermes_untouched(self):
         builder = types.SimpleNamespace(_format_backend_probe=_upstream_format)
-        with self.assertLogs("ohb.backend_probe", level="WARNING"):
+        with self.assertLogs("openedbot.backend_probe", level="WARNING"):
             self.assertFalse(self.module.install(builder))
         self.assertFalse(hasattr(builder, "_probe_remote_backend"))
 

@@ -19,6 +19,13 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- Plus aucun nom technique hérité de l'ancien nom du produit : base et rôles
+  PostgreSQL, fonctions SQL, en-têtes, cookies, schéma d'URL de l'app de
+  bureau (`openedbot://`), popup natif (`OpenedbotPopup.app`), classes CSS,
+  métriques, chemins et fichiers s'appellent tous openedbot. Chacun est
+  déconnecté une fois (cookies renommés) et les préférences locales de la
+  console repartent de zéro. Une machine déjà liée doit être liée à nouveau
+  avec le connecteur mis à jour : le lien a changé de format.
 - Les notifications s'affichent en bas à droite partout, réglages compris.
 - Réglages › Politiques : « Mentions légales », « Politique de
   confidentialité » et « Conditions d'utilisation » s'ouvrent sur le web,
@@ -53,10 +60,11 @@ connecteur hôte et le protocole tiennent le leur :
   réglages, comme dans Runtime. « Restaurer » et « Afficher » sont des
   pilules neutres, « Supprimer définitivement » une pilule rouge pleine.
 - La page introuvable (404) et l'écran de changement de mot de passe
-  affichent « openedbot » à côté du logo, et non plus « ohb ».
+  affichent désormais « openedbot » à côté du logo.
 
 ### Retiré
 
+- Les anciens noms d'en-têtes de requête et de relais ne sont plus lus.
 - Mon compte : la carte « Session » et son bouton « Se déconnecter » ; la
   déconnexion reste en bas de la barre latérale des réglages.
 - Réglages › Connecteurs : le catalogue ne propose plus que Notion, Linear
@@ -69,6 +77,11 @@ connecteur hôte et le protocole tiennent le leur :
   d'installation et de notifications push qui n'étaient plus affichés. Le service
   worker de retrait (`/sw.js`) reste en place pour désinscrire les anciennes
   installations.
+- Le filet de sécurité des anciens noms de variables d'environnement
+  (d'avant le préfixe `OPENEDBOT_`) : l'API, le worker, la passerelle de
+  lien, l'app de bureau, le Makefile et les scripts ne refusent plus de
+  démarrer quand l'un d'eux est posé, et `make env-prune` ne les réécrit
+  plus sous leur nouveau nom. Un ancien nom est simplement ignoré.
 
 ## 1.0.2 — 2026-11-04
 

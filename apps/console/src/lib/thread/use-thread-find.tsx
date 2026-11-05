@@ -22,7 +22,7 @@ export function useThreadFind(input: {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [currentMatchId, setCurrentMatchId] = useState<string | null>(null);
-  // Indexed only while the bar is open (OHB-135): the index walks every
+  // Indexed only while the bar is open: the index walks every
   // message and event of the loaded thread, and the 202 of a send and each
   // SSE flush hand this hook a new `events` array.
   const documents = useMemo(

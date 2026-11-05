@@ -57,8 +57,8 @@ type Messages = Record<string, string>;
 const COPY = messages as Record<Locale, Messages>;
 
 const DEV_ACCOUNTS = [
-  { email: "dev@ohb.local", role: "owner" as const },
-  { email: "agency@ohb.local", role: "agency" as const },
+  { email: "dev@openedbot.local", role: "owner" as const },
+  { email: "agency@openedbot.local", role: "agency" as const },
 ];
 
 function t(locale: Locale, key: string, params: Record<string, string> = {}): string {
@@ -232,7 +232,7 @@ export function applyPreview(doc: Document, options: PreviewOptions): void {
 export type LayoutCheck = { label: string; ok: boolean };
 
 /**
- * The same layout checks as /tmp/ohb-e2e/gallery.ts: the template applied, the
+ * The same layout checks as /tmp/openedbot-e2e/gallery.ts: the template applied, the
  * submit button and the language/theme switches on screen, no horizontal
  * scroll, no key element overlapping another.
  */

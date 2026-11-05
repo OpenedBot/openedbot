@@ -6,7 +6,7 @@ et choisir le bon. Il affiche la **vraie** page (`../src/renderer/signin.html`,
 lab montre est ce que l'app livre.
 
 ```sh
-make lab            # depuis ohb-desktop : bun install + Vite sur http://localhost:5317
+make lab            # depuis openedbot-desktop : bun install + Vite sur http://localhost:5317
 ```
 
 - **Galerie** (`/`) : tous les templates en direct, mêmes réglages pour tous :
@@ -28,7 +28,7 @@ le lab (feuille de style seule pour un template, page entière pour le reste).
 Un nouveau template (`../src/renderer/templates/<nom>.css`, voir le
 `README.md` de ce dossier) apparaît tout seul.
 
-Les contrôles de mise en page sont ceux de `/tmp/ohb-e2e/gallery.ts` : template
+Les contrôles de mise en page sont ceux de `/tmp/openedbot-e2e/gallery.ts` : template
 appliqué, « Se connecter » et les sélecteurs langue / thème visibles sans
 défiler, pas de défilement horizontal, aucun chevauchement entre le titre, le
 texte, les boutons et les champs.

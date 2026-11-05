@@ -49,7 +49,7 @@ describe("fake Hermes gateway", () => {
     expect(toolsets!.some((toolset) => toolset.name === "code_execution" && toolset.enabled)).toBe(true);
   });
 
-  test("serves the host session inventory: identifiers only, plus the sessions OHB never created", async () => {
+  test("serves the host session inventory: identifiers only, plus the sessions openedbot never created", async () => {
     const stranger = startFakeHermes({ port: 0, token, unattributedSessions: ["ghost-session"] });
     try {
       await new HermesClient({ endpoint: `http://127.0.0.1:${stranger.port}`, token, policy: { environment: "development", insecureOrigins: new Set([`127.0.0.1:${stranger.port}`]) }, mtls: null })
@@ -90,10 +90,10 @@ describe("fake Hermes gateway", () => {
     await client.ensureSession(sessionId, "Fake session"); // 409 is tolerated
 
     const runId = await client.createRun({
-      input: "ping", instructions: "", sessionId, idempotencyKey: "ohb-run-1",
+      input: "ping", instructions: "", sessionId, idempotencyKey: "openedbot-run-1",
     });
     const replayed = await client.createRun({
-      input: "ping", instructions: "", sessionId, idempotencyKey: "ohb-run-1",
+      input: "ping", instructions: "", sessionId, idempotencyKey: "openedbot-run-1",
     });
     expect(replayed).toBe(runId);
 
@@ -241,7 +241,7 @@ test("pauses on each FAKE_APPROVAL gate and resolves it by request_id, FIFO othe
 
   expect(requests.map((request) => request.pattern_key)).toEqual([
     "recursive delete",
-    "plugin_rule:ohb/v1/mcp:github:create_issue",
+    "plugin_rule:openedbot/v1/mcp:github:create_issue",
   ]);
   expect(requests[1]).toMatchObject({
     command: "<mcp__github__create_issue> (plugin approval rule)",

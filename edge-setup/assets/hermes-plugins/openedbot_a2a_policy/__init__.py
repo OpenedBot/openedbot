@@ -16,7 +16,7 @@ from .runtime_scope import managed_profile_guards_ready, root_home_scope, resolv
 from .snapshot import A2APolicySnapshotServer
 
 
-_EVENT = "ohb_a2a_policy:gateway_start"
+_EVENT = "openedbot_a2a_policy:gateway_start"
 _guard_registered = False
 _registered_homes: set[str] = set()
 _snapshot_server: A2APolicySnapshotServer | None = None
@@ -31,7 +31,7 @@ def _hermes_home() -> Path:
 
 
 def _runtime_root(home: Path) -> Path:
-    marker = home / "plugins" / "ohb_a2a_policy" / "runtime-home"
+    marker = home / "plugins" / "openedbot_a2a_policy" / "runtime-home"
     return resolve_runtime_home(home, marker)
 
 
@@ -40,7 +40,7 @@ def _policy_state(home: Path | None = None) -> dict[str, Any]:
     from plugins.platforms.a2a import security
 
     active_home = home or _hermes_home()
-    marker = active_home / "plugins" / "ohb_a2a_policy" / "runtime-home"
+    marker = active_home / "plugins" / "openedbot_a2a_policy" / "runtime-home"
     with root_home_scope(active_home, marker):
         config = load_config()
         if not isinstance(config, dict):
@@ -57,7 +57,7 @@ def _managed_env_value(home: Path, key: str) -> str | None:
 
     # Use the same pinned dotenv semantics as the host writer. Missing runtime
     # dependencies fail closed instead of introducing another env-file parser.
-    marker = home / "plugins" / "ohb_a2a_policy" / "runtime-home"
+    marker = home / "plugins" / "openedbot_a2a_policy" / "runtime-home"
     with root_home_scope(home, marker):
         values = load_env()
     if not isinstance(values, dict):
@@ -101,7 +101,7 @@ def _metadata_provider(home: Path):
     )
 
     def provide() -> dict[str, Any]:
-        marker = home / "plugins" / "ohb_a2a_policy" / "runtime-home"
+        marker = home / "plugins" / "openedbot_a2a_policy" / "runtime-home"
         with root_home_scope(home, marker):
             return _startup_metadata(peer_tokens_override)
 
@@ -184,7 +184,7 @@ def register(ctx: Any) -> None:
     _registered_homes.add(home_key)
     _guard_registered = True
 
-    marker = home / "plugins" / "ohb_a2a_policy" / "runtime-home"
+    marker = home / "plugins" / "openedbot_a2a_policy" / "runtime-home"
 
     def write_denial(*, peer: str, method: str, task_id: str | None = None) -> None:
         try:

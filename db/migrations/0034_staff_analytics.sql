@@ -54,7 +54,7 @@ comment on function staff_analytics_timeseries(date, date) is
   'Séries quotidiennes globales pour le backoffice staff. Agrégat tous tenants confondus : aucune dimension organisation n''est exposée, le backoffice n''ayant pas de navigation par organisation.';
 
 revoke all on function staff_analytics_timeseries(date, date) from public;
-grant execute on function staff_analytics_timeseries(date, date) to ohb_api;
+grant execute on function staff_analytics_timeseries(date, date) to openedbot_api;
 
 insert into schema_migrations(version) values ('0034_staff_analytics')
 on conflict (version) do nothing;

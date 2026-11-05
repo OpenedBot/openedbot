@@ -1,4 +1,3 @@
-import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

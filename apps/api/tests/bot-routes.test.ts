@@ -121,7 +121,7 @@ function deletionDb(calls: string[], active: boolean | "late" | "memory", inGrou
       return Promise.resolve([{ deletedAt: new Date("2026-09-01T00:00:00Z"), profile: "scout", profileManaged }]);
     }
     if (sql.includes('hermes_session_id as "sessionId"')) {
-      return Promise.resolve([{ sessionId: "ohb:org-1:thread-1", threadId: "thread-1" }]);
+      return Promise.resolve([{ sessionId: "openedbot:org-1:thread-1", threadId: "thread-1" }]);
     }
     if (sql.includes('workflow_id as "workflowId"')) {
       return Promise.resolve([{ workflowId: "workflow-1" }]);
@@ -830,7 +830,7 @@ describe("profil Hermes optionnel (0031)", () => {
   });
 });
 
-describe("profil Hermes géré par OHB (OHB-28)", () => {
+describe("profil Hermes géré par openedbot", () => {
   const hostProfile = {
     name: "atlas",
     displayName: "Atlas",

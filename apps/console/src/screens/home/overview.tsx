@@ -107,36 +107,36 @@ export function OverviewScreen() {
         data-mobile-overview=""
         data-scrolled={scrolled ? "" : undefined}
         onScroll={onScroll}
-        className="ohb-salon flex min-h-0 flex-1 flex-col"
+        className="openedbot-salon flex min-h-0 flex-1 flex-col"
       >
-        <div className="ohb-salon-guide">
-          <div className="ohb-salon-blob" data-reveal="">
+        <div className="openedbot-salon-guide">
+          <div className="openedbot-salon-blob" data-reveal="">
             <SalonOrbit />
           </div>
           {/* Téléphone : le galet et une phrase, rien d'autre. Le titre est
               dans la barre, le « + » aussi ; le reste vit dans le panneau. */}
           {isMobile ? (
-            <p className="ohb-salon-lead" data-reveal="">
+            <p className="openedbot-salon-lead" data-reveal="">
               {t(empty ? "overviewPlaceholder.emptyHint" : "overviewPlaceholder.hint")}
             </p>
           ) : (
             <>
-              <div className="ohb-salon-copy" data-reveal="">
-                <p className="ohb-salon-eyebrow">{t("overviewPlaceholder.eyebrow")}</p>
-                <h1 className="ohb-salon-title">{t(empty ? "overviewPlaceholder.emptyTitle" : "overviewPlaceholder.title")}</h1>
-                <p className="ohb-salon-lead">{t(empty ? "overviewPlaceholder.emptyHint" : "overviewPlaceholder.hint")}</p>
+              <div className="openedbot-salon-copy" data-reveal="">
+                <p className="openedbot-salon-eyebrow">{t("overviewPlaceholder.eyebrow")}</p>
+                <h1 className="openedbot-salon-title">{t(empty ? "overviewPlaceholder.emptyTitle" : "overviewPlaceholder.title")}</h1>
+                <p className="openedbot-salon-lead">{t(empty ? "overviewPlaceholder.emptyHint" : "overviewPlaceholder.hint")}</p>
               </div>
-              <div className="ohb-salon-actions" data-reveal="">
+              <div className="openedbot-salon-actions" data-reveal="">
                 {empty ? (
-                  <button type="button" className="ohb-salon-cta" onClick={() => openCreateBot()}>
+                  <button type="button" className="openedbot-salon-cta" onClick={() => openCreateBot()}>
                     {t("overviewPlaceholder.emptyCta")}
                   </button>
                 ) : (
                   <>
-                    <Link to="/inbox" className="ohb-salon-cta">
+                    <Link to="/inbox" className="openedbot-salon-cta">
                       {t("overviewPlaceholder.ctaInbox")}
                     </Link>
-                    <button type="button" className="ohb-salon-ghost" onClick={() => openCreateBot()}>
+                    <button type="button" className="openedbot-salon-ghost" onClick={() => openCreateBot()}>
                       {t("overviewPlaceholder.ctaBot")}
                     </button>
                   </>
@@ -152,7 +152,7 @@ export function OverviewScreen() {
 
 function useSalonReveal(empty: boolean) {
   useEffect(() => {
-    const nodes = [...document.querySelectorAll(".ohb-salon [data-reveal]")];
+    const nodes = [...document.querySelectorAll(".openedbot-salon [data-reveal]")];
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       for (const el of nodes) el.classList.add("in");
       return;

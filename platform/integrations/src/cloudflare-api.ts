@@ -1,5 +1,5 @@
 /**
- * OHB-75 : le strict nécessaire de l'API Cloudflare v4 pour publier un gateway
+ * Le strict nécessaire de l'API Cloudflare v4 pour publier un gateway
  * direct : tunnel nommé, ingress, DNS, application Access et service token.
  *
  * Lu par l'API (provisioning, compensation) et par le worker (état des tunnels

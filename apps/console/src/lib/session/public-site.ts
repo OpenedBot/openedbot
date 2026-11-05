@@ -1,13 +1,13 @@
 /**
  * Le site public (vitrine, liste d'attente) vit hors de la console. Son
  * adresse est un réglage de build, `VITE_PUBLIC_SITE_URL` (ou
- * `window.__OHB_PUBLIC_SITE_URL__` posé par l'hôte), jamais déduite de l'hôte
+ * `window.__OPENEDBOT_PUBLIC_SITE_URL__` posé par l'hôte), jamais déduite de l'hôte
  * qui sert la console : la même build se comporte pareil sur l'hôte de la
  * console et sur le domaine nu pendant la transition. Vide (le défaut, une
  * instance solo) : aucun lien sortant, la marque ramène à l'application.
  */
 declare global {
-  interface Window { __OHB_PUBLIC_SITE_URL__?: string }
+  interface Window { __OPENEDBOT_PUBLIC_SITE_URL__?: string }
 }
 
 /** Adresse absolue `http(s)` du site public, sans `/` final ; `null` sinon. */
@@ -25,5 +25,5 @@ export function publicSiteUrl(raw: string | undefined = readSetting()): string |
 }
 
 function readSetting(): string | undefined {
-  return globalThis.window?.__OHB_PUBLIC_SITE_URL__ ?? import.meta.env?.VITE_PUBLIC_SITE_URL;
+  return globalThis.window?.__OPENEDBOT_PUBLIC_SITE_URL__ ?? import.meta.env?.VITE_PUBLIC_SITE_URL;
 }

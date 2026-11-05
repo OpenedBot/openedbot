@@ -17,7 +17,7 @@ export type OrganizationMemberDto = {
 
 export type MemberRoleChangedDto = { userId: string; role: InvitableRole };
 
-/** Une invitation de membre dans une organisation (DEV-OHB-234) : un seul `pending` par adresse. */
+/** Une invitation de membre dans une organisation : un seul `pending` par adresse. */
 export type OrganizationMemberInvitationStatus = "pending" | "accepted" | "declined" | "canceled" | "expired";
 
 export type OrganizationMemberInvitationDto = {

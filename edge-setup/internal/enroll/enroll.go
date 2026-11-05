@@ -38,36 +38,36 @@ func IsLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// ParseOHBURL validates the openedbot API origin: HTTPS only, no path,
+// ParseOpenedbotURL validates the openedbot API origin: HTTPS only, no path,
 // query or credentials.
 //
-// allowInsecureLoopback is the development escape hatch behind `--insecure-ohb`:
+// allowInsecureLoopback is the development escape hatch behind `--insecure-openedbot`:
 // it also accepts http:// when the host is loopback, which is how an SSH reverse
 // tunnel (`ssh -R 8790:127.0.0.1:8790 <vps>`) puts a workstation in front of
 // this host without publishing it. The link then travels inside SSH, never in
 // clear text on the wire. Any other http:// origin stays refused, so a plain
 // public URL can never be linked by mistake.
-func ParseOHBURL(raw string, allowInsecureLoopback bool) (*url.URL, error) {
+func ParseOpenedbotURL(raw string, allowInsecureLoopback bool) (*url.URL, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
 		return nil, err
 	}
 	if u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
-		return nil, ohbURLError(allowInsecureLoopback)
+		return nil, openedbotURLError(allowInsecureLoopback)
 	}
 	switch {
 	case u.Scheme == "https":
 	case u.Scheme == "http" && allowInsecureLoopback && IsLoopbackHost(u.Hostname()):
 	default:
-		return nil, ohbURLError(allowInsecureLoopback)
+		return nil, openedbotURLError(allowInsecureLoopback)
 	}
 	u.Path = ""
 	return u, nil
 }
 
-func ohbURLError(allowInsecureLoopback bool) error {
+func openedbotURLError(allowInsecureLoopback bool) error {
 	if allowInsecureLoopback {
-		return errors.New("--ohb must be an https:// origin, or an http:// loopback origin (localhost, 127.0.0.1, [::1]) with --insecure-ohb, without path, query or credentials")
+		return errors.New("--openedbot must be an https:// origin, or an http:// loopback origin (localhost, 127.0.0.1, [::1]) with --insecure-openedbot, without path, query or credentials")
 	}
-	return errors.New("--ohb must be an https:// origin without path, query or credentials")
+	return errors.New("--openedbot must be an https:// origin without path, query or credentials")
 }

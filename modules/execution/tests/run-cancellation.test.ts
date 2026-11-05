@@ -134,7 +134,7 @@ describe("durable run cancellation", () => {
       code: "CANCELLED_BY_DELETE",
       message: "Passe de maintenance annulée : le bot est supprimé.",
     });
-    expect(calls.some(({ sql }) => sql.includes("ohb-run-events-cursor"))).toBe(true);
+    expect(calls.some(({ sql }) => sql.includes("openedbot-run-events-cursor"))).toBe(true);
     expect(calls.some(({ sql }) => sql.includes("update runs set status = 'cancelled'") && sql.includes("external_state = 'settled'"))).toBe(true);
     expect(calls.some(({ sql }) => sql.includes("insert into run_events") && sql.includes("'run.error'"))).toBe(true);
   });

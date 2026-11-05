@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 function signedInClient() {
-  window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf-1", userId: "user-1" }));
+  window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf-1", userId: "user-1" }));
   const client = new QueryClient();
   client.setQueryData(["organization", "org-1", "roster"], { bots: [] });
   return client;

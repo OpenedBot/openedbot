@@ -104,12 +104,12 @@ describe("seuils de latence", () => {
     clock.advance(900);
     trace.mark("hermes.first_event");
     clock.advance(400);
-    trace.mark("ohb.first_text_published");
+    trace.mark("openedbot.first_text_published");
     const record = runLatencyRecord({ runId: "run-1", organizationId: "org-1", queuedMs: 70, trace });
     expect(record).toMatchObject({
       runId: "run-1",
       queuedMs: 70,
-      marks: { "worker.claimed": 30, "hermes.first_event": 930, "ohb.first_text_published": 1_330 },
+      marks: { "worker.claimed": 30, "hermes.first_event": 930, "openedbot.first_text_published": 1_330 },
       verdicts: {
         firstRuntimeEvent: { ms: 1_000, pass: true },
         firstVisibleText: { ms: 1_400, pass: true },

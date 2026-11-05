@@ -13,7 +13,7 @@ export type Locale = "fr" | "en";
  * est le fichier dont les clés font foi, et le repli de `t()` quand une chaîne
  * manque en anglais) : ce sont deux rôles distincts, et seul le second change
  * ici. Une personne qui a déjà choisi sa langue garde son choix, il vit dans
- * `localStorage` (`ohb:locale`).
+ * `localStorage` (`openedbot:locale`).
  */
 export const DEFAULT_LOCALE: Locale = "en";
 

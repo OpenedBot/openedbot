@@ -25,8 +25,8 @@ export type PlanTurn = {
   runId: string | null;
 };
 
-const PREVIEW_KEY = "ohb:plan-preview";
-export const PLAN_PREVIEW_EVENT = "ohb-plan-preview";
+const PREVIEW_KEY = "openedbot:plan-preview";
+export const PLAN_PREVIEW_EVENT = "openedbot-plan-preview";
 
 function devBuild(): boolean {
   return import.meta.env.DEV === true;
@@ -51,7 +51,7 @@ export function dismissPlanPreview(): void {
 }
 
 function planFirstKey(scope: string): string {
-  return `ohb:plan-first:${scope}`;
+  return `openedbot:plan-first:${scope}`;
 }
 
 function readPlanFirst(scope: string): boolean {
@@ -86,7 +86,7 @@ export function usePlanFirst(scope: string): [boolean, (next: boolean) => void] 
 }
 
 function turnKey(threadId: string): string {
-  return `ohb:plan-turn:${threadId}`;
+  return `openedbot:plan-turn:${threadId}`;
 }
 
 export function readPlanTurn(threadId: string): PlanTurn | null {
@@ -142,7 +142,7 @@ export function assistantEventText(
 
 /**
  * Plan réaliste pour la passe visuelle tant que le bot ne renvoie pas
- * cette forme. Activé en dev par `sessionStorage["ohb:plan-preview"]="1"`.
+ * cette forme. Activé en dev par `sessionStorage["openedbot:plan-preview"]="1"`.
  */
 export const PLAN_PREVIEW_SOURCE = `Objectif
 Publier la page d’actualités IA de la semaine, en français, sans rien envoyer.

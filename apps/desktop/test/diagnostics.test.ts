@@ -33,7 +33,7 @@ function rows(): Array<{ level: string; source: string; message: string; detail:
 
 beforeEach(() => {
   resetDiagnosticsForTests();
-  dir = mkdtempSync(path.join(tmpdir(), "ohb-diagnostics-"));
+  dir = mkdtempSync(path.join(tmpdir(), "openedbot-diagnostics-"));
   file = path.join(dir, "diagnostics.sqlite");
 });
 
@@ -46,9 +46,9 @@ describe("redact", () => {
   test("drops tokens, queries, e-mails and long opaque strings", () => {
     expect(redact("Authorization: Bearer abc.def-123")).toBe("Authorization: Bearer [redacted]");
     expect(redact("token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl here")).toBe("token [jwt] here");
-    expect(redact("GET ohb://auth/callback?code=secret&state=x failed")).toBe("GET ohb://auth/callback?[redacted] failed");
+    expect(redact("GET openedbot://auth/callback?code=secret&state=x failed")).toBe("GET openedbot://auth/callback?[redacted] failed");
     expect(redact("at https://console.openedbot.app/o/acme#frag")).toBe("at https://console.openedbot.app/o/acme?[redacted]");
-    expect(redact("user jane.doe+ohb@example.co.uk signed in")).toBe("user [email] signed in");
+    expect(redact("user jane.doe+openedbot@example.co.uk signed in")).toBe("user [email] signed in");
     expect(redact(`refresh ${"a1B2_c3-".repeat(6)}`)).toBe("refresh [redacted]");
     expect(redact("x".repeat(5000)).length).toBeLessThanOrEqual(2000);
   });

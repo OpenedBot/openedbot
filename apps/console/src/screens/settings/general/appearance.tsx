@@ -37,7 +37,7 @@ const ACCENT_LABEL_KEY = Object.fromEntries(
  * L'accent était volontairement masqué (décision du 16-08) ; réouvert le
  * 25-08 à la demande de l'opérateur. Le mécanisme est celui de
  * `@openedbot/browser-ui-kit/theme` : `setAccent` pose `data-accent` sur <html> immédiatement
- * et persiste dans `localStorage` (`ohb:theme`) : rien à câbler ici.
+ * et persiste dans `localStorage` (`openedbot:theme`) : rien à câbler ici.
  */
 export function AppearanceSettings() {
   const theme = useTheme();

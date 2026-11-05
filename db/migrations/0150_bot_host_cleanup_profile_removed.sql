@@ -1,5 +1,5 @@
 -- A cleanup proves its profile gone once, then may stay queued for a minute
--- to re-read surviving sessions (0126, DEV-OHB-244). Until now the claim of a
+-- to re-read surviving sessions (0126). Until now the claim of a
 -- new bot's profile under the same name waited for that whole verification:
 -- a bot re-created as « CEO » right after deleting the previous « CEO » sat
 -- 44 s in « Prépare son profil » (lab, 2026-10-27). `profile_removed_at`

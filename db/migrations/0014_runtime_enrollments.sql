@@ -52,7 +52,7 @@ alter table runtime_enrollments force row level security;
 -- Le secret n'étant connu que du runtime et du QR, cette seconde porte
 -- n'autorise pas l'énumération : sans le hash exact, aucune ligne n'est
 -- visible, pas même son existence.
-create policy runtime_enrollments_credential on runtime_enrollments to ohb_api
+create policy runtime_enrollments_credential on runtime_enrollments to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or secret_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -63,11 +63,11 @@ create policy runtime_enrollments_credential on runtime_enrollments to ohb_api
   );
 
 -- Le worker purge les enrôlements expirés ou consommés.
-create policy runtime_enrollments_worker on runtime_enrollments to ohb_worker
+create policy runtime_enrollments_worker on runtime_enrollments to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on runtime_enrollments to ohb_api;
-grant select, delete on runtime_enrollments to ohb_worker;
+grant select, insert, update, delete on runtime_enrollments to openedbot_api;
+grant select, delete on runtime_enrollments to openedbot_worker;
 
 insert into schema_migrations(version) values ('0014_runtime_enrollments')
 on conflict (version) do nothing;

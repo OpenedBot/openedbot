@@ -1,6 +1,6 @@
 /**
  * 0082 on the real worker functions: provision a disposable database, never a
- * service or a build. The worker connects as `ohb_worker`, and each converted
+ * service or a build. The worker connects as `openedbot_worker`, and each converted
  * access must see its own organization's rows only because it sets
  * `app.organization_id` itself: without it, PostgreSQL returns no row and no
  * error, which is exactly the silent regression this proof exists to catch.
@@ -55,16 +55,16 @@ const ids = (org: string) => {
 
 const root = resolve(import.meta.dir, "../..");
 const source = await adminUrl();
-const database = `ohb82_scope_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot82_scope_${crypto.randomUUID().replaceAll("-", "")}`;
 const admin = new SQL({ url: source.toString(), max: 1 });
 let created = false;
 let target: SQL | null = null;
 let worker: SQL | null = null;
 try {
   await admin.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_staff') then create role ohb_staff login password 'ohb_staff_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_staff') then create role openedbot_staff login password 'openedbot_staff_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await admin.unsafe(`create database "${database}"`);
   created = true;
@@ -91,7 +91,7 @@ try {
   await target.close();
   target = null;
 
-  worker = new SQL({ url: destination.toString(), max: 2, connection: { options: "-c role=ohb_worker" } });
+  worker = new SQL({ url: destination.toString(), max: 2, connection: { options: "-c role=openedbot_worker" } });
   const a = ids(ORG_A);
   const unscopedCount = async (table: string) =>
     Number((await worker!.unsafe(`select count(*)::int as n from ${table}`))[0].n);

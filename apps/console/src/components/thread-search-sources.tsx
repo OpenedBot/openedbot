@@ -29,7 +29,7 @@ function SearchSourceRow({ source }: { source: WebSearchSource }) {
       target="_blank"
       rel="noreferrer noopener"
       title={source.url}
-      className={cn(rowClass, "outline-none ohb-row hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring")}
+      className={cn(rowClass, "outline-none openedbot-row hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring")}
     >
       {content}
     </a>

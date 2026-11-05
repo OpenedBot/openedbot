@@ -349,7 +349,7 @@ describe("message version persistence contract", () => {
     expect(body).toMatchObject({ duplicate: false, mode: "edit", ordinal: 1, status: "queued" });
     const threadInsert = fake.calls.find(({ sql }) => sql.includes("insert into threads"));
     expect(threadInsert?.sql).toContain("hermes_session_id");
-    expect(threadInsert?.values.some((value) => typeof value === "string" && value.startsWith(`ohb:${ORG}:`))).toBe(true);
+    expect(threadInsert?.values.some((value) => typeof value === "string" && value.startsWith(`openedbot:${ORG}:`))).toBe(true);
     expect(fake.calls.filter(({ sql }) => sql.includes("insert into messages"))).toHaveLength(2);
     expect(JSON.stringify(fake.calls.filter(({ sql }) => sql.includes("insert into messages"))[0]?.values))
       .not.toContain("privé");

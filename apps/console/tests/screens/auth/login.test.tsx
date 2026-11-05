@@ -49,8 +49,8 @@ function renderLogin() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
-  window.localStorage.removeItem("ohb:cloud-session");
+  window.localStorage.setItem("openedbot:locale", "fr");
+  window.localStorage.removeItem("openedbot:cloud-session");
   reply = Response.json({ error: { code: "ALPHA_CLOSED", message: "Cette route n’est pas ouverte pendant l’alpha privée." } }, { status: 403 });
   legalReply = Response.json({ documents: [] });
   codeReply = Response.json({ sent: true });
@@ -70,7 +70,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;
-  delete window.__OHB_NATIVE__;
+  delete window.__OPENEDBOT_NATIVE__;
 });
 
 const CODE_PROVIDERS = { google: { enabled: false, reason: "not_configured" }, password: { enabled: false }, emailCode: { enabled: true } };
@@ -107,7 +107,7 @@ function fakeShell(verifyOutcome: NativeSigninState) {
       return () => listeners.delete(listener);
     },
   };
-  window.__OHB_NATIVE__ = {
+  window.__OPENEDBOT_NATIVE__ = {
     readAccessToken: async () => null,
     refresh: async () => null,
     openExternal: async () => {},
@@ -147,16 +147,16 @@ describe("LoginScreen", () => {
   test("ne pré-remplit ni ne propose les comptes de développement", async () => {
     reply = Response.json({
       ...CODE_PROVIDERS,
-      devSignIn: { email: "dev@ohb.local", password: "owner-secret" },
+      devSignIn: { email: "dev@openedbot.local", password: "owner-secret" },
       devSignIns: [
-        { email: "dev@ohb.local", password: "owner-secret", role: "owner" },
-        { email: "agency@ohb.local", password: "agency-secret", role: "agency" },
+        { email: "dev@openedbot.local", password: "owner-secret", role: "owner" },
+        { email: "agency@openedbot.local", password: "agency-secret", role: "agency" },
       ],
     });
     renderLogin();
     const email = await screen.findByLabelText("Adresse e-mail") as HTMLInputElement;
     expect(email.value).toBe("");
-    expect(screen.queryByText("agency@ohb.local")).toBeNull();
+    expect(screen.queryByText("agency@openedbot.local")).toBeNull();
   });
 
   // Les pages légales n'ont de lien que si le déploiement en sert vraiment.

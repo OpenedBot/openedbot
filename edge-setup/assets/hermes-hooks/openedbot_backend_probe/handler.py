@@ -27,7 +27,7 @@ import os
 import sys
 import threading
 
-_log = logging.getLogger("ohb.backend_probe")
+_log = logging.getLogger("openedbot.backend_probe")
 _lock = threading.Lock()
 _installed = False
 

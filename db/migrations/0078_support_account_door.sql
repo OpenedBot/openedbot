@@ -32,7 +32,7 @@ begin;
 -- Idempotent : cette migration a existé une première fois sans sa ligne de
 -- version, donc elle peut être rejouée sur une base qui porte déjà la policy.
 drop policy if exists support_conversations_account on support_conversations;
-create policy support_conversations_account on support_conversations to ohb_api
+create policy support_conversations_account on support_conversations to openedbot_api
   using (
     user_id is not null
     and user_id = nullif(current_setting('app.support_user_id', true), '')::uuid

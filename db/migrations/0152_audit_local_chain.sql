@@ -52,7 +52,7 @@ alter table audit_chain enable row level security;
 alter table audit_chain force row level security;
 -- Same two contexts as runtime_audit_anchors (0052): the tenant (session
 -- routes) and the link credential (broker writes).
-create policy audit_chain_api on audit_chain to ohb_api
+create policy audit_chain_api on audit_chain to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or exists (
@@ -73,11 +73,11 @@ create policy audit_chain_api on audit_chain to ohb_api
                and r.link_token_previous_expires_at > now()))
     )
   );
-grant select, insert on audit_chain to ohb_api;
+grant select, insert on audit_chain to openedbot_api;
 
 -- The worker reads the chain in the tenant purge (plug-in onTenantDeleting).
-create policy audit_chain_worker on audit_chain for select to ohb_worker using (true);
-grant select on audit_chain to ohb_worker;
+create policy audit_chain_worker on audit_chain for select to openedbot_worker using (true);
+grant select on audit_chain to openedbot_worker;
 
 insert into schema_migrations(version) values ('0152_audit_local_chain')
 on conflict (version) do nothing;

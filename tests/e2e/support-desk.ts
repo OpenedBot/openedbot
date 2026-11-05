@@ -28,9 +28,9 @@
 import { passwordLogin } from "../../scripts/lib/password-login";
 
 const baseUrl = (process.env.E2E_API_URL ?? "http://127.0.0.1:8790").replace(/\/+$/, "");
-const staffEmail = process.env.DEV_STAFF_EMAIL ?? "staff@ohb.dev";
+const staffEmail = process.env.DEV_STAFF_EMAIL ?? "staff@openedbot.dev";
 /** Le compte opérateur semé par `make db-seed`, pour l'étape 7. */
-const operatorEmail = process.env.E2E_EMAIL ?? "dev@ohb.local";
+const operatorEmail = process.env.E2E_EMAIL ?? "dev@openedbot.local";
 const operatorPassword = process.env.E2E_PASSWORD || (() => { throw new Error("E2E_PASSWORD is not set: run `make setup` (it generates one in .env.local), or export it."); })();
 /**
  * Une adresse par exécution : un fil, jamais deux exécutions dans le même.

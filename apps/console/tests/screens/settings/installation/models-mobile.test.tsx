@@ -182,7 +182,7 @@ function renderModels() {
 beforeEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 430 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 932 });
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {

@@ -1,5 +1,5 @@
 -- La mémoire d'un bot est celle de son runtime Hermes (MEMORY.md / USER.md du
--- profil, outil `memory`), lue et corrigée par le lien. Le régime OHB
+-- profil, outil `memory`), lue et corrigée par le lien. Le régime openedbot
 -- (faits en base, lignes `remember:`, approbation, extraction automatique)
 -- est retiré : la table et ses colonnes tombent. Les décisions déjà
 -- journalisées (`decisions.envelope` de kind memory_fact) restent lisibles.

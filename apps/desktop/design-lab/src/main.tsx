@@ -17,7 +17,7 @@ function Layout() {
     <div className="lab">
       <header className="lab-head">
         <NavLink to={`/${suffix}`} className="lab-brand" end>
-          <img src="/assets/ohb-icon.webp" alt="" width="24" height="24" />
+          <img src="/assets/openedbot-icon.webp" alt="" width="24" height="24" />
           openedbot design lab
         </NavLink>
         <Toolbar />

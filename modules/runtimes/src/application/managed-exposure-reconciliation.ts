@@ -8,7 +8,7 @@ export const MANAGED_EXPOSURE_TICK_MS = 5 * 60_000;
 type ManagedExposureRow = { id: string; organizationId: string; accountId: string; tunnelId: string };
 
 /**
- * OHB-75 : relit chez Cloudflare l'état des tunnels gérés par openedbot, un par
+ * Relit chez Cloudflare l'état des tunnels gérés par openedbot, un par
  * transaction sous verrou, et écrit `healthy | degraded | down | inactive`.
  * C'est ce qui fait dire « tunnel à terre » dans le registre sans attendre
  * qu'un run échoue. Les publications du compte du client sont hors champ :

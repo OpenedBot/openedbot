@@ -1,5 +1,5 @@
 /**
- * PERM2-5 (DEV-OHB-255): read and write a bot's per-tool policies.
+ * PERM2-5: read and write a bot's per-tool policies.
  *
  * The database is the source of truth the pipeline decides from
  * (`permission-gate.ts`); the host plugin's `blocked_tools` is the second

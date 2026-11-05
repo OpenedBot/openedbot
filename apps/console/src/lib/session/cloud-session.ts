@@ -1,7 +1,7 @@
 import { fleetInPath, resolveWorkspaceKey, workspaceInPath } from "../workspace/workspace-location";
 
-const STORAGE_KEY = "ohb:cloud-session";
-const CSRF_COOKIE = "ohb_csrf";
+const STORAGE_KEY = "openedbot:cloud-session";
+const CSRF_COOKIE = "openedbot_csrf";
 const listeners = new Set<() => void>();
 let revision = 0;
 
@@ -21,7 +21,7 @@ export function readCloudSession(): WebCloudSession | null {
     if (typeof value.organizationId !== "string" && value.organizationId !== null) return null;
     const userId = typeof value.userId === "string" ? value.userId : undefined;
     let tabOrganization: string | null = null;
-    try { tabOrganization = globalThis.window?.sessionStorage.getItem(`ohb:workspace:${userId ?? value.csrfToken}`) ?? null; } catch { /* URL context remains available. */ }
+    try { tabOrganization = globalThis.window?.sessionStorage.getItem(`openedbot:workspace:${userId ?? value.csrfToken}`) ?? null; } catch { /* URL context remains available. */ }
     const pathKey = workspaceInPath(globalThis.window?.location.pathname ?? "");
     const organizationId = (pathKey && resolveWorkspaceKey(pathKey, userId)) || tabOrganization || value.organizationId;
     return { organizationId, csrfToken: value.csrfToken, userId };
@@ -33,7 +33,7 @@ export function readCloudSession(): WebCloudSession | null {
 export function saveCloudSession(session: WebCloudSession): void {
   globalThis.window?.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   try {
-    const workspaceKey = `ohb:workspace:${session.userId ?? session.csrfToken}`;
+    const workspaceKey = `openedbot:workspace:${session.userId ?? session.csrfToken}`;
     if (session.organizationId) globalThis.window?.sessionStorage.setItem(workspaceKey, session.organizationId);
     else globalThis.window?.sessionStorage.removeItem(workspaceKey);
   } catch { /* URL context remains available. */ }
@@ -49,7 +49,7 @@ export function syncCloudSession(session: WebCloudSession): void {
   // Selecting a client never writes its identity to another tab's context.
   try {
     if (session.organizationId) globalThis.window?.sessionStorage.setItem(
-      `ohb:workspace:${session.userId ?? session.csrfToken}`, session.organizationId,
+      `openedbot:workspace:${session.userId ?? session.csrfToken}`, session.organizationId,
     );
   } catch { /* URL context remains available. */ }
 }
@@ -97,5 +97,5 @@ export function notifyWorkspaceContextChanged(): void {
 }
 
 export function reportWorkspaceRevoked(organizationId: string, fleetId: string | null = activeFleetId()): void {
-  globalThis.window?.dispatchEvent(new CustomEvent("ohb:workspace-revoked", { detail: { organizationId, fleetId } }));
+  globalThis.window?.dispatchEvent(new CustomEvent("openedbot:workspace-revoked", { detail: { organizationId, fleetId } }));
 }

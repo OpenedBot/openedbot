@@ -31,7 +31,7 @@ describe("per-user and per-client drafts", () => {
     saveCloudSession({ organizationId: "a", csrfToken: "csrf", userId: "operator" });
     syncCloudSession({ organizationId: "b", csrfToken: "csrf", userId: "operator" });
     expect(readCloudSession()?.organizationId).toBe("b");
-    expect(JSON.parse(window.localStorage.getItem("ohb:cloud-session")!).organizationId).toBe("a");
+    expect(JSON.parse(window.localStorage.getItem("openedbot:cloud-session")!).organizationId).toBe("a");
   });
 });
 
@@ -72,22 +72,22 @@ describe("draft durability", () => {
     const draft = renderHook(() => useWorkspaceTextDraft("bot:one"));
     act(() => draft.result.current[1]("Sent soon"));
     act(() => draft.result.current[1](""));
-    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("ohb:draft:"))).toEqual([]);
+    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("openedbot:draft:"))).toEqual([]);
   });
   test("attachments stay with the tab, never in localStorage", () => {
     saveCloudSession({ organizationId: "a", csrfToken: "csrf", userId: "operator" });
     const draft = renderHook(() => useWorkspaceAttachmentDraft("bot:one"));
     act(() => draft.result.current[1]([{ name: "a.txt", contentType: "text/plain", kind: "document", content: [{ type: "text", text: "x" }] }]));
-    expect(Object.keys(window.localStorage).some((key) => key.startsWith("ohb:draft:"))).toBe(false);
+    expect(Object.keys(window.localStorage).some((key) => key.startsWith("openedbot:draft:"))).toBe(false);
     expect(Object.keys(window.sessionStorage).some((key) => key.endsWith(":attachments"))).toBe(true);
   });
   test("sign-out forgets every text draft on the device", () => {
     saveCloudSession({ organizationId: "a", csrfToken: "csrf", userId: "operator" });
     const draft = renderHook(() => useWorkspaceTextDraft("bot:one"));
     act(() => draft.result.current[1]("Private words"));
-    window.localStorage.setItem("ohb:locale", "fr");
+    window.localStorage.setItem("openedbot:locale", "fr");
     clearWorkspaceDrafts();
-    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("ohb:draft:"))).toEqual([]);
-    expect(window.localStorage.getItem("ohb:locale")).toBe("fr");
+    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("openedbot:draft:"))).toEqual([]);
+    expect(window.localStorage.getItem("openedbot:locale")).toBe("fr");
   });
 });

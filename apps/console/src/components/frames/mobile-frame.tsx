@@ -27,12 +27,12 @@ export function MobileFrame() {
     <div className="flex h-full w-full">
       <FleetRail client={fleetClient} fleetId={fleetFrame.fleet.id} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <FleetTopBar client={fleetClient} fleetWorkspace={fleetClient ? null : fleetFrame.fleet} className="pt-[var(--ohb-safe-top)]" />
+        <FleetTopBar client={fleetClient} fleetWorkspace={fleetClient ? null : fleetFrame.fleet} className="pt-[var(--openedbot-safe-top)]" />
         <BoardSidebar className="min-h-0 w-full flex-1 rounded-none border-0 pt-2 shadow-none" />
       </div>
     </div>
-  ) : <BoardSidebar className="h-full w-full rounded-none border-0 pt-[max(7px,var(--ohb-safe-top))] pb-[max(7px,var(--ohb-safe-bottom))] shadow-none" />;
-  // Same dev-only profiler ids as `BoardFrame` (OHB-141).
+  ) : <BoardSidebar className="h-full w-full rounded-none border-0 pt-[max(7px,var(--openedbot-safe-top))] pb-[max(7px,var(--openedbot-safe-bottom))] shadow-none" />;
+  // Same dev-only profiler ids as `BoardFrame`.
   return (
     <MobileDrawerShell panel={<DevRenderProfiler id="board-sidebar">{panel}</DevRenderProfiler>}>
       <DevRenderProfiler id="app-shell">

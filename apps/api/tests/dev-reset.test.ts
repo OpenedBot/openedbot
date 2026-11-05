@@ -55,12 +55,12 @@ describe("DEV_RESET_PRESERVED_TABLES", () => {
 });
 
 describe("assertDevResetAllowed", () => {
-  const local = "postgres://owner:secret@127.0.0.1:5432/ohb";
+  const local = "postgres://owner:secret@127.0.0.1:5432/openedbot";
 
   test("accepte development sur la boucle locale", () => {
     expect(() => assertDevResetAllowed({ environment: "development", databaseUrl: local })).not.toThrow();
     expect(() =>
-      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@localhost:5432/ohb" }),
+      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@localhost:5432/openedbot" }),
     ).not.toThrow();
   });
 
@@ -72,7 +72,7 @@ describe("assertDevResetAllowed", () => {
 
   test("refuse une base distante, même nommée comme la locale", () => {
     expect(() =>
-      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@db.preprod.ohb:5432/ohb" }),
+      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@db.preprod.openedbot:5432/openedbot" }),
     ).toThrow(/hors base locale/);
   });
 
@@ -81,7 +81,7 @@ describe("assertDevResetAllowed", () => {
       assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@127.0.0.1:5432/postgres" }),
     ).toThrow(/base système/);
     expect(() =>
-      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@127.0.0.1:5432/ohb%22;%20drop" }),
+      assertDevResetAllowed({ environment: "development", databaseUrl: "postgres://o:s@127.0.0.1:5432/openedbot%22;%20drop" }),
     ).toThrow(/nom de base/);
   });
 });

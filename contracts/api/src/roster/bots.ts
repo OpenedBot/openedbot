@@ -55,7 +55,7 @@ export type BotDto = {
   permissionMode?: BotPermissionMode;
   hermesProfile: string | null;
   /** openedbot created and owns the corresponding named host profile. */
-  /** Absent on responses from servers before OHB-28. */
+  /** Absent on responses from older servers. */
   hermesProfileManaged?: boolean;
   profileImportStatus?: "configuring" | "needs_attention" | null;
   profileProvisionStatus?: "preparing" | "failed" | null;

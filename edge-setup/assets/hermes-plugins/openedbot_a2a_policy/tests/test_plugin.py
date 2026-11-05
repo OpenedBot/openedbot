@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
 
-import ohb_a2a_policy
+import openedbot_a2a_policy
 
 
 class FakePluginContext:
@@ -35,9 +35,9 @@ class FakePluginContext:
 
 class PluginLifecycleTests(unittest.TestCase):
     def tearDown(self) -> None:
-        ohb_a2a_policy._on_unload()
-        ohb_a2a_policy._atexit_registered = False
-        ohb_a2a_policy._guard_registered = False
+        openedbot_a2a_policy._on_unload()
+        openedbot_a2a_policy._atexit_registered = False
+        openedbot_a2a_policy._guard_registered = False
 
     def test_public_registration_and_named_gateway_bridge_start_live_socket(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -46,7 +46,7 @@ class PluginLifecycleTests(unittest.TestCase):
             plugins_dir = home / "plugins"
             plugins_dir.mkdir(mode=0o700)
             os.chmod(plugins_dir, 0o700)
-            marker_dir = plugins_dir / "ohb_a2a_policy"
+            marker_dir = plugins_dir / "openedbot_a2a_policy"
             marker_dir.mkdir(mode=0o700)
             os.chmod(marker_dir, 0o700)
             (marker_dir / "runtime-home").write_text(str(home) + "\n")
@@ -61,26 +61,26 @@ class PluginLifecycleTests(unittest.TestCase):
                 "localhostOnly": False,
             }
             with (
-                patch.object(ohb_a2a_policy, "_hermes_home", return_value=home),
-                patch.object(ohb_a2a_policy, "_metadata_provider", return_value=lambda: metadata),
-                patch.object(ohb_a2a_policy.atexit, "register"),
+                patch.object(openedbot_a2a_policy, "_hermes_home", return_value=home),
+                patch.object(openedbot_a2a_policy, "_metadata_provider", return_value=lambda: metadata),
+                patch.object(openedbot_a2a_policy.atexit, "register"),
             ):
-                ohb_a2a_policy.register(context)
+                openedbot_a2a_policy.register(context)
                 self.assertIn("pre_tool_call", context.hooks)
                 self.assertIn("tool_execution", context.middlewares)
                 self.assertEqual(
                     set(context.subscriptions),
-                    {"ohb_a2a_policy:gateway_start"},
+                    {"openedbot_a2a_policy:gateway_start"},
                 )
-                callback = context.subscriptions["ohb_a2a_policy:gateway_start"]
+                callback = context.subscriptions["openedbot_a2a_policy:gateway_start"]
                 self.assertFalse(callback(gatewayStart=False))
                 self.assertTrue(callback(gatewayStart=True))
-                self.assertTrue((home / ".ohb-a2a-policy" / "state.sock").exists())
+                self.assertTrue((home / ".openedbot-a2a-policy" / "state.sock").exists())
 
                 # The public bridge gets a success only after the listener is live.
                 self.assertTrue(context.unload is not None)
                 context.unload()
-                self.assertFalse((home / ".ohb-a2a-policy" / "state.sock").exists())
+                self.assertFalse((home / ".openedbot-a2a-policy" / "state.sock").exists())
                 self.assertFalse(callback(gatewayStart=True))
 
     def test_peer_token_override_is_frozen_for_the_gateway_generation(self) -> None:
@@ -93,14 +93,14 @@ class PluginLifecycleTests(unittest.TestCase):
             with (
                 patch.dict(sys.modules, {"hermes_cli.config": config}),
                 patch.dict(os.environ, {"A2A_PEER_TOKENS": "managed-value"}),
-                patch.object(ohb_a2a_policy, "root_home_scope", lambda *_args: nullcontext(home)),
+                patch.object(openedbot_a2a_policy, "root_home_scope", lambda *_args: nullcontext(home)),
                 patch.object(
-                    ohb_a2a_policy,
+                    openedbot_a2a_policy,
                     "_startup_metadata",
                     side_effect=lambda override: {"peerTokensOverride": override},
                 ),
             ):
-                provider = ohb_a2a_policy._metadata_provider(home)
+                provider = openedbot_a2a_policy._metadata_provider(home)
                 env_file.write_text("A2A_PEER_TOKENS=pending-host-write\n")
                 config.load_env.return_value = {"A2A_PEER_TOKENS": "pending-host-write"}
                 self.assertFalse(provider()["peerTokensOverride"])
@@ -110,7 +110,7 @@ class PluginLifecycleTests(unittest.TestCase):
         for marker_state in ("missing", "symlink", "loose-mode"):
             with self.subTest(marker_state=marker_state), tempfile.TemporaryDirectory() as tmp:
                 home = Path(tmp)
-                plugin_dir = home / "plugins" / "ohb_a2a_policy"
+                plugin_dir = home / "plugins" / "openedbot_a2a_policy"
                 plugin_dir.mkdir(parents=True, mode=0o700)
                 marker = plugin_dir / "runtime-home"
                 if marker_state != "missing":
@@ -125,14 +125,14 @@ class PluginLifecycleTests(unittest.TestCase):
 
                 context = FakePluginContext()
                 with (
-                    patch.object(ohb_a2a_policy, "_hermes_home", return_value=home),
+                    patch.object(openedbot_a2a_policy, "_hermes_home", return_value=home),
                     patch.object(
-                        ohb_a2a_policy,
+                        openedbot_a2a_policy,
                         "_policy_state",
                         side_effect=RuntimeError("configuration unavailable"),
                     ),
                 ):
-                    ohb_a2a_policy.register(context)
+                    openedbot_a2a_policy.register(context)
                     self.assertIn("pre_tool_call", context.hooks)
                     self.assertIn("tool_execution", context.middlewares)
                     decision = context.hooks["pre_tool_call"](
@@ -167,7 +167,7 @@ class PluginLifecycleTests(unittest.TestCase):
             home.mkdir(parents=True, mode=0o700)
             os.chmod(root / "profiles", 0o700)
             os.chmod(home, 0o700)
-            plugin_dir = home / "plugins" / "ohb_a2a_policy"
+            plugin_dir = home / "plugins" / "openedbot_a2a_policy"
             plugin_dir.mkdir(parents=True, mode=0o700)
             os.chmod(home / "plugins", 0o700)
             os.chmod(plugin_dir, 0o700)
@@ -175,12 +175,12 @@ class PluginLifecycleTests(unittest.TestCase):
             marker.write_text(str(root) + "\n")
             os.chmod(marker, 0o600)
             context = FakePluginContext()
-            with patch.object(ohb_a2a_policy, "_hermes_home", return_value=home):
-                ohb_a2a_policy.register(context)
-                callback = context.subscriptions["ohb_a2a_policy:gateway_start"]
+            with patch.object(openedbot_a2a_policy, "_hermes_home", return_value=home):
+                openedbot_a2a_policy.register(context)
+                callback = context.subscriptions["openedbot_a2a_policy:gateway_start"]
                 self.assertFalse(callback(gatewayStart=True))
-                self.assertFalse((root / ".ohb-a2a-policy" / "state.sock").exists())
-                self.assertFalse((home / ".ohb-a2a-policy" / "state.sock").exists())
+                self.assertFalse((root / ".openedbot-a2a-policy" / "state.sock").exists())
+                self.assertFalse((home / ".openedbot-a2a-policy" / "state.sock").exists())
                 self.assertIsNotNone(context.unload)
                 context.unload()
 

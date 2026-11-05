@@ -347,7 +347,7 @@
    est `:focus-visible` et restait gris pendant que la souris en survolait une
    autre. Tant qu'une ligne est survolée, c'est elle seule qui est surlignée ;
    la souris partie, la ligne au focus clavier reprend son fond. */
-.bui-popover:has(.ohb-row:hover) .ohb-row:focus-visible:not(:hover, [data-highlighted], [aria-selected="true"], [aria-checked="true"]) {
+.bui-popover:has(.openedbot-row:hover) .openedbot-row:focus-visible:not(:hover, [data-highlighted], [aria-selected="true"], [aria-checked="true"]) {
   background-color: transparent;
 }
 
@@ -498,7 +498,7 @@
   inset-inline: 0;
   top: 0;
   z-index: 3;
-  height: max(12px, var(--ohb-safe-top));
+  height: max(12px, var(--openedbot-safe-top));
   pointer-events: none;
   background-color: var(--bui-background-secondary-default);
 }
@@ -510,21 +510,21 @@
   blur 4 px, scale 0.95. A landed tile mounts without it (the pending tile
   already played it), so the swap is not a second entrance.
 */
-@keyframes ohb-tile-in {
+@keyframes openedbot-tile-in {
   0% {
     opacity: 0;
     filter: blur(4px);
     transform: scale(0.95);
   }
 }
-.ohb-tile-in {
-  animation: ohb-tile-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+.openedbot-tile-in {
+  animation: openedbot-tile-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.ohb-tile-in[data-landed] {
+.openedbot-tile-in[data-landed] {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .ohb-tile-in {
+  .openedbot-tile-in {
     animation: none;
   }
 }

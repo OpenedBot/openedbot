@@ -3,24 +3,24 @@
    est fixe au bureau : passer d'une étape à l'autre ne fait pas sauter la
    fenêtre. */
 @media (min-width: 768px) {
-  .ohb-new-bot-dialog {
+  .openedbot-new-bot-dialog {
     height: min(38rem, calc(100dvh - 4rem));
   }
 
-  .ohb-new-bot-dialog .ohb-new-bot-body {
+  .openedbot-new-bot-dialog .openedbot-new-bot-body {
     display: flex;
     overflow: hidden;
   }
 }
 
-.ohb-new-bot-layout {
+.openedbot-new-bot-layout {
   display: grid;
   flex: 1;
   min-height: 0;
   grid-template-columns: 14rem minmax(0, 1fr);
 }
 
-.ohb-new-bot-aside {
+.openedbot-new-bot-aside {
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -29,7 +29,7 @@
   padding: 1.75rem 1.25rem 1.5rem;
 }
 
-.ohb-new-bot-avatar {
+.openedbot-new-bot-avatar {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -37,33 +37,33 @@
   text-align: center;
 }
 
-.ohb-new-bot-avatar-face {
+.openedbot-new-bot-avatar-face {
   width: 5.5rem;
   height: 5.5rem;
 }
 
-.ohb-new-bot-avatar-text {
+.openedbot-new-bot-avatar-text {
   width: 100%;
   min-width: 0;
 }
 
 /* La colonne de droite : titre, contenu qui défile, actions. Aucun trait :
    un fondu de 16 px aux bords du défilement dit qu'il y a de la suite. */
-.ohb-new-bot-pane {
+.openedbot-new-bot-pane {
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
 }
 
-.ohb-new-bot-head {
+.openedbot-new-bot-head {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
   padding: 1.5rem 1.5rem 0.5rem 1.75rem;
 }
 
-.ohb-new-bot-title {
+.openedbot-new-bot-title {
   margin: 0;
   color: var(--color-text-primary);
   font-size: 1.25rem;
@@ -72,14 +72,14 @@
   line-height: 1.3;
 }
 
-.ohb-new-bot-lede {
+.openedbot-new-bot-lede {
   margin: 0.25rem 0 0;
   color: var(--color-text-secondary);
   font-size: 0.875rem;
   line-height: 1.45;
 }
 
-.ohb-new-bot-close {
+.openedbot-new-bot-close {
   display: inline-flex;
   width: 2rem;
   height: 2rem;
@@ -94,16 +94,16 @@
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.ohb-new-bot-close:hover {
+.openedbot-new-bot-close:hover {
   background: var(--color-background-secondary-default);
   color: var(--color-text-primary);
 }
 
-:root[data-keyboard-focus] .ohb-new-bot-close:focus-visible {
+:root[data-keyboard-focus] .openedbot-new-bot-close:focus-visible {
   box-shadow: 0 0 0 2px var(--color-border-focus-ring);
 }
 
-.ohb-new-bot-main {
+.openedbot-new-bot-main {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -113,7 +113,7 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 1rem, #000 calc(100% - 1rem), transparent 100%);
 }
 
-.ohb-new-bot-actions {
+.openedbot-new-bot-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
@@ -121,17 +121,17 @@
 }
 
 /* Le bas de la fiche : où il travaillera, sous l'aperçu et les étapes. */
-.ohb-new-bot-aside-foot {
+.openedbot-new-bot-aside-foot {
   margin-top: auto;
 }
 
-.ohb-new-bot-fields {
+.openedbot-new-bot-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
-.ohb-new-bot-card-action {
+.openedbot-new-bot-card-action {
   display: inline-flex;
   min-width: 0;
   flex: 1;
@@ -150,41 +150,41 @@
   transition: background-color 120ms ease;
 }
 
-.ohb-new-bot-card-action-icon {
+.openedbot-new-bot-card-action-icon {
   width: 2rem;
   flex: 0 0 2rem;
   padding: 0;
 }
 
-.ohb-new-bot-card-action > svg {
+.openedbot-new-bot-card-action > svg {
   flex: 0 0 auto;
   color: var(--color-foreground-icon-secondary);
 }
 
-.ohb-new-bot-card-action:hover,
-.ohb-new-bot-card-action[aria-pressed="true"] {
+.openedbot-new-bot-card-action:hover,
+.openedbot-new-bot-card-action[aria-pressed="true"] {
   background: var(--color-background-tertiary-default);
 }
 
-:root[data-keyboard-focus] .ohb-new-bot-card-action:focus-visible {
+:root[data-keyboard-focus] .openedbot-new-bot-card-action:focus-visible {
   box-shadow: 0 0 0 2px var(--color-border-focus-ring);
 }
 
-.ohb-new-bot-promise {
+.openedbot-new-bot-promise {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   line-height: 1.4;
 }
 
-.ohb-new-bot-footer {
+.openedbot-new-bot-footer {
   display: grid;
   width: 100%;
   gap: 0.75rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-new-bot-card-action {
+  .openedbot-new-bot-card-action {
     transition: none;
   }
 }
@@ -192,31 +192,31 @@
 /* Téléphone (feuille du bas) : une colonne, l'aperçu en une rangée au-dessus
    de l'étape ; le titre et la description disent déjà où l'on en est. */
 @media (max-width: 767px) {
-  .ohb-new-bot-layout {
+  .openedbot-new-bot-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ohb-new-bot-aside {
+  .openedbot-new-bot-aside {
     padding: 0.75rem 1rem;
   }
 
-  .ohb-new-bot-avatar {
+  .openedbot-new-bot-avatar {
     flex-direction: row;
     text-align: left;
   }
 
-  .ohb-new-bot-avatar-face {
+  .openedbot-new-bot-avatar-face {
     width: 3rem;
     height: 3rem;
   }
 
-  .ohb-new-bot-main {
+  .openedbot-new-bot-main {
     overflow: visible;
     padding: 1rem;
     mask-image: none;
   }
 
-  .ohb-new-bot-fields {
+  .openedbot-new-bot-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 }

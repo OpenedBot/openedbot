@@ -35,7 +35,7 @@ const unused = () => {
   throw new Error("not used by this test");
 };
 const staffHost = {
-  config: { environment: "test", trustProxy: false, staffDevSignIn: null, webUrl: "https://app.ohb.test", billingEnforced: false, support: { pollMs: 1_000 } },
+  config: { environment: "test", trustProxy: false, staffDevSignIn: null, webUrl: "https://app.openedbot.test", billingEnforced: false, support: { pollMs: 1_000 } },
   blobs: {},
   session: { optional: async () => null },
   services: {
@@ -63,7 +63,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
   // mounts over an alias's path must be in the table, or the test fails.
   test("no plug-in path alias shadows a core route", async () => {
     const config = {
-      environment: "test", deployEnvironment: "dev", adminUrl: "https://backoffice.ohb.test", webUrl: "https://app.ohb.test", trustProxy: false,
+      environment: "test", deployEnvironment: "dev", adminUrl: "https://backoffice.openedbot.test", webUrl: "https://app.openedbot.test", trustProxy: false,
       google: { clientId: null, clientSecret: null, allowedEmails: new Set<string>() }, nativeRedirectUris: [], devSignIn: null,
     } as unknown as ApiConfig;
     const routers: Record<string, Array<() => Hono<never>>> = {
@@ -147,7 +147,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
       const app = apiLike(staff, { staff: staffHost }, [], true);
       expect((await app.request("/api/pro/staff/providers")).status).toBe(200);
       for (const path of ["/api/staff", "/api/staff/providers", "/api/staff/me"]) {
-        expect((await app.request(path, { headers: { Cookie: "ohb_staff_session=x" } })).status).toBe(404);
+        expect((await app.request(path, { headers: { Cookie: "openedbot_staff_session=x" } })).status).toBe(404);
       }
     });
   });
@@ -215,7 +215,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
       try {
         const app = new Hono();
         app.use("/api/*", compatPathRedirects(aliases.paths, () => app.routes));
-        app.route("/api/organization", memberRoutes(db, { webUrl: "https://app.ohb.test" } as ApiConfig));
+        app.route("/api/organization", memberRoutes(db, { webUrl: "https://app.openedbot.test" } as ApiConfig));
         app.get("/api/probe", (c) => c.json({ fleet: requestHeader(c, "X-OpenedBot-Fleet") ?? null, query: requestQuery(c, "fleetId") ?? null }));
         for (const [from, to] of [
           ["/api/agency/fleet?days=7", "/api/pro/agency/fleet?days=7"],
@@ -225,7 +225,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
           const response = await app.request(from, { method: "DELETE" });
           expect([response.status, response.headers.get("Location")]).toEqual([308, to]);
         }
-        const probe = await app.request("/api/probe?agencyId=f1", { headers: { "X-OHB-Agency": "f2" } });
+        const probe = await app.request("/api/probe?agencyId=f1", { headers: { "X-OpenedBot-Agency": "f2" } });
         expect(await probe.json()).toEqual({ fleet: "f2", query: "f1" });
       } finally {
         installCompatAliases({});
@@ -242,7 +242,7 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
   describe.skipIf(billing.length === 0)("the billing plug-in from the external plug-ins (step 8d)", () => {
     const ORG = "11111111-1111-4111-8111-111111111111";
     const billingHost = (billingEnforced: boolean) => ({
-      config: { webUrl: "https://app.ohb.test", billingEnforced, billingGraceDays: 30, plan: { runtimeLimit: 1, memberLimit: 1, concurrentRunLimit: 1, attachmentQuotaBytes: 1 }, billingPriceEur: 19 },
+      config: { webUrl: "https://app.openedbot.test", billingEnforced, billingGraceDays: 30, plan: { runtimeLimit: 1, memberLimit: 1, concurrentRunLimit: 1, attachmentQuotaBytes: 1 }, billingPriceEur: 19 },
       fleetBillingEnabled: async () => false,
     });
     function sessionApi(caller: ProCaller, billingEnforced: boolean) {

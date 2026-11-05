@@ -95,7 +95,7 @@ export function WorkflowOverview({
           onClick={() => setOpen(true)}
           title={t("workflowOverview.openDetail")}
           aria-label={`${t(STATUS_KEYS[lead.workflow.status])} ${lead.workflow.usedSteps}/${lead.workflow.maxSteps}. ${t("workflowOverview.openDetail")}`}
-          className={`ohb-press relative flex size-11 shrink-0 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`openedbot-press relative flex size-11 shrink-0 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             review ? "text-warn-700" : "text-muted-foreground"
           }`}
         >

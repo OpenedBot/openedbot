@@ -32,7 +32,7 @@ create temp table audit_scope_proof (
 );
 insert into audit_scope_proof values (-1, -1, -1, -1, -1, 'unset', 'unset', 'unset');
 
-grant select, insert, update on audit_scope_proof to ohb_api;
+grant select, insert, update on audit_scope_proof to openedbot_api;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('a0000000-0000-4000-8000-000000000001', 'scope-staff@example.test', 'x', 'Scope Staff'),
@@ -55,7 +55,7 @@ insert into staff_impersonation_claims (
    'a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000001',
    'scope-hash-3', '2026-06-03T10:05:00Z', '2026-06-03T10:00:00Z');
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', 'a0000000-0000-4000-8000-000000000001', false) \g /dev/null
 
 -- 1 et 2. Le tenant demande ne rend que lui ; le sujet traverse les tenants.

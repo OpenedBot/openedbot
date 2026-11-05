@@ -62,7 +62,7 @@ async function profileToolsets(client: BaselineClient, profile: string): Promise
 }
 
 /**
- * Socle « bot léger » (DEV-OHB-247) : amène chaque bot à profil géré dont la
+ * Socle « bot léger » : amène chaque bot à profil géré dont la
  * version stockée est sous `CAPABILITY_BASELINE_VERSION` au socle (toolsets
  * du profil, skills livrées avec Hermes), puis estampille la version. Un
  * bot neuf part à 0 et passe ici dès que sa provision a réussi. Un échec

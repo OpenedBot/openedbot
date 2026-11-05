@@ -310,7 +310,7 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
 
   const createdAt = Date.now();
   const proven = readBackByHost || (await listed()) === true;
-  // Durations of the steps that sit on the clone path (DEV-OHB-244): compare
+  // Durations of the steps that sit on the clone path: compare
   // `proof: "inventory"` with `proof: "create"` to measure the saved read.
   console.info(JSON.stringify({
     event: "profile_provision.timings", botId: job.bot_id, organizationId: job.organization_id,

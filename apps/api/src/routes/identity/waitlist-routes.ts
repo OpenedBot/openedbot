@@ -31,7 +31,7 @@ import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-er
  * la liste et sa réponse ne dit pas plus que ce que la personne vient de taper.
  *
  * La route publique ne fait AUCUNE lecture, ni ici ni sur la file d'e-mails,
- * car les deux tables portent des adresses en clair. Le rôle `ohb_api` peut
+ * car les deux tables portent des adresses en clair. Le rôle `openedbot_api` peut
  * lire la liste pour les routes staff depuis 0066, mais ce handler conserve la
  * discipline d'écriture seule de 0065 : `on conflict do nothing` sans cible et
  * aucun `returning`. Le nombre de lignes écrites suffit à distinguer une

@@ -7,7 +7,7 @@ import { BotCapabilitiesPanel, ToolErrorsSection } from "../../src/components/bo
 
 const realFetch = globalThis.fetch;
 
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(() => {
   cleanup();
   globalThis.fetch = realFetch;

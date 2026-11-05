@@ -229,7 +229,7 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       if (target.reachability === "connector") {
         await insertRuntimeLinkEvent(tx, auth.organizationId, target.id, "revoked");
       }
-      // OHB-75 : un tunnel géré part avec son runtime ; une publication sur
+      // Un tunnel géré part avec son runtime ; une publication sur
       // le compte du client est révoquée ici et nettoyée par lui.
       if (target.reachability === "direct") {
         const pending = await revokeExposureForRuntime(tx, config, auth.organizationId, target.id);

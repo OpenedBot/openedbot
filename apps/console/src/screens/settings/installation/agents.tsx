@@ -498,7 +498,7 @@ function HostProfilesMobile({
         const mission = profile.description?.trim() || t("profileImport.missionMissing");
         const model = profile.model.default ?? t("profileImport.modelUnknown");
         return (
-          <li key={profile.name} className="border-b border-[var(--ohb-grouped-separator)] last:border-b-0">
+          <li key={profile.name} className="border-b border-[var(--openedbot-grouped-separator)] last:border-b-0">
             <div className="flex min-h-12 items-start gap-3 px-4 py-3">
               {importable ? (
                 <Checkbox
@@ -523,8 +523,8 @@ function HostProfilesMobile({
                     </ToneBadge>
                   ) : null}
                 </p>
-                <p className="mt-0.5 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">{mission}</p>
-                <p className="mt-1 font-mono text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+                <p className="mt-0.5 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">{mission}</p>
+                <p className="mt-1 font-mono text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
                   {model}
                   {" · "}
                   {t("profileImport.routines", { count: String(profile.routineCount) })}

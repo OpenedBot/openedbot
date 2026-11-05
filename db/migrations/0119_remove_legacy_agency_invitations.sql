@@ -54,7 +54,7 @@ as $$
     from target t;
 $$;
 revoke all on function workspace_access(uuid, uuid) from public;
-grant execute on function workspace_access(uuid, uuid) to ohb_api;
+grant execute on function workspace_access(uuid, uuid) to openedbot_api;
 
 insert into schema_migrations(version) values ('0119_remove_legacy_agency_invitations') on conflict do nothing;
 commit;

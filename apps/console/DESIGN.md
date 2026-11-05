@@ -16,15 +16,15 @@ l’opérateur, pas le SaaS.
 
 | Rôle | Clair | Sombre |
 | --- | --- | --- |
-| Canvas (`--ohb-grouped-canvas`) | `#F2F2F7` | `#000000` |
-| Carte (`--ohb-grouped-card`) | `#FFFFFF` | `#1C1C1E` |
-| Filet inset (`--ohb-grouped-separator`) | `rgba(60,60,67,0.12)` | `rgba(84,84,88,0.65)` |
-| Libellé / icône (`--ohb-grouped-label`) | `#000000` | `#F5F5F7` |
-| Légende / valeur (`--ohb-grouped-caption`) | `#6D6D72` | `#8E8E93` |
-| Chevron (`--ohb-grouped-chevron`) | `#C7C7CC` | `#636366` |
-| Pastille fermer (`--ohb-grouped-close`) | `rgba(120,120,128,0.16)` | `rgba(120,120,128,0.24)` |
-| Pressé (`--ohb-grouped-press`) | `rgba(0,0,0,0.04)` | `#2C2C2E` |
-| Retour (`--ohb-grouped-back`) | `#007AFF` | `#0A84FF` |
+| Canvas (`--openedbot-grouped-canvas`) | `#F2F2F7` | `#000000` |
+| Carte (`--openedbot-grouped-card`) | `#FFFFFF` | `#1C1C1E` |
+| Filet inset (`--openedbot-grouped-separator`) | `rgba(60,60,67,0.12)` | `rgba(84,84,88,0.65)` |
+| Libellé / icône (`--openedbot-grouped-label`) | `#000000` | `#F5F5F7` |
+| Légende / valeur (`--openedbot-grouped-caption`) | `#6D6D72` | `#8E8E93` |
+| Chevron (`--openedbot-grouped-chevron`) | `#C7C7CC` | `#636366` |
+| Pastille fermer (`--openedbot-grouped-close`) | `rgba(120,120,128,0.16)` | `rgba(120,120,128,0.24)` |
+| Pressé (`--openedbot-grouped-press`) | `rgba(0,0,0,0.04)` | `#2C2C2E` |
+| Retour (`--openedbot-grouped-back`) | `#007AFF` | `#0A84FF` |
 
 Rayons : carte `20px`, feuille `32px` en haut seulement.
 Type : `-apple-system, system-ui` déjà servi par le shell. Corps de ligne
@@ -69,7 +69,7 @@ Variables dans `browser/ui-kit/src/styles/mobile.css`. Primitives dans
 
 `‹ Retour` est un contrôle de barre de nav iOS, pas un bouton ghost.
 
-- Chevron + libellé `17/22`, bleu système (`--ohb-grouped-back` : `#007AFF` /
+- Chevron + libellé `17/22`, bleu système (`--openedbot-grouped-back` : `#007AFF` /
   `#0A84FF`). Jamais `--primary` (violet console).
 - Pas de fond, pas de bord, pas de pastille. Appuyé : opacity `0.55`.
 - Cible 44 pt. Primitive : `InsetBackButton` / `insetBackClassName`.
@@ -78,7 +78,7 @@ Variables dans `browser/ui-kit/src/styles/mobile.css`. Primitives dans
 
 Bandeau iOS sous l’island, pas le snackbar bureau (bas-droite, carte bordée).
 
-- Ancré `top-center`, `top: max(0.75rem, var(--ohb-safe-top))`, inset 16 px.
+- Ancré `top-center`, `top: max(0.75rem, var(--openedbot-safe-top))`, inset 16 px.
 - Pleine largeur dans l’inset, rayon `20px`, matériau
   `#1C1C1E` / blur + saturate. Texte `#F5F5F7`, caption `#8E8E93`.
 - Titre `17/22`, description `15/20`. Pas de filet, pas d’ombre bureau.
@@ -104,7 +104,7 @@ Noms de ce que l’opérateur contrôle, pas de ce que le système construit.
 
 ## Do / Don’t
 
-- Do : `env(safe-area-inset-*)`, cibles 44 pt, `ohb-press`, `prefers-reduced-motion`.
+- Do : `env(safe-area-inset-*)`, cibles 44 pt, `openedbot-press`, `prefers-reduced-motion`.
 - Do : valeurs à droite quand elles existent (nom, modèle, `@slug`).
 - Don’t : tuile d’icône teintée, filet au-dessus du composer, uppercase de groupe.
 - Don’t : nav latérale, carte bordée, modal centrée : sur `pointer: coarse`.

@@ -325,7 +325,7 @@ export function FailureSurface({
       <div
         className={cn(
           "flex w-full max-w-md flex-col items-center overflow-hidden text-center",
-          isMobile ? "rounded-[20px] bg-[var(--ohb-grouped-card)]" : "rounded-xl border border-border bg-background",
+          isMobile ? "rounded-[20px] bg-[var(--openedbot-grouped-card)]" : "rounded-xl border border-border bg-background",
         )}
       >
         <div className="flex w-full flex-col items-center gap-3 px-6 pb-6 pt-8">

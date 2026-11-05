@@ -1,4 +1,3 @@
-import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { Hono } from "hono";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { assertProductionConfig, readApiConfig } from "@openedbot/platform-config/api-config";
@@ -27,7 +26,7 @@ const instanceConfig = { instanceId, apiInternalUrl: linkConfig.internalUrl, wor
 const registry = createApiInstanceRegistry(db, instanceConfig, startedAt);
 const lease = routingLease(registry);
 const locator = createRuntimeLinkLocator(db, instanceConfig);
-// AuditAnchor : chaîne locale, puis le bucket WORM (OHB-57, installation
+// AuditAnchor : chaîne locale, puis le bucket WORM (installation
 // legacy). Aucun plug-in n'est chargé ici : un ancrage externe en échec n'y
 // est jamais bloquant, il se journalise (`worm_write_failed`).
 // `inventory.changed` : la composition de l'inventaire vit dans l'API ; la

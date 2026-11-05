@@ -5,7 +5,7 @@
 -- Piege du fichier appelant : pas d apostrophe isolee dans les commentaires.
 
 create temp table pipeline_proof (step int primary key, value text not null);
-grant select, insert, update on pipeline_proof to ohb_api, ohb_worker;
+grant select, insert, update on pipeline_proof to openedbot_api, openedbot_worker;
 
 insert into staff_users (id, email, password_hash, display_name) values
   ('e7000000-0000-4000-8000-000000000001', 'pipeline-staff@example.test', 'x', 'Pipeline Staff');
@@ -46,7 +46,7 @@ insert into pipeline_proof
   select 1, permission_revision::text from bots where id = 'e7000000-0000-4000-8000-000000000021';
 
 -- 2. Without a staff identity the switch is refused.
-set role ohb_api;
+set role openedbot_api;
 do $proof$
 begin
   perform staff_set_permission_pipeline('e7000000-0000-4000-8000-000000000010', 'v2');
@@ -58,13 +58,13 @@ $proof$;
 reset role;
 
 -- 3. A live worker that does not announce v2, then a leased run, hold v2 back.
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.staff_user_id', 'e7000000-0000-4000-8000-000000000001', false) \g /dev/null
 insert into pipeline_proof
   select 3, status from staff_set_permission_pipeline('e7000000-0000-4000-8000-000000000010', 'v2');
 reset role;
 update service_instances set permission_pipelines = array['legacy', 'v2'] where id = 'pipeline-worker';
-set role ohb_api;
+set role openedbot_api;
 insert into pipeline_proof
   select 4, status from staff_set_permission_pipeline('e7000000-0000-4000-8000-000000000010', 'v2');
 reset role;
@@ -73,7 +73,7 @@ reset role;
 -- moves to a new revision, and a second call changes nothing.
 update runs set status = 'completed', lease_owner = null, lease_expires_at = null
  where id = 'e7000000-0000-4000-8000-000000000041';
-set role ohb_api;
+set role openedbot_api;
 insert into pipeline_proof
   select 5, status || ':' || previous_pipeline || '>' || current_pipeline
     from staff_set_permission_pipeline('e7000000-0000-4000-8000-000000000010', 'v2');
@@ -99,7 +99,7 @@ insert into runs (id, organization_id, thread_id, bot_id, input, status) values
    'Pipeline legacy run', 'awaiting_approval');
 -- One active run per thread and one active gate per run: each gate below
 -- has its own run and thread.
-set role ohb_worker;
+set role openedbot_worker;
 do $proof$
 begin
   insert into approval_requests (
@@ -146,7 +146,7 @@ reset role;
 
 -- 11. Back to legacy: the undelivered policy decision returns to a human,
 -- the human gate is untouched, and the revision rises again.
-set role ohb_api;
+set role openedbot_api;
 insert into pipeline_proof
   select 11, status || ':' || reverted_gates
     from staff_set_permission_pipeline('e7000000-0000-4000-8000-000000000010', 'legacy');
@@ -159,7 +159,7 @@ insert into pipeline_proof
   select 13, permission_revision::text from bots where id = 'e7000000-0000-4000-8000-000000000021';
 
 -- 14. In legacy the untraced policy write of today still passes.
-set role ohb_worker;
+set role openedbot_worker;
 insert into approval_requests (
   id, organization_id, thread_id, run_id, gate_ordinal, command, choices, expires_at,
   status, selected_choice, resolved_at, resolved_by_policy

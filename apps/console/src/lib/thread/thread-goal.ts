@@ -9,7 +9,7 @@ import { readCloudSession } from "../session/cloud-session";
  * déconnexion efface tout (`clearThreadGoals`) : sur un poste partagé, le
  * compte suivant ne doit ni voir ni envoyer l'objectif du précédent.
  */
-const PREFIX = "ohb.threadGoal.";
+const PREFIX = "openedbot.threadGoal.";
 
 function storageKey(scope: string): string | null {
   const session = readCloudSession();

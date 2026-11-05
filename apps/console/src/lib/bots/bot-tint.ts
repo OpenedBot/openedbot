@@ -104,7 +104,7 @@ export function botAccentColor(bubbleColor: string | null): string | null {
 /**
  * Le style que l'écran d'un bot pose sur sa colonne : la couleur du bot
  * (`--bot-tint`, son texte) et l'aplat Grok Bot de la bulle de l'utilisateur
- * par thème (`--ohb-user-fill-*`, lus par thread-theme.css ; absents, la bulle
+ * par thème (`--openedbot-user-fill-*`, lus par thread-theme.css ; absents, la bulle
  * reste neutre).
  */
 export function botTintStyle(bubbleColor: string | null, userFill: BotBubbleFill | null): CSSProperties | undefined {
@@ -112,6 +112,6 @@ export function botTintStyle(bubbleColor: string | null, userFill: BotBubbleFill
   return {
     "--bot-tint": bubbleColor,
     "--bot-tint-text": tintTextColor(bubbleColor),
-    ...(userFill ? { "--ohb-user-fill-light": userFill.light, "--ohb-user-fill-dark": userFill.dark } : {}),
+    ...(userFill ? { "--openedbot-user-fill-light": userFill.light, "--openedbot-user-fill-dark": userFill.dark } : {}),
   } as CSSProperties;
 }

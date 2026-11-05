@@ -1,4 +1,4 @@
--- Identité stable de chaque événement (OHB-116, OHB-118) : bot, tour, session
+-- Identité stable de chaque événement : bot, tour, session
 -- Hermes et génération de bail, portés par la ligne `run_events` elle-même.
 --
 -- Pourquoi un trigger et pas une colonne de plus dans chaque INSERT : une
@@ -15,7 +15,7 @@
 --                   DM, avec ou sans workflow).
 -- - `session_key` : `coalesce(runs.execution_session_key,
 --                   threads.hermes_session_id)`, la clé que le worker envoie à
---                   Hermes. Identifiant structurel `ohb:{org}:…`, pas un secret.
+--                   Hermes. Identifiant structurel `openedbot:{org}:…`, pas un secret.
 -- - `lease_generation` : le bail sous lequel la ligne est écrite.
 --
 -- Fencing : un écrivain qui FOURNIT `lease_generation` déclare écrire sous ce
@@ -37,7 +37,7 @@
 -- du client sur le flux de l'organisation.
 --
 -- RLS : rien à ajouter. Les colonnes héritent des policies de la table
--- (tenant `ohb_api`, `ohb_worker` using true) ; le trigger s'exécute avec les
+-- (tenant `openedbot_api`, `openedbot_worker` using true) ; le trigger s'exécute avec les
 -- droits de l'écrivain (security invoker) et ne lit que `runs`, `workflows` et
 -- `threads` de la même organisation.
 begin;

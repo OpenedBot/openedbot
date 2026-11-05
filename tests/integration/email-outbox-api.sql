@@ -1,18 +1,18 @@
 -- La frontière de la file d e-mails (0064) : l API DÉPOSE, elle ne LIT pas.
 --
 -- Quatre faits, dans l ordre du resultat attendu :
---   1. ohb_api insere une ligne (waitlist_confirmation) : accepte
---   2. ohb_api relit la file : refuse (aucun grant select), 42501
---   3. ohb_api modifie une ligne : refuse (aucun grant update), 42501
---   4. ohb_worker voit bien la ligne deposee par l API
+--   1. openedbot_api insere une ligne (waitlist_confirmation) : accepte
+--   2. openedbot_api relit la file : refuse (aucun grant select), 42501
+--   3. openedbot_api modifie une ligne : refuse (aucun grant update), 42501
+--   4. openedbot_worker voit bien la ligne deposee par l API
 --
 -- Le genre est borne par la contrainte : un genre inconnu est refuse. C est ce
 -- qui empeche une route de semer un e-mail que le worker ne saurait pas rendre.
 create temp table email_outbox_proof (inserted text, api_read text, api_update text, worker_read text);
-grant insert, update, select on email_outbox_proof to ohb_api;
-grant insert, update, select on email_outbox_proof to ohb_worker;
+grant insert, update, select on email_outbox_proof to openedbot_api;
+grant insert, update, select on email_outbox_proof to openedbot_worker;
 
-set role ohb_api;
+set role openedbot_api;
 insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload)
 values ('60000000-0000-4000-8000-000000000001', 'waitlist_confirmation',
         'waitlist:proof@example.test', 'proof@example.test', 'fr', '{}'::jsonb);
@@ -37,7 +37,7 @@ end;
 $$;
 
 reset role;
-set role ohb_worker;
+set role openedbot_worker;
 update email_outbox_proof
    set worker_read = (select count(*)::text from email_outbox
                        where dedupe_key = 'waitlist:proof@example.test');
@@ -52,11 +52,11 @@ create temp table email_outbox_events_proof (
   worker_insert text,
   worker_read text
 );
-grant insert, update, select on email_outbox_events_proof to ohb_api;
-grant insert, update, select on email_outbox_events_proof to ohb_worker;
+grant insert, update, select on email_outbox_events_proof to openedbot_api;
+grant insert, update, select on email_outbox_events_proof to openedbot_worker;
 insert into email_outbox_events_proof default values;
 
-set role ohb_api;
+set role openedbot_api;
 insert into email_outbox_events (id, outbox_id, kind, event, detail)
 values (
   '67000000-0000-4000-8000-000000000001',
@@ -71,7 +71,7 @@ update email_outbox_events_proof
                     where id = '67000000-0000-4000-8000-000000000001');
 reset role;
 
-set role ohb_worker;
+set role openedbot_worker;
 insert into email_outbox_events (id, outbox_id, kind, event, attempt)
 values (
   '67000000-0000-4000-8000-000000000002',

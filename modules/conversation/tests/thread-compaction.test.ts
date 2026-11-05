@@ -154,7 +154,7 @@ describe("prompts", () => {
   });
 
   test("session de compact isolée par org et fil", () => {
-    expect(compactionSessionKey("org", "thread")).toBe("ohb:org:compact:thread:thread");
+    expect(compactionSessionKey("org", "thread")).toBe("openedbot:org:compact:thread:thread");
   });
 
   test("normalize refuse le vide et borne", () => {

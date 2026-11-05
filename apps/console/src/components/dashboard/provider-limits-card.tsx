@@ -99,7 +99,7 @@ export function ProviderLimitsCard({ compact = false }: { compact?: boolean }) {
         aria-label={`${t("providerLimits.open")} · ${peakLabel}`}
         onClick={() => setOpen(true)}
         className={cn(
-          "ohb-press mb-2 flex min-h-11 w-full items-center gap-2 rounded-xl border border-warn-100 bg-warn-soft px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "openedbot-press mb-2 flex min-h-11 w-full items-center gap-2 rounded-xl border border-warn-100 bg-warn-soft px-3 outline-none focus-visible:ring-2 focus-visible:ring-ring",
           compact && "mx-0",
         )}
       >

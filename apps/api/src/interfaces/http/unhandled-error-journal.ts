@@ -214,7 +214,7 @@ async function insertUnhandledError(sql: Db | TransactionDb, record: UnhandledEr
  * L'écriture sous la RLS de 0161 : une ligne d'organisation sous
  * `withTenant` (le `with check` compare `app.organization_id`), une ligne
  * sans organisation (requête anonyme, compte sans espace) sans réglage. Une
- * transaction par ligne, sans `returning` : ohb_api n'a que `insert`.
+ * transaction par ligne, sans `returning` : openedbot_api n'a que `insert`.
  */
 export function unhandledErrorJournalWriter(db: Db): (record: UnhandledErrorRecord) => Promise<void> {
   return async (record) => {

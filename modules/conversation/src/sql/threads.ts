@@ -28,7 +28,7 @@ export async function insertBotDefaultThread(
 ): Promise<void> {
   await tx`
     insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-    values (${input.threadId}, ${input.organizationId}, ${input.botId}, ${input.title}, ${`ohb:${input.organizationId}:${input.threadId}`}, true)
+    values (${input.threadId}, ${input.organizationId}, ${input.botId}, ${input.title}, ${`openedbot:${input.organizationId}:${input.threadId}`}, true)
   `;
 }
 
@@ -39,7 +39,7 @@ export async function insertGroupThread(
 ): Promise<void> {
   await tx`
     insert into threads (id, organization_id, group_id, title, hermes_session_id)
-    values (${input.threadId}, ${input.organizationId}, ${input.groupId}, ${input.title}, ${`ohb:${input.organizationId}:group:${input.threadId}`})
+    values (${input.threadId}, ${input.organizationId}, ${input.groupId}, ${input.title}, ${`openedbot:${input.organizationId}:group:${input.threadId}`})
   `;
 }
 

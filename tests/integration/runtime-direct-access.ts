@@ -1,4 +1,4 @@
-/** Prove OHB-74 against a disposable PostgreSQL database and the real routes. */
+/** Prove direct runtime access against a disposable PostgreSQL database and the real routes. */
 import { SQL } from "bun";
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -57,7 +57,7 @@ function databaseUrl(source: URL, database: string, username: string, password: 
 }
 
 const source = await adminUrl();
-const database = `ohb74_access_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot74_access_${crypto.randomUUID().replaceAll("-", "")}`;
 const admin = new SQL({ url: source.toString(), max: 1 });
 let target: SQL | null = null;
 let api: SQL | null = null;
@@ -67,12 +67,12 @@ const requests: Array<{ path: string; authorization: string | null; clientId: st
 
 try {
   await admin.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await admin.unsafe(`create database "${database}"`);
   databaseCreated = true;
-  await admin.unsafe(`grant connect on database "${database}" to ohb_api, ohb_worker`);
+  await admin.unsafe(`grant connect on database "${database}" to openedbot_api, openedbot_worker`);
 
   const destination = databaseUrl(source, database, source.username, source.password);
   target = new SQL({ url: destination, max: 1 });
@@ -100,10 +100,10 @@ try {
 
   const bearer = encryptSecret("seed-bearer", key.value);
   await target`insert into organizations (id, slug, name) values
-      (${organizationA}, 'ohb74-a', 'OHB-74 A'),
-      (${organizationB}, 'ohb74-b', 'OHB-74 B')`;
-  // OHB-75: a publication records who created it (FK to users).
-  await target`insert into users (id, email) values ('81000000-0000-4000-8000-000000000021', 'ohb74-owner@example.test')`;
+      (${organizationA}, 'openedbot74-a', 'Direct access A'),
+      (${organizationB}, 'openedbot74-b', 'Direct access B')`;
+  // A publication records who created it (FK to users).
+  await target`insert into users (id, email) values ('81000000-0000-4000-8000-000000000021', 'openedbot74-owner@example.test')`;
   await target`insert into memberships (organization_id, user_id, role) values (${organizationA}, '81000000-0000-4000-8000-000000000021', 'owner')`;
   await target`insert into runtimes (
       id, organization_id, name, reachability, endpoint,
@@ -116,11 +116,11 @@ try {
   await target.close();
   target = null;
 
-  api = new SQL({ url: databaseUrl(source, database, "ohb_api", "ohb_api_dev"), max: 2 });
+  api = new SQL({ url: databaseUrl(source, database, "openedbot_api", "openedbot_api_dev"), max: 2 });
   const config = {
     environment: "test",
     // La réponse de PUT /access porte la commande de reliaison du connecteur.
-    publicUrl: "https://ohb74.example.test",
+    publicUrl: "https://openedbot74.example.test",
     tokenEncryption: { current: key, previous: [] },
     hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint },
     hermesMtls: null,
@@ -128,12 +128,12 @@ try {
     connectorVersions: {},
   } as unknown as ApiConfig;
   const auth: AuthContext = {
-    sessionId: "ohb74-session",
+    sessionId: "openedbot74-session",
     organizationId: organizationA,
     userId: "81000000-0000-4000-8000-000000000021",
     role: "owner",
     kind: "web",
-    credentialHash: "ohb74-credential",
+    credentialHash: "openedbot74-credential",
   };
   const app = new Hono<{ Variables: AppVariables }>();
   app.use("*", async (context, next) => { context.set("auth", auth); await next(); });
@@ -198,7 +198,7 @@ try {
   assert(schema[0]?.columns === "4" && schema[0].rowSecurity && schema[0].forceRowSecurity && schema[0].constraint === "runtimes_edge_auth_envelope",
     "0057 schema or RLS metadata is missing");
 
-  // OHB-75: a Tailscale Funnel publication needs no Cloudflare, so the whole
+  // A Tailscale Funnel publication needs no Cloudflare, so the whole
   // create / declare cycle runs against the real table under RLS. The tailnet
   // itself is a fake: what is proved here is the SQL, not Tailscale.
   const exposureApp = new Hono<{ Variables: AppVariables }>();
@@ -218,7 +218,7 @@ try {
   ));
   const createdExposure = await exposureApp.request("/", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ kind: "tailscale_funnel", slug: "hermes", oauthClientId: "ohb-client-id", oauthClientSecret: "ohb-oauth-secret-long-enough" }),
+    body: JSON.stringify({ kind: "tailscale_funnel", slug: "hermes", oauthClientId: "openedbot-client-id", oauthClientSecret: "openedbot-oauth-secret-long-enough" }),
   });
   assert(createdExposure.status === 201, `POST /exposures returned ${createdExposure.status}`);
   const exposureDto = await createdExposure.json() as { exposure: { id: string; status: string; hostname: string }; installCommand: string };
@@ -237,7 +237,7 @@ try {
   assert(exposureSchema[0]?.tailscaleColumn === "1", "0062 tailscale_auth_key_id column is missing");
   assert(exposureSchema[0]?.rowSecurity && exposureSchema[0].forceRowSecurity, "0058 RLS metadata is missing");
 
-  console.log("OHB-74/75 PostgreSQL proof passed: 0057, 0058 and 0062 schema, RLS, API envelope round-trip, probe headers and a Funnel publication.");
+  console.log("Direct runtime access PostgreSQL proof passed: 0057, 0058 and 0062 schema, RLS, API envelope round-trip, probe headers and a Funnel publication.");
 } finally {
   await api?.close();
   await target?.close();

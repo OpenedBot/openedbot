@@ -12,7 +12,7 @@ insert into sections (id, organization_id, name, position) values
 insert into bots (id, organization_id, section_id, name, slug, position) values
   ('9c000000-0000-4000-8000-000000000021', '9c000000-0000-4000-8000-000000000001', '9c000000-0000-4000-8000-000000000011', 'Legacy one', 'legacy-one', 0),
   ('9c000000-0000-4000-8000-000000000022', '9c000000-0000-4000-8000-000000000001', '9c000000-0000-4000-8000-000000000011', 'Legacy two', 'legacy-two', 1);
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '9c000000-0000-4000-8000-000000000001', false) \g /dev/null
 do $$
 begin

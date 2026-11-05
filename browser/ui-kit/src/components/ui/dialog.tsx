@@ -254,7 +254,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
           // entourerait toute la boîte de dialogue.
           "flex w-full flex-col overflow-hidden outline-none transition duration-150 ease-out",
           isMobile
-            ? "ohb-inset-sheet max-h-[calc(100dvh-var(--ohb-safe-top)-2.5rem)] max-w-none pb-[var(--ohb-safe-bottom)] duration-250"
+            ? "openedbot-inset-sheet max-h-[calc(100dvh-var(--openedbot-safe-top)-2.5rem)] max-w-none pb-[var(--openedbot-safe-bottom)] duration-250"
             : "max-h-[calc(100dvh-4rem)] max-w-[480px] rounded-xl border border-foreground/12 bg-card text-[13px] leading-[18px] shadow-[var(--shadow-elevated)] dark:bg-surface",
           shown ? "translate-y-0 scale-100 opacity-100" : isMobile ? "translate-y-10 scale-100 opacity-0" : "scale-95 opacity-0",
           className
@@ -274,7 +274,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
                   id={titleId}
                   className={cn(
                     "font-semibold",
-                    isMobile ? "text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]" : "text-sm leading-5 font-medium text-foreground",
+                    isMobile ? "text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]" : "text-sm leading-5 font-medium text-foreground",
                   )}
                 >
                   {title}
@@ -285,7 +285,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
                   id={descriptionId}
                   className={cn(
                     "mt-0.5",
-                    isMobile ? "text-[15px] leading-5 text-[var(--ohb-grouped-caption)]" : "text-[13px] leading-[18px] text-muted-foreground",
+                    isMobile ? "text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]" : "text-[13px] leading-[18px] text-muted-foreground",
                   )}
                 >
                   {description}
@@ -299,7 +299,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
                   onClick={onClose}
                   aria-label={closeLabel}
                   data-inset-close=""
-                  className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--ohb-grouped-close)] text-[var(--ohb-grouped-label)] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--openedbot-grouped-close)] text-[var(--openedbot-grouped-label)] outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <XIcon className="size-4" strokeWidth={2.25} />
                 </button>
@@ -324,7 +324,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
             data-mobile-action-footer={isMobile ? "" : undefined}
             className={cn(
               isMobile
-                ? "flex min-h-11 shrink-0 flex-col gap-2 border-t-0 bg-[var(--ohb-grouped-canvas)] px-4 pt-2 pb-[max(0.75rem,var(--ohb-safe-bottom))]"
+                ? "flex min-h-11 shrink-0 flex-col gap-2 border-t-0 bg-[var(--openedbot-grouped-canvas)] px-4 pt-2 pb-[max(0.75rem,var(--openedbot-safe-bottom))]"
                 : "flex min-w-0 flex-wrap items-center justify-end gap-2 border-t border-foreground/8 p-2.5",
               footerClassName,
             )}

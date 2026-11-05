@@ -1,7 +1,7 @@
 // Frozen renderer bridge contract. The openedbot console consumes this exact shape
-// from `window.__OHB_NATIVE__`; any change here is a breaking change on the
+// from `window.__OPENEDBOT_NATIVE__`; any change here is a breaking change on the
 // console side. The refresh token never crosses this boundary.
-export type OhbNativeBridge = {
+export type OpenedbotNativeBridge = {
   /** Current access token, refreshed when expired (60 s margin). null when signed out. */
   readAccessToken(): Promise<string | null>;
   /** Forces a rotation. null when the refresh is refused (401): the shell then shows its sign-in screen. */
@@ -41,7 +41,7 @@ export type NativeAuthBridge = {
 
 declare global {
   interface Window {
-    __OHB_NATIVE__?: OhbNativeBridge;
+    __OPENEDBOT_NATIVE__?: OpenedbotNativeBridge;
   }
 }
 
@@ -98,13 +98,13 @@ export type PasswordCredentials = { email: string; password: string; emailCode?:
 // The preload lists these literals in src/preload/channels.ts and checks them
 // against this union with `satisfies` (it imports types only from here).
 export type IpcChannel =
-  | "ohb:read-access-token"
-  | "ohb:refresh"
-  | "ohb:open-external"
-  | "ohb:sign-out"
-  | "ohb:theme"
-  | "ohb:text-zoom"
-  | "ohb:text-zoom-initial"
+  | "openedbot:read-access-token"
+  | "openedbot:refresh"
+  | "openedbot:open-external"
+  | "openedbot:sign-out"
+  | "openedbot:theme"
+  | "openedbot:text-zoom"
+  | "openedbot:text-zoom-initial"
   | "auth:start"
   | "auth:password"
   | "auth:email-code"

@@ -8,13 +8,13 @@ import { queryKeys, type ThreadView } from "../api";
 
 /**
  * Patches the open thread and the roster from the 202. Falls back to a full
- * reread when the payload has no `message` (API older than OHB-88).
+ * reread when the payload has no `message` (older API).
  *
  * Query observers use an external store. Their notifications are synchronous;
  * wrapping this in startTransition cannot make a large transcript cheap.
  * Keep the optimistic bubble independent and preserve unchanged cache rows.
  *
- * Both writes share one notification batch (OHB-135): each `setQueryData`
+ * Both writes share one notification batch: each `setQueryData`
  * otherwise flushes its observers in its own `setTimeout(0)` tick, so the
  * conversation screen, which observes both keys, rendered twice for one 202.
  */
@@ -23,7 +23,7 @@ export function applySendAcceptedToCaches(
   threadId: string,
   accepted: SendMessageAccepted,
 ): void {
-  globalThis.window?.__ohbThreadPerf?.recordRunAccepted(accepted.runId);
+  globalThis.window?.__openedbotThreadPerf?.recordRunAccepted(accepted.runId);
   if (!accepted.message) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.thread(threadId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.roster });

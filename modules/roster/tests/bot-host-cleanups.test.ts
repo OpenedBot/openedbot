@@ -106,7 +106,7 @@ describe("bot host cleanup", () => {
     expect(statements.at(-1)?.sql).toContain("set profile_removed_at = now()");
   });
 
-  describe("post-mortem verification (DEV-OHB-244)", () => {
+  describe("post-mortem verification", () => {
     test("a pass that deleted surviving sessions waits before succeeding", async () => {
       const { db, statements } = scriptedDb();
       const fake = client();
@@ -168,14 +168,14 @@ describe("bot host cleanup", () => {
     });
   });
 
-  test("deletes the early greeting session on the default profile (DEV-OHB-244)", async () => {
+  test("deletes the early greeting session on the default profile", async () => {
     const { db } = scriptedDb();
     const fake = client();
     const profiles: Array<string | null> = [];
-    await executeBotHostCleanup(db, { ...baseJob, profile: null, session_ids: ["ohb:org-1:t-1", "ohb:org-1:t-1:greeting"] }, {
+    await executeBotHostCleanup(db, { ...baseJob, profile: null, session_ids: ["openedbot:org-1:t-1", "openedbot:org-1:t-1:greeting"] }, {
       client: (_runtimeId, profile) => { profiles.push(profile); return fake.host; },
     });
-    expect(fake.calls).toEqual(["session:ohb:org-1:t-1", "session:ohb:org-1:t-1:greeting"]);
+    expect(fake.calls).toEqual(["session:openedbot:org-1:t-1", "session:openedbot:org-1:t-1:greeting"]);
     expect(profiles).toEqual(["scout", null]);
   });
 

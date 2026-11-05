@@ -1,5 +1,5 @@
 /**
- * PERM2-2 (DEV-OHB-252) against a disposable PostgreSQL database, the real
+ * PERM2-2 against a disposable PostgreSQL database, the real
  * queue and the real runner (loopback fake Hermes). In a `v2` organization a
  * bot whose host policy is not proven in force starts no run: the run fails
  * `PERMISSION_POLICY_NOT_EFFECTIVE` before any Hermes call. The same bot in a
@@ -42,8 +42,8 @@ const recorder = Bun.serve({
 });
 
 try {
-  await withDisposablePostgres("ohb252_preflight", async ({ owner: target, connect }) => {
-    const worker = await connect("ohb_worker");
+  await withDisposablePostgres("openedbot252_preflight", async ({ owner: target, connect }) => {
+    const worker = await connect("openedbot_worker");
     const key = secretEncryptionKey(new Uint8Array(32).fill(52));
     const endpoint = recorder.url.toString().replace(/\/$/, "");
     const bearer = encryptSecret(FAKE_HERMES_TOKEN, key.value);

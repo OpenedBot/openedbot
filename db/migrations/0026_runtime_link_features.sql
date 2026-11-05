@@ -4,7 +4,7 @@ begin;
 --
 -- Une version de hermes-setup dotée de l'opérateur local
 -- (`hermes-operator.service`) annonce `provider_management` : les routes
--- hôte `/hermes-setup/…` sont servies, et OHB peut déposer un
+-- hôte `/hermes-setup/…` sont servies, et openedbot peut déposer un
 -- credential fournisseur (clé API, session OAuth) vers cet opérateur, sans
 -- SSH ni action sur le VPS. Une version antérieure n'annonce rien :
 -- l'interface doit alors renvoyer vers le geste manuel sur l'hôte, et non

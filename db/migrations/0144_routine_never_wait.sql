@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-9 (DEV-OHB-260): runs nobody attends.
+-- PERM2-9: runs nobody attends.
 --
 -- `routines.never_wait` is the per-routine option "Never wait": a gate of a
 -- run this routine fired that would wait for a person is refused at once

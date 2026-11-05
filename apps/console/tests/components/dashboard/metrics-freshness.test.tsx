@@ -32,7 +32,7 @@ const emptyOverview: OverviewDto = {
 const emptyUsage: UsageDto = { day: [], week: [], month: [], year: [] };
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {

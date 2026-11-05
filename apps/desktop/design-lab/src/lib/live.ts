@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /*
-  Live iteration. The lab's Vite plugin sends `ohb:renderer-changed` whenever
+  Live iteration. The lab's Vite plugin sends `openedbot:renderer-changed` whenever
   a file of openedbot-desktop/src/renderer changes. A template stylesheet only bumps
   `styles` (previews swap the <link>); the markup, the base stylesheet or an
   asset bumps `page` (previews reload the iframe).
@@ -17,7 +17,7 @@ function bump(kind: keyof Revision): void {
 }
 
 if (import.meta.hot) {
-  import.meta.hot.on("ohb:renderer-changed", (data: { file: string }) => {
+  import.meta.hot.on("openedbot:renderer-changed", (data: { file: string }) => {
     bump(data.file.startsWith("templates") ? "styles" : "page");
   });
 }

@@ -5,11 +5,11 @@
 -- Une ligne, dans cet ordre :
 --   1. definition : proprietaire du role de migration (BYPASSRLS), SECURITY
 --      DEFINER, STABLE, search_path fige a pg_catalog, pg_temp ;
---   2. droits     : aucun EXECUTE pour PUBLIC, ohb_api ni ohb_staff ;
---                   EXECUTE pour ohb_worker ;
---   3. ohb_worker : org A rend ses deux maillons et rien de B, NULL refuse
+--   2. droits     : aucun EXECUTE pour PUBLIC, openedbot_api ni openedbot_staff ;
+--                   EXECUTE pour openedbot_worker ;
+--   3. openedbot_worker : org A rend ses deux maillons et rien de B, NULL refuse
 --                   (22004), lecture directe de la table refusee (42501) ;
---   4. ohb_api    : appel refuse (42501).
+--   4. openedbot_api    : appel refuse (42501).
 -- Tout se joue dans une transaction annulee : la base sort intacte.
 begin;
 
@@ -25,9 +25,9 @@ insert into audit_chain (organization_id, runtime_id, seq, kind, object_key, pay
    '{"n": 3}', repeat('b', 64), null, repeat('3', 64));
 
 create temp table purge_fn_proof (step text primary key, outcome text);
-grant select, insert, update on purge_fn_proof to ohb_worker, ohb_api;
+grant select, insert, update on purge_fn_proof to openedbot_worker, openedbot_api;
 
-set local role ohb_worker;
+set local role openedbot_worker;
 insert into purge_fn_proof
   select 'worker_a', count(*) filter (where organization_id = '15400000-0000-4000-8000-00000000000a')::text
                      || '/' || count(*) filter (where organization_id <> '15400000-0000-4000-8000-00000000000a')::text
@@ -50,7 +50,7 @@ end;
 $proof$;
 reset role;
 
-set local role ohb_api;
+set local role openedbot_api;
 do $proof$
 begin
   perform * from audit_chain_for_purge('15400000-0000-4000-8000-00000000000a');
@@ -67,9 +67,9 @@ select
   || '|' ||
   exists (select from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
            where a.grantee = 0 and a.privilege_type = 'EXECUTE')::text
-  || '/' || has_function_privilege('ohb_api', p.oid, 'execute')::text
-  || '/' || has_function_privilege('ohb_staff', p.oid, 'execute')::text
-  || '/' || has_function_privilege('ohb_worker', p.oid, 'execute')::text
+  || '/' || has_function_privilege('openedbot_api', p.oid, 'execute')::text
+  || '/' || has_function_privilege('openedbot_staff', p.oid, 'execute')::text
+  || '/' || has_function_privilege('openedbot_worker', p.oid, 'execute')::text
   || '|' ||
   (select string_agg(step || '=' || outcome, ',' order by step) from purge_fn_proof)
   from pg_proc p

@@ -536,7 +536,7 @@ export function DevicesList({
   */
   return (
     <div>
-    <ul className="ohb-status-list -mx-4 list-none">
+    <ul className="openedbot-status-list -mx-4 list-none">
       {paged.map((session) => {
         const active = isActiveSession(session);
         return (
@@ -551,17 +551,17 @@ export function DevicesList({
                 className={cn(
                   "block truncate text-[17px] leading-[22px]",
                   session.current
-                    ? "font-semibold text-[var(--ohb-grouped-label)]"
+                    ? "font-semibold text-[var(--openedbot-grouped-label)]"
                     : active
-                      ? "text-[var(--ohb-grouped-label)]"
-                      : "text-[var(--ohb-grouped-caption)]",
+                      ? "text-[var(--openedbot-grouped-label)]"
+                      : "text-[var(--openedbot-grouped-caption)]",
                 )}
               >
                 {describeDevice(session, t)}
               </span>
               <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
                 <StatusBadge session={session} t={t} />
-                <span className="min-w-0 flex-1 truncate text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+                <span className="min-w-0 flex-1 truncate text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
                   <span className={session.ip ? "font-mono" : undefined}>
                     {session.ip ?? t("settingsSecurity.unknownValue")}
                   </span>

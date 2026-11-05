@@ -138,7 +138,7 @@ func TestConnectorDaemonRefusesToStartWithoutDeviceKey(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(credDir, "runtime.env"), []byte("API_SERVER_KEY=abc\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	link := `{"schema":1,"ohb":"https://ohb.example","ws_url":"wss://ohb.example/api/runtime-links/ws","runtime_id":"rt-1","link_token":"tok","linked_at":"2026-09-06T00:00:00Z"}`
+	link := `{"schema":1,"openedbot":"https://openedbot.example","ws_url":"wss://openedbot.example/api/runtime-links/ws","runtime_id":"rt-1","link_token":"tok","linked_at":"2026-09-06T00:00:00Z"}`
 	if err := os.WriteFile(filepath.Join(credDir, "link.json"), []byte(link), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestLinkRekeyGates(t *testing.T) {
 		t.Fatalf("code=%d stderr=%q", code, errb.String())
 	}
 	errb.Reset()
-	if code := runLink(env, []string{"--rekey", "--yes", "--ohb", "https://ohb.example"}); code != cli.ExitUsage || !strings.Contains(errb.String(), "takes no ticket") {
+	if code := runLink(env, []string{"--rekey", "--yes", "--openedbot", "https://openedbot.example"}); code != cli.ExitUsage || !strings.Contains(errb.String(), "takes no ticket") {
 		t.Fatalf("code=%d stderr=%q", code, errb.String())
 	}
 }

@@ -461,7 +461,7 @@ export type ToolLogLine = {
 };
 
 /**
- * A log stays readable in a small panel, and its node count bounded (OHB-88):
+ * A log stays readable in a small panel, and its node count bounded:
  * past this many lines the middle is cut, the head and the tail kept, one
  * line of the budget saying how many were hidden. The copy and the detail
  * dialog keep the whole text.

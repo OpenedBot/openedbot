@@ -73,7 +73,7 @@ function renderEditor() {
 
 beforeEach(() => {
   patches = [];
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   // Wide window: the editor sits inline beside the thread.
   window.matchMedia = ((query: string) => ({
     matches: true,

@@ -21,10 +21,10 @@ create index runtime_link_diagnostics_recent_idx
 
 alter table runtime_link_diagnostics enable row level security;
 alter table runtime_link_diagnostics force row level security;
-create policy runtime_link_diagnostics_tenant on runtime_link_diagnostics to ohb_api
+create policy runtime_link_diagnostics_tenant on runtime_link_diagnostics to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert on runtime_link_diagnostics to ohb_api;
+grant select, insert on runtime_link_diagnostics to openedbot_api;
 
 insert into schema_migrations(version) values ('0050_runtime_link_diagnostics') on conflict (version) do nothing;
 commit;

@@ -177,7 +177,7 @@ export type RelayLinkContextLimits = {
 export type RelayLinkContextFrame = {
   t: "link.context";
   environment: RelayLinkContextEnvironment;
-  ohb: string;
+  openedbot: string;
   organization?: { id: string; name: string; slug: string };
   owner?: { email: string; displayName?: string };
   /** Seuils informatifs openedbot ; les anciens hôtes ignorent ces champs. */
@@ -370,16 +370,16 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
     }
     case "link.context": {
       const environment = optionalString(frame, "environment");
-      const ohb = optionalString(frame, "ohb");
-      if ((environment !== "dev" && environment !== "preprod" && environment !== "prod") || !ohb) {
-        throw new RelayFrameError("link.context requires environment dev|preprod|prod and ohb");
+      const openedbot = optionalString(frame, "openedbot");
+      if ((environment !== "dev" && environment !== "preprod" && environment !== "prod") || !openedbot) {
+        throw new RelayFrameError("link.context requires environment dev|preprod|prod and openedbot");
       }
       const organization = optionalLinkContextObject(frame, "organization", ["id", "name", "slug"]);
       const owner = optionalLinkContextObject(frame, "owner", ["email"], ["displayName"]);
       return {
         t,
         environment,
-        ohb,
+        openedbot,
         ...withOptional("organization", organization as RelayLinkContextFrame["organization"]),
         ...withOptional("owner", owner as RelayLinkContextFrame["owner"]),
         ...withOptional("latestVersion", optionalString(frame, "latestVersion")),

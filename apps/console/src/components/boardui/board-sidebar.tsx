@@ -58,7 +58,7 @@ const NO_SECTIONS: SectionDto[] = [];
  * What the bar reads from the roster. Not `cursor`, which every SSE flush
  * advances. `sections` stays: a dossier créé (Fly, …) doit repeindre la
  * barre même si aucune ligne n'a bougé. Le partage structurel de react-query
- * garde la référence d'une ligne non touchée, donc son `memo` tient (OHB-141).
+ * garde la référence d'une ligne non touchée, donc son `memo` tient.
  */
 function selectSidebarRoster(roster: RosterDto) {
   return {
@@ -83,7 +83,7 @@ const TOP_BUTTON =
  * variante.
  */
 export const NAV_ROW =
-  "flex h-8 shrink-0 items-center gap-2.5 rounded-2lg px-2.5 text-[13px] leading-[18px] font-medium text-text-primary outline-none ohb-row hover:bg-board-row-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-[current=page]:[background-image:var(--bui-gradient-primary)] aria-[current=page]:text-text-white [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-foreground-icon-secondary aria-[current=page]:[&>svg]:text-text-white aria-[current=page]:[&>span]:text-text-white";
+  "flex h-8 shrink-0 items-center gap-2.5 rounded-2lg px-2.5 text-[13px] leading-[18px] font-medium text-text-primary outline-none openedbot-row hover:bg-board-row-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-[current=page]:[background-image:var(--bui-gradient-primary)] aria-[current=page]:text-text-white [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-foreground-icon-secondary aria-[current=page]:[&>svg]:text-text-white aria-[current=page]:[&>span]:text-text-white";
 
 /** Les liens du pied de barre : boutons fantômes à icône, alignés à gauche. */
 export const FOOTER_BUTTON =
@@ -579,7 +579,7 @@ export function OrganizationHead({ name: fixedName }: { name?: string } = {}) {
   }, [fixedName, known, userId]);
   const workspaceSwitch = useWorkspaceSwitch();
   const [open, setOpen] = useState(false);
-  const face = <BotFace name={name || "openedbot"} seed="ohb-organization" face={null} animated={false} className="size-[18px] shrink-0" />;
+  const face = <BotFace name={name || "openedbot"} seed="openedbot-organization" face={null} animated={false} className="size-[18px] shrink-0" />;
   if (!workspaceSwitch) {
     return (
       <p className="flex h-[30px] min-w-0 items-center gap-2 px-1.5 text-body-2-medium font-semibold text-text-primary">

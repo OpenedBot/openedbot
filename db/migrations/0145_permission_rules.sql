@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-6 (DEV-OHB-256): natural-language permission rules, iso Grok Bot.
+-- PERM2-6: natural-language permission rules, iso Grok Bot.
 --
 -- A rule guides the automatic reviewer (PERM2-7) and nothing else: the
 -- worker hands it to the reviewer as fenced data. Interdictions, the floor,
@@ -52,17 +52,17 @@ create index bot_permission_rules_scope_idx on bot_permission_rules (organizatio
 alter table bot_permission_rules enable row level security;
 alter table bot_permission_rules force row level security;
 
-create policy bot_permission_rules_tenant on bot_permission_rules to ohb_api
+create policy bot_permission_rules_tenant on bot_permission_rules to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 -- The worker reads one organization at a time, under the tenant setting it
 -- sets for that read (`modules/roster/src/sql/permission-rules.ts`): no
 -- `using (true)`, no write.
-create policy bot_permission_rules_worker on bot_permission_rules for select to ohb_worker
+create policy bot_permission_rules_worker on bot_permission_rules for select to openedbot_worker
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, delete on bot_permission_rules to ohb_api;
-grant select on bot_permission_rules to ohb_worker;
+grant select, insert, delete on bot_permission_rules to openedbot_api;
+grant select on bot_permission_rules to openedbot_worker;
 
 -- The cap and the organization actor, on every insert path. The count is
 -- taken under a transaction lock of its (organization, scope, kind): two

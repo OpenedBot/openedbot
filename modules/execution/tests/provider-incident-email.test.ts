@@ -13,8 +13,8 @@ function sqlMock() {
     bindings.push(values);
     if (sql.includes("from memberships")) {
       return Promise.resolve([
-        { userId: "user-owner", email: "owner@ohb.local" },
-        { userId: "user-admin", email: "admin@ohb.local" },
+        { userId: "user-owner", email: "owner@openedbot.local" },
+        { userId: "user-admin", email: "admin@openedbot.local" },
       ]);
     }
     if (sql.includes("insert into email_outbox")) {
@@ -79,7 +79,7 @@ describe("enqueueQuotaReachedEmail", () => {
     const db = ((strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = [...strings].join(" ");
       if (sql.includes("from memberships")) {
-        return Promise.resolve([{ userId: "user-owner", email: "owner@ohb.local" }]);
+        return Promise.resolve([{ userId: "user-owner", email: "owner@openedbot.local" }]);
       }
       if (sql.includes("insert into email_outbox")) {
         const key = String(values.find((value) => typeof value === "string" && value.startsWith("provider-quota:")) ?? "");

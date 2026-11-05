@@ -777,12 +777,12 @@ export function SupportPanel({
           // déjà le fond, la coque mobile mesure déjà le clavier.
           ? "min-h-0 flex-1"
           : card
-          ? "ohb-support-card fixed right-[max(1.5rem,var(--ohb-safe-right))] bottom-[max(1.5rem,var(--ohb-safe-bottom))] z-50 h-[min(560px,calc(100dvh-3rem))] w-[min(384px,calc(100vw-2rem))] rounded-[24px] bg-(--sc-card) py-5 text-(--sc-fg) shadow-(--sc-ring)"
+          ? "openedbot-support-card fixed right-[max(1.5rem,var(--openedbot-safe-right))] bottom-[max(1.5rem,var(--openedbot-safe-bottom))] z-50 h-[min(560px,calc(100dvh-3rem))] w-[min(384px,calc(100vw-2rem))] rounded-[24px] bg-(--sc-card) py-5 text-(--sc-fg) shadow-(--sc-ring)"
           // Feuille plein cadre : `bg-background`, comme une scène de la coque
           // mobile, et non `bg-card`. L'écran qu'elle recouvre est sur ce même
           // fond, et une feuille d'une autre teinte se lirait comme un
           // panneau étranger posé dessus.
-          : "fixed inset-0 z-50 bg-background pt-[var(--ohb-safe-top)] pb-[var(--ohb-safe-bottom)] shadow-[var(--shadow-elevated)]",
+          : "fixed inset-0 z-50 bg-background pt-[var(--openedbot-safe-top)] pb-[var(--openedbot-safe-bottom)] shadow-[var(--shadow-elevated)]",
       )}
     >
       <div className="flex min-h-0 w-full flex-1 flex-col">
@@ -812,7 +812,7 @@ export function SupportPanel({
                 disabled={restarting}
                 aria-label={t("support.restart")}
                 title={t("support.restart")}
-                className="ohb-press inline-flex size-8 shrink-0 items-center justify-center rounded-[18px] border border-(--sc-line) text-(--sc-fg) outline-none hover:bg-(--sc-tile) focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                className="openedbot-press inline-flex size-8 shrink-0 items-center justify-center rounded-[18px] border border-(--sc-line) text-(--sc-fg) outline-none hover:bg-(--sc-tile) focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
               >
                 <IconRefresh aria-hidden className="size-4" />
               </button>
@@ -836,7 +836,7 @@ export function SupportPanel({
                 onClick={() => setView(view === "history" ? "thread" : "history")}
                 aria-label={view === "history" ? t("support.historyBack") : t("support.historyOpen")}
                 title={view === "history" ? t("support.historyBack") : t("support.historyOpen")}
-                className="ohb-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                className="openedbot-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {view === "history"
                   ? <IconArrowLeft aria-hidden className="size-4" />
@@ -849,8 +849,8 @@ export function SupportPanel({
                 onClick={onClose}
                 aria-label={t("support.launcherClose")}
                 className={card
-                  ? "ohb-press inline-flex size-8 shrink-0 items-center justify-center rounded-[18px] border border-(--sc-line) text-(--sc-fg) outline-none hover:bg-(--sc-tile) focus-visible:ring-2 focus-visible:ring-ring"
-                  : "ohb-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"}
+                  ? "openedbot-press inline-flex size-8 shrink-0 items-center justify-center rounded-[18px] border border-(--sc-line) text-(--sc-fg) outline-none hover:bg-(--sc-tile) focus-visible:ring-2 focus-visible:ring-ring"
+                  : "openedbot-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"}
               >
               <IconX aria-hidden className="size-4" />
             </button>
@@ -872,10 +872,10 @@ export function SupportPanel({
             ) : null}
             <p className={card ? "text-lg font-medium leading-7 tracking-tight" : "text-sm font-medium"}>{t("support.gateTitle")}</p>
             <p className={card ? "max-w-[18rem] text-sm leading-relaxed text-(--sc-muted-fg)" : "text-xs leading-5 text-muted-foreground"}>{t("support.gateBody")}</p>
-            <label className={cn("flex flex-col gap-1.5 text-xs", card ? "w-full text-left text-(--sc-muted-fg)" : "text-muted-foreground")} htmlFor="ohb-support-email">
+            <label className={cn("flex flex-col gap-1.5 text-xs", card ? "w-full text-left text-(--sc-muted-fg)" : "text-muted-foreground")} htmlFor="openedbot-support-email">
               {t("support.gateEmailLabel")}
               <input
-                id="ohb-support-email"
+                id="openedbot-support-email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -897,7 +897,7 @@ export function SupportPanel({
               <button
                 type="button"
                 className={card
-                  ? "ohb-press flex h-8 w-full items-center justify-center rounded-[18px] bg-(--sc-send) text-sm font-medium text-(--sc-send-fg) outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                  ? "openedbot-press flex h-8 w-full items-center justify-center rounded-[18px] bg-(--sc-send) text-sm font-medium text-(--sc-send-fg) outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
                   : cn(BUTTON.primary, "w-full")}
                 disabled={readOnly || opening || email.trim().length === 0}
                 onClick={() => void submitEmail()}
@@ -1067,7 +1067,7 @@ export function SupportPanel({
                       aria-label={t("support.attachmentAdd")}
                       title={t("support.attachmentAdd")}
                       className={cn(
-                        "ohb-press flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
+                        "openedbot-press flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40",
                         card && "order-2 rounded-[18px] border border-(--sc-line) bg-(--sc-plus-bg) text-(--sc-muted-fg) hover:bg-(--sc-tile) hover:text-(--sc-fg)",
                       )}
                     >
@@ -1122,7 +1122,7 @@ export function SupportPanel({
                         submitMessage();
                       }}
                       className={cn(
-                        "ohb-press relative flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 after:absolute after:-inset-2 after:rounded-full sm:ml-auto",
+                        "openedbot-press relative flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 after:absolute after:-inset-2 after:rounded-full sm:ml-auto",
                         card && "order-3 ml-auto rounded-[18px] bg-(--sc-send) text-(--sc-send-fg)",
                       )}
                     >
@@ -1254,7 +1254,7 @@ function SupportPageActions({
           title={historyOpen ? t("support.historyBack") : t("support.historyOpen")}
           className={cn(
             "inline-flex shrink-0 items-center justify-center text-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            isMobile ? "ohb-press size-11 rounded-lg text-foreground" : "bui-glass size-[31px] rounded-full",
+            isMobile ? "openedbot-press size-11 rounded-lg text-foreground" : "bui-glass size-[31px] rounded-full",
             historyCanvas && "xl:hidden",
           )}
         >

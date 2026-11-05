@@ -13,7 +13,7 @@ const items = (count: number): Item[] =>
   Array.from({ length: count }, (_, index) => ({ id: `b${index + 1}`, name: `Bot ${index + 1}` }));
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {

@@ -75,7 +75,7 @@ export function OrganizationSetupScreen() {
 
   return (
     <div className="flex h-svh min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
-      <div className="scrollbar-subtle flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pt-[max(2.5rem,var(--ohb-safe-top))] pb-10">
+      <div className="scrollbar-subtle flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pt-[max(2.5rem,var(--openedbot-safe-top))] pb-10">
         <form id="organization-setup" className="flex w-full max-w-[28rem] flex-col gap-6"
           onSubmit={(e) => { e.preventDefault(); if (ready) create.mutate(); }}>
           <div className="flex items-center justify-between gap-3">

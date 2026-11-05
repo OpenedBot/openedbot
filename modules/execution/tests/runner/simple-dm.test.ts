@@ -17,7 +17,7 @@ const base = {
   originRunId: null,
 };
 
-describe("tour de DM simple sans workflow (OHB-113)", () => {
+describe("tour de DM simple sans workflow", () => {
   test.each([[false, false, false], [false, true, false], [true, false, false], [true, true, true]])(
     "the workflow snapshot (%s) and current flag (%s) must both authorize delegation",
     (snapshot, current, permitted) => {
@@ -53,7 +53,7 @@ describe("tour de DM simple sans workflow (OHB-113)", () => {
       throw new Error("aucune requête attendue");
     }) as unknown as SQL;
     const prompt = await dmInstructions(db, { ...base, workflowId: null, stepKind: "root", routineToolEnabled: true });
-    expect(prompt.instructions).toContain("mcp_ohb_routines_routine_manage");
+    expect(prompt.instructions).toContain("mcp_openedbot_routines_routine_manage");
     expect(prompt.instructions).not.toContain("You cannot schedule anything");
     expect(prompt.instructions).not.toMatch(/run_key: [0-9a-f]{8}-/);
   });

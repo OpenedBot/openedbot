@@ -161,7 +161,7 @@ describe("rotation automatique du jeton de lien", () => {
 describe("réconciliation des sessions Hermes", () => {
   const inventory = { sessions: [{ id: "session-known", profile: "bot-a", createdAt: "2026-09-06T10:00:00Z" }, { id: "ghost-1", profile: "default", createdAt: "2026-09-06T11:00:00Z" }], total: 2, truncated: false };
 
-  test("une session inconnue d'OHB est journalisée unattributed_session avec des métadonnées bornées", async () => {
+  test("une session inconnue d'openedbot est journalisée unattributed_session avec des métadonnées bornées", async () => {
     const captured: Captured[] = [];
     const urls: string[] = [];
     const fetchImpl: LinkFetch = async (input) => { urls.push(input); return Response.json(inventory); };
@@ -175,9 +175,9 @@ describe("réconciliation des sessions Hermes", () => {
     expect(inserted[0]!.values[2]).toEqual({ sessionId: "ghost-1", profile: "default", createdAt: "2026-09-06T11:00:00Z" });
   });
 
-  test("les vrais identifiants openedbot (ohb:<org>:<thread>) sont réconciliés, un identifiant hors grammaire jamais", async () => {
+  test("les vrais identifiants openedbot (openedbot:<org>:<thread>) sont réconciliés, un identifiant hors grammaire jamais", async () => {
     const captured: Captured[] = [];
-    const real = "ohb:0b9c6a1e-0000-4000-8000-000000000001:7d1f0c2a-1111-4222-8333-444455556666";
+    const real = "openedbot:0b9c6a1e-0000-4000-8000-000000000001:7d1f0c2a-1111-4222-8333-444455556666";
     const sessions = [{ id: real, profile: "bot-a", createdAt: "2026-09-06T10:00:00Z" }, { id: "../etc/passwd", profile: "x", createdAt: "" }];
     const result = await reconcileRuntimeSessions(fakeDb(captured, { due }), { ...control, fetchImpl: async () => Response.json({ sessions, total: 2, truncated: false }) });
     expect(result.unattributed).toBe(1);

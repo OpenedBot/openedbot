@@ -1,6 +1,5 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-include scripts/lib/legacy-env.mk
 # Réglages propres au poste, jamais versionnés (.gitignore) : Makefile.local,
 # s'il existe, peut poser par exemple LINK_DEV_HOST=user@your-vm.
 -include $(CURDIR)/Makefile.local
@@ -37,7 +36,7 @@ endif
 # Vite compris ; un `bun run --cwd apps/api dev` lancé à la main ne charge
 # donc plus rien.
 ENV_FILES = $(ENV_FILE)
-LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a; . "$(CURDIR)/scripts/lib/legacy-env.sh";
+LOAD_ENV_FILES = set -a; for env_file in $(ENV_FILES); do if [ -f "$$env_file" ]; then . "$$env_file"; fi; done; set +a;
 LOAD_ENV = if [ ! -f "$(ENV_FILE)" ]; then printf '%s is missing. Run make setup.\n' "$(ENV_FILE)" >&2; exit 1; fi; $(LOAD_ENV_FILES)
 LOAD_ENV_OPT = $(LOAD_ENV_FILES)
 
@@ -464,7 +463,7 @@ test-dual: ## Tests unitaires deux fois : solo (sans plug-in), puis avec les plu
 # (règle `console-sans-ecrans-pro`) et test-dual (instantanés de routes et
 # portes par droit, tests/pro-console). Builds dans SOLO_CHECK_DIR, jamais dans
 # apps/console/dist, sans .env.local ni réseau.
-SOLO_CHECK_DIR ?= $(or $(TMPDIR),/tmp/)ohb-solo-check
+SOLO_CHECK_DIR ?= $(or $(TMPDIR),/tmp/)openedbot-solo-check
 # The pro screens' strings, which `solo-bundle-strings.ts` must find in the pro
 # build and nowhere in the solo one (with the pro routes and agency.css).
 SOLO_CHECK_MESSAGES = $(if $(plugins_dir),$(sort $(wildcard $(plugins_dir)/packages/*/console/messages.*.ts)))
@@ -682,12 +681,12 @@ build-admin: ## [deploy] Construit le backoffice staff (plug-in externe, ADMIN_D
 
 build-api: ## Construit API et worker.
 	mkdir -p dist/bin
-	bun build apps/api/src/index.ts --target=bun --outfile=dist/bin/ohb-api
-	bun build apps/worker/src/index.ts --target=bun --outfile=dist/bin/ohb-worker
+	bun build apps/api/src/index.ts --target=bun --outfile=dist/bin/openedbot-api
+	bun build apps/worker/src/index.ts --target=bun --outfile=dist/bin/openedbot-worker
 
 build-alerting: ## Construit la sonde d'alerting interne.
 	mkdir -p dist/bin
-	bun build apps/api/src/alerting/index.ts --target=bun --outfile=dist/bin/ohb-alerting
+	bun build apps/api/src/alerting/index.ts --target=bun --outfile=dist/bin/openedbot-alerting
 
 build-cloud: build-api build-alerting build-console ## Construit les services et la SPA déployables.
 
@@ -727,7 +726,7 @@ link-prod: ## [OPS] Bascule le VPS sur la production ; le ticket est demandé à
 	esac; \
 	printf '$(C_OK)[make]$(C_RESET) Ouvrez un ticket dans %s, onglet Runtimes, « Ajouter un runtime ».\n' "$(OPENEDBOT_CONSOLE_URL)"; \
 	printf '$(C_OK)[make]$(C_RESET) Collez-le à l’invite masquée ci-dessous ; il ne passe ni par argv ni par l’historique.\n'; \
-	ssh -t "$(HOST)" sudo edge-setup link --ohb "$(OPENEDBOT_PUBLIC_URL)" --yes
+	ssh -t "$(HOST)" sudo edge-setup link --openedbot "$(OPENEDBOT_PUBLIC_URL)" --yes
 
 # ─── Worktrees ───────────────────────────────────────────────────────────────
 # Un chantier = une branche = un worktree `.worktrees/<NAME>` dans ce dépôt
@@ -744,7 +743,7 @@ WT_DIR   = $(WT_ROOT)/$(NAME)
 WT_LOCAL_FILES = .env.local Makefile.local
 
 define wt_need_name
-	@if [ -z "$(NAME)" ]; then printf '$(C_ERR)[make]$(C_RESET) NAME est requis (ex. NAME=ohb-71).\n' >&2; exit 2; fi; \
+	@if [ -z "$(NAME)" ]; then printf '$(C_ERR)[make]$(C_RESET) NAME est requis (ex. NAME=openedbot-71).\n' >&2; exit 2; fi; \
 	case "$(NAME)" in *[!A-Za-z0-9._/-]*|-*|*/) printf '$(C_ERR)[make]$(C_RESET) NAME invalide : %s\n' "$(NAME)" >&2; exit 2 ;; esac
 endef
 

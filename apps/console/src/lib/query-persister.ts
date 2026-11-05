@@ -21,10 +21,10 @@ import { readCloudSession } from "./session/cloud-session";
  */
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 // Injected by `vite.config.ts` (`define`); absent under `bun test`.
-declare const __OHB_BUILD_ID__: string | undefined;
-const BUILD_ID = typeof __OHB_BUILD_ID__ === "string" ? __OHB_BUILD_ID__ : "dev";
+declare const __OPENEDBOT_BUILD_ID__: string | undefined;
+const BUILD_ID = typeof __OPENEDBOT_BUILD_ID__ === "string" ? __OPENEDBOT_BUILD_ID__ : "dev";
 
-const store = typeof indexedDB === "undefined" ? null : createStore("ohb-query-cache", "queries");
+const store = typeof indexedDB === "undefined" ? null : createStore("openedbot-query-cache", "queries");
 
 function userScope(): string | null {
   return readCloudSession()?.userId ?? null;

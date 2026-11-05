@@ -9,7 +9,7 @@ import type { AccountWorkspacesDto } from "@openedbot/contracts-api";
 
 declare global {
   interface Window {
-    __OHB_API_ORIGIN__?: string;
+    __OPENEDBOT_API_ORIGIN__?: string;
   }
 }
 
@@ -18,7 +18,7 @@ declare global {
  * même environnement; en production elle est injectée par la configuration
  * web.
  */
-export const API_ORIGIN = (globalThis.window?.__OHB_API_ORIGIN__ ?? import.meta.env.VITE_API_ORIGIN ?? "").replace(/\/+$/, "");
+export const API_ORIGIN = (globalThis.window?.__OPENEDBOT_API_ORIGIN__ ?? import.meta.env.VITE_API_ORIGIN ?? "").replace(/\/+$/, "");
 
 /**
  * Ce module n'a pas de contexte React : la langue s'y relit directement dans

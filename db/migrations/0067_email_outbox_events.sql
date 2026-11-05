@@ -4,8 +4,8 @@
 -- une clé, ni dans `detail`.
 --
 -- La table est hors tenant et sans RLS, comme `email_outbox` et
--- `waitlist_signups`. `ohb_api` écrit les décisions de dépôt et peut les lire
--- pour le futur backoffice. `ohb_worker` écrit les transitions de livraison,
+-- `waitlist_signups`. `openedbot_api` écrit les décisions de dépôt et peut les lire
+-- pour le futur backoffice. `openedbot_worker` écrit les transitions de livraison,
 -- sans aucune raison de relire le journal.
 begin;
 
@@ -23,8 +23,8 @@ create table if not exists email_outbox_events (
 create index if not exists email_outbox_events_recent_idx
   on email_outbox_events (occurred_at desc);
 
-grant insert, select on email_outbox_events to ohb_api;
-grant insert on email_outbox_events to ohb_worker;
+grant insert, select on email_outbox_events to openedbot_api;
+grant insert on email_outbox_events to openedbot_worker;
 
 insert into schema_migrations(version) values ('0067_email_outbox_events')
 on conflict (version) do nothing;

@@ -33,22 +33,22 @@
 }
 
 /* Bloc de code Shiki : deux thèmes émis en variables CSS, le `.dark` choisit. */
-.ohb-code pre.shiki {
+.openedbot-code pre.shiki {
   margin: 0;
   background: transparent !important;
 }
-.ohb-code pre.shiki code {
+.openedbot-code pre.shiki code {
   font-family: inherit;
 }
 /* Gras, italique et soulignement du thème aussi (titres markdown) : une
    variable absente laisse la valeur héritée. */
-.ohb-code .shiki span {
+.openedbot-code .shiki span {
   color: var(--shiki-light);
   font-style: var(--shiki-light-font-style);
   font-weight: var(--shiki-light-font-weight);
   text-decoration: var(--shiki-light-text-decoration);
 }
-.dark .ohb-code .shiki span {
+.dark .openedbot-code .shiki span {
   color: var(--shiki-dark);
   font-style: var(--shiki-dark-font-style);
   font-weight: var(--shiki-dark-font-weight);

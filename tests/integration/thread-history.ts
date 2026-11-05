@@ -19,7 +19,7 @@ type FixtureApp = {
 
 let phase = "prepare";
 try {
-  await withDisposablePostgres("ohb88_history", async ({ owner, connect }) => {
+  await withDisposablePostgres("openedbot88_history", async ({ owner, connect }) => {
     const organizationId = crypto.randomUUID();
     const foreignOrganizationId = crypto.randomUUID();
     const userId = crypto.randomUUID();
@@ -87,7 +87,7 @@ try {
           from unnest(${tx.array([...rootIds,...childIds], "UUID")}::uuid[]) fixture(run_id),generate_series(0,2) sequence`;
     });
     phase = "page-http";
-    const db = await connect("ohb_api");
+    const db = await connect("openedbot_api");
     let interleave = false;
     const concurrentRunId = crypto.randomUUID();
     let excludedCursor = 0;

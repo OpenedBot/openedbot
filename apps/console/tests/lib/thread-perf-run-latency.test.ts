@@ -27,7 +27,7 @@ function receipts(): RunEventReceipts {
   return { firstEventAt: null, firstTextAt: null, completedAt: null };
 }
 
-describe("latence d'un run vue du PWA (OHB-107)", () => {
+describe("latence d'un run vue du PWA", () => {
   test("distingue premier événement, premier texte et réponse complète", () => {
     const seen = receipts();
     expect(applyRunEventReceipt(seen, "tool.call", 1_200)).toBe(true);

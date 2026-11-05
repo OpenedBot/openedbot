@@ -1,19 +1,19 @@
 // `bun dev` (and its dev:prod variant): electron-vite dev, plus,
 // on the operator's Windows machine only, the two-way sync with the dev PC
-// (../ohbot-windows/sync.mjs, CLAUDE.md "Working from Windows").
+// (../openedbot-windows/sync.mjs, CLAUDE.md "Working from Windows").
 //
 // The sync runs if and only if this dev app runs: it is a child of this
 // script, started before electron-vite and killed when electron-vite exits.
-// It used to be started on its own by start-ohbot.ps1 and outlived the app;
+// It used to be started on its own by start-openedbot.ps1 and outlived the app;
 // when the dev PC dropped off the network it died, and nothing restarted it.
-// Elsewhere (the dev PC, a Mac, no ohbot-windows folder) this is plain
+// Elsewhere (the dev PC, a Mac, no openedbot-windows folder) this is plain
 // `electron-vite dev --watch`.
 
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dir, "..");
-const toolsDir = path.resolve(root, "..", "ohbot-windows");
+const toolsDir = path.resolve(root, "..", "openedbot-windows");
 const syncScript = path.join(toolsDir, "sync.mjs");
 const lockFile = path.join(toolsDir, "sync.lock");
 

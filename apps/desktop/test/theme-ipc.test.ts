@@ -38,7 +38,7 @@ beforeEach(() => {
 
 function update(url: string, mode: unknown, subframe = false): unknown {
   const frame = { url };
-  return handlers.get("ohb:theme")!({ senderFrame: frame, sender: { mainFrame: subframe ? {} : frame } }, mode);
+  return handlers.get("openedbot:theme")!({ senderFrame: frame, sender: { mainFrame: subframe ? {} : frame } }, mode);
 }
 
 test("console theme changes follow explicit modes and restore system tracking", () => {
@@ -72,7 +72,7 @@ test("invalid theme payloads leave the native theme unchanged", () => {
 function initialZoom(url: string, subframe = false): unknown {
   const frame = { url };
   const event: { returnValue?: unknown; senderFrame: unknown; sender: unknown } = { senderFrame: frame, sender: { mainFrame: subframe ? {} : frame } };
-  listeners.get("ohb:text-zoom-initial")!(event);
+  listeners.get("openedbot:text-zoom-initial")!(event);
   return event.returnValue;
 }
 

@@ -39,10 +39,9 @@ export function isCapabilityEntitlement(entitlement: string): boolean {
 
 /**
  * Header names a plug-in may alias: the core's own `X-OpenedBot-*` request
- * headers, or a name under the former `X-OHB-` prefix (the old side of an
- * alias).
+ * headers.
  */
-export const ALIAS_HEADER_RE = /^X-(?:OpenedBot|OHB)-[A-Za-z][A-Za-z0-9-]{0,39}$/;
+export const ALIAS_HEADER_RE = /^X-OpenedBot-[A-Za-z][A-Za-z0-9-]{0,39}$/;
 /** Query parameter names a plug-in may alias. */
 export const ALIAS_QUERY_RE = /^[a-z][A-Za-z0-9]{0,39}$/;
 /** Absolute paths a plug-in may redirect: lower-case segments, no trailing slash. */
@@ -108,7 +107,7 @@ export type ProPluginManifest = {
  * hands the plug-in the declared names that are set (`HookContext.env`),
  * and the API refuses to start in production while a loaded plug-in misses
  * one marked `requiredInProduction`. A name the core itself declares (its
- * environment schema), an `OPENEDBOT_*` name (or a retired `OHB_*` one) or a duplicate is refused by the
+ * environment schema), an `OPENEDBOT_*` name or a duplicate is refused by the
  * loader: a plug-in never reads the core's variables this way.
  */
 export type PluginEnvVariable = {
@@ -215,7 +214,7 @@ export type WorkerJob = {
    */
   readonly enabled?: (context: HookContext) => boolean;
   /**
-   * One pass. `db` is the worker pool (a Bun `SQL`, role `ohb_worker`); the
+   * One pass. `db` is the worker pool (a Bun `SQL`, role `openedbot_worker`); the
    * pass must stop early when `signal` aborts (worker shutdown). A throw is
    * logged and the next pass runs on schedule.
    */

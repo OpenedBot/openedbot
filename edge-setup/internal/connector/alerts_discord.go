@@ -60,7 +60,7 @@ func renderDiscordAlert(states map[string]alertState, context AlertContext, now 
 	embed.Fields = append(embed.Fields,
 		discordAlertField{Name: "Environnement", Value: alertText(context.Environment), Inline: true},
 		discordAlertField{Name: "Instance", Value: alertText(context.Instance), Inline: true},
-		discordAlertField{Name: "openedbot", Value: alertText(alertHost(context.OHB)), Inline: true},
+		discordAlertField{Name: "openedbot", Value: alertText(alertHost(context.Openedbot)), Inline: true},
 		discordAlertField{Name: "Utilisateur", Value: alertUser(context), Inline: false},
 	)
 	for _, component := range []string{"link", "operator"} {

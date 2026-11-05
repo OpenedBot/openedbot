@@ -1,8 +1,8 @@
 import { SQL } from "bun";
 import type { RunQueueNotifications } from "../application/claim-wakeup";
 
-export const RUN_QUEUE_CHANNEL = "ohb_run_queue_v1";
-/** Probe cadence while no LISTEN is acknowledged (OHB-139). */
+export const RUN_QUEUE_CHANNEL = "openedbot_run_queue_v1";
+/** Probe cadence while no LISTEN is acknowledged. */
 export const QUEUE_PROBE_MS = 25;
 type ListenerClient = {
   listen: (...args: Parameters<SQL["listen"]>) => Promise<unknown>;

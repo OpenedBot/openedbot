@@ -29,12 +29,12 @@ export type DisposablePostgres = {
   owner: SQL;
   /** Private in-memory URL, never log it or put it in process arguments. */
   url: string;
-  connect(role?: "ohb_api" | "ohb_worker" | "ohb_staff"): Promise<SQL>;
+  connect(role?: "openedbot_api" | "openedbot_worker" | "openedbot_staff"): Promise<SQL>;
 };
 
 /** Owns only its unique created database and connections. Never resets shared data or roles. */
 export async function withDisposablePostgres<T>(label: string, callback: (database: DisposablePostgres) => Promise<T>): Promise<T> {
-  if (!/^ohb[0-9]+_[a-z0-9_]+$/.test(label)) throw new Error("Invalid disposable database label.");
+  if (!/^openedbot[0-9]+_[a-z0-9_]+$/.test(label)) throw new Error("Invalid disposable database label.");
   const source = await adminUrl();
   const admin = new SQL({ url: source.toString(), max: 1 });
   const database = `${label}_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -42,8 +42,8 @@ export async function withDisposablePostgres<T>(label: string, callback: (databa
   const clients: SQL[] = [];
   let created = false;
   try {
-    const roles = await admin<Array<{ name: string }>>`select rolname as name from pg_roles where rolname in ('ohb_api', 'ohb_worker', 'ohb_staff')`;
-    if (roles.length !== 3) throw new Error("The existing OHB database roles are required.");
+    const roles = await admin<Array<{ name: string }>>`select rolname as name from pg_roles where rolname in ('openedbot_api', 'openedbot_worker', 'openedbot_staff')`;
+    if (roles.length !== 3) throw new Error("The existing openedbot database roles are required.");
     await admin.unsafe(`create database "${database}"`);
     created = true;
     const owner = new SQL({ url: destination.toString(), max: 1 }); clients.push(owner);

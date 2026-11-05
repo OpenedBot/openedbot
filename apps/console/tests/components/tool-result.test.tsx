@@ -33,7 +33,7 @@ function view(calls: ToolCall[]) {
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   scrolls = [];
   HTMLElement.prototype.scrollTo = function scrollTo(this: HTMLElement, options?: ScrollToOptions | number) {
     if (this.hasAttribute("data-tool-result-log") && typeof options === "object") scrolls.push(options);
@@ -126,7 +126,7 @@ describe("ToolResult", () => {
     await waitFor(() => expect(trigger().getAttribute("aria-expanded")).toBe("false"), {
       timeout: TOOL_RESULT_FOLD_DELAY_MS + 1000,
     });
-    const panel = root.querySelector<HTMLElement>(".ohb-disclosure")!;
+    const panel = root.querySelector<HTMLElement>(".openedbot-disclosure")!;
     expect(panel.getAttribute("data-open")).toBe("false");
     expect(panel.hasAttribute("inert")).toBe(true);
     await waitFor(() => expect(status.querySelector("[data-roll-out]")).toBeNull());
@@ -206,7 +206,7 @@ describe("ToolResult", () => {
     const result = Array.from({ length: TOOL_LOG_MAX_LINES + 100 }, (_, index) => `line ${index}`).join("\n");
     const { container } = render(view([{ tool: "terminal", done: true, failed: true, preview: "seq", attachment: { result }, errorMessage: "boom" }]));
     const lines = [...container.querySelectorAll<HTMLElement>("[data-tool-log-line]")];
-    // OHB-88: the DOM stays within the budget.
+    // The DOM stays within the budget.
     expect(lines).toHaveLength(TOOL_LOG_MAX_LINES);
     const marker = container.querySelector<HTMLElement>("[data-tool-log-hidden]")!;
     expect(marker.getAttribute("data-tool-log-hidden")).toBe("103");

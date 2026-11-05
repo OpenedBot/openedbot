@@ -2,7 +2,7 @@ begin;
 
 -- Robustesse du lien connecteur.
 --
--- 1. Rotation automatique dont la livraison est incertaine (OHB-56).
+-- 1. Rotation automatique dont la livraison est incertaine.
 --
 -- Le worker pousse `link.rotate` par la route de contrôle interne. Quand la
 -- réponse se perd ou expire, l'hôte a peut-être déjà enregistré le nouveau
@@ -20,7 +20,7 @@ alter table runtimes
 comment on column runtimes.link_token_rotation_unconfirmed_at is
   'Automatic link token rotation whose link.rotate delivery is unknown: both hashes stay valid until the host is admitted again (new token confirms, previous token reverts). NULL otherwise.';
 
--- 2. Réconciliation des sessions (OHB-56) : la passe horaire lit au plus cent
+-- 2. Réconciliation des sessions : la passe horaire lit au plus cent
 -- runtimes. Triée par identifiant, elle relisait toujours les cent mêmes et
 -- les suivants n'étaient jamais réconciliés. Elle prend désormais ceux dont
 -- la dernière lecture est la plus ancienne (jamais lus d'abord), et date

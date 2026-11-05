@@ -521,7 +521,7 @@ func strictAudit(ctx context.Context, env cli.Env, st *state.File) error {
 }
 
 func nextStep() string {
-	return "edge-setup link --ohb https://link.openedbot.app --yes (ticket prompted without echo)"
+	return "edge-setup link --openedbot https://link.openedbot.app --yes (ticket prompted without echo)"
 }
 
 func persistentJournal(ctx context.Context, sd systemd.Client) error {

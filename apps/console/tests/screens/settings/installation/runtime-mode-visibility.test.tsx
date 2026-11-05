@@ -100,7 +100,7 @@ function renderSettings() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {
@@ -263,7 +263,7 @@ describe("carte de tête", () => {
     expect(screen.getByText("votre hôte")).toBeTruthy();
   });
 
-  // OHB-15 : il n'existe plus de carte d'administration à côté du runtime, et
+  // Il n'existe plus de carte d'administration à côté du runtime, et
   // aucune saisie d'hôte ou d'utilisateur SSH ne doit réapparaître.
   test("aucune carte n’ouvre un canal vers l’hôte du client", async () => {
     stubFetch("external", "disabled");

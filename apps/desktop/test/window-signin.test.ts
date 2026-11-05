@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 
 // Every step the window takes, in order: loads, storage clears, pushes.
 let steps: string[] = [];
-const userData = mkdtempSync(path.join(tmpdir(), "ohb-window-test-"));
+const userData = mkdtempSync(path.join(tmpdir(), "openedbot-window-test-"));
 
 class FakeContents extends EventEmitter {
   url = "";

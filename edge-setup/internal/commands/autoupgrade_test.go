@@ -129,7 +129,7 @@ func TestAutoUpgradeDecidesOnTheManifestBeforeDownloading(t *testing.T) {
 
 // A release cut at or before v0.4.0 lists only the pre-rename asset name;
 // the pass must still see a candidate through legacyAsset instead of
-// reporting the release as unpublished (OHB-87 rename).
+// reporting the release as unpublished (edge-setup rename).
 func TestAutoUpgradeFallsBackToLegacyAssetName(t *testing.T) {
 	h, u := newFakeHost(t)
 	u.asset = "edge-setup_linux_amd64"
@@ -271,7 +271,7 @@ func TestLinkAdmittedMarkerRoundTrip(t *testing.T) {
 
 // A v0.4.0 binary proves its automatic upgrade to this release by reading
 // "hermes-setup/<version>" in the marker, while the wire hello says
-// edge-setup/<version>: the marker keeps the pre-rename spelling (OHB-87)
+// edge-setup/<version>: the marker keeps the pre-rename spelling
 // and proveUpgrade accepts both, for the right version only.
 func TestAdmissionMarkerKeepsThePreRenameSpelling(t *testing.T) {
 	if got := admittedAgentMarker("edge-setup/v0.5.0"); got != "hermes-setup/v0.5.0" {

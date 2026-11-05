@@ -30,7 +30,7 @@ export function resetLiveDedupe(state: LiveDedupe): void {
  * Livrer cet événement aux écrans, ou l'ignorer.
  *
  * La bulle se déduplique sur `(runId, sequence)` : un fan-out anticipé
- * (OHB-115) puis le rejeu durable du même événement ne s'ajoutent pas deux
+ * puis le rejeu durable du même événement ne s'ajoutent pas deux
  * fois. Le curseur de reprise reste celui du log (`event.cursor`), y compris
  * quand la copie est déjà connue, ce n'est pas la clé d'affichage.
  */
@@ -91,7 +91,7 @@ export function refetchOnStreamOpen(mayHaveMissed: boolean): { thread: boolean; 
  * Le reçu `message.admitted` d'un message que le snapshot a déjà (le 202 de
  * CET onglet l'a posé, avec son run) n'apprend rien : il arrive avec le
  * premier événement du run, et sa relecture coûtait un `GET /history` en
- * plein stream (OHB-135). Un message inconnu (autre onglet, autre appareil)
+ * plein stream. Un message inconnu (autre onglet, autre appareil)
  * reste relu.
  */
 export function refreshAfterAppliedEvent(input: {

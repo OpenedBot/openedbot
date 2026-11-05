@@ -5,7 +5,7 @@ import { canonicalJson } from "./canonical";
  * La chaîne de hachage de l'audit de création (`docs/CONNECTOR.md`, « Audit
  * de création chiffré ») :
  *
- *   base = SHA-256("ohb-creation-audit/v2/genesis" || runtimeId)
+ *   base = SHA-256("openedbot-creation-audit/v2/genesis" || runtimeId)
  *   h_i  = SHA-256(0x01 || canonical(e_i) || h_{i-1})
  *   tail = h_count
  *
@@ -14,7 +14,7 @@ import { canonicalJson } from "./canonical";
  * prouvable depuis `base`. Un vérificateur recalcule `tail` depuis `base` ;
  * un désaccord est une troncature, un réordonnancement ou une invention.
  */
-export const CREATION_AUDIT_GENESIS_PREFIX = "ohb-creation-audit/v2/genesis";
+export const CREATION_AUDIT_GENESIS_PREFIX = "openedbot-creation-audit/v2/genesis";
 
 const HASH_HEX = /^[0-9a-f]{64}$/;
 

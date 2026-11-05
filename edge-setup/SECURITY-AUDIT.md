@@ -102,7 +102,7 @@ Aucun fichier modifiable par tous n'a été trouvé dans les écrits du binaire.
 | PyPI / `files.pythonhosted.org` | P3 (`uv sync`) | `uv.lock` validé (hash obligatoire, git épinglé sur 40 hex) |
 | Miroirs Debian/Ubuntu | P2, P7 | APT signé par la distribution |
 | `download.docker.com`, registres d'images | `--sandbox` | clé GPG épinglée, images par digest |
-| Console (`wss://…`, `--ohb`) | `link`, connecteur | TLS ; ticket + preuve de possession Ed25519 |
+| Console (`wss://…`, `--openedbot`) | `link`, connecteur | TLS ; ticket + preuve de possession Ed25519 |
 | Webhook Discord | alertes si configurées | URL fournie par l'opérateur |
 | Fournisseurs de modèles | au fil des exécutions | hors edge-setup (runtime Hermes) |
 

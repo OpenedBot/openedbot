@@ -416,7 +416,7 @@ describe("GET /:runtimeId/models : verdict de santé", () => {
     expect(hostReads).toBe(2);
   });
 
-  test("une écriture OHB invalide le snapshot", async () => {
+  test("une écriture openedbot invalide le snapshot", async () => {
     let hostReads = 0;
     const { app, snapshots } = mount(() => {
       hostReads += 1;
@@ -568,7 +568,7 @@ describe("GET /:runtimeId/models : verdict de santé", () => {
   test("provider credential write invalidates proven models for that provider", async () => {
     const runtime = { ...connector, linkFeatures: ["provider_management"] };
     const { app, calls } = mount((path) => path.includes("/credentials")
-      ? Response.json({ provider: "anthropic", label: "ohb-test", verification: "confirmed", detail: null })
+      ? Response.json({ provider: "anthropic", label: "openedbot-test", verification: "confirmed", detail: null })
       : Response.json(catalog), { row: runtime }, true);
     const response = await app.request("/runtime-1/providers/anthropic/credentials", {
       method: "POST", headers: { "content-type": "application/json" },

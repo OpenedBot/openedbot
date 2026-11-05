@@ -39,7 +39,7 @@ export type WorkerConfig = {
   testHermesUrl: string | null;
   /** Même politique d'endpoint que l'API : une seule construction, aucun oubli. */
   hermesEndpointPolicy: EndpointPolicy;
-  /** OHB-75 : compte Cloudflare d'openedbot, pour relire l'état des tunnels gérés ; `null` sans compte. */
+  /** Compte Cloudflare d'openedbot, pour relire l'état des tunnels gérés ; `null` sans compte. */
   managedTunnel: ManagedTunnelConfig | null;
   leaseSeconds: number;
   pollMs: number;
@@ -197,7 +197,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     runtimeMode,
     databaseUrl:
       env.WORKER_DATABASE_URL?.trim() ||
-      "postgres://ohb_worker:ohb_worker_dev@127.0.0.1:5432/ohb",
+      "postgres://openedbot_worker:openedbot_worker_dev@127.0.0.1:5432/openedbot",
     workerId: workerInstanceId(env.WORKER_ID),
     apiInternalUrl: readApiInternalUrl(env.API_INTERNAL_URL, env.API_PORT),
     runtimeLinkInternalUrl: readApiInternalUrl(env.RUNTIME_LINK_INTERNAL_URL?.trim() || env.API_INTERNAL_URL, env.API_PORT),
@@ -211,7 +211,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     ),
     apiInternalToken:
       env.WORKER_INTERNAL_TOKEN?.trim() ||
-      (environment === "production" ? required(undefined, "WORKER_INTERNAL_TOKEN") : "ohb-worker-dev-token"),
+      (environment === "production" ? required(undefined, "WORKER_INTERNAL_TOKEN") : "openedbot-worker-dev-token"),
     tokenEncryption,
     hermesMtls: readHermesMtlsIdentity(env),
     hermesTimeouts: readHermesTimeouts(env),

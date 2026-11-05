@@ -29,13 +29,13 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
  *
  * A development origin reached through an SSH reverse tunnel is plain HTTP on
  * the host's own loopback: `edge-setup` only accepts it behind
- * `--insecure-ohb`, so the command shown here carries the flag rather than
+ * `--insecure-openedbot`, so the command shown here carries the flag rather than
  * leaving the operator with a copy-paste that is refused. Production origins
  * are HTTPS and never get it.
  */
 export function connectorLinkCommand(apiPublicUrl: string): string {
   const origin = connectorLinkOrigin(apiPublicUrl);
-  return `edge-setup link --ohb ${origin} --yes${isLoopbackHttpOrigin(origin) ? " --insecure-ohb" : ""}`;
+  return `edge-setup link --openedbot ${origin} --yes${isLoopbackHttpOrigin(origin) ? " --insecure-openedbot" : ""}`;
 }
 
 function connectorLinkOrigin(apiPublicUrl: string): string {
@@ -66,7 +66,7 @@ function isLoopbackHttpOrigin(origin: string): boolean {
 /**
  * The origin the enrollment command names: the dedicated link origin when
  * RUNTIME_LINK_PUBLIC_URL sets one, otherwise the API origin rules below.
- * Kept apart from connectorOHBOrigin, which also builds browser callbacks
+ * Kept apart from connectorOpenedbotOrigin, which also builds browser callbacks
  * (MCP OAuth) that must stay on the API origin.
  */
 export function connectorLinkPublicOrigin(
@@ -75,14 +75,14 @@ export function connectorLinkPublicOrigin(
 ): string {
   const link = config.linkPublicUrl?.replace(/\/+$/, "");
   if (link && link !== config.publicUrl.replace(/\/+$/, "")) return link;
-  return connectorOHBOrigin(config, requestOrigin);
+  return connectorOpenedbotOrigin(config, requestOrigin);
 }
 
 /**
  * A development request made through an HTTPS tunnel must send the connector
  * back through that tunnel. Production only trusts its deployment-owned URL.
  */
-export function connectorOHBOrigin(
+export function connectorOpenedbotOrigin(
   config: Pick<ApiConfig, "environment" | "publicUrl">,
   requestOrigin: string | undefined,
 ): string {

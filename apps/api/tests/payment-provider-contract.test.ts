@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 const SCRIPT = join(import.meta.dir, "../../../tests/scripts/payment-provider-contract.ts");
 
 function scan(files: Record<string, string>) {
-  const root = mkdtempSync(join(tmpdir(), "ohb-provider-scan-"));
+  const root = mkdtempSync(join(tmpdir(), "openedbot-provider-scan-"));
   try {
     for (const [path, text] of Object.entries(files)) {
       mkdirSync(dirname(join(root, path)), { recursive: true });

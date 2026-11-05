@@ -8,7 +8,7 @@ import { legalRoutes } from "../src/routes/legal/legal-routes";
 import type { LegalConfig } from "../src/infrastructure/config";
 
 function fixture(content: string): string {
-  const directory = mkdtempSync(join(tmpdir(), "ohb-legal-"));
+  const directory = mkdtempSync(join(tmpdir(), "openedbot-legal-"));
   const path = join(directory, "document.md");
   writeFileSync(path, content);
   return path;

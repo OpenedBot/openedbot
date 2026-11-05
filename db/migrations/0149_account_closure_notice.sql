@@ -76,7 +76,7 @@ comment on function staff_closure_notice_recipients(int) is
   'Tous les comptes (id, e-mail, nom) pour l''avis de fermeture du backoffice staff, en une lecture, borne plafonnee a 20000. Rend le total de la table : moins de lignes que ce total veut dire que la borne a coupe. Refuse (42501) sans staff actif.';
 
 revoke all on function staff_closure_notice_recipients(int) from public;
-grant execute on function staff_closure_notice_recipients(int) to ohb_api;
+grant execute on function staff_closure_notice_recipients(int) to openedbot_api;
 
 insert into schema_migrations(version) values ('0149_account_closure_notice')
 on conflict (version) do nothing;

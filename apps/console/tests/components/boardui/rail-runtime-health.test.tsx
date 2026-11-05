@@ -69,7 +69,7 @@ function renderRail(value: RuntimeHealthReading, onOpenSettings: (to: string) =>
 const button = () => screen.getByRole("button");
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "en");
+  window.localStorage.setItem("openedbot:locale", "en");
 });
 
 afterEach(() => {
@@ -130,7 +130,7 @@ describe("rail runtime health", () => {
   });
 
   test("French copy reads « connecté » and « KO »", () => {
-    window.localStorage.setItem("ohb:locale", "fr");
+    window.localStorage.setItem("openedbot:locale", "fr");
     renderRail(reading(runtime()));
     expect(button().getAttribute("aria-label")).toContain("connecté");
     cleanup();

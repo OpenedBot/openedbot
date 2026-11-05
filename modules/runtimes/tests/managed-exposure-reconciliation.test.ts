@@ -18,7 +18,7 @@ function fakeDb(rows: Array<{ id: string; organizationId: string; accountId: str
   return { db, updates };
 }
 
-test("without an OHB Cloudflare account nothing is read", async () => {
+test("without an openedbot Cloudflare account nothing is read", async () => {
   const { db, updates } = fakeDb([{ id: "e1", organizationId: "o1", accountId: "acct", tunnelId: "tun" }]);
   expect(await reconcileManagedExposures(db, null)).toBe(0);
   expect(updates).toHaveLength(0);

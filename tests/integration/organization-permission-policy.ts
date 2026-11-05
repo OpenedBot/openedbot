@@ -1,5 +1,5 @@
 /**
- * PERM2-8 (DEV-OHB-259) against a disposable PostgreSQL database: the
+ * PERM2-8 against a disposable PostgreSQL database: the
  * organization permission policy (0142). Only a live owner or admin member
  * writes it, through the definer function and inside its own tenant; a
  * member or an agency user (a member of the agency, not of the client) is
@@ -59,9 +59,9 @@ const policy = (overrides: Partial<Parameters<typeof writeOrganizationPermission
   ...overrides,
 });
 
-await withDisposablePostgres("ohb259_org_policy", async ({ owner, connect }) => {
-  const api = await connect("ohb_api");
-  const worker = await connect("ohb_worker");
+await withDisposablePostgres("openedbot259_org_policy", async ({ owner, connect }) => {
+  const api = await connect("openedbot_api");
+  const worker = await connect("openedbot_worker");
   for (const [user, email] of [[OWNER, "camille@example.com"], [ADMIN, "admin@example.com"], [MEMBER, "member@example.com"], [AGENT, "agency@example.com"]] as const) {
     await owner`insert into users (id, email) values (${user}, ${email})`;
   }

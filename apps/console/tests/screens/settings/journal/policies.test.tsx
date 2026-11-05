@@ -66,7 +66,7 @@ function renderPolicies() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {
@@ -86,7 +86,7 @@ describe("PoliciesSettings: bureau", () => {
     expect(screen.getByText("Connexion au runtime")).toBeTruthy();
     expect(screen.getByText("Secrets fournisseurs")).toBeTruthy();
 
-    // OHB-15 : plus aucun canal SSH sortant ; la clé fournisseur part en HTTPS, pas par stdin.
+    // Plus aucun canal SSH sortant ; la clé fournisseur part en HTTPS, pas par stdin.
     expect(document.body.textContent ?? "").not.toMatch(/ssh|stdin/i);
 
     expect(screen.getByRole("link", { name: "Voir le journal des décisions" }).getAttribute("href")).toBe(

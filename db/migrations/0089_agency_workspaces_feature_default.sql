@@ -5,7 +5,7 @@ begin;
 alter table product_features
   add column if not exists staff_override boolean not null default false;
 
--- agency_workspaces was not staff-switchable before OHB-100, so its existing
+-- agency_workspaces was not staff-switchable before this migration, so its existing
 -- row is the legacy global default. Reset only that key; leave other features
 -- and any later explicit staff choice untouched.
 update product_features

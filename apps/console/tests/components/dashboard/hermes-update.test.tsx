@@ -12,7 +12,7 @@ import { HermesUpdateNotice } from "../../../src/screens/settings/installation/c
 const clients: QueryClient[] = [];
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {
@@ -56,7 +56,7 @@ test("runtime screen: nothing when Hermes is current, unknown or absent", () => 
 });
 
 test("runtime screen: English copy", () => {
-  window.localStorage.setItem("ohb:locale", "en");
+  window.localStorage.setItem("openedbot:locale", "en");
   render(<I18nProvider><HermesUpdateNotice link={link(available)} /></I18nProvider>);
   expect(screen.getByText("Hermes update available")).toBeTruthy();
   expect(screen.getByText("Hermes installed: 0.22.2 · with the latest edge-setup release: 0.22.6")).toBeTruthy();

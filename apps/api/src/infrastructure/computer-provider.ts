@@ -7,7 +7,7 @@ const OFF_STATES = new Set(["archived", "stopped", "off"]);
 const DEFAULT_TTL_SECONDS = 8 * 60 * 60;
 const MAX_JSON_BYTES = 1024 * 1024;
 const MAX_CAPTURE_BYTES = 5 * 1024 * 1024;
-const SCREENSHOT_PATH = "/tmp/ohb-computer-panel.jpg";
+const SCREENSHOT_PATH = "/tmp/openedbot-computer-panel.jpg";
 const SCREENSHOT_COMMAND = [
   "export DISPLAY=${DISPLAY:-:0}",
   `f=${SCREENSHOT_PATH}`,
@@ -124,7 +124,7 @@ export class BoxComputerProvider implements ComputerProvider {
         headers: {
           // Same key across API replicas during a concurrent-start window,
           // but a later recovery can create a genuinely new machine.
-          "Idempotency-Key": `ohb-computer-${hash(workspaceKey).slice(0, 16)}-${Math.floor(Date.now() / 300_000)}`,
+          "Idempotency-Key": `openedbot-computer-${hash(workspaceKey).slice(0, 16)}-${Math.floor(Date.now() / 300_000)}`,
         },
         body: JSON.stringify({ ttlSeconds: DEFAULT_TTL_SECONDS, noEnv: true }),
       }, 30_000);
@@ -439,7 +439,7 @@ function captureMediaType(bytes: Uint8Array): "image/jpeg" | "image/png" {
 }
 
 function machineName(workspaceKey: string): string {
-  return `ohb-${hash(workspaceKey).slice(0, 20)}`;
+  return `openedbot-${hash(workspaceKey).slice(0, 20)}`;
 }
 
 function hash(value: string): string {

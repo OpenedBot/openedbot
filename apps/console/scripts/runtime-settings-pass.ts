@@ -23,7 +23,7 @@ import { listMailpitMessageIds, readMailpitLoginCode } from "../../../scripts/li
 const CDP_PORT = process.env.LINK_DEV_VERIFY_PORT?.trim() || "9333";
 const ORIGIN = (process.env.WEB_APP_URL?.trim() || "http://localhost:1420").replace(/\/+$/u, "");
 const OUT = process.env.LINK_DEV_VERIFY_OUT?.trim() || "tmp/runtime-settings-pass";
-const EMAIL = process.env.LINK_DEV_EMAIL?.trim() || process.env.E2E_EMAIL?.trim() || "dev@ohb.local";
+const EMAIL = process.env.LINK_DEV_EMAIL?.trim() || process.env.E2E_EMAIL?.trim() || "dev@openedbot.local";
 const PASSWORD = process.env.LINK_DEV_PASSWORD || process.env.E2E_PASSWORD || (() => { throw new Error("LINK_DEV_PASSWORD / E2E_PASSWORD is not set: run `make setup` (it generates E2E_PASSWORD in .env.local)."); })();
 /** Le nom du runtime de la passe : reconnaissable, et jamais celui d'un vrai. */
 const DRAFT_NAME = "Vérification appairage";
@@ -231,7 +231,7 @@ async function main(): Promise<void> {
   );
   record(
     "la fenêtre du nom devient celle du ticket",
-    modal.count === 1 && !ticketText.includes("Comment OHB joint ce runtime"),
+    modal.count === 1 && !ticketText.includes("Comment openedbot joint ce runtime"),
     `${modal.count} boîte(s) montée(s)`,
   );
   record("le décompte vit dans la boîte", modal.hasTimer, modal.hasTimer ? "role=timer présent" : "aucun décompte");

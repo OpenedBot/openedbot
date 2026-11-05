@@ -26,7 +26,7 @@ const auth: AuthContext = {
   credentialHash: "credential",
 };
 
-const REDIRECT = "ohb://auth/callback";
+const REDIRECT = "openedbot://auth/callback";
 const TICKET_ID = "20000000-0000-4000-8000-000000000003";
 const SECRET = "c".repeat(43);
 
@@ -93,8 +93,8 @@ function ticketRow(overrides: Partial<{ consumedAt: Date | null; expiresAt: Date
 }
 
 describe("lien et ticket", () => {
-  test("le lien est ohb://join avec l'origine de l'API sans barre finale", () => {
-    expect(mobileConnectJoinUrl("http://localhost:8790/", "a.b")).toBe("ohb://join?api=http%3A%2F%2Flocalhost%3A8790&ticket=a.b");
+  test("le lien est openedbot://join avec l'origine de l'API sans barre finale", () => {
+    expect(mobileConnectJoinUrl("http://localhost:8790/", "a.b")).toBe("openedbot://join?api=http%3A%2F%2Flocalhost%3A8790&ticket=a.b");
   });
 
   test("seul <uuid>.<secret base64url> est un ticket", () => {
@@ -113,7 +113,7 @@ describe("POST /api/auth/mobile-connect/tickets", () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { ticketId: string; url: string; expiresAt: string };
     const url = new URL(body.url);
-    expect(url.protocol).toBe("ohb:");
+    expect(url.protocol).toBe("openedbot:");
     expect(url.host).toBe("join");
     expect(url.searchParams.get("api")).toBe("http://localhost:8790");
     const ticket = parseMobileConnectTicket(url.searchParams.get("ticket") ?? "");
@@ -142,17 +142,17 @@ describe("POST /api/auth/mobile-connect/tickets", () => {
     // api.openedbot.app (Release.xcconfig OPENEDBOT_API_ORIGIN).
     const config = readApiConfig({
       ...base,
-      API_PUBLIC_URL: "https://console.ohb.example",
-      NATIVE_API_PUBLIC_URL: "https://api.ohb.example/",
+      API_PUBLIC_URL: "https://console.openedbot.example",
+      NATIVE_API_PUBLIC_URL: "https://api.openedbot.example/",
     });
     const response = await mount(fakeDb([], () => []), auth, config.nativeApiPublicUrl)
       .request("/api/auth/mobile-connect/tickets", { method: "POST" });
     const body = (await response.json()) as { url: string };
-    expect(new URL(body.url).searchParams.get("api")).toBe("https://api.ohb.example");
+    expect(new URL(body.url).searchParams.get("api")).toBe("https://api.openedbot.example");
   });
 
   test("sans NATIVE_API_PUBLIC_URL, l'origine native est API_PUBLIC_URL", () => {
-    expect(readApiConfig({ ...base, API_PUBLIC_URL: "https://ohb.example/" }).nativeApiPublicUrl).toBe("https://ohb.example");
+    expect(readApiConfig({ ...base, API_PUBLIC_URL: "https://openedbot.example/" }).nativeApiPublicUrl).toBe("https://openedbot.example");
     expect(readApiConfig({ ...base, API_PORT: "8790" }).nativeApiPublicUrl).toBe("http://localhost:8790");
   });
 });

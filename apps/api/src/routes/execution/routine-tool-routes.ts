@@ -28,7 +28,7 @@ import { readBearer } from "../../interfaces/http/request-readers";
 import { lockRoutineQuota, publicRoutine, validatedRoutineInput } from "./routine-routes";
 
 /**
- * Le serveur MCP `ohb_routines` : l'outil `routine_manage` (DEV-209), appelé
+ * Le serveur MCP `openedbot_routines` : l'outil `routine_manage` (DEV-209), appelé
  * par le gateway Hermes de l'hôte pendant un run, en https, jamais par un
  * navigateur.
  *

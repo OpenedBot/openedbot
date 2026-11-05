@@ -24,7 +24,7 @@
 import { type OnboardingStep } from "@/lib/session/onboarding";
 import { activeOrganizationId, readCloudSession } from "./cloud-session";
 
-export const ONBOARDING_DRAFT_KEY = "ohb:onboarding-draft";
+export const ONBOARDING_DRAFT_KEY = "openedbot:onboarding-draft";
 
 /** Incrémenter dès que la forme change : un brouillon d'avant est jeté, pas migré. */
 const DRAFT_VERSION = 2;

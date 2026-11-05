@@ -21,7 +21,7 @@ describe("link.context remis à la liaison", () => {
     expect(frame).toEqual({
       t: "link.context",
       environment: "preprod",
-      ohb: "https://preprod.openedbot.app",
+      openedbot: "https://preprod.openedbot.app",
       organization: { id: LINK_ORGANIZATION_ID, name: "Acme", slug: "acme" },
       owner: { email: "owner@example.com", displayName: "Owner" },
       limits: { features: RELAY_MAX_FEATURES },

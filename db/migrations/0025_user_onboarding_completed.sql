@@ -11,9 +11,9 @@ begin;
 -- restent : ils datent la sortie de l'espace et gardent les réponses, mais ne
 -- décident plus de l'entrée.
 --
--- `users` n'est pas sous RLS et `ohb_api` porte déjà un grant table entier
+-- `users` n'est pas sous RLS et `openedbot_api` porte déjà un grant table entier
 -- (0001) : la nouvelle colonne est lisible et modifiable par l'API sans
--- grant supplémentaire. `ohb_worker` ne lit que (id, email) (0002) et n'a
+-- grant supplémentaire. `openedbot_worker` ne lit que (id, email) (0002) et n'a
 -- rien à faire de ce flag.
 alter table users
   add column onboarding_completed boolean not null default false;
