@@ -12,9 +12,9 @@ dépôt, restent listées plus bas pour l'historique.
 
 ## Non publié
 
-## v2.0.0 - 2026-11-05
+## v1.1.0 - 2026-11-05
 
-Version majeure : le lien avec openedbot change de format. Une machine déjà liée met à jour edge-setup puis se lie à nouveau avec un nouveau ticket.
+Le lien avec openedbot change de format. Une machine déjà liée met à jour edge-setup puis se lie à nouveau avec un nouveau ticket.
 
 ### Changé
 
