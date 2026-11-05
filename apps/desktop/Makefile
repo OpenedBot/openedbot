@@ -4,7 +4,7 @@
 SHELL := /bin/sh
 .DEFAULT_GOAL := help
 include $(dir $(lastword $(MAKEFILE_LIST)))../../scripts/lib/legacy-env.mk
-.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer package-mac package-linux clean
+.PHONY: help install typecheck test compile dev dev-local start logs lab popup-check popup-stage defaults package-win package-win-installer mac-sign-check package-mac check-mac package-linux clean
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 # Defined once, reused by `make help` and by every [make] message below.
@@ -151,12 +151,39 @@ popup-stage: popup-check ## Copy the checked popup bundle to popup-bundle/, wher
 	@ditto "$(POPUP_APP)" "$(POPUP_STAGE)"
 	@printf "$(C_OK)[make] popup staged: $(POPUP_STAGE)$(C_RESET)\n"
 
-package-mac: popup-stage defaults ## macOS arm64 build (dmg + zip) into release/, signed ad hoc, popup embedded; run it on a Mac
+# MAC_SIGN picks the macOS signature:
+#   adhoc         (default) no certificate: Gatekeeper refuses the first launch
+#                 of a downloaded copy until Open Anyway. Pull requests, forks.
+#   developer-id  electron-builder.developer-id.yml: Developer ID, hardened
+#                 runtime, app and dmg notarised and stapled. Needs the
+#                 certificate (login keychain, or CSC_LINK + CSC_KEY_PASSWORD)
+#                 and APPLE_API_KEY (.p8 path), APPLE_API_KEY_ID, APPLE_API_ISSUER.
+MAC_SIGN ?= adhoc
+
+# Fails before the popup and the build when MAC_SIGN cannot produce what it
+# promises.
+mac-sign-check:
+	@case "$(MAC_SIGN)" in \
+		adhoc) printf "$(C_WARN)[make] building a macOS app signed AD HOC, not notarized (Gatekeeper blocks the first launch of a downloaded copy)$(C_RESET)\n" ;; \
+		developer-id) \
+			for v in APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER; do \
+				eval "[ -n \"\$$$$v\" ]" || { printf "$(C_ERR)[make] MAC_SIGN=developer-id needs $$v (notarisation): electron-builder would skip it with a warning$(C_RESET)\n"; exit 1; }; \
+			done; \
+			[ -f "$$APPLE_API_KEY" ] || { printf "$(C_ERR)[make] APPLE_API_KEY must be the path of the .p8 file$(C_RESET)\n"; exit 1; }; \
+			printf "$(C_WARN)[make] building a macOS app signed with the DEVELOPER ID, notarised (several minutes at Apple)$(C_RESET)\n" ;; \
+		*) printf "$(C_ERR)[make] MAC_SIGN must be adhoc or developer-id, not $(MAC_SIGN)$(C_RESET)\n"; exit 1 ;; \
+	esac
+
+package-mac: mac-sign-check popup-stage defaults ## macOS arm64 build (dmg + zip) into release/, popup embedded; MAC_SIGN=adhoc (default) or developer-id (signed, notarised); run it on a Mac
 	@[ "$$(uname -s)" = "Darwin" ] || { printf "$(C_ERR)[make] package-mac runs on macOS only (the .dmg is built with hdiutil)$(C_RESET)\n"; exit 1; }
-	@printf "$(C_WARN)[make] building a macOS app signed AD HOC, not notarized (Gatekeeper blocks the first launch of a downloaded copy)$(C_RESET)\n"
-	@bun run package:mac
+	@rm -f release/*.dmg release/*-mac-*.zip
+	@if [ "$(MAC_SIGN)" = developer-id ]; then bun run package:mac:developer-id; else bun run package:mac; fi
 	@ls -1 release/*.dmg >/dev/null 2>&1 || { printf "$(C_ERR)[make] no .dmg produced in release/$(C_RESET)\n"; exit 1; }
+	@if [ "$(MAC_SIGN)" = developer-id ]; then for f in release/*.dmg; do scripts/notarize-dmg.sh "$$f"; done; fi
 	@for f in release/*.dmg release/*-mac-*.zip; do if [ -f "$$f" ]; then printf "$(C_OK)[make] %s  (%s, sha256 %s)$(C_RESET)\n" "$$f" "$$(du -h "$$f" | cut -f1)" "$$(shasum -a 256 "$$f" | cut -d' ' -f1)"; fi; done
+
+check-mac: ## Check the package-mac build in release/ against MAC_SIGN (seal, popup, version, dmg; developer-id: Gatekeeper and stapled tickets)
+	@scripts/check-mac-app.sh "$(MAC_SIGN)" "$$(jq -r .version package.json)"
 
 # Linux x64, from Linux (the CI) or macOS: electron-builder fetches its own
 # AppImage and fpm tools. No popup: it is macOS only.

@@ -1,10 +1,16 @@
-# Builds the desktop app (apps/desktop): the macOS .dmg (arm64, signed ad hoc,
-# notch popup embedded) and the Linux AppImage and .deb (x64). A pull request
-# that touches the app builds them as run artifacts. A desktop/vX.Y.Z tag also
-# publishes them as a GitHub release, under stable names, so
+# Builds the desktop app (apps/desktop): the macOS .dmg (arm64, notch popup
+# embedded) and the Linux AppImage and .deb (x64). A pull request that touches
+# the app builds them as run artifacts. A desktop/vX.Y.Z tag also publishes
+# them as a GitHub release, under stable names, so
 # https://github.com/OpenedBot/openedbot/releases/latest/download/<file> always
-# serves the newest build. No developer certificate, no notarisation, no
-# auto-update feed (apps/desktop/README.md).
+# serves the newest build. No auto-update feed (apps/desktop/README.md).
+#
+# macOS signature: a pull request builds ad hoc (no secret reaches its code). A
+# tag, or a manual run, signs with the Developer ID and notarises the app and
+# the dmg; a tag without the secrets fails rather than publish a build
+# Gatekeeper refuses. Secrets: MACOS_CSC_LINK (base64 .p12), MACOS_CSC_KEY_PASSWORD,
+# APPLE_API_KEY_P8 (App Store Connect key, .p8 content), APPLE_API_KEY_ID,
+# APPLE_API_ISSUER.
 # Actions pinned by SHA; Bun pinned by packageManager (package.json).
 name: desktop-release
 
@@ -71,7 +77,8 @@ jobs:
     name: macOS dmg (arm64)
     needs: version
     runs-on: macos-26
-    timeout-minutes: 45
+    # Notarisation (app, then dmg) waits on Apple, usually a few minutes.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,25 +116,64 @@ jobs:
       - name: Typecheck and tests
         working-directory: apps/desktop
         run: make typecheck test
-      - name: Package
+      - name: Signing mode
+        id: sign
+        env:
+          EVENT: ${{ github.event_name }}
+          RELEASE: ${{ needs.version.outputs.release }}
+          HAS_SECRETS: ${{ secrets.MACOS_CSC_LINK != '' && secrets.MACOS_CSC_KEY_PASSWORD != '' && secrets.APPLE_API_KEY_P8 != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            mode=adhoc
+          elif [ "$HAS_SECRETS" = true ]; then
+            mode=developer-id
+          elif [ "$RELEASE" = true ]; then
+            echo "a release needs the Developer ID and notarisation secrets (MACOS_CSC_LINK, MACOS_CSC_KEY_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER)" >&2
+            exit 1
+          else
+            echo "::warning::signing secrets missing: building ad hoc"
+            mode=adhoc
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "macOS signature: $mode" >> "$GITHUB_STEP_SUMMARY"
+      - name: Package (ad hoc)
+        if: steps.sign.outputs.mode == 'adhoc'
         working-directory: apps/desktop
         env:
           # electron-builder skips signing on a pull request, which leaves the
           # app with a broken seal. The identity is ad hoc (no certificate, no
-          # secret), so a PR build is signed exactly like a release.
+          # secret), so a PR build is signed like a local one.
           CSC_FOR_PULL_REQUEST: "true"
-        run: make package-mac NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
-      - name: Check the app
+        run: make package-mac MAC_SIGN=adhoc NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
+      - name: Notarisation key
+        if: steps.sign.outputs.mode == 'developer-id'
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          # notarytool reads the key from a file: APPLE_API_KEY is its path.
+          key="$RUNNER_TEMP/AuthKey.p8"
+          (umask 077; printf '%s\n' "$APPLE_API_KEY_P8" > "$key")
+          echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
+      - name: Package (Developer ID, notarised)
+        if: steps.sign.outputs.mode == 'developer-id'
         working-directory: apps/desktop
         env:
-          VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          app=release/mac-arm64/openedbot.app
-          codesign --verify --deep --strict --verbose=2 "$app"
-          codesign -dv "$app" 2>&1 | grep -q '^Signature=adhoc$'
-          [ -x "$app/Contents/Helpers/OHBPopup.app/Contents/MacOS/OHBPopup" ]
-          [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION" ]
-          hdiutil verify "release/openedbot-$VERSION-mac-arm64.dmg"
+          # electron-builder imports the .p12 into a temporary keychain.
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: make package-mac MAC_SIGN=developer-id NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
+      - name: Remove the notarisation key
+        if: always() && steps.sign.outputs.mode == 'developer-id'
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+      - name: Check the app
+        # developer-id: Gatekeeper (spctl) must accept the app and the dmg, and
+        # both tickets must be stapled (scripts/check-mac-app.sh).
+        working-directory: apps/desktop
+        env:
+          MAC_SIGN: ${{ steps.sign.outputs.mode }}
+        run: make check-mac MAC_SIGN="$MAC_SIGN"
       - name: Stage under the release name
         env:
           VERSION: ${{ needs.version.outputs.version }}
@@ -237,7 +283,7 @@ jobs:
             echo "| Debian, Ubuntu (x64) | \`openedbot-linux-amd64.deb\` |"
             echo "| Other Linux (x64) | \`openedbot-linux-x86_64.AppImage\` |"
             echo
-            echo "No developer certificate: on macOS, the first launch is refused, then allowed from System Settings › Privacy & Security › Open Anyway. Install steps: apps/desktop/README.md."
+            echo "macOS: signed with a Developer ID and notarised by Apple, it opens without a warning. Windows and Linux builds are unsigned. Install steps: apps/desktop/README.md."
             echo
             echo "Notch popup: OpenedBot/openedbot-notch@$notch."
           } > ../notes.md

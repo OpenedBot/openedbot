@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened runtime entitlements of every nested executable (Developer ID
+  build): the Electron helpers, which run V8, and the notch popup
+  (Contents/Helpers/OHBPopup.app), which needs none of them: its Dock
+  reading goes through Accessibility, a user grant, not an entitlement.
+  electron-builder applies one file to all nested code; this one is the
+  smallest set the helpers accept.
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+  </dict>
+</plist>
