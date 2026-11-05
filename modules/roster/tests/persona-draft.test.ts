@@ -3,7 +3,7 @@ import { formatPersonaDraftTranscript, personaDraftSessionKey } from "../src/dom
 
 describe("persona-draft", () => {
   test("isole la session par org et bot", () => {
-    expect(personaDraftSessionKey("org-1", "bot-1")).toBe("ohb:org-1:persona-draft:bot:bot-1");
+    expect(personaDraftSessionKey("org-1", "bot-1")).toBe("openedbot:org-1:persona-draft:bot:bot-1");
   });
 
   test("formate un transcript lisible", () => {

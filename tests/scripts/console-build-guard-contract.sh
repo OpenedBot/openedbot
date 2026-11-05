@@ -38,14 +38,6 @@ make --no-print-directory prod-console-guard OPENEDBOT_CONSOLE_PLUGINS=/fixture/
 make --no-print-directory prod-console-guard OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODE=solo >/dev/null 2>&1 \
   || fail "OPENEDBOT_CONSOLE_MODE=solo is refused"
 
-# A retired OHB_* name is refused before any target, naming it, never read.
-set +e
-legacy="$(env -u OPENEDBOT_CONSOLE_MODE OHB_CONSOLE_SOLO=1 make --no-print-directory prod-console-guard OPENEDBOT_CONSOLE_PLUGINS=/fixture/console/index.ts 2>&1)"
-status=$?
-set -e
-[ "$status" -ne 0 ] || fail "the retired OHB_CONSOLE_SOLO is not refused"
-printf '%s' "$legacy" | grep -q 'retired OHB_ prefix is no longer read: OHB_CONSOLE_SOLO' || fail "the refusal does not name OHB_CONSOLE_SOLO"
-
 admin_plan="$(make -n build APP=admin OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODE= 2>/dev/null || true)"
 printf '%s' "$admin_plan" | grep -q 'OPENEDBOT_CONSOLE_PLUGINS vide' && fail "make build APP=admin runs the console guard"
 

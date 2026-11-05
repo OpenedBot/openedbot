@@ -100,7 +100,7 @@ export type DevResetReport = {
  * Garde-fou. Deux conditions, toutes deux nécessaires : l'environnement est
  * `development`, et la base visée est locale (boucle locale). Le test de
  * localité porte sur l'hôte de la DSN, pas sur son nom : une DSN de préprod
- * nommée « ohb » est refusée, et `localhost` reste accepté.
+ * nommée « openedbot » est refusée, et `localhost` reste accepté.
  */
 export function assertDevResetAllowed(input: { environment: string; databaseUrl: string }): void {
   if (input.environment !== "development") {

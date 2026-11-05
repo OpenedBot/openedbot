@@ -243,7 +243,7 @@ describe("runtime link broker : multiplexage", () => {
     expect(host.frames.filter((frame) => frame.t === "req")).toHaveLength(0);
   });
 
-  test("a relayed inventory write bumps the toolset epoch once the host answered, a read does not (OHB-138)", async () => {
+  test("a relayed inventory write bumps the toolset epoch once the host answered, a read does not", async () => {
     const harness = startHarness();
     const host = await harness.connect("rt-epoch");
     const dial = harness.broker.dialer("rt-epoch");

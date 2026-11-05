@@ -1,5 +1,5 @@
 /**
- * PERM2-5 (DEV-OHB-255) against a disposable PostgreSQL database: the
+ * PERM2-5 against a disposable PostgreSQL database: the
  * per-tool policies of 0141. The API writes its own tenant only, through the
  * real use case; every effective write raises the bot's revision and an
  * unchanged one does not; the constraints refuse a key outside the plugin
@@ -47,9 +47,9 @@ const WRITE: GateIdentity = {
   descriptorVersion: 1,
 };
 
-await withDisposablePostgres("ohb255_tool_policies", async ({ owner, connect }) => {
-  const api = await connect("ohb_api");
-  const worker = await connect("ohb_worker");
+await withDisposablePostgres("openedbot255_tool_policies", async ({ owner, connect }) => {
+  const api = await connect("openedbot_api");
+  const worker = await connect("openedbot_worker");
   await owner`insert into users (id, email) values (${USER}, 'camille.lefevre@example.com')`;
   for (const [org, slug] of [[ORG_A, "acme"], [ORG_B, "acme-other"], [AGENCY, "acme-agency"]] as const) {
     await owner`insert into organizations (id, slug, name, permission_pipeline) values (${org}, ${slug}, 'Acme', 'v2')`;

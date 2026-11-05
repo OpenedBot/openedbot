@@ -64,7 +64,7 @@ const WORKSPACE_FILE_SEGMENT = "(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|j
 /**
  * Identifiant de session Hermes : la grammaire d'un run, PLUS le deux-points.
  *
- * TOUTES les sessions qu'openedbot ouvre s'appellent `ohb:<org>:<...>` : la clé
+ * TOUTES les sessions qu'openedbot ouvre s'appellent `openedbot:<org>:<...>` : la clé
  * porte le deux-points, et `encodeURIComponent` l'écrit `%3A` dans le chemin.
  * `ID_SEGMENT` ne connaît ni l'un ni l'autre. Une allowlist bâtie sur lui
  * refuse donc, avant même l'aller réseau, chacune des trois routes de session
@@ -75,7 +75,7 @@ const WORKSPACE_FILE_SEGMENT = "(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|j
  * `/` ou d'un `..` en pourcentage, qui deviendrait un chemin une fois décodé
  * par le gateway, reste donc impossible.
  *
- * 256 : la plus longue clé (`ohb:<uuid>:workflow:<uuid>:bot:<uuid>`) fait 127
+ * 256 : la plus longue clé (`openedbot:<uuid>:workflow:<uuid>:bot:<uuid>`) fait 127
  * caractères, 137 une fois ses cinq deux-points échappés.
  */
 const HERMES_SESSION_SEGMENT = "(?:[A-Za-z0-9._~-]|%3[Aa]){1,256}";
@@ -109,7 +109,7 @@ export const RELAY_ALLOWLIST: ReadonlyArray<RelayRoute> = Object.freeze([
   route("GET", `^/api/sessions/${HERMES_SESSION_SEGMENT}/messages$`),
   // La seule écriture destructive du lien côté gateway : effacer une session
   // qu'openedbot y a créée, quand l'opérateur purge le bot qui la portait. Elle ne
-  // peut viser qu'un identifiant `ohb:<org>:<thread>`, le seul nom connu
+  // peut viser qu'un identifiant `openedbot:<org>:<thread>`, le seul nom connu
   // d'openedbot, et ne touche ni le profil, ni l'hôte.
   route("DELETE", `^/api/sessions/${HERMES_SESSION_SEGMENT}$`),
   route("POST", "^/v1/runs$"),

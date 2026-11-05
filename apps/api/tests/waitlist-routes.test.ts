@@ -83,7 +83,7 @@ describe("POST /api/waitlist", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ status: "joined" });
     expect(calls[0]).toContain("insert into waitlist_signups (id, email, locale)");
-    // Sans cible et sans `returning` : `ohb_api` n'a que l'insertion sur cette
+    // Sans cible et sans `returning` : `openedbot_api` n'a que l'insertion sur cette
     // table (migration 0065), et les deux formes contraires exigeraient un
     // droit de lecture sur des adresses en clair.
     expect(calls[0]).toContain("on conflict do nothing");

@@ -41,14 +41,14 @@ comment on table runtime_provider_incidents is
 alter table runtime_provider_incidents enable row level security;
 alter table runtime_provider_incidents force row level security;
 
-create policy runtime_provider_incidents_tenant on runtime_provider_incidents to ohb_api
+create policy runtime_provider_incidents_tenant on runtime_provider_incidents to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_provider_incidents_worker on runtime_provider_incidents to ohb_worker
+create policy runtime_provider_incidents_worker on runtime_provider_incidents to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on runtime_provider_incidents to ohb_api;
-grant select, insert, update, delete on runtime_provider_incidents to ohb_worker;
+grant select, insert, update, delete on runtime_provider_incidents to openedbot_api;
+grant select, insert, update, delete on runtime_provider_incidents to openedbot_worker;
 
 alter table email_outbox drop constraint email_outbox_kind_check;
 alter table email_outbox add constraint email_outbox_kind_check

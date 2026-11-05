@@ -10,7 +10,7 @@ insert into runtime_model_selection_proofs (runtime_id, organization_id, provide
 insert into runtime_model_proven (organization_id, runtime_id, provider, model) values
   ('7e000000-0000-4000-8000-000000000001', '7e000000-0000-4000-8000-000000000011', 'anthropic', 'claude-sonnet-4'),
   ('7f000000-0000-4000-8000-000000000002', '7f000000-0000-4000-8000-000000000012', 'openai-codex', 'gpt-6');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '7e000000-0000-4000-8000-000000000001', false) \g /dev/null
 do $$
 begin

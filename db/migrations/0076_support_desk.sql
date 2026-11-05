@@ -28,7 +28,7 @@ begin;
 
 -- Vrai quand la transaction courante porte une session staff vivante.
 --
--- Pas de `security definer` : la fonction tourne comme `ohb_api` et s'appuie
+-- Pas de `security definer` : la fonction tourne comme `openedbot_api` et s'appuie
 -- sur la policy `staff_users_api` de 0023, qui laisse voir exactement la ligne
 -- dont l'`id` vaut `app.staff_user_id`. Le droit n'est donc élargi nulle part,
 -- et un GUC qui ne désigne personne rend `false`.
@@ -45,11 +45,11 @@ as $$
   );
 $$;
 revoke all on function support_staff_session() from public;
-grant execute on function support_staff_session() to ohb_api;
+grant execute on function support_staff_session() to openedbot_api;
 
 -- Un jeton, une conversation, pour toujours.
 --
--- Le jeton du visiteur voyage dans un en-tête (`X-OHB-Support-Token`), pas
+-- Le jeton du visiteur voyage dans un en-tête (`X-OpenedBot-Support-Token`), pas
 -- dans un cookie : une route publique sans cookie n'a pas de surface CSRF.
 -- Effacer les données du site perd donc l'accès au fil, et c'est précisément
 -- pourquoi `email` est obligatoire : le staff garde un moyen de répondre.
@@ -153,31 +153,31 @@ alter table support_events force row level security;
 -- L'invité ne voit QUE le fil dont il porte le jeton. L'insertion passe la
 -- même barrière : `withSupportGuest` pose le GUC avant d'écrire la ligne,
 -- donc le `with check` de l'ouverture est satisfait par construction.
-create policy support_conversations_guest on support_conversations to ohb_api
+create policy support_conversations_guest on support_conversations to openedbot_api
   using (guest_token_hash = nullif(current_setting('app.support_guest_token_hash', true), ''))
   with check (guest_token_hash = nullif(current_setting('app.support_guest_token_hash', true), ''));
 
-create policy support_conversations_staff on support_conversations to ohb_api
+create policy support_conversations_staff on support_conversations to openedbot_api
   using (support_staff_session())
   with check (support_staff_session());
 
 -- Les deux tables filles délèguent au parent : la sous-requête est soumise à
 -- la RLS de `support_conversations`, donc « qui voit quoi » n'est défini qu'une
 -- fois, au-dessus.
-create policy support_messages_scope on support_messages to ohb_api
+create policy support_messages_scope on support_messages to openedbot_api
   using (exists (select 1 from public.support_conversations c where c.id = conversation_id))
   with check (exists (select 1 from public.support_conversations c where c.id = conversation_id));
 
-create policy support_events_scope on support_events to ohb_api
+create policy support_events_scope on support_events to openedbot_api
   using (exists (select 1 from public.support_conversations c where c.id = conversation_id))
   with check (exists (select 1 from public.support_conversations c where c.id = conversation_id));
 
 -- Le worker ne fait que purger, comme sur toute autre table.
-create policy support_conversations_worker on support_conversations to ohb_worker
+create policy support_conversations_worker on support_conversations to openedbot_worker
   using (true) with check (true);
-create policy support_messages_worker on support_messages to ohb_worker
+create policy support_messages_worker on support_messages to openedbot_worker
   using (true) with check (true);
-create policy support_events_worker on support_events to ohb_worker
+create policy support_events_worker on support_events to openedbot_worker
   using (true) with check (true);
 
 -- 0063 avait créé la liste d'attente SANS aucun droit : toute inscription
@@ -190,12 +190,12 @@ create policy support_events_worker on support_events to ohb_worker
 -- une réponse à une demande. Les messages et les événements partent par
 -- cascade : un message qu'on ne pourrait supprimer qu'un par un laisserait
 -- toujours un reste.
-grant select, insert, update, delete on support_conversations to ohb_api;
-grant select, insert on support_messages to ohb_api;
-grant select, insert on support_events to ohb_api;
-grant select, insert, update, delete on support_conversations to ohb_worker;
-grant select, insert, update, delete on support_messages to ohb_worker;
-grant select, insert, update, delete on support_events to ohb_worker;
+grant select, insert, update, delete on support_conversations to openedbot_api;
+grant select, insert on support_messages to openedbot_api;
+grant select, insert on support_events to openedbot_api;
+grant select, insert, update, delete on support_conversations to openedbot_worker;
+grant select, insert, update, delete on support_messages to openedbot_worker;
+grant select, insert, update, delete on support_events to openedbot_worker;
 
 -- Les destinataires de l'avis « nouveau fil de support ».
 --
@@ -215,7 +215,7 @@ as $$
    order by su.created_at asc
 $$;
 revoke all on function support_notify_recipients() from public;
-grant execute on function support_notify_recipients() to ohb_api;
+grant execute on function support_notify_recipients() to openedbot_api;
 
 -- La contrainte de genre est la jumelle SQL de `TRANSACTIONAL_EMAIL_KINDS`
 -- (`contracts/api/src/email-kinds.ts`) : un genre déposé sans son

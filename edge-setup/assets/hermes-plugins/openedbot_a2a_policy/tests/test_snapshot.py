@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from ohb_a2a_policy.snapshot import (
+from openedbot_a2a_policy.snapshot import (
     A2APolicySnapshotServer,
     _peer_uid_allowed,
     build_snapshot,
@@ -142,8 +142,8 @@ class SnapshotSocketTests(unittest.TestCase):
 
     def test_linux_allows_gateway_uid_and_root_operator_only(self) -> None:
         with (
-            patch("ohb_a2a_policy.snapshot.sys.platform", "linux"),
-            patch("ohb_a2a_policy.snapshot.os.geteuid", return_value=999),
+            patch("openedbot_a2a_policy.snapshot.sys.platform", "linux"),
+            patch("openedbot_a2a_policy.snapshot.os.geteuid", return_value=999),
         ):
             self.assertTrue(_peer_uid_allowed(999))
             self.assertTrue(_peer_uid_allowed(0))
@@ -152,15 +152,15 @@ class SnapshotSocketTests(unittest.TestCase):
 
     def test_darwin_allows_only_gateway_uid(self) -> None:
         with (
-            patch("ohb_a2a_policy.snapshot.sys.platform", "darwin"),
-            patch("ohb_a2a_policy.snapshot.os.geteuid", return_value=999),
+            patch("openedbot_a2a_policy.snapshot.sys.platform", "darwin"),
+            patch("openedbot_a2a_policy.snapshot.os.geteuid", return_value=999),
         ):
             self.assertTrue(_peer_uid_allowed(999))
             self.assertFalse(_peer_uid_allowed(0))
             self.assertFalse(_peer_uid_allowed(1000))
 
     def test_foreign_uid_is_rejected(self) -> None:
-        with patch("ohb_a2a_policy.snapshot._peer_uid", return_value=os.geteuid() + 1):
+        with patch("openedbot_a2a_policy.snapshot._peer_uid", return_value=os.geteuid() + 1):
             self.assertEqual(self._request(), b"")
 
     def test_provider_failure_closes_without_leaking_error_details(self) -> None:

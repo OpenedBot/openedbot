@@ -1,6 +1,6 @@
 begin;
 
--- OHB-113: a plain DM (no room, no explicit handoff, autonomy off) no longer
+-- A plain DM (no room, no explicit handoff, autonomy off) no longer
 -- opens a `workflows` row. The two facts the workflow carried for such a
 -- turn now live on the run itself:
 --   - `initiator_user_id`: who sent it. Folding a follow-up and creating a
@@ -69,7 +69,7 @@ before update of status on runs
 for each row execute function open_plain_dm_review_workflow();
 
 insert into schema_migrations(version)
-values ('0091_ohb113_run_admission_envelope')
+values ('0091_run_admission_envelope')
 on conflict (version) do nothing;
 
 commit;

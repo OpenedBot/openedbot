@@ -29,7 +29,7 @@ test("a plaintext v1 snapshot.json is refused by name, an oversized or foreign f
 });
 
 test("the copy is byte-for-byte, private, and never replaces an existing destination", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "ohb-export-audit-"));
+  const dir = await mkdtemp(join(tmpdir(), "openedbot-export-audit-"));
   const source = join(dir, "snapshot.bin"), destination = join(dir, "export.bin");
   const data = sealed();
   await writeFile(source, data);

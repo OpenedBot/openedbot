@@ -173,7 +173,7 @@ describe("révocations", () => {
       const calls: string[] = [];
       const bindings: unknown[][] = [];
       await revoke(fakeDb({ calls, bindings }));
-      const lock = calls.findIndex((sql) => sql.includes("pg_advisory_xact_lock(hashtext( ), hashtext('ohb-user-sessions'))"));
+      const lock = calls.findIndex((sql) => sql.includes("pg_advisory_xact_lock(hashtext( ), hashtext('openedbot-user-sessions'))"));
       expect(lock).toBeGreaterThanOrEqual(0);
       expect(bindings[lock]).toEqual(["user-1"]);
       expect(lock).toBeLessThan(calls.findIndex((sql) => sql.includes(firstWrite)));

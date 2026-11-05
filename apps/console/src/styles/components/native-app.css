@@ -18,7 +18,7 @@
 :root[data-native-titlebar] :is(
   [data-board-icon-rail],
   [data-board-topbar],
-  #ohb-board-sidebar,
+  #openedbot-board-sidebar,
   button,
   [role="button"],
   [role="menu"],
@@ -43,7 +43,7 @@
 :root[data-native-titlebar] :is(
   [data-board-icon-rail],
   [data-board-topbar],
-  #ohb-board-sidebar,
+  #openedbot-board-sidebar,
   button
 ) :is(img, a) {
   -webkit-user-drag: none;

@@ -157,7 +157,7 @@ function Mark() {
   const node = useRef<HTMLDivElement>(null);
   useExitGhost(node);
   return (
-    <div ref={node} data-thread-thinking="" className="ohb-typing-enter">
+    <div ref={node} data-thread-thinking="" className="openedbot-typing-enter">
       <span role="status" id="label">Réfléchit…</span>
     </div>
   );

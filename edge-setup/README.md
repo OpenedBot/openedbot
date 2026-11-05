@@ -121,7 +121,7 @@ edge-setup doctor
 ```
 
 `link` targets the production origin `https://link.openedbot.app` by default;
-pass `--ohb https://...` for another openedbot. The ticket is a secret: it is
+pass `--openedbot https://...` for another openedbot. The ticket is a secret: it is
 read from the hidden prompt, stdin, or a `0600` file (`--ticket-file`), never
 from the command line. `link` is an update-or-create: it rewrites the link of
 the targeted instance. `--name <name>` creates a named instance next to the
@@ -155,7 +155,7 @@ edge-setup audit --strict
 | `plan` | yes | Prints exactly what `up` would do. |
 | `up` | | Installs the runtime, loopback gateway and connector; host policies are opt-in flags. `--auto-upgrade` also enables the upgrade timer. |
 | `verify-access` | | From a fresh SSH session: proves admin access and commits a guarded policy. |
-| `link` | | Pairs the runtime with openedbot (`--ohb`, default `https://link.openedbot.app`; `--name`, `--ticket-file`, `--rekey`, `--insecure-ohb` for a loopback development origin only). |
+| `link` | | Pairs the runtime with openedbot (`--openedbot`, default `https://link.openedbot.app`; `--name`, `--ticket-file`, `--rekey`, `--insecure-openedbot` for a loopback development origin only). |
 | `unlink` | | Stops and removes one local link, keeping its device key and Hermes data. |
 | `credentials list\|add\|login\|remove` | | Model-provider credentials, from stdin or a `0600` file, or OAuth device code (`login`). |
 | `mcp`, `toolsets` | | List, add/enable or remove/disable MCP servers and toolsets on this host. |
@@ -238,8 +238,7 @@ assets/           embedded Hermes hooks and plugins, A2A assets, notices
 - Host-side connector reference: [`docs/CONNECTOR.md`](docs/CONNECTOR.md)
 - A French version of this page: [`docs/README.fr.md`](docs/README.fr.md)
 
-`--ohb`, `--insecure-ohb` and the `/hermes-setup/` routes are technical
-identifiers kept for compatibility.
+The `/hermes-setup/` routes are technical identifiers kept for compatibility.
 
 ## Contributing and security
 

@@ -171,7 +171,7 @@ func TestMirrorDotEnvDeltaDoesNotOverwriteProfileOwnedKeys(t *testing.T) {
 	if err := os.WriteFile(path, []byte("ANTHROPIC_API_KEY=profile-own\nOPENAI_API_KEY=mirrored\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(profileDir, ".env.ohb-own"), []byte("# ohb:profile-own\nANTHROPIC_API_KEY\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(profileDir, ".env.openedbot-own"), []byte("# openedbot:profile-own\nANTHROPIC_API_KEY\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	before := map[string]string{"ANTHROPIC_API_KEY": "old-root", "OPENAI_API_KEY": "old-openai"}

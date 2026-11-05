@@ -15,7 +15,7 @@ the agent that call returns, the way Hermes itself clamps a delegated child
 off keeps it off, and Hermes still clamps the tier to what the route accepts
 (``effective_cache_ttl``). Without the hook, the key is ignored.
 
-Like ``ohb_backend_probe``, a gateway hook of the root home: loaded into the
+Like ``openedbot_backend_probe``, a gateway hook of the root home: loaded into the
 one gateway process that serves every profile, whatever a profile enables.
 """
 
@@ -23,7 +23,7 @@ import functools
 import logging
 import threading
 
-_log = logging.getLogger("ohb.prompt_cache_ttl")
+_log = logging.getLogger("openedbot.prompt_cache_ttl")
 _lock = threading.Lock()
 _installed = False
 

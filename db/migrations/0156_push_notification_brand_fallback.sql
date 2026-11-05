@@ -1,5 +1,5 @@
 -- A push notification whose bot has no readable name used to be titled
--- "OHB", the old internal name of the product. Same function as 0039, only
+-- "openedbot", the old internal name of the product. Same function as 0039, only
 -- the fallback title changes: "openedbot", the name the operator sees
 -- everywhere else.
 begin;

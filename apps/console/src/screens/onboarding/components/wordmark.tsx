@@ -10,7 +10,7 @@ import { cn } from "@openedbot/browser-ui-kit";
 export function Wordmark({ className }: { className?: string }) {
   return (
     <img
-      src="/brand/ohb-icon.webp"
+      src="/brand/openedbot-icon.webp"
       alt=""
       aria-hidden="true"
       className={cn("object-contain", className)}

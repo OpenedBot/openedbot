@@ -1,8 +1,8 @@
 /**
- * PERM2-7 (DEV-OHB-258): what the automatic reviewer is asked and how its
+ * PERM2-7: what the automatic reviewer is asked and how its
  * answer is read. Pure: no I/O.
  *
- * The reviewer runs on the tool-less `ohb-reviewer` profile (PERM2-7a) with
+ * The reviewer runs on the tool-less `openedbot-reviewer` profile (PERM2-7a) with
  * the bot's model. It sees the tool, the plugin descriptor and the goal of
  * the run, and the permission rules of the bot and its organization
  * (PERM2-6), all as quoted data, and answers one JSON object. Anything else

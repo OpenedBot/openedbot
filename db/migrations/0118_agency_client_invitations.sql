@@ -14,7 +14,7 @@ create unique index agency_client_invitations_pending_email
   on agency_client_invitations (agency_organization_id, email) where status = 'pending';
 alter table agency_client_invitations enable row level security;
 alter table agency_client_invitations force row level security;
-create policy agency_client_invitations_api on agency_client_invitations to ohb_api
+create policy agency_client_invitations_api on agency_client_invitations to openedbot_api
   using (
     agency_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or token_hash = nullif(current_setting('app.agency_invitation_hash', true), '')
@@ -22,7 +22,7 @@ create policy agency_client_invitations_api on agency_client_invitations to ohb_
     agency_organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or token_hash = nullif(current_setting('app.agency_invitation_hash', true), '')
   );
-grant select, insert, update on agency_client_invitations to ohb_api;
+grant select, insert, update on agency_client_invitations to openedbot_api;
 alter table email_outbox drop constraint if exists email_outbox_kind_check;
 alter table email_outbox add constraint email_outbox_kind_check check (kind in (
   'agency_client_invitation',

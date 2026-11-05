@@ -1,7 +1,7 @@
 import { asRecord } from "@openedbot/contracts-primitives";
 
 /**
- * OHB-75 : le strict nécessaire de l'API Tailscale v2 pour publier un gateway
+ * Le strict nécessaire de l'API Tailscale v2 pour publier un gateway
  * en Funnel : échange OAuth, fichier de politique (attribut `funnel` sur le
  * tag d'openedbot), clé d'appairage taguée, inventaire et retrait des machines.
  *
@@ -47,7 +47,7 @@ export type TailscaleCredentials = { clientId: string; clientSecret: string };
 
 const TAILSCALE_API_BASE = "https://api.tailscale.com/api/v2";
 /** Le tag que les machines openedbot portent ; c'est lui qui reçoit l'attribut `funnel`. */
-export const TAILSCALE_OHB_TAG = "tag:ohb-hermes";
+export const TAILSCALE_OPENEDBOT_TAG = "tag:openedbot-hermes";
 /** Suffixe de tout nom MagicDNS public. */
 export const TAILSCALE_SUFFIX = ".ts.net";
 const TIMEOUT_MS = 15_000;

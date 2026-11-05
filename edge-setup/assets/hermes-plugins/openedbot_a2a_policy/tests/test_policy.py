@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from ohb_a2a_policy.policy import append_policy_denial, make_pre_tool_call_guard
+from openedbot_a2a_policy.policy import append_policy_denial, make_pre_tool_call_guard
 
 
 class PolicyGuardTests(unittest.TestCase):

@@ -21,7 +21,7 @@ function runtimeLabel(runtime: RuntimePublicDto): string {
 
 /** A required update comes back each session, never more than once per session. */
 function outdatedDismissKey(runtimeId: string, target: string): string {
-  return `ohb:connector-update:outdated:${runtimeId}:${target}`;
+  return `openedbot:connector-update:outdated:${runtimeId}:${target}`;
 }
 
 function readSessionFlag(key: string): boolean {
@@ -232,7 +232,7 @@ function ConnectorUpToDateNotice({ runtimeName, version }: { runtimeName: string
     <aside
       data-slot="connector-up-to-date"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-0 z-[120] flex justify-center pt-[max(0.75rem,var(--ohb-safe-top))] pr-[max(1rem,var(--ohb-safe-right))] pl-[max(1rem,var(--ohb-safe-left))]"
+      className="pointer-events-none fixed inset-x-0 top-0 z-[120] flex justify-center pt-[max(0.75rem,var(--openedbot-safe-top))] pr-[max(1rem,var(--openedbot-safe-right))] pl-[max(1rem,var(--openedbot-safe-left))]"
     >
       <Alert
         variant="success"

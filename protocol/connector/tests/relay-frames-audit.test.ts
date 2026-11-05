@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { decodeTextFrame, encodeTextFrame, RelayFrameError } from "../src/index";
 
 /**
- * Les trames ajoutées par OHB-53 (audit scellé) et OHB-54 (preuve de
- * possession) : mêmes règles que `DecodeText` côté Go. Les vecteurs partagés
+ * Les trames de l'audit scellé et de la preuve de
+ * possession : mêmes règles que `DecodeText` côté Go. Les vecteurs partagés
  * `relay-frames.vectors.json` ne sont pas réécrits ici (ils sont la copie
  * octet pour octet du golden Go) ; ces cas vivent à côté.
  */

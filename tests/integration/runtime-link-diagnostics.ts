@@ -4,7 +4,7 @@ import { createLinkLivenessStore } from "../../modules/runtime-link/src/applicat
 import type { Db } from "../../platform/db/src/db";
 import type { RelayDiagnosticFrame } from "@openedbot/contracts-connector";
 
-await withDisposablePostgres("ohb50_diagnostics", async ({ owner: db }) => {
+await withDisposablePostgres("openedbot50_diagnostics", async ({ owner: db }) => {
 const organizationId = crypto.randomUUID();
 const otherOrganizationId = crypto.randomUUID();
 const runtimeId = crypto.randomUUID();
@@ -19,7 +19,7 @@ try {
         (${otherOrganizationId}, ${`diagnostic-${otherOrganizationId}`}, 'Other diagnostic fixture')`;
       await tx`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active)
         values (${runtimeId}, ${organizationId}, 'Diagnostic fixture', 'connector', 'diagnostic-fixture-hash', false)`;
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       const scopedDb = { begin: (callback: (transaction: Bun.TransactionSQL) => Promise<unknown>) => callback(tx) } as unknown as Db;
       const store = createLinkLivenessStore(scopedDb);
       const link = { runtimeId, organizationId, tokenHash: 'diagnostic-fixture-hash', expiresAt: null };

@@ -48,8 +48,8 @@ async function readExport<T>(path: string): Promise<{ data: T; sha256: string }>
   const raw = await file.text();
   return { data: JSON.parse(raw) as T, sha256: createHash("sha256").update(raw).digest("hex") };
 }
-const artifacts = await mkdtemp(join(tmpdir(), "ohb-restart-continuity-"));
-const result: Record<string, unknown> = { passed: false, acceptanceComplete: false, startedAt: new Date().toISOString(), runtimeId, provider, model, artifacts, observationSeconds: seconds, evidenceKind: "real-runtime", plannedRealRuns: 2, remoteCreationCountVerified: false, browserReplayVerified: false, nonce, limitations: ["The sealed connector audit, decrypted and cross-checked by OHB, establishes creations dispatched through this connector in the owned profile; creations made outside that path are only covered by the runtime session reconciliation."] };
+const artifacts = await mkdtemp(join(tmpdir(), "openedbot-restart-continuity-"));
+const result: Record<string, unknown> = { passed: false, acceptanceComplete: false, startedAt: new Date().toISOString(), runtimeId, provider, model, artifacts, observationSeconds: seconds, evidenceKind: "real-runtime", plannedRealRuns: 2, remoteCreationCountVerified: false, browserReplayVerified: false, nonce, limitations: ["The sealed connector audit, decrypted and cross-checked by openedbot, establishes creations dispatched through this connector in the owned profile; creations made outside that path are only covered by the runtime session reconciliation."] };
 const secrets = [password, internalToken, metricsToken];
 const redact = (value: string) => secrets.reduce((text, secret) => text.replaceAll(secret, "[REDACTED]"), value);
 const assert: (condition: unknown, message: string) => asserts condition = (condition, message) => { if (!condition) throw new Error(message); };

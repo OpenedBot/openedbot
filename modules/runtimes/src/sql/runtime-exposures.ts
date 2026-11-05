@@ -2,7 +2,7 @@ import { isoOrNull } from "@openedbot/contracts-primitives";
 import type { RuntimeExposureDto, RuntimeExposureStatus, RuntimeExposureStoredKind, RuntimePublicDto } from "@openedbot/contracts-api";
 
 /**
- * OHB-75 : la table `runtime_direct_exposures` (0058), lue et écrite sous RLS.
+ * La table `runtime_direct_exposures` (0058), lue et écrite sous RLS.
  *
  * Partagé par les routes runtime (résumé joint au DTO public) et les routes
  * d'exposition (cycle de vie), qui ne s'importent pas l'une l'autre.
@@ -20,7 +20,7 @@ export type RuntimeExposureRow = {
   dnsRecordId: string | null;
   accessAppId: string | null;
   serviceTokenId: string | null;
-  /** OHB-75 : la clé d'appairage Tailscale à révoquer ; `null` hors Funnel. */
+  /** La clé d'appairage Tailscale à révoquer ; `null` hors Funnel. */
   tailscaleAuthKeyId: string | null;
   installTokenCiphertext: string | null;
   installTokenNonce: string | null;

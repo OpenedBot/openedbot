@@ -22,9 +22,9 @@ function fakeFetch(handler: (call: Call) => Response | Promise<Response>) {
   return { calls, fetchImpl };
 }
 
-const credentials = { clientId: "ohb-client-id", clientSecret: "ohb-client-secret" };
+const credentials = { clientId: "openedbot-client-id", clientSecret: "openedbot-client-secret" };
 
-describe("OHB-75 Tailscale API client", () => {
+describe("Tailscale API client", () => {
   test("échange le client OAuth une seule fois, porte le jeton, et ne le laisse fuir ni en URL ni en erreur", async () => {
     const { calls, fetchImpl } = fakeFetch((call) => {
       if (call.url.endsWith("/oauth/token")) return Response.json({ access_token: "tskey-access-1", expires_in: 3600 });
@@ -35,12 +35,12 @@ describe("OHB-75 Tailscale API client", () => {
     const client = createTailscaleApiClient(credentials, { fetch: fetchImpl });
 
     expect(await client.readPolicy()).toEqual({ policy: { acls: [] }, etag: "etag-7" });
-    expect(await client.createAuthKey({ tag: "tag:ohb-hermes", description: "d", expirySeconds: 60 })).toEqual({ id: "key-1", key: "tskey-auth-1" });
+    expect(await client.createAuthKey({ tag: "tag:openedbot-hermes", description: "d", expirySeconds: 60 })).toEqual({ id: "key-1", key: "tskey-auth-1" });
 
     // Un seul échange OAuth pour toute la passe, puis le jeton en en-tête.
     expect(calls.filter((call) => call.url.endsWith("/oauth/token"))).toHaveLength(1);
     expect(calls.slice(1).every((call) => call.authorization === "Bearer tskey-access-1")).toBe(true);
-    expect(calls.every((call) => !call.url.includes("ohb-client-secret"))).toBe(true);
+    expect(calls.every((call) => !call.url.includes("openedbot-client-secret"))).toBe(true);
     // Le fichier de politique est demandé en JSON : le HuJSON par défaut serait illisible.
     expect(calls[1]?.accept).toBe("application/json");
 
@@ -48,7 +48,7 @@ describe("OHB-75 Tailscale API client", () => {
     try { await client.listDevices(); } catch (error) { caught = error; }
     expect(caught).toBeInstanceOf(TailscaleApiError);
     expect((caught as TailscaleApiError).code).toBe("TAILSCALE_CREDENTIALS_REJECTED");
-    expect(String(caught)).not.toContain("ohb-client-secret");
+    expect(String(caught)).not.toContain("openedbot-client-secret");
     expect(String(caught)).not.toContain("forbidden");
   });
 
@@ -78,23 +78,23 @@ describe("OHB-75 Tailscale API client", () => {
   });
 });
 
-describe("OHB-75 politique Funnel", () => {
+describe("politique Funnel", () => {
   test("ajoute le tag et l’attribut funnel une seule fois, sans toucher au reste", () => {
-    const first = policyWithFunnelTag({ acls: [{ action: "accept" }], tagOwners: { "tag:autre": ["autogroup:admin"] } }, "tag:ohb-hermes");
+    const first = policyWithFunnelTag({ acls: [{ action: "accept" }], tagOwners: { "tag:autre": ["autogroup:admin"] } }, "tag:openedbot-hermes");
     expect(first.changed).toBe(true);
     expect(first.policy).toEqual({
       acls: [{ action: "accept" }],
-      tagOwners: { "tag:autre": ["autogroup:admin"], "tag:ohb-hermes": ["autogroup:admin"] },
-      nodeAttrs: [{ target: ["tag:ohb-hermes"], attr: ["funnel"] }],
+      tagOwners: { "tag:autre": ["autogroup:admin"], "tag:openedbot-hermes": ["autogroup:admin"] },
+      nodeAttrs: [{ target: ["tag:openedbot-hermes"], attr: ["funnel"] }],
     });
     // Rejouer ne réécrit rien : le fichier d'un client ne bouge que si nécessaire.
-    expect(policyWithFunnelTag(first.policy, "tag:ohb-hermes").changed).toBe(false);
+    expect(policyWithFunnelTag(first.policy, "tag:openedbot-hermes").changed).toBe(false);
   });
 
   test("respecte la casse déjà présente dans le fichier", () => {
-    const revised = policyWithFunnelTag({ TagOwners: {}, NodeAttrs: [] }, "tag:ohb-hermes");
+    const revised = policyWithFunnelTag({ TagOwners: {}, NodeAttrs: [] }, "tag:openedbot-hermes");
     expect(Object.keys(revised.policy).sort()).toEqual(["NodeAttrs", "TagOwners"]);
-    expect(revised.policy.TagOwners).toEqual({ "tag:ohb-hermes": ["autogroup:admin"] });
+    expect(revised.policy.TagOwners).toEqual({ "tag:openedbot-hermes": ["autogroup:admin"] });
   });
 
   test("le domaine du tailnet se lit sur une machine connectée, et nulle part ailleurs", () => {

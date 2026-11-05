@@ -31,7 +31,7 @@ export type RuntimeLinkDto = {
   /** Cette origine n'est plus parmi celles que ce déploiement accepte. */
   originRetired: boolean;
   /**
-   * `edge-setup link --ohb <origine actuelle> --yes`, seulement quand
+   * `edge-setup link --openedbot <origine actuelle> --yes`, seulement quand
    * `originRetired` : sans ticket, la commande seule ne suffit pas.
    */
   relinkCommand: string | null;

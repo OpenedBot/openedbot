@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-A (DEV-OHB-250): the identity of a Hermes gate, read by the worker on
+-- PERM2-A: the identity of a Hermes gate, read by the worker on
 -- the raw `approval.request` event (`modules/execution/src/domain/gate-identity.ts`).
 -- `hermes_request_id` is the gate Hermes resolves when the answer carries it,
 -- instead of the oldest pending one. `gate_kind` says what the gate is; a row

@@ -57,7 +57,7 @@ export type CreateHermesRunInput = {
   reasoningEffort?: string | null;
   /**
    * The prompt-cache tier of this run (`model_options.prompt_cache_ttl`,
-   * honoured by the edge-setup hook `ohb_prompt_cache_ttl`). Absent: the
+   * honoured by the edge-setup hook `openedbot_prompt_cache_ttl`). Absent: the
    * runtime's configured tier. A host without the hook ignores the key.
    */
   promptCacheTtl?: HermesPromptCacheTtl | null;
@@ -300,7 +300,7 @@ export type HermesToolsetAvailability = {
  * installe les SDK à la demande et edge-setup coupe cette installation : un
  * fournisseur connecté dont le SDK manque échoue à chaque run.
  */
-/** `installable`: `edge-setup up` installs this SDK; otherwise no OHB-supported install provides it. */
+/** `installable`: `edge-setup up` installs this SDK; otherwise no openedbot-supported install provides it. */
 export type HermesProviderSdk = { provider: string; label: string; extra: string; installed: boolean; installable: boolean };
 
 export type HermesProfileModel = {

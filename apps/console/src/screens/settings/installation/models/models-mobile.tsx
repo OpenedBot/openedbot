@@ -264,7 +264,7 @@ export function ModelsMobile({
       </InsetGroupedSection>
 
       {modelSelection ? (
-        <div className="mx-4 rounded-[20px] bg-[var(--ohb-grouped-card)] px-4 py-3">
+        <div className="mx-4 rounded-[20px] bg-[var(--openedbot-grouped-card)] px-4 py-3">
           <ModelSelectionProgress
             selection={modelSelection}
             busy={selectionBusy}
@@ -277,7 +277,7 @@ export function ModelsMobile({
       {rosterError ? (
         <Note tone="danger" role="alert">{t("modelsSettings.perBotRosterFailed")}</Note>
       ) : rosterPending ? null : bots.length === 0 ? (
-        <p className="px-8 pt-4 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+        <p className="px-8 pt-4 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
           {t("modelsSettings.perBotEmpty")}
         </p>
       ) : (
@@ -415,14 +415,14 @@ function BotModelRow({ bot, onOpen }: { bot: BotDto; onOpen: () => void }) {
       >
         <BotFace name={bot.name} seed={bot.id} face={bot.face} className="size-7 shrink-0" />
         <span className="min-w-0 flex-1 py-2.5">
-          <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+          <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
             {bot.name}
           </span>
-          <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {bot.model ?? t("modelsSettings.mobileFollowsGlobal")}
           </span>
         </span>
-        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--ohb-grouped-chevron)]" />
+        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--openedbot-grouped-chevron)]" />
       </button>
     </li>
   );
@@ -628,10 +628,10 @@ function MobileProvidersSheet({
           )}
         />
         <span className="min-w-0 flex-1 py-2.5">
-          <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+          <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
             {provider.name}
           </span>
-          <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {provider.slug}
             {provider.models.length > 0
               ? ` · ${t("modelsSettings.modelCount", { count: formatNumber(provider.models.length) })}`
@@ -640,7 +640,7 @@ function MobileProvidersSheet({
         </span>
         {provider.isCurrent ? <ToneBadge tone="success">{t("modelsSettings.active")}</ToneBadge> : null}
         {provider.sdkInstalled === false ? <ToneBadge tone="warning">{t("modelsSettings.sdkMissing")}</ToneBadge> : null}
-        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--ohb-grouped-chevron)]" />
+        <IconChevronRight aria-hidden className="size-5 shrink-0 text-[var(--openedbot-grouped-chevron)]" />
       </button>
     </li>
   );
@@ -656,13 +656,13 @@ function MobileProvidersSheet({
         })}
         closeLabel={t("modelsSettings.close")}
         bodyClassName="px-0 py-0"
-        className="h-[calc(100dvh-var(--ohb-safe-top)-2.5rem)]"
+        className="h-[calc(100dvh-var(--openedbot-safe-top)-2.5rem)]"
       >
-        <div className="sticky top-0 z-10 bg-[var(--ohb-grouped-canvas)] px-4 pb-2">
+        <div className="sticky top-0 z-10 bg-[var(--openedbot-grouped-canvas)] px-4 pb-2">
           <div className="relative">
             <IconSearch
               aria-hidden
-              className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--ohb-grouped-caption)]"
+              className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-[var(--openedbot-grouped-caption)]"
             />
             <Input
               type="search"
@@ -677,7 +677,7 @@ function MobileProvidersSheet({
           </div>
         </div>
         {matching.length === 0 ? (
-          <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--ohb-grouped-caption)]">
+          <p className="px-8 pt-6 text-[15px] leading-5 text-[var(--openedbot-grouped-caption)]">
             {t("modelsSettings.providerSearchEmpty")}
           </p>
         ) : (

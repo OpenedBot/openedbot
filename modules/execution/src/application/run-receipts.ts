@@ -106,7 +106,7 @@ async function flushRunJournalTx(tx: SQL, inputs: ReceiptInput[], events: RunJou
       order by id for key share`;
   }
   for (const [organizationId] of batches) {
-    await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('ohb-run-events-cursor'))`;
+    await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-run-events-cursor'))`;
   }
   for (const [organizationId, rows] of batches) {
     for (const row of rows) {

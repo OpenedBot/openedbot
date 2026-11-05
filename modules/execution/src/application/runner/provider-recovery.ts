@@ -408,7 +408,7 @@ export async function resolveSelectionForNewRun(
   db: SQL,
   client: HermesClient,
   context: RunContext,
-  /** The same catalogue read, already started with the preflight inventory (OHB-137). */
+  /** The same catalogue read, already started with the preflight inventory. */
   prefetchedCatalog: Promise<HermesModelOptions | null> | null = null,
   /** Present only for a new run. A stable resolution is remembered for the warm path. */
   warmKey: string | null = null,

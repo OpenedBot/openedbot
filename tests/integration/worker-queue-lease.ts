@@ -16,13 +16,13 @@ const config = (workerId: string) => ({ workerId, leaseSeconds: 30, billingEnfor
 
 type RunRow = { status: string; leaseOwner: string | null; attempts: number; leaseGeneration: string; errorCode: string | null; externalState: string };
 
-await withDisposablePostgres("ohb140_lease", async ({ owner, connect }) => {
-  await owner`insert into organizations (id, slug, name) values (${ORG}, 'ohb140', 'Queue lease')`;
+await withDisposablePostgres("openedbot140_lease", async ({ owner, connect }) => {
+  await owner`insert into organizations (id, slug, name) values (${ORG}, 'openedbot140', 'Queue lease')`;
   await owner`insert into sections (id, organization_id, name, position) values (${id(4)}, ${ORG}, 'Queue', 0)`;
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${BOT}, ${ORG}, ${id(4)}, 'Queue', 'queue', 0)`;
   for (const [index, thread] of THREADS.entries()) {
     await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-      values (${thread}, ${ORG}, ${BOT}, 'Queue', ${`ohb140-fixture-session-${index}`}, ${index === 0})`;
+      values (${thread}, ${ORG}, ${BOT}, 'Queue', ${`openedbot140-fixture-session-${index}`}, ${index === 0})`;
   }
   const linkHash = new Bun.CryptoHasher("sha256").update(crypto.randomUUID()).digest("hex");
   await owner`insert into runtimes (id, organization_id, name, reachability, is_active, capacity, link_last_seen_at, link_token_hash)
@@ -35,8 +35,8 @@ await withDisposablePostgres("ohb140_lease", async ({ owner, connect }) => {
   };
   const insert = (run: string, thread: string) =>
     owner`insert into runs (id, organization_id, thread_id, bot_id, input) values (${run}, ${ORG}, ${thread}, ${BOT}, 'fixture')`;
-  const workerA = await connect("ohb_worker");
-  const workerB = await connect("ohb_worker");
+  const workerA = await connect("openedbot_worker");
+  const workerB = await connect("openedbot_worker");
 
   // 1. One claim per run, one active run per thread.
   await insert(id(10), THREADS[0]!);
@@ -90,7 +90,7 @@ await withDisposablePostgres("ohb140_lease", async ({ owner, connect }) => {
   const CLONING = id(6);
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${CLONING}, ${ORG}, ${id(4)}, 'Cloning', 'cloning', 1)`;
   await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-    values (${id(104)}, ${ORG}, ${CLONING}, 'Cloning', 'ohb140-fixture-session-cloning', true)`;
+    values (${id(104)}, ${ORG}, ${CLONING}, 'Cloning', 'openedbot140-fixture-session-cloning', true)`;
   await owner`insert into bot_profile_provisions (bot_id, organization_id, runtime_id, slug, display_name, status)
     values (${CLONING}, ${ORG}, ${id(5)}, 'cloning', 'Cloning', 'running')`;
   await owner`insert into runs (id, organization_id, thread_id, bot_id, input) values (${id(30)}, ${ORG}, ${id(104)}, ${CLONING}, 'operator answer')`;

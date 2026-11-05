@@ -55,15 +55,15 @@ const session = {
 describe("HermesClient: routes fournisseur par le lien", () => {
   test("providerCredentialAdd : POST …/credentials, corps {apiKey,label}, mutation, verdict de l'hôte", async () => {
     const { client, sent } = fakeTransport(() =>
-      Response.json({ provider: "anthropic", label: "ohb-1", verification: "confirmed", detail: null }));
-    const result = await client.providerCredentialAdd("anthropic", "sk-ant-secret", "ohb-1");
+      Response.json({ provider: "anthropic", label: "openedbot-1", verification: "confirmed", detail: null }));
+    const result = await client.providerCredentialAdd("anthropic", "sk-ant-secret", "openedbot-1");
     expect(sent).toHaveLength(1);
     expect(sent[0]!.path).toBe("/hermes-setup/providers/anthropic/credentials");
     expect(sent[0]!.method).toBe("POST");
     expect(sent[0]!.kind).toBe("mutation");
     expect(sent[0]!.headers["content-type"]).toBe("application/json");
-    expect(JSON.parse(sent[0]!.body!)).toEqual({ apiKey: "sk-ant-secret", label: "ohb-1" });
-    expect(result).toEqual({ provider: "anthropic", label: "ohb-1", verification: "confirmed", detail: null });
+    expect(JSON.parse(sent[0]!.body!)).toEqual({ apiKey: "sk-ant-secret", label: "openedbot-1" });
+    expect(result).toEqual({ provider: "anthropic", label: "openedbot-1", verification: "confirmed", detail: null });
   });
 
   test("providerCredentialAdd : sans label, le corps ne porte que la clé ; le slug est encodé", async () => {

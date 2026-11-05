@@ -8,7 +8,7 @@ import { useT } from "../lib/i18n";
  * The silhouette of a thread while it loads, drawn on the grok thread's
  * geometry (thread-messages.tsx, thread-theme.css) so the messages land in
  * the announced shape without a jump, like the boot silhouette of
- * `index.html` (`#ohb-boot .thread`):
+ * `index.html` (`#openedbot-boot .thread`):
  *
  * - the reading lane (`data-thread-messages`, 44rem, thread-timeline.css);
  * - the operator's turn is a 36 px bubble on the right (radius 18), the
@@ -87,7 +87,7 @@ export function ThreadSkeleton() {
  */
 function ComposerSkeleton() {
   return (
-    <div data-thread-composer="" className="shrink-0 px-4 pt-2 pb-[max(1rem,var(--ohb-safe-bottom))] sm:pb-5">
+    <div data-thread-composer="" className="shrink-0 px-4 pt-2 pb-[max(1rem,var(--openedbot-safe-bottom))] sm:pb-5">
       <div className="relative w-full">
         <div
           data-composer-shell=""

@@ -47,7 +47,7 @@ const greetingSeenAt = new Map<string, number>();
  * première fois que ce client le voit en cours (le fil arrive à ce moment-là),
  * ou, rechargé une fois fini, de son démarrage réel. Pas du `startedAt` du
  * cache en direct : il est posé à la RÉCEPTION du premier événement et
- * ferait repartir le chrono à zéro quand le texte arrive (DEV-OHB-245).
+ * ferait repartir le chrono à zéro quand le texte arrive.
  */
 export function runClockStart(run: ClockedRun): number {
   const created = run.createdAt ? at(run.createdAt) : Number.NaN;

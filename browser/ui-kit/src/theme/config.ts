@@ -53,7 +53,7 @@ export const DEFAULT_THEME: Theme = { mode: DEFAULT_MODE, accent: DEFAULT_ACCENT
  * is a static bundle, so `localStorage` is both the only channel available
  * and the one the head script can read synchronously.
  */
-export const THEME_STORAGE_KEY = "ohb:theme"
+export const THEME_STORAGE_KEY = "openedbot:theme"
 
 /** Set on <html> so the head script knows whether it must consult the OS. */
 export const THEME_MODE_ATTR = "data-theme-mode"

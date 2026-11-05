@@ -197,7 +197,7 @@ describe("authMiddleware : rafraîchissement de last_seen_at", () => {
   test("émet l'update last_seen_at avec le garde interval '60 seconds'", async () => {
     const calls: string[] = [];
     const response = await mount(fakeDb({ calls })).request("/whoami", {
-      headers: { Cookie: "ohb_session=some-session-token" },
+      headers: { Cookie: "openedbot_session=some-session-token" },
     });
     expect(response.status).toBe(200);
     const refreshCall = calls.find((sql) => sql.includes("update sessions set last_seen_at = now()"));
@@ -208,7 +208,7 @@ describe("authMiddleware : rafraîchissement de last_seen_at", () => {
   test("session inconnue : pas de refus caché, 401 SESSION_EXPIRED", async () => {
     const calls: string[] = [];
     const response = await mount(fakeDb({ calls, sessionRow: null })).request("/whoami", {
-      headers: { Cookie: "ohb_session=unknown-token" },
+      headers: { Cookie: "openedbot_session=unknown-token" },
     });
     expect(response.status).toBe(401);
   });
@@ -227,7 +227,7 @@ describe("authMiddleware : rafraîchissement de last_seen_at", () => {
       },
     })).request("/mutate", {
       method: "POST",
-      headers: { Cookie: "ohb_session=session-token", "X-CSRF-Token": "csrf-token" },
+      headers: { Cookie: "openedbot_session=session-token", "X-CSRF-Token": "csrf-token" },
     });
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: { code: "IMPERSONATION_READ_ONLY" } });
@@ -247,7 +247,7 @@ describe("authMiddleware : rafraîchissement de last_seen_at", () => {
       },
     })).request("/api/auth/logout", {
       method: "POST",
-      headers: { Cookie: "ohb_session=session-token", "X-CSRF-Token": "csrf-token" },
+      headers: { Cookie: "openedbot_session=session-token", "X-CSRF-Token": "csrf-token" },
     });
     expect(response.status).toBe(204);
   });

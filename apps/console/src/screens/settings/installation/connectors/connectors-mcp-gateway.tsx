@@ -185,7 +185,7 @@ export function GatewayRestartCard({
                       ? "text-destructive-text"
                       : current.status === "ok"
                         ? "text-pos-700"
-                        : "text-[var(--ohb-grouped-caption)]",
+                        : "text-[var(--openedbot-grouped-caption)]",
                   )}
                   role={current.status === "failed" ? "alert" : "status"}
                 >

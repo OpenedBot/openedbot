@@ -10,11 +10,11 @@ const at = (iso: string) => new Date(iso);
 
 describe("session Hermes d'un fil par génération (0163)", () => {
   test("la génération 0 garde la clé d'origine, les suivantes la suffixent", () => {
-    expect(threadSessionKey("ohb:o:t", 0)).toBe("ohb:o:t");
-    expect(threadSessionKey("ohb:o:t", 3)).toBe("ohb:o:t:gen3");
-    expect(threadSessionKeys("ohb:o:t", 2)).toEqual(["ohb:o:t", "ohb:o:t:gen1", "ohb:o:t:gen2"]);
-    expect(threadSessionKeys("ohb:o:t", -1)).toEqual(["ohb:o:t"]);
-    expect(threadSessionKeys("ohb:o:t", Number.NaN)).toEqual(["ohb:o:t"]);
+    expect(threadSessionKey("openedbot:o:t", 0)).toBe("openedbot:o:t");
+    expect(threadSessionKey("openedbot:o:t", 3)).toBe("openedbot:o:t:gen3");
+    expect(threadSessionKeys("openedbot:o:t", 2)).toEqual(["openedbot:o:t", "openedbot:o:t:gen1", "openedbot:o:t:gen2"]);
+    expect(threadSessionKeys("openedbot:o:t", -1)).toEqual(["openedbot:o:t"]);
+    expect(threadSessionKeys("openedbot:o:t", Number.NaN)).toEqual(["openedbot:o:t"]);
   });
 
   test("périmée seulement quand une capacité a changé APRÈS l'ouverture de la session", () => {

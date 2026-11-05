@@ -24,7 +24,7 @@ import (
 // (compaction, auxiliary calls, delegated children) the 5m tier: a fixed
 // "1h" would bill those twice for a prefix nobody reads again. A run that
 // openedbot knows to be machine-paced (a routine, a delegated step, a
-// greeting) asks for 5m itself (hook ohb_prompt_cache_ttl).
+// greeting) asks for 5m itself (hook openedbot_prompt_cache_ttl).
 const ManagedConfig = `# Written by edge-setup: Hermes managed scope, merged over every profile.
 # Edits here are replaced on the next "edge-setup up" or "upgrade".
 prompt_caching:

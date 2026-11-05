@@ -24,7 +24,7 @@ function href(input: RequestInfo | URL): string {
 const PROVIDERS_DEV: AuthProvidersDto = {
   google: { enabled: false, reason: "not_configured" },
   password: { enabled: true },
-  devSignIn: { email: "dev@ohb.local", password: "secret" },
+  devSignIn: { email: "dev@openedbot.local", password: "secret" },
 };
 
 const PROVIDERS_PROD: AuthProvidersDto = {
@@ -86,7 +86,7 @@ function renderTools() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {
@@ -143,7 +143,7 @@ describe("DevOnboardingTools", () => {
     const calls: string[] = [];
     const bodies: string[] = [];
     stubFetch(PROVIDERS_DEV, calls, bodies);
-    window.localStorage.setItem("ohb:onboarding-draft", "stale draft");
+    window.localStorage.setItem("openedbot:onboarding-draft", "stale draft");
     const router = renderTools();
     fireEvent.click(await screen.findByRole("button", { name: "Repartir de zéro (dev)" }));
     fireEvent.click(await screen.findByRole("button", { name: "Vider et repartir de zéro" }));
@@ -151,7 +151,7 @@ describe("DevOnboardingTools", () => {
       expect(calls).toContain("POST /api/onboarding/reset");
     });
     expect(bodies.map((body) => JSON.parse(body))).toContainEqual({ scope: "full" });
-    expect(window.localStorage.getItem("ohb:onboarding-draft")).toBeNull();
+    expect(window.localStorage.getItem("openedbot:onboarding-draft")).toBeNull();
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/onboarding");
     });

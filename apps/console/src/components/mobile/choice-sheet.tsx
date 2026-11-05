@@ -95,11 +95,11 @@ export function MobileChoiceSheet<T extends string>({
                   data-inset-grouped-row=""
                 >
                   <span className="min-w-0 flex-1 py-3">
-                    <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]">
+                    <span className="block truncate text-left text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]">
                       {option.label}
                     </span>
                     {option.detail ? (
-                      <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+                      <span className="mt-0.5 block truncate text-left text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
                         {option.detail}
                       </span>
                     ) : null}
@@ -110,7 +110,7 @@ export function MobileChoiceSheet<T extends string>({
                   {option.id === value ? (
                     <IconCheck
                       aria-hidden
-                      className="size-5 shrink-0 text-[var(--ohb-grouped-back)]"
+                      className="size-5 shrink-0 text-[var(--openedbot-grouped-back)]"
                       stroke={2.25}
                     />
                   ) : null}

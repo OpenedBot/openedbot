@@ -144,8 +144,7 @@ tests/            bun tests
 
 The published site: <https://docs.openedbot.app>.
 
-`--ohb` and the `/hermes-setup/` routes quoted in the pages are technical identifiers kept for
-compatibility.
+The `/hermes-setup/` routes quoted in the pages are technical identifiers kept for compatibility.
 
 ## License
 

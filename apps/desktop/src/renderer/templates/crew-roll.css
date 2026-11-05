@@ -111,7 +111,7 @@ body {
 .d8 { --size: 34px; order: 3; z-index: 1; background-image: url("../assets/bots/firefly.webp"); --from: -150px; }
 
 /* The mascot leads the crew: larger, on the same deep disc, with a thin
-   ohb-blue ring as the page's one accent outside the buttons. */
+   openedbot-blue ring as the page's one accent outside the buttons. */
 .art-mascot {
   position: relative;
   z-index: 5;

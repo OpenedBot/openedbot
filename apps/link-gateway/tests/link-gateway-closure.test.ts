@@ -51,9 +51,6 @@ const ALLOWED_PLATFORM = [
   "platform/config/src/deploy-environment.ts",
   "platform/config/src/hermes-timeouts.ts",
   "platform/config/src/http-body.ts",
-  // Side-effect import first in main.ts: refuses a retired OHB_* variable.
-  "platform/config/src/legacy-env-guard.ts",
-  "platform/config/src/legacy-env.ts",
   "platform/config/src/rate-limit.ts",
   "platform/config/src/runtime-mode.ts",
   "platform/config/src/sse-heartbeat.ts",
@@ -154,12 +151,12 @@ describe("import scan", () => {
   test("follows side-effect imports, and still skips type-only ones", () => {
     const source = [
       'import "../../api/src/index";',
-      'import "@openedbot/platform-config/legacy-env-guard"; // first',
+      'import "./side-effect"; // first',
       'import type { A } from "./a";',
       'import { type B } from "./b";',
       'import { c } from "./c";',
     ].join("\n");
-    expect(runtimeSpecifiers(source).sort()).toEqual(["../../api/src/index", "./c", "@openedbot/platform-config/legacy-env-guard"]);
+    expect(runtimeSpecifiers(source).sort()).toEqual(["../../api/src/index", "./c", "./side-effect"]);
   });
 });
 

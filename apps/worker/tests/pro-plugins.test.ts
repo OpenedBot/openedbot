@@ -18,7 +18,7 @@ function roleDb(queries: string[], facts: { superuser?: boolean } = {}) {
   const tag = async (strings: TemplateStringsArray) => {
     const sql = strings.join("?");
     queries.push(sql);
-    if (sql.includes("pg_roles")) return [{ role: "ohb_worker", superuser: facts.superuser ?? false, bypassRls: false, ownsTables: false, current: true }];
+    if (sql.includes("pg_roles")) return [{ role: "openedbot_worker", superuser: facts.superuser ?? false, bypassRls: false, ownsTables: false, current: true }];
     return [];
   };
   return tag as unknown as Db;

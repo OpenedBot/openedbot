@@ -145,15 +145,15 @@ function eventBody(frame: SseFrame): Record<string, unknown> {
 }
 
 async function main(): Promise<void> {
-  await withDisposablePostgres("ohb115_stream", async ({ owner, connect }) => {
+  await withDisposablePostgres("openedbot115_stream", async ({ owner, connect }) => {
     const organizationId = crypto.randomUUID();
     const otherOrganizationId = crypto.randomUUID();
     const sectionId = crypto.randomUUID();
     const botId = crypto.randomUUID();
     const threadId = crypto.randomUUID();
     const runId = crypto.randomUUID();
-    const workerId = `ohb115-${crypto.randomUUID()}`;
-    const sessionId = `ohb115-session-${crypto.randomUUID()}`;
+    const workerId = `openedbot115-${crypto.randomUUID()}`;
+    const sessionId = `openedbot115-session-${crypto.randomUUID()}`;
     const leaseGeneration = 4;
 
     await owner`insert into organizations (id, slug, name)
@@ -173,8 +173,8 @@ async function main(): Promise<void> {
       ${workerId}, now() + interval '2 minutes', ${leaseGeneration}, 'streaming', 0, 'root', ${sessionId}
     )`;
 
-    const apiDb = await connect("ohb_api");
-    const workerDb = await connect("ohb_worker");
+    const apiDb = await connect("openedbot_api");
+    const workerDb = await connect("openedbot_worker");
     await workerDb`select set_config('app.organization_id', ${organizationId}, false)`;
 
     const hub = new EventHub();
@@ -290,7 +290,7 @@ async function main(): Promise<void> {
 
       const cursor1 = Number(durableRows[0]!.cursor);
       const cursor2 = Number(durableRows[1]!.cursor);
-      // DEV-OHB-112: the connection that already carried both frames live
+      // The connection that already carried both frames live
       // receives their commit as a cursor advance, never a second copy.
       const cursorFrames = await Promise.all([
         within(nextSseFrame(stream), "first durable cursor"),

@@ -13,7 +13,7 @@ export function ComposerReplyTab({ preview, onCancel }: { preview: { author: str
   return (
     <div
       data-composer-reply=""
-      className="ohb-fade-up mx-4 -mb-3 flex min-w-0 items-start gap-2 rounded-t-2xl border border-b-0 border-s-2 border-composer-edge border-s-[color:var(--bot-tint,var(--color-composer-edge-hover))] bg-background-secondary-default px-3 pt-2 pb-5 text-xs leading-5 text-text-secondary shadow-xs dark:bg-background-tertiary-default"
+      className="openedbot-fade-up mx-4 -mb-3 flex min-w-0 items-start gap-2 rounded-t-2xl border border-b-0 border-s-2 border-composer-edge border-s-[color:var(--bot-tint,var(--color-composer-edge-hover))] bg-background-secondary-default px-3 pt-2 pb-5 text-xs leading-5 text-text-secondary shadow-xs dark:bg-background-tertiary-default"
     >
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-text-primary">{t("composer.replyingTo", { name: preview.author })}</p>

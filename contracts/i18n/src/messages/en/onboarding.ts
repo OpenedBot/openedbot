@@ -4,9 +4,9 @@ export const tailscaleGuide = {
   title: "Create the OAuth client for openedbot",
   openPolicy: "Open the policy file",
   openCredentials: "Open Trust credentials",
-  step1: "In Access controls, open the policy file and declare openedbot’s tag if it is missing: under tagOwners, add \"tag:ohb-hermes\": [\"autogroup:admin\"], then save. Tailscale requires the tag to exist before an OAuth client can carry it.",
+  step1: "In Access controls, open the policy file and declare openedbot’s tag if it is missing: under tagOwners, add \"tag:openedbot-hermes\": [\"autogroup:admin\"], then save. Tailscale requires the tag to exist before an OAuth client can carry it.",
   scopesIntro: "In Settings → Trust credentials → OAuth clients, click Generate OAuth client, name it openedbot publication, then tick these scopes:",
-  step2: "In the client’s Tags field, select tag:ohb-hermes. Without that tag, Tailscale will refuse the auth key openedbot has to create.",
+  step2: "In the client’s Tags field, select tag:openedbot-hermes. Without that tag, Tailscale will refuse the auth key openedbot has to create.",
   step3: "Click Generate client. Immediately copy the Client ID and the Client Secret, shown only once, paste them below, then click Publish.",
   scope: "This client lets openedbot set the funnel attribute on its tag and create one auth key. openedbot does not keep it: revoke it once publishing is done.",
   docs: "Tailscale documentation",
@@ -31,7 +31,7 @@ export const onboarding = {
   },
   // ── Welcome ──
   welcome: {
-    wordmark: "Welcome to ohb",
+    wordmark: "Welcome to openedbot",
     headline_line1: "Your AI teammates,",
     headline_line2: "in",
     headline_emphasis: "one workspace.",

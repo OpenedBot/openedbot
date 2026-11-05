@@ -99,7 +99,7 @@ function setViewportWidth(width: number) {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   setViewportWidth(1280);
 });
 

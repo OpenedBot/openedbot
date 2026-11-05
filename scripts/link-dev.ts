@@ -106,7 +106,7 @@ async function run(argv: string[]): Promise<string> {
 async function stalenessHints(mode: "embedded" | "separate"): Promise<string[]> {
   if (mode !== "separate") return [];
   try {
-    const monotonicUs = Number(await run(["systemctl", "--user", "show", "-p", "ExecMainStartTimestampMonotonic", "--value", "ohb-runtime-link-gateway"]));
+    const monotonicUs = Number(await run(["systemctl", "--user", "show", "-p", "ExecMainStartTimestampMonotonic", "--value", "openedbot-runtime-link-gateway"]));
     const uptimeS = Number((await Bun.file("/proc/uptime").text()).split(" ")[0]);
     if (!Number.isFinite(monotonicUs) || monotonicUs <= 0 || !Number.isFinite(uptimeS)) return [];
     const gatewayStartedAtMs = Date.now() - (uptimeS - monotonicUs / 1_000_000) * 1_000;

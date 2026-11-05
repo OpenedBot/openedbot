@@ -4,7 +4,7 @@
  * masked tail followed by a solid caret, so the text resolves out of a blur
  * as it moves out of the tail. `ThreadMarkdown` applies it to the LAST block
  * of a streaming text only; settled blocks and finished answers never carry
- * it. Styles: `.ohb-stream-tail`, `.ohb-stream-caret` (thread-timeline.css).
+ * it. Styles: `.openedbot-stream-tail`, `.openedbot-stream-caret` (thread-timeline.css).
  *
  * Code (`pre`, `code`) and math are never split: Shiki and KaTeX own them.
  * When the stream is writing one (it is the last thing in the tree), there
@@ -89,7 +89,7 @@ export function rehypeStreamTail() {
     const caret: HastElement = {
       type: "element",
       tagName: "span",
-      properties: { className: ["ohb-stream-caret"], ariaHidden: "true", dataTick: String(caretTick) },
+      properties: { className: ["openedbot-stream-caret"], ariaHidden: "true", dataTick: String(caretTick) },
       children: [],
     };
     const found = streamingText(tree);
@@ -107,7 +107,7 @@ export function rehypeStreamTail() {
       {
         type: "element",
         tagName: "span",
-        properties: { className: ["ohb-stream-tail"] },
+        properties: { className: ["openedbot-stream-tail"] },
         children: [{ type: "text", value: chars.slice(split).join("") }],
       },
       caret,
@@ -117,7 +117,7 @@ export function rehypeStreamTail() {
 
 /**
  * Block-level reveal: every top-level element (every item of a list) of a block that was mounted
- * while the answer streams gets `ohb-reveal` (blur-in, thread-timeline.css).
+ * while the answer streams gets `openedbot-reveal` (blur-in, thread-timeline.css).
  * It adds a class and nothing else, so the DOM stays the one a single
  * Markdown render would give.
  */
@@ -126,7 +126,7 @@ export function rehypeReveal() {
     const existing = element.properties?.className;
     element.properties = {
       ...element.properties,
-      className: [...(Array.isArray(existing) ? existing : []), "ohb-reveal"],
+      className: [...(Array.isArray(existing) ? existing : []), "openedbot-reveal"],
     };
   };
   return (tree: HastRoot) => {
@@ -169,7 +169,7 @@ function wrapWords(parent: { children: HastNode[] }): void {
  * word still being written keeps its span as it grows: it never replays.
  *
  * Code and math are never split (Shiki and KaTeX own them): a top-level one
- * born in the stream blurs in as a whole (`ohb-reveal`), once.
+ * born in the stream blurs in as a whole (`openedbot-reveal`), once.
  */
 export function rehypeStreamWords() {
   return (tree: HastRoot) => {
@@ -178,7 +178,7 @@ export function rehypeStreamWords() {
         const existing = child.properties?.className;
         child.properties = {
           ...child.properties,
-          className: [...(Array.isArray(existing) ? existing : []), "ohb-reveal"],
+          className: [...(Array.isArray(existing) ? existing : []), "openedbot-reveal"],
         };
       }
     }

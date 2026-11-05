@@ -86,7 +86,7 @@ export const runtimeApi = {
   updateRuntimeAccess: (runtimeId: string, input: RuntimeDirectAccessUpdateInput) =>
     request<RuntimePublicDto>(`/api/runtime/${runtimeId}/access`, { method: "PUT", body: JSON.stringify(input) }),
   /**
-   * OHB-75 : publie un gateway (Cloudflare provisionné, tunnel géré, Funnel).
+   * Publie un gateway (Cloudflare provisionné, tunnel géré, Funnel).
    * La commande d'installation revient UNE fois : l'écran l'affiche puis l'oublie.
    */
   createRuntimeExposure: (input: RuntimeExposureCreateInput) =>

@@ -9,7 +9,7 @@ import type { Plugin } from "vite";
  * desktop, sans liste d'empreintes à recopier dans trois serveurs.
  *
  * Pourquoi elle compte : dans l'app desktop, tout script de la page atteint
- * `window.__OHB_NATIVE__.readAccessToken()`. Une injection de script vaudrait
+ * `window.__OPENEDBOT_NATIVE__.readAccessToken()`. Une injection de script vaudrait
  * vol de session ; `script-src` n'admet que les fichiers du site, les scripts
  * inline de démarrage par leur empreinte et les scripts externes déclarés
  * dans `index.html` (la mesure d'audience).
@@ -86,7 +86,7 @@ export function injectPolicy(html: string, policy: string): string {
 export function contentSecurityPolicy(): Plugin {
   let apiOrigin = "";
   return {
-    name: "ohb-console-csp",
+    name: "openedbot-console-csp",
     apply: "build",
     configResolved(config) {
       apiOrigin = String(config.env.VITE_API_ORIGIN ?? "").trim();

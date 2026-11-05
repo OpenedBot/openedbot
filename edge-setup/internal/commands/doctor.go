@@ -87,7 +87,7 @@ func doctor(ctx context.Context) ([]string, []string) {
 			if fsx.Exists(linkPathOf(inst)) {
 				problems = append(problems, inst.Unit()+".service is not active although a link exists")
 			} else if inst.IsDefault() {
-				warnings = append(warnings, "connector mode without a link yet: run `edge-setup link --ohb https://… --yes` and paste the ticket at the hidden prompt")
+				warnings = append(warnings, "connector mode without a link yet: run `edge-setup link --openedbot https://… --yes` and paste the ticket at the hidden prompt")
 			}
 		}
 		if problem, warning := autoUpgradeDoctor(loadAutoUpgradeRecord(layout.AutoUpgradeRecord)); problem != "" {

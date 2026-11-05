@@ -1,5 +1,5 @@
--- OHB-25 : api_instances is an ops table, no tenant RLS.
--- ohb_api writes, ohb_worker reads, worker insert is denied.
+-- api_instances is an ops table, no tenant RLS.
+-- openedbot_api writes, openedbot_worker reads, worker insert is denied.
 -- Piege du fichier appelant : pas d apostrophe isolee dans les commentaires.
 
 create temp table api_instances_proof (
@@ -16,16 +16,16 @@ update api_instances_proof
                 join pg_namespace n on n.oid = c.relnamespace
                where n.nspname = 'public' and c.relname = 'api_instances');
 
-grant select, insert, update on api_instances_proof to ohb_api, ohb_worker;
+grant select, insert, update on api_instances_proof to openedbot_api, openedbot_worker;
 
-set role ohb_api;
+set role openedbot_api;
 insert into api_instances (instance_id, internal_url)
 values ('api-proof-a', 'http://10.0.0.2:8790')
 on conflict (instance_id) do update set last_seen_at = now(), stopped_at = null;
 update api_instances_proof set api_write = (select count(*) from api_instances where instance_id = 'api-proof-a');
 reset role;
 
-set role ohb_worker;
+set role openedbot_worker;
 update api_instances_proof set worker_read = (select count(*) from api_instances where instance_id = 'api-proof-a');
 do $proof$
 begin

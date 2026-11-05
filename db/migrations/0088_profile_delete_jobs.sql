@@ -36,13 +36,13 @@ create index profile_delete_history_idx on profile_delete_jobs (organization_id,
 alter table profile_delete_jobs enable row level security;
 alter table profile_delete_jobs force row level security;
 
-create policy profile_delete_jobs_tenant on profile_delete_jobs to ohb_api
+create policy profile_delete_jobs_tenant on profile_delete_jobs to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy profile_delete_jobs_worker on profile_delete_jobs to ohb_worker using (true) with check (true);
+create policy profile_delete_jobs_worker on profile_delete_jobs to openedbot_worker using (true) with check (true);
 
-grant select, insert, update on profile_delete_jobs to ohb_api;
-grant select, insert, update, delete on profile_delete_jobs to ohb_worker;
+grant select, insert, update on profile_delete_jobs to openedbot_api;
+grant select, insert, update, delete on profile_delete_jobs to openedbot_worker;
 
 comment on table profile_delete_jobs is 'Durable bounded Hermes host profile deletions; worker-owned, polled by the console.';
 

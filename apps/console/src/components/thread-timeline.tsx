@@ -80,7 +80,7 @@ const EMPTY_SETTING_PROPOSALS: readonly BotSettingProposalDto[] = [];
 
 /**
  * Distance (en entrées, pas en tours) au bas du fil sous laquelle une entrée
- * n'est JAMAIS contenue (`ohb-turn-contain`) : le run en direct grandit vite,
+ * n'est JAMAIS contenue (`openedbot-turn-contain`) : le run en direct grandit vite,
  * et un tour encore visible pourrait se voir donner une taille de repli
  * fausse par `contain-intrinsic-size`. La région NON contenue est aussi ce
  * que le `ResizeObserver` du fil (plus bas) doit remettre en page à chaque
@@ -466,7 +466,7 @@ function ThreadTimelineView({
   // the top of the screen, then pushed thousands of pixels up by the growth:
   // on every refresh it appeared, then vanished. A spacer stands in for the
   // turns the growth will add, at their estimated height (the
-  // `contain-intrinsic-size` of `.ohb-turn-contain`) and never less than a
+  // `contain-intrinsic-size` of `.openedbot-turn-contain`) and never less than a
   // screen: the reader pinned to the bottom never sees the swap.
   const pendingGrowthTurns = growToLiveWindow
     ? Math.min(windowed.turnCount, THREAD_LIVE_TURN_WINDOW) - liveTurns
@@ -667,7 +667,7 @@ function ThreadTimelineView({
       tabIndex={0}
       role="log"
       aria-label={t("threadTimeline.transcriptLabel")}
-      className="ohb-thread-scroll-contain bui-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-inset"
+      className="openedbot-thread-scroll-contain bui-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-4 outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring focus-visible:ring-inset"
       onPointerDown={(event) => {
         if (!event.currentTarget.closest("[data-mobile-shell]")) return;
         dismissComposerKeyboardFromThread(event);
@@ -1179,7 +1179,7 @@ function ThreadTimelineView({
         };
         // Rien au-delà des `THREAD_SETTLED_ENTRY_MARGIN` dernières entrées, et
         // rien du run en direct : ces tours reçoivent `content-visibility:
-        // auto` (voir `ohb-turn-contain`, thread-timeline.css). La marge
+        // auto` (voir `openedbot-turn-contain`, thread-timeline.css). La marge
         // couvre large plutôt que de risquer de contenir un tour encore
         // proche du bas, là où une taille de repli approximative se verrait.
         // Nor anything of the first window: its height decides, before its

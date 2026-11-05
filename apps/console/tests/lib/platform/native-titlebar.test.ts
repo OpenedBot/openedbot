@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { OhbNativeBridge } from "../../../src/lib/platform/native-bridge";
+import type { OpenedbotNativeBridge } from "../../../src/lib/platform/native-bridge";
 import {
   applyNativeTitlebar,
   NATIVE_TITLEBAR_ATTRIBUTE,
@@ -11,7 +11,7 @@ const MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.
 const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) openedbot/0.1.0 Chrome/140.0.0.0 Electron/44.7.0 Safari/537.36";
 
 // Le contrat figé : `shell.platform` vaut "windows" même sous macOS.
-const bridge: OhbNativeBridge = {
+const bridge: OpenedbotNativeBridge = {
   readAccessToken: async () => "token",
   refresh: async () => "token",
   openExternal: async () => undefined,
@@ -29,7 +29,7 @@ function setNavigator(userAgent: string, platform: string) {
 
 afterEach(() => {
   setNavigator(originalUa, originalPlatform);
-  delete window.__OHB_NATIVE__;
+  delete window.__OPENEDBOT_NATIVE__;
   document.documentElement.removeAttribute(NATIVE_TITLEBAR_ATTRIBUTE);
   for (const band of document.querySelectorAll(`[${NATIVE_TITLEBAR_BAND_ATTRIBUTE}]`)) band.remove();
 });
@@ -74,7 +74,7 @@ describe("applyNativeTitlebar", () => {
 
   test("coque macOS : marque <html> et pose une seule bande, en tête de <body>", () => {
     setNavigator(MAC_UA, "MacIntel");
-    window.__OHB_NATIVE__ = bridge;
+    window.__OPENEDBOT_NATIVE__ = bridge;
     const existing = document.createElement("div");
     document.body.prepend(existing);
 
@@ -91,7 +91,7 @@ describe("applyNativeTitlebar", () => {
 
   test("coque Windows : marque <html> et pose la bande", () => {
     setNavigator(WINDOWS_UA, "Win32");
-    window.__OHB_NATIVE__ = bridge;
+    window.__OPENEDBOT_NATIVE__ = bridge;
     expect(applyNativeTitlebar()).toBe("windows");
     expect(document.documentElement.getAttribute(NATIVE_TITLEBAR_ATTRIBUTE)).toBe("windows");
     expect(document.querySelectorAll(`[${NATIVE_TITLEBAR_BAND_ATTRIBUTE}]`).length).toBe(1);

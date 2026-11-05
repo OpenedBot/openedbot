@@ -31,8 +31,8 @@ describe("purges des données de connexion", () => {
     expect(migration).toContain("expires_at < pg_catalog.now() - interval '1 day'");
     expect(migration).toContain("coalesce(refresh_expires_at, access_expires_at) < pg_catalog.now() - interval '30 days'");
     expect(migration).toContain("revoked_at is null or revoked_at < pg_catalog.now() - interval '30 days'");
-    expect(migration).toMatch(/grant execute on function public\.purge_dead_sessions\(\) to ohb_worker;/);
-    expect(migration).toMatch(/grant execute on function public\.purge_spent_email_login_codes\(\) to ohb_worker;/);
+    expect(migration).toMatch(/grant execute on function public\.purge_dead_sessions\(\) to openedbot_worker;/);
+    expect(migration).toMatch(/grant execute on function public\.purge_spent_email_login_codes\(\) to openedbot_worker;/);
     expect(migration).not.toMatch(/grant [^;]* on (table )?(sessions|email_login_codes)\b/);
     expect(migration).not.toMatch(/create policy/);
   });

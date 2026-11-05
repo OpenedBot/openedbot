@@ -2,7 +2,7 @@ begin;
 
 -- Backoffice staff : la version du connecteur `edge-setup` déclarée par chaque
 -- runtime `connector` non révoqué, tous tenants confondus, pour que l'équipe
--- prévienne le propriétaire d'un connecteur périmé. OHB ne met jamais l'hôte
+-- prévienne le propriétaire d'un connecteur périmé. openedbot ne met jamais l'hôte
 -- à jour lui-même : il ne peut que nommer la commande à lancer.
 --
 -- Lecture seule. Même garde que `staff_runtime_link_alerts` (0087) : la
@@ -78,7 +78,7 @@ comment on function staff_runtime_connectors(int) is
   'Runtimes connector non révoqués des organisations vivantes, avec la version déclarée du connecteur (link_agent), le premier propriétaire actif et l''état du lien. Lecture staff seule, `p_limit` borné à 2000.';
 
 revoke all on function staff_runtime_connectors(int) from public;
-grant execute on function staff_runtime_connectors(int) to ohb_api;
+grant execute on function staff_runtime_connectors(int) to openedbot_api;
 
 insert into schema_migrations(version) values ('0102_staff_runtime_connectors');
 commit;

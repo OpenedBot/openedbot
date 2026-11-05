@@ -22,13 +22,13 @@
   --grok-hover: rgb(13 13 13 / 0.05);
   --grok-blue: #299fff;
   /* Grok Bot's message bubbles (desktop app, Sand Light), see below. */
-  --ohb-bubble-agent: rgb(28 28 28 / 0.06);
-  --ohb-bubble-user: #1c1c1c;
-  --ohb-bubble-user-text: #ffffff;
-  --ohb-bubble-specular: rgb(255 255 255 / 0.16);
-  --ohb-bubble-specular-user: rgb(255 255 255 / 0.06);
-  --ohb-bubble-edge: rgb(28 28 28 / 0.06);
-  --ohb-code-inline: rgb(28 28 28 / 0.04);
+  --openedbot-bubble-agent: rgb(28 28 28 / 0.06);
+  --openedbot-bubble-user: #1c1c1c;
+  --openedbot-bubble-user-text: #ffffff;
+  --openedbot-bubble-specular: rgb(255 255 255 / 0.16);
+  --openedbot-bubble-specular-user: rgb(255 255 255 / 0.06);
+  --openedbot-bubble-edge: rgb(28 28 28 / 0.06);
+  --openedbot-code-inline: rgb(28 28 28 / 0.04);
 }
 
 .dark {
@@ -43,22 +43,22 @@
   --grok-hover: rgba(252, 252, 252, 0.06);
   --grok-blue: #299fff;
   /* Sand Dark. */
-  --ohb-bubble-agent: rgb(245 245 245 / 0.04);
-  --ohb-bubble-user: rgb(245 245 245 / 0.18);
-  --ohb-bubble-user-text: #f5f5f5;
-  --ohb-bubble-specular: rgb(255 255 255 / 0.03);
-  --ohb-bubble-specular-user: rgb(255 255 255 / 0.01);
-  --ohb-bubble-edge: rgb(245 245 245 / 0.04);
-  --ohb-code-inline: rgb(245 245 245 / 0.02);
+  --openedbot-bubble-agent: rgb(245 245 245 / 0.04);
+  --openedbot-bubble-user: rgb(245 245 245 / 0.18);
+  --openedbot-bubble-user-text: #f5f5f5;
+  --openedbot-bubble-specular: rgb(255 255 255 / 0.03);
+  --openedbot-bubble-specular-user: rgb(255 255 255 / 0.01);
+  --openedbot-bubble-edge: rgb(245 245 245 / 0.04);
+  --openedbot-code-inline: rgb(245 245 245 / 0.02);
 }
 
 /* The bot's own fill for the user's bubble, per theme (`botTintStyle`). */
 [data-thread-column] {
-  --ohb-user-fill: var(--ohb-user-fill-light);
+  --openedbot-user-fill: var(--openedbot-user-fill-light);
 }
 
 .dark [data-thread-column] {
-  --ohb-user-fill: var(--ohb-user-fill-dark);
+  --openedbot-user-fill: var(--openedbot-user-fill-dark);
 }
 
 [data-thread-column] {
@@ -79,21 +79,21 @@
  * Every answer sits in the agent bubble: the base ink at 6 % (light) / 4 %
  * (dark), a white specular sheen from the top, a half pixel edge. The user's
  * bubble is the base ink (light) or a 18 % veil (dark), or, in a bot's DM,
- * that bot's colour (`--ohb-user-fill`, `botUserBubbleFill`); its text is
+ * that bot's colour (`--openedbot-user-fill`, `botUserBubbleFill`); its text is
  * `text/on-primary`. Radius 18, padding 7 / 12, at most min(80 %, 560 px,
  * 100 % − 82 px): the geometry is in the markup (thread-messages.tsx).
  */
 [data-assistant-layout="grok"],
 [data-user-bubble] {
   box-shadow:
-    inset 0 0.5px 0 var(--ohb-bubble-specular),
-    inset 0 -0.5px 0 var(--ohb-bubble-specular),
-    inset 0 0 0 0.5px var(--ohb-bubble-edge);
+    inset 0 0.5px 0 var(--openedbot-bubble-specular),
+    inset 0 -0.5px 0 var(--openedbot-bubble-specular),
+    inset 0 0 0 0.5px var(--openedbot-bubble-edge);
 }
 
 [data-assistant-layout="grok"] {
-  background-color: var(--ohb-bubble-agent);
-  background-image: linear-gradient(to bottom, var(--ohb-bubble-specular), transparent);
+  background-color: var(--openedbot-bubble-agent);
+  background-image: linear-gradient(to bottom, var(--openedbot-bubble-specular), transparent);
 }
 
 /* ── Answer (`Answer`): grok.com's typography inside the bubble ────────── */
@@ -130,7 +130,7 @@
  */
 [data-assistant-layout="grok"] .prose :not(pre) > code {
   color: inherit;
-  background-color: var(--ohb-code-inline);
+  background-color: var(--openedbot-code-inline);
   border-radius: 4px;
   padding: 0 2px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -252,7 +252,7 @@
   background-color: var(--grok-side);
 }
 
-[data-assistant-layout="grok"] [data-code-block] > :is(.ohb-code, pre) {
+[data-assistant-layout="grok"] [data-code-block] > :is(.openedbot-code, pre) {
   padding: 12px 16px;
   font-size: 13px;
   line-height: 20px;
@@ -261,9 +261,9 @@
 /* ── User bubble (Grok Bot, above) ─────────────────────────────────────── */
 
 [data-user-bubble] {
-  background-color: var(--ohb-user-fill, var(--ohb-bubble-user));
-  background-image: linear-gradient(to bottom, var(--ohb-bubble-specular-user), transparent);
-  color: var(--ohb-bubble-user-text);
+  background-color: var(--openedbot-user-fill, var(--openedbot-bubble-user));
+  background-image: linear-gradient(to bottom, var(--openedbot-bubble-specular-user), transparent);
+  color: var(--openedbot-bubble-user-text);
 }
 
 [data-user-bubble] [data-mention] {

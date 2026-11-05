@@ -30,8 +30,8 @@ export type SpeechOutputSettings = {
   voiceURI: string | null;
 };
 
-export const SPEECH_SETTINGS_EVENT = "ohb:speech-output-settings";
-const SPEECH_SETTINGS_KEY = "ohb:speech-output-settings:v1";
+export const SPEECH_SETTINGS_EVENT = "openedbot:speech-output-settings";
+const SPEECH_SETTINGS_KEY = "openedbot:speech-output-settings:v1";
 const MAX_UTTERANCE_LENGTH = 700;
 
 export function readSpeechOutputSettings(): SpeechOutputSettings {

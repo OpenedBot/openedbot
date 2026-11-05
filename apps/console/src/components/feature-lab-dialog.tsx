@@ -102,7 +102,7 @@ export function FeatureLabDialog({
               aria-checked={selected}
               data-feature-lab-scenario={scenario.id}
               onClick={() => setSelectedId(scenario.id)}
-              className="ohb-press group flex min-h-16 w-full items-start gap-3 px-5 py-3 text-left outline-none ohb-row hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              className="openedbot-press group flex min-h-16 w-full items-start gap-3 px-5 py-3 text-left outline-none openedbot-row hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               <span
                 aria-hidden

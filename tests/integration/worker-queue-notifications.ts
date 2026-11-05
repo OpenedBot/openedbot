@@ -28,15 +28,15 @@ const id = (n: number) => `91210000-0000-4000-8000-${String(n).padStart(12, "0")
   if (!hasListen) throw new Error(`Bun ${Bun.version} has no sql.listen: this proof needs the pinned Bun 1.4.0 (packageManager).`);
 }
 
-await withDisposablePostgres("ohb121_queue", async ({ owner, url, connect }) => {
+await withDisposablePostgres("openedbot121_queue", async ({ owner, url, connect }) => {
   const versions = await owner<Array<{ version: string }>>`select version from schema_migrations where version in
     ('0094_worker_run_queue_notifications', '0095_worker_run_queue_unblock_notifications') order by version`;
   assert(versions.length === 2, "Both notification migrations must commit their version receipts.");
-  await owner`insert into organizations (id, slug, name) values (${ORG}, 'ohb121', 'Queue integration')`;
+  await owner`insert into organizations (id, slug, name) values (${ORG}, 'openedbot121', 'Queue integration')`;
   await owner`insert into sections (id, organization_id, name, position) values (${id(4)}, ${ORG}, 'Queue', 0)`;
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${BOT}, ${ORG}, ${id(4)}, 'Queue', 'queue', 0)`;
   await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-    values (${THREAD}, ${ORG}, ${BOT}, 'Queue', 'ohb121-fixture-session', true)`;
+    values (${THREAD}, ${ORG}, ${BOT}, 'Queue', 'openedbot121-fixture-session', true)`;
   const linkHash = new Bun.CryptoHasher("sha256").update(crypto.randomUUID()).digest("hex");
   await owner`insert into runtimes (id, organization_id, name, reachability, is_active, capacity, link_last_seen_at, link_token_hash)
     values (${id(5)}, ${ORG}, 'Fixture connector', 'connector', true, 4, now(), ${linkHash})`;
@@ -73,7 +73,7 @@ await withDisposablePostgres("ohb121_queue", async ({ owner, url, connect }) => 
     await owner`delete from runs where organization_id = ${ORG}`;
   } finally { await listener.stop(); }
 
-  const db = await connect("ohb_worker");
+  const db = await connect("openedbot_worker");
   const native = new SQL({ url, max: 1, idleTimeout: 0, connectionTimeout: 2 });
   ready = 0; notified = 0;
   const notifications = createRunQueueNotifications(url, { clientFactory: () => ({
@@ -144,7 +144,7 @@ await withDisposablePostgres("ohb121_queue", async ({ owner, url, connect }) => 
     await until(() => claimed.length === 3);
     const unblockMs = Math.round(performance.now() - released);
     assert(unblockMs < 1_000 && claimed[2]!.id === id(31), "Reconciling an unknown outcome must wake its FIFO follower before the two-second poll.");
-    console.info(JSON.stringify({ event: "ohb121.notifications.passed", committedOnly: true, rollbackSilent: true,
+    console.info(JSON.stringify({ event: "openedbot121.notifications.passed", committedOnly: true, rollbackSilent: true,
       hintQueuedMs: claimed[0]!.queuedMs, reconnectQueuedMs: claimed[1]!.queuedMs, unblockMs, readyCount: ready, claimed: claimed.length }));
   } finally { worker.stop("integration-complete"); await running; }
 });
@@ -165,7 +165,7 @@ try {
   const started = performance.now();
   await connecting.stop();
   assert(performance.now() - started < 2_500, "Stopping a pending native LISTEN must be bounded.");
-  console.info(JSON.stringify({ event: "ohb121.pending_listen_stop.passed", stopMs: Math.round(performance.now() - started) }));
+  console.info(JSON.stringify({ event: "openedbot121.pending_listen_stop.passed", stopMs: Math.round(performance.now() - started) }));
 } finally {
   await connecting.stop();
   for (const socket of sockets) socket.destroy();

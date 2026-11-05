@@ -1,5 +1,5 @@
 /**
- * OHB-75 : comment un gateway direct a été publié.
+ * Comment un gateway direct a été publié.
  *
  * - `managed_cloudflare` : tunnel, DNS et Access créés sur le compte Cloudflare
  *   d'openedbot, hostname sous le suffixe géré (`<slug>.rt.openedbot.app`).
@@ -29,7 +29,7 @@ export type RuntimeExposureStoredKind = RuntimeExposureKind | "customer_cloudfla
 export type RuntimeExposureStatus = "awaiting_install" | "reachable" | "declared" | "failed" | "revoked";
 
 export type RuntimeExposureCreateInput =
-  /** Sans `slug`, openedbot tire lui-même `ohb-<hex>` sur sa zone gérée. */
+  /** Sans `slug`, openedbot tire lui-même `openedbot-<hex>` sur sa zone gérée. */
   | { kind: "managed_cloudflare"; slug?: string }
   /** Le client OAuth du tailnet, le temps d'une requête, jamais stocké. */
   | { kind: "tailscale_funnel"; slug: string; oauthClientId: string; oauthClientSecret: string };

@@ -29,7 +29,7 @@ const runtimeOne = "57000000-0000-4000-8000-000000000021";
 const runtimeTwo = "57000000-0000-4000-8000-000000000022";
 const runtimeThree = "57000000-0000-4000-8000-000000000023";
 const keyring = { current: secretEncryptionKey(new Uint8Array(32).fill(5)), previous: [] };
-const options = { downAfterMinutes: 5, webAppUrl: "https://console.ohb.test/", environment: "dev" };
+const options = { downAfterMinutes: 5, webAppUrl: "https://console.openedbot.test/", environment: "dev" };
 const webhook = (n: number) => `https://discord.com/api/webhooks/14596853750385911${n}0/${"k".repeat(60)}${n}`;
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -90,7 +90,7 @@ function databaseUrl(source: URL, database: string, username: string, password: 
 }
 
 const source = await adminUrl();
-const database = `ohb157_alerts_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot157_alerts_${crypto.randomUUID().replaceAll("-", "")}`;
 const adminDb = new SQL({ url: source.toString(), max: 1 });
 let target: SQL | null = null;
 let api: SQL | null = null;
@@ -99,12 +99,12 @@ let databaseCreated = false;
 
 try {
   await adminDb.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await adminDb.unsafe(`create database "${database}"`);
   databaseCreated = true;
-  await adminDb.unsafe(`grant connect on database "${database}" to ohb_api, ohb_worker`);
+  await adminDb.unsafe(`grant connect on database "${database}" to openedbot_api, openedbot_worker`);
 
   target = new SQL({ url: databaseUrl(source, database, source.username, source.password), max: 1 });
   for (const migration of (await readdir(resolve(root, "db/migrations"))).filter((name) => name.endsWith(".sql")).sort()) {
@@ -112,22 +112,22 @@ try {
   }
 
   await target`insert into organizations (id, slug, name) values
-      (${organizationA}, 'ohb157-a', 'OHB-157 A'),
-      (${organizationB}, 'ohb157-b', 'OHB-157 B')`;
-  await target`insert into users (id, email, display_name) values (${owner}, 'ohb157-owner@example.test', 'Owner')`;
+      (${organizationA}, 'openedbot157-a', 'Alert channels A'),
+      (${organizationB}, 'openedbot157-b', 'Alert channels B')`;
+  await target`insert into users (id, email, display_name) values (${owner}, 'openedbot157-owner@example.test', 'Owner')`;
   await target`insert into memberships (organization_id, user_id, role) values (${organizationA}, ${owner}, 'owner')`;
   await target`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active, last_health_status, last_health_error, link_last_seen_at)
     values
-      (${runtimeOne}, ${organizationA}, 'VPS @everyone', 'connector', 'ohb157-hash-1', false, 'disconnected', 'Aucun signe de vie du lien depuis 45 s.', now() - interval '10 minutes'),
-      (${runtimeTwo}, ${organizationA}, 'VPS deux', 'connector', 'ohb157-hash-2', false, 'healthy', null, now()),
-      (${runtimeThree}, ${organizationA}, 'VPS trois', 'connector', 'ohb157-hash-3', false, 'healthy', null, now())`;
+      (${runtimeOne}, ${organizationA}, 'VPS @everyone', 'connector', 'openedbot157-hash-1', false, 'disconnected', 'Aucun signe de vie du lien depuis 45 s.', now() - interval '10 minutes'),
+      (${runtimeTwo}, ${organizationA}, 'VPS deux', 'connector', 'openedbot157-hash-2', false, 'healthy', null, now()),
+      (${runtimeThree}, ${organizationA}, 'VPS trois', 'connector', 'openedbot157-hash-3', false, 'healthy', null, now())`;
 
-  worker = new SQL({ url: databaseUrl(source, database, "ohb_worker", "ohb_worker_dev"), max: 1 });
-  api = new SQL({ url: databaseUrl(source, database, "ohb_api", "ohb_api_dev"), max: 1 });
+  worker = new SQL({ url: databaseUrl(source, database, "openedbot_worker", "openedbot_worker_dev"), max: 1 });
+  api = new SQL({ url: databaseUrl(source, database, "openedbot_api", "openedbot_api_dev"), max: 1 });
   const discord = scriptedDiscord();
   const scope = { organizationId: organizationA, userId: owner };
   const deps = { keyring, transport: discord.transport };
-  const workerConfig = { tokenEncryption: keyring, workerId: "ohb157-worker" };
+  const workerConfig = { tokenEncryption: keyring, workerId: "openedbot157-worker" };
 
   // Channels: encrypted at rest, duplicates and foreign URLs refused, tenant-scoped.
   const created = await createDiscordAlertChannel(api, scope, { webhookUrl: webhook(1), label: undefined }, deps);
@@ -219,7 +219,7 @@ try {
   const apiQueue = await withTenant(api, organizationA, (tx) => tx`select 1 from alert_deliveries`).then(() => "read", (error) => String(error));
   assert(apiQueue !== "read", "the API has no access to the delivery queue");
 
-  console.log("OHB-157 PostgreSQL proof passed: alert channels are encrypted and tenant-scoped, a link alert queues one delivery per enabled channel once, Discord outages back off, deleted webhooks disable their channel, a 🔴 the outage outlived is dropped, 🟢 follows 🔴, tests are throttled and deletions cascade.");
+  console.log("Alert channels PostgreSQL proof passed: alert channels are encrypted and tenant-scoped, a link alert queues one delivery per enabled channel once, Discord outages back off, deleted webhooks disable their channel, a 🔴 the outage outlived is dropped, 🟢 follows 🔴, tests are throttled and deletions cascade.");
 } finally {
   await api?.close();
   await worker?.close();

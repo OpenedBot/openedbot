@@ -88,8 +88,8 @@ describe("aplat Grok Bot de la bulle de l'utilisateur", () => {
 
   test("le style de la colonne porte l'aplat seulement quand il existe", () => {
     const fill = botUserBubbleFill("bot-1", vector("bleu"));
-    expect(botTintStyle("#3b93f0", fill)).toMatchObject({ "--ohb-user-fill-light": "#126fd4", "--ohb-user-fill-dark": "#116dd2" });
-    expect(botTintStyle("#a3a3a3", null)).not.toHaveProperty("--ohb-user-fill-light");
+    expect(botTintStyle("#3b93f0", fill)).toMatchObject({ "--openedbot-user-fill-light": "#126fd4", "--openedbot-user-fill-dark": "#116dd2" });
+    expect(botTintStyle("#a3a3a3", null)).not.toHaveProperty("--openedbot-user-fill-light");
     expect(botTintStyle(null, fill)).toBeUndefined();
   });
 });

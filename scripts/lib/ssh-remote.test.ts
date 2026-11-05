@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { REMOTE_TIMED_OUT, sshGuardArgs, sshRemote } from "./ssh-remote";
 
 /** Un faux `ssh` : le test n'a besoin d'aucun VPS pour prouver la borne. */
-const root = mkdtempSync(join(tmpdir(), "ohb-ssh-remote-"));
+const root = mkdtempSync(join(tmpdir(), "openedbot-ssh-remote-"));
 function fakeSsh(name: string, body: string): string {
   const path = join(root, name);
   writeFileSync(path, `#!/bin/sh\n${body}\n`);

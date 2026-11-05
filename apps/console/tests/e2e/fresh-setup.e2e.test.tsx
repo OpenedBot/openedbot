@@ -96,7 +96,7 @@ function renderJourney() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(() => {
@@ -106,7 +106,7 @@ afterEach(() => {
 });
 
 describe("fresh setup d’un runtime client non administré", () => {
-  // OHB-15 : la console n'ouvre plus de session sur la machine du client. Le
+  // La console n'ouvre plus de session sur la machine du client. Le
   // parcours doit rester complet : conversations, catalogue, choix de modèle,
   // et dire explicitement où se pose une clé fournisseur : sur l'hôte.
   test("garde Hermes utilisable et renvoie vers le geste client", async () => {

@@ -14,7 +14,7 @@ const fleetB = "90000000-0000-4000-8000-000000000003";
 beforeEach(() => {
   window.location.href = "http://localhost/o/studio/clients/atelier/settings";
   window.sessionStorage.clear();
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   saveCloudSession({ organizationId: clientId, userId: "operator", csrfToken: "fixture-csrf" });
   rememberWorkspaces([
     { id: clientId, slug: "atelier", name: "Atelier", kind: "personal", role: "owner", viaAgencyIds: [fleetA, fleetB] },

@@ -337,7 +337,7 @@ func TestCreationAuditVectorMatchesTestdata(t *testing.T) {
 	if err != nil || keyID != "key-vector" || runtimeID != "runtime-vector" || seq != 3 {
 		t.Fatalf("header %q %q %d %v", keyID, runtimeID, seq, err)
 	}
-	if !bytes.HasPrefix(got, []byte("OHBAUDT2\x02\x01")) {
+	if !bytes.HasPrefix(got, []byte("OBAUDIT2\x02\x01")) {
 		t.Fatalf("magic/version/suite: %x", got[:10])
 	}
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # `make load`: the whole bench on this machine, against the shared infra-postgres
-# container (a disposable `ohb_load` database, dropped at the end) and the fake
+# container (a disposable `openedbot_load` database, dropped at the end) and the fake
 # Hermes streaming like a model. Nothing here reaches a lab runtime or a model.
 #
 #   LOAD_SESSIONS=50|100|200|500   connected operators (one SSE each)   [200]
@@ -12,7 +12,7 @@
 #   LOAD_STREAM_DELTAS=N           deltas per run, 100 ms apart         [30]
 #   LOAD_API_DB_MAX / LOAD_WORKER_DB_MAX / LOAD_WORKER_MAX_ACTIVE_RUNS   pool and concurrency
 #   LOAD_ENFORCE_SALES_GATE=1      60-minute soak with the RSS growth gate
-#   LOAD_KEEP_DATABASE=1           keep ohb_load for inspection
+#   LOAD_KEEP_DATABASE=1           keep openedbot_load for inspection
 #
 # The report also charges the conversation phase's CPU (average cores, from
 # /proc) to the API, each worker and the fake Hermes.
@@ -23,7 +23,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
-database="ohb_load"
+database="openedbot_load"
 tier="${LOAD_SESSIONS:-200}"
 api_port="${LOAD_API_PORT:-18790}"
 fake_port="${LOAD_HERMES_PORT:-18642}"
@@ -80,7 +80,7 @@ pg_admin_db="$(docker exec "$container" printenv POSTGRES_DB)"
 drop_database
 psql_admin <<SQL >/dev/null
 create database $database;
-grant connect on database $database to ohb_api, ohb_worker;
+grant connect on database $database to openedbot_api, openedbot_worker;
 SQL
 for migration in "$root"/db/migrations/*.sql; do
   docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U "$pg_user" -d "$database" < "$migration" >/dev/null
@@ -90,8 +90,8 @@ say "database $database migrated"
 mkdir -p "$artefacts"
 ln -sfn "$stamp" "$root/tmp/load/latest"
 encryption_key="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
-api_url="postgres://ohb_api:ohb_api_dev@127.0.0.1:5432/$database"
-worker_url="postgres://ohb_worker:ohb_worker_dev@127.0.0.1:5432/$database"
+api_url="postgres://openedbot_api:openedbot_api_dev@127.0.0.1:5432/$database"
+worker_url="postgres://openedbot_worker:openedbot_worker_dev@127.0.0.1:5432/$database"
 fake_url="http://127.0.0.1:$fake_port"
 
 RUNTIME_TOKEN_ENCRYPTION_KEY="$encryption_key" LOAD_DATABASE_URL="$api_url" LOAD_MANIFEST="$manifest" \

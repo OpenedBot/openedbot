@@ -85,7 +85,7 @@ export function AskUserCard({
                 if (event.key === "ArrowDown") { event.preventDefault(); moveFocus(index, 1); }
                 if (event.key === "ArrowUp") { event.preventDefault(); moveFocus(index, -1); }
               }}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-start text-body-regular text-text-primary outline-none ohb-row hover:bg-background-secondary-default focus-visible:bg-background-secondary-default focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-start text-body-regular text-text-primary outline-none openedbot-row hover:bg-background-secondary-default focus-visible:bg-background-secondary-default focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
               <kbd
                 aria-hidden

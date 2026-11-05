@@ -9,7 +9,7 @@ import { passwordLogin } from "../../scripts/lib/password-login";
 
 const artifactBase = process.env.E2E_ARTIFACT_DIR ?? tmpdir();
 await mkdir(artifactBase, { recursive: true });
-const artifacts = await mkdtemp(join(artifactBase, "ohb-connector-live-k6-"));
+const artifacts = await mkdtemp(join(artifactBase, "openedbot-connector-live-k6-"));
 const secrets: string[] = [];
 const redact = (text: string) => secrets.reduce((value, secret) => secret ? value.replaceAll(secret, "[redacted]") : value, text)
   .replace(/Bearer\s+[^\s"\\]+/gi, "Bearer [redacted]");

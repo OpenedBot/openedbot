@@ -33,13 +33,13 @@ alter table staff_impersonation_claims force row level security;
 -- La route publique d'échange ne connaît que le hash du code one-shot. Elle
 -- peut lire et consommer CETTE ligne, jamais énumérer les autres demandes.
 create policy staff_impersonation_claim_token on staff_impersonation_claims
-  for select to ohb_api
+  for select to openedbot_api
   using (
     claim_token_hash = nullif(current_setting('app.staff_impersonation_claim_hash', true), '')
   );
 
 create policy staff_impersonation_claim_consume on staff_impersonation_claims
-  for update to ohb_api
+  for update to openedbot_api
   using (
     claim_token_hash = nullif(current_setting('app.staff_impersonation_claim_hash', true), '')
   )
@@ -47,7 +47,7 @@ create policy staff_impersonation_claim_consume on staff_impersonation_claims
     claim_token_hash = nullif(current_setting('app.staff_impersonation_claim_hash', true), '')
   );
 
-grant select, update on staff_impersonation_claims to ohb_api;
+grant select, update on staff_impersonation_claims to openedbot_api;
 
 -- Une émission est un seul statement SECURITY DEFINER : l'organisation doit
 -- être active et l'utilisateur encore membre au moment précis où le code est
@@ -107,7 +107,7 @@ end;
 $$;
 
 revoke all on function staff_issue_impersonation_claim(uuid, uuid, uuid, text, timestamptz) from public;
-grant execute on function staff_issue_impersonation_claim(uuid, uuid, uuid, text, timestamptz) to ohb_api;
+grant execute on function staff_issue_impersonation_claim(uuid, uuid, uuid, text, timestamptz) to openedbot_api;
 
 -- La fiche staff doit fournir l'identifiant stable utilisé par l'action ;
 -- l'e-mail seul n'est ni immuable ni une clé de membre.

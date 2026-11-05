@@ -158,7 +158,7 @@ function ToolTraceRow({ part }: { part: LabToolPart }) {
       <span className="grid size-4 shrink-0 place-items-center">
         <ToolStateIcon done={!running} failed={failed} tool={part.tool} />
       </span>
-      <span className={cn("min-w-0 truncate", running && "ohb-agent-label")}>
+      <span className={cn("min-w-0 truncate", running && "openedbot-agent-label")}>
         <span className="text-text-primary">{part.tool}</span>
         {part.preview ? <span className="ms-1.5 font-mono text-[12.5px]">{part.preview}</span> : null}
       </span>
@@ -307,7 +307,7 @@ function ChipRow({ part }: { part: LabActivityPart }) {
             </>
           )}
         </span>
-        <span className={cn("shrink-0 text-body-2-medium text-text-primary", running && "ohb-agent-label")}>
+        <span className={cn("shrink-0 text-body-2-medium text-text-primary", running && "openedbot-agent-label")}>
           {tool ? tool.tool : "Pense"}
         </span>
         <span
@@ -393,7 +393,7 @@ function TaskRow({ part }: { part: LabActivityPart }) {
           {running ? <ToolStateIcon done={false} failed={false} /> : failed ? <X className="size-3" aria-hidden /> : <Check className="size-3 animate-in duration-200 zoom-in-50" aria-hidden />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className={cn("truncate text-body-2-medium text-text-primary", running && "ohb-agent-label")}>{part.tool}</span>
+          <span className={cn("truncate text-body-2-medium text-text-primary", running && "openedbot-agent-label")}>{part.tool}</span>
           {part.preview ? <span className="truncate font-mono text-caption-1-regular text-text-tertiary">{part.preview}</span> : null}
         </span>
         {toolMeta(part) ? (

@@ -83,8 +83,8 @@ describe("slugify", () => {
     expect(slugify("Root")).toBe("root-bot");
     expect(slugify("Testeur")).toBe("testeur");
     // openedbot's own check profiles (PERM2-7a) are never a bot's profile.
-    expect(slugify("OHB reviewer")).toBe("ohb-reviewer-bot");
-    expect(slugify("OHB model check")).toBe("ohb-model-check-bot");
+    expect(slugify("openedbot reviewer")).toBe("openedbot-reviewer-bot");
+    expect(slugify("openedbot model check")).toBe("openedbot-model-check-bot");
   });
 });
 

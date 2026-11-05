@@ -315,7 +315,7 @@ async function readResetScope(request: Request): Promise<OnboardingResetScope> {
 }
 
 /**
- * Le vidage complet ne passe PAS par `db` : `ohb_api` n'a ni `delete` sur les
+ * Le vidage complet ne passe PAS par `db` : `openedbot_api` n'a ni `delete` sur les
  * tables append-only (`decisions`, `team_imports`, `email_outbox`,
  * `tenant_blob_deletions`) ni le droit de `truncate` une table qu'il ne
  * possède pas. Il lui faut la DSN propriétaire `DEV_RESET_DATABASE_URL` ;

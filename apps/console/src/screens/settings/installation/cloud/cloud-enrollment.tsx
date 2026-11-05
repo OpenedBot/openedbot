@@ -9,12 +9,12 @@ import type { RuntimeEnrollmentTicketDto } from "@openedbot/contracts-api";
 import { BUTTON } from "../../../../components/settings/primitives";
 
 /**
- * L'API ne pose `--insecure-ohb` que sur une origine `http://` de loopback,
+ * L'API ne pose `--insecure-openedbot` que sur une origine `http://` de loopback,
  * c'est-à-dire un poste de développement joint par `make link-dev-up` : la
  * commande elle-même dit si le tunnel est un prérequis.
  */
 function isDevelopmentLinkCommand(command: string): boolean {
-  return command.includes("--insecure-ohb");
+  return command.includes("--insecure-openedbot");
 }
 
 /**

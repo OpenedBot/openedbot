@@ -84,7 +84,7 @@ export type RunContext = {
   linkLastSeenAt: Date | string | null;
   /** Instant de la connexion courante. Bouge au hello, pas au heartbeat. */
   linkConnectedAt: Date | string | null;
-  /** `runtimes.toolset_epoch` as text (OHB-138): bumped by each relayed inventory write. */
+  /** `runtimes.toolset_epoch` as text: bumped by each relayed inventory write. */
   toolsetEpoch?: string | null;
   leaseGeneration: number;
   externalState: "not_started" | "creating" | "streaming" | "polling" | "stopping" | "settled" | "ambiguous";

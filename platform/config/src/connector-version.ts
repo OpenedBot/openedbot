@@ -49,7 +49,7 @@ export function runtimeConnector(
   const minimumVersion = parseConnectorVersion(versions.minimumVersion);
   const latestVersion = parseConnectorVersion(versions.latestVersion);
   // "edge-setup/" est le préfixe canonique ; "hermes-setup/" reste accepté
-  // pour les connecteurs déjà en production avant le renommage OHB-87.
+  // pour les connecteurs déjà en production avant le renommage en edge-setup.
   const version = agent.startsWith("edge-setup/")
     ? parseConnectorVersion(agent.slice("edge-setup/".length))
     : agent.startsWith("hermes-setup/")

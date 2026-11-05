@@ -1,7 +1,7 @@
--- DEV-209 (ex OHB-132): the bot manages its own routines from the conversation.
+-- DEV-209: the bot manages its own routines from the conversation.
 --
 -- The tool is `routine_manage`, served by the API as one https MCP server per
--- runtime (`ohb_routines`), installed on the host through the named
+-- runtime (`openedbot_routines`), installed on the host through the named
 -- `mcp_management` verbs. One server per runtime and not per bot: a named
 -- profile clones the root config at creation, so a per-bot server would leak
 -- to every bot created afterwards. The bot is identified per run instead (a
@@ -26,7 +26,7 @@ create table runtime_routine_tools (
   runtime_id uuid not null,
   secret_hash text not null
     constraint runtime_routine_tools_secret_hash_check check (secret_hash ~ '^[0-9a-f]{64}$'),
-  server_name text not null default 'ohb_routines'
+  server_name text not null default 'openedbot_routines'
     constraint runtime_routine_tools_server_name_check check (server_name ~ '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'),
   installed_at timestamptz,
   enabled_bot_ids uuid[] not null default '{}',
@@ -43,14 +43,14 @@ create table runtime_routine_tools (
 alter table runtime_routine_tools enable row level security;
 alter table runtime_routine_tools force row level security;
 
-create policy runtime_routine_tools_tenant on runtime_routine_tools to ohb_api
+create policy runtime_routine_tools_tenant on runtime_routine_tools to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-create policy runtime_routine_tools_worker on runtime_routine_tools for select to ohb_worker using (true);
+create policy runtime_routine_tools_worker on runtime_routine_tools for select to openedbot_worker using (true);
 
-grant select, insert, update, delete on runtime_routine_tools to ohb_api;
-grant select on runtime_routine_tools to ohb_worker;
+grant select, insert, update, delete on runtime_routine_tools to openedbot_api;
+grant select on runtime_routine_tools to openedbot_worker;
 
 insert into schema_migrations(version) values ('0105_runtime_routine_tools')
 on conflict (version) do nothing;

@@ -142,7 +142,7 @@ export type LinkLivenessStore = {
   /** Journal de dispatch (0052) : un enregistrement par création relayée, statut et run_id compris. */
   dispatched?(link: LinkIdentity, record: LinkDispatchRecord, instanceId: string): Promise<void>;
   /**
-   * OHB-138: bump `runtimes.toolset_epoch` after a relayed host write that can
+   * Bump `runtimes.toolset_epoch` after a relayed host write that can
    * change the toolset inventory, so the worker's inventory cache re-reads.
    */
   toolsetsWritten?(link: LinkIdentity): Promise<void>;

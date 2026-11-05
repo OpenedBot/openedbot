@@ -176,27 +176,16 @@ export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
  * - `DEV_HERMES_ADMIN_URL/TOKEN`, `DEV_HERMES_DASHBOARD_URL`,
  *   `DEV_BUNDLED_HERMES_URL`, `BOX_TOKEN` : l'administration du runtime ne
  *   passe plus par ces adresses (« Release boundary », CLAUDE.md).
- * - `OHB_GOOGLE_*` : renommés `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
  * - `MIGRATOR_DATABASE_URL` : la tuyauterie de déploiement qui la lisait
  *   (deploy/) a été retirée avec le passage cloud-only ; plus
  *   aucune source ne la lit.
  * - `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_RUNTIME_DOCS_URL`,
  *   `NEXT_PUBLIC_SITE_URL` : lues par l'ancien site `sites/marketing`,
  *   supprimé du dépôt le 2026-10-27 ; aucune source ne les lit plus.
- * - `OHB_AGENCY_ENABLED` : remplacé par les features `agency_workspaces` et
- *   `connector_only_enrollment` dans PostgreSQL.
- * - `OHB_RUNTIME_MODE` : le mode est toujours `external`
- *   (platform/config/src/runtime-mode.ts) ; le profil de `make` se déduit de
- *   DEV_HERMES_URL. Retiré lors du passage au préfixe OPENEDBOT_.
- * - `OHB_RUNTIME_ADMIN_MODE` : aucun canal d'administration sortant n'existe
- *   depuis OHB-15 (`runtimeAdminChannels` vaut toujours `{ local: false }`) ;
- *   retiré, avec son contrôle de production, lors du passage à OPENEDBOT_.
- * - `OHB_MIGRATION_VERSION` : jamais lue par `scripts/db.sh --migrate` ni par
- *   aucune autre source.
- * - `OHB_DATABASE_NAME`, `OHB_POSTGRES_PORT` (and their short-lived
- *   `OPENEDBOT_` names) : le nom de la base et le port se lisent dans
- *   API_DATABASE_URL (scripts/db.sh, dev-reset-data.ts, env-check), qui les
- *   portait déjà ; une seconde copie ne pouvait que diverger.
+ * - `OPENEDBOT_DATABASE_NAME`, `OPENEDBOT_POSTGRES_PORT` : le nom de la
+ *   base et le port se lisent dans API_DATABASE_URL (scripts/db.sh,
+ *   dev-reset-data.ts, env-check), qui les portait déjà ; une seconde copie
+ *   ne pouvait que diverger.
  * - `REPLACE` : `make link-dev-up REPLACE=1` used to re-enroll an instance
  *   linked elsewhere. `edge-setup link` has no `--replace` any more and always
  *   replaces the link of the instance it targets (`scripts/lib/link-dev.ts`),
@@ -221,15 +210,6 @@ export const DEPRECATED_ENV_NAMES: readonly string[] = [
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_RUNTIME_DOCS_URL",
   "NEXT_PUBLIC_SITE_URL",
-  "OHB_AGENCY_ENABLED",
-  "OHB_DATABASE_NAME",
-  "OHB_GOOGLE_ALLOWED_EMAILS",
-  "OHB_GOOGLE_CLIENT_ID",
-  "OHB_GOOGLE_CLIENT_SECRET",
-  "OHB_MIGRATION_VERSION",
-  "OHB_POSTGRES_PORT",
-  "OHB_RUNTIME_ADMIN_MODE",
-  "OHB_RUNTIME_MODE",
   "OPENEDBOT_DATABASE_NAME",
   "OPENEDBOT_POSTGRES_PORT",
   "REPLACE",

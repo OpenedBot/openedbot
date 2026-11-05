@@ -53,7 +53,7 @@ insert into decisions (
   null, 'audit-entry-hash', 1
 );
 
-set role ohb_api;
+set role openedbot_api;
 set app.organization_id = '71000000-0000-4000-8000-000000000001';
 
 -- This is the same tenant-scoped DELETE issued by the bot route. It cascades

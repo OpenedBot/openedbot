@@ -1,9 +1,9 @@
 begin;
 
--- PERM2-7a and PERM2-7 (DEV-OHB-257, DEV-OHB-258): the automatic review.
+-- PERM2-7a and PERM2-7: the automatic review.
 --
 -- `runtime_review_profiles` holds, per runtime, the proof that its
--- `ohb-reviewer` profile has no tool: every toolset off (re-read on
+-- `openedbot-reviewer` profile has no tool: every toolset off (re-read on
 -- `/v1/toolsets`), every inherited MCP server off for it, and the approval
 -- plugin in `block_writes`. Without a fresh proof the review is unavailable
 -- and `auto` behaves as `manual` on that runtime. The worker writes it; the
@@ -29,13 +29,13 @@ create table runtime_review_profiles (
 create index runtime_review_profiles_due_idx on runtime_review_profiles (next_check_at);
 alter table runtime_review_profiles enable row level security;
 alter table runtime_review_profiles force row level security;
-create policy runtime_review_profiles_tenant on runtime_review_profiles for select to ohb_api
+create policy runtime_review_profiles_tenant on runtime_review_profiles for select to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy runtime_review_profiles_worker on runtime_review_profiles to ohb_worker using (true) with check (true);
-grant select on runtime_review_profiles to ohb_api;
-grant select, insert, update, delete on runtime_review_profiles to ohb_worker;
+create policy runtime_review_profiles_worker on runtime_review_profiles to openedbot_worker using (true) with check (true);
+grant select on runtime_review_profiles to openedbot_api;
+grant select, insert, update, delete on runtime_review_profiles to openedbot_worker;
 comment on table runtime_review_profiles is
-  'PERM2-7a: proof per runtime that the ohb-reviewer profile runs without any tool. Written by the worker only.';
+  'PERM2-7a: proof per runtime that the openedbot-reviewer profile runs without any tool. Written by the worker only.';
 
 -- A gate under review is claimed by one worker at a time: a token and a
 -- lease, and the verdict write requires both. `review_started_at` bounds

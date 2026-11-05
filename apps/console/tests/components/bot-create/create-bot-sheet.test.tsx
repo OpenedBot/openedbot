@@ -140,7 +140,7 @@ beforeEach(() => {
   createdBodies = [];
   patched = false;
   currentPath = "/";
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   Object.defineProperty(window, "innerWidth", { value: 1280, configurable: true });
   Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
   serve();

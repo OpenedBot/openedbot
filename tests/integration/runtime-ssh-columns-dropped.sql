@@ -1,4 +1,4 @@
--- OHB-15. La cible SSH d un runtime quitte le schema.
+-- La cible SSH d un runtime quitte le schema.
 --
 -- Une migration jouee sur une base neuve ne prouve rien : le cas reel est une
 -- base qui PORTE deja les colonnes, avec les contraintes posees en 0002

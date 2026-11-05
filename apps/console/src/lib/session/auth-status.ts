@@ -95,6 +95,6 @@ subscribeCloudSession(resetAuthStatus);
 // Un jeton qui change ou un 401 rend la réponse précédente caduque.
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key === "ohb:cloud-session") resetAuthStatus();
+    if (event.key === "openedbot:cloud-session") resetAuthStatus();
   });
 }

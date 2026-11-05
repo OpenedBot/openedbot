@@ -96,7 +96,7 @@ on 2026-10-10; its evidence stays under `docs/reports/`. It deliberately emitted
 `acceptanceComplete: false` and exited
 nonzero because it does not prove restart overlap or independent SSE continuity.
 Its `/api/events` observer may close during an API restart without indicating a
-worker/gateway failure. Use the full acceptance runner above for OHB-50.
+worker/gateway failure. Use the full acceptance runner above for runtime link continuity.
 
 The real bot recipe also checks auxiliary behaviors. A failed lifecycle is not
 automatically a transport defect; retain the failing step and its evidence. A
@@ -180,7 +180,7 @@ existing stream opened cannot recover its unseen bytes and may fail coverage.
 Navigate to the created bot's `/bot/<botId>` route through SPA links using current
 snapshots and refs, without reloading the document (which removes the observer).
 Only after the target route is visible and an observed `/api/events` fetch has
-returned 200, export `globalThis.__ohbContinuityEvidence.snapshot()` through MCP
+returned 200, export `globalThis.__openedbotContinuityEvidence.snapshot()` through MCP
 and save that structured value unchanged to `E2E_BROWSER_EVIDENCE_PATH` using an
 atomic local file replacement. The runner requires those readiness conditions
 in addition to the matching scenario nonce and thread ID. Keep that thread open
@@ -203,7 +203,7 @@ When the runner emits `awaiting_external_evidence`, use the same registered MCP
 replacing the ready file:
 
 ```js
-globalThis.__ohbContinuityEvidence.snapshot(true)
+globalThis.__openedbotContinuityEvidence.snapshot(true)
 ```
 
 This restores the original fetch, stops the bounded observer timer, and records
@@ -249,7 +249,7 @@ the login session is revoked afterwards. It can supersede only the named old
 browser-proof failures; transport, inference, observation and cleanup failures
 remain failures. It rechecks 30 minutes, two real run identities, ordered
 independent gateway streams, both API boot overlaps, unchanged link journal,
-OHB-verified connector dispatches, all expected persisted event
+openedbot-verified connector dispatches, all expected persisted event
 sequences/cursors against the PWA, rendered messages, and the original cleanup.
 
 The corrected browser proof accepts an SSE request opened before the first boot

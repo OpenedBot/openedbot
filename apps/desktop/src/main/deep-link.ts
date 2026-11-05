@@ -3,8 +3,8 @@ import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { log } from "./log";
 
-export const PROTOCOL = "ohb";
-export const PROTOCOL_REDIRECT_URI = "ohb://auth/callback";
+export const PROTOCOL = "openedbot";
+export const PROTOCOL_REDIRECT_URI = "openedbot://auth/callback";
 export const LOOPBACK_PORT = 47813;
 export const LOOPBACK_REDIRECT_URI = `http://127.0.0.1:${LOOPBACK_PORT}/callback`;
 
@@ -43,13 +43,13 @@ function registerProtocol(): boolean {
 }
 
 /**
- * Registers the ohb:// protocol and installs the open-url hook. Call once at
+ * Registers the openedbot:// protocol and installs the open-url hook. Call once at
  * startup, after the single-instance lock is held (a second launch would
  * otherwise rewrite the OS registration of the running instance).
  */
 export function setupDeepLink(onCallback: () => void): DeepLinkHandle {
   const registered = registerProtocol();
-  if (!registered) log.warn("ohb:// protocol registration failed, falling back to the loopback callback");
+  if (!registered) log.warn("openedbot:// protocol registration failed, falling back to the loopback callback");
 
   // macOS delivers the URL through this event; kept so the module is not
   // Windows-only by accident even though macOS is out of V1 scope.

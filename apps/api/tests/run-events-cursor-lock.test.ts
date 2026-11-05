@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * Invariant OHB-18 : verrou de curseur avant tout INSERT dans `run_events`.
+ * Invariant Verrou de curseur avant tout INSERT dans `run_events`.
  *
  * Règle : tout `insert into run_events` doit être précédé, dans la MÊME
- * transaction, d'un `pg_advisory_xact_lock(hashtext(<org>), hashtext('ohb-run-events-cursor'))`.
+ * transaction, d'un `pg_advisory_xact_lock(hashtext(<org>), hashtext('openedbot-run-events-cursor'))`.
  *
  * Pourquoi : PostgreSQL tourne en READ COMMITTED. Sans ce verrou d'organisation,
  * deux transactions concurrentes peuvent obtenir des curseurs (`sequence`) dans
@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
  * Ce test est statique (aucun Postgres) : il parcourt les sources et exige,
  * pour chaque occurrence d'`insert into run_events`, la présence dans le même
  * fichier, à une position antérieure dans le texte, soit :
- *   - d'un `pg_advisory_xact_lock(` portant la clé `'ohb-run-events-cursor'`
+ *   - d'un `pg_advisory_xact_lock(` portant la clé `'openedbot-run-events-cursor'`
  *     (inline ou dans une CTE SQL, comme `modules/execution/src/application/queue.ts`) ;
  *   - soit d'un APPEL à un helper dont le nom contient `lockRunEventCursor` ou
  *     `RunEventCursorLock` (comme `lockRunEventCursorTx` dans
@@ -47,9 +47,9 @@ const INSERT_PATTERN = /insert\s+into\s+run_events\b/giu;
 
 /**
  * `pg_advisory_xact_lock(` suivi, dans la même instruction (fenêtre bornée,
- * sans `;` ni backtick, multi-ligne autorisé), de la clé `'ohb-run-events-cursor'`.
+ * sans `;` ni backtick, multi-ligne autorisé), de la clé `'openedbot-run-events-cursor'`.
  */
-const INLINE_LOCK_PATTERN = /pg_advisory_xact_lock\s*\([^;`]{0,240}?['"]ohb-run-events-cursor['"]/giu;
+const INLINE_LOCK_PATTERN = /pg_advisory_xact_lock\s*\([^;`]{0,240}?['"]openedbot-run-events-cursor['"]/giu;
 
 /** Appel d'un helper reconnu : identifiant contenant le fragment, suivi de `(`. */
 const HELPER_CALL_PATTERN = /\b[\w$]*(?:lockRunEventCursor|RunEventCursorLock)[\w$]*\s*\(/gu;
@@ -125,7 +125,7 @@ function listTypeScriptFiles(root: string): string[] {
 const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const SCANNED_ROOTS = ["apps/api/src", "apps/worker/src", "modules"] as const;
 
-describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () => {
+describe("Verrou de curseur avant chaque insert dans run_events", () => {
   test("chaque `insert into run_events` des sources est précédé d'un verrou d'organisation dans son fichier", () => {
     const failures: UnlockedRunEventInsert[] = [];
     let insertsSeen = 0;
@@ -145,7 +145,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
     const report = failures.map((failure) => `  - ${failure.path}:${failure.line}`).join("\n");
     expect(
       failures,
-      `insert into run_events sans pg_advisory_xact_lock(hashtext(<org>), hashtext('ohb-run-events-cursor')) antérieur dans le même fichier :\n${report}\n` +
+      `insert into run_events sans pg_advisory_xact_lock(hashtext(<org>), hashtext('openedbot-run-events-cursor')) antérieur dans le même fichier :\n${report}\n` +
         "Voir modules/conversation/src/sql/organization-cursor.ts (borne basse sous READ COMMITTED).",
     ).toEqual([]);
   });
@@ -168,7 +168,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
   test("un verrou placé APRÈS l'insert ne compte pas", () => {
     const fixture = [
       "await tx`insert into run_events (organization_id) values (${org})`;",
-      "await tx`select pg_advisory_xact_lock(hashtext(${org}), hashtext('ohb-run-events-cursor'))`;",
+      "await tx`select pg_advisory_xact_lock(hashtext(${org}), hashtext('openedbot-run-events-cursor'))`;",
     ].join("\n");
 
     expect(findUnlockedRunEventInserts(fixture, "fixture/late.ts")).toEqual([{ path: "fixture/late.ts", line: 1 }]);
@@ -177,7 +177,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
   test("le verrou inline multi-ligne avant l'insert est reconnu", () => {
     const fixture = [
       "await tx`select pg_advisory_xact_lock(",
-      "  hashtext(${auth.organizationId}), hashtext('ohb-run-events-cursor')",
+      "  hashtext(${auth.organizationId}), hashtext('openedbot-run-events-cursor')",
       ")`;",
       "await tx`",
       "  insert   into",
@@ -191,7 +191,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
     const fixture = [
       "await sql`",
       "  with locked as (",
-      "    select pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('ohb-run-events-cursor')) as locked",
+      "    select pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked",
       "    from runs where id = ${runId}",
       "  )",
       "  insert into run_events (organization_id) select organization_id from locked",
@@ -206,7 +206,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
       "await lockRunEventCursorTx(tx, organizationId);",
       "await tx`insert into run_events (organization_id) values (${org})`;",
       "async function lockRunEventCursorTx(tx, organizationId) {",
-      "  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('ohb-run-events-cursor'))`;",
+      "  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-run-events-cursor'))`;",
       "}",
     ].join("\n");
     expect(findUnlockedRunEventInserts(withCall, "fixture/helper-call.ts")).toEqual([]);
@@ -225,7 +225,7 @@ describe("OHB-18 : verrou de curseur avant chaque insert dans run_events", () =>
   test("une mention du helper en commentaire ne vaut pas verrou", () => {
     const fixture = [
       "// comme `lockRunEventCursorTx(` dans runner.ts",
-      "/* pg_advisory_xact_lock(hashtext(o), hashtext('ohb-run-events-cursor')) */",
+      "/* pg_advisory_xact_lock(hashtext(o), hashtext('openedbot-run-events-cursor')) */",
       "await tx`insert into run_events (organization_id) values (${org})`;",
     ].join("\n");
 

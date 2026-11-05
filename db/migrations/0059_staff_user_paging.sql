@@ -144,7 +144,7 @@ comment on function staff_search_users(text, text, int, timestamptz, text, uuid)
   'Page de comptes pour le backoffice staff : recherche e-mail / nom échappée, filtre d''assistance, borne plafonnée à 200 et curseur keyset (created_at, lower(email), id). Rend le total du filtre et le reste à partir du curseur ; ne remplace jamais une borne par un offset.';
 
 revoke all on function staff_search_users(text, text, int, timestamptz, text, uuid) from public;
-grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to ohb_api;
+grant execute on function staff_search_users(text, text, int, timestamptz, text, uuid) to openedbot_api;
 
 -- Compteurs du tableau de bord. Ils existent pour que l'écran d'accueil cesse
 -- de charger la liste complète pour afficher trois nombres : le prédicat
@@ -202,7 +202,7 @@ comment on function staff_user_counts() is
   'Compteurs de comptes du tableau de bord staff : total, inscriptions à 7 et 30 jours, comptes avec un accès actif (même prédicat que can_impersonate) et date du dernier compte créé.';
 
 revoke all on function staff_user_counts() from public;
-grant execute on function staff_user_counts() to ohb_api;
+grant execute on function staff_user_counts() to openedbot_api;
 
 -- Résolution d'un identifiant pour l'omnibox du backoffice.
 --
@@ -349,7 +349,7 @@ comment on function staff_resolve_reference(text) is
   'Omnibox du backoffice staff : résout un e-mail, un fragment d''e-mail ou un identifiant de compte, d''organisation, de runtime, de run ou de fil vers le compte à ouvrir. Ne rend jamais de contenu de message ni de titre de fil. Aucun requestId : le log technique vit chez le collecteur, hors base.';
 
 revoke all on function staff_resolve_reference(text) from public;
-grant execute on function staff_resolve_reference(text) to ohb_api;
+grant execute on function staff_resolve_reference(text) to openedbot_api;
 
 insert into schema_migrations(version) values ('0059_staff_user_paging')
 on conflict (version) do nothing;

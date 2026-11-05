@@ -18,8 +18,6 @@
     "./env-schema": "./src/env-schema.ts",
     "./hermes-timeouts": "./src/hermes-timeouts.ts",
     "./http-body": "./src/http-body.ts",
-    "./legacy-env": "./src/legacy-env.ts",
-    "./legacy-env-guard": "./src/legacy-env-guard.ts",
     "./rate-limit": "./src/rate-limit.ts",
     "./runtime-mode": "./src/runtime-mode.ts",
     "./sse-heartbeat": "./src/sse-heartbeat.ts"

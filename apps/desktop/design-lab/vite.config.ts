@@ -10,7 +10,7 @@ import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 const renderer = path.resolve(__dirname, "../src/renderer");
 const templatesDir = path.join(renderer, "templates");
 const TEMPLATE_NAME = /^[a-z0-9-]{1,40}$/;
-const VIRTUAL_ID = "virtual:ohb-templates";
+const VIRTUAL_ID = "virtual:openedbot-templates";
 const RESOLVED_ID = `\0${VIRTUAL_ID}`;
 
 // Where the desktop app reads its user settings (config.ts, userData =
@@ -47,9 +47,9 @@ function sendJson(res: import("node:http").ServerResponse, status: number, body:
   res.end(JSON.stringify(body));
 }
 
-function ohbLab(): Plugin {
+function openedbotLab(): Plugin {
   return {
-    name: "ohb-lab",
+    name: "openedbot-lab",
     resolveId: (id) => (id === VIRTUAL_ID ? RESOLVED_ID : null),
     load: (id) => (id === RESOLVED_ID ? `export default ${JSON.stringify(readTemplates())};` : null),
     configureServer(server: ViteDevServer) {
@@ -66,7 +66,7 @@ function ohbLab(): Plugin {
           server.ws.send({ type: "full-reload" });
           return;
         }
-        server.ws.send({ type: "custom", event: "ohb:renderer-changed", data: { file: relative, at: Date.now() } });
+        server.ws.send({ type: "custom", event: "openedbot:renderer-changed", data: { file: relative, at: Date.now() } });
       };
       server.watcher.on("change", (file) => notify(file, "change"));
       server.watcher.on("add", (file) => notify(file, "add"));
@@ -105,7 +105,7 @@ function ohbLab(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), ohbLab()],
+  plugins: [react(), openedbotLab()],
   publicDir: renderer,
   server: {
     port: 5317,

@@ -15,7 +15,7 @@ const BEARER = "bot-settings-bearer";
 const WORKER_SECRET = "integration-worker-secret";
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 
-await withDisposablePostgres("ohb131_bot_settings", async ({ owner, connect }) => {
+await withDisposablePostgres("openedbot131_bot_settings", async ({ owner, connect }) => {
   await owner`insert into users (id, email) values (${USER}, 'camille@example.com')`;
   await owner`insert into organizations (id, slug, name) values (${ORG_A}, 'acme', 'Acme'), (${ORG_B}, 'other', 'Other')`;
   await owner`insert into memberships (organization_id, user_id, role) values (${ORG_A}, ${USER}, 'owner')`;
@@ -43,7 +43,7 @@ await withDisposablePostgres("ohb131_bot_settings", async ({ owner, connect }) =
   await owner`insert into runtime_bot_settings_tools (organization_id, runtime_id, secret_hash, installed_at, enabled_bot_ids)
     values (${ORG_A}, ${RUNTIME}, ${botSettingsToolSecretHash(BEARER)}, now(), ${`{${BYPASS},${PLAN},${STALE},${REJECT},${SUPERSEDE}}`}::uuid[])`;
 
-  const db = await connect("ohb_api");
+  const db = await connect("openedbot_api");
   const app = new Hono<{ Variables: AppVariables }>();
   app.onError((error, context) => error instanceof HttpError
     ? context.json({ code: error.code }, error.status as 401)
@@ -75,7 +75,7 @@ await withDisposablePostgres("ohb131_bot_settings", async ({ owner, connect }) =
   const init = await (await post(ORG_A, BEARER, { jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2025-06-18" } })).json() as {
     result: { protocolVersion: string; serverInfo: { name: string } };
   };
-  assert(init.result.protocolVersion === "2025-06-18" && init.result.serverInfo.name === "ohb_bot_settings", "MCP initialize must identify the server");
+  assert(init.result.protocolVersion === "2025-06-18" && init.result.serverInfo.name === "openedbot_bot_settings", "MCP initialize must identify the server");
   const listed = await (await post(ORG_A, BEARER, { jsonrpc: "2.0", id: 3, method: "tools/list" })).json() as { result: { tools: Array<{ name: string }> } };
   assert(listed.result.tools.map((tool) => tool.name).join() === "bot_settings_propose", "tools/list must serve one tool");
   assert((await call(OFF, { reason: "test", label: "Off" })).error, "a bot without the switch must be refused");

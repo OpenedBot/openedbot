@@ -273,7 +273,7 @@ export function McpPanelView({
         </InsetGroupedSection>
 
         {mcp.catalog.length === 0 ? (
-          <p className="px-8 pt-4 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <p className="px-8 pt-4 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {t("connectorsSettings.mcpCatalogEmpty")}
           </p>
         ) : (

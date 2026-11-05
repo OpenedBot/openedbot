@@ -103,7 +103,7 @@ export function DecisionsSettings() {
     <>
       {rows.length === 0 ? (
         (
-          <p className={isMobile ? "px-8 py-4 text-[15px] text-[var(--ohb-grouped-caption)]" : "text-sm text-muted-foreground"}>
+          <p className={isMobile ? "px-8 py-4 text-[15px] text-[var(--openedbot-grouped-caption)]" : "text-sm text-muted-foreground"}>
             {t("decisions.empty")}
           </p>
         )
@@ -225,7 +225,7 @@ function DecisionsSkeleton({ label, stacked }: { label: string; stacked: boolean
     return (
       <div role="status" aria-label={label} className="flex flex-col gap-2 px-4">
         {[0, 1, 2, 3].map((index) => (
-          <div key={index} className="space-y-2 rounded-[20px] bg-[var(--ohb-grouped-card)] px-4 py-3">
+          <div key={index} className="space-y-2 rounded-[20px] bg-[var(--openedbot-grouped-card)] px-4 py-3">
             <Skeleton className="h-5 w-16 rounded-full motion-reduce:animate-none" />
             <Skeleton className="h-4 w-24 motion-reduce:animate-none" />
             <Skeleton className="h-3.5 w-full motion-reduce:animate-none" />
@@ -318,14 +318,14 @@ function DecisionCard({
     <li>
       <div data-inset-grouped-row="" className="relative flex min-h-16 flex-col justify-center gap-1 px-4 py-3">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0 flex-1 truncate text-[17px] leading-[22px] font-medium text-[var(--ohb-grouped-label)]">
+          <span className="min-w-0 flex-1 truncate text-[17px] leading-[22px] font-medium text-[var(--openedbot-grouped-label)]">
             {bot}
           </span>
-          <span className="shrink-0 text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">
+          <span className="shrink-0 text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">
             {formatDate(decision.issuedAt, {})}
           </span>
         </div>
-        <p className="line-clamp-2 font-mono text-[13px] leading-4 break-all text-[var(--ohb-grouped-caption)]">
+        <p className="line-clamp-2 font-mono text-[13px] leading-4 break-all text-[var(--openedbot-grouped-caption)]">
           {action}
         </p>
         <div className="flex items-center gap-2">
@@ -339,9 +339,9 @@ function DecisionCard({
             {denied ? t("decisions.denied") : t("decisions.allowed")}
           </span>
           <OriginBadge decision={decision} t={t} />
-          <span className="text-[13px] leading-4 text-[var(--ohb-grouped-caption)]">· {kind}</span>
+          <span className="text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]">· {kind}</span>
         </div>
-        <DecisionTrace decision={decision} className="text-[13px] leading-4 text-[var(--ohb-grouped-caption)]" />
+        <DecisionTrace decision={decision} className="text-[13px] leading-4 text-[var(--openedbot-grouped-caption)]" />
       </div>
     </li>
   );

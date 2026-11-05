@@ -27,7 +27,7 @@ const fixedNumber = (value: number, options?: Intl.NumberFormatOptions) =>
   value.toLocaleString("fr-FR", options);
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(cleanup);
@@ -122,7 +122,7 @@ describe("answer stream words", () => {
     view.rerender(<ThreadMarkdown streaming>{"Bonjour à tous, voici"}</ThreadMarkdown>);
     expect(view.container.querySelector(".grok-w")).toBe(first);
     expect(words(view.container)).toEqual(["Bonjour ", "à ", "tous, ", "voici"]);
-    expect(view.container.querySelector(".ohb-stream-caret, .ohb-stream-tail")).toBeNull();
+    expect(view.container.querySelector(".openedbot-stream-caret, .openedbot-stream-tail")).toBeNull();
   });
 
   test("a streamed lead title still reads as a title", () => {
@@ -236,8 +236,8 @@ describe("thread timeline status and action row", () => {
 describe("prefers-reduced-motion", () => {
   test("the block reveal, the fade-up and the caret blink stop", () => {
     const reduced = reducedMotion(css("thread-timeline.css"));
-    expect(reduced).toMatch(/\.ohb-reveal,\s*\.ohb-fade-up \{\s*animation: none;/);
-    expect(reduced).toMatch(/\.ohb-stream-caret \{\s*animation: none;/);
+    expect(reduced).toMatch(/\.openedbot-reveal,\s*\.openedbot-fade-up \{\s*animation: none;/);
+    expect(reduced).toMatch(/\.openedbot-stream-caret \{\s*animation: none;/);
   });
 
   test("every grok.com motion stops: words, feed, dots, shimmer, pop", () => {
@@ -250,9 +250,9 @@ describe("prefers-reduced-motion", () => {
 
   test("the dots' pop-in and the guide draw stop", () => {
     // Grok Bot's typing dots never wave: only their pop-in moves.
-    expect(css("agent-activity.css")).not.toMatch(/\.ohb-thinking-dots > i \{[^}]*animation/);
-    expect(reducedMotion(css("thread-motion.css"))).toContain(".ohb-typing-enter .ohb-thinking-dots");
-    expect(reducedMotion(css("agent-activity.css"))).toMatch(/\.ohb-activity-list \[data-activity-row\]::before \{\s*animation: none;/);
+    expect(css("agent-activity.css")).not.toMatch(/\.openedbot-thinking-dots > i \{[^}]*animation/);
+    expect(reducedMotion(css("thread-motion.css"))).toContain(".openedbot-typing-enter .openedbot-thinking-dots");
+    expect(reducedMotion(css("agent-activity.css"))).toMatch(/\.openedbot-activity-list \[data-activity-row\]::before \{\s*animation: none;/);
   });
 });
 
@@ -280,19 +280,19 @@ describe("grok.com's thread theme", () => {
   });
 
   test("the bubbles are Grok Bot's: agent veil, user ink or the bot's fill, per theme", () => {
-    expect(theme).toContain("--ohb-bubble-agent: rgb(28 28 28 / 0.06);");
-    expect(theme).toContain("--ohb-bubble-agent: rgb(245 245 245 / 0.04);");
-    expect(theme).toContain("--ohb-bubble-user: #1c1c1c;");
-    expect(theme).toContain("--ohb-bubble-user: rgb(245 245 245 / 0.18);");
-    expect(theme).toMatch(/\[data-assistant-layout="grok"\] \{\s*background-color: var\(--ohb-bubble-agent\);/);
-    expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--ohb-user-fill, var\(--ohb-bubble-user\)\);/);
-    expect(theme).toMatch(/\.dark \[data-thread-column\] \{\s*--ohb-user-fill: var\(--ohb-user-fill-dark\);/);
+    expect(theme).toContain("--openedbot-bubble-agent: rgb(28 28 28 / 0.06);");
+    expect(theme).toContain("--openedbot-bubble-agent: rgb(245 245 245 / 0.04);");
+    expect(theme).toContain("--openedbot-bubble-user: #1c1c1c;");
+    expect(theme).toContain("--openedbot-bubble-user: rgb(245 245 245 / 0.18);");
+    expect(theme).toMatch(/\[data-assistant-layout="grok"\] \{\s*background-color: var\(--openedbot-bubble-agent\);/);
+    expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--openedbot-user-fill, var\(--openedbot-bubble-user\)\);/);
+    expect(theme).toMatch(/\.dark \[data-thread-column\] \{\s*--openedbot-user-fill: var\(--openedbot-user-fill-dark\);/);
   });
 
   test("inline code is Grok Bot's in both themes: the text's ink on a 4 % / 2 % veil", () => {
-    expect(theme).toContain("--ohb-code-inline: rgb(28 28 28 / 0.04);");
-    expect(theme).toContain("--ohb-code-inline: rgb(245 245 245 / 0.02);");
-    expect(theme).toMatch(/\.prose :not\(pre\) > code \{\s*color: inherit;\s*background-color: var\(--ohb-code-inline\);/);
+    expect(theme).toContain("--openedbot-code-inline: rgb(28 28 28 / 0.04);");
+    expect(theme).toContain("--openedbot-code-inline: rgb(245 245 245 / 0.02);");
+    expect(theme).toMatch(/\.prose :not\(pre\) > code \{\s*color: inherit;\s*background-color: var\(--openedbot-code-inline\);/);
     // Typography's inks follow the thread tokens, never its light-only defaults.
     expect(theme).toContain("--tw-prose-code: var(--grok-fg);");
   });

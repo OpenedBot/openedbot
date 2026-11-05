@@ -13,7 +13,7 @@ insert into runtimes (id, organization_id, name, reachability, link_token_hash, 
 insert into bot_profile_provisions (bot_id, organization_id, runtime_id, slug, display_name) values
   ('7c000000-0000-4000-8000-000000000021', '7c000000-0000-4000-8000-000000000001', '7c000000-0000-4000-8000-000000000031', 'a', 'A'),
   ('7d000000-0000-4000-8000-000000000022', '7d000000-0000-4000-8000-000000000002', '7d000000-0000-4000-8000-000000000032', 'b', 'B');
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '7c000000-0000-4000-8000-000000000001', false) \g /dev/null
 do $$
 begin

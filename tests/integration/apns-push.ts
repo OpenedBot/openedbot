@@ -95,7 +95,7 @@ const apns: ApnsConfig = {
 const transport = createApnsTransport(apns, { timeoutMs: 2_000 });
 
 const source = await adminUrl();
-const database = `ohb108_apns_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot108_apns_${crypto.randomUUID().replaceAll("-", "")}`;
 const adminDb = new SQL({ url: source.toString(), max: 1 });
 let target: SQL | null = null;
 let api: SQL | null = null;
@@ -187,12 +187,12 @@ function journalFor(token: string): FakeApnsDelivery[] {
 
 try {
   await adminDb.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await adminDb.unsafe(`create database "${database}"`);
   databaseCreated = true;
-  await adminDb.unsafe(`grant connect on database "${database}" to ohb_api, ohb_worker`);
+  await adminDb.unsafe(`grant connect on database "${database}" to openedbot_api, openedbot_worker`);
 
   target = new SQL({ url: databaseUrl(source, database, source.username, source.password), max: 1 });
   for (const migration of (await readdir(resolve(root, "db/migrations"))).filter((name) => name.endsWith(".sql")).sort()) {
@@ -216,8 +216,8 @@ try {
   await target`insert into threads (id, organization_id, group_id, title, hermes_session_id) values
     (${GROUP_THREAD}, ${ORG_A}, ${GROUP_A}, 'secret group title', 'apns:group')`;
 
-  api = new SQL({ url: databaseUrl(source, database, "ohb_api", "ohb_api_dev"), max: 2 });
-  worker = new SQL({ url: databaseUrl(source, database, "ohb_worker", "ohb_worker_dev"), max: 2 });
+  api = new SQL({ url: databaseUrl(source, database, "openedbot_api", "openedbot_api_dev"), max: 2 });
+  worker = new SQL({ url: databaseUrl(source, database, "openedbot_worker", "openedbot_worker_dev"), max: 2 });
   const ownerA = authOf(ORG_A, OWNER_A);
   const memberA = authOf(ORG_A, MEMBER_A, "member");
   const ownerB = authOf(ORG_B, OWNER_B);
@@ -338,7 +338,7 @@ try {
     `headers: ${JSON.stringify(toOwner)}`);
   assert(JSON.stringify(toOwner.payload) === JSON.stringify({
     aps: { alert: { title: "Atlas", body: "Routine terminée" }, sound: "default", "thread-id": DM_THREAD },
-    ohb: { kind: "workflow", threadId: DM_THREAD, organizationId: ORG_A },
+    openedbot: { kind: "workflow", threadId: DM_THREAD, organizationId: ORG_A },
   }), `payload: ${JSON.stringify(toOwner.payload)}`);
   assert(!JSON.stringify(fake.journal()).includes(SECRET_OUTPUT) && !JSON.stringify(fake.journal()).includes("secret"),
     "no workflow output, prompt or thread title leaves");
@@ -358,7 +358,7 @@ try {
     `approval headers: ${JSON.stringify(approvalToOwner)}`);
   assert(JSON.stringify(approvalToOwner.payload) === JSON.stringify({
     aps: { alert: { title: "Salon Nord", body: "Approbation en attente" }, sound: "default", "thread-id": GROUP_THREAD },
-    ohb: { kind: "approval", threadId: GROUP_THREAD, organizationId: ORG_A },
+    openedbot: { kind: "approval", threadId: GROUP_THREAD, organizationId: ORG_A },
   }), `approval payload: ${JSON.stringify(approvalToOwner.payload)}`);
 
   // Another tenant's transition never reaches tenant A devices.

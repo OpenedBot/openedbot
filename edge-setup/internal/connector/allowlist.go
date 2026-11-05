@@ -20,7 +20,7 @@ const idSeg = `[A-Za-z0-9._~-]{1,128}`
 
 // sessionSeg is a Hermes session id: a run id's grammar PLUS the colon.
 //
-// Every session openedbot opens is named `ohb:<org>:<...>`, and
+// Every session openedbot opens is named `openedbot:<org>:<...>`, and
 // encodeURIComponent writes that colon as `%3A` in the path. idSeg knows
 // neither form, so an allowlist built on it refuses all three session routes
 // for the only name openedbot can produce.
@@ -30,7 +30,7 @@ const idSeg = `[A-Za-z0-9._~-]{1,128}`
 // percent form, which the gateway would decode back into a path, stays
 // impossible.
 //
-// 256: the longest key, `ohb:<uuid>:workflow:<uuid>:bot:<uuid>`, is 127
+// 256: the longest key, `openedbot:<uuid>:workflow:<uuid>:bot:<uuid>`, is 127
 // characters, 137 once its five colons are escaped.
 const sessionSeg = `(?:[A-Za-z0-9._~-]|%3[Aa]){1,256}`
 
@@ -72,7 +72,7 @@ var Allowlist = []Route{
 	{Method: "GET", Path: regexp.MustCompile(`^/api/sessions/` + sessionSeg + `/messages$`)},
 	// The link's only destructive gateway write: erasing a session openedbot
 	// created here, when the operator purges the bot that owned it. It can only
-	// name an `ohb:<org>:<thread>` id, the only identifier openedbot knows,
+	// name an `openedbot:<org>:<thread>` id, the only identifier openedbot knows,
 	// touches neither the profile nor the host.
 	{Method: "DELETE", Path: regexp.MustCompile(`^/api/sessions/` + sessionSeg + `$`)},
 	{Method: "POST", Path: regexp.MustCompile(`^/v1/runs$`)},

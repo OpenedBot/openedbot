@@ -194,12 +194,12 @@ describe("le flux du guichet côté visiteur", () => {
 
 describe("le flux du guichet dans la coque desktop", () => {
   afterEach(() => {
-    delete window.__OHB_NATIVE__;
+    delete window.__OPENEDBOT_NATIVE__;
   });
 
   test("un compte sans jeton de guichet présente son Bearer, relu à chaque reconnexion", async () => {
     const tokens = ["acces-1", "acces-2"];
-    window.__OHB_NATIVE__ = {
+    window.__OPENEDBOT_NATIVE__ = {
       readAccessToken: async () => tokens.shift() ?? null,
       refresh: async () => null,
       openExternal: async () => undefined,

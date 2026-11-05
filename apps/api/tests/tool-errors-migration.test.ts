@@ -10,12 +10,12 @@ describe("contrat de la migration 0037_tool_errors", () => {
     expect(sql).toContain("insert into schema_migrations(version) values ('0037_tool_errors')");
   });
 
-  test("RLS tenant forcée pour ohb_api, ouverte pour le worker qui écrit hors tenant", () => {
+  test("RLS tenant forcée pour openedbot_api, ouverte pour le worker qui écrit hors tenant", () => {
     expect(sql).toContain("alter table tool_errors enable row level security;");
     expect(sql).toContain("alter table tool_errors force row level security;");
-    expect(sql).toContain("create policy tool_errors_tenant on tool_errors to ohb_api");
+    expect(sql).toContain("create policy tool_errors_tenant on tool_errors to openedbot_api");
     expect(sql).toContain("nullif(current_setting('app.organization_id', true), '')::uuid");
-    expect(sql).toContain("create policy tool_errors_worker on tool_errors to ohb_worker");
+    expect(sql).toContain("create policy tool_errors_worker on tool_errors to openedbot_worker");
   });
 
   test("la purge d'un bot emporte ses lignes ; l'opérateur est nullable et détaché à son départ", () => {

@@ -169,6 +169,6 @@ func testConfig(t *testing.T, r exec.Runner) launchd.Config {
 	t.Helper()
 	home := t.TempDir()
 	return launchd.Config{Runner: r, LaunchctlPath: "/bin/launchctl", UID: 501, HomeDir: home,
-		ExecutablePath: "/opt/ohb/edge-setup", CredentialsDirectory: filepath.Join(home, "credentials"),
+		ExecutablePath: "/opt/openedbot/edge-setup", CredentialsDirectory: filepath.Join(home, "credentials"),
 		StateDirectory: filepath.Join(home, "state"), Instance: "dev"}
 }

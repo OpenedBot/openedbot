@@ -80,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
             ? "min-h-0 h-full bg-sidebar"
             : isMobile
               ? "min-h-0 h-full"
-              : "h-svh pt-[var(--ohb-safe-top)] pr-[var(--ohb-safe-right)] pb-[var(--ohb-safe-bottom)] pl-[var(--ohb-safe-left)]",
+              : "h-svh pt-[var(--openedbot-safe-top)] pr-[var(--openedbot-safe-right)] pb-[var(--openedbot-safe-bottom)] pl-[var(--openedbot-safe-left)]",
         )}
         style={
           {
@@ -111,8 +111,8 @@ export function Shell({ children }: { children: ReactNode }) {
 }
 
 /**
- * Recopie le mode de la coque sur `<html>` (`data-ohb-shell`,
- * `data-ohb-pwa-standalone`, `data-ohb-ios-device`) pour `mobile.css`.
+ * Recopie le mode de la coque sur `<html>` (`data-openedbot-shell`,
+ * `data-openedbot-pwa-standalone`, `data-openedbot-ios-device`) pour `mobile.css`.
  *
  * La CSS lisait `html:has([data-shell="mobile"]) ...` : un `:has()` sur la
  * racine oblige Chrome à revalider le style de tout le document à CHAQUE
@@ -125,13 +125,13 @@ export function Shell({ children }: { children: ReactNode }) {
 function useRootShellAttributes(mobileShell: boolean, standalone: boolean, ios: boolean): void {
   useLayoutEffect(() => {
     const root = document.documentElement;
-    root.setAttribute("data-ohb-shell", mobileShell ? "mobile" : "desktop");
-    root.toggleAttribute("data-ohb-pwa-standalone", standalone);
-    root.toggleAttribute("data-ohb-ios-device", ios);
+    root.setAttribute("data-openedbot-shell", mobileShell ? "mobile" : "desktop");
+    root.toggleAttribute("data-openedbot-pwa-standalone", standalone);
+    root.toggleAttribute("data-openedbot-ios-device", ios);
     return () => {
-      root.removeAttribute("data-ohb-shell");
-      root.removeAttribute("data-ohb-pwa-standalone");
-      root.removeAttribute("data-ohb-ios-device");
+      root.removeAttribute("data-openedbot-shell");
+      root.removeAttribute("data-openedbot-pwa-standalone");
+      root.removeAttribute("data-openedbot-ios-device");
     };
   }, [mobileShell, standalone, ios]);
 }

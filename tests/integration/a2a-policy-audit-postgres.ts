@@ -24,7 +24,7 @@ const RUNTIME_DENIED = "84000000-0000-4000-8000-000000000023";
 const TASK_UPSTREAM = "task-0123456789abcdef";
 const TASK_PROBE = "task-fedcba9876543210";
 const SAME_TS = 1_760_000_000;
-const REPORT_PATH = "/tmp/ohb84-audit-postgres.json";
+const REPORT_PATH = "/tmp/openedbot84-audit-postgres.json";
 
 const report: Record<string, boolean | number> = {
   ownerUrlLoopbackValidated: false,
@@ -178,9 +178,9 @@ async function run(): Promise<void> {
   let failed = false;
   try {
     process.env.INTEGRATION_ADMIN_DATABASE_URL = await ownerAdminUrl();
-    await withDisposablePostgres("ohb84_audit_policy", async ({ owner, connect }) => {
+    await withDisposablePostgres("openedbot84_audit_policy", async ({ owner, connect }) => {
       const current = await owner<Array<{ name: string }>>`select current_database() as name`;
-      check(/^ohb84_audit_policy_[a-f0-9]{32}$/.test(current[0]?.name ?? "") && current[0]?.name !== "ohb",
+      check(/^openedbot84_audit_policy_[a-f0-9]{32}$/.test(current[0]?.name ?? "") && current[0]?.name !== "openedbot",
         "The generated disposable database name did not pass its safety check.");
       disposableDatabaseName = current[0]!.name;
       report.freshDatabaseNameValidated = true;
@@ -217,8 +217,8 @@ async function run(): Promise<void> {
           values (${runtimeId}, ${organizationId}, 'audit fixture', 'https://runtime.invalid', 'cipher', 'nonce', 'tag', true)`;
       }
 
-      const api = await connect("ohb_api");
-      const worker = await connect("ohb_worker");
+      const api = await connect("openedbot_api");
+      const worker = await connect("openedbot_worker");
       const scopeA: Scope = { userId: USER, agencyId: AGENCY, clientId: CLIENT_A };
       const scopeB: Scope = { userId: USER, agencyId: AGENCY, clientId: CLIENT_B };
       const deniedScope: Scope = { userId: USER, agencyId: AGENCY, clientId: CLIENT_DENIED };
@@ -322,7 +322,7 @@ async function run(): Promise<void> {
         workerQueryThrew = true;
       }
       const workerPrivilege = await owner<Array<{ allowed: boolean }>>`
-        select has_table_privilege('ohb_worker', 'runtime_a2a_audit', 'select') as allowed`;
+        select has_table_privilege('openedbot_worker', 'runtime_a2a_audit', 'select') as allowed`;
       workerDenied = workerQueryThrew && workerPrivilege[0]?.allowed === false;
       report.workerSelectDenied = workerDenied;
       check(workerDenied, "The worker role could read the A2A audit projection.");

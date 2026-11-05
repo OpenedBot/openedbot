@@ -34,7 +34,7 @@ function app(options: { enabled?: boolean; kind?: "web" | "native"; staff?: bool
 
 function request(path = "/api/bots", method = "GET") {
   return new Request(`http://localhost${path}`, { method, headers: {
-    Cookie: "ohb_session=test", "X-OpenedBot-Organization": B, "X-CSRF-Token": "csrf",
+    Cookie: "openedbot_session=test", "X-OpenedBot-Organization": B, "X-CSRF-Token": "csrf",
   } });
 }
 
@@ -131,7 +131,7 @@ describe("agency tenant boundary", () => {
         actingFleetId: AG, method: "POST", path: "/*", status: 200 })]);
       const serialized = JSON.stringify(entries);
       expect(serialized).not.toContain("fixture-sensitive-segment");
-      expect(serialized).not.toContain("ohb_session");
+      expect(serialized).not.toContain("openedbot_session");
       expect(serialized).not.toContain("csrf");
     } finally { log.mockRestore(); }
   });

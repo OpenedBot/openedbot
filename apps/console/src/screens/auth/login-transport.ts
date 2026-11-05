@@ -4,7 +4,7 @@ import type { NativeAuthBridge, NativeSigninState } from "../../lib/platform/nat
 /**
  * Où part la connexion de l'écran `/login`. Un seul écran, deux transports :
  * - **web** : l'API directement, la session devient un cookie ;
- * - **native** : la coque desktop (`__OHB_NATIVE__.auth`), qui garde le PKCE
+ * - **native** : la coque desktop (`__OPENEDBOT_NATIVE__.auth`), qui garde le PKCE
  *   et ses jetons dans son processus principal. Elle répond par des états
  *   (`onState`) ; ce module les remet en promesses pour que l'écran n'ait
  *   qu'une seule façon d'attendre.

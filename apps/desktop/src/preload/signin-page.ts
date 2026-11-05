@@ -142,8 +142,8 @@ const MESSAGES: Record<Locale, Messages> = {
   },
 };
 
-const LOCALE_KEY = "ohb:signin-locale";
-const THEME_KEY = "ohb:signin-theme";
+const LOCALE_KEY = "openedbot:signin-locale";
+const THEME_KEY = "openedbot:signin-theme";
 // A template name becomes a file name: same rule as config.ts.
 const TEMPLATE_PATTERN = /^[a-z0-9-]{1,40}$/;
 

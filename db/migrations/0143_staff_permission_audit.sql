@@ -1,6 +1,6 @@
 begin;
 
--- PERM2-11 (DEV-OHB-262): the staff audit of permission decisions.
+-- PERM2-11: the staff audit of permission decisions.
 --
 -- Read-only, cross-tenant, staff only. Same guard as
 -- `staff_runtime_connectors` (0102): every function is `security definer` and
@@ -94,7 +94,7 @@ comment on function staff_permission_decision_stats(int) is
   'PERM2-11: gates of the last p_days days (1 to 90) counted by pipeline, stage, decider, outcome and gate kind. Staff read only, no gate text.';
 
 revoke all on function staff_permission_decision_stats(int) from public;
-grant execute on function staff_permission_decision_stats(int) to ohb_api;
+grant execute on function staff_permission_decision_stats(int) to openedbot_api;
 
 -- The latest gates, newest first, one stage at a time or all of them.
 -- `p_stage` is a pipeline stage, `legacy` for gates without the pipeline
@@ -193,7 +193,7 @@ comment on function staff_permission_decisions(text, int, timestamptz) is
   'PERM2-11: latest gates, filtered by stage (or legacy), with who or what decided and the reason codes of decision_detail only. Staff read only, p_limit bounded to 500.';
 
 revoke all on function staff_permission_decisions(text, int, timestamptz) from public;
-grant execute on function staff_permission_decisions(text, int, timestamptz) to ohb_api;
+grant execute on function staff_permission_decisions(text, int, timestamptz) to openedbot_api;
 
 -- Bots to watch: stored in `bypass`, or in a `v2` organization whose host
 -- policy is not proven effective (PERM2-2: no run starts). The expected host
@@ -265,7 +265,7 @@ comment on function staff_permission_bots(int) is
   'PERM2-11: live bots in bypass, or whose host policy is not proven effective under v2 (PERM2-2), with the organization ceiling. Staff read only, p_limit bounded to 2000.';
 
 revoke all on function staff_permission_bots(int) from public;
-grant execute on function staff_permission_bots(int) to ohb_api;
+grant execute on function staff_permission_bots(int) to openedbot_api;
 
 insert into schema_migrations(version) values ('0143_staff_permission_audit');
 commit;

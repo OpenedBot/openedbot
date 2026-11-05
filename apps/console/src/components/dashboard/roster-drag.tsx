@@ -342,7 +342,7 @@ export function RosterDragProvider({
         if (!started) {
           if (Math.hypot(move.clientX - startX, move.clientY - startY) < DRAG_SLOP) return;
           started = true;
-          document.body.classList.add("ohb-roster-dragging");
+          document.body.classList.add("openedbot-roster-dragging");
           handlers.start();
         }
         handlers.move(move.clientX, move.clientY);
@@ -361,7 +361,7 @@ export function RosterDragProvider({
         window.removeEventListener("dragstart", onNativeDrag, { capture: true });
         if (frame) cancelAnimationFrame(frame);
         if (!started) return;
-        document.body.classList.remove("ohb-roster-dragging");
+        document.body.classList.remove("openedbot-roster-dragging");
         // Le `click` qui suit le relâchement ouvrirait le fil (ou replierait la
         // section) qu'on vient de déposer. Il part dans la même tâche que le
         // `pointerup` ; s'il ne vient pas, le garde se désarme aussitôt.

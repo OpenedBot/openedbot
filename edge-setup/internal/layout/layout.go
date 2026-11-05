@@ -1,7 +1,7 @@
 // Package layout fixes the on-disk namespace of everything edge-setup
 // (formerly hermes-setup) creates. The names are a contract with hosts
 // already provisioned (units, state markers, backups): renaming one requires
-// a migration, never a silent change. The tool rename (OHB-87) kept every
+// a migration, never a silent change. The tool rename kept every
 // path below as it was, except the installed binary's own filename and its
 // PATH copies, where a hermes-setup symlink alias now sits next to the
 // canonical edge-setup file so an already-provisioned host keeps working.
@@ -112,7 +112,7 @@ const (
 	ToolQuarantineDir = ToolStateDir + "/quarantine"
 	ToolInstallDir    = "/usr/local/lib/hermes-setup"
 	// ToolInstalledPath is the canonical installed binary since the
-	// edge-setup rename (OHB-87); ToolAliasPath is the pre-rename filename,
+	// edge-setup rename; ToolAliasPath is the pre-rename filename,
 	// kept as a symlink to it in the same directory.
 	ToolInstalledPath = ToolInstallDir + "/edge-setup"
 	ToolAliasPath     = ToolInstallDir + "/hermes-setup"
@@ -140,7 +140,7 @@ var ToolPathCopies = []string{"/usr/local/sbin/edge-setup", "/usr/sbin/edge-setu
 // ToolLegacyPathCopies are the pre-rename names of ToolPathCopies, in the
 // same directories, index for index. `upgrade` keeps each one that exists as
 // a symlink pointing at its edge-setup sibling, so a script or a habit that
-// still types hermes-setup keeps running the same build (OHB-87).
+// still types hermes-setup keeps running the same build.
 var ToolLegacyPathCopies = []string{"/usr/local/sbin/hermes-setup", "/usr/sbin/hermes-setup", "/usr/local/bin/hermes-setup"}
 
 // ToolPathLink is the symlink `up` and `upgrade` keep pointing at the

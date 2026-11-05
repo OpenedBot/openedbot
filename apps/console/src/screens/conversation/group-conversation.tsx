@@ -74,7 +74,7 @@ export function GroupConversationScreen() {
     thread.data?.id === group?.threadId ? thread.data : null,
   );
 
-  // Content-stable, like the direct thread (OHB-135, OHB-141): the 202, the
+  // Content-stable, like the direct thread: the 202, the
   // read receipt and every SSE flush patch the roster; a new array or Map
   // with the same content would re-run the thread model and every turn
   // signature for nothing.
@@ -367,7 +367,7 @@ export function GroupConversationScreen() {
           guichet reste dans sa carte. */}
       <div className="relative flex min-h-0 flex-1">
         {/* `data-thread-column` : même colonne de lecture que le fil d'un bot
-            (`--ohb-thread-column`, thread-timeline.css). Sans elle, messages,
+            (`--openedbot-thread-column`, thread-timeline.css). Sans elle, messages,
             docks et composer du salon s'étiraient sur toute la fenêtre. */}
         <div data-thread-column="" className="flex min-h-0 min-w-0 flex-1 flex-col">
           {isMobile ? null : header}

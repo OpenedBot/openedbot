@@ -37,8 +37,8 @@ import { fleetWorkspacesEnabled, readResolvedProductFeatures, sessionEntitlement
 
 import { agencyRequestAllowed, assertWorkspaceId, EMPTY_WORKSPACE_ID, isAccountIdentityPath } from "@openedbot/identity/domain/workspace-access";
 
-const SESSION_COOKIE = "ohb_session";
-const CSRF_COOKIE = "ohb_csrf";
+const SESSION_COOKIE = "openedbot_session";
+const CSRF_COOKIE = "openedbot_csrf";
 
 export type AuthContext = {
   sessionId: string;

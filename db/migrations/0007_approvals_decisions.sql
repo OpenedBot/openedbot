@@ -119,7 +119,7 @@ create trigger approval_requests_sync_forward_state_legacy
 before insert or update of status, selected_choice, forwarded_at on approval_requests
 for each row execute function sync_approval_forward_state_legacy();
 
--- La télémétrie transverse ne peut pas passer par une requête ohb_api
+-- La télémétrie transverse ne peut pas passer par une requête openedbot_api
 -- ordinaire : FORCE RLS masque, à raison, les lignes sans
 -- app.organization_id. Ce definer expose UNE ligne agrégée : aucun id de
 -- tenant/user/bot/run/workflow ni contenu persisté ne sort de la fonction.
@@ -249,27 +249,27 @@ as $$
 $$;
 
 revoke all on function internal_operational_metrics() from public;
-grant execute on function internal_operational_metrics() to ohb_api;
+grant execute on function internal_operational_metrics() to openedbot_api;
 
 alter table approval_requests enable row level security;
 alter table approval_requests force row level security;
 alter table decisions enable row level security;
 alter table decisions force row level security;
 
-create policy approval_requests_tenant on approval_requests to ohb_api
+create policy approval_requests_tenant on approval_requests to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy approval_requests_worker on approval_requests to ohb_worker using (true) with check (true);
+create policy approval_requests_worker on approval_requests to openedbot_worker using (true) with check (true);
 
-create policy decisions_tenant on decisions to ohb_api
+create policy decisions_tenant on decisions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy decisions_worker on decisions to ohb_worker using (true) with check (true);
+create policy decisions_worker on decisions to openedbot_worker using (true) with check (true);
 
-grant select, insert, update, delete on approval_requests to ohb_api;
-grant select, insert, update, delete on approval_requests to ohb_worker;
-grant select, insert on decisions to ohb_api;
-grant select, insert on decisions to ohb_worker;
+grant select, insert, update, delete on approval_requests to openedbot_api;
+grant select, insert, update, delete on approval_requests to openedbot_worker;
+grant select, insert on decisions to openedbot_api;
+grant select, insert on decisions to openedbot_worker;
 
 insert into schema_migrations(version) values ('0007_approvals_decisions')
 on conflict (version) do nothing;

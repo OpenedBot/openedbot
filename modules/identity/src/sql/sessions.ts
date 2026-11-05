@@ -97,7 +97,7 @@ async function insertNativeSession(
  * déjà commitée, jamais l'entre-deux où aucune n'est vivante.
  */
 export async function lockUserSessions(tx: TransactionDb, userId: string): Promise<void> {
-  await tx`select pg_advisory_xact_lock(hashtext(${userId}), hashtext('ohb-user-sessions'))`;
+  await tx`select pg_advisory_xact_lock(hashtext(${userId}), hashtext('openedbot-user-sessions'))`;
 }
 
 /** Une session vivante telle que la porte d'authentification la lit. */

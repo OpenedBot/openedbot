@@ -5,7 +5,7 @@ import {
 } from "@openedbot/browser-api-client/support-stream";
 import type { SupportEventDto } from "@openedbot/contracts-api";
 import { API_ORIGIN } from "../api";
-import { nativeBridge, type OhbNativeBridge } from "../platform/native-bridge";
+import { nativeBridge, type OpenedbotNativeBridge } from "../platform/native-bridge";
 
 /**
  * Le flux du guichet, côté visiteur.
@@ -65,7 +65,7 @@ export function openSupportStream(input: {
  * connecté qui ouvre son fil sans jeton de guichet prend un 401 et le flux
  * s'arrête. Le jeton est relu à chaque (re)connexion, parce qu'il tourne.
  */
-function withNativeBearer(fetchImpl: typeof fetch, bridge: OhbNativeBridge | null): typeof fetch {
+function withNativeBearer(fetchImpl: typeof fetch, bridge: OpenedbotNativeBridge | null): typeof fetch {
   if (!bridge) return fetchImpl;
   const authorized = async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const token = await bridge.readAccessToken();

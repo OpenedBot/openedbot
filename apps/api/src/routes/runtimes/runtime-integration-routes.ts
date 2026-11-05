@@ -18,7 +18,7 @@ export { publicEndpoint, publicWriteError, runtimeIntegrationInventory } from ".
  * La route est réservée aux propriétaires et administrateurs : elle révèle la
  * topologie d'outils de l'organisation.
  *
- * OHB-15 reste vrai : l'API n'ouvre AUCUNE session shell vers la machine d'un
+ * Toujours vrai : l'API n'ouvre AUCUNE session shell vers la machine d'un
  * client et ne détient aucune clé qui en ouvrirait une. Les écritures de ce
  * fichier passent toutes par le même canal HTTPS déjà authentifié que les
  * runs, jusqu'à l'opérateur `edge-setup` de l'hôte, et se limitent à des

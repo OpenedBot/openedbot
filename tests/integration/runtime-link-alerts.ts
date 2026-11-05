@@ -25,7 +25,7 @@ const freshRuntime = "87000000-0000-4000-8000-000000000022";
 const staleRuntime = "87000000-0000-4000-8000-000000000023";
 const healthyRuntime = "87000000-0000-4000-8000-000000000024";
 const staffId = "87000000-0000-4000-8000-000000000031";
-const options = { downAfterMinutes: 5, webAppUrl: "https://console.ohb.test/", environment: "dev" };
+const options = { downAfterMinutes: 5, webAppUrl: "https://console.openedbot.test/", environment: "dev" };
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -66,7 +66,7 @@ function databaseUrl(source: URL, database: string, username: string, password: 
 }
 
 const source = await adminUrl();
-const database = `ohb87_alerts_${crypto.randomUUID().replaceAll("-", "")}`;
+const database = `openedbot87_alerts_${crypto.randomUUID().replaceAll("-", "")}`;
 const adminDb = new SQL({ url: source.toString(), max: 1 });
 let target: SQL | null = null;
 let api: SQL | null = null;
@@ -75,12 +75,12 @@ let databaseCreated = false;
 
 try {
   await adminDb.unsafe(`do $$ begin
-    if not exists (select from pg_roles where rolname = 'ohb_api') then create role ohb_api login password 'ohb_api_dev' nosuperuser nocreatedb nocreaterole; end if;
-    if not exists (select from pg_roles where rolname = 'ohb_worker') then create role ohb_worker login password 'ohb_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_api') then create role openedbot_api login password 'openedbot_api_dev' nosuperuser nocreatedb nocreaterole; end if;
+    if not exists (select from pg_roles where rolname = 'openedbot_worker') then create role openedbot_worker login password 'openedbot_worker_dev' nosuperuser nocreatedb nocreaterole; end if;
   end $$`);
   await adminDb.unsafe(`create database "${database}"`);
   databaseCreated = true;
-  await adminDb.unsafe(`grant connect on database "${database}" to ohb_api, ohb_worker`);
+  await adminDb.unsafe(`grant connect on database "${database}" to openedbot_api, openedbot_worker`);
 
   target = new SQL({ url: databaseUrl(source, database, source.username, source.password), max: 1 });
   for (const migration of (await readdir(resolve(root, "db/migrations"))).filter((name) => name.endsWith(".sql")).sort()) {
@@ -88,13 +88,13 @@ try {
   }
 
   await target`insert into organizations (id, slug, name) values
-      (${organizationA}, 'ohb87-a', 'OHB-87 A'),
-      (${organizationB}, 'ohb87-b', 'OHB-87 B')`;
+      (${organizationA}, 'openedbot87-a', 'Link alerts A'),
+      (${organizationB}, 'openedbot87-b', 'Link alerts B')`;
   await target`insert into users (id, email, display_name) values
-      (${pairer}, 'ohb87-pairer@example.test', 'Pairer'),
-      (${owner}, 'ohb87-owner@example.test', null),
-      (${admin}, 'ohb87-admin@example.test', null),
-      (${member}, 'ohb87-member@example.test', null)`;
+      (${pairer}, 'openedbot87-pairer@example.test', 'Pairer'),
+      (${owner}, 'openedbot87-owner@example.test', null),
+      (${admin}, 'openedbot87-admin@example.test', null),
+      (${member}, 'openedbot87-member@example.test', null)`;
   await target`insert into memberships (organization_id, user_id, role) values
       (${organizationA}, ${pairer}, 'member'),
       (${organizationA}, ${owner}, 'owner'),
@@ -102,16 +102,16 @@ try {
       (${organizationA}, ${member}, 'member')`;
   await target`insert into runtimes (id, organization_id, name, reachability, link_token_hash, is_active, last_health_status, last_health_error, link_last_seen_at)
     values
-      (${downRuntime}, ${organizationA}, 'VPS down', 'connector', 'ohb87-hash-down', false, 'disconnected', 'Aucun signe de vie du lien depuis 45 s.', now() - interval '10 minutes'),
-      (${freshRuntime}, ${organizationA}, 'VPS blip', 'connector', 'ohb87-hash-fresh', false, 'disconnected', null, now() - interval '2 minutes'),
-      (${staleRuntime}, ${organizationA}, 'Laptop off', 'connector', 'ohb87-hash-stale', false, 'disconnected', null, now() - interval '3 days'),
-      (${healthyRuntime}, ${organizationB}, 'VPS fine', 'connector', 'ohb87-hash-fine', false, 'healthy', null, now())`;
+      (${downRuntime}, ${organizationA}, 'VPS down', 'connector', 'openedbot87-hash-down', false, 'disconnected', 'Aucun signe de vie du lien depuis 45 s.', now() - interval '10 minutes'),
+      (${freshRuntime}, ${organizationA}, 'VPS blip', 'connector', 'openedbot87-hash-fresh', false, 'disconnected', null, now() - interval '2 minutes'),
+      (${staleRuntime}, ${organizationA}, 'Laptop off', 'connector', 'openedbot87-hash-stale', false, 'disconnected', null, now() - interval '3 days'),
+      (${healthyRuntime}, ${organizationB}, 'VPS fine', 'connector', 'openedbot87-hash-fine', false, 'healthy', null, now())`;
   await target`insert into runtime_enrollments (id, secret_hash, runtime_name, verification_code, organization_id, claimed_by, claimed_at, consumed_at, runtime_id, expires_at, reachability)
-    values (${crypto.randomUUID()}, 'ohb87-enrollment', 'VPS down', '000000', ${organizationA}, ${pairer}, now() - interval '1 day', now() - interval '1 day', ${downRuntime}, now() - interval '1 day', 'connector')`;
-  await target`insert into staff_users (id, email, password_hash) values (${staffId}, 'ohb87-staff@example.test', 'not-a-real-hash')`;
+    values (${crypto.randomUUID()}, 'openedbot87-enrollment', 'VPS down', '000000', ${organizationA}, ${pairer}, now() - interval '1 day', now() - interval '1 day', ${downRuntime}, now() - interval '1 day', 'connector')`;
+  await target`insert into staff_users (id, email, password_hash) values (${staffId}, 'openedbot87-staff@example.test', 'not-a-real-hash')`;
 
-  worker = new SQL({ url: databaseUrl(source, database, "ohb_worker", "ohb_worker_dev"), max: 1 });
-  api = new SQL({ url: databaseUrl(source, database, "ohb_api", "ohb_api_dev"), max: 1 });
+  worker = new SQL({ url: databaseUrl(source, database, "openedbot_worker", "openedbot_worker_dev"), max: 1 });
+  api = new SQL({ url: databaseUrl(source, database, "openedbot_api", "openedbot_api_dev"), max: 1 });
 
   // A worker that just started judges no link: after an openedbot outage every link
   // looks silent since the cut, while connectors come back within seconds.
@@ -137,9 +137,9 @@ try {
     select recipient_email as recipient, dedupe_key as "dedupeKey", payload->>'settingsUrl' as "settingsUrl"
       from email_outbox where kind = 'runtime_link_down' order by recipient_email
   `;
-  assert(emails.map((email) => email.recipient).join(",") === "ohb87-admin@example.test,ohb87-owner@example.test,ohb87-pairer@example.test", `unexpected recipients ${emails.map((email) => email.recipient)}`);
+  assert(emails.map((email) => email.recipient).join(",") === "openedbot87-admin@example.test,openedbot87-owner@example.test,openedbot87-pairer@example.test", `unexpected recipients ${emails.map((email) => email.recipient)}`);
   assert(emails.every((email) => email.dedupeKey.startsWith("runtime_link_down:")), "dedupe keys are scoped to the alert");
-  assert(emails.every((email) => email.settingsUrl === "https://console.ohb.test/o/ohb87-a/settings/runtime"), "settings URL targets the workspace slug");
+  assert(emails.every((email) => email.settingsUrl === "https://console.openedbot.test/o/openedbot87-a/settings/runtime"), "settings URL targets the workspace slug");
 
   const replay = await evaluateRuntimeLinkAlerts(worker, options);
   assert(replay.opened === 0 && replay.emails === 0 && replay.resolved === 0, `a replayed pass is a no-op, got ${JSON.stringify(replay)}`);
@@ -159,7 +159,7 @@ try {
   const listed = await withStaffUser(api, staffId, (tx) => tx<Array<{ runtimeName: string; email: string | null }>>`
     select runtime_name as "runtimeName", concerned_user_email as email from staff_runtime_link_alerts('open', 10, null)
   `);
-  assert(listed.length === 2 && listed.some((row) => row.email === "ohb87-pairer@example.test"), "staff lists open alerts with the concerned user");
+  assert(listed.length === 2 && listed.some((row) => row.email === "openedbot87-pairer@example.test"), "staff lists open alerts with the concerned user");
 
   const alertId = (await target<Array<{ id: string }>>`select id from runtime_link_alerts where runtime_id = ${downRuntime}`)[0]!.id;
   const acknowledged = await withStaffUser(api, staffId, (tx) => tx<Array<{ at: Date }>>`select acknowledged_at as at from staff_acknowledge_runtime_link_alert(${alertId}::uuid)`);
@@ -186,7 +186,7 @@ try {
   const open = await target<Array<{ count: string }>>`select count(*)::text as count from runtime_link_alerts where status = 'open'`;
   assert(open[0]?.count === "0", "no alert stays open");
 
-  console.log("OHB-87 PostgreSQL proof passed: 0087 alerts open after the threshold, email the pairer and admins once, skip stale outages, resolve on reconnect or revocation, say when the link is back, wait after a worker start, stay tenant-scoped and serve staff.");
+  console.log("Runtime link alerts PostgreSQL proof passed: 0087 alerts open after the threshold, email the pairer and admins once, skip stale outages, resolve on reconnect or revocation, say when the link is back, wait after a worker start, stay tenant-scoped and serve staff.");
 } finally {
   await api?.close();
   await worker?.close();

@@ -136,7 +136,7 @@ func TestApprovalPolicyPluginGateIdentityGolden(t *testing.T) {
 				t.Errorf("%s: %+v", result.Name, result.Result)
 			}
 		default:
-			if result.Result.Action != "approve" || !strings.HasPrefix(ruleKey, "ohb/v1/") || len(lines) != 2 || !strings.HasPrefix(lines[1], "ohb-gate/v1 ") {
+			if result.Result.Action != "approve" || !strings.HasPrefix(ruleKey, "openedbot/v1/") || len(lines) != 2 || !strings.HasPrefix(lines[1], "openedbot-gate/v1 ") {
 				t.Errorf("%s: an identified gate needs a rule key and one descriptor line: %+v", result.Name, result.Result)
 				continue
 			}

@@ -2,8 +2,8 @@ import type { OrganizationEvent } from "@openedbot/contracts-events";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
 import type { ThreadSnapshot, WorkflowDto } from "@openedbot/contracts-api";
 
-export const WEB_NOTIFICATION_STORAGE_KEY = "ohb:web-workflow-notifications";
-export const WEB_NOTIFICATION_PREFERENCE_EVENT = "ohb:web-notification-preference";
+export const WEB_NOTIFICATION_STORAGE_KEY = "openedbot:web-workflow-notifications";
+export const WEB_NOTIFICATION_PREFERENCE_EVENT = "openedbot:web-notification-preference";
 
 const MAX_CHECKPOINTS = 256;
 const TERMINAL_STATUSES = new Set<WorkflowDto["status"]>([
@@ -243,7 +243,7 @@ function publicNotification(
     return {
       title: content.approvalTitle,
       body: content.approvalBody,
-      tag: `ohb-workflow-${workflow.id}`,
+      tag: `openedbot-workflow-${workflow.id}`,
       route,
     };
   }
@@ -251,14 +251,14 @@ function publicNotification(
     return {
       title: content.completedTitle,
       body: content.outcomeBody,
-      tag: `ohb-workflow-${workflow.id}`,
+      tag: `openedbot-workflow-${workflow.id}`,
       route,
     };
   }
   return {
     title: content.attentionTitle,
     body: content.outcomeBody,
-    tag: `ohb-workflow-${workflow.id}`,
+    tag: `openedbot-workflow-${workflow.id}`,
     route,
   };
 }

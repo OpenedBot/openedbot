@@ -13,7 +13,7 @@ const unused = () => {
 };
 /** The `StaffHost` the API lends the `staff` plug-in (`proHosts().staff`), with unused services. */
 const staffHost = {
-  config: { environment: "test", trustProxy: false, staffDevSignIn: null, webUrl: "https://app.ohb.test", billingEnforced: false, support: { pollMs: 1_000 } },
+  config: { environment: "test", trustProxy: false, staffDevSignIn: null, webUrl: "https://app.openedbot.test", billingEnforced: false, support: { pollMs: 1_000 } },
   supportHub: {},
   blobs: {},
   services: {
@@ -124,7 +124,7 @@ describe("public plug-in mounts (core side, a stand-in backoffice)", () => {
     const app = apiLike([fakeStaff as ProPlugin], { staff: staffHost }, [], true);
     expect((await app.request("/api/pro/staff/providers")).status).toBe(200);
     for (const path of ["/api/staff", "/api/staff/providers", "/api/staff/me", "/api/staff/login/code"]) {
-      const response = await app.request(path, { headers: { Cookie: "ohb_staff_session=x; ohb_session=y" } });
+      const response = await app.request(path, { headers: { Cookie: "openedbot_staff_session=x; openedbot_session=y" } });
       expect(response.status).toBe(404);
       expect(response.headers.get("Deprecation")).toBeNull();
       expect(await response.json()).toEqual({ error: { code: "NOT_FOUND", message: "Route introuvable." } });

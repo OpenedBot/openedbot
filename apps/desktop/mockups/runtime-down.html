@@ -101,7 +101,7 @@
     <button class="grid size-8 place-items-center rounded-lg text-muted opacity-35"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 18 6-6-6-6"/></svg></button>
     <span class="ml-2 text-muted">Salon</span><span class="px-1 text-faint">›</span>
     <span class="size-4 rounded-full bg-red-500"></span>
-    <span class="truncate pl-1.5 font-semibold">Recette OHB-105 regle 3 b087fa48</span>
+    <span class="truncate pl-1.5 font-semibold">Recette 105 regle 3 b087fa48</span>
 
     <div class="ml-auto flex items-center gap-1.5 pr-2">
       <!-- The one persistent signal: present on every screen while the runtime is away. -->
@@ -139,7 +139,7 @@
     <div id="threads" class="min-h-0 flex-1 space-y-0.5 overflow-hidden"></div>
     <div class="mt-2 flex items-center gap-2.5 px-2 py-1.5">
       <span class="size-7 rounded-full bg-blue-500"></span>
-      <div class="leading-tight"><b class="font-semibold">@kev</b><small class="block text-[11.5px] text-muted">dev@ohb.local</small></div>
+      <div class="leading-tight"><b class="font-semibold">@kev</b><small class="block text-[11.5px] text-muted">dev@openedbot.local</small></div>
     </div>
   </aside>
 
@@ -258,7 +258,7 @@
         <div class="rounded-2xl bg-raised p-3 shadow-sm ring-1 ring-black/5 dark:ring-white/5" data-composer>
           <div class="px-1 pb-6 pt-1 text-[14px] text-faint">
             <span data-state="down retry">Écrire à Recette… (en attente du runtime)</span>
-            <span data-state="back">Écrire à Recette OHB-105</span>
+            <span data-state="back">Écrire à Recette 105</span>
           </div>
           <div class="flex items-center gap-2">
             <button class="grid size-8 place-items-center rounded-full bg-black/5 dark:bg-white/10">+</button>
@@ -307,12 +307,12 @@
 
 <script>
   const threads = [
-    ["bg-red-500", "Recette OHB-105 regle 3", "Bonjour Julien.", "hier", true],
-    ["bg-orange-500", "Recette OHB-119 apres-2", "La commande a échoué :…", "hier"],
-    ["bg-indigo-500", "Recette OHB-119 avant-2", "Fais revenir du guanciale…", "01:01"],
-    ["bg-slate-800", "Recette OHB-105 témoin B", "Je ne peux pas la planifier…", "01:01"],
-    ["bg-sky-500", "Recette OHB-105 témoin A", "Je n'ai pas pu la créer…", "01:01"],
-    ["bg-teal-500", "Recette OHB-105 regle 1", "Voici une recette classique…", "01:01"],
+    ["bg-red-500", "Recette 105 regle 3", "Bonjour Julien.", "hier", true],
+    ["bg-orange-500", "Recette 119 apres-2", "La commande a échoué :…", "hier"],
+    ["bg-indigo-500", "Recette 119 avant-2", "Fais revenir du guanciale…", "01:01"],
+    ["bg-slate-800", "Recette 105 témoin B", "Je ne peux pas la planifier…", "01:01"],
+    ["bg-sky-500", "Recette 105 témoin A", "Je n'ai pas pu la créer…", "01:01"],
+    ["bg-teal-500", "Recette 105 regle 1", "Voici une recette classique…", "01:01"],
   ];
   document.getElementById("threads").innerHTML = threads.map(([c, t, s, d, cur]) => `
     <div class="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 ${cur ? "bg-black/[.06] dark:bg-white/[.08]" : ""}">

@@ -86,7 +86,7 @@ export async function failRunsOnUnhealthyDirectRuntimes(db: SQL, timeoutMs: numb
        returning workflow.organization_id, workflow.id
     ), cursor_locks as materialized (
       select organization_id,
-             pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('ohb-run-events-cursor')) as locked
+             pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked
         from (select distinct organization_id from failed_runs) organizations
        order by organization_id
     ), event_rows as (

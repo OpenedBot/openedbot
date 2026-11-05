@@ -1,4 +1,4 @@
-/** OHB-102: the actual API, queue and runner under tenant roles, in an owned disposable database. */
+/** The actual API, queue and runner under tenant roles, in an owned disposable database. */
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { encryptSecret, secretEncryptionKey } from "../../platform/hermes/src/index";
@@ -57,13 +57,13 @@ const recorder = Bun.serve({
 });
 
 try {
-  await withDisposablePostgres("ohb102_coordination", async ({ owner, connect }) => {
-    const api = await connect("ohb_api"), worker = await connect("ohb_worker");
+  await withDisposablePostgres("openedbot102_coordination", async ({ owner, connect }) => {
+    const api = await connect("openedbot_api"), worker = await connect("openedbot_worker");
     const key = secretEncryptionKey(new Uint8Array(32).fill(102));
     const endpoint = recorder.url.toString().replace(/\/$/, "");
     const bearer = encryptSecret(FAKE_HERMES_TOKEN, key.value);
-    await owner`insert into users (id, email) values (${USER}, 'ohb102@example.test')`;
-    await owner`insert into organizations (id, slug, name) values (${ORG}, 'ohb102', 'OHB102')`;
+    await owner`insert into users (id, email) values (${USER}, 'openedbot102@example.test')`;
+    await owner`insert into organizations (id, slug, name) values (${ORG}, 'openedbot102', 'OPENEDBOT102')`;
     await owner`insert into memberships (organization_id, user_id, role) values (${ORG}, ${USER}, 'owner')`;
     await owner`insert into sections (id, organization_id, name, position) values (${SECTION}, ${ORG}, 'Coordination', 0)`;
     await owner`insert into runtimes (id, organization_id, name, reachability, endpoint,
@@ -74,17 +74,17 @@ try {
       await owner`insert into bots (id, organization_id, section_id, name, slug, position, autonomy_enabled)
         values (${bot}, ${ORG}, ${SECTION}, ${slug}, ${slug}, ${position}, ${bot === A})`;
       await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-        values (${bot === A ? THREAD : bot === B ? id(21) : id(22)}, ${ORG}, ${bot}, 'DM', ${`ohb102-${slug}`}, true)`;
+        values (${bot === A ? THREAD : bot === B ? id(21) : id(22)}, ${ORG}, ${bot}, 'DM', ${`openedbot102-${slug}`}, true)`;
     }
     const config: WorkerConfig = {
-      workerId: "ohb102-worker", apiInternalUrl: "http://127.0.0.1:9", apiInternalToken: "ohb102",
+      workerId: "openedbot102-worker", apiInternalUrl: "http://127.0.0.1:9", apiInternalToken: "openedbot102",
       tokenEncryption: { current: key, previous: [] }, hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],
       leaseSeconds: 30, runInactivityMs: 20_000, runTimeoutMs: 30_000, reconciliationTimeoutMs: 10_000,
       billingEnforced: false, cachedInputTokenWeight: 0.1, webAppUrl: "http://127.0.0.1:1420",
     };
     const auth: AuthContext = {
-      sessionId: "ohb102-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "ohb102",
+      sessionId: "openedbot102-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "openedbot102",
     };
     const app = new Hono<{ Variables: AppVariables }>();
     app.onError((error, context) => {
@@ -230,7 +230,7 @@ try {
       proof.push({ scenario: reason, notice: true, noChild: true, emptyBodyFailed: true });
     }
     assert(inputs.every((input) => input.includes("[Workflow limits]")), "Step limits must remain in input");
-    console.log(JSON.stringify({ event: "ohb102.postgres-proof", passed: true, proof }));
+    console.log(JSON.stringify({ event: "openedbot102.postgres-proof", passed: true, proof }));
   });
 } finally {
   recorder.stop(true); hermes.stop(true);

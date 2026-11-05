@@ -2,7 +2,7 @@
  * What the API and worker logs say about the same run, read after the soak:
  * the access log (one JSON line per request: route, status, durationMs), the
  * `run.admission` line of the API and the `run.latency` line of the worker
- * (OHB-107 marks, OHB-133 spans), and the worker's queue wake-up mode (OHB-139).
+ * (latency marks and spans), and the worker's queue wake-up mode.
  * Nothing here needs the processes alive: the files are enough.
  */
 import { summarize, round, type Summary } from "./stats";
@@ -87,8 +87,8 @@ export function summarizeRunLatency(lines: JsonLine[], runIds: ReadonlySet<strin
     if (Number.isFinite(queuedMs)) {
       queued.push(queuedMs);
       if (typeof marks["hermes.first_event"] === "number") firstEvent.push(queuedMs + marks["hermes.first_event"]);
-      if (typeof marks["ohb.first_text_published"] === "number") firstText.push(queuedMs + marks["ohb.first_text_published"]);
-      if (typeof marks["ohb.terminal_published"] === "number") terminal.push(queuedMs + marks["ohb.terminal_published"]);
+      if (typeof marks["openedbot.first_text_published"] === "number") firstText.push(queuedMs + marks["openedbot.first_text_published"]);
+      if (typeof marks["openedbot.terminal_published"] === "number") terminal.push(queuedMs + marks["openedbot.terminal_published"]);
     }
     for (const [name, value] of Object.entries((line.spans ?? {}) as Record<string, number>)) {
       const entry = spans.get(name) ?? [];

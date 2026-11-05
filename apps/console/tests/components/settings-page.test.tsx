@@ -58,7 +58,7 @@ function renderApp(initial = "/") {
 
 test("a settings section always opens as a page on its route, never as a window", async () => {
   // Even a device that once chose the window: the choice no longer exists.
-  localStorage.setItem("ohb:settings-display", "modal");
+  localStorage.setItem("openedbot:settings-display", "modal");
   const { router, client } = renderApp();
   fireEvent.click(await screen.findByText("Open runtime fixture"));
   await screen.findByText("Standalone runtime route");
@@ -75,7 +75,7 @@ test("a history entry written by the old window opens that section's route, tab 
   // the mask name the section.
   await router.navigate({
     to: "/",
-    state: { [SETTINGS_OVERLAY_STATE_KEY]: "/settings/runtime", ohbSettingsRuntimeSection: "runtimes" } as never,
+    state: { [SETTINGS_OVERLAY_STATE_KEY]: "/settings/runtime", openedbotSettingsRuntimeSection: "runtimes" } as never,
     mask: { to: "/settings/runtime", search: { section: "runtimes" } } as never,
   });
   await screen.findByText("Standalone runtime route");

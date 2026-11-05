@@ -22,9 +22,9 @@ func newTestClient(t *testing.T, home string, instance layout.ConnectorInstance,
 		LaunchctlPath:        "/bin/launchctl",
 		UID:                  501,
 		HomeDir:              home,
-		ExecutablePath:       "/opt/ohb/edge-setup",
-		CredentialsDirectory: filepath.Join(home, "Library", "Application Support", "OHB", "credentials"),
-		StateDirectory:       filepath.Join(home, "Library", "Application Support", "OHB", "state"),
+		ExecutablePath:       "/opt/openedbot/edge-setup",
+		CredentialsDirectory: filepath.Join(home, "Library", "Application Support", "openedbot", "credentials"),
+		StateDirectory:       filepath.Join(home, "Library", "Application Support", "openedbot", "state"),
 		Instance:             instance,
 	})
 	if err != nil {
@@ -85,9 +85,9 @@ func TestNewRejectsUnvalidatedInstanceAndRelativePaths(t *testing.T) {
 		LaunchctlPath:        "/bin/launchctl",
 		UID:                  501,
 		HomeDir:              "/Users/operator",
-		ExecutablePath:       "/opt/ohb/edge-setup",
-		CredentialsDirectory: "/Users/operator/Library/Application Support/OHB/credentials",
-		StateDirectory:       "/Users/operator/Library/Application Support/OHB/state",
+		ExecutablePath:       "/opt/openedbot/edge-setup",
+		CredentialsDirectory: "/Users/operator/Library/Application Support/openedbot/credentials",
+		StateDirectory:       "/Users/operator/Library/Application Support/openedbot/state",
 	}
 	for _, tc := range []struct {
 		name string
@@ -135,7 +135,7 @@ func TestRenderPlistEscapesXMLAndUsesBoundedLaunchAgentContract(t *testing.T) {
 		LaunchctlPath:        "/bin/launchctl",
 		UID:                  501,
 		HomeDir:              home,
-		ExecutablePath:       "/opt/ohb/edge<&>-setup",
+		ExecutablePath:       "/opt/openedbot/edge<&>-setup",
 		CredentialsDirectory: filepath.Join(home, "credentials&<path>"),
 		StateDirectory:       filepath.Join(home, "state&<path>"),
 		Instance:             "blue-1",

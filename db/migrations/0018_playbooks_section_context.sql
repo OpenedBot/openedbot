@@ -37,21 +37,21 @@ alter table playbooks force row level security;
 alter table bot_playbooks enable row level security;
 alter table bot_playbooks force row level security;
 
-create policy playbooks_tenant on playbooks to ohb_api
+create policy playbooks_tenant on playbooks to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy playbooks_worker on playbooks to ohb_worker
+create policy playbooks_worker on playbooks to openedbot_worker
   using (true) with check (true);
-create policy bot_playbooks_tenant on bot_playbooks to ohb_api
+create policy bot_playbooks_tenant on bot_playbooks to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_playbooks_worker on bot_playbooks to ohb_worker
+create policy bot_playbooks_worker on bot_playbooks to openedbot_worker
   using (true) with check (true);
 
-grant select, insert, update, delete on playbooks to ohb_api;
-grant select, insert, update, delete on playbooks to ohb_worker;
-grant select, insert, update, delete on bot_playbooks to ohb_api;
-grant select, insert, update, delete on bot_playbooks to ohb_worker;
+grant select, insert, update, delete on playbooks to openedbot_api;
+grant select, insert, update, delete on playbooks to openedbot_worker;
+grant select, insert, update, delete on bot_playbooks to openedbot_api;
+grant select, insert, update, delete on bot_playbooks to openedbot_worker;
 
 alter table sections
   add column context text not null default ''

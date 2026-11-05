@@ -93,13 +93,13 @@ const recorder = Bun.serve({
 });
 
 try {
-  await withDisposablePostgres("ohb132_fallback", async ({ owner: target, connect }) => {
-    const api = await connect("ohb_api");
-    const worker = await connect("ohb_worker");
+  await withDisposablePostgres("openedbot132_fallback", async ({ owner: target, connect }) => {
+    const api = await connect("openedbot_api");
+    const worker = await connect("openedbot_worker");
     const key = secretEncryptionKey(new Uint8Array(32).fill(32));
     const endpoint = recorder.url.toString().replace(/\/$/, "");
     const bearer = encryptSecret(FAKE_HERMES_TOKEN, key.value);
-    await target`insert into users (id, email) values (${USER}, 'ohb132@example.com')`;
+    await target`insert into users (id, email) values (${USER}, 'openedbot132@example.com')`;
     await target`insert into organizations (id, slug, name) values (${ORG}, 'acme-fallback', 'Acme')`;
     await target`insert into memberships (organization_id, user_id, role) values (${ORG}, ${USER}, 'owner')`;
     await target`insert into sections (id, organization_id, name, position) values (${SECTION}, ${ORG}, 'Fallback', 0)`;
@@ -114,13 +114,13 @@ try {
       await target`insert into bots (id, organization_id, section_id, name, slug, position)
         values (${botId}, ${ORG}, ${SECTION}, ${slug}, ${slug}, ${position})`;
       await target`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
-        values (${threadId}, ${ORG}, ${botId}, 'DM', ${`ohb132-${threadId}`}, true)`;
+        values (${threadId}, ${ORG}, ${botId}, 'DM', ${`openedbot132-${threadId}`}, true)`;
     }
 
     const workerConfig: WorkerConfig = {
-      workerId: "ohb132-worker",
+      workerId: "openedbot132-worker",
       apiInternalUrl: "http://127.0.0.1:9",
-      apiInternalToken: "ohb132",
+      apiInternalToken: "openedbot132",
       tokenEncryption: { current: key, previous: [] },
       hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],
@@ -133,7 +133,7 @@ try {
       webAppUrl: "http://127.0.0.1:1420",
     };
     const auth: AuthContext = {
-      sessionId: "ohb132-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "ohb132",
+      sessionId: "openedbot132-session", organizationId: ORG, userId: USER, role: "owner", kind: "web", credentialHash: "openedbot132",
     };
     const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", async (context, next) => { context.set("auth", auth); await next(); });

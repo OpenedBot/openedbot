@@ -21,8 +21,8 @@ export function WorkspaceAccessBoundary({ children }: { children: ReactNode }) {
       queryClient.clear();
       void clearPersistedQueries();
     };
-    window.addEventListener("ohb:workspace-revoked", onRevoked);
-    return () => window.removeEventListener("ohb:workspace-revoked", onRevoked);
+    window.addEventListener("openedbot:workspace-revoked", onRevoked);
+    return () => window.removeEventListener("openedbot:workspace-revoked", onRevoked);
   }, [organizationId, fleetId, queryClient]);
   return revoked ? <p role="alert" className="p-4 text-sm text-muted-foreground">{t("common.workspaceAccessRevoked")}</p> : children;
 }

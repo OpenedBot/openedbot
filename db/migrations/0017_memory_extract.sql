@@ -1,6 +1,6 @@
 begin;
 
--- Passe d'extraction mémoire OHB-owned : un second run, après le tour, qui
+-- Passe d'extraction mémoire openedbot-owned : un second run, après le tour, qui
 -- écrit des faits dans `bot_memories` sans lever le refus des toolsets
 -- `memory` / `session_search`. Le discriminant `step_kind` permet de ne pas
 -- poser de bulle, de ne pas avancer un salon, et de ne pas parser `@slug`.

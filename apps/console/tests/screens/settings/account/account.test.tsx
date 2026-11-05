@@ -116,7 +116,7 @@ function stubFetch(options: Options = {}) {
     }
     if (url.includes("/api/organization/invitations")) {
       return Response.json(
-        { id: "inv-1", email: body?.email, role: body?.role, token: "ohbi_secret", expiresAt: "2026-09-12T09:00:00.000Z" },
+        { id: "inv-1", email: body?.email, role: body?.role, token: "openedboti_secret", expiresAt: "2026-09-12T09:00:00.000Z" },
         { status: 201 },
       );
     }
@@ -127,7 +127,7 @@ function stubFetch(options: Options = {}) {
 }
 
 function renderSettings(component: FunctionComponent, path: string, organizationId = "org-1") {
-  window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId, csrfToken: "csrf", userId: `account-test-${++sessionSequence}` }));
+  window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId, csrfToken: "csrf", userId: `account-test-${++sessionSequence}` }));
   const rootRoute = createRootRoute({ component: Outlet });
   const settingsRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -154,8 +154,8 @@ function renderAccount() {
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  window.localStorage.setItem("ohb:locale", "fr");
-  window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf" }));
+  window.localStorage.setItem("openedbot:locale", "fr");
+  window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf" }));
 });
 
 afterEach(() => {

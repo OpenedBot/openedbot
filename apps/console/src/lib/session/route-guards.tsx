@@ -319,7 +319,7 @@ export function CloudSessionGate() {
     };
     const unsubscribe = subscribeCloudSession(() => applySessionChange(readCloudSession() !== null));
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== "ohb:cloud-session") return;
+      if (event.key !== "openedbot:cloud-session") return;
       applySessionChange(event.newValue !== null);
     };
     const onWorkspaceRevoked = async (event: Event) => {
@@ -353,12 +353,12 @@ export function CloudSessionGate() {
       if (session) saveCloudSession({ ...session, organizationId: personal?.id ?? null });
       window.location.replace(personal ? workspaceHref(personal.id, "/", null) : ONBOARDING_PATH);
     };
-    window.addEventListener("ohb:workspace-revoked", onWorkspaceRevoked);
+    window.addEventListener("openedbot:workspace-revoked", onWorkspaceRevoked);
     window.addEventListener("storage", onStorage);
     return () => {
       unsubscribe();
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("ohb:workspace-revoked", onWorkspaceRevoked);
+      window.removeEventListener("openedbot:workspace-revoked", onWorkspaceRevoked);
     };
   }, [router, navigate, queryClient]);
 

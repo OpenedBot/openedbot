@@ -2,12 +2,12 @@ import {
   policyWithFunnelTag,
   tailnetDomainFromDevices,
   TailscaleApiError,
-  TAILSCALE_OHB_TAG,
+  TAILSCALE_OPENEDBOT_TAG,
   type TailscaleApiClient,
 } from "@openedbot/platform-integrations/tailscale-api";
 
 /**
- * OHB-75 : publier un gateway direct sur le tailnet du client, en une passe.
+ * Publier un gateway direct sur le tailnet du client, en une passe.
  *
  * Le pendant Tailscale de `provisionDirectExposure` : l'attribut `funnel` sur
  * le tag d'openedbot dans le fichier de politique, puis une clé d'appairage taguée
@@ -50,7 +50,7 @@ export async function provisionTailscaleExposure(
   client: TailscaleApiClient,
   input: TailscaleExposureProvisionInput,
 ): Promise<TailscaleExposureProvisionResult> {
-  const tag = input.tag ?? TAILSCALE_OHB_TAG;
+  const tag = input.tag ?? TAILSCALE_OPENEDBOT_TAG;
   const devices = await client.listDevices();
   const tailnetDomain = tailnetDomainFromDevices(devices);
   if (!tailnetDomain) {
@@ -68,7 +68,7 @@ export async function provisionTailscaleExposure(
 
   const key = await client.createAuthKey({
     tag,
-    description: `OHB Hermes ${hostname}`,
+    description: `openedbot Hermes ${hostname}`,
     expirySeconds: input.keyTtlSeconds ?? TAILSCALE_KEY_TTL_SECONDS,
   });
 
@@ -76,7 +76,7 @@ export async function provisionTailscaleExposure(
 }
 
 /** La commande unique à coller sur l'hôte : joindre le tailnet, puis publier le gateway. */
-export function tailscaleInstallCommand(authKey: string, slug: string, tag: string = TAILSCALE_OHB_TAG): string {
+export function tailscaleInstallCommand(authKey: string, slug: string, tag: string = TAILSCALE_OPENEDBOT_TAG): string {
   return `sudo tailscale up --auth-key ${authKey} --hostname ${slug} --advertise-tags ${tag} && sudo tailscale funnel --bg ${HERMES_FUNNEL_PORT}`;
 }
 

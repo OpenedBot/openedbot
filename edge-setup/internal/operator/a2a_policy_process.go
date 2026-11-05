@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	a2aPolicyProcessDirName = ".ohb-a2a-policy"
+	a2aPolicyProcessDirName = ".openedbot-a2a-policy"
 	a2aPolicyProcessSock    = "state.sock"
 	a2aPolicyProcessSchema  = 1
 	a2aPolicyProcessTimeout = 750 * time.Millisecond

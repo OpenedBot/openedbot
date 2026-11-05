@@ -13,7 +13,7 @@ from typing import Iterator
 _PROFILE_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 _MARKER_NAME = "runtime-home"
 _MAX_MARKER_BYTES = 4096
-_PLUGIN_NAME = "ohb_a2a_policy"
+_PLUGIN_NAME = "openedbot_a2a_policy"
 
 
 class RuntimeHomeError(RuntimeError):

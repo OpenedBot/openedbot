@@ -2,7 +2,7 @@
 -- autorise la creation d un compte, et rien d autre ne l autorise.
 --
 -- Huit faits, dans l ordre du resultat attendu :
---   1. ohb_api valide une adresse (update accorde par 0068)
+--   1. openedbot_api valide une adresse (update accorde par 0068)
 --   2. la porte lit le mode d une adresse validee : alpha
 --   3. la porte ne lit rien pour une adresse non validee
 --   4. un mode sans instant de validation est refuse (contrainte 23514)
@@ -29,7 +29,7 @@ create temp table waitlist_access_proof (
   reject_approved text,
   reason_without_rejection text
 );
-grant insert, update, select on waitlist_access_proof to ohb_api;
+grant insert, update, select on waitlist_access_proof to openedbot_api;
 insert into waitlist_access_proof default values;
 
 insert into waitlist_signups (id, email, locale) values
@@ -37,7 +37,7 @@ insert into waitlist_signups (id, email, locale) values
   ('70000000-0000-4000-8000-000000000002', 'attente@gate.test', 'en'),
   ('70000000-0000-4000-8000-000000000003', 'validee@gate.test', 'fr');
 
-set role ohb_api;
+set role openedbot_api;
 
 update waitlist_signups
    set access_tier = 'alpha',

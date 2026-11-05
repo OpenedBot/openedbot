@@ -6,7 +6,7 @@ insert into runtime_read_snapshots (organization_id, runtime_id, kind, document,
   ('10000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000091', 'mcp', '{"value":"a"}', now()),
   ('20000000-0000-4000-8000-000000000002', '60000000-0000-4000-8000-000000000092', 'mcp', '{"value":"b"}', now());
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 do $$
 begin
@@ -32,8 +32,8 @@ reset role;
 
 do $$
 begin
-  if has_table_privilege('ohb_worker', 'runtime_read_snapshots', 'select,insert,update,delete') then
-    raise exception 'ohb_worker has access to runtime_read_snapshots';
+  if has_table_privilege('openedbot_worker', 'runtime_read_snapshots', 'select,insert,update,delete') then
+    raise exception 'openedbot_worker has access to runtime_read_snapshots';
   end if;
 end
 $$;

@@ -19,7 +19,7 @@ const context = {
   organizationId: "org-1",
   threadId: "thread-1",
   botId: "bot-1",
-  sessionId: "ohb:org-1:dm:run-1",
+  sessionId: "openedbot:org-1:dm:run-1",
   leaseGeneration: 4,
   workflowId: null,
   workflowRootRunId: null,

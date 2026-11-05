@@ -1,7 +1,7 @@
 import type { PermissionRulesMode } from "./policy";
 
 /**
- * PERM2-6 (DEV-OHB-256): natural-language permission rules, iso Grok Bot.
+ * PERM2-6: natural-language permission rules, iso Grok Bot.
  * A rule guides the automatic reviewer only: it is data the reviewer reads,
  * never a decision. Interdictions, the floor, the deletion stage, `block`
  * and the command blocklist are decided before the reviewer and no rule can

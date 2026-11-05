@@ -20,8 +20,8 @@ import { LEGAL_SLUGS, type LegalSlug, type RuntimeMode } from "@openedbot/contra
 import { fileBlobRoot, resolveBlobDriver } from "./blob-driver";
 
 /** Non-secret placeholder used outside production; rejected by assertProductionConfig. */
-const DEV_WORKER_INTERNAL_TOKEN = "ohb-worker-dev-token";
-const DEV_METRICS_INTERNAL_TOKEN = "ohb-metrics-dev-token";
+const DEV_WORKER_INTERNAL_TOKEN = "openedbot-worker-dev-token";
+const DEV_METRICS_INTERNAL_TOKEN = "openedbot-metrics-dev-token";
 
 /** L'origine de la PWA en développement, quand `WEB_APP_URL` n'est pas posé. */
 export const DEV_WEB_ORIGIN = "http://localhost:1420";
@@ -35,8 +35,8 @@ export const DEV_WEB_ORIGIN = "http://localhost:1420";
  * `make db-seed`) en génère un aléatoire dans .env.local (E2E_PASSWORD,
  * DEV_STAFF_PASSWORD). Sans valeur, rien n'est publié à `/login`.
  */
-export const DEV_SEED_EMAIL = "dev@ohb.local";
-export const DEV_STAFF_EMAIL = "staff@ohb.dev";
+export const DEV_SEED_EMAIL = "dev@openedbot.local";
+export const DEV_STAFF_EMAIL = "staff@openedbot.dev";
 
 export type ApiEnvironment = "development" | "test" | "production";
 
@@ -149,7 +149,7 @@ export type ApiConfig = {
   /**
    * DSN privilégiée du vidage `POST /api/onboarding/reset {"scope":"full"}`,
    * en développement uniquement, `null` partout ailleurs et par défaut.
-   * `ohb_api` ne peut PAS faire ce vidage : il n'a ni `delete` sur les tables
+   * `openedbot_api` ne peut PAS faire ce vidage : il n'a ni `delete` sur les tables
    * append-only (`decisions`, `team_imports`, `email_outbox`,
    * `tenant_blob_deletions`) ni le droit de `truncate` une table qu'il ne
    * possède pas : c'est le dessin des grants, pas un oubli. Sans cette DSN, la
@@ -169,7 +169,7 @@ export type ApiConfig = {
    * `NATIVE_API_PUBLIC_URL` : l'origine de l'API que visent les clients natifs
    * (app iOS, bureau, notch), `https://api.openedbot.app` en production, gravée
    * dans leur build (`OPENEDBOT_API_ORIGIN`). Le lien du QR « Mobile Connect »
-   * (`ohb://join?api=…`) la porte : l'app refuse une autre origine que la
+   * (`openedbot://join?api=…`) la porte : l'app refuse une autre origine que la
    * sienne (`foreignDeployment`). `publicUrl` par défaut, l'origine de la PWA,
    * qui n'est pas celle de l'app dès que la console vit sur un autre nom.
    */
@@ -316,10 +316,10 @@ export type ApiConfig = {
    * solo il n'est jamais tenu, quelle que soit cette valeur.
    */
   billingEnforced: boolean;
-  /** OHB-75 : compte Cloudflare d'openedbot pour les tunnels gérés ; `null` cache cette voie. */
+  /** Compte Cloudflare d'openedbot pour les tunnels gérés ; `null` cache cette voie. */
   managedTunnel: ManagedTunnelConfig | null;
   /**
-   * OHB-75 : la publication Tailscale Funnel assistée. Fermée par défaut : le
+   * La publication Tailscale Funnel assistée. Fermée par défaut : le
    * parcours existe de bout en bout mais n'est pas ouvert aux organisations.
    */
   tailscaleFunnelEnabled: boolean;
@@ -405,9 +405,8 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     ...webOrigins,
     ...(adminOrigin ? [adminOrigin] : []),
   ]);
-  // Aucun canal d'administration sortant (OHB-15) : plus de shell vers un
-  // runtime client, quel que soit l'environnement. L'ancienne variable qui le
-  // réglait n'est plus lue (legacy-env.ts refuse de démarrer tant qu'elle est posée).
+  // Aucun canal d'administration sortant : plus de shell vers un
+  // runtime client, quel que soit l'environnement.
   const runtimeAdminChannels: RuntimeAdminChannels = { local: false };
   const base = {
     environment,
@@ -416,7 +415,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     port: readApiPort(env.API_PORT),
     databaseUrl:
       env.API_DATABASE_URL?.trim() ||
-      "postgres://ohb_api:ohb_api_dev@127.0.0.1:5432/ohb",
+      "postgres://openedbot_api:openedbot_api_dev@127.0.0.1:5432/openedbot",
     devResetDatabaseUrl:
       environment === "development" ? env.DEV_RESET_DATABASE_URL?.trim() || null : null,
     databaseMaxConnections: positiveInteger(env.API_DB_MAX, 32, "API_DB_MAX"),
@@ -433,7 +432,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     // Fixed allowlist: the Expo client was removed and NATIVE_REDIRECT_URIS is
     // deprecated. An OAuth redirect_uri allowlist must not be widenable by the
     // environment.
-    nativeRedirectUris: splitList("ohb://auth/callback,http://127.0.0.1:47813/callback"),
+    nativeRedirectUris: splitList("openedbot://auth/callback,http://127.0.0.1:47813/callback"),
     runtimeMode,
     runtimeAdminChannels,
     computer: readComputerProvider(env, environment),

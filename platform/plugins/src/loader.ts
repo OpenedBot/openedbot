@@ -155,11 +155,8 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
   return null;
 }
 
-/**
- * Prefixes of the core's own variables: `OPENEDBOT_`, and `OHB_`, the retired
- * one, which no process starts with (platform/config/src/legacy-env.ts).
- */
-const CORE_ENV_PREFIXES = ["OPENEDBOT_", "OHB_"] as const; // rename:keep
+/** Prefix of the core's own variables. */
+const CORE_ENV_PREFIXES = ["OPENEDBOT_"] as const;
 
 function invalidEnvReason(declared: unknown, reserved: ((name: string) => boolean) | undefined): string | null {
   if (!Array.isArray(declared) || declared.length > PLUGIN_ENV_MAX) return "invalid manifest.env";

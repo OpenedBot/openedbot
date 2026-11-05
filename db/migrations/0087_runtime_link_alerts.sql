@@ -46,15 +46,15 @@ comment on table runtime_link_alerts is
 alter table runtime_link_alerts enable row level security;
 alter table runtime_link_alerts force row level security;
 
-create policy runtime_link_alerts_tenant on runtime_link_alerts to ohb_api
+create policy runtime_link_alerts_tenant on runtime_link_alerts to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 -- Le worker ouvre et résout les alertes de toutes les organisations :
 -- exception déclarée dans tests/integration/postgres-rls.sh.
-create policy runtime_link_alerts_worker on runtime_link_alerts to ohb_worker
+create policy runtime_link_alerts_worker on runtime_link_alerts to openedbot_worker
   using (true) with check (true);
 
-grant select on runtime_link_alerts to ohb_api;
-grant select, insert, update on runtime_link_alerts to ohb_worker;
+grant select on runtime_link_alerts to openedbot_api;
+grant select, insert, update on runtime_link_alerts to openedbot_worker;
 
 create or replace function staff_runtime_link_alerts(
   p_status text default 'open',
@@ -129,7 +129,7 @@ comment on function staff_runtime_link_alerts(text, int, timestamptz) is
   'Alertes de lien connecteur servies au backoffice staff, les plus récentes d''abord. `p_status` : open, resolved ou all. Pagination par curseur `p_before` sur `opened_at`, `p_limit` borné à 500.';
 
 revoke all on function staff_runtime_link_alerts(text, int, timestamptz) from public;
-grant execute on function staff_runtime_link_alerts(text, int, timestamptz) to ohb_api;
+grant execute on function staff_runtime_link_alerts(text, int, timestamptz) to openedbot_api;
 
 create or replace function staff_acknowledge_runtime_link_alert(p_alert uuid)
 returns table (acknowledged_at timestamptz)
@@ -171,7 +171,7 @@ comment on function staff_acknowledge_runtime_link_alert(uuid) is
   'Acquitte une alerte de lien connecteur au nom du staff courant. Aucune ligne rendue : alerte inconnue.';
 
 revoke all on function staff_acknowledge_runtime_link_alert(uuid) from public;
-grant execute on function staff_acknowledge_runtime_link_alert(uuid) to ohb_api;
+grant execute on function staff_acknowledge_runtime_link_alert(uuid) to openedbot_api;
 
 -- Jumelle SQL de TRANSACTIONAL_EMAIL_KINDS (contracts/api/src/email-kinds.ts).
 alter table email_outbox drop constraint if exists email_outbox_kind_check;

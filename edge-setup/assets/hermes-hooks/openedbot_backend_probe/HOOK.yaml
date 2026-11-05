@@ -1,4 +1,4 @@
-name: ohb_backend_probe
+name: openedbot_backend_probe
 description: Answer the docker backend probe of the system prompt from the host kernel.
 events:
   - gateway:startup

@@ -97,7 +97,7 @@ beforeEach(() => {
   usageStatus = "ok";
   providers = [{ slug: "openai-codex", name: "OpenAI Codex" }, { slug: "anthropic", name: "Anthropic" }];
   snapshots = [snapshot("openai-codex", [["Weekly", 42]]), snapshot("anthropic", [["Current week", 85]])];
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     if (url.includes("/api/auth/me")) return Response.json({ user: { email: "o@example.test", displayName: null }, organization: { id: "org", slug: "org", name: "Org" }, role });

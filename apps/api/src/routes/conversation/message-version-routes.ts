@@ -244,7 +244,7 @@ export function messageVersionRoutes(
             id, organization_id, bot_id, title, hermes_session_id, is_default
           ) values (
             ${branchThreadId}, ${auth.organizationId}, ${rootBot.id}, ${title},
-            ${`ohb:${auth.organizationId}:${branchThreadId}`}, false
+            ${`openedbot:${auth.organizationId}:${branchThreadId}`}, false
           )
         `;
 
@@ -348,7 +348,7 @@ export function messageVersionRoutes(
           )
         `;
         if (mention) {
-          await tx`select pg_advisory_xact_lock(hashtext(${auth.organizationId}), hashtext('ohb-run-events-cursor'))`;
+          await tx`select pg_advisory_xact_lock(hashtext(${auth.organizationId}), hashtext('openedbot-run-events-cursor'))`;
           await tx`
             insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
             values (${auth.organizationId}, ${branchThreadId}, ${runId}, 0, 'system.notice',

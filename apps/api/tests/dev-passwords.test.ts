@@ -27,13 +27,13 @@ describe("dev seed passwords", () => {
   test("missing passwords are generated once and stored privately; existing ones are kept", () => {
     const dir = mkdtempSync(join(tmpdir(), "ob-dev-pw-"));
     const file = join(dir, ".env.local");
-    writeFileSync(file, "E2E_EMAIL=dev@ohb.local\nE2E_PASSWORD=\n");
+    writeFileSync(file, "E2E_EMAIL=dev@openedbot.local\nE2E_PASSWORD=\n");
     const env: Record<string, string | undefined> = { DEV_STAFF_PASSWORD: "kept" };
     let n = 0;
     const generated = ensureDevPasswords(env, file, () => `gen-${++n}`);
     expect(generated).toEqual(["E2E_PASSWORD"]);
     expect(env.E2E_PASSWORD).toBe("gen-1");
-    expect(readFileSync(file, "utf8")).toBe("E2E_EMAIL=dev@ohb.local\nE2E_PASSWORD=gen-1\n");
+    expect(readFileSync(file, "utf8")).toBe("E2E_EMAIL=dev@openedbot.local\nE2E_PASSWORD=gen-1\n");
     expect(statSync(file).mode & 0o777).toBe(0o600);
     expect(ensureDevPasswords(env, file, () => "never")).toEqual([]);
   });

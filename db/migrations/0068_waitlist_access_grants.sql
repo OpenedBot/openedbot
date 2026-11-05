@@ -22,7 +22,7 @@
 -- instant serait un accès qu'aucune route ne reconnaît, un instant sans mode un
 -- accès que le backoffice ne sait pas nommer. La contrainte le dit.
 --
--- `ohb_api` gagne l'`update`, et seulement lui : la route publique
+-- `openedbot_api` gagne l'`update`, et seulement lui : la route publique
 -- `POST /api/waitlist` garde sa discipline d'écriture seule (0065), les routes
 -- staff lisent depuis 0066, et rien ici n'ouvre la liste au chemin public.
 --
@@ -58,7 +58,7 @@ create index if not exists waitlist_signups_approved_at_idx
   on waitlist_signups (approved_at desc)
   where approved_at is not null;
 
-grant update on waitlist_signups to ohb_api;
+grant update on waitlist_signups to openedbot_api;
 
 -- Le mode sous lequel ce compte est entré. `null` pour tous les comptes
 -- existants : ils sont nés avant la porte, et rien ne doit leur inventer un

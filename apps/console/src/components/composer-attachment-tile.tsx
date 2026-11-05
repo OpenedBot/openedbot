@@ -89,7 +89,7 @@ export function ComposerAttachmentTile({
       data-composer-file-attachment={image ? undefined : ""}
       data-uploading={uploading ? "" : undefined}
       data-landed={landed ? "" : undefined}
-      className="ohb-tile-in"
+      className="openedbot-tile-in"
     >
       <div
         title={title ?? name}

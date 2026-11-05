@@ -2,12 +2,12 @@
  * The pro console modules this build carries, and the gate of each feature:
  * its module is present AND the session holds its entitlement.
  *
- * Solo (`OPENEDBOT_CONSOLE_PLUGINS` empty), `virtual:ohb-pro-console` is an empty list:
+ * Solo (`OPENEDBOT_CONSOLE_PLUGINS` empty), `virtual:openedbot-pro-console` is an empty list:
  * every feature reads `undefined`, so no route, nav entry or card exists and
  * no pro endpoint is ever called.
  */
 import { useQuery } from "@tanstack/react-query";
-import proConsoleModules from "virtual:ohb-pro-console";
+import proConsoleModules from "virtual:openedbot-pro-console";
 import { api, queryKeys } from "../lib/api";
 import { queryClient } from "../lib/query-client";
 import { PRO_CONSOLE_ENTITLEMENTS, type ProConsoleFeature, type ProConsoleFeatures, type ProConsoleModule } from "./contract";

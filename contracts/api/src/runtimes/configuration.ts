@@ -3,7 +3,7 @@ import type { RuntimePublicDto } from "./runtime";
 import type { RuntimeHealthStatus } from "../shared/domain";
 
 /**
- * @deprecated OHB-74 : le mode d'organisation « intégré / externe » est retiré. Le serveur
+ * @deprecated Le mode d'organisation « intégré / externe » est retiré. Le serveur
  * renvoie toujours `"external"` ; l'écran se lit sur `RuntimePublicDto.reachability`.
  */
 export type RuntimeMode = "external";
@@ -23,7 +23,7 @@ export type ModelAssignmentModeInput = { mode: ModelAssignmentMode };
 
 export type RuntimeAdminMode = "disabled" | "local";
 
-// ─── OHB-74 : accès direct à la charge du client (Cloudflare Tunnel, Tailscale Funnel) ───
+// ─── Accès direct à la charge du client (Cloudflare Tunnel, Tailscale Funnel) ───
 
 /**
  * Service token Cloudflare Access d'un runtime direct. Envoyé par openedbot dans
@@ -49,7 +49,7 @@ export type RuntimeDirectAccessUpdateInput = {
   edgeAuth?: RuntimeEdgeAuthInput | null;
 };
 
-/** Diagnostics de la sonde « Tester » d'un runtime direct (US OHB-74 §4). Un code nommé exige une preuve spécifique. */
+/** Diagnostics de la sonde « Tester » d'un runtime direct. Un code nommé exige une preuve spécifique. */
 export type RuntimeProbeDiagnosticCode =
   | "RUNTIME_QUICK_TUNNEL_REFUSED"
   | "RUNTIME_DNS_UNRESOLVED"
@@ -121,12 +121,12 @@ export type RuntimeConfigurationDto = {
   /** Always null. Kept on the wire so older clients do not break. */
   devDefaults: RuntimeDevDefaultsDto | null;
   /**
-   * OHB-75 : openedbot peut publier un gateway sur son propre compte Cloudflare
+   * openedbot peut publier un gateway sur son propre compte Cloudflare
    * (`OPENEDBOT_MANAGED_TUNNEL_URL` renseignée). Absent sur les serveurs antérieurs.
    */
   managedTunnelAvailable?: boolean;
   /**
-   * OHB-75 : la publication Tailscale Funnel assistée est ouverte
+   * La publication Tailscale Funnel assistée est ouverte
    * (`OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`). Fausse ou absente, la carte reste
    * affichée mais désactivée.
    */

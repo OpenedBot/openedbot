@@ -62,7 +62,7 @@ export async function appendRunErrorTx(
  * lower identity from a concurrent run.
  */
 export async function lockRunEventCursorTx(tx: SQL, organizationId: string): Promise<void> {
-  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('ohb-run-events-cursor'))`;
+  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-run-events-cursor'))`;
 }
 
 export async function publish(

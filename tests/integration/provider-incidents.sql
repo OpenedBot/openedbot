@@ -5,7 +5,7 @@
 
 create temp table incident_proof (own int, other int, worker_scoped int, worker_unscoped int, after_purge int);
 insert into incident_proof values (-1, -1, -1, -1, -1);
-grant select, insert, update on incident_proof to ohb_api, ohb_worker;
+grant select, insert, update on incident_proof to openedbot_api, openedbot_worker;
 
 insert into runtimes (
   id, organization_id, name, reachability, link_token_hash, link_last_seen_at, is_active
@@ -31,12 +31,12 @@ insert into runtime_provider_incidents (
   'openai-codex', 'auth', now() + interval '24 hours', null, null
 );
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update incident_proof set own = (select count(*) from runtime_provider_incidents);
 reset role;
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update incident_proof set other = (
   select count(*) from runtime_provider_incidents
@@ -44,7 +44,7 @@ update incident_proof set other = (
 );
 reset role;
 
-set role ohb_worker;
+set role openedbot_worker;
 update incident_proof set worker_scoped = (select count(*) from runtime_provider_incidents);
 select set_config('app.organization_id', '', false) \g /dev/null
 update incident_proof set worker_unscoped = (select count(*) from runtime_provider_incidents);

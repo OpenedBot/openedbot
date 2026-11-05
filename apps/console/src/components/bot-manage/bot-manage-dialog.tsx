@@ -184,7 +184,7 @@ export function BotManageDialog({
   const description = (id: BotManagePage): string | undefined => {
     if (id !== "runtime") return undefined;
     if (!bot.hermesProfile) return t("botManage.profile.unassigned");
-    return t(bot.hermesProfileManaged ? "botManage.profile.managedByOhb" : "botManage.profile.imported", { profile: bot.hermesProfile });
+    return t(bot.hermesProfileManaged ? "botManage.profile.managedByOpenedbot" : "botManage.profile.imported", { profile: bot.hermesProfile });
   };
 
   const go = (id: BotManagePage) => {
@@ -244,8 +244,8 @@ export function BotManageDialog({
       {header}
       {BOT_MANAGE_GROUPS.map((group) => (
         <section key={group.labelKey} aria-label={t(group.labelKey)}>
-          <h3 className="ohb-manage-caption pb-2">{t(group.labelKey)}</h3>
-          <ul className="ohb-manage-group">
+          <h3 className="openedbot-manage-caption pb-2">{t(group.labelKey)}</h3>
+          <ul className="openedbot-manage-group">
             {group.pages.filter(shown).map((id) => {
               const entry = PAGES[id];
               const RowIcon = entry.icon;
@@ -257,14 +257,14 @@ export function BotManageDialog({
                     onClick={() => go(id)}
                     disabled={entry.disabled}
                     aria-disabled={entry.disabled || undefined}
-                    className="ohb-row ohb-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    className="openedbot-row openedbot-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <RowIcon aria-hidden className="size-4 shrink-0 text-foreground-icon-secondary" />
                     <span className="min-w-0 flex-1">
-                      <span className="ohb-manage-title block truncate">{t(entry.labelKey)}</span>
-                      {description(id) ? <span className="ohb-manage-muted block truncate">{description(id)}</span> : null}
+                      <span className="openedbot-manage-title block truncate">{t(entry.labelKey)}</span>
+                      {description(id) ? <span className="openedbot-manage-muted block truncate">{description(id)}</span> : null}
                     </span>
-                    {value(id) ? <span className="ohb-manage-muted max-w-[45%] truncate">{value(id)}</span> : null}
+                    {value(id) ? <span className="openedbot-manage-muted max-w-[45%] truncate">{value(id)}</span> : null}
                     <IconChevronRight aria-hidden className="size-4 shrink-0 text-foreground-icon-tertiary" />
                   </button>
                 </li>
@@ -274,8 +274,8 @@ export function BotManageDialog({
         </section>
       ))}
       <section aria-label={t("botManage.group.manage")}>
-        <h3 className="ohb-manage-caption pb-2">{t("botManage.group.manage")}</h3>
-        <ul className="ohb-manage-group">
+        <h3 className="openedbot-manage-caption pb-2">{t("botManage.group.manage")}</h3>
+        <ul className="openedbot-manage-group">
           {manageRows.map((row) => {
             const RowIcon = row.icon;
             return (
@@ -285,12 +285,12 @@ export function BotManageDialog({
                   onClick={row.onSelect}
                   disabled={row.pending}
                   className={cn(
-                    "ohb-row ohb-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:opacity-50",
+                    "openedbot-row openedbot-manage-row flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring disabled:opacity-50",
                   )}
                 >
                   <RowIcon aria-hidden className={cn("size-4 shrink-0", row.destructive ? "text-destructive-text" : "text-foreground-icon-secondary")} />
                   {/* Same type as the rows above; « Supprimer » keeps its red. */}
-                  <span className={cn("ohb-manage-title min-w-0 flex-1 truncate", row.destructive && "!text-destructive-text")}>{row.label}</span>
+                  <span className={cn("openedbot-manage-title min-w-0 flex-1 truncate", row.destructive && "!text-destructive-text")}>{row.label}</span>
                 </button>
               </li>
             );
@@ -301,11 +301,11 @@ export function BotManageDialog({
   );
 
   const indexMobile = (
-    <div className="flex min-h-0 flex-1 flex-col bg-[var(--ohb-grouped-canvas)]">
+    <div className="flex min-h-0 flex-1 flex-col bg-[var(--openedbot-grouped-canvas)]">
       <header className="flex min-h-11 shrink-0 items-center justify-end px-4 pt-2">
         <InsetCloseButton label={t("common.close")} onClick={onClose} />
       </header>
-      <nav aria-label={t("botManage.navLabel")} className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto pb-[max(1.5rem,var(--ohb-safe-bottom))]">
+      <nav aria-label={t("botManage.navLabel")} className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto pb-[max(1.5rem,var(--openedbot-safe-bottom))]">
         {header}
         {BOT_MANAGE_GROUPS.map((group) => (
           <InsetGroupedSection key={group.labelKey} caption={t(group.labelKey)}>
@@ -390,7 +390,7 @@ export function BotManageDialog({
 
   const detail = page ? (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-      <header className={cn("flex items-center gap-1", isMobile ? "bg-[var(--ohb-grouped-canvas)] px-2 py-1" : "gap-2 border-b border-border px-4 py-3")}>
+      <header className={cn("flex items-center gap-1", isMobile ? "bg-[var(--openedbot-grouped-canvas)] px-2 py-1" : "gap-2 border-b border-border px-4 py-3")}>
         {isMobile ? (
           <InsetBackButton label={t("botManage.back")} onClick={back} />
         ) : (
@@ -403,7 +403,7 @@ export function BotManageDialog({
             <IconArrowLeft className="size-4" aria-hidden />
           </button>
         )}
-        <h2 className={cn("min-w-0 flex-1 truncate font-semibold", isMobile ? "px-2 text-center text-[17px] leading-[22px] text-[var(--ohb-grouped-label)]" : "text-base text-text-primary")}>
+        <h2 className={cn("min-w-0 flex-1 truncate font-semibold", isMobile ? "px-2 text-center text-[17px] leading-[22px] text-[var(--openedbot-grouped-label)]" : "text-base text-text-primary")}>
           {t(PAGES[page].labelKey)}
         </h2>
         {isMobile ? (
@@ -431,10 +431,10 @@ export function BotManageDialog({
           data-bot-manage-scroll=""
           className={cn(
             "scrollbar-subtle min-h-0 flex-1 overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring",
-            isMobile ? "bg-[var(--ohb-grouped-canvas)] px-4 py-4" : "px-5 py-4",
+            isMobile ? "bg-[var(--openedbot-grouped-canvas)] px-4 py-4" : "px-5 py-4",
           )}
         >
-          <div className={cn(isMobile && "rounded-[20px] bg-[var(--ohb-grouped-card)] px-4 py-4")}>{body}</div>
+          <div className={cn(isMobile && "rounded-[20px] bg-[var(--openedbot-grouped-card)] px-4 py-4")}>{body}</div>
         </div>
       )}
       {footer ? (
@@ -444,7 +444,7 @@ export function BotManageDialog({
           <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">{footer}</footer>
         )
       ) : isMobile && !runtimePane ? (
-        <div className="shrink-0 bg-[var(--ohb-grouped-canvas)] pb-[max(0.75rem,var(--ohb-safe-bottom))]" />
+        <div className="shrink-0 bg-[var(--openedbot-grouped-canvas)] pb-[max(0.75rem,var(--openedbot-safe-bottom))]" />
       ) : null}
     </div>
   ) : null;
@@ -458,10 +458,10 @@ export function BotManageDialog({
         closeLabel={t("common.close")}
         showHandle={!isMobile}
         className={cn(
-          !isMobile && "ohb-manage h-[min(48rem,calc(100dvh-6rem))] max-h-[min(48rem,calc(100dvh-6rem))] max-w-[min(48rem,calc(100vw-2rem))]",
+          !isMobile && "openedbot-manage h-[min(48rem,calc(100dvh-6rem))] max-h-[min(48rem,calc(100dvh-6rem))] max-w-[min(48rem,calc(100vw-2rem))]",
           !isMobile && runtimePane && "max-w-[min(80rem,calc(100vw-2rem))]",
           isMobile &&
-            "ohb-inset-sheet h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)] max-h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)] max-sm:max-h-[calc(100dvh-var(--ohb-safe-top)-0.75rem)]",
+            "openedbot-inset-sheet h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)] max-h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)] max-sm:max-h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)]",
         )}
         bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-hidden p-0"
       >

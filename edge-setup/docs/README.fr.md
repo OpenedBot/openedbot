@@ -116,15 +116,15 @@ n'est pas publié, et le VPS atteint le point d'entrée openedbot local sur sa p
 loopback. `make link-dev-up` démarre la passerelle locale en mode `separate`,
 ouvre le tunnel et lie l'instance au nom du poste (un port VPS par poste) avec
 un ticket de l'openedbot locale.
-`link --ohb` n'accepte une origine `http://` que sur la loopback, et seulement
-derrière `--insecure-ohb` :
+`link --openedbot` n'accepte une origine `http://` que sur la loopback, et seulement
+derrière `--insecure-openedbot` :
 
 ```bash
 # Machine de développement, à la racine du dépôt openedbot ; l'API doit déjà répondre sur :8790 (make dev)
 make link-dev-up HOST=hermes-admin@203.0.113.10
 
 # À la main sur le VPS ; l'origine est la loopback du VPS
-edge-setup link --ohb http://127.0.0.1:8790 --yes --insecure-ohb --name dev
+edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot --name dev
 # Coller le ticket à l'invite masquée. `--name dev` évite d'écraser un lien
 # de production posé sur le même hôte (docs/CONNECTOR.md, « Instances nommées »).
 ```
@@ -147,7 +147,7 @@ lancé à la main reste une option avancée, jamais devant le gateway du VPS.
 | `plan` | oui | Ce que `up` ferait, sans rien écrire. |
 | `up` | | Installe le runtime minimal sous l'unique compte `hermes`, le gateway loopback et le connector. Chaque protection globale (`--sandbox`, journal persistant, mises à jour, sudo, PAM, LLMNR, UFW, fail2ban, SSH et quarantaine) est opt-in. `--auto-upgrade` active en plus le timer de mise à jour automatique une fois `up` réussi (comme `auto-upgrade enable --yes`) ; sans lui, `up` se termine par un conseil qui nomme `sudo edge-setup auto-upgrade enable --yes`. |
 | `verify-access` | | Depuis une **nouvelle** session SSH : prouve l'accès admin et désarme le rollback. |
-| `link --ohb URL` | | Handshake du lien connector, jeton persisté 0600, démon démarré. Le ticket arrive par stdin ou `--ticket-file` (0600), jamais en argument. `--insecure-ohb` accepte en plus une origine `http://` **de la loopback** (tunnel SSH inverse de développement) ; toute autre origine `http://` reste refusée. `--name <name>` crée une instance nommée (`hermes-connector@<name>.service`, `/etc/hermes/connector/<name>/`, état séparé) à côté du lien par défaut : dev et prod sur un même hôte. `link` est un *updateOrCreate* : il écrit le lien de l'instance visée quel qu'ait été le précédent, vers un openedbot de développement comme vers la production. Aucun drapeau à lever, `--replace` a été retiré. La reprise est annoncée avant la lecture du ticket, avec l'origine quittée et le runtime qui s'y fige. Un lien réussi se termine par le même conseil que `up` tant que la mise à jour automatique est désactivée. |
+| `link --openedbot URL` | | Handshake du lien connector, jeton persisté 0600, démon démarré. Le ticket arrive par stdin ou `--ticket-file` (0600), jamais en argument. `--insecure-openedbot` accepte en plus une origine `http://` **de la loopback** (tunnel SSH inverse de développement) ; toute autre origine `http://` reste refusée. `--name <name>` crée une instance nommée (`hermes-connector@<name>.service`, `/etc/hermes/connector/<name>/`, état séparé) à côté du lien par défaut : dev et prod sur un même hôte. `link` est un *updateOrCreate* : il écrit le lien de l'instance visée quel qu'ait été le précédent, vers un openedbot de développement comme vers la production. Aucun drapeau à lever, `--replace` a été retiré. La reprise est annoncée avant la lecture du ticket, avec l'origine quittée et le runtime qui s'y fige. Un lien réussi se termine par le même conseil que `up` tant que la mise à jour automatique est désactivée. |
 | `credentials list\|add\|login\|remove` | | Clé fournisseur par stdin ou fichier 0600, ou OAuth par code d'appareil (`login`), prouvés via `/api/model/options`. openedbot pose les mêmes accès depuis son interface via le connector. |
 | `doctor`, `audit [--strict]`, `status`, `export` | oui | Lecture seule (`audit` écrit un rapport root-only, le flag `ReadOnly` du verbe reste vrai). |
 | `upgrade --yes [--release-url URL]` | | Télécharge une release en HTTPS, vérifie la signature Sigstore de son `SHA256SUMS` puis, une fois, le SHA-256 du binaire contre ce manifeste, remplace le binaire puis redémarre `hermes-operator` (toujours) + `try-restart hermes-connector` et chaque `hermes-connector@<name>` s'ils existent (clé device scellée pour chaque instance liée qui n'en a pas). Il réécrit aussi `hermes-gateway.service` quand elle diffère de l'unité que ce binaire rend avec les paramètres de `up` : si ses directives changent, le gateway redémarre et `/health` est prouvé quand l'hôte est au repos (ni transaction ni run en cours), sinon le marqueur « redémarrage en attente » est posé et le redémarrage reste au propriétaire ; si seuls des commentaires ou des lignes vides changent, l'unité est réécrite et rechargée sans redémarrage ni marqueur ; un gateway qui ne répond pas retrouve l'unité précédente et l'étape échoue. `update --self` en est l'alias. `update` seul sort 69 (non implémenté). |

@@ -29,18 +29,18 @@ function fakeCloudflare(options: { existingTunnel?: boolean; failAt?: keyof Clou
   return { client, log, state };
 }
 
-const input = { accountId: "acct", zoneId: "zone", hostname: "hermes.example.com", tunnelName: "ohb-hermes-hermes", accessName: "OHB Hermes hermes.example.com" };
+const input = { accountId: "acct", zoneId: "zone", hostname: "hermes.example.com", tunnelName: "openedbot-hermes-hermes", accessName: "openedbot Hermes hermes.example.com" };
 
-describe("OHB-75 direct exposure provisioning", () => {
+describe("direct exposure provisioning", () => {
   test("creates tunnel, ingress, CNAME, Access app, service token and policy, then reads the install token", async () => {
     const { client, log } = fakeCloudflare();
     const result = await provisionDirectExposure(client, input);
     expect(result).toMatchObject({ tunnelId: "tun-new", dnsRecordId: "rec-1", accessAppId: "app-1", serviceTokenId: "st-1", edgeAuth: { clientId: "cid", clientSecret: "csecret" } });
     expect(result.installToken.startsWith("install-token-")).toBe(true);
     expect(log).toEqual([
-      "findTunnel:ohb-hermes-hermes", "createTunnel:ohb-hermes-hermes", "ingress:tun-new:hermes.example.com:http://127.0.0.1:8642",
+      "findTunnel:openedbot-hermes-hermes", "createTunnel:openedbot-hermes-hermes", "ingress:tun-new:hermes.example.com:http://127.0.0.1:8642",
       "findDns:hermes.example.com", "cname:hermes.example.com:tun-new", "findApp:hermes.example.com", "createApp:hermes.example.com",
-      "createToken:OHB Hermes hermes.example.com", "policy:app-1:st-1", "token:tun-new",
+      "createToken:openedbot Hermes hermes.example.com", "policy:app-1:st-1", "token:tun-new",
     ]);
   });
 

@@ -167,7 +167,7 @@ function QueryRow({
       <div className="py-1">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 text-body-regular text-muted-foreground">
-            <span className={query.running ? "ohb-agent-label" : undefined}>{query.query}</span>
+            <span className={query.running ? "openedbot-agent-label" : undefined}>{query.query}</span>
           </p>
           {query.resultLabel ? (
             <span className="shrink-0 pt-px text-body-regular tabular-nums text-muted-foreground/80">

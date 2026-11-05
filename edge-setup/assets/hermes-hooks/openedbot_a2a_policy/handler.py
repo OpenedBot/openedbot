@@ -10,7 +10,7 @@ import logging
 
 _started = False
 _warned = False
-_log = logging.getLogger("ohb.a2a.policy")
+_log = logging.getLogger("openedbot.a2a.policy")
 
 
 async def handle(event_type, context):

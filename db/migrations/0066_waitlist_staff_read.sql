@@ -10,7 +10,7 @@
 -- `returning`) : ce nouveau droit ne rouvre rien dans sa réponse.
 begin;
 
-grant select, delete on waitlist_signups to ohb_api;
+grant select, delete on waitlist_signups to openedbot_api;
 
 insert into schema_migrations(version) values ('0066_waitlist_staff_read') on conflict (version) do nothing;
 

@@ -2,7 +2,7 @@ import { DEFAULT_LOCALE, isLocale, type Locale } from "@openedbot/contracts-loca
 
 /**
  * Choix de la langue de l'interface web (console et backoffice), une seule
- * règle pour la clé `ohb:locale`, partagée aussi avec le site public.
+ * règle pour la clé `openedbot:locale`, partagée aussi avec le site public.
  *
  * Au montage : une préférence valide enregistrée dans `localStorage` gagne,
  * sinon la première langue prise en charge dans `navigator.languages` est
@@ -10,7 +10,7 @@ import { DEFAULT_LOCALE, isLocale, type Locale } from "@openedbot/contracts-loca
  * langue devinée n'est pas persistée : elle doit pouvoir suivre un autre
  * navigateur tant que la personne n'a pas choisi de préférence.
  */
-export const LOCALE_STORAGE_KEY = "ohb:locale";
+export const LOCALE_STORAGE_KEY = "openedbot:locale";
 
 /** Fonction pure : `stored` est la valeur brute de `localStorage`, `languages` la liste du navigateur. */
 export function resolveInitialLocale(

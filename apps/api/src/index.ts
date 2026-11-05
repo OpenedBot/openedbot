@@ -1,4 +1,3 @@
-import "@openedbot/platform-config/legacy-env-guard"; // first: refuses a retired OHB_* variable before any module reads the environment
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";
@@ -251,7 +250,7 @@ const runtimeMetrics = new ApiRuntimeMetrics();
 const computer = createComputerProvider(config.computer);
 // Une seule clé de verdict par processus : la publier et signer avec la même.
 const verdictSigner = createVerdictSigner(config.auditVerdictSigning);
-// Le bucket WORM (OHB-57) : ancres et verdicts y sont déposés une fois ; `null` hors production sans R2.
+// Le bucket WORM : ancres et verdicts y sont déposés une fois ; `null` hors production sans R2.
 const auditWorm = createAuditWormStore(config.auditWorm);
 // AuditAnchor : la chaîne locale toujours, puis le bucket WORM (installation
 // legacy jusqu'à l'étape 8). Un ancrage externe en échec bloque l'écriture
@@ -392,7 +391,7 @@ app.route("/api/account", workspaceRoutes(db, {
   environment: config.environment,
 }));
 app.route("/api/runtime-enrollments", runtimeEnrollmentClaimRoutes(db, config));
-// OHB-75 : avant `/api/runtime` pour que `/exposures/:id` ne tombe pas sur `/:runtimeId`.
+// Avant `/api/runtime` pour que `/exposures/:id` ne tombe pas sur `/:runtimeId`.
 app.route("/api/runtime/exposures", runtimeExposureRoutes(db, config));
 app.route("/api/runtime", runtimeRoutes(db, config, undefined, undefined, productFeatures.connectorOnlyEnrollment));
 app.route("/api/runtimes", connectorReleaseRoutes(db, connectorReleases));

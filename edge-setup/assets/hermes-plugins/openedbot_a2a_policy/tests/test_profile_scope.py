@@ -11,9 +11,9 @@ import types
 import unittest
 from unittest.mock import patch
 
-from ohb_a2a_policy import _policy_state
-from ohb_a2a_policy.policy import make_pre_tool_call_guard, make_tool_execution_middleware
-from ohb_a2a_policy.runtime_scope import root_home_scope
+from openedbot_a2a_policy import _policy_state
+from openedbot_a2a_policy.policy import make_pre_tool_call_guard, make_tool_execution_middleware
+from openedbot_a2a_policy.runtime_scope import root_home_scope
 
 
 class ProfileRootPolicyTests(unittest.TestCase):
@@ -312,7 +312,7 @@ def _home(path: Path) -> Path:
 
 
 def _marker(active_home: Path, root: Path) -> Path:
-    plugin_dir = _home(active_home / "plugins" / "ohb_a2a_policy")
+    plugin_dir = _home(active_home / "plugins" / "openedbot_a2a_policy")
     marker = plugin_dir / "runtime-home"
     marker.write_text(str(root) + "\n", encoding="utf-8")
     os.chmod(marker, 0o600)

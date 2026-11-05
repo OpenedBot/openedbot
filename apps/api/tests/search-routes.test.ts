@@ -47,7 +47,7 @@ function searchDb(input: { missing?: boolean } = {}) {
     }
     if (sql.includes("with search_query as")) {
       if (input.missing) return Promise.reject(Object.assign(
-        new Error("function public.ohb_global_search_normalize(text) does not exist"),
+        new Error("function public.openedbot_global_search_normalize(text) does not exist"),
         { errno: "42883" },
       ));
       return Promise.resolve([
@@ -95,9 +95,9 @@ describe("global search route", () => {
     expect(sql).toContain("hidden.user_id =");
     expect(sql).toContain("not like '%:persona-draft:%'");
     expect(sql).toContain("counter.next_sequence -");
-    expect(sql).toContain("ohb_visible_message_search_text");
+    expect(sql).toContain("openedbot_visible_message_search_text");
     expect(sql).toContain("plainto_tsquery");
-    expect(sql).toContain("public.ohb_global_search_normalize");
+    expect(sql).toContain("public.openedbot_global_search_normalize");
     const operatorSql = fixture.statements.find((statement) => statement.includes("from operator_profiles")) ?? "";
     expect(operatorSql).toContain("where organization_id =");
     expect(operatorSql).not.toContain("user_id");
@@ -118,7 +118,7 @@ describe("global search route", () => {
   });
 
   test("missing indexed-search migration is explicit", async () => {
-    for (const functionName of ["ohb_visible_message_search_text", "ohb_global_search_normalize"]) {
+    for (const functionName of ["openedbot_visible_message_search_text", "openedbot_global_search_normalize"]) {
       const error = Object.assign(
         new Error(`function public.${functionName}(text) does not exist`),
         { code: "ERR_POSTGRES_SERVER_ERROR", errno: "42883" },
@@ -134,7 +134,7 @@ describe("global search route", () => {
     const sql = await Bun.file(
       new URL("../../../db/migrations/0006_messaging_search.sql", import.meta.url),
     ).text();
-    expect(sql).toContain("create or replace function public.ohb_global_search_normalize(input text)");
+    expect(sql).toContain("create or replace function public.openedbot_global_search_normalize(input text)");
     expect(sql).toContain("immutable");
     expect(sql).toContain("NFKD");
     expect(sql).toContain("U&'[\\0300-\\036f]' collate \"C\"");
@@ -147,12 +147,12 @@ describe("global search route", () => {
     expect(sql).toContain("when part.value->>'type' = 'text'");
     expect(sql).toContain("when part.value->>'type' = 'attachment'");
     expect(sql).not.toContain("part.value->>'args'");
-    expect(sql).toContain("public.ohb_global_search_normalize(coalesce(string_agg(");
+    expect(sql).toContain("public.openedbot_global_search_normalize(coalesce(string_agg(");
     // Les index GIN portent leurs noms finaux et indexent la projection
     // normalisée : messages via l'allow-list, threads via le titre normalisé.
     expect(sql).toContain("create index messages_global_search_idx");
     expect(sql).toContain("create index threads_global_search_idx");
-    expect(sql).toMatch(/create index messages_global_search_idx\s+on messages using gin \(\s*to_tsvector\('simple'::regconfig, public\.ohb_visible_message_search_text\(content\)\)/u);
-    expect(sql).toMatch(/create index threads_global_search_idx\s+on threads using gin \(\s*to_tsvector\(\s*'simple'::regconfig,\s*public\.ohb_global_search_normalize\(coalesce\(title, ''\)\)/u);
+    expect(sql).toMatch(/create index messages_global_search_idx\s+on messages using gin \(\s*to_tsvector\('simple'::regconfig, public\.openedbot_visible_message_search_text\(content\)\)/u);
+    expect(sql).toMatch(/create index threads_global_search_idx\s+on threads using gin \(\s*to_tsvector\(\s*'simple'::regconfig,\s*public\.openedbot_global_search_normalize\(coalesce\(title, ''\)\)/u);
   });
 });

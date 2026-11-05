@@ -6,13 +6,13 @@ import (
 	"path"
 )
 
-//go:embed hermes-plugins/ohb_a2a_policy/plugin.yaml hermes-plugins/ohb_a2a_policy/*.py hermes-hooks/ohb_a2a_policy/HOOK.yaml hermes-hooks/ohb_a2a_policy/handler.py hermes-hooks/ohb_backend_probe/HOOK.yaml hermes-hooks/ohb_backend_probe/handler.py hermes-hooks/ohb_prompt_cache_ttl/HOOK.yaml hermes-hooks/ohb_prompt_cache_ttl/handler.py
+//go:embed hermes-plugins/openedbot_a2a_policy/plugin.yaml hermes-plugins/openedbot_a2a_policy/*.py hermes-hooks/openedbot_a2a_policy/HOOK.yaml hermes-hooks/openedbot_a2a_policy/handler.py hermes-hooks/openedbot_backend_probe/HOOK.yaml hermes-hooks/openedbot_backend_probe/handler.py hermes-hooks/openedbot_prompt_cache_ttl/HOOK.yaml hermes-hooks/openedbot_prompt_cache_ttl/handler.py
 var a2aFiles embed.FS
 
 // A2APolicyFiles returns only the shipped companion code and the gateway
 // hooks of the runtime root: the A2A startup hook, the backend probe hook
-// (ohb_backend_probe, prompt latency) and the per-run prompt-cache tier
-// (ohb_prompt_cache_ttl). Tests, caller paths and downloaded plugins never
+// (openedbot_backend_probe, prompt latency) and the per-run prompt-cache tier
+// (openedbot_prompt_cache_ttl). Tests, caller paths and downloaded plugins never
 // enter this inventory.
 func A2APolicyFiles() (map[string][]byte, error) {
 	files := make(map[string][]byte)

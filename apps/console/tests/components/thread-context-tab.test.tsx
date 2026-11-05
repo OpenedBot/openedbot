@@ -135,8 +135,8 @@ function renderTab(
 beforeEach(() => {
   // No thread is painted here: open the secondary reads the frame would open.
   openSecondaryReads();
-  window.localStorage.setItem("ohb:locale", "fr");
-  window.localStorage.setItem("ohb:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf" }));
+  window.localStorage.setItem("openedbot:locale", "fr");
+  window.localStorage.setItem("openedbot:cloud-session", JSON.stringify({ organizationId: "org-1", csrfToken: "csrf" }));
 });
 
 afterEach(() => {

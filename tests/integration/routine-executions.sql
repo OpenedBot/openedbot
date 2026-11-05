@@ -1,9 +1,9 @@
--- OHB-21 : historique des tirs, RLS tenant, cascade a la suppression de routine.
+-- Historique des tirs, RLS tenant, cascade a la suppression de routine.
 -- Reutilise tenant-a / tenant-b. Pas d apostrophe isolee dans les commentaires.
 
 create temp table routine_exec_proof (own int, other int, after_delete int);
 insert into routine_exec_proof values (-1, -1, -1);
-grant select, insert, update on routine_exec_proof to ohb_api;
+grant select, insert, update on routine_exec_proof to openedbot_api;
 
 insert into routines (
   id, organization_id, bot_id, name, schedule, timezone, message, enabled
@@ -34,12 +34,12 @@ insert into routine_executions (
   'fired', 'scheduled', null, null
 );
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update routine_exec_proof set own = (select count(*) from routine_executions);
 reset role;
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 update routine_exec_proof set other = (
   select count(*) from routine_executions

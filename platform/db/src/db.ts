@@ -13,7 +13,7 @@ export function createDatabase(url: string, maxConnections: number): Db {
  *
  * Le worker traverse les organisations (file de runs, maintenance) et ses
  * policies historiques `using (true)` ne lisent pas `app.organization_id`.
- * Une table passée sous policy tenant pour `ohb_worker` ne se lit plus qu'ici :
+ * Une table passée sous policy tenant pour `openedbot_worker` ne se lit plus qu'ici :
  * sans ce réglage, PostgreSQL ne rend aucune ligne, sans erreur. Chaque accès
  * converti passe donc par cette fonction, et `tests/integration/worker-tenant-scope.ts`
  * le prouve sur une vraie base.

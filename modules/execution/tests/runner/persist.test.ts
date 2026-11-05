@@ -12,7 +12,7 @@ const html = "<!doctype html><html><body>semaine</body></html>";
 
 describe("persistEvents : pièces du runtime", () => {
   test("copie un HTML write_file en attachments et en part du message", async () => {
-    const root = await mkdtemp(join(tmpdir(), "ohb-artifacts-"));
+    const root = await mkdtemp(join(tmpdir(), "openedbot-artifacts-"));
     const messages: unknown[] = [];
     const attachments: unknown[] = [];
     const payloads: unknown[] = [];
@@ -24,7 +24,7 @@ describe("persistEvents : pièces du runtime", () => {
           cursor: "1",
           botId: "bot-1",
           turnId: "run-1",
-          sessionKey: "ohb:org:thread",
+          sessionKey: "openedbot:org:thread",
           leaseGeneration: "1",
         }]);
       }
@@ -62,7 +62,7 @@ describe("persistEvents : pièces du runtime", () => {
       botId: "bot-1",
       botName: "Neo",
       botSlug: "neo",
-      sessionId: "ohb:org:thread",
+      sessionId: "openedbot:org:thread",
       leaseGeneration: 1,
       workflowId: null,
       workflowRootRunId: null,

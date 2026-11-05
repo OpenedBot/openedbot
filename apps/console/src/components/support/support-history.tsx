@@ -31,7 +31,7 @@ export function SupportHistoryList({
             type="button"
             data-support-history-item={item.conversationId}
             onClick={() => onPick(item.conversationId)}
-            className="ohb-press flex w-full flex-col gap-1 rounded-2xl border border-border/60 bg-card px-3 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring dark:bg-muted/40"
+            className="openedbot-press flex w-full flex-col gap-1 rounded-2xl border border-border/60 bg-card px-3 py-2 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring dark:bg-muted/40"
           >
             <span className="flex w-full items-center gap-2">
               <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">

@@ -51,7 +51,7 @@ type AlertContext struct {
 	Instance string
 	// openedbot is the origin of the openedbot behind the link; only its host
 	// is rendered.
-	OHB string
+	Openedbot string
 	// OwnerEmail and Organization identify whose runtime this is.
 	OwnerEmail   string
 	Organization string

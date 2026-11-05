@@ -100,7 +100,7 @@ describe("json() : lecture toujours bornée", () => {
       kind: "direct",
       send: async () => new Response(streamedJson("{\"data\":[\"", size)),
     };
-    const messages = await new HermesClient({ transport }).sessionMessages("ohb:org:thread");
+    const messages = await new HermesClient({ transport }).sessionMessages("openedbot:org:thread");
     expect(messages).toHaveLength(1);
   });
 });

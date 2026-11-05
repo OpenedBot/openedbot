@@ -1,26 +1,26 @@
 /**
- * PERM2-A (DEV-OHB-250): a gate raised by the host approval plugin reaches
+ * PERM2-A: a gate raised by the host approval plugin reaches
  * openedbot identified (tool key, descriptor, Hermes request id), and the answer
  * resolves that exact gate. The bot asks for a `write_file`; the answer is
  * `deny`, so the pass leaves no file on the runtime. Whether the model calls
  * the tool at all is its choice: no gate is a warning, a gate that arrives
  * unidentified is a failure.
  *
- * PERM2-1 (DEV-OHB-251): when the organization is in the `v2` pipeline, the
+ * PERM2-1: when the organization is in the `v2` pipeline, the
  * same pass also proves who answered. The manual gate is a human's
  * (`awaiting_human`, then `member`); in `bypass` a write to `/tmp` inside the
  * non-persistent terminal container is answered `once` by the policy without
  * a card, and a write under `.ssh` stays at the floor for a human, who
  * refuses it. Nothing persistent is left on the runtime.
  *
- * PERM2-4 (DEV-OHB-254): a manual gate offers no "Always" (the pipeline
+ * PERM2-4: a manual gate offers no "Always" (the pipeline
  * sends every manual gate to a person before the grant stage, spec section
  * 5 step 5). On a fresh `auto` bot whose gate reaches a person, the card
  * offers "Always for this tool"; the next gate of that tool is answered
  * `once` at the grant stage without a card, and the grant is revoked before
  * the bot is purged.
  *
- * PERM2-7 (DEV-OHB-258): once the runtime's review profile is proven, a new
+ * PERM2-7: once the runtime's review profile is proven, a new
  * bot without an explicit mode starts in `auto` (D-1), and an `auto` gate is
  * answered by the reviewer on the bot's model, or handed to a person with
  * its reason, within the 15 s budget. The write targets `/tmp` in the
@@ -186,7 +186,7 @@ export const permissions: Scenario = {
         if (gate.gateKind !== "plugin_tool" || !gate.toolKey || gate.descriptorVersion !== 1) {
           throw new Error(`The gate reads ${gate.gateKind}/${String(gate.toolKey)}, not an identified plugin gate.`);
         }
-        if (gate.description?.includes("ohb-gate/")) throw new Error("The descriptor line reached the displayed description.");
+        if (gate.description?.includes("openedbot-gate/")) throw new Error("The descriptor line reached the displayed description.");
         if (pipeline === "v2" && (gate.decisionState !== "awaiting_human" || gate.decidedByKind !== null)) {
           throw new Error(`A manual v2 gate reads ${String(gate.decisionState)}/${String(gate.decidedByKind)}, not awaiting_human for a person.`);
         }
@@ -227,7 +227,7 @@ export const permissions: Scenario = {
         if (row?.mode !== "ask_writes") throw new Error(`A v2 bypass bot reads host policy ${String(row?.mode)}, not ask_writes.`);
         const t0 = Date.now();
         const sent = await session.api<{ runId: string }>("POST", `/api/threads/${bot.threadId}/messages`, {
-          input: `Utilise l'outil write_file pour créer le fichier /tmp/ohb-e2e-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
+          input: `Utilise l'outil write_file pour créer le fichier /tmp/openedbot-e2e-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
         }, 202);
         const policyGate = await waitGate(lab, sent.runId, t0);
         if (!policyGate) return noGate(lab, sent.runId, t0);
@@ -246,7 +246,7 @@ export const permissions: Scenario = {
         if (pipeline !== "v2") throw new Skip("organization in the legacy pipeline");
         const t0 = Date.now();
         const sent = await session.api<{ runId: string }>("POST", `/api/threads/${bot.threadId}/messages`, {
-          input: `Utilise l'outil write_file pour créer le fichier .ssh/ohb-e2e-${lab.tag} avec le seul mot bonjour. Appelle l'outil directement.`,
+          input: `Utilise l'outil write_file pour créer le fichier .ssh/openedbot-e2e-${lab.tag} avec le seul mot bonjour. Appelle l'outil directement.`,
         }, 202);
         const floorGate = await waitGate(lab, sent.runId, t0);
         if (!floorGate) return noGate(lab, sent.runId, t0);
@@ -274,7 +274,7 @@ export const permissions: Scenario = {
         if (always.permissionMode !== "auto") throw new Error(`The bot mode reads ${String(always.permissionMode)}, not auto.`);
         const t0 = Date.now();
         const first = await session.api<{ runId: string }>("POST", `/api/threads/${always.threadId}/messages`, {
-          input: `Utilise l'outil write_file pour créer le fichier /tmp/ohb-e2e-always-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
+          input: `Utilise l'outil write_file pour créer le fichier /tmp/openedbot-e2e-always-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
         }, 202);
         const asked = await waitGate(lab, first.runId, t0);
         if (!asked) return noGate(lab, first.runId, t0);
@@ -304,7 +304,7 @@ export const permissions: Scenario = {
 
         const t1 = Date.now();
         const second = await session.api<{ runId: string }>("POST", `/api/threads/${always.threadId}/messages`, {
-          input: `Utilise encore l'outil write_file pour créer le fichier /tmp/ohb-e2e-always-2-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
+          input: `Utilise encore l'outil write_file pour créer le fichier /tmp/openedbot-e2e-always-2-${lab.tag}.md avec le seul mot bonjour. Appelle l'outil directement.`,
         }, 202);
         const granted = await waitGate(lab, second.runId, t1);
         let grantedStage: string | null = null;
@@ -338,7 +338,7 @@ export const permissions: Scenario = {
         if (reviewed.permissionMode !== "auto") throw new Error(`D-1: a bot created without a mode reads ${String(reviewed.permissionMode)}, not auto.`);
         const t0 = Date.now();
         const sent = await session.api<{ runId: string }>("POST", `/api/threads/${reviewed.threadId}/messages`, {
-          input: `Utilise l'outil write_file pour créer le fichier /tmp/ohb-e2e-review-${lab.tag}.md avec le seul mot bonjour, c'est ce que je te demande. Appelle l'outil directement.`,
+          input: `Utilise l'outil write_file pour créer le fichier /tmp/openedbot-e2e-review-${lab.tag}.md avec le seul mot bonjour, c'est ce que je te demande. Appelle l'outil directement.`,
         }, 202);
         const reviewGate = await waitGate(lab, sent.runId, t0);
         if (!reviewGate) return noGate(lab, sent.runId, t0);

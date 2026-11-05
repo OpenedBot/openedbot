@@ -1,6 +1,6 @@
 -- Step durations kept for analysis, next to the row they measure. Until now
--- they only lived in worker log lines (`run.latency`, OHB-107;
--- `profile_provision.timings`, DEV-OHB-244), lost with the process output.
+-- they only lived in worker log lines (`run.latency`,
+-- `profile_provision.timings`), lost with the process output.
 -- A provision carries them in the update that already closes its pass. A
 -- run gets them in a write the worker does not wait for, once the run is
 -- over: a failed write costs a log line, never the run. Names and durations

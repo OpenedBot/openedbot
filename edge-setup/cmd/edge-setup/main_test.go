@@ -30,11 +30,11 @@ func baseEnv(run func(*exec.Cmd) error, stderr *bytes.Buffer) elevateEnv {
 func TestElevatePassesArgvBehindDoubleDashAndGuardsRecursion(t *testing.T) {
 	var got *exec.Cmd
 	var errb bytes.Buffer
-	code, ran := elevateWith(baseEnv(func(c *exec.Cmd) error { got = c; return nil }, &errb), []string{"link", "--ohb", "https://x", "--yes"})
+	code, ran := elevateWith(baseEnv(func(c *exec.Cmd) error { got = c; return nil }, &errb), []string{"link", "--openedbot", "https://x", "--yes"})
 	if !ran || code != cli.ExitOK {
 		t.Fatalf("ran=%v code=%d", ran, code)
 	}
-	want := []string{"/usr/bin/sudo", "--", "/usr/local/sbin/edge-setup", "link", "--ohb", "https://x", "--yes"}
+	want := []string{"/usr/bin/sudo", "--", "/usr/local/sbin/edge-setup", "link", "--openedbot", "https://x", "--yes"}
 	if strings.Join(got.Args, " ") != strings.Join(want, " ") {
 		t.Fatalf("argv %v, want %v", got.Args, want)
 	}

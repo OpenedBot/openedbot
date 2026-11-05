@@ -1,4 +1,4 @@
-import { nativeBridge, type OhbNativeBridge } from "./native-bridge";
+import { nativeBridge, type OpenedbotNativeBridge } from "./native-bridge";
 
 /**
  * La barre de titre de la coque native, sous macOS et sous Windows.
@@ -24,7 +24,7 @@ export const NATIVE_TITLEBAR_ATTRIBUTE = "data-native-titlebar";
 export const NATIVE_TITLEBAR_BAND_ATTRIBUTE = "data-native-titlebar-band";
 
 export function nativeTitlebarFor(
-  bridge: OhbNativeBridge | null,
+  bridge: OpenedbotNativeBridge | null,
   nav: { platform: string; userAgent: string },
 ): NativeTitlebar | null {
   if (!bridge) return null;

@@ -151,7 +151,7 @@ export function buildTeamMarkdownExport(snapshot: TeamExportSnapshot): TeamMarkd
 
   const canonical = JSON.stringify({ organization: snapshot.organization, members, rooms, routines });
   const digest = createHash("sha256").update(canonical).digest("hex");
-  const sourceId = `ohb-${safePackageSlug(snapshot.organization.slug).slice(0, 48)}-${digest.slice(0, 12)}`;
+  const sourceId = `openedbot-${safePackageSlug(snapshot.organization.slug).slice(0, 48)}-${digest.slice(0, 12)}`;
   const release = "1.0.0";
   const team: TeamMarkdownExportInput = {
     format: "openmaus.botmrr",

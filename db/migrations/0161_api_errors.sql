@@ -32,12 +32,12 @@ begin;
 -- avalanche d'erreurs ne vide pas le pool de connexions.
 --
 -- RLS :
--- - ohb_api n'a QUE `insert`, sans policy de lecture : l'API écrit le journal,
+-- - openedbot_api n'a QUE `insert`, sans policy de lecture : l'API écrit le journal,
 --   elle ne le relit pas. Une ligne d'organisation s'écrit sous `withTenant`
 --   (le `with check` exige la même organisation que `app.organization_id`) ;
 --   une requête sans organisation (non authentifiée, compte sans espace)
 --   écrit `organization_id` NULL, sans réglage.
--- - ohb_worker ne voit et ne supprime que les lignes de plus de 90 jours : la
+-- - openedbot_worker ne voit et ne supprime que les lignes de plus de 90 jours : la
 --   policy EST la rétention, le worker n'a jamais accès à une erreur fraîche.
 -- - la lecture par référence se fait hors rôles applicatifs (superutilisateur
 --   ou rôle de migration, qui contournent la RLS) ; aucun backoffice du cœur
@@ -77,23 +77,23 @@ create index api_errors_org_occurred_idx
   where organization_id is not null;
 
 comment on table api_errors is
-  'Erreurs non prévues de l''API (500 INTERNAL_ERROR), une ligne par référence affichée à l''utilisateur. Écriture asynchrone best-effort par ohb_api (insert seul). Ni corps, ni en-têtes, ni query string ; message et pile rédigés et bornés. Le worker purge au-delà de 90 jours (policy api_errors_worker_*). Lecture : select * from api_errors where reference = ''<référence>''.';
+  'Erreurs non prévues de l''API (500 INTERNAL_ERROR), une ligne par référence affichée à l''utilisateur. Écriture asynchrone best-effort par openedbot_api (insert seul). Ni corps, ni en-têtes, ni query string ; message et pile rédigés et bornés. Le worker purge au-delà de 90 jours (policy api_errors_worker_*). Lecture : select * from api_errors where reference = ''<référence>''.';
 
 alter table api_errors enable row level security;
 alter table api_errors force row level security;
 
-create policy api_errors_api_insert on api_errors for insert to ohb_api
+create policy api_errors_api_insert on api_errors for insert to openedbot_api
   with check (
     organization_id is null
     or organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
   );
-create policy api_errors_worker_expired on api_errors for select to ohb_worker
+create policy api_errors_worker_expired on api_errors for select to openedbot_worker
   using (occurred_at < now() - interval '90 days');
-create policy api_errors_worker_purge on api_errors for delete to ohb_worker
+create policy api_errors_worker_purge on api_errors for delete to openedbot_worker
   using (occurred_at < now() - interval '90 days');
 
-grant insert on api_errors to ohb_api;
-grant select, delete on api_errors to ohb_worker;
+grant insert on api_errors to openedbot_api;
+grant select, delete on api_errors to openedbot_worker;
 
 insert into schema_migrations(version) values ('0161_api_errors')
 on conflict (version) do nothing;

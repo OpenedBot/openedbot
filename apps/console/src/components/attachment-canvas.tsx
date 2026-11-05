@@ -467,7 +467,7 @@ export function AttachmentCanvas() {
                     // Le panneau descend jusqu'au bord de la scène, où repose
                     // l'indicateur d'accueil : c'est le CONTENU qui garde ses
                     // distances, pas le fond.
-                    isMobile && "pb-[max(0.75rem,var(--ohb-safe-bottom))]",
+                    isMobile && "pb-[max(0.75rem,var(--openedbot-safe-bottom))]",
                     // Une image se lit en entier, centrée, sans faire défiler.
                     imageUrl ? "flex items-center justify-center bg-muted/30" : undefined,
                   ],
@@ -528,8 +528,8 @@ export function AttachmentCanvas() {
 /** Bureau : les mêmes boutons que le canva du guichet. Doigt : 44 pt. */
 export function canvasChromeButton(coarse: boolean): string {
   return coarse
-    ? "ohb-press flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-    : "ohb-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring";
+    ? "openedbot-press flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    : "openedbot-settings-action mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring";
 }
 
 /** Le type MIME d'abord, l'extension ensuite : un `.md` arrive parfois nu. */

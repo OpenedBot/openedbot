@@ -43,7 +43,7 @@ function jsonFeatures(eventReplay: boolean): Response {
   return Response.json({ features: { event_replay: eventReplay } });
 }
 
-describe("cache du préflight Hermes (OHB-114)", () => {
+describe("cache du préflight Hermes", () => {
   afterEach(() => {
     useHermesPreflightCacheStore(null);
   });
@@ -221,7 +221,7 @@ describe("cache du préflight Hermes (OHB-114)", () => {
     expect(probes).toBe(0);
   });
 
-  test("consecutive turns on the same link reuse the answer well past the short TTL (OHB-137)", async () => {
+  test("consecutive turns on the same link reuse the answer well past the short TTL", async () => {
     const probed = client("alpha", () => jsonFeatures(true));
     const start = Date.now();
     const scope: HermesPreflightScope = {
@@ -240,7 +240,7 @@ describe("cache du préflight Hermes (OHB-114)", () => {
     expect(HERMES_PREFLIGHT_LINK_TTL_MS).toBeGreaterThan(HERMES_PREFLIGHT_TTL_MS);
   });
 
-  test("a new link instant in the scope probes again (OHB-137)", async () => {
+  test("a new link instant in the scope probes again", async () => {
     let supported = true;
     const probed = client("alpha", () => jsonFeatures(supported));
     const scope: HermesPreflightScope = {
@@ -276,7 +276,7 @@ describe("cache du préflight Hermes (OHB-114)", () => {
   });
 });
 
-describe("toolset inventory reused across runs on one link (OHB-138)", () => {
+describe("toolset inventory reused across runs on one link", () => {
   afterEach(() => {
     useHermesToolsetCacheStore(null);
   });

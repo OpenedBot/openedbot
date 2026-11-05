@@ -8,7 +8,7 @@ import { FailureState, classifyFailure } from "../../src/components/failure-stat
 // Ces cas vérifient une copie FRANÇAISE : la langue est posée explicitement,
 // le défaut du produit étant désormais l'anglais (`DEFAULT_LOCALE`).
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
 });
 
 afterEach(cleanup);

@@ -112,21 +112,21 @@ alter table webhook_deliveries force row level security;
 alter table webhook_management_operations enable row level security;
 alter table webhook_management_operations force row level security;
 
-create policy webhook_endpoints_tenant on webhook_endpoints to ohb_api
+create policy webhook_endpoints_tenant on webhook_endpoints to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-create policy webhook_deliveries_tenant on webhook_deliveries to ohb_api
+create policy webhook_deliveries_tenant on webhook_deliveries to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-create policy webhook_management_operations_tenant on webhook_management_operations to ohb_api
+create policy webhook_management_operations_tenant on webhook_management_operations to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on webhook_endpoints to ohb_api;
-grant select, insert, update, delete on webhook_deliveries to ohb_api;
-grant select, insert, update, delete on webhook_management_operations to ohb_api;
+grant select, insert, update, delete on webhook_endpoints to openedbot_api;
+grant select, insert, update, delete on webhook_deliveries to openedbot_api;
+grant select, insert, update, delete on webhook_management_operations to openedbot_api;
 
 insert into schema_migrations(version) values ('0010_webhooks')
 on conflict (version) do nothing;

@@ -39,7 +39,7 @@ type Calls = string[];
 function client(calls: Calls, getRunStatus: (signal: AbortSignal | undefined) => Promise<unknown>): ReturnType<ReviewDeps["client"]> {
   return {
     mcpInventory: async () => ({ platform: "api_server", servers: [], catalog: [] }) as never,
-    hostProfileInventory: async () => ({ profiles: [{ name: "ohb-reviewer", mcpServers: [] }] }) as never,
+    hostProfileInventory: async () => ({ profiles: [{ name: "openedbot-reviewer", mcpServers: [] }] }) as never,
     createRun: async () => { calls.push("createRun"); return "hermes-review-1"; },
     getRunStatus: async (_id: string, signal?: AbortSignal) => { calls.push("getRunStatus"); return getRunStatus(signal) as never; },
     stopRun: async () => { calls.push("stopRun"); },

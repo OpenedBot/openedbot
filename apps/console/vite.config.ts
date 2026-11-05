@@ -52,7 +52,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
     // `make solo-check`: which source modules each chunk carries (`vite-module-report.ts`).
     moduleReport(process.env.OPENEDBOT_CONSOLE_MODULE_REPORT),
     {
-      name: "ohb-dev-app-name",
+      name: "openedbot-dev-app-name",
       transformIndexHtml(html) {
         if (!isDevServe) return html;
         return html.replace(`<title>${PRODUCTION_APP_NAME}</title>`, `<title>${DEVELOPMENT_APP_NAME}</title>`);
@@ -68,7 +68,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
   // Derived from the sources, never the clock (`vite-build-id.ts`), or every
   // deploy renames every chunk and empties every browser cache.
   define: {
-    __OHB_BUILD_ID__: JSON.stringify(buildId(fileURLToPath(new URL("../../", import.meta.url)), mode, loadEnv(mode, fileURLToPath(new URL("./", import.meta.url)), "VITE_"))),
+    __OPENEDBOT_BUILD_ID__: JSON.stringify(buildId(fileURLToPath(new URL("../../", import.meta.url)), mode, loadEnv(mode, fileURLToPath(new URL("./", import.meta.url)), "VITE_"))),
   },
   server: {
     host: true,

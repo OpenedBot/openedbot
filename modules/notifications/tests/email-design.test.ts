@@ -67,7 +67,7 @@ describe("coque HTML des e-mails", () => {
 
   test("rend un code en grand dans le panneau, et en clair dans le texte", () => {
     const withCode: EmailDocument = { ...document, blocks: [{ kind: "code", label: "Code", code: "482913" }] };
-    expect(renderEmailHtml(withCode)).toContain('class="ohb-code" aria-label="Code">482913</td>');
+    expect(renderEmailHtml(withCode)).toContain('class="openedbot-code" aria-label="Code">482913</td>');
     expect(renderEmailText(withCode)).toContain("Code : 482913");
   });
 

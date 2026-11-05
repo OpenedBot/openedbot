@@ -18,7 +18,7 @@ create unique index organization_member_invitations_pending_email
 
 alter table organization_member_invitations enable row level security;
 alter table organization_member_invitations force row level security;
-create policy organization_member_invitations_api on organization_member_invitations to ohb_api
+create policy organization_member_invitations_api on organization_member_invitations to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or token_hash = nullif(current_setting('app.member_invitation_hash', true), '')
@@ -26,7 +26,7 @@ create policy organization_member_invitations_api on organization_member_invitat
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or token_hash = nullif(current_setting('app.member_invitation_hash', true), '')
   );
-grant select, insert, update on organization_member_invitations to ohb_api;
+grant select, insert, update on organization_member_invitations to openedbot_api;
 
 alter table membership_events drop constraint if exists membership_events_kind_check;
 alter table membership_events add constraint membership_events_kind_check

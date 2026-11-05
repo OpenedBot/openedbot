@@ -8,7 +8,7 @@
 
 create temp table push_proof (own int, other int, after_purge int);
 insert into push_proof values (-1, -1, -1);
-grant select, insert, update on push_proof to ohb_api;
+grant select, insert, update on push_proof to openedbot_api;
 
 insert into push_subscriptions (
   id, organization_id, user_id, endpoint, p256dh, auth, locale
@@ -30,13 +30,13 @@ insert into push_subscriptions (
   'en'
 );
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 select set_config('app.authenticating_user_id', '30000000-0000-4000-8000-000000000031', false) \g /dev/null
 update push_proof set own = (select count(*) from push_subscriptions);
 reset role;
 
-set role ohb_api;
+set role openedbot_api;
 select set_config('app.organization_id', '10000000-0000-4000-8000-000000000001', false) \g /dev/null
 select set_config('app.authenticating_user_id', '30000000-0000-4000-8000-000000000031', false) \g /dev/null
 update push_proof set other = (

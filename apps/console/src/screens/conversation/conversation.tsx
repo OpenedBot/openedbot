@@ -276,7 +276,7 @@ export function ConversationScreen() {
   // Bot mode : les bots joignables par `@slug` : tous ceux du roster sauf
   // celui du fil (le cloud API ignore de toute façon une mention de soi-même).
   // Mémoïsé : la timeline s'en sert pour ses chips et ses bulles sont `memo`.
-  // Content-stable (OHB-135): every roster patch (202, read receipt, SSE
+  // Content-stable: every roster patch (202, read receipt, SSE
   // flush) rebuilds `roster.data`; a new array with the same bots re-ran the
   // thread model and every turn signature for nothing.
   const mentionables = useContentStable(useMemo<MentionableBot[]>(
@@ -973,7 +973,7 @@ export function ConversationScreen() {
           flottent au-dessus du fichier ouvert. */}
       <div className="relative flex min-h-0 flex-1">
         {/* `data-thread-column` : messages, docks et composer se centrent dans
-            une colonne de lecture (`--ohb-thread-column`, thread-timeline.css).
+            une colonne de lecture (`--openedbot-thread-column`, thread-timeline.css).
             La rangée reste pleine largeur : le défilement du fil garde sa
             barre au bord de la fenêtre, l'en-tête ses actions à droite. */}
         <div

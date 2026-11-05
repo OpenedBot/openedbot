@@ -10,7 +10,7 @@ export const RUN_STEER_POLL_MS = 250;
  * Il n'y a pas de plafond en base : au-delà, la ligne passe `expired` avec
  * `STEER_ATTEMPTS_EXHAUSTED` et n'est plus rejouée. Seul un POST prouvé non
  * transmis peut revenir en pending. Un sending expiré devient ambiguous,
- * car le handler Hermes ne déduplique pas la clé de tentative (OHB-117).
+ * car le handler Hermes ne déduplique pas la clé de tentative.
  */
 export const MAX_RUN_STEER_ATTEMPTS = 3;
 
@@ -44,7 +44,7 @@ export type RunSteerForwardOutcome =
 type ClaimedSteer = {
   id: string;
   sourceRunId: string;
-  /** Null pour le repli d'un DM simple, admis sans workflow (OHB-113). */
+  /** Null pour le repli d'un DM simple, admis sans workflow. */
   sourceWorkflowId: string | null;
   text: string;
   forwardingEpoch: number;
@@ -620,7 +620,7 @@ async function lockSteerParentsTx(tx: SQL, rows: ReadonlyArray<{
  * Un `pending` reste en file tant que la cible est vivante, même sans
  * `hermes_run_id` (tour réclamé, création Hermes pas finie). Il meurt avec un
  * code stable quand la cible expire, échoue, ou que le lien runtime est mort
- * et que plus personne ne tient le bail (OHB-117). Le repli (DM sans workflow,
+ * et que plus personne ne tient le bail. Le repli (DM sans workflow,
  * workflow autonome, ou salon) redevient une FIFO ordinaire.
  */
 async function expirePendingRunSteersTx(tx: SQL, context?: RunSteerAckContext): Promise<void> {

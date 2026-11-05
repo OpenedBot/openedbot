@@ -41,7 +41,7 @@ function renderScreen(onDone: () => void = () => {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

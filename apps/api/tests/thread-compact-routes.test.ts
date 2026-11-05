@@ -19,7 +19,7 @@ afterAll(() => installSubscriptionPort(null));
 /**
  * `POST /api/threads/:threadId/compact` (DEV-332). La base est un faux `tx` qui
  * répond selon le texte de la requête ; il applique aussi la règle de la vraie
- * base pour `ohb_api` : `messages` ne rend aucune ligne hors d'une transaction
+ * base pour `openedbot_api` : `messages` ne rend aucune ligne hors d'une transaction
  * dont `app.organization_id` est posé (RLS), sans erreur.
  */
 

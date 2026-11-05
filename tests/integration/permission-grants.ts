@@ -1,5 +1,5 @@
 /**
- * PERM2-4 (DEV-OHB-254) against a disposable PostgreSQL database (0140):
+ * PERM2-4 against a disposable PostgreSQL database (0140):
  * "Always for this tool on this bot" and the runtime terminal switch.
  * Proves the tenant RLS of both tables for the API, the worker's read-only
  * access scoped to its run's organization, the partial unique index (a
@@ -57,9 +57,9 @@ async function refused(run: () => Promise<unknown>): Promise<string> {
   return "accepted";
 }
 
-await withDisposablePostgres("ohb254_grants", async ({ owner, connect }) => {
-  const worker = await connect("ohb_worker");
-  const api = await connect("ohb_api");
+await withDisposablePostgres("openedbot254_grants", async ({ owner, connect }) => {
+  const worker = await connect("openedbot_worker");
+  const api = await connect("openedbot_api");
   const revision = async (bot: string) => Number((await owner<Array<{ r: string }>>`select permission_revision as r from bots where id = ${bot}`)[0]!.r);
 
   await owner`insert into users (id, email) values (${USER}, 'camille.lefevre@example.com')`;
@@ -91,7 +91,7 @@ await withDisposablePostgres("ohb254_grants", async ({ owner, connect }) => {
   const duplicate = await refused(() => owner`insert into bot_permission_grants (organization_id, bot_id, tool_key, created_by_user_id, created_by_kind)
     values (${ORG_A}, ${BOT_A1}, 'write_file', ${USER}, 'member')`);
   assert(duplicate === "23505", `a second active grant was accepted: ${duplicate}`);
-  const racer = await connect("ohb_api");
+  const racer = await connect("openedbot_api");
   const raced = await Promise.all([api, racer].map((sql) => asTenant(sql, ORG_A, (tx) =>
     createBotPermissionGrantTx(tx, { organizationId: ORG_A, botId: BOT_A2, toolKey: "patch", actor: MEMBER, approvalId: null }))));
   const patchRows = await owner`select id from bot_permission_grants where bot_id = ${BOT_A2} and tool_key = 'patch'`;

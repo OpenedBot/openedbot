@@ -14,11 +14,11 @@ app is a thin Electron shell around it; it re-implements **nothing** of the prod
 - loads the full openedbot web console (`OPENEDBOT_CONSOLE_URL`);
 - handles native sign-in, always with PKCE: a one-time e-mail code, or Google through the system
   browser;
-- exposes a minimal bridge to the page, `window.__OHB_NATIVE__`;
+- exposes a minimal bridge to the page, `window.__OPENEDBOT_NATIVE__`;
 - on macOS, hosts the native notch popup (openedbot-notch).
 
 The whole UI (bots, threads, settings) comes from the console, sign-in included: signed out, the
-window shows the console's `/login`, which signs in through `__OHB_NATIVE__.auth`. The local page
+window shows the console's `/login`, which signs in through `__OPENEDBOT_NATIVE__.auth`. The local page
 (`src/renderer/signin.html`) is only a fallback for a console that predates that screen.
 
 **Scope:** macOS (Apple Silicon) first, Windows x64 and Linux x64 also built, sideloaded. Out of
@@ -119,7 +119,7 @@ Precedence: environment variable, then `config.json`, then build-time defaults
 |---|---|---|---|
 | Web console | `OPENEDBOT_CONSOLE_URL` | `consoleUrl` | `https://console.openedbot.app` |
 | API origin | `OPENEDBOT_API_ORIGIN` | `apiOrigin` | `https://api.openedbot.app` |
-| OAuth client id | — (no override) | `clientId` | `ohb-desktop-windows` |
+| OAuth client id | — (no override) | `clientId` | `openedbot-desktop-windows` |
 | Sign-in template | `OPENEDBOT_SIGNIN_TEMPLATE` | `signinTemplate` | `console-split` |
 
 Development-only variables: `OPENEDBOT_TARGET` (`prod` or an API URL), `OPENEDBOT_POPUP_APP` (path to a popup bundle),
@@ -147,11 +147,11 @@ older `config.json` or build that names the apex keeps working (`src/main/target
   written in clear. Linux's `basic_text` fallback (a key built into Chromium) counts as no vault
   (`src/main/vault.ts`).
 - The access token is renewed 60 s before expiry; a refused refresh shows the sign-in page again.
-- Browser callback: `ohb://auth/callback`, falling back to `http://127.0.0.1:47813/callback`.
+- Browser callback: `openedbot://auth/callback`, falling back to `http://127.0.0.1:47813/callback`.
 
 ## Notch popup (macOS)
 
-`make package-mac` embeds the built popup as `openedbot.app/Contents/Helpers/OHBPopup.app` and
+`make package-mac` embeds the built popup as `openedbot.app/Contents/Helpers/OpenedbotPopup.app` and
 runs it with `--hosted`. The shell stays the only session holder: the hosted popup asks it for
 tokens over stdin/stdout (one JSON line per message, protocol in
 [`src/shared/popup-protocol.ts`](src/shared/popup-protocol.ts)). If the popup crashes it is
@@ -203,7 +203,7 @@ make test        # bun test: popup protocol, theme IPC, target, diagnostics
 
 ```text
 src/main/       main process: lifecycle, config, auth, token store, window, tray, popup host
-src/preload/    window.__OHB_NATIVE__ bridge
+src/preload/    window.__OPENEDBOT_NATIVE__ bridge
 src/renderer/   local sign-in page, templates, assets
 src/shared/     pure contracts: bridge, host <-> popup protocol
 test/           bun tests
@@ -225,10 +225,7 @@ docs/           developer notes (Windows workstation)
 - Product documentation: <https://docs.openedbot.app>
 - [`docs/WINDOWS_DEV.md`](docs/WINDOWS_DEV.md): developing from a Windows workstation
 
-Variables are named `OPENEDBOT_*`. A retired `OHB_*` name is no longer read: the app refuses to
-start and names its successor.
-Names such as `ohb://`, `window.__OHB_NATIVE__` and `OHBPopup.app` are technical
-identifiers kept for compatibility.
+Variables are named `OPENEDBOT_*`.
 
 ## License
 

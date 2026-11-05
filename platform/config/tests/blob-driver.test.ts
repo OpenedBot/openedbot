@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { fileBlobRoot, otherBlobBackend, r2ConfigurationProblems, resolveBlobDriver } from "../src/blob-driver";
 
 const r2 = {
-  R2_BUCKET: "ohb-files",
+  R2_BUCKET: "openedbot-files",
   R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
   R2_ACCESS_KEY_ID: "key-id",
   R2_SECRET_ACCESS_KEY: "secret",
@@ -35,7 +35,7 @@ describe("resolveBlobDriver", () => {
   test("lists every problem and places the volume by environment", () => {
     expect(r2ConfigurationProblems(r2)).toEqual([]);
     expect(r2ConfigurationProblems({ ...r2, R2_ACCESS_KEY_ID: " " }).join()).toContain("R2_ACCESS_KEY_ID absent");
-    expect(fileBlobRoot({}, true)).toBe("/var/lib/ohb/blobs");
+    expect(fileBlobRoot({}, true)).toBe("/var/lib/openedbot/blobs");
     expect(fileBlobRoot({}, false)).toBe(".data/blobs");
     expect(fileBlobRoot({ BLOB_FILE_ROOT: " /mnt/blobs " }, true)).toBe("/mnt/blobs");
   });
@@ -43,12 +43,12 @@ describe("resolveBlobDriver", () => {
 
 describe("otherBlobBackend", () => {
   test("R2 qui écrit garde le disque pour les objets d'avant la bascule", () => {
-    expect(otherBlobBackend(r2, "r2", "/var/lib/ohb/blobs")).toEqual({ driver: "file", root: "/var/lib/ohb/blobs" });
+    expect(otherBlobBackend(r2, "r2", "/var/lib/openedbot/blobs")).toEqual({ driver: "file", root: "/var/lib/openedbot/blobs" });
   });
 
   test("le disque qui écrit ne relit R2 que si ses quatre valeurs sont réelles", () => {
     expect(otherBlobBackend(r2, "file", "/x")).toEqual({ driver: "r2", ...{
-      bucket: "ohb-files", endpoint: "https://account.r2.cloudflarestorage.com", accessKeyId: "key-id", secretAccessKey: "secret",
+      bucket: "openedbot-files", endpoint: "https://account.r2.cloudflarestorage.com", accessKeyId: "key-id", secretAccessKey: "secret",
     } });
     // Repli sur valeurs neutralisées : les objets R2 sont injoignables, pas supposés absents.
     expect(otherBlobBackend({ ...r2, R2_BUCKET: "alpha-r2-not-provisioned" }, "file", "/x")).toBeNull();

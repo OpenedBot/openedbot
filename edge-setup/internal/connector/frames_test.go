@@ -17,7 +17,7 @@ func TestTextRoundTripAndValidation(t *testing.T) {
 		{T: TCapabilities},
 		{T: TLinkIssued, RuntimeID: "rt", LinkToken: "tok"},
 		{T: TLinkRotate, RuntimeID: "rt", LinkToken: "tok2"},
-		{T: TLinkContext, Environment: "prod", OHB: "https://console.openedbot.app", Organization: &LinkOrganization{ID: "org", Name: "Acme", Slug: "acme"}, Owner: &LinkOwner{Email: "o@example.com"}},
+		{T: TLinkContext, Environment: "prod", Openedbot: "https://console.openedbot.app", Organization: &LinkOrganization{ID: "org", Name: "Acme", Slug: "acme"}, Owner: &LinkOwner{Email: "o@example.com"}},
 		{T: TLinkContext, Environment: "dev"},
 		{T: TAuditKey, RuntimeID: "rt", KeyID: "key-1", Key: strings.Repeat("A", 43) + "=", Previous: []AuditKeyRef{{KeyID: "key-0", Key: strings.Repeat("B", 43) + "="}}},
 		{T: TAuditAnchor, RuntimeID: "rt", KeyID: "key-1", WriteSeq: 3, Count: 2, Tail: strings.Repeat("ab", 32)},
@@ -96,7 +96,7 @@ func TestFeatureListBound(t *testing.T) {
 // unknown bound inside it, and no limits at all announce nothing.
 func TestLinkContextLimitsAreValidated(t *testing.T) {
 	frame := func(limits string) string {
-		return `{"t":"link.context","environment":"prod","ohb":"https://openedbot.app","limits":` + limits + `}`
+		return `{"t":"link.context","environment":"prod","openedbot":"https://openedbot.app","limits":` + limits + `}`
 	}
 	for _, limits := range []string{`{"features":64}`, `{"features":16}`, `{"features":1}`, `{}`, `null`, `{"features":null}`, `{"features":64,"requests":10}`} {
 		if _, err := DecodeText([]byte(frame(limits))); err != nil {
@@ -175,15 +175,15 @@ func TestAllowlist(t *testing.T) {
 		"POST /v1/runs/run_abc/stop": "", "POST /v1/runs/run_abc/approval": "", "GET /p/prod-1/health": "", "POST /p/prod-1/v1/runs": "",
 		"GET /api/sessions/s1": "", "GET /api/sessions/s1/messages": "", "POST /api/sessions": "", "GET /api/mcp/servers": "",
 		"DELETE /api/sessions/s1": "", "DELETE /p/prod-1/api/sessions/s1": "",
-		// openedbot's REAL session names: `ohb:<org>:<...>`, whose every
+		// openedbot's REAL session names: `openedbot:<org>:<...>`, whose every
 		// colon encodeURIComponent writes as `%3A`. The original cases knew only
 		// `s1`, a name openedbot never produces, so the list refused all
 		// three session routes in production.
-		"DELETE /api/sessions/ohb%3A00000000-0000-4000-8000-000000000201%3A57cc181a-554c-41e4-bdd1-b6d360290ddb": "",
-		"GET /api/sessions/ohb%3Aorg-1%3Acompact%3Athread%3At-1":                                                 "",
-		"GET /api/sessions/ohb%3Aorg-1%3Amemory%3Abot%3Ab-1/messages":                                            "",
-		"DELETE /p/prod-1/api/sessions/ohb%3aorg-1%3aworkflow%3aw-1%3abot%3ab-1":                                 "",
-		"POST /hermes-setup/providers/openai-codex/credentials":                                                  "host", "POST /hermes-setup/providers/anthropic/oauth": "host",
+		"DELETE /api/sessions/openedbot%3A00000000-0000-4000-8000-000000000201%3A57cc181a-554c-41e4-bdd1-b6d360290ddb": "",
+		"GET /api/sessions/openedbot%3Aorg-1%3Acompact%3Athread%3At-1":                                                 "",
+		"GET /api/sessions/openedbot%3Aorg-1%3Amemory%3Abot%3Ab-1/messages":                                            "",
+		"DELETE /p/prod-1/api/sessions/openedbot%3aorg-1%3aworkflow%3aw-1%3abot%3ab-1":                                 "",
+		"POST /hermes-setup/providers/openai-codex/credentials":                                                        "host", "POST /hermes-setup/providers/anthropic/oauth": "host",
 		"GET /hermes-setup/providers/openai-codex/oauth/abc123": "host", "DELETE /hermes-setup/providers/anthropic/oauth/s-1": "host",
 		"POST /p/prod-1/hermes-setup/providers/anthropic/oauth": "host", "GET /hermes-setup/capabilities": "host", "GET /hermes-setup/usage": "host",
 		"GET /hermes-setup/provider-sdks": "host",
@@ -282,8 +282,8 @@ func TestAllowlist(t *testing.T) {
 		"DELETE /api/sessions", "DELETE /api/sessions/s1/messages",
 		// `%3A` is the only escape admitted: a `/` or a `.` in percent form
 		// would become a path again once the gateway decodes it.
-		"DELETE /api/sessions/ohb%2Fetc%2Fpasswd", "DELETE /api/sessions/%2e%2e%2fadmin",
-		"DELETE /api/sessions/ohb%3Aorg%25", "DELETE /api/sessions/" + strings.Repeat("a", 257),
+		"DELETE /api/sessions/openedbot%2Fetc%2Fpasswd", "DELETE /api/sessions/%2e%2e%2fadmin",
+		"DELETE /api/sessions/openedbot%3Aorg%25", "DELETE /api/sessions/" + strings.Repeat("a", 257),
 	} {
 		m, p, _ := strings.Cut(k, " ")
 		if Match(m, p) != nil {

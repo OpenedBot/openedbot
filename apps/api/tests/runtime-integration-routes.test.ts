@@ -117,7 +117,7 @@ function mount(options: {
   app.onError((error, context) => error instanceof HttpError
     ? context.json({ error: { code: error.code, message: error.message } }, error.status as 400)
     : context.json({ error: { code: "UNEXPECTED" } }, 500));
-  const config = { environment: "production", publicUrl: options.publicUrl ?? "https://ohb.example" } as ApiConfig;
+  const config = { environment: "production", publicUrl: options.publicUrl ?? "https://openedbot.example" } as ApiConfig;
   const clientFactory = () => ({
       capabilityInventory: async () => {
         inventoryReads += 1;
@@ -548,7 +548,7 @@ describe("POST /runtime/integrations/toolsets/:name", () => {
   });
 });
 
-describe("MCP piloté depuis OHB", () => {
+describe("MCP piloté depuis openedbot", () => {
   test("ajoute un serveur https et ne renvoie jamais le jeton", async () => {
     let seen: HermesMcpServerRequest | null = null;
     const mounted = mount({
@@ -638,7 +638,7 @@ const notionOauth: HermesMcpOauthSession = {
   expiresAt: "2026-08-26T12:15:00.000Z",
 };
 
-describe("OAuth MCP piloté depuis OHB", () => {
+describe("OAuth MCP piloté depuis openedbot", () => {
   test("ouvre l'autorisation avec l'URL de retour de l'API, et seulement si l'hôte annonce mcp_oauth", async () => {
     const mounted = mount({
       hostFeatures: ["mcp_management", "mcp_oauth"],
@@ -648,7 +648,7 @@ describe("OAuth MCP piloté depuis OHB", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: "pending", authorizationUrl: "https://mcp.notion.com/authorize?state=abc" });
     expect(mounted.writes()).toEqual([
-      "mcp oauth notion https://ohb.example/api/mcp-oauth/callback/org-1/00000000-0000-4000-8000-000000000101/notion",
+      "mcp oauth notion https://openedbot.example/api/mcp-oauth/callback/org-1/00000000-0000-4000-8000-000000000101/notion",
     ]);
 
     const silent = mount({ hostFeatures: ["mcp_management"], mcpOauthStart: async () => notionOauth });
@@ -742,7 +742,7 @@ describe("OAuth MCP piloté depuis OHB", () => {
   });
 });
 
-describe("redémarrage du gateway depuis OHB", () => {
+describe("redémarrage du gateway depuis openedbot", () => {
   const job: HermesGatewayRestartJob = {
     jobId: "job-1",
     status: "running",
@@ -1315,7 +1315,7 @@ describe("connecter une entrée du catalogue à un bot", () => {
     expect(added).toEqual([{ name: "linear", url: "https://mcp.linear.app/mcp", auth: "oauth" }]);
     expect(mounted.writes()).toEqual([
       "mcp add linear",
-      "mcp oauth linear https://ohb.example/api/mcp-oauth/callback/org-1/00000000-0000-4000-8000-000000000101/linear profile=dev",
+      "mcp oauth linear https://openedbot.example/api/mcp-oauth/callback/org-1/00000000-0000-4000-8000-000000000101/linear profile=dev",
     ]);
   });
 

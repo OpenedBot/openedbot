@@ -1,6 +1,6 @@
 import type { AccountWorkspace, AccountWorkspacesDto } from "@openedbot/contracts-api";
 
-const STORAGE_KEY = "ohb:workspace-directory";
+const STORAGE_KEY = "openedbot:workspace-directory";
 
 type Directory = { userId: string; workspaces: AccountWorkspace[] };
 

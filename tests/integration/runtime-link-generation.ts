@@ -1,11 +1,11 @@
 /** Real SQL fencing proof on a disposable database (every migration applied).
- * Fixtures run in one rolled-back transaction; never touches the live ohb DB.
+ * Fixtures run in one rolled-back transaction; never touches the live openedbot DB.
  */
 import { withDisposablePostgres } from "./disposable-postgres";
 import { createLinkLivenessStore, LinkLeaseLostError } from "../../modules/runtime-link/src/application/broker";
 import type { Db } from "../../platform/db/src/db";
 
-await withDisposablePostgres("ohb50_generation", async ({ owner: db }) => {
+await withDisposablePostgres("openedbot50_generation", async ({ owner: db }) => {
 const organizationId = crypto.randomUUID(), runtimeId = crypto.randomUUID();
 const rollback = new Error("ROLLBACK_GENERATION_FIXTURES");
 const assert = (condition: unknown, message: string) => { if (!condition) throw new Error(message); };
@@ -25,7 +25,7 @@ try {
         assert(rejected, 'stale write was not fenced');
         fencedWrites++;
       };
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       const old = { ...identity, generation: await store.reserveGeneration!(identity) };
       const sameProcessWinner = { ...identity, generation: await store.reserveGeneration!(identity) };
       assert(BigInt(sameProcessWinner.generation) > BigInt(old.generation), 'reservations are not monotonic');
@@ -73,17 +73,17 @@ try {
       await fence(() => store.reserveGeneration!({ ...identity, tokenHash: 'wrong-hash' }));
       await tx`reset role`;
       await tx`update runtimes set link_token_hash = 'generation-new-hash', link_token_previous_hash = 'generation-current-hash', link_token_previous_expires_at = now() + interval '1 minute' where id = ${runtimeId}`;
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       const grace = { ...identity, generation: await store.reserveGeneration!(identity) };
       await store.connected(grace, 'api-grace', ['grace']);
       await tx`reset role`;
       await tx`update runtimes set link_token_previous_expires_at = now() - interval '1 second' where id = ${runtimeId}`;
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       await fence(() => store.seen(grace, 'api-grace'));
       await fence(() => store.reserveGeneration!(identity));
       await tx`reset role`;
       await tx`update runtimes set revoked_at = now(), is_active = false where id = ${runtimeId}`;
-      await tx`set local role ohb_api`;
+      await tx`set local role openedbot_api`;
       await fence(() => store.reserveGeneration!({ ...identity, tokenHash: 'generation-new-hash' }));
       await tx`reset role`;
       throw rollback;

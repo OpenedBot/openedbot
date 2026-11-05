@@ -1,4 +1,4 @@
--- OHB-15. OHB n'ouvre plus de session shell vers l'hôte d'un client :
+-- openedbot n'ouvre plus de session shell vers l'hôte d'un client :
 -- les coordonnées SSH d'un runtime n'ont plus de consommateur, et les garder
 -- laisserait en base l'inventaire exact des machines qu'une API compromise
 -- saurait joindre. Aucune politique RLS ni vue ne référence ces colonnes.

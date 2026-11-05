@@ -134,16 +134,16 @@ alter table operator_profiles force row level security;
 alter table oauth_attempts enable row level security;
 alter table oauth_attempts force row level security;
 
-create policy organizations_tenant on organizations to ohb_api
+create policy organizations_tenant on organizations to openedbot_api
   using (id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy memberships_tenant on memberships to ohb_api
+create policy memberships_tenant on memberships to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid
   )
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy sessions_credential on sessions to ohb_api
+create policy sessions_credential on sessions to openedbot_api
   using (
     session_token_hash = nullif(current_setting('app.session_credential_hash', true), '')
     or access_token_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -155,7 +155,7 @@ create policy sessions_credential on sessions to ohb_api
     or access_token_hash = nullif(current_setting('app.session_credential_hash', true), '')
     or refresh_token_hash = nullif(current_setting('app.session_credential_hash', true), '')
   );
-create policy native_auth_codes_credential on native_auth_codes to ohb_api
+create policy native_auth_codes_credential on native_auth_codes to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or code_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -165,7 +165,7 @@ create policy native_auth_codes_credential on native_auth_codes to ohb_api
     or code_hash = nullif(current_setting('app.session_credential_hash', true), '')
   );
 
-create policy operator_profiles_tenant on operator_profiles to ohb_api
+create policy operator_profiles_tenant on operator_profiles to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
@@ -173,7 +173,7 @@ create policy operator_profiles_tenant on operator_profiles to ohb_api
 -- ni jeton d'invitation. `app.invited_email` est la porte de lecture qui permet
 -- de retrouver l'invitation qui vise cette adresse : lecture seulement, le
 -- `with check` ne s'élargit pas.
-create policy organization_invitations_tenant on organization_invitations to ohb_api
+create policy organization_invitations_tenant on organization_invitations to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     or token_hash = nullif(current_setting('app.session_credential_hash', true), '')
@@ -184,30 +184,30 @@ create policy organization_invitations_tenant on organization_invitations to ohb
     or token_hash = nullif(current_setting('app.session_credential_hash', true), '')
   );
 
-create policy organizations_worker on organizations to ohb_worker using (true) with check (true);
-create policy memberships_worker on memberships to ohb_worker using (true) with check (true);
-create policy sessions_worker on sessions to ohb_worker using (true) with check (true);
-create policy native_auth_codes_worker on native_auth_codes to ohb_worker using (true) with check (true);
-create policy organization_invitations_worker on organization_invitations to ohb_worker using (true) with check (true);
-create policy operator_profiles_worker on operator_profiles to ohb_worker using (true) with check (true);
+create policy organizations_worker on organizations to openedbot_worker using (true) with check (true);
+create policy memberships_worker on memberships to openedbot_worker using (true) with check (true);
+create policy sessions_worker on sessions to openedbot_worker using (true) with check (true);
+create policy native_auth_codes_worker on native_auth_codes to openedbot_worker using (true) with check (true);
+create policy organization_invitations_worker on organization_invitations to openedbot_worker using (true) with check (true);
+create policy operator_profiles_worker on operator_profiles to openedbot_worker using (true) with check (true);
 
 -- Les routes publiques ne reçoivent que l'identifiant ou le state aléatoire.
 -- L'API les hache avant d'ouvrir cette porte et ne peut donc jamais énumérer
 -- les tentatives actives avec son rôle applicatif.
 create policy oauth_attempts_select_lookup on oauth_attempts
-  for select to ohb_api
+  for select to openedbot_api
   using (
     attempt_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
     or state_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
   );
 create policy oauth_attempts_insert_lookup on oauth_attempts
-  for insert to ohb_api
+  for insert to openedbot_api
   with check (
     attempt_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
     or state_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
   );
 create policy oauth_attempts_update_lookup on oauth_attempts
-  for update to ohb_api
+  for update to openedbot_api
   using (
     attempt_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
     or state_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
@@ -217,18 +217,18 @@ create policy oauth_attempts_update_lookup on oauth_attempts
     or state_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
   );
 create policy oauth_attempts_delete_lookup on oauth_attempts
-  for delete to ohb_api
+  for delete to openedbot_api
   using (
     attempt_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
     or state_hash = nullif(current_setting('app.oauth_lookup_hash', true), '')
   );
 
-grant select, insert, update, delete on users to ohb_api;
+grant select, insert, update, delete on users to openedbot_api;
 grant select, insert, update, delete on organizations, memberships, sessions, native_auth_codes,
-  organization_invitations, operator_profiles to ohb_api;
+  organization_invitations, operator_profiles to openedbot_api;
 grant select, insert, update, delete on organizations, memberships, sessions, native_auth_codes,
-  organization_invitations, operator_profiles to ohb_worker;
-grant select, insert, update, delete on oauth_attempts to ohb_api;
+  organization_invitations, operator_profiles to openedbot_worker;
+grant select, insert, update, delete on oauth_attempts to openedbot_api;
 
 -- Nettoyage borné sans ouvrir une policy permettant au rôle applicatif de
 -- parcourir toutes les tentatives. La fonction ne rend aucun contenu.
@@ -243,7 +243,7 @@ as $$
   select count(*)::bigint from deleted;
 $$;
 revoke all on function purge_expired_oauth_attempts() from public;
-grant execute on function purge_expired_oauth_attempts() to ohb_api;
+grant execute on function purge_expired_oauth_attempts() to openedbot_api;
 
 insert into schema_migrations(version) values ('0001_tenancy_auth')
 on conflict (version) do nothing;

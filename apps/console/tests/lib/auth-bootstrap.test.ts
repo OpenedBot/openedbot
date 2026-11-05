@@ -10,7 +10,7 @@ afterEach(() => {
 describe("cloud auth bootstrap", () => {
   test("does not send a stale organization header to auth/me", async () => {
     window.localStorage.setItem(
-      "ohb:cloud-session",
+      "openedbot:cloud-session",
       JSON.stringify({ organizationId: "previous-organization", csrfToken: "previous-csrf" }),
     );
 

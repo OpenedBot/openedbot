@@ -135,18 +135,18 @@ test("e-mail bounds: 3 and 320 characters pass, surrounding spaces are trimmed",
 
 test("sign-out while signed in signs out, without asking the window", () => {
   signedIn = true;
-  invoke("ohb:sign-out", "https://console.example.com/settings");
+  invoke("openedbot:sign-out", "https://console.example.com/settings");
   expect(calls).toEqual(["signOut"]);
 });
 
 test("compatibility: sign-out while already signed out from an old /login falls back to the local page, no sign-out loop", () => {
   fallBack = true;
-  invoke("ohb:sign-out", CONSOLE_LOGIN);
+  invoke("openedbot:sign-out", CONSOLE_LOGIN);
   expect(calls).toEqual(["fallBackToLocalSignin"]);
 });
 
 test("sign-out while signed out elsewhere than /login still signs out (the window declined the fallback)", () => {
   fallBack = false;
-  invoke("ohb:sign-out", "https://console.example.com/settings");
+  invoke("openedbot:sign-out", "https://console.example.com/settings");
   expect(calls).toEqual(["fallBackToLocalSignin", "signOut"]);
 });

@@ -1,5 +1,5 @@
 /**
- * PERM2-6 (DEV-OHB-256): read, add and remove natural-language permission
+ * PERM2-6: read, add and remove natural-language permission
  * rules, per bot and per organization.
  *
  * A rule is read by the automatic reviewer only (`approval-review.ts`), as

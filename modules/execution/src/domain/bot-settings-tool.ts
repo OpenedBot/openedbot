@@ -7,7 +7,7 @@ import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { readEditorSettings } from "@openedbot/roster/domain/bot-input";
 import { PERSONA_MAX_CHARS } from "@openedbot/roster/domain/persona";
 
-export const BOT_SETTINGS_TOOL_SERVER = "ohb_bot_settings";
+export const BOT_SETTINGS_TOOL_SERVER = "openedbot_bot_settings";
 export const BOT_SETTINGS_TOOL_NAME = "bot_settings_propose";
 export const BOT_SETTINGS_TOOL_RUNTIME_NAME = `mcp_${BOT_SETTINGS_TOOL_SERVER}_${BOT_SETTINGS_TOOL_NAME}`;
 

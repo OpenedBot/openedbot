@@ -254,7 +254,7 @@ comment on function staff_get_user(uuid) is
   'Fiche staff d''un compte utilisateur. `organizationActivity` agrège les organisations du compte : `messages` et `runs` ne portent aucun auteur utilisateur, l''activité n''est donc PAS attribuable à un membre précis. N''expose ni secret runtime, ni ip / user-agent / hash de jeton de session, ni hash de code d''assistance.';
 
 revoke all on function staff_get_user(uuid) from public;
-grant execute on function staff_get_user(uuid) to ohb_api;
+grant execute on function staff_get_user(uuid) to openedbot_api;
 
 insert into schema_migrations(version) values ('0036_staff_user_detail')
 on conflict (version) do nothing;

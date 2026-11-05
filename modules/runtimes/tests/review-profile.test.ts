@@ -160,6 +160,6 @@ describe("PERM2-7a review profile", () => {
 
   test("the review profile is a service profile", () => {
     expect(OPENEDBOT_SERVICE_PROFILES.has(REVIEW_PROFILE)).toBe(true);
-    expect(OPENEDBOT_SERVICE_PROFILES.has("ohb-model-check")).toBe(true);
+    expect(OPENEDBOT_SERVICE_PROFILES.has("openedbot-model-check")).toBe(true);
   });
 });

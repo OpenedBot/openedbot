@@ -5,7 +5,7 @@ import { formatMs, renderReport } from "./html";
 import { ScenarioRecorder, Skip, StepFailed, warn, worst, type RunReport } from "./report";
 import { classCandidates } from "./tailwind";
 
-const env = { E2E_ALLOW_REAL_RUNS: "1", WORKER_DATABASE_URL: "postgres://x@127.0.0.1/ohb" };
+const env = { E2E_ALLOW_REAL_RUNS: "1", WORKER_DATABASE_URL: "postgres://x@127.0.0.1/openedbot" };
 
 describe("config", () => {
   test("refuses to run without the real-runs opt-in", () => {

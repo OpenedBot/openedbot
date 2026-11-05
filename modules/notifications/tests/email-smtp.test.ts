@@ -38,7 +38,7 @@ describe("createTransactionalEmailSender", () => {
     resendApiKey: null as string | null,
     resendBaseUrl: "https://api.resend.com",
     token: null as string | null,
-    from: "ohb@ohb.local",
+    from: "openedbot@openedbot.local",
     timeoutMs: 10_000,
     leaseSeconds: 300,
     maxAttempts: 5,
@@ -47,7 +47,7 @@ describe("createTransactionalEmailSender", () => {
   test("HTTP and SMTP together are a config error", () => {
     expect(() => createTransactionalEmailSender({
       ...base,
-      endpoint: "https://mail.ohb.example/send",
+      endpoint: "https://mail.openedbot.example/send",
       smtpUrl: "smtp://127.0.0.1:1025",
       token: "token",
     })).toThrow(/exactly one transport/);
@@ -68,7 +68,7 @@ describe("createTransactionalEmailSender", () => {
       id: "mail-1",
       kind: "provider_quota_reached",
       dedupeKey: "provider-quota:rt-1:openai-codex:2026-09-04:user-1",
-      recipientEmail: "owner@ohb.local",
+      recipientEmail: "owner@openedbot.local",
       locale: "fr",
       data: {
         provider: "openai-codex",

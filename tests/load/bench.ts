@@ -1,10 +1,10 @@
 /**
  * The load driver (`make load`): LOAD_SESSIONS operators connected over SSE,
  * LOAD_CONVERSATIONS threads talking in a closed loop for LOAD_DURATION_SECONDS
- * against the fake Hermes streaming like a model (OHB-133 run pipeline), then
+ * against the fake Hermes streaming like a model, then
  * one report from three sources: this client, the API log and the worker logs.
  *
- * One conversation loop is what the console does on a send (OHB-134/135):
+ * One conversation loop is what the console does on a send:
  *   POST /messages (202) -> first SSE event -> first agent.message -> terminal
  *   -> POST /read once the run settled -> think -> next message.
  * Every LOAD_SNAPSHOT_INTERVAL_MS each session also reopens the roster and a
@@ -13,7 +13,7 @@
  * streaming 30 deltas (about 3.5 s a run) and a 10 s think, 50 conversations
  * keep about 13 runs in flight; LOAD_THINK_MS=2000 saturates two workers.
  *
- * Gates: no HTTP failure, no run without a terminal, the OHB-107 budgets at
+ * Gates: no HTTP failure, no run without a terminal, the run latency budgets at
  * p95 (admission, first runtime event, first visible text), every SSE closed
  * at the end, RSS under 70 % of the host, and under LOAD_ENFORCE_SALES_GATE=1
  * (60 minutes minimum) an RSS growth under 10 %.
@@ -49,7 +49,7 @@ type RunSample = {
 /**
  * Frames the worker produces for a run, as opposed to what the API publishes at
  * admission (the operator's message, notices): the "first runtime event" the
- * OHB-107 budget talks about is the first of these.
+ * run latency budget talks about is the first of these.
  */
 const RUNTIME_FRAME = /^(agent\.|tool\.|raw$|run\.completed$|run\.error$|approval\.)/;
 

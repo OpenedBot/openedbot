@@ -7,7 +7,7 @@
  * une taille de repli : sans elle, un bloc pas encore mesuré vaudrait 0 et
  * le scroll sauterait à chaque tour qui entre ou sort du viewport.
  */
-.ohb-turn-contain {
+.openedbot-turn-contain {
   content-visibility: auto;
   contain-intrinsic-size: auto 120px;
 }
@@ -19,7 +19,7 @@
  * `contain: layout style` déclare la frontière explicitement plutôt que de
  * laisser le navigateur la déduire de `overflow-y: auto` seul.
  */
-.ohb-thread-scroll-contain {
+.openedbot-thread-scroll-contain {
   contain: layout style;
 }
 
@@ -93,12 +93,12 @@
  */
 [data-thread-column] {
   /* grok.com: a 736 px lane in `px-4`, so 704 px of text (`max-w-[736px] px-4`). */
-  --ohb-thread-column: 44rem;
+  --openedbot-thread-column: 44rem;
 }
 
 [data-thread-column] [data-thread-messages] {
   width: 100%;
-  max-width: var(--ohb-thread-column);
+  max-width: var(--openedbot-thread-column);
   margin-inline: auto;
 }
 
@@ -110,14 +110,14 @@
   [data-run-activity]
 ) {
   width: 100%;
-  max-width: calc(var(--ohb-thread-column) + 3rem);
+  max-width: calc(var(--openedbot-thread-column) + 3rem);
   margin-inline: auto;
 }
 
 /* The composer, grok's `max-w-[752px]`: the text lane plus 24 px each side. */
 [data-thread-column] :is([data-thread-composer], [data-composer-disabled-surface]) {
   width: 100%;
-  max-width: calc(var(--ohb-thread-column) + 3rem);
+  max-width: calc(var(--openedbot-thread-column) + 3rem);
   margin-inline: auto;
 }
 
@@ -131,11 +131,11 @@
 @media (min-width: 40rem) {
   [data-thread-column] {
     /* grok.com's lane and composer dock are both `px-4`. */
-    --ohb-thread-gutter: 1rem;
+    --openedbot-thread-gutter: 1rem;
   }
 
   [data-thread-column] [role="log"] {
-    padding-inline: var(--ohb-thread-gutter);
+    padding-inline: var(--openedbot-thread-gutter);
   }
 
   /*
@@ -144,19 +144,19 @@
    * content box, as wide as the dock's), so the overhang stays 24 px.
    */
   [data-thread-column]:not([data-mobile-scene] *) [data-thread-messages] {
-    max-width: min(var(--ohb-thread-column), 100% - 3rem);
+    max-width: min(var(--openedbot-thread-column), 100% - 3rem);
   }
 
   [data-thread-column] :is([data-thread-lane], [data-approval-dock], [data-plan-dock], [data-run-activity]) {
-    padding-inline: var(--ohb-thread-gutter);
-    max-width: calc(var(--ohb-thread-column) + 2 * var(--ohb-thread-gutter));
+    padding-inline: var(--openedbot-thread-gutter);
+    max-width: calc(var(--openedbot-thread-column) + 2 * var(--openedbot-thread-gutter));
   }
 
   /* The dock: `px-4 pb-5`, the card at 752 px. */
   [data-thread-column] [data-thread-composer] {
-    padding-inline: var(--ohb-thread-gutter);
+    padding-inline: var(--openedbot-thread-gutter);
     padding-bottom: 20px;
-    max-width: calc(var(--ohb-thread-column) + 3rem + 2 * var(--ohb-thread-gutter));
+    max-width: calc(var(--openedbot-thread-column) + 3rem + 2 * var(--openedbot-thread-gutter));
   }
 
   [data-thread-column] [data-composer-disabled-surface] {
@@ -171,13 +171,13 @@
  * finished answer carries neither. Under reduced motion the tail is plain
  * text; the caret stays, it does not move on its own.
  */
-.ohb-stream-tail {
+.openedbot-stream-tail {
   filter: blur(1.6px);
   -webkit-mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
   mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
 }
 
-.ohb-stream-caret {
+.openedbot-stream-caret {
   display: inline-block;
   width: 2px;
   height: 1.05em;
@@ -194,21 +194,21 @@
   every text update (`rehypeStreamTail`), which swaps the name and restarts
   the blink, so the caret stays solid while tokens arrive.
 */
-@keyframes ohb-caret-blink-a {
+@keyframes openedbot-caret-blink-a {
   50% {
     opacity: 0;
   }
 }
-@keyframes ohb-caret-blink-b {
+@keyframes openedbot-caret-blink-b {
   50% {
     opacity: 0;
   }
 }
-.ohb-stream-caret {
-  animation: ohb-caret-blink-a 1s steps(2, start) 0.45s infinite;
+.openedbot-stream-caret {
+  animation: openedbot-caret-blink-a 1s steps(2, start) 0.45s infinite;
 }
-.ohb-stream-caret[data-tick="1"] {
-  animation-name: ohb-caret-blink-b;
+.openedbot-stream-caret[data-tick="1"] {
+  animation-name: openedbot-caret-blink-b;
 }
 
 /*
@@ -216,39 +216,39 @@
   while the answer streams blurs in. Opacity, filter and transform only: no
   layout shift, nothing the scroll pin has to chase.
 */
-@keyframes ohb-reveal {
+@keyframes openedbot-reveal {
   from {
     opacity: 0;
     filter: blur(6px);
     transform: translateY(4px);
   }
 }
-.ohb-reveal {
-  animation: ohb-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+.openedbot-reveal {
+  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* The action row of a finished answer rises in (`chat-fade-up`). */
-@keyframes ohb-fade-up {
+@keyframes openedbot-fade-up {
   from {
     opacity: 0;
     transform: translateY(8px);
   }
 }
-.ohb-fade-up {
-  animation: ohb-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+.openedbot-fade-up {
+  animation: openedbot-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-stream-tail {
+  .openedbot-stream-tail {
     filter: none;
     -webkit-mask-image: none;
     mask-image: none;
   }
-  .ohb-stream-caret {
+  .openedbot-stream-caret {
     animation: none;
   }
-  .ohb-reveal,
-  .ohb-fade-up {
+  .openedbot-reveal,
+  .openedbot-fade-up {
     animation: none;
   }
 }

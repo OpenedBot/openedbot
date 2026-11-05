@@ -105,7 +105,7 @@ describe("direct and connector runtime factories", () => {
 });
 
 describe("runtime administration mode", () => {
-  // OHB-15 : un runtime client n'a plus de canal du tout. La seule forme
+  // Un runtime client n'a plus de canal du tout. La seule forme
   // d'administration restante est celle du Hermes que ce déploiement démarre
   // lui-même, et l'écran doit renvoyer vers le geste client dans tous les
   // autres cas.
@@ -197,13 +197,13 @@ describe("mode de jonction sur le fil", () => {
       {
         environment: "production",
         acceptedOrigins: ["https://link.openedbot.app", "https://openedbot.app"],
-        relinkCommand: "edge-setup link --ohb https://link.openedbot.app --yes",
+        relinkCommand: "edge-setup link --openedbot https://link.openedbot.app --yes",
       },
     );
     expect(published.link).toMatchObject({
       origin: "https://console.openedbot.app",
       originRetired: true,
-      relinkCommand: "edge-setup link --ohb https://link.openedbot.app --yes",
+      relinkCommand: "edge-setup link --openedbot https://link.openedbot.app --yes",
     });
     const current = publicRuntime(
       { ...connector, linkOrigin: "https://link.openedbot.app" },
@@ -214,7 +214,7 @@ describe("mode de jonction sur le fil", () => {
       {
         environment: "production",
         acceptedOrigins: ["https://link.openedbot.app", "https://openedbot.app"],
-        relinkCommand: "edge-setup link --ohb https://link.openedbot.app --yes",
+        relinkCommand: "edge-setup link --openedbot https://link.openedbot.app --yes",
       },
     );
     expect(current.link).toMatchObject({ originRetired: false, relinkCommand: null });

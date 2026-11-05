@@ -86,7 +86,7 @@ func TestUnsolicitedFramesWaitForProof(t *testing.T) {
 	go func() { _ = c.Session(ctx) }()
 	<-broker.ready
 	// A first broker frame confirms the session before the challenge arrives.
-	broker.send(Text{T: TLinkContext, Environment: "dev", OHB: "http://127.0.0.1:8790"})
+	broker.send(Text{T: TLinkContext, Environment: "dev", Openedbot: "http://127.0.0.1:8790"})
 	// Room for a premature diagnostic to leave before the challenge does.
 	time.Sleep(200 * time.Millisecond)
 	encoded, _ := nonceB64(3)

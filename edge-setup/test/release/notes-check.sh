@@ -15,7 +15,7 @@ check() { NOTES_FILE="$1" make -s -C "$root" notes-check >"$tmp/out" 2>&1; }
 printf '### Nouveautés\n\n- Vos bots répondent plus vite.\n\nMise à jour : `sudo edge-setup upgrade --yes`.\n' > "$tmp/good.md"
 check "$tmp/good.md" || { cat "$tmp/out"; echo "notes-check test: product copy refused" >&2; exit 1; }
 
-for bad in 'Corrige DEV-OHB-247.' 'Nouvelle route /hermes-setup/providers.' 'Code RUNTIME_NOT_FOUND.' 'Fichier /etc/hermes/runtime.env.' "Rapide $(printf '\xe2\x80\x94') vraiment."; do
+for bad in 'Corrige DEV-OPS-247.' 'Nouvelle route /hermes-setup/providers.' 'Code RUNTIME_NOT_FOUND.' 'Fichier /etc/hermes/runtime.env.' "Rapide $(printf '\xe2\x80\x94') vraiment."; do
 	printf '%s\n' "$bad" > "$tmp/bad.md"
 	if check "$tmp/bad.md"; then echo "notes-check test: accepted: $bad" >&2; exit 1; fi
 done

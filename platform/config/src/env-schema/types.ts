@@ -62,5 +62,5 @@ export type EnvVar = {
 };
 
 /** Development database URLs, the examples of API_DATABASE_URL and WORKER_DATABASE_URL. */
-export const DEVELOPMENT_DATABASE_URL_API = "postgres://ohb_api:ohb_api_dev@127.0.0.1:5432/ohb";
-export const DEVELOPMENT_DATABASE_URL_WORKER = "postgres://ohb_worker:ohb_worker_dev@127.0.0.1:5432/ohb";
+export const DEVELOPMENT_DATABASE_URL_API = "postgres://openedbot_api:openedbot_api_dev@127.0.0.1:5432/openedbot";
+export const DEVELOPMENT_DATABASE_URL_WORKER = "postgres://openedbot_worker:openedbot_worker_dev@127.0.0.1:5432/openedbot";

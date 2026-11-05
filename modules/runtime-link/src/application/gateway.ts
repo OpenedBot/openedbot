@@ -362,7 +362,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       environment: config.deployEnvironment,
       // L'origine du lien, pas celle de la PWA : un hôte >= v0.5.7 la suit
       // seul quand elle partage le domaine parent (`connector.MovedWSURL`).
-      ohb: config.linkPublicUrl ?? config.publicUrl,
+      openedbot: config.linkPublicUrl ?? config.publicUrl,
       // La borne que `decodeTextFrame` applique à `hello` et `capabilities` : l'hôte
       // la retient (persistée avec le contexte) pour dimensionner son prochain `hello`.
       limits: { features: RELAY_MAX_FEATURES }, accepts: [...RELAY_ACCEPTED_HOST_FRAMES],

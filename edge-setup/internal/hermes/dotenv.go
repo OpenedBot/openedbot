@@ -21,9 +21,9 @@ var profileName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
 
 // ProfileOwnMarker is written next to a key that a named profile owns. The
 // root→profile credential mirror must never overwrite those keys.
-const ProfileOwnMarker = "ohb:profile-own"
+const ProfileOwnMarker = "openedbot:profile-own"
 
-const profileOwnFile = ".env.ohb-own"
+const profileOwnFile = ".env.openedbot-own"
 
 // EnvStore binds credential snapshots and mirrors to one runtime root and
 // owner. It is intended for callers that manage runtimes outside the legacy

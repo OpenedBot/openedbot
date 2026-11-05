@@ -48,7 +48,7 @@ function view({ live, forceOpen = false, feed = calls, rows = [] }: { live: bool
 }
 
 beforeEach(() => {
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.ResizeObserver = DrivenResizeObserver as unknown as typeof ResizeObserver;
 });
 
@@ -236,16 +236,16 @@ describe("prefers-reduced-motion", () => {
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
 
   test("every motion of the fold, the rows and the live shimmer stops", () => {
-    expect(reduced).toContain(".ohb-disclosure");
-    expect(reduced).toMatch(/\.ohb-thinking-shimmer \{\s*animation: none;/);
+    expect(reduced).toContain(".openedbot-disclosure");
+    expect(reduced).toMatch(/\.openedbot-thinking-shimmer \{\s*animation: none;/);
     expect(reduced).toMatch(/\[data-turn-activity\]\[data-live\] \[data-activity-row\] \{\s*animation: none;/);
-    expect(reduced).toMatch(/\.ohb-activity-chevron \{\s*transition: none;/);
+    expect(reduced).toMatch(/\.openedbot-activity-chevron \{\s*transition: none;/);
   });
 
   test("the rolling labels swap instantly", () => {
     const appCss = readFileSync(new URL("../../../../browser/ui-kit/src/styles/app.css", import.meta.url), "utf8");
-    const roll = appCss.slice(appCss.indexOf(".ohb-roll {"));
-    expect(roll).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.ohb-roll-in \{\s*animation: none;\s*\}\s*\.ohb-roll-out \{\s*display: none;/);
+    const roll = appCss.slice(appCss.indexOf(".openedbot-roll {"));
+    expect(roll).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.openedbot-roll-in \{\s*animation: none;\s*\}\s*\.openedbot-roll-out \{\s*display: none;/);
   });
 });
 

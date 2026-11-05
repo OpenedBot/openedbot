@@ -210,7 +210,7 @@ func runMacUp(env cli.Env, o *upOptions) int {
 	if err := st.SaveTo(p.ToolConfig, fsx.Current()); err != nil {
 		return fail(env, cli.ExitFailure, "macOS setup state could not be saved")
 	}
-	printf(env.Stdout, "macOS runtime prepared and verified; pair it with edge-setup link --ohb https://... --yes")
+	printf(env.Stdout, "macOS runtime prepared and verified; pair it with edge-setup link --openedbot https://... --yes")
 	return cli.ExitOK
 }
 

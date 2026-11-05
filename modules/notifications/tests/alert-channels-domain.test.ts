@@ -69,7 +69,7 @@ describe("discordAlertMessage", () => {
     runtimeName: "VPS @everyone **gras** [clic](https://evil.test)",
     reason: "Aucun signe de vie du lien depuis 45 s.",
     downSince: "2026-10-31T23:13:00.000Z",
-    settingsUrl: "https://console.ohb.test/o/acme/settings/runtime",
+    settingsUrl: "https://console.openedbot.test/o/acme/settings/runtime",
     environment: "dev",
   };
 
@@ -82,7 +82,7 @@ describe("discordAlertMessage", () => {
     expect(message.content).toContain("<t:1793488380:f>");
     expect(message.content).toContain("<t:1793488380:R>");
     expect(message.content).toContain("Raison : Aucun signe de vie du lien depuis 45 s.");
-    expect(message.content).toContain("<https://console.ohb.test/o/acme/settings/runtime>");
+    expect(message.content).toContain("<https://console.openedbot.test/o/acme/settings/runtime>");
     // The organisation's text cannot format, link or mention.
     expect(message.content).toContain("\\*\\*gras\\*\\*");
     expect(message.content).toContain("\\[clic\\]\\(https\\:");
@@ -99,7 +99,7 @@ describe("discordAlertMessage", () => {
       runtimeName: "VPS",
       downSince: "2026-10-31T23:13:00.000Z",
       restoredAt: "2026-11-01T09:28:00.000Z",
-      settingsUrl: "https://console.ohb.test/o/acme/settings/runtime",
+      settingsUrl: "https://console.openedbot.test/o/acme/settings/runtime",
       environment: "prod",
     });
     expect(message.content).toStartWith("🟢 **Runtime rétabli : VPS**");

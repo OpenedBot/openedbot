@@ -712,7 +712,7 @@ export function MessageInteractionShell({
             aria-label={copyState === "copied" ? labels.copied : labels.copy}
             title={copyState === "copied" ? labels.copied : labels.copy}
             onClick={() => void copy()}
-            className="ohb-press flex h-11 w-8 items-center justify-center rounded-lg text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="openedbot-press flex h-11 w-8 items-center justify-center rounded-lg text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {copyState === "copied"
               ? <Check className="size-4" aria-hidden />
@@ -727,7 +727,7 @@ export function MessageInteractionShell({
               haptics.light();
               setSheetOpen(true);
             }}
-            className="ohb-press flex h-11 w-8 items-center justify-center rounded-lg text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="openedbot-press flex h-11 w-8 items-center justify-center rounded-lg text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Ellipsis className="size-4" aria-hidden />
           </button>
@@ -864,7 +864,7 @@ function MessageActionSheet({
                   onClose();
                 }}
                 className={cn(
-                  "ohb-press flex size-11 flex-1 items-center justify-center rounded-xl text-2xl leading-none outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "openedbot-press flex size-11 flex-1 items-center justify-center rounded-xl text-2xl leading-none outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active && "bg-primary/15",
                 )}
               >
@@ -885,7 +885,7 @@ function MessageActionSheet({
                   action.run();
                   onClose();
                 }}
-                className="ohb-press flex min-h-12 w-full items-center gap-3 px-4 text-left text-base text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+                className="openedbot-press flex min-h-12 w-full items-center gap-3 px-4 text-left text-base text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
               >
                 <span className="text-muted-foreground">{action.icon}</span>
                 {action.label}

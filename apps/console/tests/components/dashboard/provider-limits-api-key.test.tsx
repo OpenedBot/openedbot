@@ -49,7 +49,7 @@ beforeEach(() => {
   openSecondaryReads();
   seen.length = 0;
   worth = null;
-  window.localStorage.setItem("ohb:locale", "fr");
+  window.localStorage.setItem("openedbot:locale", "fr");
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     seen.push(url);

@@ -1,6 +1,6 @@
 begin;
 
--- OHB-21 : historique d'execution des routines. Chaque tick laisse une ligne
+-- Historique d'execution des routines. Chaque tick laisse une ligne
 -- relisible : tir nominal, rattrapage, report de fil occupe, abandon au
 -- plafond, salon vide. Les recus (`GET /api/routines/receipts`) restent la
 -- vue workflow ; cette table est l'audit des issues qui ne creent pas de
@@ -44,14 +44,14 @@ comment on table routine_executions is
 alter table routine_executions enable row level security;
 alter table routine_executions force row level security;
 
-create policy routine_executions_tenant on routine_executions to ohb_api
+create policy routine_executions_tenant on routine_executions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy routine_executions_worker on routine_executions to ohb_worker
+create policy routine_executions_worker on routine_executions to openedbot_worker
   using (true) with check (true);
 
-grant select, insert on routine_executions to ohb_api;
-grant select, insert, update, delete on routine_executions to ohb_worker;
+grant select, insert on routine_executions to openedbot_api;
+grant select, insert, update, delete on routine_executions to openedbot_worker;
 
 insert into schema_migrations(version) values ('0043_routine_executions')
 on conflict (version) do nothing;

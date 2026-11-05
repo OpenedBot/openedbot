@@ -3,8 +3,8 @@ import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { REVIEW_PROFILE_FEATURES } from "../domain/runtime-contract";
 
 /**
- * PERM2-7a (0139): the per-runtime proof that `ohb-reviewer` runs without
- * any tool. Written by the worker only (`ohb_worker` reads every
+ * PERM2-7a (0139): the per-runtime proof that `openedbot-reviewer` runs without
+ * any tool. Written by the worker only (`openedbot_worker` reads every
  * organization); the API reads its own tenant's rows.
  */
 export type ReviewProfileStatus = "queued" | "proven" | "pending_restart" | "failed";
@@ -84,7 +84,7 @@ export type ReviewProfileOutcome =
       /**
        * The check did not reach the host (busy link, gateway restarting): it
        * proves nothing either way. A proof still fresh is kept until it ages
-       * out (`REVIEW_PROFILE_PROOF_MAX_AGE_SECONDS`), so an OHB-driven gateway
+       * out (`REVIEW_PROFILE_PROOF_MAX_AGE_SECONDS`), so an openedbot-driven gateway
        * restart no longer turns every `auto` bot into `manual` for a pass
        * (lab, 2026-10-25). The reviewer itself hands a gate to a person when
        * the host does not answer.

@@ -238,10 +238,10 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   };
 
   const preview = (
-    <aside className="ohb-new-bot-aside" aria-label={t("newBotDialog.identity")}>
-      <div className="ohb-new-bot-avatar" aria-live="polite">
-        <BotFace name={previewName} seed="preview" face={draft.face} className="ohb-new-bot-avatar-face" animated />
-        <div className="ohb-new-bot-avatar-text">
+    <aside className="openedbot-new-bot-aside" aria-label={t("newBotDialog.identity")}>
+      <div className="openedbot-new-bot-avatar" aria-live="polite">
+        <BotFace name={previewName} seed="preview" face={draft.face} className="openedbot-new-bot-avatar-face" animated />
+        <div className="openedbot-new-bot-avatar-text">
           <p className="truncate text-sm font-semibold text-text-primary">{previewName}</p>
           <p className="truncate text-xs text-text-tertiary">{draft.role.trim() || t("newBotDialog.previewRole")}</p>
         </div>
@@ -251,7 +251,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
             aria-label={t("newBotDialog.randomize")}
             title={t("newBotDialog.randomize")}
             onClick={() => update({ face: draft.face.artwork ? randomArtworkFace() : randomFace() })}
-            className="ohb-new-bot-card-action ohb-new-bot-card-action-icon"
+            className="openedbot-new-bot-card-action openedbot-new-bot-card-action-icon"
           >
             <IconDice5 className="size-[18px]" aria-hidden />
           </button>
@@ -262,7 +262,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
             aria-pressed={faceEditing}
             aria-controls={`${idPrefix}-face-studio`}
             onClick={() => setFaceEditing((current) => !current)}
-            className="ohb-new-bot-card-action ohb-new-bot-card-action-icon"
+            className="openedbot-new-bot-card-action openedbot-new-bot-card-action-icon"
           >
             <IconBrush className="size-4" aria-hidden />
           </button>
@@ -271,7 +271,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
       {/* Où et comment il travaillera : une donnée du bot, donc dans sa fiche,
           pas dans le pied, qui ne garde que les actions. */}
       {!isMobile ? (
-        <div className="ohb-new-bot-aside-foot">
+        <div className="openedbot-new-bot-aside-foot">
           <RuntimePromiseLine runtime={runtime} model={ownModel} pendingModel={pendingModel} mode={creationOptions.permissionMode} />
         </div>
       ) : null}
@@ -290,7 +290,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
 
   const fields = (
     <div className="space-y-4">
-      <div className="ohb-new-bot-fields">
+      <div className="openedbot-new-bot-fields">
         <div className="space-y-1.5">
           <Label htmlFor={`${idPrefix}-name`}>{t("newBotDialog.nameLabel")}</Label>
           <Input
@@ -386,31 +386,31 @@ export function CreateBotSheet({ open, onClose, source = null }: {
         title={isMobile ? title : undefined}
         description={isMobile ? description : undefined}
         closeLabel={t("common.close")}
-        className="ohb-new-bot-dialog max-w-4xl"
-        bodyClassName="ohb-new-bot-body p-0"
+        className="openedbot-new-bot-dialog max-w-4xl"
+        bodyClassName="openedbot-new-bot-body p-0"
         footer={isMobile ? (
-          <div className="ohb-new-bot-footer">
+          <div className="openedbot-new-bot-footer">
             <RuntimePromiseLine runtime={runtime} model={ownModel} pendingModel={pendingModel} mode={creationOptions.permissionMode} />
             <div className="flex justify-end gap-2">{actions}</div>
           </div>
         ) : undefined}
       >
-        <div className="ohb-new-bot-layout">
+        <div className="openedbot-new-bot-layout">
           {preview}
-          <div className="ohb-new-bot-pane">
+          <div className="openedbot-new-bot-pane">
             {isMobile ? null : (
-              <header className="ohb-new-bot-head">
+              <header className="openedbot-new-bot-head">
                 <div className="min-w-0 flex-1">
-                  <h2 className="ohb-new-bot-title">{title}</h2>
-                  <p id={`${idPrefix}-lede`} className="ohb-new-bot-lede">{description}</p>
+                  <h2 className="openedbot-new-bot-title">{title}</h2>
+                  <p id={`${idPrefix}-lede`} className="openedbot-new-bot-lede">{description}</p>
                 </div>
-                <button type="button" onClick={close} aria-label={t("common.close")} className="ohb-new-bot-close">
+                <button type="button" onClick={close} aria-label={t("common.close")} className="openedbot-new-bot-close">
                   <IconX className="size-4" aria-hidden />
                 </button>
               </header>
             )}
-            <div className="ohb-new-bot-main">{content}</div>
-            {isMobile ? null : <div className="ohb-new-bot-actions">{actions}</div>}
+            <div className="openedbot-new-bot-main">{content}</div>
+            {isMobile ? null : <div className="openedbot-new-bot-actions">{actions}</div>}
           </div>
         </div>
       </Dialog>

@@ -28,13 +28,13 @@ describe("useThreadGoal", () => {
 
   test("la déconnexion efface tous les objectifs, ancien format compris", () => {
     saveCloudSession({ organizationId: "org", csrfToken: "csrf", userId: "user" });
-    window.localStorage.setItem("ohb.threadGoal.bot:legacy", "Ancien objectif");
+    window.localStorage.setItem("openedbot.threadGoal.bot:legacy", "Ancien objectif");
     const goal = renderHook(() => useThreadGoal("bot:one"));
     act(() => goal.result.current[1]("Objectif"));
     goal.unmount();
 
     clearThreadGoals();
-    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("ohb.threadGoal."))).toEqual([]);
+    expect(Object.keys(window.localStorage).filter((key) => key.startsWith("openedbot.threadGoal."))).toEqual([]);
     expect(renderHook(() => useThreadGoal("bot:one")).result.current[0]).toBeNull();
   });
 });

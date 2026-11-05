@@ -34,7 +34,7 @@ function leaseDb(lease: { held: boolean }, log: string[]): SQL {
     if (sql.startsWith("select * from profile_delete_jobs")) return Promise.resolve(lease.held ? [job()] : []);
     if (sql.startsWith("select id from bots")) return Promise.resolve([{ id: "bot-1" }]);
     if (sql.startsWith("with before as")) return Promise.resolve([{ alreadyDeleting: false, wasArchived: false }]);
-    if (sql.includes("hermes_session_id")) return Promise.resolve([{ sessionId: "ohb:o:thread-1", threadId: "thread-1", sessionGeneration: 0 }]);
+    if (sql.includes("hermes_session_id")) return Promise.resolve([{ sessionId: "openedbot:o:thread-1", threadId: "thread-1", sessionGeneration: 0 }]);
     return Promise.resolve([]);
   }) as unknown as SQL;
   (db as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
@@ -73,7 +73,7 @@ describe("exécution d'un job de suppression de profils", () => {
         deleteSession: async (id: string) => { remote.push(`session:${id}`); lease.held = false; },
       }) as never,
     });
-    expect(remote).toEqual(["session:ohb:o:thread-1"]);
+    expect(remote).toEqual(["session:openedbot:o:thread-1"]);
     // Un autre worker peut reprendre à partir de l'état posé : il reste.
     expect(log.some((sql) => sql.includes("set host_profile_deleting_at = null"))).toBe(false);
   });

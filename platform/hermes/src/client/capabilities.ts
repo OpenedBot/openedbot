@@ -111,7 +111,7 @@ export async function runSteerSupported(ctx: HermesClientContext): Promise<boole
  * ne cloisonne quoi que ce soit sur ce runtime.
  */
 export async function probeProfileIsolation(ctx: HermesClientContext, slug: string): Promise<HermesProfileIsolation> {
-  const control = `ohb-control-${sessionFingerprint(slug)}`;
+  const control = `openedbot-control-${sessionFingerprint(slug)}`;
   const [profile, sentinel] = await Promise.all([
     profileHealth(ctx, slug),
     profileHealth(ctx, control),
@@ -300,7 +300,7 @@ export async function toolsets(ctx: HermesClientContext): Promise<HermesToolset[
 }
 
 /**
- * `toolsets()` reused across runs on one link (OHB-138), for this client's
+ * `toolsets()` reused across runs on one link, for this client's
  * profile. A miss, an expired entry or a cache error reads live; a live
  * failure is thrown as is and nothing is remembered. `null` is never cached.
  * The caller gates the result exactly as it gates a live read.
@@ -330,7 +330,7 @@ export async function cachedToolsets(ctx: HermesClientContext, scope: HermesTool
  *
  * Avec un scope, la réponse (vraie ou fausse, quand la sonde a répondu) est
  * gardée par organisation, runtime et profil du client : TTL court, ou long
- * quand elle est ancrée sur l'instant du lien (OHB-137). Une erreur
+ * quand elle est ancrée sur l'instant du lien. Une erreur
  * de cache relance la sonde. Une erreur de sonde est fail-closed (pas de
  * rejeu) et n'est pas mémorisée, pour que le tour suivant réessaie.
  */

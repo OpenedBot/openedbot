@@ -13,7 +13,7 @@ describe("worker loop health file", () => {
   let directory: string;
   let file: string;
   beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), "ohb-worker-health-"));
+    directory = mkdtempSync(join(tmpdir(), "openedbot-worker-health-"));
     file = join(directory, "alive");
     spyOn(console, "error").mockImplementation(() => undefined);
     spyOn(console, "info").mockImplementation(() => undefined);

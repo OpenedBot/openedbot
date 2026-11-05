@@ -50,7 +50,7 @@ export type TokenUsage = {
 
 /**
  * Intervalle de flush des deltas. Mesure : 33,6 deltas/s a 4 caracteres piece.
- * 150 ms (DEV-OHB-111) : un flush coute un POST et une transaction, le premier
+ * 150 ms : un flush coute un POST et une transaction, le premier
  * texte part de toute facon sans attendre (`flushFirstDelta`).
  */
 export const DELTA_FLUSH_MS = 150;

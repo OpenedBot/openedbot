@@ -10,7 +10,7 @@ import (
 
 func TestA2ACompanionInstallBindsRootAndProfilesWithoutConfigChanges(t *testing.T) {
 	root := t.TempDir()
-	profile := filepath.Join(root, "profiles", "ohb-client")
+	profile := filepath.Join(root, "profiles", "openedbot-client")
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestA2ACompanionInstallBindsRootAndProfilesWithoutConfigChanges(t *testing.
 		t.Fatal(err)
 	}
 	for _, home := range []string{root, profile} {
-		plugin := filepath.Join(home, "plugins", "ohb_a2a_policy")
+		plugin := filepath.Join(home, "plugins", "openedbot_a2a_policy")
 		marker, err := os.ReadFile(filepath.Join(plugin, "runtime-home"))
 		if err != nil || string(marker) != root+"\n" {
 			t.Fatal("profile guard was not bound to its runtime root")
@@ -42,10 +42,10 @@ func TestA2ACompanionInstallBindsRootAndProfilesWithoutConfigChanges(t *testing.
 			t.Fatal("file materialization rewrote unrelated configuration")
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, "hooks", "ohb_a2a_policy", "handler.py")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "hooks", "openedbot_a2a_policy", "handler.py")); err != nil {
 		t.Fatal("root gateway startup hook is absent")
 	}
-	for _, hook := range []string{"ohb_backend_probe", "ohb_prompt_cache_ttl"} {
+	for _, hook := range []string{"openedbot_backend_probe", "openedbot_prompt_cache_ttl"} {
 		for _, name := range []string{"HOOK.yaml", "handler.py"} {
 			if _, err := os.Stat(filepath.Join(root, "hooks", hook, name)); err != nil {
 				t.Fatal("root gateway hook is absent: " + hook + "/" + name)

@@ -115,7 +115,7 @@ export type RemoteConnector = {
   name: string;
   active?: boolean;
   link_present?: boolean;
-  ohb?: string;
+  openedbot?: string;
   runtime_id?: string;
   device_key_sealed?: boolean;
 };
@@ -132,7 +132,7 @@ export function remoteLinkState(statusJson: unknown, plan: LinkDevPlan): "linked
   if (!Array.isArray(connectors)) throw new Error("`edge-setup status --json` ne liste pas `connectors` : mettre le VPS à niveau (edge-setup upgrade).");
   const instance = connectors.find((connector) => connector?.name === plan.instance);
   if (!instance || !instance.link_present) return "absent";
-  return instance.ohb?.replace(/\/+$/u, "") === plan.remoteOrigin ? "linked" : "elsewhere";
+  return instance.openedbot?.replace(/\/+$/u, "") === plan.remoteOrigin ? "linked" : "elsewhere";
 }
 
 /**
@@ -143,7 +143,7 @@ export function remoteLinkState(statusJson: unknown, plan: LinkDevPlan): "linked
  * the link of the instance it targets.
  */
 export function remoteLinkCommand(plan: LinkDevPlan): string[] {
-  const argv = ["sudo", "-n", "edge-setup", "link", "--ohb", plan.remoteOrigin, "--yes", "--insecure-ohb"];
+  const argv = ["sudo", "-n", "edge-setup", "link", "--openedbot", plan.remoteOrigin, "--yes", "--insecure-openedbot"];
   if (plan.instance !== "default") argv.push("--name", plan.instance);
   return argv;
 }
@@ -180,7 +180,7 @@ export function remoteShell(script: string): string[] {
  * `make setup` (or the first `make db-seed`).
  */
 export function localCredentials(env: LinkDevEnv): { email: string; password: string } {
-  const email = (env.LINK_DEV_EMAIL ?? env.E2E_EMAIL ?? "dev@ohb.local").trim();
+  const email = (env.LINK_DEV_EMAIL ?? env.E2E_EMAIL ?? "dev@openedbot.local").trim();
   const password = env.LINK_DEV_PASSWORD ?? env.E2E_PASSWORD ?? "";
   if (!email || !password) throw new Error("LINK_DEV_EMAIL / LINK_DEV_PASSWORD (ou E2E_*) sont vides : make setup génère E2E_PASSWORD dans .env.local.");
   return { email, password };
@@ -200,7 +200,7 @@ export function gatewayStaleness(input: {
   const hints: string[] = [];
   if (input.gatewayStartedAtMs === null) return hints;
   if (input.gatewayStartedAtMs < input.headCommittedAtMs) {
-    hints.push("la passerelle de lien (ohb-runtime-link-gateway) a démarré avant le dernier commit : systemctl --user restart ohb-runtime-link-gateway");
+    hints.push("la passerelle de lien (openedbot-runtime-link-gateway) a démarré avant le dernier commit : systemctl --user restart openedbot-runtime-link-gateway");
   }
   if (input.migrationMtimesMs.some((mtime) => mtime > input.gatewayStartedAtMs!)) {
     hints.push("des migrations sont plus récentes que la passerelle : make db-migrate, puis relancer la passerelle");

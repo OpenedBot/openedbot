@@ -1,5 +1,5 @@
 /**
- * DEV-209: `routine_manage` on a real PostgreSQL, under ohb_api and tenant RLS.
+ * DEV-209: `routine_manage` on a real PostgreSQL, under openedbot_api and tenant RLS.
  *
  * Proves: the MCP handshake and the per-runtime bearer, the run key (signed by
  * the worker secret, live run only), the per-bot switch, each permission mode
@@ -21,7 +21,7 @@ const SECRET = "integration-worker-secret";
 const BEARER_A = "bearer-a", BEARER_B = "bearer-b";
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 
-await withDisposablePostgres("ohb209_routine_tool", async ({ owner, connect }) => {
+await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connect }) => {
   await owner`insert into users (id, email) values (${USER}, 'dev209@example.test')`;
   await owner`insert into organizations (id, slug, name) values (${ORG_A}, 'dev209-a', 'A'), (${ORG_B}, 'dev209-b', 'B')`;
   await owner`insert into memberships (organization_id, user_id, role) values (${ORG_A}, ${USER}, 'owner')`;
@@ -50,7 +50,7 @@ await withDisposablePostgres("ohb209_routine_tool", async ({ owner, connect }) =
     values (${ORG_A}, ${RUNTIME_A}, ${routineToolSecretHash(BEARER_A)}, now(), ${`{${BYPASS},${MANUAL},${PLAN}}`}::uuid[]),
            (${ORG_B}, ${RUNTIME_B}, ${routineToolSecretHash(BEARER_B)}, now(), ${`{${BOT_B}}`}::uuid[])`;
 
-  const db = await connect("ohb_api");
+  const db = await connect("openedbot_api");
   const app = new Hono<{ Variables: AppVariables }>();
   app.onError((error, context) => error instanceof HttpError
     ? context.json({ code: error.code }, error.status as 401)

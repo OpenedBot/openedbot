@@ -28,10 +28,10 @@ create table account_preferences (
 );
 alter table account_preferences enable row level security;
 alter table account_preferences force row level security;
-create policy account_preferences_user on account_preferences to ohb_api
+create policy account_preferences_user on account_preferences to openedbot_api
   using (user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid)
   with check (user_id = nullif(current_setting('app.authenticating_user_id', true), '')::uuid);
-grant select, insert, update on account_preferences to ohb_api;
+grant select, insert, update on account_preferences to openedbot_api;
 
 create table membership_events (
   id uuid primary key,
@@ -44,10 +44,10 @@ create table membership_events (
 );
 alter table membership_events enable row level security;
 alter table membership_events force row level security;
-create policy membership_events_tenant on membership_events to ohb_api
+create policy membership_events_tenant on membership_events to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-grant select, insert on membership_events to ohb_api;
+grant select, insert on membership_events to openedbot_api;
 create index membership_events_timeline on membership_events (organization_id, occurred_at desc);
 
 insert into schema_migrations(version) values ('0083_agency_workspaces') on conflict (version) do nothing;

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import templates from "virtual:ohb-templates";
+import templates from "virtual:openedbot-templates";
 import { Preview } from "../components/Preview";
 import { ChecksBadge } from "../components/Checks";
 import { themesOf, useControls } from "../lib/controls";

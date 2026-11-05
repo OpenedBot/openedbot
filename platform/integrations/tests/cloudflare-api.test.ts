@@ -14,12 +14,12 @@ function fakeFetch(handler: (call: Call) => Response | Promise<Response>) {
   return { calls, fetchImpl };
 }
 
-describe("OHB-75 Cloudflare API client", () => {
+describe("Cloudflare API client", () => {
   test("sends the bearer, parses envelopes and never leaks the token in an error", async () => {
     const { calls, fetchImpl } = fakeFetch((call) => {
       if (call.url.endsWith("/user/tokens/verify")) return Response.json({ success: true, result: { id: "tok", status: "active" } });
       if (call.url.includes("/zones?")) return Response.json({ success: true, result: [{ id: "zone-1", name: "example.com", account: { id: "acct-1" } }] });
-      if (call.url.endsWith("/cfd_tunnel") && call.method === "POST") return Response.json({ success: true, result: { id: "tun-1", name: "ohb-hermes-x", status: "inactive" } });
+      if (call.url.endsWith("/cfd_tunnel") && call.method === "POST") return Response.json({ success: true, result: { id: "tun-1", name: "openedbot-hermes-x", status: "inactive" } });
       if (call.url.endsWith("/token")) return Response.json({ success: true, result: "x".repeat(64) });
       if (call.url.endsWith("/service_tokens")) return Response.json({ success: true, result: { id: "st-1", name: "n", client_id: "cid", client_secret: "csecret" } });
       return Response.json({ success: false, errors: [{ code: 10000, message: "Authentication error" }] }, { status: 403 });
@@ -27,7 +27,7 @@ describe("OHB-75 Cloudflare API client", () => {
     const client = createCloudflareApiClient("secret-api-token", { fetch: fetchImpl });
     expect(await client.verifyToken()).toEqual({ id: "tok", status: "active" });
     expect(await client.listZones("example.com")).toEqual([{ id: "zone-1", name: "example.com", accountId: "acct-1" }]);
-    expect((await client.createTunnel("acct-1", "ohb-hermes-x")).id).toBe("tun-1");
+    expect((await client.createTunnel("acct-1", "openedbot-hermes-x")).id).toBe("tun-1");
     expect(await client.readTunnelToken("acct-1", "tun-1")).toHaveLength(64);
     expect((await client.createServiceToken("acct-1", "n")).clientSecret).toBe("csecret");
     expect(calls.every((call) => call.authorization === "Bearer secret-api-token")).toBe(true);

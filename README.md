@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/console/public/brand/ohb-icon.webp" width="72" height="72" alt="">
+<img src="apps/console/public/brand/openedbot-icon.webp" width="72" height="72" alt="">
 
 # openedbot
 
@@ -140,9 +140,7 @@ The Makefile also includes the checkout's `make/*.mk` fragments when there are a
 
 ## Configuration names
 
-Environment variables are named `OPENEDBOT_*` and request headers `X-OpenedBot-*`. The retired
-`OHB_*` variables are no longer read: the apps and the Makefile refuse to start and name the
-successor. The former `X-OHB-*` request headers are still accepted for one release.
+Environment variables are named `OPENEDBOT_*` and request headers `X-OpenedBot-*`.
 
 ## Security
 

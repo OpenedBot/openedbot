@@ -122,7 +122,7 @@ func collectMacStatus(ctx context.Context, home string, p layout.MacRuntimePaths
 			if err != nil || lf == nil {
 				return nil, errors.New("connector link metadata could not be read")
 			}
-			entry.Link, entry.OHB, entry.RuntimeID = true, lf.OHB, lf.RuntimeID
+			entry.Link, entry.Openedbot, entry.RuntimeID = true, lf.Openedbot, lf.RuntimeID
 			lc := lf.linkContext()
 			if stored, ok := loadLinkContext(filepath.Join(inst.DirUnder(p.StateRoot), "link-context.json"), lf.RuntimeID); ok {
 				lc = stored

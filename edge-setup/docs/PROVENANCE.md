@@ -14,7 +14,7 @@ runtime Hermes pour openedbot :
    statique exécuté **sur l'hôte**, sans Ansible ni SSH sortant, avec un mode
    `connector` qui rend le homelab possible. L'ancien arbre reste lisible via
    `git show develop:<chemin>`. Nommé `hermes-setup`.
-4. **OHB-87, renommage en `edge-setup`** : même binaire, même namespace
+4. **Renommage en `edge-setup`** : même binaire, même namespace
    disque et mêmes routes de lien ; seul le fichier installé et ses copies
    PATH changent de nom, `hermes-setup` restant un alias symlink créé et
    rafraîchi par `install` et `upgrade` pour un hôte déjà provisionné.

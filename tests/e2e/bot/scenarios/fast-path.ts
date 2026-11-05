@@ -1,5 +1,5 @@
 /**
- * Bench: the operator's turn on a ready bot (OHB-119). One bot on its own
+ * Bench: the operator's turn on a ready bot. One bot on its own
  * profile receives `--messages` short messages, one at a time, on the SSE
  * stream already open (the PWA case). Content is never asserted: only that
  * a non-empty assistant reply exists.

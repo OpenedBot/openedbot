@@ -148,7 +148,7 @@ comment on function staff_reset_user_password(uuid, text) is
   'Repose un mot de passe temporaire sur un compte existant, depuis le backoffice : nouveau hachage, drapeau must_change_password, et fermeture de toutes les sessions encore ouvertes, dans une seule transaction. Gardée par app.staff_user_id. Ne rend AUCUNE ligne pour un compte inconnu, et refuse sans rien écrire un compte qui n''entre que par Google (google_only) ou qui n''a plus d''espace vivant (no_organization).';
 
 revoke all on function staff_reset_user_password(uuid, text) from public;
-grant execute on function staff_reset_user_password(uuid, text) to ohb_api;
+grant execute on function staff_reset_user_password(uuid, text) to openedbot_api;
 
 insert into schema_migrations(version) values ('0071_staff_temporary_password_reset')
 on conflict (version) do nothing;

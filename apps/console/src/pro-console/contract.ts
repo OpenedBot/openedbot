@@ -1,7 +1,7 @@
 /**
  * What a pro console module gives the console (open-core step 9).
  *
- * The console builds its pro screens from `virtual:ohb-pro-console`
+ * The console builds its pro screens from `virtual:openedbot-pro-console`
  * (`vite-pro-console.ts`): solo, the list is empty and no fleet, billing or
  * permission-rules screen enters the bundle; pro, each entry of
  * `OPENEDBOT_CONSOLE_PLUGINS` is one of these modules. A feature is shown only when its

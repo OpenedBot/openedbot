@@ -142,7 +142,7 @@ function StarsIndicator() {
   return (
     <span
       aria-hidden
-      className="ohb-agent-stars relative block shrink-0"
+      className="openedbot-agent-stars relative block shrink-0"
       style={{ width: box, height: box }}
     >
       {STAR_LAYOUT.map((star, i) => {
@@ -151,7 +151,7 @@ function StarsIndicator() {
           <svg
             key={i}
             viewBox="0 0 24 24"
-            className="ohb-agent-star absolute"
+            className="openedbot-agent-star absolute"
             style={{
               width: size,
               height: size,
@@ -205,7 +205,7 @@ function InfinityIndicator() {
         strokeWidth={INFINITY_STROKE}
         strokeLinecap="round"
         strokeDasharray={`${INFINITY_TRAIL} ${100 - INFINITY_TRAIL}`}
-        className="ohb-agent-comet"
+        className="openedbot-agent-comet"
         style={{ animationDuration: `${INFINITY_DURATION_S}s` }}
       />
     </svg>
@@ -266,7 +266,7 @@ export function AgentThinking({
     <div
       role="status"
       className={cn("flex items-center gap-2.5", className)}
-      style={{ color, "--ohb-agent-tone": color } as React.CSSProperties}
+      style={{ color, "--openedbot-agent-tone": color } as React.CSSProperties}
     >
       {(variant === "wave" || variant === "spin") && <DotsIndicator variant={variant} />}
       {variant === "stars" && <StarsIndicator />}
@@ -294,8 +294,8 @@ export function ShimmerLabel({
   const color = TONE_COLORS[tone];
   return (
     <span
-      className={cn("ohb-agent-label", className)}
-      style={{ color, "--ohb-agent-tone": color } as React.CSSProperties}
+      className={cn("openedbot-agent-label", className)}
+      style={{ color, "--openedbot-agent-tone": color } as React.CSSProperties}
     >
       {children}
     </span>

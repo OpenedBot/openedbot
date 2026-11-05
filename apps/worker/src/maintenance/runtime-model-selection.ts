@@ -46,7 +46,7 @@ export async function withRuntimeModelProofLock(db: SQL, job: ModelProofJob, cal
   let reusable = true;
   try {
     const rows = await connection<Array<{ locked: boolean }>>`
-      select pg_try_advisory_lock(hashtext('ohb-model-proof'), hashtext(${job.runtime_id}::text)) as locked
+      select pg_try_advisory_lock(hashtext('openedbot-model-proof'), hashtext(${job.runtime_id}::text)) as locked
     `;
     acquired = rows[0]?.locked === true;
     if (!acquired) {
@@ -60,14 +60,14 @@ export async function withRuntimeModelProofLock(db: SQL, job: ModelProofJob, cal
     return true;
   } catch (error) {
     if (acquired) {
-      try { await connection`select pg_advisory_unlock(hashtext('ohb-model-proof'), hashtext(${job.runtime_id}::text))`; }
+      try { await connection`select pg_advisory_unlock(hashtext('openedbot-model-proof'), hashtext(${job.runtime_id}::text))`; }
       catch { reusable = false; }
       acquired = false;
     }
     throw error;
   } finally {
     if (acquired) {
-      try { await connection`select pg_advisory_unlock(hashtext('ohb-model-proof'), hashtext(${job.runtime_id}::text))`; }
+      try { await connection`select pg_advisory_unlock(hashtext('openedbot-model-proof'), hashtext(${job.runtime_id}::text))`; }
       catch { reusable = false; }
     }
     if (reusable) connection.release();

@@ -97,23 +97,23 @@ alter table thread_reads force row level security;
 alter table thread_hides enable row level security;
 alter table thread_hides force row level security;
 
-create policy threads_tenant on threads to ohb_api
+create policy threads_tenant on threads to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy threads_worker on threads to ohb_worker using (true) with check (true);
+create policy threads_worker on threads to openedbot_worker using (true) with check (true);
 
-create policy thread_reads_tenant on thread_reads to ohb_api
-  using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
-  with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-
-create policy thread_hides_tenant on thread_hides to ohb_api
+create policy thread_reads_tenant on thread_reads to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
 
-grant select, insert, update, delete on threads to ohb_api;
-grant select, insert, update, delete on threads to ohb_worker;
-grant select, insert, update, delete on thread_reads to ohb_api;
-grant select, insert, update, delete on thread_hides to ohb_api;
+create policy thread_hides_tenant on thread_hides to openedbot_api
+  using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
+  with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
+
+grant select, insert, update, delete on threads to openedbot_api;
+grant select, insert, update, delete on threads to openedbot_worker;
+grant select, insert, update, delete on thread_reads to openedbot_api;
+grant select, insert, update, delete on thread_hides to openedbot_api;
 
 insert into schema_migrations(version) values ('0004_threads')
 on conflict (version) do nothing;

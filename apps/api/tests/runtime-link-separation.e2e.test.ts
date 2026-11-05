@@ -21,7 +21,7 @@ const enabled = process.env.OPENEDBOT_LINK_GATEWAY_E2E === "1";
 /** A device key as systemd would unseal it for the daemon: the Ed25519 seed, base64, under `$CREDENTIALS_DIRECTORY/device.key`. */
 async function testDeviceKey(): Promise<{ credentials: string; publicKey: string }> {
   const seed = randomBytes(32);
-  const credentials = await mkdtemp(join(tmpdir(), "ohb-link-e2e-creds-"));
+  const credentials = await mkdtemp(join(tmpdir(), "openedbot-link-e2e-creds-"));
   await writeFile(join(credentials, "device.key"), seed.toString("base64") + "\n", { mode: 0o600 });
   const privateKey = createPrivateKey({ key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]), format: "der", type: "pkcs8" });
   return { credentials, publicKey: rawPublicKey(privateKey) };

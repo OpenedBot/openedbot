@@ -300,7 +300,7 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
           // aucun workflow : la réponse porte les identifiants du run replié.
           // `enqueue` est le même geste sur le repli déjà posé d'un steer
           // pending : on allonge aussi le texte de la tentative, sans second
-          // workflow (OHB-117).
+          // workflow.
           await tx`
             update runs set input = case when input = '' then ${runInput} else input || E'\n\n' || ${runInput} end,
               updated_at = now()
@@ -409,7 +409,7 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
         const workflowUpdatedAt = new Date().toISOString();
         // Un steer n'ouvre pas de workflow : le tour occupé garde le sien.
         // Le run créé ci-dessous est le repli FIFO, pas un second workflow
-        // autonome (OHB-117). DM simple : déjà sans workflow (OHB-113).
+        // autonome. DM simple : déjà sans workflow.
         const workflowId = steerTargetRunId
           ? null
           : (thread.groupId || delegationNotice || policy.enabled ? reservedWorkflowId : null);
@@ -490,7 +490,7 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
         if (delegationNotice && sentNotice && receivedNotice) {
           await tx`
             select pg_advisory_xact_lock(
-              hashtext(${auth.organizationId}), hashtext('ohb-run-events-cursor')
+              hashtext(${auth.organizationId}), hashtext('openedbot-run-events-cursor')
             )
           `;
           await tx`

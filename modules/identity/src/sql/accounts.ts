@@ -269,7 +269,7 @@ export async function readLivingOrganizationSummary(
 }
 
 /**
- * `users` n'est pas sous RLS et `ohb_api` y porte un grant de table entière
+ * `users` n'est pas sous RLS et `openedbot_api` y porte un grant de table entière
  * depuis 0001 : l'adresse se lit sous la porte déjà ouverte.
  */
 export async function readUserEmail(tx: TransactionDb, userId: string): Promise<string | null> {

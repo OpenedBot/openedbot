@@ -10,7 +10,7 @@ begin;
 -- introuvable. La policy reste bornée aux clés `org/` de l'organisation de la
 -- transaction : l'API ne voit ni les clés d'un autre tenant ni celles du
 -- guichet par cette porte.
-create policy tenant_blob_reservations_api on tenant_blob_deletions to ohb_api
+create policy tenant_blob_reservations_api on tenant_blob_deletions to openedbot_api
   using (
     organization_id = nullif(current_setting('app.organization_id', true), '')::uuid
     and object_key like ('org/' || organization_id::text || '/%')
@@ -102,7 +102,7 @@ begin
   select t.tableowner into migrator
     from pg_catalog.pg_tables t
    where t.schemaname = 'public' and t.tablename = 'users';
-  if migrator in ('ohb_api', 'ohb_worker', 'ohb_staff') then
+  if migrator in ('openedbot_api', 'openedbot_worker', 'openedbot_staff') then
     raise exception 'erase_account_user: % is an application role, not the migration role', migrator;
   end if;
   execute pg_catalog.format('alter function public.erase_account_user(uuid) owner to %I', migrator);
@@ -110,10 +110,10 @@ end;
 $owner$;
 
 revoke all on function public.erase_account_user(uuid) from public;
-grant execute on function public.erase_account_user(uuid) to ohb_worker;
+grant execute on function public.erase_account_user(uuid) to openedbot_worker;
 
 comment on function public.erase_account_user(uuid) is
-  'Account purge: deletes a user without any membership, pseudonymizes one that only keeps revoked memberships (history of other tenants), keeps one with a live membership. ohb_worker only.';
+  'Account purge: deletes a user without any membership, pseudonymizes one that only keeps revoked memberships (history of other tenants), keeps one with a live membership. openedbot_worker only.';
 
 -- 5. L'acteur d'un envoi, d'un workflow ou d'une routine, sous mandat d'agence.
 --

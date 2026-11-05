@@ -195,7 +195,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       tabIndex={-1}
       data-turn-of={author?.id}
       data-thread-find-target={author || hover ? findTargetId : undefined}
-      className={`group/reply flex w-full max-w-full flex-col items-start self-start text-body-regular ${settled ? "ohb-turn-contain" : ""} ${findActive ? "rounded-[var(--radius-2-5xl)] ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
+      className={`group/reply flex w-full max-w-full flex-col items-start self-start text-body-regular ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-[var(--radius-2-5xl)] ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
       <div data-assistant-response="" className="flex w-full min-w-0 flex-col items-start">
         {body}
@@ -307,7 +307,7 @@ export const UserMessage = memo(function UserMessage({
     <div
       data-thread-find-target={findTargetId}
       tabIndex={-1}
-      className={`flex max-w-full flex-col items-end gap-1.5 self-end ${settled ? "ohb-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`flex max-w-full flex-col items-end gap-1.5 self-end ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
     >
       {attachments?.length ? (
         <ul className="flex flex-wrap justify-end gap-1.5">
@@ -410,7 +410,7 @@ export const BotInboundMessage = memo(function BotInboundMessage({
   return (
     <div
       tabIndex={-1}
-      className={`flex max-w-full items-start gap-2 self-start ${settled ? "ohb-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`flex max-w-full items-start gap-2 self-start ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
       aria-label={t("threadTimeline.inboundFrom", { name: label })}
       data-inbound-from={authorBot.id}
       data-thread-find-target={findTargetId}

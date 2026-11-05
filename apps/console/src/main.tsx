@@ -38,7 +38,7 @@ applyStoredTextSize();
 // version est désinscrit (voir `lib/platform/legacy-service-worker.ts`).
 retireLegacyServiceWorker();
 
-// La silhouette du cadre (`#ohb-boot`, `index.html`) couvre la page jusqu'au
+// La silhouette du cadre (`#openedbot-boot`, `index.html`) couvre la page jusqu'au
 // premier rendu du routeur : gardes de session passées, vraie page peinte
 // dessous. La retirer plus tôt, c'était remettre l'écran blanc entre le JS
 // chargé et les gardes résolues. Une coque périmée (index.html précaché par le
@@ -46,10 +46,10 @@ retireLegacyServiceWorker();
 // L'échéance couvre un routeur qui ne rendrait jamais (exception au démarrage).
 const BOOT_FALLBACK_MS = 10_000;
 function endBoot() {
-  document.getElementById("ohb-boot")?.remove();
-  document.documentElement.removeAttribute("data-ohb-booting");
+  document.getElementById("openedbot-boot")?.remove();
+  document.documentElement.removeAttribute("data-openedbot-booting");
 }
-if (document.getElementById("ohb-boot")) {
+if (document.getElementById("openedbot-boot")) {
   // `onResolved` ET `onRendered` : le second n'est émis que si la transition
   // React confirme son rendu, ce qui n'arrive pas au premier chargement
   // (mesuré : la silhouette restait jusqu'à l'échéance). Le premier des deux
@@ -67,7 +67,7 @@ if (document.getElementById("ohb-boot")) {
   window.setTimeout(endBoot, BOOT_FALLBACK_MS);
 }
 
-// OHB-88 perf HUD: dev only, and further gated behind `?perf=1` inside the
+// Thread perf HUD: dev only, and further gated behind `?perf=1` inside the
 // module itself. The dynamic import keeps `thread-perf-hud.tsx` (and its
 // probe) out of a production bundle entirely: see
 // `docs/cloud/THREAD_PERF_HUD.md`. `=== true`: Bun maps `import.meta.env` to `process.env`

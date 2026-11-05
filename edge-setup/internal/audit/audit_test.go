@@ -42,7 +42,7 @@ func TestPlatformsGate(t *testing.T) {
 	}
 	a = fixture(t, map[string]string{layout.RuntimeRoot + "/.env": "TELEGRAM_BOT_TOKEN=123:abc\nTELEGRAM_ALLOWED_USERS=42\n"})
 	if r := a.hermesPlatforms(context.Background()); r.Status != Warn {
-		t.Fatalf("telegram with allowlist is a WARN on an OHB runtime: %+v", r)
+		t.Fatalf("telegram with allowlist is a WARN on an openedbot runtime: %+v", r)
 	}
 	a = fixture(t, map[string]string{layout.RuntimeRoot + "/.env": "DISCORD_BOT_TOKEN=x\nGATEWAY_ALLOW_ALL_USERS=true\n"})
 	if r := a.hermesPlatforms(context.Background()); r.Status != Fail {

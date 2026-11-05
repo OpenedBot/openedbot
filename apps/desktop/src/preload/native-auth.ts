@@ -2,7 +2,7 @@ import { ipcRenderer, type IpcRendererEvent } from "electron";
 import type { NativeAuthBridge, SigninState } from "../shared/bridge";
 import { CHANNEL } from "./channels";
 
-// `__OHB_NATIVE__.auth`: the console's /login drives the shell's sign-in
+// `__OPENEDBOT_NATIVE__.auth`: the console's /login drives the shell's sign-in
 // through it. The main process re-checks every call (sender and arguments);
 // the page only gets plain copies of the states, never the IPC event.
 

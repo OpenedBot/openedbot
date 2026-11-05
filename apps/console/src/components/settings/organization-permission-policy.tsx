@@ -15,7 +15,7 @@ import { ACTIONS, BUTTON, CardHeading, FIELD, Note, SettingsCard, StatusList, St
 import { FieldsetRow, SegmentedRadio } from "./segmented";
 
 /**
- * PERM2-8 (DEV-OHB-259): the organization's permission policy on the
+ * PERM2-8: the organization's permission policy on the
  * « Politiques » page. Every member reads it; owners and admins edit it. An
  * agency acting on a client never sees it: the API refuses every
  * `/api/organization*` route to an agency (D-5).

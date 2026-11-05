@@ -7,8 +7,8 @@ import { createTransactionalEmailSender } from "@openedbot/notifications/applica
 
 const smtpUrl = process.env.TRANSACTIONAL_EMAIL_SMTP_URL?.trim() || "smtp://127.0.0.1:1025";
 const mailpitUrl = (process.env.E2E_MAILPIT_URL?.trim() || "http://127.0.0.1:8025").replace(/\/+$/, "");
-const from = process.env.TRANSACTIONAL_EMAIL_FROM?.trim() || "ohb@ohb.local";
-const recipient = process.env.E2E_EMAIL?.trim() || "dev@ohb.local";
+const from = process.env.TRANSACTIONAL_EMAIL_FROM?.trim() || "openedbot@openedbot.local";
+const recipient = process.env.E2E_EMAIL?.trim() || "dev@openedbot.local";
 
 const probe = await fetch(`${mailpitUrl}/api/v1/messages`).catch(() => null);
 if (!probe?.ok) {

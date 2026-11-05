@@ -73,7 +73,7 @@ const hostile = (path: string, method = "POST") => new Request(`http://api.test$
   method,
   headers: {
     authorization: "Bearer eyJhbGciOi.payload.signature",
-    cookie: "ohb_session=cookie-value-42",
+    cookie: "openedbot_session=cookie-value-42",
     "content-type": "application/json",
   },
   ...(method === "POST" ? { body: JSON.stringify({ password: "body-secret-99" }) } : {}),
@@ -236,14 +236,14 @@ describe("contrat de la migration 0161_api_errors", () => {
     expect(sql).toContain("insert into schema_migrations(version) values ('0161_api_errors')");
   });
 
-  test("RLS forcée ; ohb_api n'a que l'insertion, sans lecture ; le worker ne voit que l'expiré", () => {
+  test("RLS forcée ; openedbot_api n'a que l'insertion, sans lecture ; le worker ne voit que l'expiré", () => {
     expect(sql).toContain("alter table api_errors enable row level security;");
     expect(sql).toContain("alter table api_errors force row level security;");
-    expect(sql).toContain("create policy api_errors_api_insert on api_errors for insert to ohb_api");
-    expect(sql).toContain("grant insert on api_errors to ohb_api;");
-    expect(sql).not.toMatch(/grant select[^;]*to ohb_api/);
-    expect(sql).not.toMatch(/for select to ohb_api/);
-    expect(sql).toContain("for delete to ohb_worker\n  using (occurred_at < now() - interval '90 days')");
+    expect(sql).toContain("create policy api_errors_api_insert on api_errors for insert to openedbot_api");
+    expect(sql).toContain("grant insert on api_errors to openedbot_api;");
+    expect(sql).not.toMatch(/grant select[^;]*to openedbot_api/);
+    expect(sql).not.toMatch(/for select to openedbot_api/);
+    expect(sql).toContain("for delete to openedbot_worker\n  using (occurred_at < now() - interval '90 days')");
     expect(sql).toContain("reference       uuid primary key");
   });
 

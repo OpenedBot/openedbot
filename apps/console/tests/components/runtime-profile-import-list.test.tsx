@@ -4,7 +4,7 @@ import type { RuntimeHostProfileDto } from "@openedbot/contracts-api";
 import { I18nProvider } from "../../src/lib/i18n";
 import { RuntimeProfileImportList } from "../../src/components/runtime-profile-import-list";
 
-beforeEach(() => window.localStorage.setItem("ohb:locale", "fr"));
+beforeEach(() => window.localStorage.setItem("openedbot:locale", "fr"));
 afterEach(() => {
   cleanup();
   window.localStorage.clear();

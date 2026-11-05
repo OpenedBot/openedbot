@@ -13,7 +13,7 @@ create table bot_profile_provisions (
   -- sous ce nom n'est adopté que dans ce cas (essai interrompu), jamais avant.
   host_create_attempted boolean not null default false,
   -- A qui est le profil de l'hôte qui porte ce nom : 'ours' prouvé créé par
-  -- OHB, 'foreign' trouvé avant tout appel (jamais adopté, jamais supprimé),
+  -- openedbot, 'foreign' trouvé avant tout appel (jamais adopté, jamais supprimé),
   -- 'unknown' tant que rien n'est prouvé. Une annulation garde la ligne
   -- ('cancelled') pour que la corbeille puis la purge lisent la même réponse.
   host_profile_ownership text not null default 'unknown' check (host_profile_ownership in ('unknown','ours','foreign')),
@@ -34,12 +34,12 @@ create index bot_profile_provision_claim_idx on bot_profile_provisions (next_att
   where status in ('queued','running');
 alter table bot_profile_provisions enable row level security;
 alter table bot_profile_provisions force row level security;
-create policy bot_profile_provisions_tenant on bot_profile_provisions to ohb_api
+create policy bot_profile_provisions_tenant on bot_profile_provisions to openedbot_api
   using (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid)
   with check (organization_id = nullif(current_setting('app.organization_id', true), '')::uuid);
-create policy bot_profile_provisions_worker on bot_profile_provisions to ohb_worker using (true) with check (true);
-grant select, insert, update on bot_profile_provisions to ohb_api;
-grant select, insert, update, delete on bot_profile_provisions to ohb_worker;
+create policy bot_profile_provisions_worker on bot_profile_provisions to openedbot_worker using (true) with check (true);
+grant select, insert, update on bot_profile_provisions to openedbot_api;
+grant select, insert, update, delete on bot_profile_provisions to openedbot_worker;
 comment on table bot_profile_provisions is 'Durable provisioning of managed Hermes profiles for roster bots.';
 insert into schema_migrations(version) values ('0122_bot_profile_provisions') on conflict (version) do nothing;
 commit;

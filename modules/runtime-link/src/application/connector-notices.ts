@@ -7,7 +7,7 @@ import type { TransactionDb } from "@openedbot/platform-db";
  * `RUNTIME_CONNECTOR_MIN_VERSION`. openedbot never updates a customer host: the
  * message only names `sudo edge-setup upgrade --yes`.
  *
- * Runs under `withTenant` as `ohb_api`, which may insert into
+ * Runs under `withTenant` as `openedbot_api`, which may insert into
  * `runtime_connector_notices` and `email_outbox` but read neither back (0064,
  * 0101). Hence `on conflict do nothing` without a target and no `returning`:
  * the written row count says whether the notice is new. The notice row and the

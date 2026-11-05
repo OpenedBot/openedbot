@@ -119,7 +119,7 @@ describe("cible de steering d'un follow-up", () => {
     expect(sql).toContain("target_run_id <> source_run_id");
     expect(sql).toMatch(/status in \(\s*'pending', 'sending', 'confirmed'/);
     expect(sql).toContain("force row level security");
-    expect(sql).toContain("to ohb_worker");
+    expect(sql).toContain("to openedbot_worker");
     expect(sql).toContain("char_length(text) between 1 and 65536");
   });
 
@@ -166,7 +166,7 @@ describe("cible de steering d'un follow-up", () => {
       status: "queued",
       steerTargetRunId: "run-active",
     });
-    // OHB-107 : l'admission se journalise en noms et durées, sans le texte.
+    // L'admission se journalise en noms et durées, sans le texte.
     const admission = records.find((record) => record.event === "run.admission");
     expect(admission).toMatchObject({
       runId: accepted.runId,
@@ -308,7 +308,7 @@ describe("issue d'un message en rafale (supersede + prepend)", () => {
   });
 });
 
-describe("admission d'un DM sans workflow (OHB-113)", () => {
+describe("admission d'un DM sans workflow", () => {
   type Bot = { enabled: boolean; timeoutSeconds?: number };
   const admit = async (input: {
     text: string;
@@ -910,10 +910,10 @@ describe("fenêtre récente du snapshot de fil", () => {
 
   test("rend les événements dans l'enveloppe du flux, tour d'un DM simple = son run", async () => {
     const statements: string[] = [];
-    // Un DM simple (OHB-113) : pas de workflow, le trigger 0092 a posé turn_id = run_id.
+    // Un DM simple : pas de workflow, le trigger 0092 a posé turn_id = run_id.
     const row = {
       cursor: "7005", organizationId: "org-1", threadId: "thread-1", runId: "run-dm",
-      botId: "bot-1", turnId: "run-dm", sessionKey: "ohb:org-1:thread:thread-1", leaseGeneration: "3",
+      botId: "bot-1", turnId: "run-dm", sessionKey: "openedbot:org-1:thread:thread-1", leaseGeneration: "3",
       sequence: 2, type: "agent.message", payload: { delta: "bonjour" },
       occurredAt: new Date("2026-10-03T12:00:00.000Z"),
     };

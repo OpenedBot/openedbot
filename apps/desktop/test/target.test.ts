@@ -90,7 +90,7 @@ test("devUserDataName follows the backend the environment aims at", () => {
 });
 
 // getConfig() end to end, with electron mocked: precedence between sources.
-const userData = mkdtempSync(path.join(tmpdir(), "ohb-config-"));
+const userData = mkdtempSync(path.join(tmpdir(), "openedbot-config-"));
 // Every named export a transitively imported main module reads must exist on
 // the mock: bun keeps one electron mock across files, and a missing name (net)
 // fails the link of the next file that imports it.
