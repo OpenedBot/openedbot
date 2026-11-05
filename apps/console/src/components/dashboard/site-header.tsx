@@ -20,6 +20,7 @@ export function SiteHeader({
   heading = true,
   align = "center",
   root = false,
+  centered = false,
 }: {
   title: ReactNode;
   /**
@@ -45,6 +46,8 @@ export function SiteHeader({
   align?: "start" | "center";
   /** Bureau : le Salon lui-même, sans « Salon › » devant son titre. */
   root?: boolean;
+  /** Bureau : le titre seul, centré sur la barre (`BoardHeader`), comme l'en-tête d'un fil. */
+  centered?: boolean;
 }) {
   // Dans la coque mobile (`MobileDrawerShell`), le même en-tête devient la
   // barre de navigation d'un écran du drawer : bouton du panneau ou
@@ -69,5 +72,5 @@ export function SiteHeader({
   }
   // Bureau : le fil d'Ariane et les actions de l'écran, posés dans la barre
   // du haut du cadre (`board-chrome.tsx`). Le sous-titre est mobile seulement.
-  return <BoardHeader title={title} avatar={avatar} actions={actions} heading={heading} root={root} />;
+  return <BoardHeader title={title} avatar={avatar} actions={actions} heading={heading} root={root} centered={centered} />;
 }

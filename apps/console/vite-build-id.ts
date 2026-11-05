@@ -13,7 +13,7 @@ export const BUILD_INPUTS = ["apps/console", "browser", "contracts", "bun.lock",
  * builds of the same tree give the same id, so the same chunk hashes, and a
  * redeploy that does not touch the console keeps every browser cache. Any
  * change to a source, a dependency, the mode or a `VITE_*` value gives a new
- * id, which busts the persisted query cache and drives the PWA update.
+ * id, which busts the persisted query cache.
  *
  * Tracked and untracked files both count (`-co`), so a dirty tree builds what
  * it holds; ignored files (`dist`, `node_modules`, `.env`) never do. Without

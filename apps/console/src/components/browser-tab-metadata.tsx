@@ -10,9 +10,8 @@ import { useT } from "../lib/i18n";
  *
  * Les pages fixes reprennent le libellé traduit de leur navigation. Un fil
  * affiche le nom réel du bot ou du groupe, afin que plusieurs onglets openedbot
- * restent distinguables. Le manifeste PWA et le titre Apple de l'écran
- * d'accueil sont posés à la construction (Vite) : "openedbot (dev)" en serve,
- * "openedbot" en production. Ce composant ne les réécrit pas.
+ * restent distinguables. Le titre de départ est posé à la construction
+ * (Vite) : "openedbot (dev)" en serve, "openedbot" en production.
  */
 export function BrowserTabMetadata() {
   const { pathname } = useLocation();

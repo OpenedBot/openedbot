@@ -55,12 +55,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       name: "ohb-dev-app-name",
       transformIndexHtml(html) {
         if (!isDevServe) return html;
-        return html
-          .replace(
-            `<meta name="apple-mobile-web-app-title" content="${PRODUCTION_APP_NAME}" />`,
-            `<meta name="apple-mobile-web-app-title" content="${DEVELOPMENT_APP_NAME}" />`,
-          )
-          .replace(`<title>${PRODUCTION_APP_NAME}</title>`, `<title>${DEVELOPMENT_APP_NAME}</title>`);
+        return html.replace(`<title>${PRODUCTION_APP_NAME}</title>`, `<title>${DEVELOPMENT_APP_NAME}</title>`);
       },
     },
   ],

@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from "r
 import { createPortal } from "react-dom";
 import { useLocation } from "@tanstack/react-router";
 import { cn, SidebarProvider, Toaster, TooltipProvider, useIsMobile } from "@openedbot/browser-ui-kit";
-import { isMobileShellPath, isSettingsPath } from "../lib/shell/mobile-navigation";
+import { isMobileShellPath } from "../lib/shell/mobile-navigation";
 import { isIosDevice, isStandaloneDisplay } from "../lib/platform/pwa-display";
 import { useVisualViewportInset } from "../lib/platform/use-visual-viewport-height";
 
@@ -58,9 +58,6 @@ export function Shell({ children }: { children: ReactNode }) {
   const [ios] = useState(isIosDevice);
   const keyboardInset = useVisualViewportInset(mobileShell);
   useRootShellAttributes(mobileShell, standalone, ios);
-  // Les réglages bureau sont une modale centrée : le toast se pose sous elle,
-  // au centre. Ailleurs, le coin bas droit d'affectUI.
-  const toastPosition = isSettingsPath(pathname) ? "bottom-center" : "bottom-right";
   return (
     <TooltipProvider>
       {/* Keep the iOS scroll-edge backing outside the keyboard-transformed shell. */}
@@ -105,7 +102,9 @@ export function Shell({ children }: { children: ReactNode }) {
         }
       >
         {children}
-        <Toaster position={toastPosition} />
+        {/* Partout en bas à droite, réglages compris : ce sont désormais une
+            page du cadre, plus une modale centrée sous laquelle se poser. */}
+        <Toaster position="bottom-right" />
       </SidebarProvider>
     </TooltipProvider>
   );

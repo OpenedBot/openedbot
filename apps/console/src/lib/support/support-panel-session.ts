@@ -6,9 +6,6 @@ import { useEffect, useState } from "react";
  * Seule la BULLE s'en sert : page publique, connexion, légal, onboarding.
  * Dans l'application, le guichet est une page (`/support`), et c'est l'URL
  * qui dit s'il est à l'écran.
- *
- * Même forme que `pwa-install-session.ts` : une valeur de module, un jeu
- * d'abonnés, un hook qui les relie.
  */
 
 let open = false;

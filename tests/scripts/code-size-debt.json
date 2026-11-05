@@ -23,7 +23,7 @@
   "apps/console/src/route-tree.tsx": 1113,
   "apps/console/src/screens/conversation/conversation.tsx": 1233,
   "apps/console/src/screens/conversation/inbox.tsx": 658,
-  "apps/console/src/screens/settings/account/account.tsx": 1194,
+  "apps/console/src/screens/settings/account/account.tsx": 1163,
   "apps/console/src/screens/settings/installation/models/models-mobile.tsx": 711,
   "browser/face/src/bloub/engine.ts": 648,
   "browser/face/src/bloub/states.ts": 619,

@@ -115,20 +115,6 @@ export const settingsNotifications = {
   enabling: "Requesting…",
   disable: "Disable in openedbot",
   pushTitle: "Push notifications",
-  pushReady: "On",
-  pushUnavailable: "Not configured",
-  pushDisabled: "Off",
-  pushUnsupported: "Not supported",
-  pushIosNotInstalled: "PWA not installed",
-  pushDescription:
-    "Wakes the browser for a routine or an approval, even if the tab is closed. The text stays generic: bot name and event type, never message content.",
-  pushServerMissing:
-    "VAPID keys are not set on this deployment. In development that is expected: the feature stays off while PUSH_VAPID_* is absent.",
-  pushIosInstall:
-    "On iPhone and iPad, Safari allows Web Push only for a PWA added to the Home Screen (Share → Add to Home Screen). Then open openedbot from its icon.",
-  pushEnable: "Enable push notifications",
-  pushDisable: "Disable push notifications",
-  pushEnabling: "Enabling…",
   notificationApprovalTitle: "openedbot : action required",
   notificationCompletedTitle: "openedbot : workflow completed",
   notificationAttentionTitle: "openedbot : workflow needs review",
@@ -151,8 +137,6 @@ export const pushNotifications = {
 
 export const settingsAccount = {
   title: "My account",
-  sessionTitle: "Session",
-  signOutHint: "Ends the session in this browser. Your bots keep running on their runtime.",
   description:
     "Who you are here : the identity you sign in with, the name your bots use, and the people who share your workspace.",
   profileTitle: "Profile",
@@ -405,4 +389,23 @@ export const settingsArchives = {
   emptyDescription: "Archive a bot or hide a conversation from its row in the list: whatever you put away lands here.",
   loadFailed: "The archive could not be loaded.",
   retry: "Retry",
+  selectPage: "Select this page",
+  selectRow: "Select {name}",
+  selectedCount: "{count} of {total} selected",
+  selectAll: "Select all ({count})",
+  clearSelection: "Clear selection",
+  restoreSelected: "Restore ({count})",
+  showSelected: "Show ({count})",
+  deleteSelected: "Delete permanently ({count})",
+  purgeManyTitle: "Permanently delete {count} bots?",
+  restoredMany: "Restored: {count}.",
+  shownMany: "Shown: {count}.",
+  purgedMany: "Permanently deleted: {count}.",
+  bulkFailed: "Failed for {count}: {message}",
+  actionFailed: "The action failed.",
+  paginationLabel: "Pages of “{title}”",
+  paginationRange: "{from} to {to} of {total}",
+  paginationPrevious: "Previous page",
+  paginationNext: "Next page",
+  paginationPage: "Page {page}",
 } as const;

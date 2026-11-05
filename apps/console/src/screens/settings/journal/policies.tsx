@@ -80,15 +80,15 @@ export function PoliciesSettings() {
         <InsetGroupedSection caption={t("legal.navigationLabel")}>
           <InsetGroupedRow
             label={t("legal.mentions")}
-            onClick={() => void navigate({ to: "/legal/$slug", params: { slug: "mentions" } })}
+            onClick={() => openLegalPage("mentions")}
           />
           <InsetGroupedRow
             label={t("legal.privacy")}
-            onClick={() => void navigate({ to: "/legal/$slug", params: { slug: "privacy" } })}
+            onClick={() => openLegalPage("privacy")}
           />
           <InsetGroupedRow
             label={t("legal.terms")}
-            onClick={() => void navigate({ to: "/legal/$slug", params: { slug: "terms" } })}
+            onClick={() => openLegalPage("terms")}
           />
         </InsetGroupedSection>
       </SettingsPane>
@@ -148,16 +148,38 @@ export function PoliciesSettings() {
       <FleetA2APolicySettings />
 
       <nav aria-label={t("legal.navigationLabel")} className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
-        <Link to="/legal/$slug" params={{ slug: "mentions" }} className="underline underline-offset-4 hover:text-foreground">
-          {t("legal.mentions")}
-        </Link>
-        <Link to="/legal/$slug" params={{ slug: "privacy" }} className="underline underline-offset-4 hover:text-foreground">
-          {t("legal.privacy")}
-        </Link>
-        <Link to="/legal/$slug" params={{ slug: "terms" }} className="underline underline-offset-4 hover:text-foreground">
-          {t("legal.terms")}
-        </Link>
+        {LEGAL_SLUGS.map((slug) => (
+          <a
+            key={slug}
+            href={legalPageUrl(slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            {t(`legal.${slug}`)}
+          </a>
+        ))}
       </nav>
     </SettingsPane>
   );
+}
+
+const LEGAL_SLUGS = ["mentions", "privacy", "terms"] as const;
+type LegalSlug = (typeof LEGAL_SLUGS)[number];
+
+/**
+ * Les textes légaux s'ouvrent sur le web, dans le navigateur, et non dans
+ * l'application : une page publique (`/legal/<slug>`, celle vers laquelle
+ * pointe aussi le pied de page du site) qu'on lit, garde ou partage hors de la
+ * session. Dans l'app de bureau, un nouvel onglet part dans le navigateur du
+ * système (`setWindowOpenHandler`, apps/desktop/src/main/window.ts).
+ */
+function legalPageUrl(slug: LegalSlug): string {
+  // Relatif à l'origine de la console : le navigateur le résout, et l'app de
+  // bureau reçoit l'adresse absolue dans `setWindowOpenHandler`.
+  return `/legal/${slug}`;
+}
+
+function openLegalPage(slug: LegalSlug): void {
+  window.open(legalPageUrl(slug), "_blank", "noopener,noreferrer");
 }

@@ -67,7 +67,6 @@ export function consolePolicy(html: string, apiOrigin = ""): string {
     // `attachment-canvas.tsx`). Aucune autre origine ne s'encadre ici.
     ["frame-src", ["'self'"]],
     ["worker-src", ["'self'"]],
-    ["manifest-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
     ["form-action", ["'self'"]],

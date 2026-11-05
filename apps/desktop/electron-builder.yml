@@ -36,7 +36,7 @@ win:
       arch:
         - x64
   artifactName: ${productName}-${version}-win-${arch}.${ext}
-  # Derived from the official brand/bloub-batman.png; electron-builder derives the .ico.
+  # The bloub (apps/console/public/brand/openedbot-bloub.svg) on a white tile; electron-builder derives the .ico.
   # With signAndEditExecutable off, openedbot.exe itself keeps the Electron icon in
   # Explorer: only the installer uses this one. The running window and taskbar
   # get it from BrowserWindow `icon` (src/main/window.ts).
@@ -100,7 +100,7 @@ linux:
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   executableName: openedbot
   # The hicolor sizes, so every launcher and dock picks a sharp one
-  # (derived from src/renderer/icon.png: `sips -z N N`).
+  # (rendered from apps/console/public/brand/openedbot-bloub.svg, like icon.png).
   icon: build/icons
   # Electron reports desktopName (package.json) as the window's app_id / WM_CLASS.
   # The .desktop entry must carry that same name, or GNOME (Wayland above all)

@@ -19,8 +19,8 @@ html {
   font-size: 14px;
 }
 
-/* Match the console's ice-blue mascot on dark surfaces. The landing page
-   stays light and uses the unfiltered navy master. */
+/* Match the console's inverted bloub on dark surfaces. The landing page
+   stays light and uses the unfiltered black master. */
 :root[data-theme='dark'] .site-title img {
   filter: invert(1) hue-rotate(180deg);
 }

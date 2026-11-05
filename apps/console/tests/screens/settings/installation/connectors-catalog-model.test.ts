@@ -15,27 +15,33 @@ import { MCP_CONNECTOR_MARKS } from "../../../../src/components/mcp-connector-ma
 import { connectorInitial } from "../../../../src/components/mcp-connector-row";
 
 const describeEntry = (entry: { id: string }) => `desc-${entry.id}`;
+/** Une entrée hors « À la une », pour éprouver les sections par catégorie. */
+const offFeatured = { ...MCP_CONNECTOR_CATALOG[0]!, id: "acme", name: "Acme", category: "dev" as const };
+const withCategory = [...MCP_CONNECTOR_CATALOG, offFeatured];
 
 describe("les sections du catalogue", () => {
   test("à la une puis par catégorie, chaque entrée une seule fois", () => {
-    const sections = catalogSections(MCP_CONNECTOR_CATALOG, describeEntry, "");
-    expect(sections.map((section) => section.key)).toEqual(["featured", "docs", "dev", "payments", "crm", "web"]);
+    // Tout le catalogue d'openedbot est à la une : aucune section de catégorie.
+    expect(catalogSections(MCP_CONNECTOR_CATALOG, describeEntry, "").map((section) => section.key)).toEqual(["featured"]);
+    const sections = catalogSections(withCategory, describeEntry, "");
+    expect(sections.map((section) => section.key)).toEqual(["featured", "dev"]);
     expect(sections[0]!.entries.map((entry) => entry.id)).toEqual([...FEATURED_CONNECTOR_IDS]);
     const ids = sections.flatMap((section) => section.entries.map((entry) => entry.id));
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBe(MCP_CONNECTOR_CATALOG.length);
+    expect(ids.length).toBe(withCategory.length);
   });
 
   test("la recherche porte sur le nom et la description, et retire les sections vides", () => {
-    expect(catalogSections(MCP_CONNECTOR_CATALOG, describeEntry, "  NET ").flatMap((s) => s.entries.map((e) => e.id))).toEqual(["netlify"]);
-    expect(catalogSections(MCP_CONNECTOR_CATALOG, describeEntry, "desc-paypal").map((s) => s.key)).toEqual(["payments"]);
-    expect(catalogSections(MCP_CONNECTOR_CATALOG, describeEntry, "zzz")).toEqual([]);
+    expect(catalogSections(withCategory, describeEntry, "  CLOUD ").flatMap((s) => s.entries.map((e) => e.id))).toEqual(["cloudflare"]);
+    expect(catalogSections(withCategory, describeEntry, "desc-acme").map((s) => s.key)).toEqual(["dev"]);
+    expect(catalogSections(withCategory, describeEntry, "zzz")).toEqual([]);
   });
 
-  test("chaque entrée du catalogue a sa phrase, et une marque sauf Attio", () => {
+  test("chaque entrée du catalogue a sa phrase et sa marque", () => {
+    expect(MCP_CONNECTOR_CATALOG.map((entry) => entry.id)).toEqual(["notion", "linear", "cloudflare"]);
     for (const entry of MCP_CONNECTOR_CATALOG) {
       expect(connectorDescriptionKey(entry.id)).not.toBeNull();
-      if (entry.id !== "attio") expect(MCP_CONNECTOR_MARKS[entry.id]?.path.length ?? 0).toBeGreaterThan(10);
+      expect(MCP_CONNECTOR_MARKS[entry.id]?.path.length ?? 0).toBeGreaterThan(10);
     }
   });
 });
@@ -95,18 +101,17 @@ describe("« Connectés » : les connexions par bot", () => {
   test("une entrée par connecteur, ses bots par nom, et le jeton de la racine", () => {
     const connections = catalogConnections({
       catalog: MCP_CONNECTOR_CATALOG,
-      profiles: [profile("rech", "b-rech", ["linear"]), profile("dev", "b-dev", ["linear", "notion"]), profile("orphan", null, ["sentry"])],
+      profiles: [profile("rech", "b-rech", ["linear"]), profile("dev", "b-dev", ["linear", "notion"]), profile("orphan", null, ["cloudflare"])],
       bots,
-      rootServers: [root("linear", "https://mcp.linear.app/mcp", false), root("supabase", "https://mcp.supabase.com/mcp", true)],
+      rootServers: [root("linear", "https://mcp.linear.app/mcp", false), root("cloudflare", "https://mcp.cloudflare.com/mcp", true)],
     });
-    expect(connections.map((connection) => connection.entry.id)).toEqual(["notion", "linear", "supabase"]);
+    expect(connections.map((connection) => connection.entry.id)).toEqual(["notion", "linear", "cloudflare"]);
     const linear = connections.find((connection) => connection.entry.id === "linear")!;
     expect(linear.bots.map((link) => link.name)).toEqual(["Dev", "Recherche"]);
     expect(linear.rootToken).toBe(false);
     expect(connections.find((connection) => connection.entry.id === "notion")!.bots[0]!.enabled).toBe(false);
     // Le jeton seul à la racine compte ; un profil sans bot ne se déconnecte pas d'ici.
-    expect(connections.find((connection) => connection.entry.id === "supabase")).toMatchObject({ bots: [], rootToken: true });
-    expect(connections.some((connection) => connection.entry.id === "sentry")).toBe(false);
+    expect(connections.find((connection) => connection.entry.id === "cloudflare")).toMatchObject({ bots: [], rootToken: true });
   });
 
   test("un serveur de la racine sans jeton, ou vers une autre adresse, n'est pas une connexion", () => {
@@ -119,10 +124,10 @@ describe("« Connectés » : les connexions par bot", () => {
   });
 
   test("une entrée connectée ne revient ni à la une ni dans sa catégorie", () => {
-    const ids = catalogSections(MCP_CONNECTOR_CATALOG, () => "", "", new Set(["linear", "todoist"]))
+    const ids = catalogSections(MCP_CONNECTOR_CATALOG, () => "", "", new Set(["linear", "cloudflare"]))
       .flatMap((section) => section.entries.map((entry) => entry.id));
     expect(ids).not.toContain("linear");
-    expect(ids).not.toContain("todoist");
+    expect(ids).not.toContain("cloudflare");
     expect(ids).toContain("notion");
   });
 

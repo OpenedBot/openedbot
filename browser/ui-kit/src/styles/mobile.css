@@ -735,14 +735,6 @@ html[data-ohb-vt="pop"]::view-transition-new(root) {
 }
 
 /*
-  L'installation ne s'invite plus par-dessus l'écran. Le bandeau flottant
-  recouvrait le haut de chaque liste et le composer ; sur téléphone, la
-  proposition vit maintenant dans le panneau, au-dessus de la ligne de
-  l'opérateur (`pwa-install-row.tsx`), et la marche à suivre complète reste
-  dans Réglages › Application.
-*/
-
-/*
   Liste d'état (`StatusList` / `StatusGrid`) dans une carte de réglages.
 
   Le filet iOS part du texte, pas du bord : 16 px à gauche, jusqu'au bord

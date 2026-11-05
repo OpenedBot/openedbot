@@ -152,7 +152,11 @@ const CLOSE_MS = 200;
  */
 const CANVAS_CARD = "overflow-hidden rounded-3xl border border-border-button-white bg-background-secondary-default shadow-sm";
 const CANVAS_GUTTER = "bg-background";
-const ATTACHMENT_CANVAS_WIDTH = "w-[min(42rem,38vw)] min-w-80";
+// Le plancher de 20rem vit DANS la largeur, jamais en `min-w-*` : posé sur le
+// conteneur animé, un `min-width` l'emporte sur la largeur de départ (0) et
+// la transition sautait d'un coup à 320 px, fil décalé de 160 px en une
+// frame, avant de glisser sur le reste.
+const ATTACHMENT_CANVAS_WIDTH = "w-[max(20rem,min(42rem,38vw))]";
 
 /**
  * Le panneau lui-même : à côté du fil, jamais par-dessus.

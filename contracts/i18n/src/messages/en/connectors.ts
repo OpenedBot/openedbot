@@ -218,9 +218,6 @@ export const mcpCatalog = {
   reconnect: "Reconnect",
   categoryDocs: "Docs and tasks",
   categoryDev: "Development",
-  categoryPayments: "Payments",
-  categoryCrm: "CRM and scheduling",
-  categoryWeb: "Web",
   noteWorkspaceAdmin: "Depending on your plan, the workspace admin may need to allow it.",
   unavailableProfile: "This bot has no Hermes profile: create it to connect an MCP server to it.",
   unavailableHost: "This runtime’s host cannot yet authorize an MCP server for a single bot. Update edge-setup on the host so it announces mcp_oauth_profile.",
@@ -229,16 +226,7 @@ export const mcpCatalog = {
   connectedRestart: "Connected. The server will be available to this bot once the gateway restarts.",
   descriptionNotion: "Pages, databases and search across your Notion workspace.",
   descriptionLinear: "Linear issues, projects and cycles.",
-  descriptionTodoist: "Todoist tasks, projects and due dates.",
-  descriptionGitlab: "GitLab projects, issues and merge requests.",
-  descriptionSentry: "Sentry errors, issues and traces.",
   descriptionCloudflare: "Cloudflare Workers, DNS and documentation.",
-  descriptionSupabase: "Supabase databases, tables and projects.",
-  descriptionNetlify: "Netlify sites, deploys and forms.",
-  descriptionPaypal: "PayPal payments, invoices and disputes.",
-  descriptionAttio: "Contacts, companies and lists in the Attio CRM.",
-  descriptionCalendly: "Calendly event types and bookings.",
-  descriptionWebflow: "Webflow sites, pages and collections.",
 } as const;
 
 export const connectorsPage = {

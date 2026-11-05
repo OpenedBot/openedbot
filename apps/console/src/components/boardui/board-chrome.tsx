@@ -87,6 +87,16 @@ export const COLLAPSE_MOTION = "duration-300 ease-in-out motion-reduce:transitio
 /** Le repli de la barre latérale, aux deux endroits où il vit. */
 type SidebarControl = { id: string; collapsed: boolean; onToggle: () => void };
 
+/**
+ * Le bloub juste après les feux de macOS, avant le repli de la barre : les
+ * feux recouvrent le logo du rail, il se montre ici à la place
+ * (`native-titlebar.css`). Masqué partout ailleurs ; décoratif, la rangée
+ * reste une poignée de la fenêtre.
+ */
+export function TitlebarLogo() {
+  return <img data-titlebar-logo="" src="/brand/ohb-icon.webp" alt="" aria-hidden className="size-[22px] shrink-0 object-contain" />;
+}
+
 export function SidebarToggle({ className, control }: { className?: string; control?: SidebarControl }) {
   const { t } = useT();
   const personalCollapsed = useBoardChrome((state) => state.collapsed);
@@ -246,6 +256,7 @@ export function BoardTopBar({
     // `data-titlebar-drag` : poignée de la fenêtre dans la coque native macOS.
     <div data-board-topbar="" data-titlebar-drag="" className={cn("relative flex h-[46px] shrink-0 items-center gap-1 ps-3 pe-3", className)}>
       <div aria-hidden data-titlebar-lights="" />
+      <TitlebarLogo />
       {/* Barre ouverte (bureau) : l'organisation, à sa largeur, puis le repli
           et la navigation juste après elle, sans le vide qui les calait sur
           le bord de la carte principale. Au repli, elle sort par la même

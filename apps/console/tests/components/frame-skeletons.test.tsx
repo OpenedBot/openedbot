@@ -53,8 +53,9 @@ describe("silhouettes du cadre", () => {
     expect(document.querySelector("[data-titlebar-drag] [data-titlebar-lights]")).toBeTruthy();
   });
 
-  // Le bas du rail est celui du vrai `BoardIconRail` : runtime, thème, langue,
-  // Réglages, déconnexion ; plus d'avatar ni de Support d'office.
+  // Le bas du rail est celui du vrai `BoardIconRail` : les trois quotas LLM
+  // en chargement, le runtime, Réglages ; plus d'avatar, de déconnexion ni de
+  // Support d'office.
   test("le rail porte les boutons du vrai rail, sans avatar", () => {
     setAccountLayout("c");
     document.documentElement.classList.add("dark");
@@ -63,7 +64,10 @@ describe("silhouettes du cadre", () => {
     // Ni thème ni langue : ils se règlent dans Réglages > Apparence.
     expect(rail.textContent).toBe("");
     expect(rail.querySelector(".tabler-icon-server-bolt")).toBeTruthy();
-    expect(rail.querySelectorAll("svg")).toHaveLength(5);
+    const quotas = rail.querySelector('[data-rail-llm-quotas="loading"]')!;
+    expect(quotas.children).toHaveLength(3);
+    // Salon, À traiter, runtime, Réglages : rien d'autre hors des quotas.
+    expect([...rail.querySelectorAll("svg")].filter((icon) => !quotas.contains(icon))).toHaveLength(4);
     expect(rail.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
 

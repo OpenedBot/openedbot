@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -99,6 +99,23 @@ describe("PoliciesSettings: bureau", () => {
       "/settings/security",
     );
     expect(document.body.textContent ?? "").not.toContain("Cette page décrit les invariants appliqués");
+  });
+
+  // Les textes légaux sont des pages web publiques : ils s'ouvrent dans le
+  // navigateur (un nouvel onglet, que l'app de bureau confie au système).
+  test("les textes légaux s'ouvrent sur le web, hors de l'application", async () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    renderPolicies();
+    const legal = await screen.findByRole("navigation", { name: "Documents légaux" });
+    const links = within(legal).getAllByRole("link");
+    expect(links.map((link) => [link.textContent, link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")])).toEqual(
+      (["mentions", "privacy", "terms"] as const).map((slug, index) => [
+        ["Mentions légales", "Politique de confidentialité", "Conditions d’utilisation"][index]!,
+        `/legal/${slug}`,
+        "_blank",
+        "noopener noreferrer",
+      ]),
+    );
   });
 });
 

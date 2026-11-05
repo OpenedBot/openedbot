@@ -266,14 +266,11 @@ describe("connecteurs : bureau, catalogue en lignes", () => {
     // À la une d'abord, dans l'ordre choisi ; une entrée n'apparaît qu'une fois.
     const featured = screen.getByRole("region", { name: "À la une" });
     expect(within(featured).getAllByRole("button", { name: /^Ajouter .* à un bot$/ }).map((button) => button.getAttribute("aria-label")))
-      .toEqual(["Notion", "Linear", "GitLab", "Sentry", "Cloudflare", "Supabase"].map((name) => `Ajouter ${name} à un bot`));
-    const dev = screen.getByRole("region", { name: "Développement" });
-    expect(within(dev).getByText("Netlify")).toBeTruthy();
-    expect(within(dev).queryByText("GitLab")).toBeNull();
+      .toEqual(["Notion", "Linear", "Cloudflare"].map((name) => `Ajouter ${name} à un bot`));
+    // Tout le catalogue est à la une : pas de section de catégorie vide.
+    expect(screen.queryByRole("region", { name: "Développement" })).toBeNull();
     expect(screen.getByText("Pages, bases et recherche dans l’espace Notion.")).toBeTruthy();
-    // Une marque connue se peint ; Attio, absente de simple-icons, prend son initiale.
     expect(document.querySelector("[data-connector-logo='notion'] svg path")).toBeTruthy();
-    expect(document.querySelector("[data-connector-logo='letter']")?.textContent).toBe("A");
 
     // Le détail des toolsets et des skills reste dans sa rubrique.
     expect(screen.queryByText("GitHub")).toBeNull();
@@ -309,15 +306,12 @@ describe("connecteurs : bureau, catalogue en lignes", () => {
   test("la recherche filtre les lignes de toutes les sections, et dit quand rien ne reste", async () => {
     renderConnectors();
     const search = await screen.findByRole("searchbox", { name: "Rechercher dans cette rubrique" });
-    fireEvent.change(search, { target: { value: "merge requests" } });
-    expect(screen.getByText("GitLab")).toBeTruthy();
+    fireEvent.change(search, { target: { value: "  DNS " } });
+    expect(screen.getByText("Cloudflare")).toBeTruthy();
     expect(screen.queryByText("Notion")).toBeNull();
     // Une section que la recherche vide disparaît, pas seulement son contenu.
-    expect(screen.queryByRole("region", { name: "Développement" })).toBeNull();
-    fireEvent.change(search, { target: { value: "  CALEND " } });
-    expect(screen.getByText("Calendly")).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "À la une" })).toBeNull();
     fireEvent.change(search, { target: { value: "zzz" } });
+    expect(screen.queryByRole("region", { name: "À la une" })).toBeNull();
     expect(screen.getByText("Aucun résultat pour « zzz »."));
   });
 

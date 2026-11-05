@@ -97,3 +97,18 @@ test("dragging the handle follows the pointer without the width animation, then 
   expect(aside.className.split(" ")).not.toContain("transition-none");
   expect(window.localStorage.getItem(KEY)).toBe("500");
 });
+
+test("the animated container carries no min-width, so opening glides from 0 instead of snapping to 320 px", () => {
+  const aside = renderCanvas();
+  const classes = aside.className.split(" ");
+  // A `min-w-*` here would beat the transition's starting width (0) on the
+  // first frame: the floor belongs inside the width expression.
+  expect(classes.filter((name) => name.startsWith("min-w-"))).toEqual([]);
+  expect(classes).toContain("transition-[width,opacity]");
+  expect(classes).toContain("w-[max(20rem,min(42rem,38vw))]");
+  // Closed, it is back at 0 without a floor either.
+  fireEvent.keyDown(document, { key: "Escape" });
+  const closed = aside.className.split(" ");
+  expect(closed).toContain("w-0");
+  expect(closed.filter((name) => name.startsWith("min-w-"))).toEqual([]);
+});

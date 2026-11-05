@@ -16,32 +16,20 @@ import type { MessageKey } from "../../../../lib/i18n";
  */
 
 /** « À la une », dans cet ordre. Les autres entrées vivent dans leur catégorie. */
-export const FEATURED_CONNECTOR_IDS: readonly string[] = ["notion", "linear", "gitlab", "sentry", "cloudflare", "supabase"];
+export const FEATURED_CONNECTOR_IDS: readonly string[] = ["notion", "linear", "cloudflare"];
 
-export const CATEGORY_ORDER: readonly McpConnectorCategory[] = ["docs", "dev", "payments", "crm", "web"];
+export const CATEGORY_ORDER: readonly McpConnectorCategory[] = ["docs", "dev"];
 
 export const CATEGORY_LABEL: Record<McpConnectorCategory, MessageKey> = {
   docs: "mcpCatalog.categoryDocs",
   dev: "mcpCatalog.categoryDev",
-  payments: "mcpCatalog.categoryPayments",
-  crm: "mcpCatalog.categoryCrm",
-  web: "mcpCatalog.categoryWeb",
 };
 
 /** La phrase d'une entrée du catalogue. Une entrée sans phrase n'en affiche pas. */
 const DESCRIPTION: Record<string, MessageKey> = {
   notion: "mcpCatalog.descriptionNotion",
   linear: "mcpCatalog.descriptionLinear",
-  todoist: "mcpCatalog.descriptionTodoist",
-  gitlab: "mcpCatalog.descriptionGitlab",
-  sentry: "mcpCatalog.descriptionSentry",
   cloudflare: "mcpCatalog.descriptionCloudflare",
-  supabase: "mcpCatalog.descriptionSupabase",
-  netlify: "mcpCatalog.descriptionNetlify",
-  paypal: "mcpCatalog.descriptionPaypal",
-  attio: "mcpCatalog.descriptionAttio",
-  calendly: "mcpCatalog.descriptionCalendly",
-  webflow: "mcpCatalog.descriptionWebflow",
 };
 
 export function connectorDescriptionKey(id: string): MessageKey | null {
