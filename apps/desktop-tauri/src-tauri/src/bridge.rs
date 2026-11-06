@@ -13,9 +13,12 @@ use std::sync::Arc;
 use tauri::State;
 use url::Url;
 
-use crate::auth::{AuthService, HttpAuthApi, Persistence, SigninState};
+use crate::auth::{AuthService, AuthorizeTargets, GoogleSteps, GoogleTiming, HttpAuthApi, Persistence, SigninState};
 use crate::config::ShellConfig;
+use crate::diagnostics::{Level, Source};
+use crate::update_state::{UpdateState, UpdateStatus};
 use crate::vault::Vault;
+use crate::window::ThemeMode;
 
 /// Bumped on any breaking change of the commands below; the console reads it
 /// from `window.__OPENEDBOT_SHELL__.bridgeVersion`.
@@ -47,6 +50,48 @@ pub struct Shell {
     pub config: ShellConfig,
     pub version: String,
     pub opener: Opener,
+    /// The browser and the loopback listener of a Google attempt.
+    pub google: Arc<dyn GoogleSteps>,
+    pub client_id: String,
+    /// The main window, for the commands that move or paint it.
+    pub window: Box<dyn WindowControl>,
+}
+
+/// What the page may ask of its window (`window.rs` in the app, a recorder in tests).
+pub trait WindowControl: Send + Sync {
+    fn set_theme(&self, mode: ThemeMode);
+    fn set_text_zoom(&self, factor: f64);
+    fn start_drag(&self);
+    fn toggle_maximize(&self);
+}
+
+/// The operating system the shell runs on (`window.__OPENEDBOT_SHELL__.platform`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Platform {
+    Macos,
+    Windows,
+    Linux,
+}
+
+impl Platform {
+    pub fn current() -> Self {
+        if cfg!(target_os = "windows") {
+            Self::Windows
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
+        } else {
+            Self::Macos
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Macos => "macos",
+            Self::Windows => "windows",
+            Self::Linux => "linux",
+        }
+    }
 }
 
 /// A named failure the console can tell apart (never a token, never a body).
@@ -72,7 +117,7 @@ impl From<crate::auth::ApiError> for BridgeError {
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ShellInfo {
-    pub platform: String,
+    pub platform: Platform,
     pub version: String,
     pub bridge_version: u32,
     pub persistence: Persistence,
@@ -81,6 +126,13 @@ pub struct ShellInfo {
 /// Pushed to the console's `/login` on every sign-in state change.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct SigninStateChanged(pub SigninState);
+
+/// A click on a notification the page showed, by the id the page gave it:
+/// the page runs that notification's `onclick` (open the conversation).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct NotificationClicked {
+    pub id: i32,
+}
 
 /// The current access token, refreshed when it is about to expire; `null` signed out.
 #[tauri::command]
@@ -96,8 +148,9 @@ pub async fn refresh(shell: State<'_, Shell>) -> Result<Option<String>, BridgeEr
     Ok(shell.auth.refresh().await?)
 }
 
-/// Opens an https page of the public console or of the API in the system
-/// browser (http only for an origin configured as a lab host).
+/// Opens an https page of the public console or of the API, or the site's
+/// download page, in the system browser (http only for an origin configured
+/// as a lab host).
 #[tauri::command]
 #[specta::specta]
 pub fn open_external(shell: State<'_, Shell>, url: String) -> Result<(), BridgeError> {
@@ -116,11 +169,17 @@ pub fn trusted_external_url(config: &ShellConfig, raw: &str) -> Result<Url, Brid
     }
     // Config validation already restricts an http origin to a lab host.
     let origin = url.origin().ascii_serialization();
-    if origin != config.public_console_url && origin != config.api_origin {
+    let download_page = origin == SITE_ORIGIN && DOWNLOAD_PATHS.contains(&url.path()) && url.query().is_none();
+    if origin != config.public_console_url && origin != config.api_origin && !download_page {
         return Err(refused());
     }
     Ok(url)
 }
+
+/// The site's download pages, which the "update required" screen opens
+/// (`apps/console/src/lib/platform/client-update.ts`).
+const SITE_ORIGIN: &str = "https://openedbot.app";
+const DOWNLOAD_PATHS: [&str; 2] = ["/download", "/fr/download"];
 
 /// Revokes the session and forgets it; the shell then shows `/login`.
 #[tauri::command]
@@ -150,11 +209,17 @@ pub fn verify_email_code(shell: State<'_, Shell>, email: String, code: String) -
     Ok(())
 }
 
-/// Google sign-in is not part of the D2a prototype (D2b).
+/// Starts a Google sign-in in the system browser; progress and outcome
+/// arrive as `SigninStateChanged`, success replaces the page.
 #[tauri::command]
 #[specta::specta]
-pub fn start_google() -> Result<(), BridgeError> {
-    Err(BridgeError::new("NOT_SUPPORTED", "Google sign-in is not available in this preview."))
+pub fn start_google(shell: State<'_, Shell>) -> Result<(), BridgeError> {
+    let auth = shell.auth.clone();
+    let google = shell.google.clone();
+    let targets = AuthorizeTargets { api_origin: shell.config.api_origin.clone(), console_origin: shell.config.public_console_url.clone() };
+    let client_id = shell.client_id.clone();
+    tauri::async_runtime::spawn(async move { auth.sign_in_with_google(google.as_ref(), &targets, &client_id, GoogleTiming::default()).await });
+    Ok(())
 }
 
 #[tauri::command]
@@ -174,11 +239,100 @@ pub fn signin_state(shell: State<'_, Shell>) -> SigninState {
 #[specta::specta]
 pub fn shell_info(shell: State<'_, Shell>) -> ShellInfo {
     ShellInfo {
-        platform: std::env::consts::OS.to_string(),
+        platform: Platform::current(),
         version: shell.version.clone(),
         bridge_version: BRIDGE_VERSION,
         persistence: shell.auth.persistence(),
     }
+}
+
+/// The console's theme (`<html data-theme-mode>`): the window's appearance follows.
+#[tauri::command]
+#[specta::specta]
+pub fn set_theme(shell: State<'_, Shell>, mode: ThemeMode) {
+    shell.window.set_theme(mode);
+}
+
+/// The console's text size as a page zoom (10 to 14 px over 14): the shell
+/// zooms the window and keeps the factor for the next launch.
+#[tauri::command]
+#[specta::specta]
+pub fn set_text_zoom(shell: State<'_, Shell>, factor: f64) -> Result<(), BridgeError> {
+    if !crate::prefs::is_text_zoom(factor) {
+        return Err(BridgeError::new("INVALID_ZOOM", "Unknown text zoom."));
+    }
+    shell.window.set_text_zoom(factor);
+    Ok(())
+}
+
+/// A press on the console's top bar: the window follows the pointer (WKWebView
+/// has no `-webkit-app-region`).
+#[tauri::command]
+#[specta::specta]
+pub fn start_window_drag(shell: State<'_, Shell>) {
+    shell.window.start_drag();
+}
+
+/// A double click on the console's top bar: zoom or unzoom the window, as a title bar does.
+#[tauri::command]
+#[specta::specta]
+pub fn toggle_maximize(shell: State<'_, Shell>) {
+    shell.window.toggle_maximize();
+}
+
+/// Pushed on every change of the update state (progress included).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct UpdateStateChanged(pub UpdateState);
+
+/// Where the self-update stands now.
+#[tauri::command]
+#[specta::specta]
+pub fn update_state(status: State<'_, UpdateStatus>) -> UpdateState {
+    status.get()
+}
+
+/// Restarts into the installed update; `UPDATE_NOT_READY` unless one is `ready`.
+#[tauri::command]
+#[specta::specta]
+pub fn restart_to_update(status: State<'_, UpdateStatus>) -> Result<(), BridgeError> {
+    if status.restart() {
+        Ok(())
+    } else {
+        Err(BridgeError::new("UPDATE_NOT_READY", "No update is ready to apply."))
+    }
+}
+
+/// A version number as the API names it (`1.1.0`): digits and dots only.
+fn is_version(text: &str) -> bool {
+    let parts: Vec<&str> = text.split('.').collect();
+    (1..=3).contains(&parts.len()) && parts.iter().all(|part| (1..=4).contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+/// The API refused this version (426, `minimum` when it named one): the
+/// state becomes `required` and the feed is checked now.
+#[tauri::command]
+#[specta::specta]
+pub fn report_update_required(status: State<'_, UpdateStatus>, minimum: Option<String>) -> Result<(), BridgeError> {
+    if minimum.as_deref().is_some_and(|minimum| !is_version(minimum)) {
+        return Err(BridgeError::new("INVALID_VERSION", "Invalid version."));
+    }
+    status.required(minimum);
+    Ok(())
+}
+
+/// The longest text the page may hand to the journal (redacted and cut further there).
+const MAX_DIAGNOSTIC: usize = 4096;
+
+/// A page error, a failed API call or a failed load, for the shell's journal
+/// (`diagnostics.rs`). The page may not write as the shell itself.
+#[tauri::command]
+#[specta::specta]
+pub fn report_diagnostic(level: Level, source: Source, message: String, detail: Option<String>) -> Result<(), BridgeError> {
+    if !matches!(source, Source::Page | Source::Http | Source::Load) || message.len() > MAX_DIAGNOSTIC || detail.as_ref().is_some_and(|detail| detail.len() > MAX_DIAGNOSTIC) {
+        return Err(BridgeError::new("INVALID_DIAGNOSTIC", "Diagnostic refused."));
+    }
+    crate::diagnostics::record(level, source, &message, detail.as_deref());
+    Ok(())
 }
 
 /// The typed bridge: commands and events, shared by the app and the exporter.
@@ -195,8 +349,16 @@ pub fn specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             cancel_sign_in,
             signin_state,
             shell_info,
+            set_theme,
+            set_text_zoom,
+            start_window_drag,
+            toggle_maximize,
+            report_diagnostic,
+            update_state,
+            restart_to_update,
+            report_update_required,
         ])
-        .events(tauri_specta::collect_events![SigninStateChanged])
+        .events(tauri_specta::collect_events![SigninStateChanged, NotificationClicked, UpdateStateChanged])
 }
 
 /// The TypeScript bindings, with the repository's header.

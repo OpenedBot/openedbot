@@ -39,6 +39,11 @@ describe("nativeTitlebarFor", () => {
     expect(nativeTitlebarFor(bridge, { platform: "MacIntel", userAgent: MAC_UA })).toBe("mac");
   });
 
+  test("coque Tauri : sa plateforme suffit, quel que soit l'agent utilisateur", () => {
+    const tauri: OpenedbotNativeBridge = { ...bridge, shell: { platform: "macos", version: "1.1.0" } };
+    expect(nativeTitlebarFor(tauri, { platform: "", userAgent: "Mozilla/5.0 AppleWebKit/605.1.15" })).toBe("mac");
+  });
+
   test("lit l'UA quand `navigator.platform` est vide", () => {
     expect(nativeTitlebarFor(bridge, { platform: "", userAgent: MAC_UA })).toBe("mac");
   });

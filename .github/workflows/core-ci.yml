@@ -1,6 +1,7 @@
 # Contrôles du cœur TypeScript (apps, platform, contracts, modules, browser,
 # tests, scripts) : typecheck, tests unitaires, frontières et licences, puis
-# tests d'intégration contre un PostgreSQL jetable. Aucun plug-in pro
+# tests d'intégration contre un PostgreSQL jetable ; et le shell Rust de l'app
+# de bureau (cargo test, clippy) sur macOS. Aucun plug-in pro
 # (./plugins) en CI : le cœur tourne en solo, c'est attendu. Aucun secret,
 # aucun .env.local : les cibles make tournent sur leurs valeurs par défaut.
 # Actions épinglées par SHA ; Bun épinglé par packageManager (package.json).
@@ -119,12 +120,40 @@ jobs:
           psql -v ON_ERROR_STOP=1 -At "$INTEGRATION_ADMIN_DATABASE_URL" -c 'show server_version'
       - run: make test-integration
 
+  desktop-tauri:
+    # The Rust shell of the desktop app (ADR 0001, 4.8): cargo test (IPC
+    # refusals, single-flight refresh, keystore, popup host, Google door,
+    # diagnostics, bindings up to date) and clippy -D warnings. On macOS: the
+    # shell's macOS modules (menus, Dock menu, WebKit purge, objc2) only
+    # compile there, and the placeholder console of `build.rs` stands in for
+    # the console build. Toolchain from rustup (preinstalled on the runner).
+    name: Desktop shell (Rust)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
+          cargo --version && cargo clippy --version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/desktop-tauri/src-tauri/target
+          key: desktop-tauri-${{ runner.os }}-${{ hashFiles('apps/desktop-tauri/src-tauri/Cargo.lock') }}
+          restore-keys: desktop-tauri-${{ runner.os }}-
+      - run: make desktop-tauri-check
+
   ci-ok:
     # The single required check. It always runs and passes only when every
     # job succeeded: a failed, cancelled or skipped job fails it.
     name: core-ci ok
     if: always()
-    needs: [typecheck, unit, bundle, deps, integration]
+    needs: [typecheck, unit, bundle, deps, integration, desktop-tauri]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

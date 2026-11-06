@@ -1,5 +1,6 @@
 //! A small file logger: `~/Library/Logs/<bundle id>/preview.log`, one line per
-//! record, never a token (callers log kinds and codes only).
+//! record, never a token (callers log kinds and codes only). Warnings and
+//! errors are copied to the diagnostics journal (`diagnostics.rs`).
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -25,6 +26,15 @@ impl log::Log for FileLogger {
         let line = format!("{now} {} [{}] {}\n", record.level(), record.target(), record.args());
         if let Ok(mut file) = self.file.lock() {
             let _ = file.write_all(line.as_bytes());
+        }
+        // The shell's warnings and errors also go to the SQLite journal.
+        let level = match record.level() {
+            log::Level::Error => Some(crate::diagnostics::Level::Error),
+            log::Level::Warn => Some(crate::diagnostics::Level::Warn),
+            _ => None,
+        };
+        if let Some(level) = level {
+            crate::diagnostics::record(level, crate::diagnostics::Source::Main, &record.args().to_string(), Some(record.target()));
         }
         if cfg!(debug_assertions) {
             eprint!("{line}");

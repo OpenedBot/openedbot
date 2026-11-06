@@ -22,7 +22,12 @@ export type OpenedbotNativeBridge = {
   openExternal(url: string): Promise<void>;
   /** Efface les jetons côté coque et montre sa page de connexion. */
   signOut(): Promise<void>;
-  shell: { platform: "windows"; version: string };
+  /**
+   * `platform` : le système de la coque Tauri ; la coque Electron, dont le
+   * contrat est figé, dit toujours "windows" (`native-titlebar.ts` lit alors
+   * le système dans l'agent utilisateur).
+   */
+  shell: { platform: "windows" | "macos" | "linux"; version: string };
   /**
    * La connexion menée par la coque depuis l'écran `/login` de la console
    * (même écran que le navigateur). Absent d'une coque plus ancienne : la

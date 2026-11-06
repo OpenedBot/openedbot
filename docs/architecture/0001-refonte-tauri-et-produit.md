@@ -624,6 +624,88 @@ desktop-tauri-publish TAURI_VERSION=0.0.2` ; l'app installée lit
 - `cargo test` et `cargo clippy` en CI (aujourd'hui `make desktop-tauri-check` en local), crates
   pour Windows et Linux (`keyring` n'active que le Keychain).
 
+### 4.3.2 Parité D2b (2026-11-06)
+
+Branche `feat/d2b-macos-parity`. Le shell Tauri reprend le tableau de la section 4.3 sur macOS.
+L'identifiant reste `app.openedbot.desktop.preview`, la version commitée reste 0.0.1. Les builds
+de test sont numérotés 0.0.4 à 0.0.15, non publiés. Le code propre à macOS est derrière
+`#[cfg(target_os = "macos")]` ou dans `src/macos/` : menus, Dock, purge WKWebView, plantage
+de la WebView, `Reopen`.
+
+Le parcours de bout en bout a tourné sur l'app **signée Developer ID, notarisée et agrafée**,
+installée dans `/Applications` (`spctl` : `accepted, source=Notarized Developer ID`). Elle
+utilisait l'API locale de la branche (:8792), derrière une sonde Google locale (:8793), et le
+runtime de la VM 240. Les captures sont gardées hors du dépôt.
+
+| Responsabilité (4.3) | État | Preuve |
+|---|---|---|
+| Code e-mail | Fait | App signée : code reçu par Mailpit, connexion, console complète `/`. La session du pont est posée par la console complète, plus seulement par `/compact` |
+| Google (navigateur + claim) | Fait, même parcours qu'Electron | Navigateur système, puis retour par la boucle locale `127.0.0.1:47813`, sondage du claim (1,5 s, 5 min au plus, un 4xx est fatal), échange PKCE. Sur l'app signée, avec un claim simulé côté API locale : connecté 80 à 120 ms après le retour du navigateur. 8 tests Rust : accepté, refusé, URL d'autorisation inattendue, port occupé, délai, annulation, retour anticipé, contrôle des URL. **Non vérifié** : la vraie page de consentement Google, faute d'identifiants OAuth en local |
+| Refresh anticipé, mono-vol | Fait | Minuterie : rotation avant l'expiration ; après un échec, nouvel essai 30 s plus tard, jamais de boucle. Tests en temps suspendu |
+| Déconnexion | Fait | Révocation, puis effacement local même si l'API est injoignable (test). La console est déchargée sur `about:blank` et le magasin WKWebView est vidé avec attente de sa confirmation (`removeDataOfTypes`). Sur l'app signée : 0 fichier IndexedDB, 0 LocalStorage, aucun item Keychain. Le thème et la taille du texte de l'appareil sont reportés. Une purge qui échoue garde la console fermée (dialogue « Réessayer / Quitter »), et une purge interrompue est reprise au lancement suivant. Une seule purge à la fois |
+| Backend configurable, stockage isolé | Fait | Le coffre est rangé par origine d'API (D2a). Les données de la WebView d'un autre backend sont purgées avant que la console ne se charge (`dataOrigin`, journal « purged »). La navigation du popup attend la fin de la purge |
+| Deep link + repli boucle locale | Fait, repli seul actif | `tauri-plugin-deep-link`, et le repli testé quand le schéma n'est pas enregistré. La preview ne déclare **aucun** schéma, pour cohabiter avec Electron : seule la boucle locale sert |
+| Instance unique | Fait | App signée : un second lancement quitte aussitôt, et la première fenêtre passe au premier plan |
+| Dock | Fait | Menu : Affichage (Fenêtre / Popup / Fenêtre et popup, « popup introuvable » si absente), Toujours au premier plan, Se déconnecter. Lu sur l'app signée ; « Se déconnecter » et « Toujours au premier plan » joués. Le mode Popup seul masque l'icône du Dock tant que la fenêtre est cachée : non éprouvé à l'écran |
+| Raccourci global `Cmd+Shift+O` | Fait | App signée : fenêtre cachée, puis réaffichée au premier plan. Un raccourci déjà pris est journalisé, sans effet sur le démarrage |
+| Fenêtre | Fait, sauf les feux | Fermer = cacher : vérifié, l'app et le notch continuent. Réouverture par le Dock (`Reopen`). Barre de titre en surimpression, feux à (16, 16). Position mémorisée : sur l'app signée, la fenêtre a été déplacée à (240, 110, 1150 × 740), l'app quittée par son menu, et la fenêtre est revenue au même endroit au lancement suivant. Une fenêtre sur un écran débranché est ramenée sur un écran branché (5 tests). « Toujours au premier plan » se règle dans le menu du Dock : coché, la fenêtre reste au-dessus des autres apps, et le choix est retenu |
+| Navigation verrouillée, ouverture externe | Fait | Seule l'origine locale est chargée. Un lien web part dans le navigateur, le reste est refusé. Liste blanche d'ouverture : l'API, la console publique, et `openedbot.app/download`. Tests Rust |
+| Notifications | Fait | Polyfill de `tauri-plugin-notification` (trois permissions). Le clic revient par l'événement typé `NotificationClicked` et lance l'`onclick` de la page, donc ouvre la conversation. Test TS. **Non éprouvé à l'écran** : aucune notification de workflow dans le parcours |
+| Presse-papiers | Partiel | Menu Edit (Cmd+C / V / X / A dans les champs). `navigator.clipboard` sous `tauri://localhost` n'est pas éprouvé |
+| Menu contextuel | Menu natif | Menu de WKWebView. **Non vérifié** : la copie interdite sur un champ mot de passe |
+| Menus macOS | Fait | App, Edit, View (Actual Size = taille du texte, Zoom In / Out, plein écran), Window : lus sur l'app signée, Zoom Out appliqué |
+| Hôte du popup notch | Fait | App signée : popup lancé depuis `Contents/Helpers`, `ready`, puis jeton servi. Le notch affiche les bots et les notifications de la session. Tests : 5 redémarrages puis repli sur la fenêtre avec dialogue, fermeture par l'utilisateur, popup tenu à l'arrêt pendant l'installation d'une mise à jour, lancement réservé sous le verrou de l'arrêt |
+| Diagnostics SQLite masqués | Fait | `diagnostics.sqlite`, alimenté par les erreurs de page, la console, `fetch` vers l'API (≥ 400 ou réseau), les avertissements du shell et le plantage du processus WebKit (journalisé, puis rechargement). Masquage sans regex : bearer, JWT, longues suites, requêtes d'URL, e-mails. Limite de débit, rétention 14 jours, 20 000 lignes. Tests |
+| Thème et zoom à un endroit | Fait | La taille du texte de la console est le seul facteur (`set_zoom` du shell, retenu au lancement). Le shell publie le zoom en vigueur à la page à chaque changement, menu View compris, pour la place des feux. Thème : apparence de la fenêtre |
+| `shell.platform` | Fait | `"macos"` | `"windows"` | `"linux"` (contrat typé), `native-titlebar` reconnaît `macos` |
+| Mises à jour | Fait | Vérification 3 s après le lancement, puis toutes les 4 h (`OPENEDBOT_UPDATE_CHECK_SECONDS` pour les tests). Sur l'app signée, **en cours de session**, deux fois (0.0.10 → 0.0.11, 0.0.14 → 0.0.15) : téléchargement, signature vérifiée, popup arrêté (sortie attendue) puis tenu, bundle remplacé, feuille « Mise à jour installée » (Redémarrer / Plus tard). Après « Redémarrer » : la nouvelle version tourne, toujours notarisée, la session Keychain est relue et le popup relancé. « Plus tard » arrête les vérifications jusqu'au redémarrage : couvert par un test seulement, le bouton n'a pas été joué. Si l'app est translocalisée, un dialogue « Déplacez openedbot preview dans Applications » s'affiche et rien n'est tenté (test du chemin) |
+| État de mise à jour | Fait (contrat) | `UpdateState` : idle, available, downloading (octets reçus et total), ready, error (code : flux, téléchargement, signature refusée, popup non arrêté, installation, translocation), required. Côté pont : `update_state`, `restart_to_update` (seulement si `ready`), `report_update_required` (le 426 de l'API, version minimale validée : l'état passe à `required` et le flux est vérifié aussitôt), et l'événement `UpdateStateChanged`. Côté notch : un message `updateState` à chaque changement de statut, ajouté dans la v1 (un notch qui ne le connaît pas ignore la ligne). Les dialogues du shell restent provisoires : l'interface (pastille) est l'étape suivante. Tests Rust et IPC ; non éprouvé sur l'app signée |
+| CI | Fait | Job `desktop-tauri` (macOS) dans `core-ci.yml` : `make desktop-tauri-check` (cargo test, clippy `-D warnings`), requis par `ci-ok` |
+| Tests de refus IPC | Fait | Autre fenêtre, autre origine, commandes des plugins non accordées (fenêtre, deep link, dialog, raccourci, `register_listener`, fs). Capability exacte, diagnostic forgé refusé, zoom inconnu refusé, bindings à jour |
+
+**Constats.**
+- Les dialogues sans fenêtre parente passent par `CFUserNotificationDisplayAlert` (rfd), une
+  alerte système dans un autre processus. L'invite de redémarrage de l'app signée est apparue en
+  retard, hors de l'app, et n'était pas visible dans les captures. Tous les dialogues du shell
+  sont désormais des feuilles de la fenêtre principale, amenée au premier plan.
+- Quitter par le menu de l'app ne gardait pas la position de la fenêtre. Le shell retient
+  maintenant la dernière position à chaque déplacement et l'écrit à la sortie.
+- Une fois, après « Se déconnecter » depuis le Dock, la capture de la fenêtre inactive est restée
+  vide. La page de connexion était chargée, et s'est affichée dès que la fenêtre est passée au
+  premier plan. Une seconde tentative s'est affichée normalement.
+- `window.url()` de wry panique tant que la WebView n'a pas d'URL. Le shell n'interroge jamais
+  l'URL : l'origine locale est fixe par plateforme.
+- `clear_all_browsing_data` (wry) n'attend pas la fin de l'effacement. Sur macOS, la purge passe
+  par `WKWebsiteDataStore` avec son handler de complétion.
+- Le CLI Tauri lance `npm list` pour vérifier les versions des paquets `@tauri-apps/*` pendant
+  `tauri build`. Ce n'est pas un script du dépôt.
+
+**Écarts restants pour D3.**
+- Feux tricolores : la place réservée suit le zoom, mais les boutons ne sont pas déplacés selon
+  le zoom comme sous Electron.
+- Silhouette de démarrage : le script inline de `index.html` ne voit pas encore le pont.
+- Écran « mise à jour requise » (426) : pas de bouton de mise à jour par le pont, seulement le
+  lien de téléchargement.
+- Manifeste par canal et variante, hébergement du flux (Q2).
+- Menu contextuel : copie sur un champ mot de passe à vérifier, sinon menu maison.
+- `navigator.clipboard` et le clic sur une notification à éprouver sur l'app signée.
+- Google réel : un parcours avec de vrais identifiants OAuth sur un backend de test.
+- Schéma `openedbot://` à déclarer au moment où l'app remplace Electron (même identifiant).
+- Changer de backend efface aussi le thème et la taille du texte de l'appareil, qui ne sont
+  reportés qu'à la déconnexion.
+- Une configuration invalide arrête l'app sans dialogue (journal seulement).
+- Le raccourci global peut être déjà pris par l'app Electron : le second inscrit perd.
+- Linux et Windows : la purge n'a pas de confirmation (pause de 500 ms). La compilation Linux
+  n'a pas été vérifiée ici, elle l'est par D5.
+- Interface de mise à jour (pastille) branchée sur `UpdateState`. La console doit aussi
+  appeler `report_update_required` sur un 426.
+- Version de la bascule : 1.1.0 (dmg de D3).
+
+**Reproduire.** `make desktop-tauri-check`, `make desktop-tauri-mac TAURI_VERSION=X.Y.Z
+TAURI_POPUP=…/OpenedbotPopup.app`, `make desktop-tauri-feed`, `make desktop-tauri-publish
+TAURI_VERSION=X.Y.Z`. L'app lit `OPENEDBOT_UPDATE_CHECK_SECONDS` pour une vérification
+rapprochée.
+
 ### 4.4 Console : origine, plateforme, performance
 
 **Découpler la console de son origine** (bloquant pour l'embarquement, O) :
@@ -932,7 +1014,9 @@ Recommandations issues de la revue Codex ; celles marquées **(décision)** atte
 ## 9. Ce qui n'est pas vérifié
 
 WKWebView, la signature, la notarisation et la mise à jour sont vérifiés par le prototype D2a
-(section 4.3.1). Aucun test sur WebView2 ou WebKitGTK ni aucun test PostgreSQL concurrent n'a été
+(section 4.3.1), et la parité macOS par D2b (section 4.3.2). D2b n'a pas vérifié la vraie page
+Google, le menu contextuel sur un champ mot de passe, `navigator.clipboard`, ni le clic sur une
+notification à l'écran. Aucun test sur WebView2 ou WebKitGTK ni aucun test PostgreSQL concurrent n'a été
 fait. Les autres points marqués `I` restent à confirmer.
 
 ## 10. Historique de revue
@@ -1020,3 +1104,17 @@ fencing du worker ajoute l'échéance du bail au propriétaire et à la généra
 (arrêt du worker remis en `polling`), D6 (courrier clos sous garde : la double livraison est
 reproduite sur le code d'avant), D9 (abandon et relance règlent l'état externe). D5, D7, D8, D10,
 D11 restent ouverts (verrous de route, admission, données héritées). Aucune migration.
+
+**Parité macOS D2b (2026-11-06)** : résultats en section 4.3.2. Le tableau de la section 4.3 est
+couvert sur l'app signée et notarisée, à l'exception des points listés pour D3. L'état de mise à
+jour est exposé par le pont et au notch. Plusieurs passes de `codex review` ont été faites ; leurs
+findings P1/P2 ont été corrigés dans la branche :
+- purge non confirmée, purges concurrentes ;
+- écritures de préférences concurrentes ;
+- réinstallation après « Plus tard » ;
+- popup relancé pendant l'installation ;
+- espace des feux au zoom du menu ;
+- clic sur une notification ;
+- processus de popup qui se chevauchent ;
+- masquage d'une URL entre parenthèses ;
+- refresh lancé avant la fenêtre.

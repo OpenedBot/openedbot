@@ -1,48 +1,55 @@
-//! openedbot desktop, Tauri 2 prototype (ADR 0001, step D2a).
+//! openedbot desktop, Tauri 2 (ADR 0001, steps D2a then D2b: macOS parity).
 //!
 //! One window serves the console embedded in the app (`../console-dist`, the
-//! solo desktop build) from the local origin (`tauri://localhost` on macOS).
-//! The session lives here (`auth.rs`, bearer, Keychain); the console reaches
-//! it through the typed bridge (`bridge.rs`) only. The notch popup is hosted
-//! over its stdin/stdout protocol (`popup.rs`), and the app updates itself
-//! from a signed feed (`updater.rs`).
+//! solo desktop build) from the local origin (`tauri://localhost` on macOS,
+//! `window.rs`). The session lives here (`auth.rs`, bearer, Keychain); the
+//! console reaches it through the typed bridge (`bridge.rs`) only. The notch
+//! popup is hosted over its stdin/stdout protocol (`popup.rs`), the app
+//! updates itself from a signed feed (`updater.rs`), and `shell.rs` ties
+//! session, window, popup and menus together like the Electron `main.ts`.
 //!
-//! The prototype coexists with the Electron app: its own bundle identifier
+//! The preview coexists with the Electron app: its own bundle identifier
 //! (Keychain service), its own name, no `openedbot://` scheme.
 
 pub mod auth;
 pub mod bridge;
+pub mod callback;
 pub mod config;
 pub mod csp;
+pub mod diagnostics;
 mod logger;
+#[cfg(target_os = "macos")]
+mod macos;
 pub mod popup;
+pub mod prefs;
+pub mod shell;
+pub mod update_state;
 mod updater;
 pub mod vault;
+pub mod window;
 
-use std::borrow::Cow;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::webview::NewWindowResponse;
-use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
-use tauri_specta::Event;
+use std::time::Duration;
+use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
-use auth::{AuthApi, AuthEvents, AuthService, HttpAuthApi, SignedOutReason, SigninState};
-use bridge::{Auth, Shell, SigninStateChanged};
-use config::ShellConfig;
-use popup::{GiveUp, HostToPopup, PopupEvents, PopupHost, TokenSource};
+use auth::{AuthApi, AuthEvents, AuthService, HttpAuthApi};
+use bridge::{Auth, Shell};
+use callback::Loopback;
+use popup::{PopupHost, TokenSource};
+use prefs::{DisplayMode, PreferenceStore};
+use shell::{PopupHandle, ShellEvents, ShellGoogle, ShellPopupEvents};
 use vault::{KeychainVault, Vault, VaultError};
+use window::WindowState;
 
 pub const BUNDLE_ID: &str = "app.openedbot.desktop.preview";
 /// The OAuth client id the API records for this build.
 pub const CLIENT_ID: &str = "openedbot-desktop-macos-preview";
-/// A redirect URI the API allows (`nativeRedirectUris`, `platform/config/src/api-config.ts`).
-/// The e-mail code door never opens it: it only binds the authorization code to this client.
-pub const REDIRECT_URI: &str = "http://127.0.0.1:47813/callback";
-pub const MAIN_WINDOW: &str = "main";
-/// The console route the window shows, as in the Electron shell (`window.ts`):
-/// the compact frame primes its session from the bridge (`compact-shell.ts`);
-/// the full console does not yet (D2b).
-pub const START_PATH: &str = "/compact";
+/// Show or hide the window from anywhere, as the Electron shell.
+pub const TOGGLE_SHORTCUT: &str = "CommandOrControl+Shift+O";
+/// How long an update waits for the popup to leave before it refuses to install.
+const POPUP_EXIT_LIMIT: Duration = Duration::from_secs(5);
 
 /// A keystore turned off (`OPENEDBOT_PREVIEW_VAULT=memory`, development runs
 /// whose ad hoc signature changes on every build): memory-only sessions.
@@ -72,137 +79,24 @@ impl<A: AuthApi, V: Vault> TokenSource for AuthService<A, V> {
     }
 }
 
-struct PopupHandle(Arc<PopupHost<Auth>>);
-
-/// Shows a path of the local console in the main window.
-fn navigate<R: Runtime>(app: &AppHandle<R>, path_and_query: &str) {
-    let Some(window) = app.get_webview_window(MAIN_WINDOW) else { return };
-    let Ok(current) = window.url() else { return };
-    let Ok(target) = current.join(path_and_query) else { return };
-    // `Url::origin` is opaque for `tauri:` (not a special scheme): compare the parts.
-    let same = |url: &Url| (url.scheme().to_string(), url.host_str().map(str::to_string), url.port());
-    if same(&target) != same(&current) || !is_local_origin(&target) {
-        log::warn!("navigation outside the local origin refused");
-        return;
+/// Whether the OS hands `openedbot://` links to this app. macOS reads the
+/// scheme from the bundle's Info.plist at install; elsewhere it is registered
+/// at run time, and a refusal falls back to the loopback page.
+fn deep_link_registered<R: Runtime>(app: &AppHandle<R>) -> bool {
+    if callback::DECLARED_SCHEME != Some(callback::SCHEME) {
+        return false;
     }
-    let _ = window.navigate(target);
-    let _ = window.show();
-    let _ = window.set_focus();
-}
-
-struct ShellEvents<R: Runtime> {
-    app: AppHandle<R>,
-}
-
-impl<R: Runtime> ShellEvents<R> {
-    fn popup(&self, message: HostToPopup) {
-        if let Some(popup) = self.app.try_state::<PopupHandle>() {
-            popup.0.notify(message);
+    if cfg!(target_os = "macos") {
+        return true;
+    }
+    use tauri_plugin_deep_link::DeepLinkExt;
+    match app.deep_link().register(callback::SCHEME) {
+        Ok(()) => true,
+        Err(error) => {
+            log::warn!("openedbot:// registration failed ({error}), falling back to the loopback callback");
+            false
         }
     }
-}
-
-impl<R: Runtime> AuthEvents for ShellEvents<R> {
-    fn signin_state(&self, state: &SigninState) {
-        if let Err(error) = SigninStateChanged(state.clone()).emit(&self.app) {
-            log::warn!("sign-in state not delivered ({error})");
-        }
-    }
-
-    fn signed_in(&self) {
-        log::info!("signed in");
-        navigate(&self.app, START_PATH);
-        self.popup(HostToPopup::SignedIn);
-    }
-
-    fn signed_out(&self, reason: SignedOutReason) {
-        log::info!("signed out ({reason:?})");
-        navigate(&self.app, if reason == SignedOutReason::SessionLost { "/login?reason=session-lost" } else { "/login" });
-        self.popup(HostToPopup::SignedOut);
-    }
-}
-
-struct ShellPopupEvents<R: Runtime> {
-    app: AppHandle<R>,
-}
-
-impl<R: Runtime> PopupEvents for ShellPopupEvents<R> {
-    fn open_console(&self, path: &str) {
-        navigate(&self.app, path);
-    }
-    fn gave_up(&self, reason: &GiveUp) {
-        // The window stays the way in; D2b adds the dialog of the Electron shell.
-        log::warn!("popup unavailable ({reason:?}), the window remains");
-    }
-}
-
-/// The values the console reads before its first module runs.
-pub fn initialization_script(config: &ShellConfig, version: &str) -> String {
-    let shell = serde_json::json!({
-        "platform": std::env::consts::OS,
-        "version": version,
-        "bridgeVersion": bridge::BRIDGE_VERSION,
-    });
-    format!(
-        "Object.defineProperty(window, '__OPENEDBOT_SHELL__', {{ value: Object.freeze({shell}), writable: false, configurable: false }});\n\
-         window.__OPENEDBOT_API_ORIGIN__ = {api};\n\
-         window.__OPENEDBOT_PUBLIC_CONSOLE_URL__ = {console};\n",
-        api = serde_json::Value::String(config.api_origin.clone()),
-        console = serde_json::Value::String(config.public_console_url.clone()),
-    )
-}
-
-fn is_local_origin(url: &Url) -> bool {
-    matches!((url.scheme(), url.host_str()), ("tauri", Some("localhost")) | ("http", Some("tauri.localhost")) | ("https", Some("tauri.localhost")))
-}
-
-/// The main window: the embedded console, navigation locked on the local
-/// origin, new windows sent to the system browser when trusted, the CSP
-/// completed with the runtime API origin.
-pub fn main_window<R: Runtime, M: Manager<R>>(manager: &M, config: &ShellConfig, version: &str, signed_in: bool) -> tauri::Result<tauri::WebviewWindow<R>> {
-    // Signed out, the console's own `/login` (driven through the bridge).
-    let start = if signed_in { START_PATH } else { "/login" };
-    let api_origin = config.api_origin.clone();
-    let popup_config = config.clone();
-    let app = manager.app_handle().clone();
-    WebviewWindowBuilder::new(manager, MAIN_WINDOW, WebviewUrl::App(start.trim_start_matches('/').into()))
-        .title("openedbot preview")
-        .inner_size(1100.0, 760.0)
-        .min_inner_size(420.0, 520.0)
-        .initialization_script(initialization_script(config, version))
-        .on_web_resource_request(move |_request, response| {
-            let html = response
-                .headers()
-                .get("content-type")
-                .and_then(|value| value.to_str().ok())
-                .is_some_and(|value| value.starts_with("text/html"));
-            if !html {
-                return;
-            }
-            if let Some(filled) = csp::fill(response.body(), &api_origin) {
-                *response.body_mut() = Cow::Owned(filled);
-            }
-        })
-        .on_navigation(|url| {
-            let allowed = is_local_origin(url);
-            if !allowed {
-                log::warn!("navigation to another origin refused ({})", url.scheme());
-            }
-            allowed
-        })
-        .on_new_window(move |url, _features| {
-            match bridge::trusted_external_url(&popup_config, url.as_str()) {
-                Ok(url) => {
-                    use tauri_plugin_opener::OpenerExt;
-                    if app.opener().open_url(url.as_str(), None::<&str>).is_err() {
-                        log::warn!("system browser could not be opened");
-                    }
-                }
-                Err(_) => log::warn!("new window to an untrusted origin refused"),
-            }
-            NewWindowResponse::Deny
-        })
-        .build()
 }
 
 fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::Error>> {
@@ -211,19 +105,57 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
         logger::init(dir);
     }
     let version = app.package_info().version.to_string();
+    let data_dir = app.path().app_data_dir().ok();
+    if let Some(dir) = &data_dir {
+        let _ = std::fs::create_dir_all(dir);
+        diagnostics::open(&dir.join("diagnostics.sqlite"), &format!("openedbot preview {version}, {} {}", std::env::consts::OS, std::env::consts::ARCH));
+    }
     let env = |name: &str| std::env::var(name).ok();
     let config = config::load(app.path().app_config_dir().ok().as_deref(), &env).inspect_err(|error| log::error!("configuration refused: {error}"))?;
     log::info!("openedbot preview {version}, API {}", config.api_origin);
+
+    let prefs = Arc::new(PreferenceStore::open(data_dir.as_deref()));
+    app.manage(WindowState::new(prefs.clone()));
+    app.manage(shell::Purging::default());
+    app.manage(update_state::UpdateStatus::new(
+        {
+            let app = app.handle().clone();
+            Box::new(move |state, status_changed| {
+                use tauri_specta::Event;
+                if let Err(error) = bridge::UpdateStateChanged(state.clone()).emit(&app) {
+                    log::warn!("update state not delivered ({error})");
+                }
+                if status_changed {
+                    if let Some(popup) = app.try_state::<PopupHandle>() {
+                        let (status, version) = state.summary();
+                        popup.0.notify(popup::HostToPopup::UpdateState { status, version: version.map(str::to_string) });
+                    }
+                }
+            })
+        },
+        {
+            let app = app.handle().clone();
+            Box::new(move || app.restart())
+        },
+    ));
 
     let vault: Box<dyn Vault> = if std::env::var("OPENEDBOT_PREVIEW_VAULT").as_deref() == Ok("memory") {
         Box::new(DisabledVault)
     } else {
         Box::new(KeychainVault::new(BUNDLE_ID, &config.api_origin))
     };
+    let registered = deep_link_registered(&handle);
+    let redirect_uri = callback::redirect_uri(registered);
+    let returned = handle.clone();
+    let google = Arc::new(ShellGoogle {
+        app: handle.clone(),
+        loopback: Loopback::new(callback::LOOPBACK_PORT, Arc::new(move || shell::browser_returned(&returned))),
+        uses_loopback: !registered,
+    });
     let events: Arc<dyn AuthEvents> = Arc::new(ShellEvents { app: handle.clone() });
-    let auth = Arc::new(AuthService::new(HttpAuthApi::new(&config.api_origin, &version), vault, events, REDIRECT_URI, CLIENT_ID));
+    let auth: Arc<Auth> = Arc::new(AuthService::new(HttpAuthApi::new(&config.api_origin, &version), vault, events, redirect_uri, CLIENT_ID));
     let restored = auth.restore();
-    log::info!("session {} ({:?})", if restored { "restored" } else { "absent" }, auth.persistence());
+    log::info!("session {} ({:?}), browser return by {redirect_uri}", if restored { "restored" } else { "absent" }, auth.persistence());
 
     let opener_handle = handle.clone();
     app.manage(Shell {
@@ -234,193 +166,223 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
             use tauri_plugin_opener::OpenerExt;
             opener_handle.opener().open_url(url.as_str(), None::<&str>).map_err(|error| error.to_string())
         }),
+        google,
+        client_id: CLIENT_ID.into(),
+        window: Box::new(window::MainWindowControl(handle.clone())),
     });
-    main_window(app, &config, &version, restored)?;
 
-    if config.popup {
+    // The popup host exists whenever the popup is supported: the Dock menu
+    // greys its modes when no bundle is found.
+    if shell::POPUP_SUPPORTED {
         let executable = std::env::current_exe()?;
         let bundle = popup::locate_bundle(&executable, std::env::var_os("OPENEDBOT_POPUP_APP").map(Into::into));
-        let host = PopupHost::new(bundle, &config.api_origin, &config.public_console_url, auth, Arc::new(ShellPopupEvents { app: handle.clone() }));
-        host.start();
+        let host = PopupHost::new(bundle, &config.api_origin, &config.public_console_url, auth.clone(), Arc::new(ShellPopupEvents { app: handle.clone() }));
         app.manage(PopupHandle(host));
     }
+    let mode = shell::display_mode(&handle);
+    let start = if restored { window::START_PATH } else { window::LOGIN_PATH };
+    let visible = !(mode == DisplayMode::Popup && restored);
+
+    // Data stored for another backend (or by a build that did not record
+    // one) is purged before the console loads: one store, one backend.
+    let stale = prefs.get().data_origin.as_deref() != Some(config.api_origin.as_str());
+    window::build(&handle, &config, &version, (!stale).then_some(start), visible)?;
+    // Only now: a session lost at the first refresh purges a window that exists.
+    tauri::async_runtime::spawn(auth.clone().keep_fresh());
+    if stale {
+        let purging = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let chooser = purging.clone();
+            let purged = shell::purge_and_open(&purging, move || {
+                let signed_in = chooser.try_state::<Shell>().is_some_and(|shell| shell.auth.is_signed_in());
+                if signed_in { window::START_PATH } else { window::LOGIN_PATH }.to_string()
+            })
+            .await;
+            if purged == Some(true) {
+                log::info!("WebView data of another backend purged");
+            }
+        });
+    }
+    if mode != DisplayMode::Window {
+        if let Some(popup) = app.try_state::<PopupHandle>() {
+            popup.0.start();
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        app.set_menu(macos::menu::build(&handle)?)?;
+        let dock = handle.clone();
+        macos::dock::install(
+            &handle,
+            Box::new(move |action| match action {
+                macos::dock::DockAction::DisplayMode(mode) => shell::set_display_mode(&dock, mode),
+                macos::dock::DockAction::ToggleAlwaysOnTop => {
+                    let current = dock.state::<WindowState>().prefs.get().always_on_top;
+                    shell::set_always_on_top(&dock, !current);
+                }
+                macos::dock::DockAction::SignOut => shell::sign_out_from_menu(&dock),
+            }),
+        );
+    }
+    shell::visibility_changed(&handle);
+
+    {
+        use tauri_plugin_global_shortcut::GlobalShortcutExt;
+        // Not fatal: the Dock icon still works. Another app may own the shortcut.
+        if let Err(error) = app.global_shortcut().register(TOGGLE_SHORTCUT) {
+            log::warn!("global shortcut {TOGGLE_SHORTCUT} unavailable ({error})");
+        }
+    }
+    {
+        use tauri_plugin_notification::NotificationExt;
+        // A click on the notification itself (`tap`); the page's notifications carry no actions.
+        let clicked = handle.clone();
+        app.notification().on_action(move |performed| {
+            if performed.action_id() == "tap" {
+                shell::notification_clicked(&clicked, performed.notification().map(|notification| notification.id()));
+            }
+        })?;
+    }
+    {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        let linked = handle.clone();
+        app.deep_link().on_open_url(move |event| {
+            if event.urls().iter().any(|url| callback::is_auth_callback(url.as_str())) {
+                shell::browser_returned(&linked);
+            }
+        });
+    }
+
     if let Some(manifest) = config.update_url.clone() {
-        let (stop_handle, restart_handle) = (handle.clone(), handle.clone());
-        let hooks = updater::InstallHooks {
-            before_install: Box::new(move || {
-                if let Some(popup) = stop_handle.try_state::<PopupHandle>() {
-                    log::info!("stopping the popup before the update replaces the bundle");
-                    popup.0.stop();
-                }
-            }),
-            after_failed_install: Box::new(move || {
-                if let Some(popup) = restart_handle.try_state::<PopupHandle>() {
-                    log::info!("update not installed: restarting the popup");
-                    popup.0.start();
-                }
-            }),
-        };
-        updater::spawn_check(handle, manifest, hooks);
+        updater::spawn_checks(handle.clone(), manifest, update_hooks(&handle));
     }
     Ok(())
 }
 
+fn update_hooks<R: Runtime>(app: &AppHandle<R>) -> updater::UpdateHooks {
+    let (stopping, resuming, asking, moving) = (app.clone(), app.clone(), app.clone(), app.clone());
+    updater::UpdateHooks {
+        before_install: Box::new(move || {
+            let app = stopping.clone();
+            Box::pin(async move {
+                let Some(popup) = app.try_state::<PopupHandle>().map(|popup| popup.0.clone()) else { return true };
+                log::info!("stopping the popup before the update replaces the bundle");
+                // Held until `resume` or the restart: a Dock choice cannot relaunch it mid-install.
+                let stopped = popup.hold_and_wait(POPUP_EXIT_LIMIT).await;
+                if !stopped {
+                    log::error!("the popup did not exit in time");
+                }
+                stopped
+            })
+        }),
+        resume: Box::new(move || {
+            let Some(popup) = resuming.try_state::<PopupHandle>() else { return };
+            popup.0.release();
+            if shell::display_mode(&resuming) != DisplayMode::Window {
+                popup.0.start();
+            }
+        }),
+        confirm_restart: Box::new(move |version| {
+            let app = asking.clone();
+            Box::pin(async move {
+                use tauri_plugin_dialog::MessageDialogButtons;
+                let (answer, answered) = tokio::sync::oneshot::channel();
+                shell::dialog(&app, format!("openedbot preview {version} est installée. Redémarrez pour l’utiliser ; sinon elle s’ouvrira au prochain lancement."))
+                .title("Mise à jour installée")
+                    .buttons(MessageDialogButtons::OkCancelCustom("Redémarrer".into(), "Plus tard".into()))
+                    .show(move |restart| {
+                        let _ = answer.send(restart);
+                    });
+                answered.await.unwrap_or(false)
+            })
+        }),
+        translocated: Box::new(move || {
+            shell::warn(
+                &moving,
+                "Déplacez openedbot preview dans Applications",
+                "macOS fait tourner cette copie depuis un emplacement en lecture seule : les mises à jour ne peuvent pas s’y installer. Quittez l’app, glissez-la dans le dossier Applications depuis le Finder, puis relancez-la.",
+            );
+        }),
+    }
+}
+
+fn on_run_event<R: Runtime>(app: &AppHandle<R>, event: tauri::RunEvent) {
+    match event {
+        tauri::RunEvent::ExitRequested { .. } => {
+            let state = app.state::<WindowState>();
+            state.quitting.store(true, Ordering::SeqCst);
+            window::save_placement(app);
+        }
+        // Quit from the app menu did not keep the placement through `ExitRequested` alone (observed): save here too.
+        tauri::RunEvent::Exit => {
+            if let Some(state) = app.try_state::<WindowState>() {
+                state.quitting.store(true, Ordering::SeqCst);
+            }
+            window::save_placement(app);
+            if let Some(popup) = app.try_state::<PopupHandle>() {
+                // Closing its stdin is enough: the popup quits on EOF.
+                popup.0.stop();
+            }
+        }
+        // macOS: a Dock click on a hidden window brings it back, like any Mac app.
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+            window::show(app);
+            shell::visibility_changed(app);
+        }
+        _ => {}
+    }
+}
+
 pub fn run() {
     let specta = bridge::specta_builder::<tauri::Wry>();
-    let app = tauri::Builder::default()
+    // Single instance first: a second launch (or a deep link on Windows and
+    // Linux) lands in the running app instead of opening a second window.
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if argv.iter().any(|arg| callback::is_auth_callback(arg)) {
+                shell::browser_returned(app);
+            } else {
+                window::bring_to_front(app);
+                shell::visibility_changed(app);
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        window::toggle(app);
+                        shell::visibility_changed(app);
+                    }
+                })
+                .build(),
+        )
         .invoke_handler(specta.invoke_handler())
+        .on_window_event(window::on_window_event);
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .on_menu_event(|app, event| macos::menu::on_menu_event(app, &event))
+        // WKWebView's content process died (crash, memory pressure): journal it and reload.
+        .on_web_content_process_terminate(|webview| {
+            diagnostics::record(diagnostics::Level::Error, diagnostics::Source::Renderer, "web content process terminated", None);
+            log::error!("the WebView's content process terminated, reloading");
+            let _ = webview.reload();
+        });
+    let app = builder
         .setup(move |app| {
             specta.mount_events(app);
             setup(app)
         })
         .build(tauri::generate_context!())
         .expect("openedbot preview failed to start");
-    app.run(|handle, event| {
-        if let tauri::RunEvent::Exit = event {
-            if let Some(popup) = handle.try_state::<PopupHandle>() {
-                popup.0.stop();
-            }
-        }
-    });
+    app.run(on_run_event);
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::{json, Value};
-    use tauri::ipc::{CallbackFn, InvokeBody};
-    use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
-    use tauri::webview::InvokeRequest;
-
-    fn test_config() -> ShellConfig {
-        ShellConfig {
-            // Never reached: the tests only call commands that answer locally.
-            api_origin: "http://127.0.0.1:9".into(),
-            public_console_url: "https://console.openedbot.app".into(),
-            update_url: None,
-            popup: false,
-        }
-    }
-
-    struct NoEvents;
-    impl AuthEvents for NoEvents {
-        fn signin_state(&self, _: &SigninState) {}
-        fn signed_in(&self) {}
-        fn signed_out(&self, _: SignedOutReason) {}
-    }
-
-    fn app() -> tauri::App<MockRuntime> {
-        let specta = bridge::specta_builder::<MockRuntime>();
-        let app = mock_builder()
-            .invoke_handler(specta.invoke_handler())
-            .build(tauri::generate_context!(test = true))
-            .expect("mock app");
-        let config = test_config();
-        let auth = AuthService::new(HttpAuthApi::new(&config.api_origin, "0.0.0"), Box::new(DisabledVault) as Box<dyn Vault>, Arc::new(NoEvents), REDIRECT_URI, CLIENT_ID);
-        auth.restore();
-        app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())) });
-        app
-    }
-
-    fn window(app: &tauri::App<MockRuntime>, label: &str) -> tauri::WebviewWindow<MockRuntime> {
-        WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into())).build().expect("window")
-    }
-
-    fn invoke(window: &tauri::WebviewWindow<MockRuntime>, cmd: &str, origin: &str, body: Value) -> Result<Value, Value> {
-        get_ipc_response(
-            window,
-            InvokeRequest {
-                cmd: cmd.into(),
-                callback: CallbackFn(0),
-                error: CallbackFn(1),
-                url: origin.parse().unwrap(),
-                body: InvokeBody::Json(body),
-                headers: Default::default(),
-                invoke_key: INVOKE_KEY.to_string(),
-            },
-        )
-        .map(|response| response.deserialize::<Value>().unwrap())
-    }
-
-    const LOCAL: &str = "tauri://localhost";
-
-    #[test]
-    fn the_main_window_on_the_local_origin_reaches_the_bridge() {
-        let app = app();
-        let main = window(&app, MAIN_WINDOW);
-        assert_eq!(invoke(&main, "read_access_token", LOCAL, json!({})), Ok(Value::Null));
-        let info = invoke(&main, "shell_info", LOCAL, json!({})).unwrap();
-        assert_eq!(info["bridgeVersion"], json!(bridge::BRIDGE_VERSION));
-        assert_eq!(info["persistence"], json!("memory-only"));
-        assert_eq!(invoke(&main, "signin_state", LOCAL, json!({})), Ok(json!({ "status": "idle" })));
-    }
-
-    #[test]
-    fn another_window_is_refused() {
-        let app = app();
-        let _main = window(&app, MAIN_WINDOW);
-        let probe = window(&app, "probe");
-        for command in bridge::COMMANDS {
-            let refused = invoke(&probe, command, LOCAL, json!({})).expect_err(command);
-            assert!(refused.to_string().contains("not allowed"), "{command}: {refused}");
-        }
-    }
-
-    #[test]
-    fn another_origin_is_refused_even_in_the_main_window() {
-        let app = app();
-        let main = window(&app, MAIN_WINDOW);
-        for origin in ["https://console.openedbot.app", "http://localhost:1420", "https://evil.example"] {
-            let refused = invoke(&main, "read_access_token", origin, json!({})).expect_err(origin);
-            assert!(refused.to_string().contains("not allowed"), "{origin}: {refused}");
-        }
-    }
-
-    #[test]
-    fn plugin_commands_are_not_granted_to_the_page() {
-        let app = app();
-        let main = window(&app, MAIN_WINDOW);
-        for command in ["plugin:opener|open_url", "plugin:updater|check", "plugin:updater|download_and_install", "plugin:webview|create_webview_window"] {
-            let refused = invoke(&main, command, LOCAL, json!({ "url": "https://evil.example" })).expect_err(command);
-            assert!(refused.to_string().contains("not allowed") || refused.to_string().contains("not found"), "{command}: {refused}");
-        }
-    }
-
-    #[test]
-    fn open_external_only_takes_the_console_and_the_api() {
-        let config = test_config();
-        assert!(bridge::trusted_external_url(&config, "https://console.openedbot.app/o/acme").is_ok());
-        assert!(bridge::trusted_external_url(&config, "http://127.0.0.1:9/api/legal").is_ok());
-        for refused in ["https://evil.example", "file:///etc/passwd", "javascript:alert(1)", "https://console.openedbot.app.evil.example/"] {
-            assert!(bridge::trusted_external_url(&config, refused).is_err(), "{refused}");
-        }
-    }
-
-    #[test]
-    fn the_capability_grants_exactly_the_declared_commands() {
-        let capability: Value = serde_json::from_str(include_str!("../capabilities/main.json")).unwrap();
-        assert_eq!(capability["windows"], json!([MAIN_WINDOW]));
-        assert!(capability.get("remote").is_none(), "no remote origin may reach the bridge");
-        let mut granted: Vec<String> = capability["permissions"].as_array().unwrap().iter().map(|value| value.as_str().unwrap().to_string()).collect();
-        let mut expected: Vec<String> = bridge::COMMANDS.iter().map(|name| format!("allow-{}", name.replace('_', "-"))).collect();
-        expected.extend(["core:event:allow-listen".to_string(), "core:event:allow-unlisten".to_string()]);
-        granted.sort();
-        expected.sort();
-        assert_eq!(granted, expected);
-    }
-
-    #[test]
-    fn bindings_are_current() {
-        let committed = include_str!("../../../../contracts/native-bridge/src/bindings.ts");
-        assert_eq!(bridge::bindings_typescript(), committed, "run `make desktop-tauri-bindings`");
-    }
-
-    #[test]
-    fn the_initialization_script_escapes_its_values() {
-        let script = initialization_script(&test_config(), "0.0.1");
-        assert!(script.contains(r#"window.__OPENEDBOT_API_ORIGIN__ = "http://127.0.0.1:9";"#));
-        assert!(script.contains(r#""version":"0.0.1""#));
-    }
-}
+mod ipc_tests;

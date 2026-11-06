@@ -1,7 +1,7 @@
-//! The native session: e-mail code sign-in (PKCE), single-flight refresh,
-//! sign-out. Port of the Electron shell's `apps/desktop/src/main/auth.ts`,
-//! reduced to what the D2a prototype proves (no Google, no password door, no
-//! proactive refresh timer: a token is refreshed when read near its expiry).
+//! The native session: e-mail code and Google sign-in (PKCE), single-flight
+//! refresh, proactive refresh before expiry, sign-out. Port of the Electron
+//! shell's `apps/desktop/src/main/auth.ts` (without the password door of its
+//! local fallback page, which the embedded console does not have).
 //!
 //! The access token stays here and is handed out on request only
 //! (`read_access_token`); the refresh token never leaves this module, except
@@ -24,6 +24,12 @@ use crate::vault::Vault;
 /// Refresh this long before expiry so a request in flight never carries a
 /// token that dies on the way (same margin as Electron).
 const REFRESH_MARGIN: Duration = Duration::from_secs(60);
+/// A proactive refresh that failed on the network or a 5xx is tried again
+/// this long after: the refresh token is still valid.
+const TRANSIENT_REFRESH_RETRY: Duration = Duration::from_secs(30);
+
+mod google;
+pub use google::{AuthorizeTargets, GoogleSteps, GoogleTiming, StepFailed};
 
 /// Shape of `POST /api/auth/native/token` responses.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -127,6 +133,11 @@ pub struct AuthService<A: AuthApi, V: Vault> {
     /// use, so two parallel refreshes would make the loser look like a lost
     /// session.
     refresh_lock: tokio::sync::Mutex<()>,
+    /// Rung on every session change, so the proactive refresh re-plans.
+    changed: tokio::sync::Notify,
+    /// Rung when the browser step of a Google attempt is over (deep link or
+    /// loopback hit), or the attempt is cancelled: the claim is polled now.
+    wake: tokio::sync::Notify,
 }
 
 struct Inner {
@@ -146,26 +157,50 @@ fn lock(mutex: &Mutex<Inner>) -> MutexGuard<'_, Inner> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// User-facing failure: a code the console translates, and a French fallback.
-fn failure(error: &ApiError) -> SigninState {
-    let message = match error.code.as_str() {
+const GENERIC_FAILURE: &str = "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.";
+
+/// The French fallback of a known failure code (the console translates the
+/// code itself; same wording as the Electron shell's `FAILURE_MESSAGES`).
+fn known_message(code: &str) -> Option<&'static str> {
+    Some(match code {
         "EMAIL_LOGIN_CODE_INVALID" => "Code invalide ou expiré. Demandez un nouveau code.",
         "EMAIL_LOGIN_CODE_COOLDOWN" => "Patientez une minute avant de demander un nouveau code.",
         "EMAIL_LOGIN_CODE_UNSENT" => "Le code n’a pas pu être envoyé. Réessayez.",
         "RATE_LIMITED" => "Trop de tentatives : patientez une minute.",
         "REDIRECT_URI_INVALID" => "Cette version de l’application n’est pas autorisée par le serveur.",
         "AUTH_EMAIL_NOT_ALLOWED" => "Cette adresse n’est pas encore ouverte sur openedbot.",
-        _ if error.status == 0 => "La connexion a échoué. Vérifiez votre réseau puis réessayez.",
-        _ if error.status >= 500 => "Le service est indisponible. Réessayez dans un instant.",
-        _ => "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.",
-    };
+        "MEMBERSHIP_REQUIRED" => "Ce compte est reconnu, mais il n’appartient à aucune organisation active : demandez une invitation à un administrateur.",
+        "AUTH_NOT_A_MEMBER" => "Ce compte n’a pas encore d’organisation : créez-la depuis l’application web, puis reconnectez-vous.",
+        "AUTH_DENIED" => "Connexion annulée dans Google.",
+        "AUTH_EMAIL_NOT_VERIFIED" => "Google ne certifie pas cet e-mail : utilisez un compte dont l’adresse est vérifiée.",
+        "AUTH_PROVIDER_DISABLED" => "Le SSO Google est désactivé sur cet environnement.",
+        "GOOGLE_REFUSED" => "La connexion Google a été refusée ou a expiré. Réessayez.",
+        "TIMEOUT" => "Délai dépassé : la connexion n’a pas abouti en 5 minutes.",
+        "LOOPBACK_BUSY" => "Le port local 47813 est occupé : fermez l’application qui l’utilise puis réessayez.",
+        "BROWSER_UNAVAILABLE" => "Le navigateur n’a pas pu être ouvert.",
+        "AUTHORIZE_URL_UNEXPECTED" => "Le serveur a renvoyé une adresse de connexion inattendue.",
+        "BAD_RESPONSE" => "Réponse inattendue du serveur de connexion.",
+        _ => return None,
+    })
+}
+
+/// User-facing failure of an API call: a code the console translates, and a French fallback.
+fn failure(error: &ApiError) -> SigninState {
     // A transport failure or a 5xx is never a refusal of the credentials.
-    let code = if error.status == 0 || error.status >= 500 {
-        "SERVICE_UNAVAILABLE".to_string()
-    } else {
-        error.code.clone()
-    };
-    SigninState::Error { code, message: message.into() }
+    if error.status == 0 || error.status >= 500 {
+        let message = if error.status == 0 {
+            "La connexion a échoué. Vérifiez votre réseau puis réessayez."
+        } else {
+            "Le service est indisponible. Réessayez dans un instant."
+        };
+        return SigninState::Error { code: "SERVICE_UNAVAILABLE".into(), message: message.into() };
+    }
+    SigninState::Error { code: error.code.clone(), message: known_message(&error.code).unwrap_or(GENERIC_FAILURE).into() }
+}
+
+/// A failure the shell names itself (timeout, busy port, refused claim).
+fn named_failure(code: &str) -> SigninState {
+    SigninState::Error { code: code.into(), message: known_message(code).unwrap_or(GENERIC_FAILURE).into() }
 }
 
 pub fn create_pkce() -> (String, String) {
@@ -213,7 +248,14 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
                 last_state: SigninState::Idle { reason: None },
             }),
             refresh_lock: tokio::sync::Mutex::new(()),
+            changed: tokio::sync::Notify::new(),
+            wake: tokio::sync::Notify::new(),
         }
+    }
+
+    /// The redirect URI this session binds its authorization codes to.
+    pub fn redirect_uri(&self) -> &str {
+        &self.redirect_uri
     }
 
     /// Loads the persisted session, if any. A keystore that refuses leaves the
@@ -235,9 +277,13 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
                 None
             }
         };
-        let mut inner = lock(&self.inner);
-        inner.tokens = loaded;
-        inner.tokens.is_some()
+        let restored = {
+            let mut inner = lock(&self.inner);
+            inner.tokens = loaded;
+            inner.tokens.is_some()
+        };
+        self.changed.notify_one();
+        restored
     }
 
     pub fn is_signed_in(&self) -> bool {
@@ -262,6 +308,7 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
     fn store_tokens(&self, inner: &mut Inner, next: NativeTokens) {
         let serialized = serde_json::to_string(&next).expect("tokens serialize");
         inner.tokens = Some(next);
+        self.changed.notify_one();
         if inner.persistence == Persistence::MemoryOnly {
             return;
         }
@@ -278,6 +325,7 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
             inner.generation += 1;
             inner.last_state = SigninState::Idle { reason: Some(reason) };
         }
+        self.changed.notify_one();
         if let Err(error) = self.vault.clear() {
             log::warn!("{error}: could not clear the stored session");
         }
@@ -446,21 +494,7 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
             return;
         }
         match outcome {
-            Ok(tokens) => {
-                {
-                    // Checked again under the lock that stores the tokens: a
-                    // cancel or sign-out landing after the check above must
-                    // not be undone by this late answer.
-                    let mut inner = lock(&self.inner);
-                    if inner.attempt != attempt {
-                        return;
-                    }
-                    inner.generation += 1;
-                    self.store_tokens(&mut inner, tokens);
-                }
-                self.report(SigninState::Idle { reason: None });
-                self.events.signed_in();
-            }
+            Ok(tokens) => self.complete_sign_in(attempt, tokens),
             Err(error) => {
                 log::warn!("e-mail code sign-in failed ({error})");
                 self.report(failure(&error));
@@ -468,10 +502,75 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
         }
     }
 
+    /// Stores the tokens of a sign-in attempt, unless it was dropped.
+    fn complete_sign_in(&self, attempt: u64, tokens: NativeTokens) {
+        {
+            // Checked under the lock that stores the tokens: a cancel or
+            // sign-out landing after the caller's check must not be undone
+            // by this late answer.
+            let mut inner = lock(&self.inner);
+            if inner.attempt != attempt {
+                return;
+            }
+            inner.generation += 1;
+            self.store_tokens(&mut inner, tokens);
+        }
+        self.report(SigninState::Idle { reason: None });
+        self.events.signed_in();
+    }
+
     /// Drops the attempt in progress and goes back to idle.
     pub fn cancel_sign_in(&self) {
         self.begin_attempt();
+        // A Google attempt waiting between two polls notices at once.
+        self.wake.notify_one();
         self.report(SigninState::Idle { reason: None });
+    }
+
+    /// The browser step is over (deep link or loopback hit): poll the claim now.
+    pub fn nudge(&self) {
+        self.wake.notify_one();
+    }
+
+    /// How long until the access token must be rotated; `None` signed out.
+    fn next_refresh_in(&self) -> Option<Duration> {
+        let inner = lock(&self.inner);
+        let tokens = inner.tokens.as_ref()?;
+        Some(remaining(tokens, OffsetDateTime::now_utc()).map_or(Duration::ZERO, |left| left.saturating_sub(REFRESH_MARGIN)))
+    }
+
+    /// Rotates the token shortly before it expires, for as long as the app
+    /// runs: an idle console (or the popup alone) never meets a dead token,
+    /// and a session lost while idle is noticed without a request. Runs
+    /// forever; spawn it once.
+    pub async fn keep_fresh(self: Arc<Self>) {
+        let mut retry: Option<Duration> = None;
+        loop {
+            // Registered before the state is read: a change in between is not lost.
+            let changed = self.changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            let Some(delay) = retry.take().or_else(|| self.next_refresh_in()) else {
+                changed.await;
+                continue;
+            };
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {
+                    // `read_access_token` rotates only a token inside the margin.
+                    // It also answers `Ok` with a still-alive token when the
+                    // rotation failed: a token still due means "try later",
+                    // never "try again now".
+                    let read = self.read_access_token().await;
+                    if let Err(error) = &read {
+                        log::warn!("proactive refresh failed, retrying ({error})");
+                    }
+                    if read.is_err() || self.next_refresh_in() == Some(Duration::ZERO) {
+                        retry = Some(TRANSIENT_REFRESH_RETRY);
+                    }
+                }
+                _ = &mut changed => {}
+            }
+        }
     }
 
     /// Revokes the session on the API, then forgets it locally. The local
@@ -479,6 +578,7 @@ impl<A: AuthApi, V: Vault> AuthService<A, V> {
     /// never swallowed.
     pub async fn sign_out(&self) -> SignOutResult {
         self.begin_attempt();
+        self.wake.notify_one();
         // An expired access token is refreshed first so the API still
         // recognises the session it must revoke. A failure here is not fatal:
         // the revocation below reports it.
@@ -571,301 +671,4 @@ impl AuthApi for HttpAuthApi {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::vault::VaultError;
-    use std::collections::VecDeque;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    fn tokens(access: &str, refresh: &str, expires_in_secs: i64) -> NativeTokens {
-        NativeTokens {
-            access_token: access.into(),
-            access_token_expires_at: (OffsetDateTime::now_utc() + time::Duration::seconds(expires_in_secs)).format(&Rfc3339).unwrap(),
-            refresh_token: refresh.into(),
-            organization_id: Some("org-1".into()),
-        }
-    }
-
-    /// A scripted API: answers in order, counts calls, can stall.
-    #[derive(Default)]
-    struct FakeApi {
-        answers: Mutex<VecDeque<Result<Value, ApiError>>>,
-        calls: Mutex<Vec<String>>,
-        refreshes: AtomicUsize,
-        delay_ms: u64,
-        logout_fails: bool,
-    }
-
-    impl FakeApi {
-        fn answering(answers: Vec<Result<Value, ApiError>>) -> Self {
-            Self { answers: Mutex::new(answers.into()), ..Self::default() }
-        }
-    }
-
-    impl AuthApi for Arc<FakeApi> {
-        async fn post_json(&self, path: &str, body: Value) -> Result<Value, ApiError> {
-            self.calls.lock().unwrap().push(path.to_string());
-            if body.get("grantType").and_then(Value::as_str) == Some("refresh_token") {
-                self.refreshes.fetch_add(1, Ordering::SeqCst);
-            }
-            if self.delay_ms > 0 {
-                tokio::time::sleep(Duration::from_millis(self.delay_ms)).await;
-            }
-            self.answers.lock().unwrap().pop_front().unwrap_or_else(|| Err(ApiError::network()))
-        }
-
-        async fn logout(&self, _access_token: &str) -> Result<(), ApiError> {
-            self.calls.lock().unwrap().push("/api/auth/logout".into());
-            if self.logout_fails {
-                Err(ApiError::network())
-            } else {
-                Ok(())
-            }
-        }
-    }
-
-    /// A keystore that may refuse; records what it was given.
-    #[derive(Default)]
-    struct FakeVault {
-        stored: Mutex<Option<String>>,
-        broken: bool,
-    }
-
-    impl Vault for Arc<FakeVault> {
-        fn load(&self) -> Result<Option<String>, VaultError> {
-            if self.broken {
-                return Err(VaultError("locked".into()));
-            }
-            Ok(self.stored.lock().unwrap().clone())
-        }
-        fn save(&self, secret: &str) -> Result<(), VaultError> {
-            if self.broken {
-                return Err(VaultError("locked".into()));
-            }
-            *self.stored.lock().unwrap() = Some(secret.into());
-            Ok(())
-        }
-        fn clear(&self) -> Result<(), VaultError> {
-            if self.broken {
-                return Err(VaultError("locked".into()));
-            }
-            *self.stored.lock().unwrap() = None;
-            Ok(())
-        }
-    }
-
-    #[derive(Default)]
-    struct Recorder {
-        states: Mutex<Vec<SigninState>>,
-        signed_in: AtomicUsize,
-        signed_out: Mutex<Vec<SignedOutReason>>,
-    }
-
-    impl AuthEvents for Recorder {
-        fn signin_state(&self, state: &SigninState) {
-            self.states.lock().unwrap().push(state.clone());
-        }
-        fn signed_in(&self) {
-            self.signed_in.fetch_add(1, Ordering::SeqCst);
-        }
-        fn signed_out(&self, reason: SignedOutReason) {
-            self.signed_out.lock().unwrap().push(reason);
-        }
-    }
-
-    type Service = AuthService<Arc<FakeApi>, Arc<FakeVault>>;
-
-    fn service(api: Arc<FakeApi>, vault: Arc<FakeVault>) -> (Arc<Service>, Arc<Recorder>) {
-        let events = Arc::new(Recorder::default());
-        let service = AuthService::new(api, vault, events.clone(), "http://127.0.0.1:47813/callback", "test-client");
-        (Arc::new(service), events)
-    }
-
-    fn signed_in_with(vault: &Arc<FakeVault>, value: &NativeTokens) {
-        *vault.stored.lock().unwrap() = Some(serde_json::to_string(value).unwrap());
-    }
-
-    #[tokio::test]
-    async fn concurrent_refreshes_rotate_once() {
-        let api = Arc::new(FakeApi {
-            delay_ms: 50,
-            ..FakeApi::answering(vec![Ok(serde_json::to_value(tokens("access-2", "refresh-2", 900)).unwrap())])
-        });
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-1", "refresh-1", 900));
-        let (auth, _) = service(api.clone(), vault.clone());
-        assert!(auth.restore());
-
-        let mut tasks = Vec::new();
-        for _ in 0..8 {
-            let auth = auth.clone();
-            tasks.push(tokio::spawn(async move { auth.refresh().await }));
-        }
-        for task in tasks {
-            assert_eq!(task.await.unwrap().unwrap().as_deref(), Some("access-2"));
-        }
-        assert_eq!(api.refreshes.load(Ordering::SeqCst), 1, "one rotation for eight callers");
-        let persisted: NativeTokens = serde_json::from_str(vault.stored.lock().unwrap().as_deref().unwrap()).unwrap();
-        assert_eq!(persisted.refresh_token, "refresh-2");
-    }
-
-    #[tokio::test]
-    async fn an_expiring_token_is_refreshed_on_read_and_a_fresh_one_is_not() {
-        let api = Arc::new(FakeApi::answering(vec![Ok(serde_json::to_value(tokens("access-2", "refresh-2", 900)).unwrap())]));
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-1", "refresh-1", 30));
-        let (auth, _) = service(api.clone(), vault);
-        auth.restore();
-        assert_eq!(auth.read_access_token().await.unwrap().as_deref(), Some("access-2"));
-        assert_eq!(auth.read_access_token().await.unwrap().as_deref(), Some("access-2"));
-        assert_eq!(api.refreshes.load(Ordering::SeqCst), 1);
-    }
-
-    #[tokio::test]
-    async fn a_transient_failure_keeps_a_token_that_is_still_alive() {
-        let api = Arc::new(FakeApi::answering(vec![Err(ApiError { status: 503, code: "DOWN".into() })]));
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-1", "refresh-1", 30));
-        let (auth, events) = service(api, vault);
-        auth.restore();
-        assert_eq!(auth.read_access_token().await.unwrap().as_deref(), Some("access-1"));
-        assert!(auth.is_signed_in());
-        assert!(events.signed_out.lock().unwrap().is_empty());
-    }
-
-    #[tokio::test]
-    async fn a_refused_refresh_loses_the_session() {
-        let api = Arc::new(FakeApi::answering(vec![Err(ApiError { status: 401, code: "REFRESH_INVALID".into() })]));
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-1", "refresh-1", 900));
-        let (auth, events) = service(api, vault.clone());
-        auth.restore();
-        assert_eq!(auth.refresh().await.unwrap(), None);
-        assert!(!auth.is_signed_in());
-        assert_eq!(*events.signed_out.lock().unwrap(), vec![SignedOutReason::SessionLost]);
-        assert!(vault.stored.lock().unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn without_a_keystore_the_session_lives_in_memory_only() {
-        let api = Arc::new(FakeApi::answering(vec![
-            Ok(json!({ "code": "auth-code" })),
-            Ok(serde_json::to_value(tokens("access-1", "refresh-1", 900)).unwrap()),
-        ]));
-        let vault = Arc::new(FakeVault { broken: true, ..FakeVault::default() });
-        let (auth, events) = service(api, vault.clone());
-        assert!(!auth.restore());
-        assert_eq!(auth.persistence(), Persistence::MemoryOnly);
-
-        auth.verify_email_code("dev@ohb.local".into(), "123456".into()).await;
-        assert_eq!(events.signed_in.load(Ordering::SeqCst), 1);
-        assert_eq!(auth.read_access_token().await.unwrap().as_deref(), Some("access-1"));
-        // Nothing reached any storage: the vault refused, and there is no file fallback.
-        assert!(vault.stored.lock().unwrap().is_none());
-    }
-
-    #[tokio::test]
-    async fn a_keystore_that_fails_on_save_switches_to_memory_only() {
-        let api = Arc::new(FakeApi::answering(vec![
-            Ok(json!({ "code": "auth-code" })),
-            Ok(serde_json::to_value(tokens("access-1", "refresh-1", 900)).unwrap()),
-        ]));
-        // Loads fine (nothing stored), then refuses to write.
-        struct WriteRefused;
-        impl Vault for WriteRefused {
-            fn load(&self) -> Result<Option<String>, VaultError> {
-                Ok(None)
-            }
-            fn save(&self, _: &str) -> Result<(), VaultError> {
-                Err(VaultError("user denied".into()))
-            }
-            fn clear(&self) -> Result<(), VaultError> {
-                Ok(())
-            }
-        }
-        let events = Arc::new(Recorder::default());
-        let auth = AuthService::new(api, WriteRefused, events, "http://127.0.0.1:47813/callback", "test");
-        auth.restore();
-        auth.verify_email_code("dev@ohb.local".into(), "123456".into()).await;
-        assert_eq!(auth.persistence(), Persistence::MemoryOnly);
-        assert_eq!(auth.read_access_token().await.unwrap().as_deref(), Some("access-1"));
-    }
-
-    #[tokio::test]
-    async fn the_code_flow_reports_its_states_and_sends_pkce() {
-        let api = Arc::new(FakeApi::answering(vec![
-            Ok(json!({ "ok": true })),
-            Err(ApiError { status: 400, code: "EMAIL_LOGIN_CODE_INVALID".into() }),
-        ]));
-        let (auth, events) = service(api.clone(), Arc::new(FakeVault::default()));
-        auth.request_email_code("dev@ohb.local".into(), "fr".into()).await;
-        auth.verify_email_code("dev@ohb.local".into(), "000000".into()).await;
-        let states = events.states.lock().unwrap().clone();
-        assert_eq!(states[0], SigninState::Sending);
-        assert_eq!(states[1], SigninState::CodeSent { email: "dev@ohb.local".into() });
-        assert_eq!(states[2], SigninState::Verifying);
-        assert!(matches!(&states[3], SigninState::Error { code, .. } if code == "EMAIL_LOGIN_CODE_INVALID"));
-        assert_eq!(*api.calls.lock().unwrap(), vec!["/api/auth/login/code", "/api/auth/native/code/verify"]);
-        assert!(!auth.is_signed_in());
-    }
-
-    #[tokio::test]
-    async fn a_cancelled_attempt_cannot_sign_in_late() {
-        let api = Arc::new(FakeApi {
-            delay_ms: 50,
-            ..FakeApi::answering(vec![
-                Ok(json!({ "code": "auth-code" })),
-                Ok(serde_json::to_value(tokens("access-1", "refresh-1", 900)).unwrap()),
-            ])
-        });
-        let (auth, events) = service(api, Arc::new(FakeVault::default()));
-        let verifying = {
-            let auth = auth.clone();
-            tokio::spawn(async move { auth.verify_email_code("dev@ohb.local".into(), "123456".into()).await })
-        };
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        auth.cancel_sign_in();
-        verifying.await.unwrap();
-        assert!(!auth.is_signed_in());
-        assert_eq!(events.signed_in.load(Ordering::SeqCst), 0);
-    }
-
-    #[tokio::test]
-    async fn sign_out_clears_locally_even_when_revocation_fails() {
-        let api = Arc::new(FakeApi { logout_fails: true, ..FakeApi::default() });
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-1", "refresh-1", 900));
-        let (auth, events) = service(api, vault.clone());
-        auth.restore();
-        let result = auth.sign_out().await;
-        assert!(result.revocation_failed);
-        assert!(!auth.is_signed_in());
-        assert!(vault.stored.lock().unwrap().is_none());
-        assert_eq!(*events.signed_out.lock().unwrap(), vec![SignedOutReason::SignedOut]);
-    }
-
-    #[tokio::test]
-    async fn a_forced_popup_read_reuses_a_token_rotated_since_it_was_served() {
-        let api = Arc::new(FakeApi::default());
-        let vault = Arc::new(FakeVault::default());
-        signed_in_with(&vault, &tokens("access-2", "refresh-2", 900));
-        let (auth, _) = service(api.clone(), vault);
-        auth.restore();
-        let grant = auth.read_access(true, Some("access-1".into())).await.unwrap().unwrap();
-        assert_eq!(grant.access_token, "access-2");
-        assert_eq!(api.refreshes.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn pkce_is_43_chars_and_derived_by_sha256() {
-        let (verifier, challenge) = create_pkce();
-        assert_eq!(verifier.len(), 43);
-        assert_eq!(challenge, URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())));
-    }
-
-    #[test]
-    fn tokens_never_print() {
-        let printed = format!("{:?}", tokens("secret-access", "secret-refresh", 900));
-        assert!(!printed.contains("secret"));
-    }
-}
+mod tests;

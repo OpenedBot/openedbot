@@ -13,4 +13,12 @@ pub const COMMANDS: &[&str] = &[
     "cancel_sign_in",
     "signin_state",
     "shell_info",
+    "set_theme",
+    "set_text_zoom",
+    "start_window_drag",
+    "toggle_maximize",
+    "report_diagnostic",
+    "update_state",
+    "restart_to_update",
+    "report_update_required",
 ];

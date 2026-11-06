@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, emitTo, listen, once } from "@tauri-apps/api/event";
-import { commands, events, installTauriRuntime, type BridgeError } from "@openedbot/contracts-native-bridge";
+import { commands, events, installTauriRuntime, type BridgeError, type Platform } from "@openedbot/contracts-native-bridge";
 import type { NativeAuthBridge, NativeSigninState, OpenedbotNativeBridge } from "./native-bridge";
+import { installTauriShell } from "./tauri-shell";
 
 /**
  * Le pont natif de l'app de bureau Tauri (`apps/desktop-tauri`), construit sur
@@ -14,12 +15,13 @@ import type { NativeAuthBridge, NativeSigninState, OpenedbotNativeBridge } from 
  */
 
 /** Ce que la coque pose avant le premier script de la page (`initialization_script`, `src-tauri/src/lib.rs`). */
-type TauriShellInfo = { platform: string; version: string; bridgeVersion: number };
+type TauriShellInfo = { platform: Platform; version: string; bridgeVersion: number };
 
 declare global {
   interface Window {
     __OPENEDBOT_SHELL__?: TauriShellInfo;
     __TAURI_INTERNALS__?: unknown;
+    __OPENEDBOT_API_ORIGIN__?: string;
   }
 }
 
@@ -65,6 +67,7 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
       emitTo: (target, event, payload) => emitTo(target as Parameters<typeof emitTo>[0], event, payload),
     },
   });
+  installTauriShell(globalThis.window, globalThis.window.__OPENEDBOT_API_ORIGIN__ ?? "");
 
   // Un seul abonnement pour la vie de la page : la coque pousse chaque état,
   // et `onState` doit rejouer le dernier aussitôt (contrat d'Electron).
@@ -115,9 +118,8 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
     signOut: async () => {
       unwrap(await commands.signOut());
     },
-    // Le contrat du pont fige `platform` à "windows" (`native-titlebar.ts`
-    // lit le système dans l'agent utilisateur) : la coque Tauri le garde.
-    shell: { platform: "windows", version: shell.version },
+    // La coque Tauri dit son vrai système ; celle d'Electron dit toujours "windows".
+    shell: { platform: shell.platform, version: shell.version },
     auth,
   };
 }

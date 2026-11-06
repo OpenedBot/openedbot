@@ -14,9 +14,10 @@ import { nativeBridge, type OpenedbotNativeBridge } from "./native-bridge";
  * - Windows (`"windows"`) : la coque dessine réduire, agrandir et fermer
  *   par-dessus le coin haut droit (`titleBarOverlay`, 46 px de haut).
  *
- * Détection : le pont présent ET la plateforme lue sur le navigateur.
- * `shell.platform` du pont vaut toujours `"windows"` et son contrat est figé,
- * il ne distingue donc rien. Dans un navigateur ou une PWA, rien ne change.
+ * Détection : le pont présent ET sa plateforme. La coque Tauri la dit
+ * (`"macos"`) ; celle d'Electron dit toujours `"windows"` (contrat figé),
+ * la plateforme se lit alors sur le navigateur. Dans un navigateur ou une
+ * PWA, rien ne change.
  */
 export type NativeTitlebar = "mac" | "windows";
 
@@ -28,6 +29,7 @@ export function nativeTitlebarFor(
   nav: { platform: string; userAgent: string },
 ): NativeTitlebar | null {
   if (!bridge) return null;
+  if (bridge.shell?.platform === "macos") return "mac";
   // `MacIntel` aussi sur Apple Silicon ; l'UA d'Electron porte « Macintosh ».
   if (nav.platform.startsWith("Mac") || /Macintosh/.test(nav.userAgent)) return "mac";
   // `Win32` aussi en 64 bits ; l'UA d'Electron porte « Windows NT ».

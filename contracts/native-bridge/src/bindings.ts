@@ -12,8 +12,9 @@ export const commands = {
 	/**  Forces a rotation (single flight); `null` when the refresh is refused. */
 	refresh: () => typedError<string | null, BridgeError>(__TAURI_INVOKE("refresh")),
 	/**
-	 *  Opens an https page of the public console or of the API in the system
-	 *  browser (http only for an origin configured as a lab host).
+	 *  Opens an https page of the public console or of the API, or the site's
+	 *  download page, in the system browser (http only for an origin configured
+	 *  as a lab host).
 	 */
 	openExternal: (url: string) => typedError<null, BridgeError>(__TAURI_INVOKE("open_external", { url })),
 	/**  Revokes the session and forgets it; the shell then shows `/login`. */
@@ -25,17 +26,50 @@ export const commands = {
 	 *  success replaces the page.
 	 */
 	verifyEmailCode: (email: string, code: string) => typedError<null, BridgeError>(__TAURI_INVOKE("verify_email_code", { email, code })),
-	/**  Google sign-in is not part of the D2a prototype (D2b). */
+	/**
+	 *  Starts a Google sign-in in the system browser; progress and outcome
+	 *  arrive as `SigninStateChanged`, success replaces the page.
+	 */
 	startGoogle: () => typedError<null, BridgeError>(__TAURI_INVOKE("start_google")),
 	cancelSignIn: () => __TAURI_INVOKE<void>("cancel_sign_in"),
 	/**  The last sign-in state, replayed to a listener that subscribes late. */
 	signinState: () => __TAURI_INVOKE<SigninState_Serialize>("signin_state"),
 	shellInfo: () => __TAURI_INVOKE<ShellInfo>("shell_info"),
+	/**  The console's theme (`<html data-theme-mode>`): the window's appearance follows. */
+	setTheme: (mode: ThemeMode) => __TAURI_INVOKE<void>("set_theme", { mode }),
+	/**
+	 *  The console's text size as a page zoom (10 to 14 px over 14): the shell
+	 *  zooms the window and keeps the factor for the next launch.
+	 */
+	setTextZoom: (factor: number | null) => typedError<null, BridgeError>(__TAURI_INVOKE("set_text_zoom", { factor })),
+	/**
+	 *  A press on the console's top bar: the window follows the pointer (WKWebView
+	 *  has no `-webkit-app-region`).
+	 */
+	startWindowDrag: () => __TAURI_INVOKE<void>("start_window_drag"),
+	/**  A double click on the console's top bar: zoom or unzoom the window, as a title bar does. */
+	toggleMaximize: () => __TAURI_INVOKE<void>("toggle_maximize"),
+	/**
+	 *  A page error, a failed API call or a failed load, for the shell's journal
+	 *  (`diagnostics.rs`). The page may not write as the shell itself.
+	 */
+	reportDiagnostic: (level: Level, source: Source, message: string, detail: string | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_diagnostic", { level, source, message, detail })),
+	/**  Where the self-update stands now. */
+	updateState: () => __TAURI_INVOKE<UpdateState_Serialize>("update_state"),
+	/**  Restarts into the installed update; `UPDATE_NOT_READY` unless one is `ready`. */
+	restartToUpdate: () => typedError<null, BridgeError>(__TAURI_INVOKE("restart_to_update")),
+	/**
+	 *  The API refused this version (426, `minimum` when it named one): the
+	 *  state becomes `required` and the feed is checked now.
+	 */
+	reportUpdateRequired: (minimum: string | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_update_required", { minimum })),
 };
 
 /** Events */
 export const events = {
+	notificationClicked: makeEvent<NotificationClicked, NotificationClicked>("notification-clicked"),
 	signinStateChanged: makeEvent<SigninStateChanged_Serialize, SigninStateChanged_Deserialize>("signin-state-changed"),
+	updateStateChanged: makeEvent<UpdateStateChanged_Serialize, UpdateStateChanged_Deserialize>("update-state-changed"),
 };
 
 /* Types */
@@ -45,14 +79,27 @@ export type BridgeError = {
 	message: string,
 };
 
+export type Level = "info" | "warn" | "error";
+
+/**
+ *  A click on a notification the page showed, by the id the page gave it:
+ *  the page runs that notification's `onclick` (open the conversation).
+ */
+export type NotificationClicked = {
+	id: number,
+};
+
 export type Persistence = 
 /**  The session is in the keystore and survives a restart. */
 "keystore" | 
 /**  The keystore refused: the session lives in memory only. */
 "memory-only";
 
+/**  The operating system the shell runs on (`window.__OPENEDBOT_SHELL__.platform`). */
+export type Platform = "macos" | "windows" | "linux";
+
 export type ShellInfo = {
-	platform: string,
+	platform: Platform,
 	version: string,
 	bridgeVersion: number,
 	persistence: Persistence,
@@ -86,6 +133,74 @@ export type SigninState_Deserialize = { status: "idle"; reason?: SignedOutReason
  *  of `apps/console/src/lib/platform/native-bridge.ts`).
  */
 export type SigninState_Serialize = { status: "idle"; reason?: SignedOutReason } | { status: "sending" } | { status: "code_sent"; email: string } | { status: "verifying" } | { status: "waiting" } | { status: "error"; code: string; message: string };
+
+export type Source = "main" | "page" | "http" | "load" | "renderer";
+
+/**  The console's theme request (`<html data-theme-mode>`): "system" follows macOS. */
+export type ThemeMode = "light" | "dark" | "system";
+
+/**  Why an attempt failed, without detail (the journal has it). */
+export type UpdateErrorCode = 
+/**  The feed could not be read (network, status, malformed manifest). */
+"FEED_UNREACHABLE" | 
+/**  The artifact could not be downloaded. */
+"DOWNLOAD_FAILED" | 
+/**  The artifact's signature is not the update key's: nothing was written. */
+"SIGNATURE_REFUSED" | 
+/**  The notch popup did not exit in time: the bundle was left alone. */
+"POPUP_STILL_RUNNING" | 
+/**  Replacing the bundle failed. */
+"INSTALL_FAILED" | 
+/**  macOS runs this copy from a read-only place: move it to Applications. */
+"TRANSLOCATED";
+
+/**  One state at a time; `Ready` lasts until the restart. */
+export type UpdateState = UpdateState_Serialize | UpdateState_Deserialize;
+
+/**  Pushed on every change of the update state (progress included). */
+export type UpdateStateChanged = UpdateStateChanged_Serialize | UpdateStateChanged_Deserialize;
+
+/**  Pushed on every change of the update state (progress included). */
+export type UpdateStateChanged_Deserialize = UpdateState_Deserialize;
+
+/**  Pushed on every change of the update state (progress included). */
+export type UpdateStateChanged_Serialize = UpdateState_Serialize;
+
+/**  One state at a time; `Ready` lasts until the restart. */
+export type UpdateState_Deserialize = 
+/**  Up to date, or not checked yet. */
+{ status: "idle" } | 
+/**  The feed offers `version`; the download starts at once. */
+{ status: "available"; version: string } | 
+/**  Bytes received so far; `total` when the feed said it. */
+{ status: "downloading"; version: string; downloaded: number; total?: number | null } | 
+/**  Installed: applied by a restart (`restart_to_update`) or at the next launch. */
+{ status: "ready"; version: string } | 
+/**  The last attempt failed; the installed version is intact. */
+{ status: "error"; code: UpdateErrorCode } | 
+/**
+ *  The API refuses this version (426): an update is needed to go on.
+ *  `minimum` when the API named it.
+ */
+{ status: "required"; minimum?: string | null };
+
+/**  One state at a time; `Ready` lasts until the restart. */
+export type UpdateState_Serialize = 
+/**  Up to date, or not checked yet. */
+{ status: "idle" } | 
+/**  The feed offers `version`; the download starts at once. */
+{ status: "available"; version: string } | 
+/**  Bytes received so far; `total` when the feed said it. */
+{ status: "downloading"; version: string; downloaded: number; total: number | null } | 
+/**  Installed: applied by a restart (`restart_to_update`) or at the next launch. */
+{ status: "ready"; version: string } | 
+/**  The last attempt failed; the installed version is intact. */
+{ status: "error"; code: UpdateErrorCode } | 
+/**
+ *  The API refuses this version (426): an update is needed to go on.
+ *  `minimum` when the API named it.
+ */
+{ status: "required"; minimum: string | null };
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

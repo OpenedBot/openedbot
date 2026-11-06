@@ -8,7 +8,6 @@
 //! Life cycle: one launch, then up to `MAX_FAILURES` restarts with a growing
 //! delay; a missing or incompatible bundle stops at once.
 
-use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -20,114 +19,38 @@ use tokio::sync::mpsc;
 
 use crate::auth::{AccessGrant, ApiError};
 
+mod protocol;
+pub use protocol::{encode_host_message, parse_popup_message, resolve_console_path, HostToPopup, ParseFailure, PopupToHost};
+
 pub const PROTOCOL_VERSION: u32 = 1;
 /// Longest line either side accepts. Real messages are a few hundred bytes.
 pub const MAX_LINE_LENGTH: usize = 16 * 1024;
 pub const BUNDLE_NAME: &str = "OpenedbotPopup.app";
 const EXECUTABLE: &str = "Contents/MacOS/OpenedbotPopup";
-const READY_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_GRACE: Duration = Duration::from_secs(2);
-const MAX_FAILURES: u32 = 5;
-const RESTART_BASE: Duration = Duration::from_secs(1);
-const RESTART_CAP: Duration = Duration::from_secs(16);
-const HEALTHY_RUN: Duration = Duration::from_secs(60);
-const MAX_PATH_LENGTH: usize = 1024;
 
-/// Popup -> host.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum PopupToHost {
-    Ready { protocol: u32, version: String },
-    Token { id: String, #[serde(default)] force: bool },
-    OpenConsole { path: String },
-    SignOut,
-    Fatal { code: String },
+/// How long the host waits and how often it restarts (`popup-host.ts`):
+/// one launch, then up to `max_failures` restarts with a doubling delay; a
+/// run that lasted `healthy_run` resets the count.
+#[derive(Debug, Clone, Copy)]
+pub struct Policy {
+    pub ready_timeout: Duration,
+    pub max_failures: u32,
+    pub restart_base: Duration,
+    pub restart_cap: Duration,
+    pub healthy_run: Duration,
 }
 
-/// Host -> popup. Serialized field by field: nothing else can leak.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum HostToPopup {
-    #[serde(rename_all = "camelCase")]
-    Hello { protocol: u32, api_origin: String, console_url: String },
-    #[serde(rename_all = "camelCase")]
-    Token {
-        id: String,
-        access_token: Option<String>,
-        expires_at: Option<String>,
-        organization_id: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        error: Option<&'static str>,
-    },
-    SignedOut,
-    SignedIn,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParseFailure {
-    TooLong,
-    InvalidJson,
-    UnknownType,
-    InvalidFields,
-}
-
-fn valid_id(id: &str) -> bool {
-    (1..=64).contains(&id.len()) && id.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-}
-
-fn valid_code(code: &str) -> bool {
-    let bytes = code.as_bytes();
-    (1..=64).contains(&bytes.len())
-        && bytes[0].is_ascii_uppercase()
-        && bytes.iter().all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || *byte == b'_')
-}
-
-/// Parses one line read from the popup. Unknown fields are ignored (forward compatible).
-pub fn parse_popup_message(line: &str) -> Result<PopupToHost, ParseFailure> {
-    if line.len() > MAX_LINE_LENGTH {
-        return Err(ParseFailure::TooLong);
+impl Default for Policy {
+    fn default() -> Self {
+        Self {
+            ready_timeout: Duration::from_secs(10),
+            max_failures: 5,
+            restart_base: Duration::from_secs(1),
+            restart_cap: Duration::from_secs(16),
+            healthy_run: Duration::from_secs(60),
+        }
     }
-    let value: serde_json::Value = serde_json::from_str(line).map_err(|_| ParseFailure::InvalidJson)?;
-    let kind = value.get("type").and_then(|kind| kind.as_str()).ok_or(ParseFailure::InvalidJson)?;
-    if !matches!(kind, "ready" | "token" | "openConsole" | "signOut" | "fatal") {
-        return Err(ParseFailure::UnknownType);
-    }
-    let message: PopupToHost = serde_json::from_value(value).map_err(|_| ParseFailure::InvalidFields)?;
-    let valid = match &message {
-        PopupToHost::Ready { version, .. } => (1..=64).contains(&version.len()),
-        PopupToHost::Token { id, .. } => valid_id(id),
-        PopupToHost::OpenConsole { path } => (1..=MAX_PATH_LENGTH).contains(&path.len()),
-        PopupToHost::SignOut => true,
-        PopupToHost::Fatal { code } => valid_code(code),
-    };
-    if valid {
-        Ok(message)
-    } else {
-        Err(ParseFailure::InvalidFields)
-    }
-}
-
-pub fn encode_host_message(message: &HostToPopup) -> String {
-    let mut line = serde_json::to_string(message).expect("host message serializes");
-    line.push('\n');
-    line
-}
-
-/// A console path asked by the popup, or `None`. Only a plain absolute path
-/// qualifies: no scheme, no `//host`, no backslash or control character, no
-/// `..` segment. The shell then opens it on its local origin.
-pub fn resolve_console_path(path: &str) -> Option<String> {
-    if path.is_empty() || path.len() > MAX_PATH_LENGTH || !path.starts_with('/') || path.starts_with("//") {
-        return None;
-    }
-    if path.chars().any(|c| c == '\\' || c.is_control()) {
-        return None;
-    }
-    let route = path.split(['?', '#']).next().unwrap_or("");
-    if route.split('/').any(|segment| segment == ".." || segment == ".") {
-        return None;
-    }
-    Some(path.to_string())
 }
 
 /// The protocol a bundle declares (`OpenedbotHostedProtocol` in its
@@ -160,6 +83,8 @@ pub trait PopupEvents: Send + Sync + 'static {
     fn open_console(&self, path: &str);
     /// The popup cannot run (missing, crash loop, refused): fall back to the window.
     fn gave_up(&self, reason: &GiveUp);
+    /// "Quit" from the popup's own menu: the user no longer wants it.
+    fn user_closed(&self) {}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,6 +97,8 @@ pub enum GiveUp {
 
 struct State {
     wanted: bool,
+    /// An update replaces the bundle: no start until released.
+    held: bool,
     /// The run that owns `sender` and `stop`: a run that ends late (stopped,
     /// then started again) must not clear its successor's channel.
     run: u64,
@@ -185,7 +112,11 @@ pub struct PopupHost<T: TokenSource> {
     console_url: String,
     tokens: Arc<T>,
     events: Arc<dyn PopupEvents>,
+    policy: Policy,
     state: Mutex<State>,
+    /// How many popup processes exist (launching included): the updater
+    /// waits for 0 before it replaces the bundle that holds the executable.
+    running: tokio::sync::watch::Sender<usize>,
 }
 
 enum RunEnd {
@@ -199,24 +130,67 @@ enum RunEnd {
 
 impl<T: TokenSource> PopupHost<T> {
     pub fn new(bundle: Option<PathBuf>, api_origin: &str, console_url: &str, tokens: Arc<T>, events: Arc<dyn PopupEvents>) -> Arc<Self> {
+        Self::with_policy(bundle, api_origin, console_url, tokens, events, Policy::default())
+    }
+
+    pub fn with_policy(bundle: Option<PathBuf>, api_origin: &str, console_url: &str, tokens: Arc<T>, events: Arc<dyn PopupEvents>, policy: Policy) -> Arc<Self> {
         Arc::new(Self {
             bundle,
             api_origin: api_origin.into(),
             console_url: console_url.into(),
             tokens,
             events,
-            state: Mutex::new(State { wanted: false, run: 0, sender: None, stop: None }),
+            policy,
+            state: Mutex::new(State { wanted: false, held: false, run: 0, sender: None, stop: None }),
+            running: tokio::sync::watch::channel(0).0,
         })
+    }
+
+    /// A bundle was found (the menu greys the popup modes otherwise).
+    pub fn available(&self) -> bool {
+        self.bundle.is_some()
+    }
+
+    /// Stops the popup and waits, at most `limit`, until its process has
+    /// exited. `true` when no popup process remains.
+    pub async fn stop_and_wait(&self, limit: Duration) -> bool {
+        self.stop();
+        let mut running = self.running.subscribe();
+        tokio::time::timeout(limit, running.wait_for(|running| *running == 0)).await.is_ok_and(|waited| waited.is_ok())
+    }
+
+    /// One launch is over (spawn failed, stopped, or exited). Runs may
+    /// overlap (stopped, then started before the old process exited): the
+    /// count reaches 0 only once every one of them is gone.
+    fn release_run(&self) {
+        self.running.send_modify(|running| *running = running.saturating_sub(1));
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    /// Keeps a popup running from now on (idempotent). Must be called inside the async runtime.
+    /// Stops the popup and refuses every `start` until `release`, then waits
+    /// for its exit like `stop_and_wait`: the updater replaces the bundle
+    /// that holds the executable meanwhile.
+    pub async fn hold_and_wait(&self, limit: Duration) -> bool {
+        self.lock().held = true;
+        self.stop_and_wait(limit).await
+    }
+
+    /// Lifts `hold_and_wait`; the caller starts the popup again if wanted.
+    pub fn release(&self) {
+        self.lock().held = false;
+    }
+
+    /// Keeps a popup running from now on (idempotent; ignored while held). Must be called inside the async runtime.
     pub fn start(self: &Arc<Self>) {
         {
             let mut state = self.lock();
+            if state.held {
+                log::info!("popup start deferred: an update replaces the bundle");
+                return;
+            }
             if state.wanted {
                 return;
             }
@@ -259,6 +233,7 @@ impl<T: TokenSource> PopupHost<T> {
                 RunEnd::UserClosed => {
                     self.lock().wanted = false;
                     log::info!("popup closed by the user");
+                    self.events.user_closed();
                     return;
                 }
                 RunEnd::Refused(reason) => {
@@ -266,16 +241,17 @@ impl<T: TokenSource> PopupHost<T> {
                     return;
                 }
                 RunEnd::Failed { ran_for } => {
-                    if ran_for.is_some_and(|ran| ran >= HEALTHY_RUN) {
+                    let policy = self.policy;
+                    if ran_for.is_some_and(|ran| ran >= policy.healthy_run) {
                         failures = 0;
                     }
                     failures += 1;
-                    if failures > MAX_FAILURES {
+                    if failures > policy.max_failures {
                         self.give_up(GiveUp::Crashing(failures - 1));
                         return;
                     }
-                    let delay = RESTART_BASE.saturating_mul(2u32.saturating_pow(failures - 1)).min(RESTART_CAP);
-                    log::warn!("popup failed ({failures}/{MAX_FAILURES}), restarting in {} ms", delay.as_millis());
+                    let delay = policy.restart_base.saturating_mul(2u32.saturating_pow(failures - 1)).min(policy.restart_cap);
+                    log::warn!("popup failed ({failures}/{}), restarting in {} ms", policy.max_failures, delay.as_millis());
                     tokio::time::sleep(delay).await;
                 }
             }
@@ -289,6 +265,15 @@ impl<T: TokenSource> PopupHost<T> {
     }
 
     async fn run_once(self: &Arc<Self>, bundle: &Path) -> RunEnd {
+        {
+            let state = self.lock();
+            if !state.wanted {
+                return RunEnd::Stopped;
+            }
+            // Claimed under the lock `stop` takes: from here a stop waits for
+            // this launch to end, even one still being spawned.
+            self.running.send_modify(|running| *running += 1);
+        }
         let spawned = Command::new(bundle.join(EXECUTABLE))
             .arg("--hosted")
             .stdin(Stdio::piped())
@@ -301,6 +286,7 @@ impl<T: TokenSource> PopupHost<T> {
             Ok(child) => child,
             Err(error) => {
                 log::error!("popup spawn failed ({})", error.kind());
+                self.release_run();
                 return RunEnd::Failed { ran_for: None };
             }
         };
@@ -311,13 +297,21 @@ impl<T: TokenSource> PopupHost<T> {
         let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel::<()>();
         let run = {
             let mut state = self.lock();
-            if !state.wanted {
-                return RunEnd::Stopped;
+            if state.wanted {
+                state.run += 1;
+                state.sender = Some(sender.clone());
+                state.stop = Some(stop_tx);
+                Some(state.run)
+            } else {
+                None
             }
-            state.run += 1;
-            state.sender = Some(sender.clone());
-            state.stop = Some(stop_tx);
-            state.run
+        };
+        let Some(run) = run else {
+            // Stopped while it was being spawned.
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            self.release_run();
+            return RunEnd::Stopped;
         };
 
         // One writer: replies from several token tasks never interleave.
@@ -336,7 +330,7 @@ impl<T: TokenSource> PopupHost<T> {
         let mut ready_at: Option<Instant> = None;
         let mut refusal: Option<GiveUp> = None;
         let served: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-        let ready_deadline = tokio::time::sleep(READY_TIMEOUT);
+        let ready_deadline = tokio::time::sleep(self.policy.ready_timeout);
         tokio::pin!(ready_deadline);
         let mut stopping = false;
 
@@ -403,6 +397,7 @@ impl<T: TokenSource> PopupHost<T> {
         }
         drop(sender);
         writer.abort();
+        self.release_run();
         log::info!("popup exited ({})", status.map(|status| status.to_string()).unwrap_or_else(|| "unknown".into()));
         if stopping || !self.lock().wanted || self.lock().run != run {
             return RunEnd::Stopped;
@@ -518,160 +513,4 @@ async fn read_bounded_line<R: tokio::io::AsyncBufRead + Unpin>(reader: &mut R, l
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::os::unix::fs::PermissionsExt;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    #[test]
-    fn parses_the_popup_messages_and_rejects_the_rest() {
-        assert_eq!(
-            parse_popup_message(r#"{"type":"ready","protocol":1,"version":"1.2.0","extra":true}"#),
-            Ok(PopupToHost::Ready { protocol: 1, version: "1.2.0".into() })
-        );
-        assert_eq!(parse_popup_message(r#"{"type":"token","id":"t-1"}"#), Ok(PopupToHost::Token { id: "t-1".into(), force: false }));
-        assert_eq!(parse_popup_message(r#"{"type":"token","id":"bad id"}"#), Err(ParseFailure::InvalidFields));
-        assert_eq!(parse_popup_message(r#"{"type":"fatal","code":"lower"}"#), Err(ParseFailure::InvalidFields));
-        assert_eq!(parse_popup_message(r#"{"type":"steal"}"#), Err(ParseFailure::UnknownType));
-        assert_eq!(parse_popup_message("not json"), Err(ParseFailure::InvalidJson));
-        assert_eq!(parse_popup_message(&"x".repeat(MAX_LINE_LENGTH + 1)), Err(ParseFailure::TooLong));
-    }
-
-    #[test]
-    fn encodes_host_messages_on_one_line() {
-        let hello = encode_host_message(&HostToPopup::Hello { protocol: 1, api_origin: "http://127.0.0.1:8790".into(), console_url: "x".into() });
-        assert_eq!(hello, "{\"type\":\"hello\",\"protocol\":1,\"apiOrigin\":\"http://127.0.0.1:8790\",\"consoleUrl\":\"x\"}\n");
-        let token = encode_host_message(&HostToPopup::Token { id: "a".into(), access_token: None, expires_at: None, organization_id: None, error: Some("unavailable") });
-        assert_eq!(token, "{\"type\":\"token\",\"id\":\"a\",\"accessToken\":null,\"expiresAt\":null,\"organizationId\":null,\"error\":\"unavailable\"}\n");
-        assert_eq!(encode_host_message(&HostToPopup::SignedIn), "{\"type\":\"signedIn\"}\n");
-    }
-
-    #[test]
-    fn console_paths_stay_plain_and_absolute() {
-        assert_eq!(resolve_console_path("/compact/bot-1?x=1#y").as_deref(), Some("/compact/bot-1?x=1#y"));
-        for refused in ["", "compact", "//evil.com", "/a\\b", "/a/../b", "/a\nb", "https://evil.com"] {
-            assert_eq!(resolve_console_path(refused), None, "{refused:?}");
-        }
-    }
-
-    struct Tokens {
-        served: AtomicUsize,
-    }
-
-    impl TokenSource for Tokens {
-        async fn read_access(&self, _force: bool, _served: Option<String>) -> Result<Option<AccessGrant>, ApiError> {
-            self.served.fetch_add(1, Ordering::SeqCst);
-            Ok(Some(AccessGrant { access_token: "access".into(), expires_at: "2099-01-01T00:00:00Z".into(), organization_id: Some("org".into()) }))
-        }
-        fn is_signed_in(&self) -> bool {
-            true
-        }
-        async fn sign_out(&self) {}
-    }
-
-    #[derive(Default)]
-    struct Events {
-        opened: Mutex<Vec<String>>,
-        gave_up: Mutex<Vec<GiveUp>>,
-    }
-
-    impl PopupEvents for Events {
-        fn open_console(&self, path: &str) {
-            self.opened.lock().unwrap().push(path.into());
-        }
-        fn gave_up(&self, reason: &GiveUp) {
-            self.gave_up.lock().unwrap().push(reason.clone());
-        }
-    }
-
-    /// A fake popup bundle: a shell script speaking the protocol.
-    fn fake_bundle(name: &str, protocol: u32, script: &str) -> PathBuf {
-        let bundle = std::env::temp_dir().join(format!("openedbot-popup-test-{}-{name}", std::process::id())).join(BUNDLE_NAME);
-        std::fs::create_dir_all(bundle.join("Contents/MacOS")).unwrap();
-        std::fs::write(
-            bundle.join("Contents/Info.plist"),
-            format!("<plist><dict><key>OpenedbotHostedProtocol</key>\n  <integer>{protocol}</integer></dict></plist>"),
-        )
-        .unwrap();
-        let executable = bundle.join(EXECUTABLE);
-        std::fs::write(&executable, format!("#!/bin/sh\n{script}\n")).unwrap();
-        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
-        bundle
-    }
-
-    #[test]
-    fn reads_the_declared_protocol() {
-        let bundle = fake_bundle("plist", 1, "exit 0");
-        assert_eq!(read_hosted_protocol(&bundle), Some(1));
-        assert_eq!(read_hosted_protocol(Path::new("/nonexistent")), None);
-    }
-
-    #[tokio::test]
-    async fn hosts_a_popup_through_ready_hello_and_a_token() {
-        // Answers ready, then asks for a token and a console path once it got
-        // hello and the session state, then echoes the token reply to a file.
-        let out = std::env::temp_dir().join(format!("openedbot-popup-test-{}-out", std::process::id()));
-        let script = format!(
-            r#"echo '{{"type":"ready","protocol":1,"version":"test"}}'
-read hello; read state
-echo '{{"type":"token","id":"t1"}}'
-echo '{{"type":"openConsole","path":"/compact/bot-1"}}'
-echo '{{"type":"openConsole","path":"//evil"}}'
-read reply
-printf '%s\n%s\n%s\n' "$hello" "$state" "$reply" > '{}'
-read eof
-exit 0"#,
-            out.display()
-        );
-        let bundle = fake_bundle("happy", 1, &script);
-        let tokens = Arc::new(Tokens { served: AtomicUsize::new(0) });
-        let events = Arc::new(Events::default());
-        let host = PopupHost::new(Some(bundle), "http://127.0.0.1:8790", "http://localhost:1420", tokens.clone(), events.clone());
-        host.start();
-        for _ in 0..100 {
-            if out.exists() && std::fs::read_to_string(&out).unwrap().lines().count() == 3 {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-        let written = std::fs::read_to_string(&out).expect("the fake popup wrote what it received");
-        let lines: Vec<&str> = written.lines().collect();
-        assert_eq!(lines[0], r#"{"type":"hello","protocol":1,"apiOrigin":"http://127.0.0.1:8790","consoleUrl":"http://localhost:1420"}"#);
-        assert_eq!(lines[1], r#"{"type":"signedIn"}"#);
-        assert!(lines[2].contains(r#""id":"t1""#) && lines[2].contains(r#""organizationId":"org""#));
-        assert_eq!(tokens.served.load(Ordering::SeqCst), 1);
-        assert_eq!(*events.opened.lock().unwrap(), vec!["/compact/bot-1".to_string()]);
-        host.stop();
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        assert!(events.gave_up.lock().unwrap().is_empty());
-        let _ = std::fs::remove_file(out);
-    }
-
-    #[tokio::test]
-    async fn an_incompatible_or_missing_bundle_is_given_up_at_once() {
-        let events = Arc::new(Events::default());
-        let tokens = Arc::new(Tokens { served: AtomicUsize::new(0) });
-        let old = fake_bundle("old", 2, "exit 0");
-        PopupHost::new(Some(old), "a", "b", tokens.clone(), events.clone()).start();
-        PopupHost::new(None, "a", "b", tokens, events.clone()).start();
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        let reasons = events.gave_up.lock().unwrap().clone();
-        assert!(reasons.contains(&GiveUp::Protocol(2)));
-        assert!(reasons.contains(&GiveUp::Missing));
-    }
-
-    #[tokio::test]
-    async fn a_popup_that_refuses_is_not_restarted() {
-        let events = Arc::new(Events::default());
-        let tokens = Arc::new(Tokens { served: AtomicUsize::new(0) });
-        let bundle = fake_bundle("fatal", 1, r#"echo '{"type":"fatal","code":"UNSUPPORTED_OS"}'; sleep 5"#);
-        PopupHost::new(Some(bundle), "a", "b", tokens, events.clone()).start();
-        for _ in 0..60 {
-            if !events.gave_up.lock().unwrap().is_empty() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-        assert_eq!(*events.gave_up.lock().unwrap(), vec![GiveUp::Fatal("UNSUPPORTED_OS".into())]);
-    }
-}
+mod tests;

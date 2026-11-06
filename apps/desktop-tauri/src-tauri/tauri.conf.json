@@ -11,12 +11,17 @@
     "windows": [],
     "security": {
       "csp": null,
-      "capabilities": ["main"]
+      "capabilities": [
+        "main"
+      ]
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "createUpdaterArtifacts": true,
     "category": "Productivity",
     "copyright": "openedbot",
@@ -35,6 +40,11 @@
     "updater": {
       "pubkey": "",
       "endpoints": []
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": []
+      }
     }
   }
 }
