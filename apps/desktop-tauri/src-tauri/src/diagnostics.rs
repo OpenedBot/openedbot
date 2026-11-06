@@ -348,10 +348,16 @@ mod tests {
             record(Level::Warn, Source::Http, &format!("GET /api/x {index} 500"), Some("fetch"));
         }
         let db = Connection::open(&path).unwrap();
-        let count = |source: &str| -> i64 { db.query_row("select count(*) from events where source = ?1", [source], |row| row.get(0)).unwrap() };
-        assert_eq!(count("http"), i64::from(MAX_PER_MINUTE));
-        assert_eq!(count("page"), 1);
-        let page: String = db.query_row("select message from events where source = 'page'", [], |row| row.get(0)).unwrap();
+        // The journal is process-wide and other tests (bridge, logger) may record
+        // into it while this one runs: count only this test's own events.
+        let count = |source: &str, pattern: &str| -> i64 {
+            db.query_row("select count(*) from events where source = ?1 and message like ?2", [source, pattern], |row| row.get(0)).unwrap()
+        };
+        // The per-minute cap holds for the source as a whole, whoever records.
+        assert_eq!(count("http", "%"), i64::from(MAX_PER_MINUTE));
+        assert!(count("http", "GET /api/x % 500") >= i64::from(MAX_PER_MINUTE) - 5);
+        assert_eq!(count("page", "before open%"), 1);
+        let page: String = db.query_row("select message from events where source = 'page' and message like 'before open%'", [], |row| row.get(0)).unwrap();
         assert!(!page.contains("secret-value"), "{page}");
         let launches: i64 = db.query_row("select count(*) from events where message = 'launch'", [], |row| row.get(0)).unwrap();
         assert_eq!(launches, 1);

@@ -42,6 +42,17 @@ const isExpr = (value: unknown): value is SqlExpr =>
 
 export const NOW = sqlExpr`now()`;
 
+/**
+ * A template object built at run time, shaped like the one a tagged literal
+ * gets: frozen, with a non-enumerable frozen `raw`. Bun 1.4.4's `sql` refuses
+ * an array whose `raw` is enumerable (ERR_INVALID_ARG_VALUE).
+ */
+export function templateStrings(parts: readonly string[]): TemplateStringsArray {
+  const strings = [...parts];
+  Object.defineProperty(strings, "raw", { value: Object.freeze([...parts]) });
+  return Object.freeze(strings) as unknown as TemplateStringsArray;
+}
+
 /** One statement, built in pieces and sent as a single tagged template. */
 export class SqlStatement {
   private readonly parts: string[] = [""];
@@ -68,8 +79,7 @@ export class SqlStatement {
   }
 
   run<T>(sql: SQL): Promise<T> {
-    const strings = Object.assign([...this.parts], { raw: [...this.parts] }) as unknown as TemplateStringsArray;
-    return sql(strings, ...this.bound) as unknown as Promise<T>;
+    return sql(templateStrings(this.parts), ...this.bound) as unknown as Promise<T>;
   }
 }
 

@@ -10,7 +10,7 @@ import {
   statusEdgeCondition,
   statusTransitionAllowed,
 } from "../src/domain/run-transitions";
-import { leaseFence, transitionRuns, type RunTransitionChange } from "../src/sql/run-transitions";
+import { leaseFence, templateStrings, transitionRuns, type RunTransitionChange } from "../src/sql/run-transitions";
 
 /**
  * S2d: the tables of `domain/run-transitions.ts`, every pair, against the
@@ -203,5 +203,18 @@ describe("primitive de transition (S2d)", () => {
       target: { organizationId: "org-1", ids: [] }, fence: "unleased", transition: { from: ["queued"], to: { status: "cancelled" } },
     })).toEqual([]);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("templateStrings", () => {
+  // Bun 1.4.4's sql rejects a template object whose raw is enumerable.
+  test("is shaped like a tagged literal's template object", () => {
+    const strings = templateStrings(["select ", " from runs"]);
+    expect([...strings]).toEqual(["select ", " from runs"]);
+    expect(strings.raw).toEqual(["select ", " from runs"]);
+    expect(Object.keys(strings)).toEqual(["0", "1"]);
+    expect(Object.getOwnPropertyDescriptor(strings, "raw")?.enumerable).toBe(false);
+    expect(Object.isFrozen(strings)).toBe(true);
+    expect(Object.isFrozen(strings.raw)).toBe(true);
   });
 });
