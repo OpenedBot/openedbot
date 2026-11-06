@@ -8,7 +8,7 @@ import {
   advanceThreadSessionGeneration,
   markThreadSessionOpened,
   readThreadSessionGeneration,
-} from "@openedbot/conversation/sql/threads";
+} from "@openedbot/conversation/application/threads";
 import type { ClaimedRun } from "../queue";
 import { log } from "./util";
 import { pinRunSessionKey } from "../../sql/run-columns";

@@ -8,6 +8,9 @@ import type { Db } from "@openedbot/platform-db";
 import type { AccessTier, ProductFeatureAudience, ResolvedProductFeatures } from "@openedbot/contracts-api";
 import { readProductFeatureRows, seedProductFeatureDefault } from "../sql/product-features";
 
+/** The stored rows themselves, for the backoffice (plug-in) that switches them. */
+export { readProductFeatureRows };
+
 /**
  * The stored switch keys (`product_features.feature_key`) behind the fleet
  * capabilities. Rows written before step 11.2 keep their old keys; they are

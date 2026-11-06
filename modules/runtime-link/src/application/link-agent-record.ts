@@ -1,7 +1,7 @@
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import { runtimeConnector } from "@openedbot/platform-config/connector-version";
 import { withCredential, withTenant, type Db } from "@openedbot/platform-db";
-import { writeLinkAgent } from "@openedbot/runtimes/sql/runtime-link-rows";
+import { writeLinkAgent } from "@openedbot/runtimes/application/runtime-link-rows";
 import { enqueueConnectorUpgradeNotice } from "./connector-notices";
 import type { LinkConnection, LinkIdentity, LinkLogger, RuntimeLinkBroker } from "./broker";
 

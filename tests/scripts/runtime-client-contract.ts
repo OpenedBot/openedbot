@@ -15,7 +15,10 @@
  *     (`execution/application/runtime-client`), no import of an execution
  *     entry point (`ENTRY_POINTS`: the room summary, a run, a command).
  *  2. In `modules/*\/src` and `platform/*\/src`, `new HermesClient` only in
- *     the files of `CONSTRUCTORS`, each with its class: a new one is
+ *     the files of `CONSTRUCTORS`, each with its class: the two factories
+ *     (`runtimeAdminClient`, the worker's `createRuntimeClient`) and the
+ *     client itself. Since S4 the roster's bot host and the link enrollment
+ *     probe go through `runtimeAdminClient` too; a new constructor is
  *     classified here (read/admin or execution) before it ships.
  *  3. Every public method of `HermesClient` is classified: one of
  *     `RUNTIME_EXECUTION_VERBS` (parsed from `FACTORY`) or one of
@@ -42,8 +45,6 @@ const CONSTRUCTORS: Record<string, string> = {
   [FACTORY]: "read/admin : le seul client de l'API, sans verbe d'exécution",
   [CLIENT]: "le client lui-même (son profil dérivé)",
   "modules/execution/src/application/runtime-client.ts": "exécution : le client du worker, sous le bail du run ou de la commande",
-  "modules/roster/src/application/bot-host.ts": "read/admin : profils et sessions d'un bot (création, purge), défauts injectables",
-  "modules/runtime-link/src/application/gateway.ts": "read/admin : sonde d'enrôlement à travers le lien, avant que le runtime existe",
 };
 
 /** The reads and administration of a runtime; `RUNTIME_EXECUTION_VERBS` holds the rest. */

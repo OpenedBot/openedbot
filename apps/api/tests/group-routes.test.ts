@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { groupRoutes } from "../src/routes/roster/group-routes";
 import { readGroupDefaultResponder } from "@openedbot/roster/domain/groups";
-import { readGroups } from "@openedbot/roster/sql/groups";
+import { readGroups } from "@openedbot/roster/application/groups";
 import { HttpError } from "../src/interfaces/http/http-error";
 
 const owner: AuthContext = {

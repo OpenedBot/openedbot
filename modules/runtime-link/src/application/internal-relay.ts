@@ -15,7 +15,7 @@ import { jsonBody } from "@openedbot/platform-config/http-body";
 import { SSE_HEARTBEAT_INTERVAL_MS } from "@openedbot/platform-config/sse-heartbeat";
 import { constantTimeEqual } from "@openedbot/platform-db/credential";
 import { relayFailureStatus, type RuntimeLinkBroker } from "./broker";
-import { parseProbeGeneration, type LinkProbeResult } from "../domain/link-probe";
+import { parseProbeGeneration, type LinkProbeResult } from "@openedbot/runtimes/domain/link-probe";
 import {
   loopResponse,
   RUNTIME_LINK_INTERNAL_PREFIX,

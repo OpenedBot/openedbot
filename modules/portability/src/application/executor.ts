@@ -2,14 +2,14 @@ import type { SQL, TransactionSQL } from "bun";
 import { HermesClientError, type HermesClient, type HermesHostProfile, type HermesModelOptions, type HermesProfileAvatar } from "@openedbot/hermes";
 import { ALWAYS_FORBIDDEN_TOOLSETS } from "@openedbot/runtimes/domain/runtime-contract";
 import type { HermesBundleImportJobDto } from "@openedbot/contracts-api";
-import { ProfileImportError } from "../domain/errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import {
   assertImportCollisions, assertImportTenantAvailable, emptyImportReport, IMPORT_LEASE_SECONDS,
   type ImportItemRow, type ImportJobRow, type ImportOperation, type ImportRuntime,
 } from "../sql/jobs";
-import { resolveImportedModel } from "./model";
-import { profileCreationFailureState } from "./provision";
-import { lockProfileImports } from "../sql/reservations";
+import { resolveImportedModel } from "@openedbot/roster/application/host-profile-model";
+import { profileCreationFailureState } from "@openedbot/roster/application/host-profile-provision";
+import { lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 import { createImportedGroups, importHermesProfile, importObjectKey, type ImportBlobStore } from "../sql/roster";
 import { RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 

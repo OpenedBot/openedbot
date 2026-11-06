@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import type { PersonaDraftDto } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { queuePersonaDraftRunTx } from "@openedbot/execution/application/run-creation";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { PERSONA_MAX_CHARS } from "../domain/persona";
@@ -21,13 +20,14 @@ import {
   setBotInstructions,
 } from "../sql/bot-activity";
 import type { BotDeps } from "./bot-host";
+import type { BotRuns } from "./bot-runs";
 
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 /** Met un brouillon de persona en file pour un bot existant, à partir de sa conversation. */
-export async function queuePersonaDraft(db: Db, organizationId: string, botId: string): Promise<PersonaDraftDto> {
+export async function queuePersonaDraft(db: Db, runs: BotRuns, organizationId: string, botId: string): Promise<PersonaDraftDto> {
   const queued = await withTenant(db, organizationId, async (tx) => {
     const bot = await lockBotForPersonaDraft(tx, organizationId, botId);
     if (!bot) return { kind: "missing" } as const;
@@ -47,7 +47,7 @@ export async function queuePersonaDraft(db: Db, organizationId: string, botId: s
     );
     const sessionKey = personaDraftSessionKey(organizationId, bot.id);
     const draftThreadId = await ensurePersonaDraftThread(tx, organizationId, bot.id, bot.name, sessionKey);
-    const runId = await queuePersonaDraftRunTx(tx, {
+    const runId = await runs.queuePersonaDraft(tx, {
       organizationId,
       threadId: draftThreadId,
       botId: bot.id,

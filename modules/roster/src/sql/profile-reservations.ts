@@ -1,5 +1,5 @@
 import type { TransactionSQL } from "bun";
-import { ProfileImportError } from "../domain/errors";
+import { ProfileImportError } from "../domain/profile-errors";
 
 export async function lockProfileImports(tx: TransactionSQL, organizationId: string): Promise<void> {
   await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('hermes-profile-import'))`;

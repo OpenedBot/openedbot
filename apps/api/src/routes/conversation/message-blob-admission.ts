@@ -1,6 +1,6 @@
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { reserveUncommittedBlobs } from "@openedbot/conversation/sql/uncommitted-blobs";
+import { reserveUncommittedBlobs } from "@openedbot/conversation/application/uncommitted-blobs";
 import type { BlobStore } from "../../infrastructure/blob-store";
 
 export type StoredObject = { key: string; data: Uint8Array; contentType: string };

@@ -12,7 +12,7 @@ import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { readOrganizationRuntimeModeIn } from "@openedbot/runtimes/application/runtime-mode";
 import { assertLinkReachable, runtimeClientConfig } from "@openedbot/runtimes/application/runtime-access";
-import { readRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
 import { requireOperator, type AppVariables } from "../identity/auth";
 import { HttpError } from "../../interfaces/http/http-error";
 import { runtimeLinks, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";

@@ -5,8 +5,8 @@ import {
   authMiddleware,
   sessionDevice,
 } from "../src/routes/identity/auth";
-import { recordUserLogin } from "@openedbot/identity/sql/accounts";
-import { createWebSession } from "@openedbot/identity/sql/sessions";
+import { recordUserLogin } from "@openedbot/identity/application/accounts";
+import { createWebSession } from "@openedbot/identity/application/sessions";
 import { hashCredential } from "../src/infrastructure/crypto";
 import type { AppVariables } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";

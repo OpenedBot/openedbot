@@ -25,7 +25,7 @@ import {
 } from "../src/routes/runtimes/runtime-routes";
 import { readRuntimeSecret, runtimeClientConfig } from "@openedbot/runtimes/application/runtime-access";
 import type { RuntimeLinkLocator } from "@openedbot/runtime-link/application/instances";
-import type { LinkProbeResult } from "@openedbot/runtime-link/domain/link-probe";
+import type { LinkProbeResult } from "@openedbot/runtimes/domain/link-probe";
 
 const row: RuntimeRow = {
   id: "runtime-1",

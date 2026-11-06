@@ -11,12 +11,12 @@ import {
   lockBotWithHostProfileDeleting,
   markBotHostProfileDeleting,
   releaseBotHostProfileDeleting,
-} from "@openedbot/roster/sql/bot-import";
+} from "@openedbot/roster/application/bot-import";
 import { workflowSessionKey } from "@openedbot/roster/domain/autonomous-workflow";
 import { personaDraftSessionKey } from "@openedbot/roster/domain/persona-draft";
 import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
-import { ProfileDeleteError } from "../domain/errors";
-import { assertProfileNamesAvailable, lockProfileImports } from "../sql/reservations";
+import { ProfileDeleteError } from "@openedbot/roster/domain/profile-errors";
+import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 
 export const PROFILE_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 export const PROFILE_INVENTORY_TIMEOUT_MS = 60_000;

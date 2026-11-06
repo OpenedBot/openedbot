@@ -7,7 +7,7 @@ import type { AppVariables } from "../identity/auth";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "../../interfaces/http/http-error";
-import { readOrganizationCursor } from "@openedbot/conversation/sql/organization-cursor";
+import { readOrganizationCursor } from "@openedbot/conversation/application/organization-cursor";
 import {
   alwaysOffered,
   approvalGateView,

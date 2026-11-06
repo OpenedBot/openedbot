@@ -32,8 +32,18 @@ const ALLOWED_APP = [
 ];
 
 const ALLOWED_RUNTIMES = [
+  // The enrollment probe's read-only client (S4), no execution verb.
+  "modules/runtimes/src/application/runtime-admin-client.ts",
   "modules/runtimes/src/application/runtime-enrollment.ts",
+  // The link registry, locator types and probe result the link module
+  // implements, defined in runtimes since S4 (no runtimes -> runtime-link edge).
+  "modules/runtimes/src/application/runtime-link-port.ts",
+  // The application façades (S4) over the three SQL files below.
+  "modules/runtimes/src/application/runtime-link-rows.ts",
   "modules/runtimes/src/application/runtime-probe.ts",
+  "modules/runtimes/src/application/runtime-replacement.ts",
+  "modules/runtimes/src/application/runtime-rows.ts",
+  "modules/runtimes/src/domain/link-probe.ts",
   "modules/runtimes/src/domain/runtime-contract.ts",
   "modules/runtimes/src/sql/runtime-enrollments.ts",
   "modules/runtimes/src/sql/runtime-link-rows.ts",

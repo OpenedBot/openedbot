@@ -9,7 +9,7 @@ import {
   type PersistCompaction,
 } from "@openedbot/conversation/application/compact-thread";
 import { readRoomCompactionTarget, type RoomCompactionTarget } from "@openedbot/conversation/application/compact-room-request";
-import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 import {
   claimExecutionCommand,
   finishExecutionCommand,
@@ -28,6 +28,9 @@ import {
 } from "../sql/execution-commands";
 import { applyRuntimeModelSelection } from "./runner/provider-recovery";
 import { log } from "./runner/util";
+
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export { purgeSettledExecutionCommands } from "../sql/execution-commands";
 
 /**
  * Durable execution commands (ADR 0001 S3, section 4.6). The API records a

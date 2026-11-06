@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ProfileDeleteError } from "../src/domain/errors";
+import { ProfileDeleteError } from "@openedbot/roster/domain/profile-errors";
 import { parseDeleteJobSlugs } from "../src/application/host-profile-delete";
 
 describe("parseDeleteJobSlugs", () => {

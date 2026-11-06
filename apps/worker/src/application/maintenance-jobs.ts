@@ -5,8 +5,9 @@ import { deleteBlob } from "../infrastructure/blob-store";
 import { reapPoisonRuns, sweepExpiredRuns } from "@openedbot/execution/application/queue";
 import { purgeOldToolErrors } from "@openedbot/execution/application/tool-errors";
 import { processTenantDeletion } from "@openedbot/identity/application/tenant-deletion";
-import { purgeDeadSessions, purgeSpentEmailLoginCodes } from "@openedbot/identity/sql/auth-retention";
-import { purgeDeliveredEmails } from "@openedbot/notifications/sql/email-retention";
+import { tenantPurgeProfileJobs } from "@openedbot/portability/application/tenant-purge";
+import { purgeDeadSessions, purgeSpentEmailLoginCodes } from "@openedbot/identity/application/auth-retention";
+import { purgeDeliveredEmails } from "@openedbot/notifications/application/email-retention";
 import {
   createTransactionalEmailSender,
   processEmailOutbox,
@@ -28,11 +29,11 @@ import { processReviewProfiles } from "../maintenance/review-profiles";
 import { processApprovalReviews } from "../maintenance/approval-reviews";
 import { processExecutionCommands } from "../maintenance/execution-commands";
 import { COMMAND_RETENTION_DAYS } from "@openedbot/execution/application/execution-commands";
-import { purgeSettledExecutionCommands } from "@openedbot/execution/sql/execution-commands";
+import { purgeSettledExecutionCommands } from "@openedbot/execution/application/execution-commands";
 import { fireDueRoutine, purgeOldRunEvents } from "@openedbot/execution/application/routines";
-import { purgeStaleRuntimeEnrollments } from "@openedbot/runtimes/sql/runtime-enrollments";
-import { expireRotatedLinkTokens } from "@openedbot/runtimes/sql/runtime-link-rows";
-import { purgeClosedSupportConversations, purgeOldSupportEvents } from "@openedbot/support/sql/support-retention";
+import { purgeStaleRuntimeEnrollments } from "@openedbot/runtimes/application/runtime-enrollment";
+import { expireRotatedLinkTokens } from "@openedbot/runtimes/application/runtime-link-rows";
+import { purgeClosedSupportConversations, purgeOldSupportEvents } from "@openedbot/support/application/support-retention";
 import {
   LINK_SECURITY_TICK_MS,
   purgeOldRuntimeLinkEvents,
@@ -180,6 +181,7 @@ export function maintenanceJobs(
           workerId: config.workerId,
           webAppUrl: config.webAppUrl,
           deleteBlob: (key, driver) => deleteBlob(config, key, driver),
+          profileJobs: tenantPurgeProfileJobs,
         });
       },
     },

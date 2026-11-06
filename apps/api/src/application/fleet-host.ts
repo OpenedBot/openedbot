@@ -19,7 +19,7 @@
  */
 import { Hono, type Context } from "hono";
 import type { Db } from "@openedbot/platform-db";
-import { createWebSession } from "@openedbot/identity/sql/sessions";
+import { createWebSession } from "@openedbot/identity/application/sessions";
 import type { ApiConfig } from "../infrastructure/config";
 import type { EntitlementScope } from "@openedbot/identity/application/entitlements";
 import { fleetWorkspacesEnabled, type ProductFeatureSource } from "./product-features";

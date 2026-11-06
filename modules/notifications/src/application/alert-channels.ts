@@ -32,6 +32,9 @@ import {
 } from "../sql/alert-channels";
 import { DiscordTransportError, type DiscordTransport } from "./discord-transport";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export { enqueueRuntimeLinkDownDeliveries, enqueueRuntimeLinkRestoredDeliveries } from "../sql/alert-channels";
+
 /**
  * Les gestes de Réglages sur les canaux d'alerte (owner et admin ; le rôle est
  * vérifié par la route). Chaque issue attendue est une valeur, pas une

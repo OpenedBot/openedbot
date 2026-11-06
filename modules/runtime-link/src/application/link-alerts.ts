@@ -1,9 +1,9 @@
 import type { SQL } from "bun";
-import { enqueueEmailReturningId } from "@openedbot/notifications/sql/email-outbox";
+import { enqueueEmailReturningId } from "@openedbot/notifications/application/email-outbox";
 import {
   enqueueRuntimeLinkDownDeliveries,
   enqueueRuntimeLinkRestoredDeliveries,
-} from "@openedbot/notifications/sql/alert-channels";
+} from "@openedbot/notifications/application/alert-channels";
 
 /**
  * Alertes de panne durable du lien connecteur, côté worker.

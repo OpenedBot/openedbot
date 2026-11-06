@@ -1,7 +1,7 @@
 import { isUuid } from "@openedbot/contracts-primitives";
-import { insertMessageAttachment } from "@openedbot/conversation/sql/attachments";
-import { insertAssistantMessage } from "@openedbot/conversation/sql/messages";
-import { raiseGroupNeedsYou } from "@openedbot/roster/sql/groups";
+import { insertMessageAttachment } from "@openedbot/conversation/application/attachments";
+import { insertAssistantMessage } from "@openedbot/conversation/application/messages";
+import { raiseGroupNeedsYou } from "@openedbot/roster/application/groups";
 import type { SQL } from "bun";
 import type { HermesClient } from "@openedbot/hermes";
 import type { RunEvent } from "../../domain/hermes-events";

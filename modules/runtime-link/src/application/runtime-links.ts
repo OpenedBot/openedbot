@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import { createHash, randomBytes } from "node:crypto";
-import { holdUnconfirmedLinkTokenRotation, rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/sql/runtime-link-rows";
+import { holdUnconfirmedLinkTokenRotation, rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/application/runtime-link-rows";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { controlPushOf, LINK_CONTROL_FORWARD_TIMEOUT_MS, type ControlPush } from "./instances";
 import { RELAY_FEATURE_SESSIONS_INVENTORY } from "@openedbot/contracts-connector/features";

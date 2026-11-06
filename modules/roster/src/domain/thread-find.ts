@@ -1,14 +1,14 @@
 import type { ThreadMessageDto } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
-import type { MentionableBot } from "@openedbot/roster/domain/mentions";
+import type { MentionableBot } from "./mentions";
 import {
   handoffDirectiveNotices,
   splitHandoff,
-} from "@openedbot/roster/domain/bot-mode";
+} from "./bot-mode";
 import { DEFAULT_LOCALE, type Locale } from "@openedbot/contracts-locale";
-import { splitAskUser } from "@openedbot/roster/domain/ask-user";
+import { splitAskUser } from "./ask-user";
 import { t } from "@openedbot/contracts-i18n";
-import { readAttachment, toolCallKey, toolLabel } from "./thread-tools";
+import { readAttachment, toolCallKey, toolLabel } from "@openedbot/conversation/domain/thread-tools";
 
 export type ThreadFindDocument = {
   /** Stable DOM/navigation target: message id or first event cursor of a visible block. */

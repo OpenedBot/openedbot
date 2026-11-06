@@ -1,8 +1,37 @@
 import { isUuid } from "@openedbot/contracts-primitives";
-import { RelayDialError, type RelayDialer, type RelayRequest } from "@openedbot/hermes";
-import { RELAY_STAGE_HEADER, relayStageOf, type RelayLinkRotateFrame } from "@openedbot/contracts-connector";
+import { RelayDialError, type RelayDialer } from "@openedbot/hermes";
+import { relayStageOf } from "@openedbot/contracts-connector";
 import type { Db } from "@openedbot/platform-db";
-import { LINK_PROBE_TIMEOUT_MS, parseLinkProbeResult, type LinkProbeResult } from "../domain/link-probe";
+import { LINK_PROBE_TIMEOUT_MS, parseLinkProbeResult } from "@openedbot/runtimes/domain/link-probe";
+import {
+  RUNTIME_LINK_RELAY_STAGE_HEADER,
+  unavailableDial,
+  unavailableMessage,
+  unavailableResponse,
+  type ControlPush,
+  type LinkLocation,
+  type LinkUnavailableDetail,
+  type RuntimeLinkLocator,
+} from "@openedbot/runtimes/application/runtime-link-port";
+
+/**
+ * The locator's types, its registry and the unavailable answers live in
+ * `modules/runtimes` (`application/runtime-link-port`) since S4; re-exported
+ * here for the API, the link gateway and the tests.
+ */
+export {
+  installRuntimeLinkLocator,
+  NO_RUNTIME_LINK_LOCATOR,
+  RUNTIME_LINK_RELAY_STAGE_HEADER,
+  runtimeLinkLocator,
+  unavailableDial,
+  unavailableMessage,
+  unavailableResponse,
+  type ControlPush,
+  type LinkLocation,
+  type LinkUnavailableDetail,
+  type RuntimeLinkLocator,
+} from "@openedbot/runtimes/application/runtime-link-port";
 
 /** Préfixe du relais interne ; les routes le réexportent. */
 export const RUNTIME_LINK_INTERNAL_PREFIX = "/internal/runtime-links";
@@ -13,8 +42,6 @@ export const RUNTIME_LINK_RELAY_HOP_HEADER = "X-OpenedBot-Relay-Hop";
 export function relayHopped(header: (name: string) => string | undefined): boolean {
   return Boolean(header(RUNTIME_LINK_RELAY_HOP_HEADER));
 }
-/** En-tête posé sur une réponse qui décrit une panne du LIEN, pas une réponse gateway. */
-export const RUNTIME_LINK_RELAY_STAGE_HEADER = RELAY_STAGE_HEADER;
 
 /**
  * Registre des instances API et résolution de l'instance qui tient un lien.
@@ -29,58 +56,10 @@ export const API_INSTANCE_HEARTBEAT_MS = 15_000;
 export const API_INSTANCE_DEAD_AFTER_MS = 60_000;
 export const API_INSTANCE_DEAD_AFTER_SQL = "interval '60 seconds'";
 
-export type LinkUnavailableDetail = "instance_dead" | "no_link";
-
-export type LinkLocation =
-  | { kind: "local" }
-  | { kind: "remote"; instanceId: string; internalUrl: string }
-  | { kind: "unavailable"; detail: LinkUnavailableDetail };
-
-export type RuntimeLinkLocator = {
-  instanceId: string;
-  locate(runtimeId: string): Promise<LinkLocation>;
-  /** Relais HTTP vers l'instance propriétaire (même chemin, même bearer, hop=1). */
-  forwardProxy(runtimeId: string, request: Request): Promise<Response>;
-  forwardDial(runtimeId: string, request: RelayRequest, signal?: AbortSignal): Promise<Response>;
-  /**
-   * `"unknown"` : la trame a peut-être été écrite (saut expiré, réponse
-   * perdue ou illisible). L'appelant ne doit pas défaire la rotation.
-   */
-  forwardRotate(runtimeId: string, frame: RelayLinkRotateFrame): Promise<ControlPush>;
-  forwardClose(runtimeId: string, code: number, reason: string): Promise<boolean>;
-  /** Sonde le lien sur l'instance propriétaire ; attend son verdict, borné. */
-  forwardProbe(runtimeId: string, expectedGeneration: string | null): Promise<LinkProbeResult>;
-};
-
-/** Issue d'une trame de contrôle poussée : certaine (`true`/`false`) ou inconnue. */
-export type ControlPush = boolean | "unknown";
-
 export type InstanceRegistry = {
   heartbeat(): Promise<void>;
   stop(): Promise<void>;
 };
-
-export const NO_RUNTIME_LINK_LOCATOR: RuntimeLinkLocator = {
-  instanceId: "",
-  locate: async () => ({ kind: "unavailable", detail: "no_link" }),
-  forwardProxy: async () => unavailableResponse("no_link"),
-  forwardDial: async () => {
-    throw unavailableDial("no_link");
-  },
-  forwardRotate: async () => false,
-  forwardClose: async () => false,
-  forwardProbe: async () => ({ outcome: "no_link" }),
-};
-
-let installedLocator: RuntimeLinkLocator = NO_RUNTIME_LINK_LOCATOR;
-
-export function installRuntimeLinkLocator(locator: RuntimeLinkLocator): void {
-  installedLocator = locator;
-}
-
-export function runtimeLinkLocator(): RuntimeLinkLocator {
-  return installedLocator;
-}
 
 export type LocatorConfig = {
   instanceId: string;
@@ -285,23 +264,6 @@ export function instanceAwareDial(
     if (location.kind === "remote") return locator.forwardDial(runtimeId, request, signal);
     throw unavailableDial(location.kind === "unavailable" ? location.detail : "no_link");
   };
-}
-
-export function unavailableDial(detail: LinkUnavailableDetail, cause?: unknown): RelayDialError {
-  return new RelayDialError(unavailableMessage(detail), "before_dispatch", "RUNTIME_LINK_UNAVAILABLE", cause ? { cause } : undefined);
-}
-
-export function unavailableMessage(detail: LinkUnavailableDetail): string {
-  return detail === "instance_dead"
-    ? "L’instance qui tenait le lien connecteur ne répond plus."
-    : "Ce runtime n’a pas de lien connecteur ouvert.";
-}
-
-export function unavailableResponse(detail: LinkUnavailableDetail, status = 503): Response {
-  return Response.json(
-    { error: { code: "RUNTIME_LINK_UNAVAILABLE", message: unavailableMessage(detail), stage: "before_dispatch", detail } },
-    { status, headers: { [RUNTIME_LINK_RELAY_STAGE_HEADER]: "before_dispatch", "Cache-Control": "no-store" } },
-  );
 }
 
 export function loopResponse(): Response {

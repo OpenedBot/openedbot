@@ -1,5 +1,5 @@
 import type { TransactionDb } from "@openedbot/platform-db";
-import { moveTeamImportsToSection } from "@openedbot/portability/sql/team-imports";
+import { moveTeamImportsToSection } from "./team-import-sections";
 
 export type SectionRow = { id: string; name: string; position: number; collapsed: boolean; context?: string };
 

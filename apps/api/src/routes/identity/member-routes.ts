@@ -5,6 +5,7 @@ import { requireRole } from "./auth";
 import type { Db } from "@openedbot/platform-db";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { changeMemberRole, listMembers, removeMember } from "@openedbot/identity/application/members";
+import { pauseMemberRoutines } from "@openedbot/execution/application/routines";
 import {
   cancelMemberInvitation,
   listMemberInvitations,
@@ -74,7 +75,7 @@ export function memberRoutes(db: Db, config?: Pick<ApiConfig, "webUrl">, deps: {
     const auth = context.get("auth");
     requireRole(auth, ["owner", "admin"]);
     const userId = context.req.param("userId");
-    await removeMember(db, { organizationId: auth.organizationId, actorUserId: auth.userId, userId });
+    await removeMember(db, { organizationId: auth.organizationId, actorUserId: auth.userId, userId }, pauseMemberRoutines);
     return context.body(null, 204);
   });
 

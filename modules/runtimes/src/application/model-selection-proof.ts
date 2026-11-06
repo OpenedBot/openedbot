@@ -6,6 +6,13 @@ import { withTenant } from "@openedbot/platform-db";
 import { deleteModelSelectionProof, readModelSelectionProof, upsertModelSelectionProof, upsertProvenRuntimeModel, type RuntimeModelSelectionProof } from "../sql/model-selection-proofs";
 import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export {
+  invalidateProvenRuntimeModels,
+  readModelSelectionProof,
+  readProvenRuntimeModel,
+} from "../sql/model-selection-proofs";
+
 export type ModelSelection = { provider: string | null; model: string | null; reasoningEffort: string | null };
 export type ModelProofClient = Pick<HermesClient, "createRun" | "getRunStatus" | "stopRun" | "deleteSession">;
 export type ModelProofJob = RuntimeModelSelectionProof & {

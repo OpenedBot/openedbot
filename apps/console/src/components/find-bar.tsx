@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
-import { stepThreadFindIndex } from "@openedbot/conversation/domain/thread-find";
+import { stepThreadFindIndex } from "@openedbot/roster/domain/thread-find";
 
 export type FindBarLabels = {
   search: string;

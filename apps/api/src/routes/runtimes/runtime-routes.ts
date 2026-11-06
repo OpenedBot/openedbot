@@ -3,10 +3,10 @@ import { type HermesClientConfig } from "@openedbot/hermes";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { readModelSelectionProof } from "@openedbot/runtimes/sql/model-selection-proofs";
-import { defaultPermissionMode, readPermissionPipeline } from "@openedbot/roster/sql/bots";
-import { readOrganizationPermissionPolicy } from "@openedbot/identity/sql/permission-policy";
-import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
+import { readModelSelectionProof } from "@openedbot/runtimes/application/model-selection-proof";
+import { defaultPermissionMode, readPermissionPipeline } from "@openedbot/roster/application/bot-reads";
+import { readOrganizationPermissionPolicy } from "@openedbot/identity/application/permission-policy";
+import { readReviewProven } from "@openedbot/runtimes/application/review-profile";
 import type { TransactionDb } from "@openedbot/platform-db";
 import { runtimeLinks, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";
 import { runtimeLinkLocator, type RuntimeLinkLocator } from "@openedbot/runtime-link/application/instances";
@@ -45,13 +45,13 @@ import {
   updateRuntimeHealth,
   updateRuntimeHealthForFailure,
 } from "@openedbot/runtimes/application/runtime-health";
-import { readExposureSummaries } from "@openedbot/runtimes/sql/runtime-exposures";
+import { readExposureSummaries } from "@openedbot/runtimes/application/runtime-exposures";
 import {
   mapHermesError,
   probeRuntimeWith,
   type RuntimeProbeClient,
 } from "@openedbot/runtimes/application/runtime-probe";
-import { readAllRuntimeRows, readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
+import { readAllRuntimeRows, readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
 import {
   directConfig,
   optionalDirectToken,
@@ -66,7 +66,7 @@ export { RUNTIME_LINK_STALE_MS, runtimeHealthStatusForError, shouldMarkLinkDisco
 // La sonde et la lecture des lignes `runtimes` vivent dans `application/` : la
 // passerelle du lien les appelle sans charger ce routeur.
 export { probeRuntimeCapacityWith, type RuntimeProbeClient } from "@openedbot/runtimes/application/runtime-probe";
-export { readAllRuntimeRows, readRuntimeRowById, readRuntimeRows, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+export { readAllRuntimeRows, readRuntimeRowById, readRuntimeRows, type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 
 export type RuntimeRouteDeps = {
   /** Construit le client d'une sonde ; un faux dans les tests, `HermesClient` sinon. */

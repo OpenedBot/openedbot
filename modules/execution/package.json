@@ -6,8 +6,7 @@
   "type": "module",
   "exports": {
     "./application/*": "./src/application/*.ts",
-    "./domain/*": "./src/domain/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/*": "./src/domain/*.ts"
   },
   "scripts": {
     "test": "bun test tests",

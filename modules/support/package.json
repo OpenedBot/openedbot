@@ -6,7 +6,7 @@
   "description": "Dated debt (open-core step 11.3, until 2026-12-31): the help desk itself moved to the staff plug-in; only the retention of its tables, run by the core worker, stays here while the worker does not load that plug-in.",
   "type": "module",
   "exports": {
-    "./sql/*": "./src/sql/*.ts"
+    "./application/*": "./src/application/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

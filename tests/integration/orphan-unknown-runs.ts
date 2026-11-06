@@ -39,6 +39,7 @@ import { chainLegacyRoomTurnTx } from "../../modules/execution/src/application/r
 import type { RunContext } from "../../modules/execution/src/application/runner/types";
 import type { WorkerConfig } from "../../modules/execution/src/application/worker-config";
 import { queuePersonaDraft } from "../../modules/roster/src/application/persona-drafts";
+import { botRuns } from "../../modules/execution/src/application/bot-runs";
 import { withDisposablePostgres } from "./disposable-postgres";
 
 const id = (n: number) => `92000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -223,13 +224,13 @@ await withDisposablePostgres("openedbot2_s2b_unknown", async ({ owner, connect }
   proof.push({ case: "handoff entrant (step_kind null)", ...inboundRow, review: "workflow dm 0175, initiateur nul ; relance refusée" });
 
   // 3b. Persona draft: queued by the real roster command.
-  const draft = await queuePersonaDraft(api, ORG, bots.neo);
+  const draft = await queuePersonaDraft(api, botRuns, ORG, bots.neo);
   assert(draft.runId, "the persona draft was not queued");
   const draftRow = await loseLeaseDuringCreate(draft.runId);
   assert(draftRow.stepKind === "persona_draft", `the persona draft shape changed: ${JSON.stringify(draftRow)}`);
   assertReviewed(draftRow, "dm", "the persona draft");
   let refused: string | null = null;
-  try { await queuePersonaDraft(api, ORG, bots.neo); } catch (error) {
+  try { await queuePersonaDraft(api, botRuns, ORG, bots.neo); } catch (error) {
     refused = error instanceof HttpError ? error.code : String(error);
   }
   assert(refused === "BOT_BUSY", `a new persona draft was accepted while the first one awaits review: ${refused}`);
@@ -260,7 +261,7 @@ await withDisposablePostgres("openedbot2_s2b_unknown", async ({ owner, connect }
   const claimedAfter = new Set([(await claimRun(worker, config))?.id, (await claimRun(worker, config))?.id]);
   assert(claimedAfter.has(blocked) && claimedAfter.has(unrelated),
     `after the review, the turn behind the orphan and the unrelated one should run, got ${[...claimedAfter].join(", ")}`);
-  const redraft = await queuePersonaDraft(api, ORG, bots.neo);
+  const redraft = await queuePersonaDraft(api, botRuns, ORG, bots.neo);
   assert(redraft.runId, "a new persona draft is still refused after the review");
   await owner`update runs set status = 'completed', external_state = 'settled', lease_owner = null,
       lease_expires_at = null, ended_at = now(), updated_at = now() where id in ${owner([blocked, unrelated, redraft.runId])}`;

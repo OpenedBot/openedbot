@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import type { HermesRunImage } from "@openedbot/hermes";
-import { insertAssistantMessage } from "@openedbot/conversation/sql/messages";
+import { insertAssistantMessage } from "@openedbot/conversation/application/messages";
 import { getArtifactBlob } from "../artifact-store";
 import {
   ATTACHMENT_LIMITS,

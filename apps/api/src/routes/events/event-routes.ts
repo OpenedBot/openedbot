@@ -1,5 +1,5 @@
 import { isUuid } from "@openedbot/contracts-primitives";
-import { hasLiveWorkspaceSession } from "@openedbot/identity/sql/session-access";
+import { hasLiveWorkspaceSession } from "@openedbot/identity/application/session-access";
 import { Hono } from "hono";
 import {
   organizationEventEnvelope,

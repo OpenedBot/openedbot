@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import { HermesClientError } from "@openedbot/hermes";
-import { recordDirectProbeResult } from "@openedbot/runtimes/sql/runtime-rows";
+import { recordDirectProbeResult } from "@openedbot/runtimes/application/runtime-rows";
 import { appendRunEventsTx } from "../sql/run-events";
 import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
 import { createRuntimeClient, type RuntimeClientContext, type RuntimeClientConfig } from "@openedbot/execution/application/runtime-client";

@@ -1,13 +1,13 @@
-import { createManagedProfile as provisionManagedProfile } from "@openedbot/portability/application/provision";
-import { asProfileHttpError } from "@openedbot/portability/application/profile-import-guard";
+import { createManagedProfile as provisionManagedProfile } from "./host-profile-provision";
+import { asProfileHttpError } from "./profile-import-guard";
 import {
   resolvedHostProfileModel as resolveProfileModel,
   type HostProfileModelSelection,
-} from "@openedbot/portability/application/model";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
+} from "./host-profile-model";
+import { ProfileImportError } from "../domain/profile-errors";
 import {
-  HermesClient,
   HermesClientError,
+  type HermesClient,
   type HermesClientConfig,
   type HermesHostProfileCreateOptions,
   type HermesModelOptions,
@@ -18,7 +18,9 @@ import type { PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-co
 import { applyHostApprovalPolicy } from "./approval-policy";
 import type { HermesApprovalPolicyState } from "@openedbot/hermes";
 import { readRegisteredRuntimeForCleanup, readRuntimeSecret, type RuntimeAccessConfig } from "@openedbot/runtimes/application/runtime-access";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { Db } from "@openedbot/platform-db";
+import type { BotRuns } from "./bot-runs";
 import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export type BotRouteClient = Pick<
@@ -60,15 +62,18 @@ export type BotDeps = {
   readRuntime: (db: Db, organizationId: string) => Promise<BotRuntime | null>;
   readRuntimeForDeletion: (db: Db, organizationId: string) => Promise<{ id: string; linkFeatures: string[] } | null>;
   clientFactory: (clientConfig: HermesClientConfig) => BotRouteClient;
+  /** Les runs que le roster demande à l'exécution (accueil, brouillon de persona, passes de maintenance). */
+  runs: BotRuns;
 };
 
-/** Lie la configuration de l'API aux dépendances substituables ; le défaut est le vrai runtime et `HermesClient`. */
-export function resolveBotDeps(config: RuntimeAccessConfig, deps: BotRouteDeps = {}): BotDeps {
+/** Lie la configuration de l'API aux dépendances substituables ; le défaut est le vrai runtime et `runtimeAdminClient`. */
+export function resolveBotDeps(config: RuntimeAccessConfig, runs: BotRuns, deps: BotRouteDeps = {}): BotDeps {
   const readRuntime = deps.readRuntime ?? readRuntimeSecret;
   return {
     readRuntime: (db, organizationId) => readRuntime(db, config, organizationId),
     readRuntimeForDeletion: deps.readRuntimeForDeletion ?? readRegisteredRuntimeForCleanup,
-    clientFactory: deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig)),
+    clientFactory: deps.clientFactory ?? runtimeAdminClient,
+    runs,
   };
 }
 
@@ -232,7 +237,7 @@ export async function purgeRuntimeSessions(
   runtime: { client: HermesClientConfig } | null,
   profile: string | null,
   sessions: ReadonlyArray<string>,
-  clientFactory: (clientConfig: HermesClientConfig) => Pick<HermesClient, "deleteSession"> = (clientConfig) => new HermesClient(clientConfig),
+  clientFactory: (clientConfig: HermesClientConfig) => Pick<HermesClient, "deleteSession"> = runtimeAdminClient,
 ): Promise<{ deleted: number; failed: string[]; reason: string | null }> {
   if (!runtime) {
     return {

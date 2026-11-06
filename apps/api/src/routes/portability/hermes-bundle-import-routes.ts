@@ -1,11 +1,11 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import { parseHermesBundleInput } from "@openedbot/portability/domain/validation";
 import {
   acknowledgeImportJob, enqueueProfileImport, findIdempotentImport, listImportJobs,
   readImportJob,
-} from "@openedbot/portability/sql/jobs";
+} from "@openedbot/portability/application/jobs";
 import type { Db } from "@openedbot/platform-db";
 import type { ApiConfig } from "../../infrastructure/config";
 import { requireOperator, type AppVariables } from "../identity/auth";

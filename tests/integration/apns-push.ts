@@ -21,6 +21,7 @@ import { APNS_MAX_ATTEMPTS, processApnsDeliveries } from "../../modules/notifica
 import { createApnsTransport } from "../../modules/notifications/src/application/apns-transport";
 import { claimApnsDelivery } from "../../modules/notifications/src/sql/apns-devices";
 import { removeMember } from "../../modules/identity/src/application/members";
+import { pauseMemberRoutines } from "../../modules/execution/src/sql/routines";
 import { startFakeApns, type FakeApnsDelivery } from "../fake-apns/server";
 
 const root = resolve(import.meta.dir, "../..");
@@ -454,7 +455,7 @@ try {
 
   // Member removal: the membership trigger drops the devices (and their deliveries).
   assert((await register(memberA, "install-2", T2, "production")).status === 200, "member A re-registers");
-  await removeMember(api, { organizationId: ORG_A, actorUserId: OWNER_A, userId: MEMBER_A });
+  await removeMember(api, { organizationId: ORG_A, actorUserId: OWNER_A, userId: MEMBER_A }, pauseMemberRoutines);
   assert(!(await devices()).some((row) => row.userId === MEMBER_A), "a removed member keeps no APNs device");
 
   console.log(JSON.stringify({

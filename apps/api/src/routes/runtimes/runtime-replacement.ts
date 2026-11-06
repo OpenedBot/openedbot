@@ -1,5 +1,5 @@
 import type { TransactionDb } from "@openedbot/platform-db";
-import { hasPendingReplacement, lockRuntimeDeclarations } from "@openedbot/runtimes/sql/runtime-replacement";
+import { hasPendingReplacement, lockRuntimeDeclarations } from "@openedbot/runtimes/application/runtime-replacement";
 import { HttpError } from "../../interfaces/http/http-error";
 
 /**

@@ -1,4 +1,4 @@
-import { HermesClient, createRelayTransport } from "@openedbot/hermes";
+import { createRelayTransport } from "@openedbot/hermes";
 import {
   decodeTextFrame,
   RELAY_ACCEPTED_HOST_FRAMES,
@@ -14,12 +14,12 @@ import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
 import { withCredential, withTenant } from "@openedbot/platform-db";
 import { constantTimeEqual, hashCredential, randomCredential } from "@openedbot/platform-db/credential";
-import { consumeRuntimeEnrollment } from "@openedbot/runtimes/sql/runtime-enrollments";
+import { consumeRuntimeEnrollment, enrollmentState, readEnrollmentRow } from "@openedbot/runtimes/application/runtime-enrollment";
 import {
   insertConnectorRuntime,
   registerLinkDevicePublicKey,
   writeLinkOrigin,
-} from "@openedbot/runtimes/sql/runtime-link-rows";
+} from "@openedbot/runtimes/application/runtime-link-rows";
 import { enrolledRuntimeActivation } from "./enroll-activation";
 import { insertRuntimeLinkEvent } from "./link-persistence";
 import {
@@ -40,10 +40,10 @@ import {
 } from "./instances";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { API_RATE_RULES, createRateLimitGate, requestClientIp, RUNTIME_LINK_UPGRADE_RULE, type RateLimitGate } from "@openedbot/platform-config/rate-limit";
-import { enrollmentState, readEnrollmentRow } from "@openedbot/runtimes/application/runtime-enrollment";
 import { probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtime-probe";
-import { readAllRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
-import { lockRuntimeDeclarations } from "@openedbot/runtimes/sql/runtime-replacement";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
+import { readAllRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
+import { lockRuntimeDeclarations } from "@openedbot/runtimes/application/runtime-replacement";
 import { logEvent } from "@openedbot/platform-observability";
 
 /**
@@ -625,7 +625,7 @@ export async function enrollConnectorRuntime(
   enrollment: LinkEnrollment,
   signal: AbortSignal,
 ): Promise<IssuedLink> {
-  const client = new HermesClient({
+  const client = runtimeAdminClient({
     transport: createRelayTransport({
       runtimeId: `enrollment:${enrollment.id}`,
       dial: (request, requestSignal) => connection.dispatch(request, anySignal(signal, requestSignal)),

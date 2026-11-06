@@ -1,5 +1,5 @@
 import type { LegalCatalogDto, LegalDocumentDto, LegalSlug } from "@openedbot/contracts-api";
-import type { GlobalSearchPageDto } from "@openedbot/conversation/domain/global-search";
+import type { GlobalSearchPageDto } from "@openedbot/roster/domain/global-search";
 import { request } from "./http";
 
 export const workspaceApi = {

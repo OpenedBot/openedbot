@@ -2,8 +2,8 @@ import type { SQL } from "bun";
 import {
   type BotIdentity,
 } from "@openedbot/roster/domain/bot-mode";
-import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
-import { NOW, transitionRuns } from "@openedbot/execution/sql/run-transitions";
+import { appendRunEventsTx } from "@openedbot/execution/application/run-events";
+import { NOW, transitionRuns } from "@openedbot/execution/application/run-transitions";
 import { SERVICE_STEP_KINDS } from "@openedbot/execution/domain/run-step";
 import type { MessageContent } from "@openedbot/contracts-api";
 import { logEvent } from "@openedbot/platform-observability";

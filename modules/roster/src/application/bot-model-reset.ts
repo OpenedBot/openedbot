@@ -1,7 +1,7 @@
 import type { BotModelResetDto, BotProfileModelSyncDto } from "@openedbot/contracts-api";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { applyHostProfileModel } from "@openedbot/portability/application/model";
+import { applyHostProfileModel } from "./host-profile-model";
 import { botsFollowingRuntimeModel, clearBotModelOverrides } from "../sql/bots";
 import { resolvedHostProfileModel, type BotDeps, type BotRouteClient } from "./bot-host";
 import { RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MODEL_BATCH } from "@openedbot/contracts-connector/features";

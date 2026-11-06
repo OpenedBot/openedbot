@@ -62,7 +62,7 @@ import { paymentWebhookRoute } from "./routes/payments/payment-webhook-route";
 import { accountDeletionRoutes, accountDeletionWriteGuard } from "./routes/identity/account-deletion-routes";
 import { accountSecurityRoutes } from "./routes/identity/account-security-routes";
 import { createGoogleAuth } from "@openedbot/identity/application/google-auth";
-import { createPostgresOAuthAttemptStore } from "@openedbot/identity/sql/oauth-attempt-store";
+import { createPostgresOAuthAttemptStore } from "@openedbot/identity/application/oauth-attempt-store";
 import { pushSubscriptionRoutes } from "./routes/notifications/push-subscription-routes";
 import { apnsDeviceRoutes } from "./routes/notifications/apns-device-routes";
 import { alertChannelRoutes } from "./routes/notifications/alert-channel-routes";

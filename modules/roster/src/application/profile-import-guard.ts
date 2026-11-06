@@ -2,8 +2,8 @@ import { withTenant, type Db, type TransactionDb } from "@openedbot/platform-db"
 import {
   assertProfileNamesAvailable as checkNames, assertNoProfileImportReservations as checkAll,
   lockProfileImports,
-} from "../sql/reservations";
-import { ProfileDeleteError, ProfileImportError } from "../domain/errors";
+} from "../sql/profile-reservations";
+import { ProfileDeleteError, ProfileImportError } from "../domain/profile-errors";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 
 export { lockProfileImports };

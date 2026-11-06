@@ -1,8 +1,8 @@
 import type { SQL } from "bun";
-import { insertRoutineInputMessage } from "@openedbot/conversation/sql/messages";
-import { touchThread } from "@openedbot/conversation/sql/threads";
+import { insertRoutineInputMessage } from "@openedbot/conversation/application/messages";
+import { touchThread } from "@openedbot/conversation/application/threads";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
-import { clearGroupNeedsYou } from "@openedbot/roster/sql/groups";
+import { clearGroupNeedsYou } from "@openedbot/roster/application/groups";
 import { ROOM_LIMITS } from "@openedbot/roster/domain/bot-mode";
 import { coerceGroupDefaultResponder, planRoutineGroupSend } from "../domain/group-send";
 import { fireRoutineTx } from "./run-creation";
@@ -17,6 +17,9 @@ import {
   routineFireText,
 } from "../domain/routines";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
+
+/** The routine writes other packages call (ADR 0001 S4): a removed member's routines pause, an import inserts its routines disabled. */
+export { insertDisabledRoutine, pauseMemberRoutines } from "../sql/routines";
 
 /**
  * Le tick des routines : l'autre moitié du planificateur (`routine-routes.ts`

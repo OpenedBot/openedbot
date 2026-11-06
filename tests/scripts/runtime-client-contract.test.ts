@@ -91,6 +91,16 @@ describe("runtime-client-contract", () => {
     expect(result.output).toContain("CONSTRUCTORS");
   });
 
+  test("the bot host and the link enrollment probe are no longer classified constructors (S4)", () => {
+    const root = fixture();
+    write(root, "modules/roster/src/application/bot-host.ts", "export const c = () => new HermesClient({});\n");
+    write(root, "modules/runtime-link/src/application/gateway.ts", "export const c = () => new HermesClient({});\n");
+    const result = run(root);
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("modules/roster/src/application/bot-host.ts:1");
+    expect(result.output).toContain("modules/runtime-link/src/application/gateway.ts:1");
+  });
+
   test("refuses an unclassified HermesClient method and a verb HermesClient no longer has", () => {
     const unclassified = fixture();
     write(unclassified, "platform/hermes/src/client.ts", [

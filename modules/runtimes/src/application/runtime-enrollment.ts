@@ -1,5 +1,8 @@
 import type { TransactionDb } from "@openedbot/platform-db";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export { consumeRuntimeEnrollment, purgeStaleRuntimeEnrollments } from "../sql/runtime-enrollments";
+
 /**
  * Historical rows may still say `direct` while an old migration drains. No
  * route in this module can create or complete such a row anymore.

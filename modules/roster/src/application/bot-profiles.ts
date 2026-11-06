@@ -10,8 +10,8 @@ import type {
 } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { HermesCapabilityInventory, HermesHostToolsets, HermesModelOptions, HermesProfileMemoryWrite, HermesProfileNamedFlag } from "@openedbot/hermes";
-import type { HostProfileModelSelection } from "@openedbot/portability/application/model";
-import { withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
+import type { HostProfileModelSelection } from "./host-profile-model";
+import { withBotProfileLock } from "./profile-import-guard";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import {

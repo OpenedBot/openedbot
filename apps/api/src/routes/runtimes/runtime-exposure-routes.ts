@@ -20,7 +20,7 @@ import {
   readExposureById,
   readPendingExposures,
   type RuntimeExposureRow,
-} from "@openedbot/runtimes/sql/runtime-exposures";
+} from "@openedbot/runtimes/application/runtime-exposures";
 import {
   defaultCloudflareClientFactory,
   defaultTailscaleClientFactory,

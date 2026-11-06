@@ -3,8 +3,9 @@ import type { TransactionDb } from "@openedbot/platform-db";
 /**
  * `team_imports.section_id` n'a pas de `on delete` : un import d'équipe garde la
  * section où il a posé ses bots, et suit son bot quand cette section disparaît.
- * La table appartient à `portability` ; le roster passe par ces deux fonctions
- * quand il supprime ou purge une section.
+ * La table appartient à `portability` ; le roster, qui est en dessous de lui
+ * (ADR 0001 S4), la réécrit ici quand il supprime ou purge une section : un
+ * writer déclaré dans `db/ownership.json`.
  */
 
 /** Rattache les imports d'équipe de ces sections à la section par défaut (première par rang). */

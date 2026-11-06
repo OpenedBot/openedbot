@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { resolveImportedModel } from "../src/application/model";
+import { resolveImportedModel } from "../src/application/host-profile-model";
 import type { HermesModelOptions } from "@openedbot/hermes";
 const load = async () => ({ providers: [{ slug: "provider", authenticated: true, models: [{ id: "available" }, { id: "fallback" }] }] }) as Pick<HermesModelOptions, "providers">;
 test("available explicit models survive; unavailable models fall back without a stale bot override", async () => {

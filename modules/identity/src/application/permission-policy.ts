@@ -18,6 +18,13 @@ import {
   writeOrganizationPermissionPolicy,
 } from "../sql/permission-policy";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export {
+  readOrganizationPermissionPipeline,
+  readOrganizationPermissionPolicy,
+  type OrganizationPermissionPolicyRow,
+} from "../sql/permission-policy";
+
 /** PERM2-8: owners and admins write the policy; agencies never do (D-5). */
 export function canEditPermissionPolicy(role: WorkspaceRole): boolean {
   return role === "owner" || role === "admin";

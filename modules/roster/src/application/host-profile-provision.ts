@@ -1,6 +1,6 @@
 import { HermesClientError, type HermesClient, type HermesClientConfig, type HermesHostProfileCreateOptions } from "@openedbot/hermes";
-import { ProfileImportError } from "../domain/errors";
-import { applyHostProfileModel } from "./model";
+import { ProfileImportError } from "../domain/profile-errors";
+import { applyHostProfileModel } from "./host-profile-model";
 
 export type ProfileProvisionClient = Pick<HermesClient, "hostCreateProfile" | "hostDeleteProfile" | "probeProfileIsolation" | "hostSetProfileModel">;
 

@@ -1141,10 +1141,10 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
     cinq fichiers classés ; chaque méthode de `HermesClient` doit être classée exécution ou
     lecture/administration. Sur `develop` avant S3, elle relève les 13 constructions et l'import
     de `compactThreadNow`.
-  - Restent hors de l'API mais construits dans des modules qu'elle appelle, classés
+  - Restaient hors de l'API mais construits dans des modules qu'elle appelle, classés
     lecture/administration : `roster/application/bot-host.ts` (profils et sessions d'un bot) et
-    `runtime-link/application/gateway.ts` (sonde d'enrôlement). Ils passeront par la fabrique
-    avec S4.
+    `runtime-link/application/gateway.ts` (sonde d'enrôlement). Depuis S4 ils construisent
+    `runtimeAdminClient`, et la garde ne classe plus que les deux fabriques et le client.
 - **Frontières des modules.** Les exports de packages ne publient plus `./sql/*` ; un module
   n'importe un autre module que par sa couche `application` publique ; règles dependency-cruiser ;
   cycles de packages cassés (roster ↔ conversation, roster ↔ portability, runtimes ↔ runtime-link,
@@ -1153,6 +1153,70 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
   `openedbot-pro/packages/pro-agency/src/invitations.ts:17`, pro-staff, pro-billing) migrent vers
   des façades publiques, vérifiées par `make test-dual` et `make solo-check` (`Makefile:451-484`).
   Les ~670 lectures de tables étrangères sont gelées par un cliquet puis réduites.
+
+  **État S4 (livré).** Les façades d'abord, la restriction ensuite.
+  - **Façades pour pro.** Pro importait sept fichiers SQL du cœur (`identity/sql/sessions`,
+    `accounts`, `staff-access`, `blob-deletions`, `deletions`, `product-features` et
+    `roster/sql/permission-grants`, dont `pro-agency/src/invitations.ts:17`). Chacun a une façade
+    dans la couche `application` de son module, qui réexporte ce qu'elle ouvre ; pro y est passé
+    sur sa branche `refactor/s4-core-facades`, à fusionner avec celle du cœur.
+  - **Exports restreints.** Les paquets ne publient plus `./sql/*` (`support` publie
+    `./application/*`). Les fichiers du cœur qui importaient le SQL d'un autre paquet passent par
+    une façade au nom du fichier SQL (`conversation/application/threads`,
+    `execution/application/run-events`, `runtimes/application/runtime-rows`…) ou par une
+    réexportation ajoutée au cas d'usage qui existait déjà. Règles dependency-cruiser
+    `sql-prive-au-module` (le `src/sql` d'un module ne s'importe que de ce module) et
+    `porte-permissions-par-le-port`, étendue aux façades du roster et de `runtimes`.
+  - **Cycles cassés.** dependency-cruiser ne voyait aucun cycle de fichiers ; le graphe des
+    paquets en avait deux : `runtime-link ↔ runtimes`, et `identity → execution/portability →
+    roster → identity` avec `roster ↔ conversation`, `roster ↔ portability` et
+    `roster ↔ execution`. Le graphe est désormais en couches ; un module n'importe que ceux, plus
+    bas, que déclare son `package.json` :
+
+    ```
+     portability
+          │
+          v
+     execution
+          │
+          v
+       roster
+          │
+          v
+     conversation       identity       runtimes  <───  runtime-link
+                            │                              │
+                            v                              │
+                      notifications  <─────────────────────┘
+    ```
+
+    `dm-handoff`, `global-search` et `thread-find`, qui lisaient le balisage des mentions du
+    roster, passent de `conversation/domain` à `roster/domain`. Le roster demande ses runs
+    (accueil, brouillon de persona, passes de maintenance) par le port `BotRuns`, implémenté par
+    `execution/application/bot-runs` et passé par l'API. `permission-rule-input`, lu par le seul
+    plug-in `permissions`, passe à `execution/domain`. Les aides de profil hôte (verrou et
+    réservations d'import, modèle, création, erreurs) passent de `portability` au roster, avec
+    ses deux écritures de `team_imports` (writer déclaré). La suppression de compte, le retrait
+    d'un membre et la purge d'un tenant reçoivent en argument obligatoire ce qu'ils demandent à
+    l'exécution et aux imports (`TenantPurgeProfileJobs`, `portability/application/tenant-purge`).
+    Le registre des liens, les types du localisateur et le résultat de sonde passent à
+    `runtimes/application/runtime-link-port`, réexportés par `runtime-link`. Gardes :
+    `workspace-deps-contract.ts` refuse un cycle des dépendances `@openedbot` déclarées, la règle
+    `module-par-ses-dependances` tient chaque module aux modules de son `package.json`.
+  - **Propriété étendue à `apps/*`.** La seconde passe de `db-ownership-contract.sh` lit aussi
+    `apps/*/src` ; chaque application est un contexte (`apps/api`, `apps/worker`). `apps/api`
+    possède `api_errors` (writer `apps/worker`, qui la purge) et les tables des webhooks sortants ;
+    les 36 tables de modules que l'API ou le worker écrivent en SQL en ligne les nomment en
+    `writers`, écritures inter-contextes déclarées. 557 écritures vérifiées.
+  - **Cliquet sur les lectures étrangères.** `tests/scripts/foreign-reads-contract.ts` compte par
+    fichier et par table les lectures (`from`, `join`) d'une table d'un autre contexte dans le SQL
+    livré des modules et des applications : 553 sur `develop` (99 fichiers, dont 299 dans
+    `apps/api` ; l'estimation de ~670 comptait aussi des écritures). Elles sont gelées dans
+    `foreign-reads-debt.json` (jusqu'au 2027-06-30) ; un compte ne fait que baisser. Réduites à 543
+    sans changer de requête : une copie de `readOperatorProfile` dans `misc-routes.ts`, la lecture
+    du pipeline d'une organisation par le roster (celle d'identity), et les 8 lectures des tables
+    de webhooks par leur nouveau propriétaire.
+  - Aucune migration, aucun changement de comportement. Aucune erreur nouvelle : les routes
+    touchées ne changent que leur câblage, la règle des erreurs de domaine n'a rien à convertir.
 - **Erreurs et contrats.** Erreurs de domaine dans les modules (code stable, sans statut HTTP ni
   texte français) ; `apps/api` fait la correspondance HTTP ; les clients traduisent par code.
   Schémas zod dans `contracts/api`, validés par un middleware. Ces deux règles s'appliquent **dès
@@ -1333,7 +1397,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales. **Fait** (2026-11-06) ; reste : transitions de `workflows` (cliquet daté) |
 | **S2e** `executeRun` | Découpage en étapes nommées | Comportement identique (tests existants) + taille sous le cliquet. **Fait** (2026-11-06) |
 | **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution. **Fait** (2026-11-06) |
-| **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert |
+| **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert. **Fait** (2026-11-06) ; reste : réduire les 543 lectures étrangères et les écritures inter-contextes de l'API |
 | **S6** Temps réel | LISTEN par processus, trigger gardé, rattrapage durable | Tests LISTEN de la section 5 |
 | **S7** Protocole et corrélation | Contrat du connecteur unique, `traceparent`, logger commun | Un run se suit d'un bout à l'autre dans les logs. **Fait** (2026-11-06) ; reste : publier edge-setup, copier `protocol/connector` dans l'image pro, spans par étape après S2e |
 
@@ -1507,3 +1571,14 @@ sans finding) ; leurs findings P1/P2 ont été corrigés dans la branche :
 - compte des runs en cache qui n'expirait pas pendant une panne.
 Corrigé après l'épreuve sur l'app signée : une signature refusée était retéléchargée à chaque
 vérification et son erreur disparaissait de Réglages.
+
+**Frontières S4 (2026-11-06)** : section 4.6. Façades `application` pour les sept fichiers SQL
+que pro lisait, pro migré (branche `refactor/s4-core-facades`, à fusionner avec le cœur), puis
+`./sql/*` retiré des exports et tenu privé par dependency-cruiser. Les deux cycles de paquets
+cassés (ports `BotRuns` et `TenantPurgeProfileJobs`, arguments obligatoires, déplacements vers le
+roster et `runtimes`) ; graphe déclaré sans cycle, gardé. Propriété des tables étendue à
+`apps/*` (36 tables écrites par l'API ou le worker, writers déclarés) ; 553 lectures étrangères
+gelées par un cliquet, 543 après réduction. `bot-host` et la sonde d'enrôlement passent par
+`runtimeAdminClient`. `make solo-check` (deps-check, test-dual) au vert hors des trois
+« silhouettes du cadre » connues en mode pro ; `make test-integration` au vert. Une passe de
+`codex review` par dépôt, sans finding. Aucune migration.

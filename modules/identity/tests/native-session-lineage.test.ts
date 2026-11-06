@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
-import { refreshNativeSession } from "@openedbot/identity/application/native-auth";
-import { replacePasswordRevokingOtherSessions } from "@openedbot/identity/sql/accounts";
+import { refreshNativeSession } from "../src/application/native-auth";
+import { replacePasswordRevokingOtherSessions } from "../src/sql/accounts";
 import {
   createNativeSession,
   listUserSessions,
   revokeOtherUserSessions,
   revokeUserSession,
-} from "@openedbot/identity/sql/sessions";
+} from "../src/sql/sessions";
 
 /**
  * La coque openedbot-desktop tourne son refresh token toutes les 15 minutes. Chaque

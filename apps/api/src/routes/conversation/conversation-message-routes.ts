@@ -16,11 +16,11 @@ import {
   handoffSentNotice,
   type HandoffMention,
 } from "@openedbot/roster/domain/bot-mode";
-import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
+import { dmHandoffMention } from "@openedbot/roster/domain/dm-handoff";
 import { type GroupFollowUp, type GroupSendState } from "@openedbot/execution/domain/group-send";
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
-import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
-import { foldQueuedRunInputTx } from "@openedbot/execution/sql/run-columns";
+import { appendRunEventsTx } from "@openedbot/execution/application/run-events";
+import { foldQueuedRunInputTx } from "@openedbot/execution/application/run-columns";
 import { admitUserTurnTx } from "@openedbot/execution/application/run-creation";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -38,7 +38,7 @@ import type { BlobStore } from "../../infrastructure/blob-store";
 import { objectKey } from "../../infrastructure/blob-store";
 import type { Db } from "@openedbot/platform-db";
 import { isUniqueViolation } from "@openedbot/platform-db";
-import { claimReservedBlobsTx } from "@openedbot/conversation/sql/uncommitted-blobs";
+import { claimReservedBlobsTx } from "@openedbot/conversation/application/uncommitted-blobs";
 import { admitWithStoredBlobs } from "./message-blob-admission";
 import { RunTrace } from "@openedbot/platform-observability/run-trace";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";

@@ -1,7 +1,7 @@
 import type { SQL } from "bun";
 import { type HermesClient, HermesClientError, type HermesRunDetails } from "@openedbot/hermes";
 import { FOLLOWUP_SUPERSEDE_CODE } from "@openedbot/contracts-errors";
-import { insertAssistantMessage } from "@openedbot/conversation/sql/messages";
+import { insertAssistantMessage } from "@openedbot/conversation/application/messages";
 import { isServiceStepKind } from "../../domain/run-step";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { WorkerConfig } from "../worker-config";

@@ -6,14 +6,14 @@ import {
   globalSearchVisibleMessageText,
   type GlobalSearchHitDto,
   type GlobalSearchPageDto,
-} from "@openedbot/conversation/domain/global-search";
+} from "@openedbot/roster/domain/global-search";
 import type { MentionableBot } from "@openedbot/roster/domain/mentions";
 import type { MessageContent } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "../../interfaces/http/http-error";
-import { readOperatorProfile } from "@openedbot/identity/sql/operator-profile";
+import { readOperatorProfile } from "@openedbot/identity/application/operator-profile";
 
 type SearchCandidate = {
   kind: "conversation" | "message";

@@ -1,11 +1,11 @@
 import { recordRuntimeHealthObservation } from "@openedbot/runtimes/application/runtime-health";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import {
   resolvedHostProfileModel as resolveProfileModel,
   type HostProfileModelSelection,
-} from "@openedbot/portability/application/model";
+} from "@openedbot/roster/application/host-profile-model";
 import { Hono } from "hono";
-import { setModelAssignmentMode } from "@openedbot/identity/sql/organizations";
+import { setModelAssignmentMode } from "@openedbot/identity/application/organizations";
 import {
   HermesClientError,
   hermesProviderAcceptsApiKey,
@@ -40,10 +40,10 @@ import {
   publicRuntimeWithBots,
   type RuntimeRow,
 } from "./runtime-routes";
-import { readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { cancelModelSelectionProof, enqueueModelSelectionProof } from "@openedbot/runtimes/application/model-selection-proof";
-import { readProvenRuntimeModel } from "@openedbot/runtimes/sql/model-selection-proofs";
+import { readProvenRuntimeModel } from "@openedbot/runtimes/application/model-selection-proof";
 import { followingInDb, startProfileModelSync } from "@openedbot/roster/application/bot-model-reset";
 import { RELAY_FEATURE_PROFILE_MODEL_BATCH, RELAY_FEATURE_PROVIDER_SDKS } from "@openedbot/contracts-connector/features";
 

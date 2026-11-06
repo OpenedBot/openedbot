@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
-import { resolveImportedModel } from "@openedbot/portability/application/model";
-import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/portability/sql/reservations";
-import { createImportedGroups, importHermesProfile } from "@openedbot/portability/sql/roster";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { resolveImportedModel } from "@openedbot/roster/application/host-profile-model";
+import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/roster/application/profile-reservations";
+import { createImportedGroups, importHermesProfile } from "@openedbot/portability/application/roster";
 import type { RuntimeProfileImportDto } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import { requireOperator } from "../identity/auth";

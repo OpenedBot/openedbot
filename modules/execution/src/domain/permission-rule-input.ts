@@ -5,7 +5,7 @@ import {
   type PermissionRuleKind,
 } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { collapseWhitespace, redactSecrets } from "@openedbot/execution/domain/tool-text";
+import { collapseWhitespace, redactSecrets } from "./tool-text";
 
 /**
  * PERM2-6: the stored form of a rule. One line (control characters removed,

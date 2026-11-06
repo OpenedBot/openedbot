@@ -21,7 +21,7 @@ import {
   runtimeCapacity,
   type RuntimeProbeClient,
 } from "@openedbot/runtimes/application/runtime-probe";
-import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 import {
   decryptEdgeAuth,
   decryptRuntimeToken,

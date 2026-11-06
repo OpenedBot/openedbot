@@ -1,7 +1,7 @@
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { assertProfileNamesAvailable } from "@openedbot/portability/application/profile-import-guard";
+import { assertProfileNamesAvailable } from "./profile-import-guard";
 import type { CreateBotInput } from "../domain/bot-input";
 
 /** Au-delà, la collision redevient un 409 BOT_PROFILE_TAKEN. */

@@ -17,7 +17,7 @@ import {
 } from "@openedbot/roster/domain/bot-mode";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { branchTurnTx } from "@openedbot/execution/application/run-creation";
-import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
+import { appendRunEventsTx } from "@openedbot/execution/application/run-events";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { messageVersionPrecondition } from "@openedbot/conversation/domain/message-version";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -30,7 +30,7 @@ import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import { assertEntitled } from "@openedbot/identity/domain/entitlement";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readIdempotencyKey } from "@openedbot/conversation/application/message-ingress";
-import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
+import { dmHandoffMention } from "@openedbot/roster/domain/dm-handoff";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 import { assertSourceEligible, readSource } from "./message-version-source";

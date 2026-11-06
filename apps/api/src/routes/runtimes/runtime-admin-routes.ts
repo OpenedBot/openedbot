@@ -13,7 +13,7 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { resolveRuntime } from "./runtime-model-routes";
 import { invalidateSnapshots, postgresSnapshotStore, type SnapshotStore } from "@openedbot/runtimes/application/runtime-read-snapshots";
 import { runtimeManagement, type RuntimeManagement, type RuntimeRow } from "./runtime-routes";
-import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/sql/model-selection-proofs";
+import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/application/model-selection-proof";
 
 /**
  * Dépôt d'un credential fournisseur (clé API, session OAuth) sur un runtime.

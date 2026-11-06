@@ -9,8 +9,8 @@ import {
   type ProviderFailureKind,
 } from "../domain/provider-failure";
 import { withTenant } from "@openedbot/platform-db";
-import { enqueueEmailReturningId } from "@openedbot/notifications/sql/email-outbox";
-import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/sql/model-selection-proofs";
+import { enqueueEmailReturningId } from "@openedbot/notifications/application/email-outbox";
+import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/application/model-selection-proof";
 import { defaultTierModel } from "@openedbot/runtimes/domain/runtime/default-model";
 import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 export type RunModelSelection = {

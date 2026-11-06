@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import { claimProfileImport, executeProfileImport, purgeOldProfileImports } from "@openedbot/portability/application/executor";
-import type { ImportBlobStore } from "@openedbot/portability/sql/roster";
+import type { ImportBlobStore } from "@openedbot/portability/application/roster";
 import type { WorkerConfig } from "../config";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
 import { deleteBlob } from "../infrastructure/blob-store";

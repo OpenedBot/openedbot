@@ -7,8 +7,7 @@
   "exports": {
     "./application/*": "./src/application/*.ts",
     "./domain/*": "./src/domain/*.ts",
-    "./domain/archive/*": "./src/domain/archive/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/archive/*": "./src/domain/archive/*.ts"
   },
   "scripts": {
     "test": "bun test tests",
@@ -22,6 +21,7 @@
     "@openedbot/conversation": "workspace:*",
     "@openedbot/execution": "workspace:*",
     "@openedbot/hermes": "workspace:*",
+    "@openedbot/identity": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
     "@openedbot/roster": "workspace:*",
     "@openedbot/runtimes": "workspace:*",

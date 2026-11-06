@@ -8,8 +8,8 @@ import {
 } from "@openedbot/roster/domain/bot-mode";
 import { UNTRACKED_BACKGROUND_TOOLS } from "@openedbot/runtimes/domain/runtime-contract";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
-import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/sql/messages";
-import { touchThread } from "@openedbot/conversation/sql/threads";
+import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/application/messages";
+import { touchThread } from "@openedbot/conversation/application/threads";
 import { appendRunEventsTx } from "../../sql/run-events";
 import { NOW, transitionRuns } from "../../sql/run-transitions";
 import { appendNoticeTx } from "./events";

@@ -6,8 +6,8 @@ import type {
 } from "@openedbot/contracts-api";
 import { isUniqueViolation } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
-import { ProfileDeleteError, ProfileImportError } from "../domain/errors";
-import { lockProfileImports } from "./reservations";
+import { ProfileDeleteError, ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export const DELETE_LEASE_SECONDS = 180;

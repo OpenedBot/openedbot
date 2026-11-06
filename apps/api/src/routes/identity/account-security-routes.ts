@@ -7,7 +7,7 @@ import {
   revokeOwnSession,
 } from "@openedbot/identity/application/account-security";
 import { unlinkGoogle } from "@openedbot/identity/application/google-link";
-import type { LinkClaimResult, LinkOptions } from "@openedbot/identity/sql/oauth-attempt-store";
+import type { LinkClaimResult, LinkOptions } from "@openedbot/identity/application/oauth-attempt-store";
 import type { AppVariables } from "./auth";
 import type { Db } from "@openedbot/platform-db";
 import { assertPassword, assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";

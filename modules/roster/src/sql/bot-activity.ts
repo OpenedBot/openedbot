@@ -1,5 +1,5 @@
 import type { BotToolUsageDto, ToolErrorDto, ToolErrorPageDto } from "@openedbot/contracts-api";
-import { insertPersonaDraftThreadIfAbsent } from "@openedbot/conversation/sql/threads";
+import { insertPersonaDraftThreadIfAbsent } from "@openedbot/conversation/application/threads";
 import type { TransactionDb } from "@openedbot/platform-db";
 
 /** Le bot existe-t-il pour cette organisation ? */

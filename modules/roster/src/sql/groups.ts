@@ -1,5 +1,5 @@
 import type { GroupDto } from "@openedbot/contracts-api";
-import { insertGroupThread } from "@openedbot/conversation/sql/threads";
+import { insertGroupThread } from "@openedbot/conversation/application/threads";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { groupDtos, type GroupRow, type MemberRow } from "../domain/groups";
 import { nextSectionRowPosition } from "./sections";

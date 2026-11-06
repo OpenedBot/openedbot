@@ -1,9 +1,9 @@
 import type { SQL, TransactionSQL } from "bun";
 import type { HermesBundleImportDto, HermesBundleImportInput, HermesBundleImportJobDto, HermesBundleImportJobListDto, HermesProfileImportEntry } from "@openedbot/contracts-api";
-import { ProfileImportError } from "../domain/errors";
-import { assertProfileNamesAvailable, lockProfileImports } from "./reservations";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 import { assertNoActiveProfileDelete } from "./delete-jobs";
-import type { HostProfileModelSelection } from "../application/model";
+import type { HostProfileModelSelection } from "@openedbot/roster/application/host-profile-model";
 import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export const IMPORT_LEASE_SECONDS = 180;

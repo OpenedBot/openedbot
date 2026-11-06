@@ -5,7 +5,7 @@ import {
   mcpCatalogRootMatch,
   mcpConnectorEntry,
 } from "@openedbot/runtimes/domain/mcp-connector-catalog";
-import { readBotCapabilityTarget } from "@openedbot/roster/sql/bots";
+import { readBotCapabilityTarget } from "@openedbot/roster/application/bot-reads";
 import type {
   RuntimeIntegrationMcpDto,
   RuntimeIntegrationMcpServerDto,

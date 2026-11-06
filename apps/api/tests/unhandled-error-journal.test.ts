@@ -253,8 +253,8 @@ describe("contrat de la migration 0161_api_errors", () => {
     expect(sql).toContain("length(path) <= 512");
   });
 
-  test("db/ownership.json la range sous le propriétaire technique api", () => {
+  test("db/ownership.json la range sous l'API, que le worker purge (writer)", () => {
     const ownership = JSON.parse(readFileSync(new URL("../../../db/ownership.json", import.meta.url), "utf8")) as Record<string, unknown>;
-    expect(ownership.api_errors).toBe("api");
+    expect(ownership.api_errors).toEqual({ owner: "apps/api", writers: ["apps/worker"] });
   });
 });

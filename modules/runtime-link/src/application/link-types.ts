@@ -1,6 +1,6 @@
 import type { RelayAuditAnchorFrame, RelayDiagnosticFrame } from "@openedbot/contracts-connector";
 import type { AnchorWrite } from "./audit-keys";
-import { LINK_RECONNECT_REASON } from "../domain/link-probe";
+import { LINK_RECONNECT_REASON } from "@openedbot/runtimes/domain/link-probe";
 
 /**
  * Ce que le broker attend d'un WebSocket serveur: `Bun.ServerWebSocket` s'y

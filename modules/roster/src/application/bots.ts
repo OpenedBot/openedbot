@@ -1,13 +1,10 @@
 import { createHash } from "node:crypto";
 import { HermesClientError } from "@openedbot/hermes";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { withBotProfileLock, withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
-import { applyHostProfileModel } from "@openedbot/portability/application/model";
-import { readOrganizationCursor } from "@openedbot/conversation/sql/organization-cursor";
-import { cancelMaintenanceRunsTx, isMaintenanceStepKind } from "@openedbot/execution/application/run-cancellation";
-import { botGreetingInput } from "@openedbot/execution/domain/bot-greeting";
-import { greetNewBotTx } from "@openedbot/execution/application/run-creation";
-import { readOperatorProfile } from "@openedbot/identity/sql/operator-profile";
+import { withBotProfileLock, withProfileNamesLock } from "./profile-import-guard";
+import { applyHostProfileModel } from "./host-profile-model";
+import { readOrganizationCursor } from "@openedbot/conversation/application/organization-cursor";
+import { readOperatorProfile } from "@openedbot/identity/application/operator-profile";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import { botRuntimeSessionIds, namedHostProfileSlug } from "../domain/bot-deletion";
@@ -16,6 +13,7 @@ import { applyHostApprovalPolicy, applyTighteningPolicyBeforeMutation, approvalP
 import { publicBot, type BotRow } from "../domain/bot-dto";
 import { assertPermissionModeUnderCeiling } from "./permission-ceiling";
 import type { CreateBotInput, UpdateBotInput } from "../domain/bot-input";
+import type { BotRuns } from "./bot-runs";
 import { chooseBotSlug } from "./bot-slug";
 import {
   deleteBotRow,
@@ -257,18 +255,18 @@ export async function createBot(
       });
     }
     if (options.greeting && input.greet) {
-      await greetNewBotTx(tx, {
+      await deps.runs.greetNewBot(tx, {
         organizationId,
         threadId,
         botId: id,
         initiatorUserId: options.greeting.initiatorUserId,
-        input: botGreetingInput({
+        bot: {
           name,
           role: input.description,
           mission: input.mission,
           replyLanguage: input.editor.replyLanguage ?? "auto",
           operatorLocale: input.operatorLocale,
-        }),
+        },
       });
     }
     if (options.afterInsert) await options.afterInsert(tx, { id, threadId });
@@ -343,6 +341,7 @@ export async function updateBot(
   if (input.archived === true) {
     await withTenant(db, organizationId, (tx) => assertBotQuiescent(
       tx,
+      deps.runs,
       organizationId,
       botId,
       { code: "CANCELLED_BY_ARCHIVE", message: "Passe de maintenance annulée : le bot est archivé." },
@@ -391,6 +390,7 @@ export async function updateBot(
     if (input.archived === true) {
       const found = await assertBotQuiescent(
         tx,
+        deps.runs,
         organizationId,
         botId,
         {
@@ -482,12 +482,13 @@ export async function updateBot(
  */
 export async function assertBotDeletable(
   tx: TransactionDb,
+  runs: BotRuns,
   organizationId: string,
   botId: string,
   options: { detachGroups?: boolean } = {},
 ): Promise<void> {
   await assertBotProfileSettled(tx, organizationId, botId);
-  await assertBotQuiescent(tx, organizationId, botId, {
+  await assertBotQuiescent(tx, runs, organizationId, botId, {
     code: "CANCELLED_BY_DELETE",
     message: "Passe de maintenance annulée : le bot est supprimé.",
   }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.", options.detachGroups === true);
@@ -521,6 +522,7 @@ async function assertBotNotInGroup(
  */
 async function assertBotQuiescent(
   tx: TransactionDb,
+  runs: BotRuns,
   organizationId: string,
   botId: string,
   maintenanceReason: { code: string; message: string },
@@ -529,14 +531,8 @@ async function assertBotQuiescent(
 ): Promise<boolean> {
   const active = await lockActiveBotRuns(tx, organizationId, botId);
   if (!(await lockBotRow(tx, organizationId, botId))) return false;
-  await cancelMaintenanceRunsTx(
-    tx,
-    organizationId,
-    active.filter((run) => isMaintenanceStepKind(run.stepKind)),
-    maintenanceReason,
-  );
-  const blocking = active.find((run) => !isMaintenanceStepKind(run.stepKind))
-    ?? (await readActiveBotRuns(tx, organizationId, botId))[0];
+  const remaining = await runs.stopMaintenanceRuns(tx, organizationId, active, maintenanceReason);
+  const blocking = remaining[0] ?? (await readActiveBotRuns(tx, organizationId, botId))[0];
   if (blocking) {
     throw new HttpError(
       409,
@@ -576,7 +572,7 @@ export async function deleteBot(
   return withBotProfileLock(db, organizationId, botId, async (db) => {
     if (!purge) {
       const scope = await withTenant(db, organizationId, async (tx) => {
-        await assertBotDeletable(tx, organizationId, botId);
+        await assertBotDeletable(tx, deps.runs, organizationId, botId);
         return readBotDeletionScope(tx, organizationId, botId);
       });
       if (!scope) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
@@ -608,7 +604,7 @@ export async function deleteBot(
         }
       }
       const rows = await withTenant(db, organizationId, async (tx) => {
-        await assertBotDeletable(tx, organizationId, botId);
+        await assertBotDeletable(tx, deps.runs, organizationId, botId);
         const deletedAt = await softDeleteBot(tx, organizationId, botId);
         if (!deletedAt) return [] as BotRow[];
         if (runtime && (sessions.length > 0 || slug)) {
@@ -637,7 +633,7 @@ export async function deleteBot(
     // lecture ne pourrait naître que d'un run, et un run actif a déjà fait
     // échouer `assertBotDeletable`.
     const scope = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
+      await assertBotDeletable(tx, deps.runs, organizationId, botId, { detachGroups: force });
       return readBotDeletionScope(tx, organizationId, botId);
     });
     if (!scope) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
@@ -653,7 +649,7 @@ export async function deleteBot(
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la suppression de profils.");
     }
     const result = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
+      await assertBotDeletable(tx, deps.runs, organizationId, botId, { detachGroups: force });
       const groupsDetached = force ? await detachBotFromGroups(tx, organizationId, botId) : null;
       const existing = await tx<Array<{ status: string }>>`select status from bot_host_cleanups
         where organization_id = ${organizationId} and bot_id = ${botId}

@@ -17,9 +17,9 @@ import {
   readThrough,
   wantsFreshRead,
 } from "@openedbot/runtimes/application/runtime-read-snapshots";
-import { asProfileHttpError, withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
+import { asProfileHttpError, withProfileNamesLock } from "@openedbot/roster/application/profile-import-guard";
 import { deleteHostProfile, parseDeleteJobSlugs } from "@openedbot/portability/application/host-profile-delete";
-import { enqueueProfileDelete, lastProfileJobChange, listDeleteJobs } from "@openedbot/portability/sql/delete-jobs";
+import { enqueueProfileDelete, lastProfileJobChange, listDeleteJobs } from "@openedbot/portability/application/delete-jobs";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import { publicWriteError, withDeadline } from "./runtime-integration-public";
 import {

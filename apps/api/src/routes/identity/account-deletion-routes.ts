@@ -8,7 +8,8 @@ import {
   readAccountDeletionState,
   scheduleAccountDeletion,
 } from "@openedbot/identity/application/account-deletion";
-import { hasPendingAccountDeletion } from "@openedbot/identity/sql/deletions";
+import { requestOrganizationCancellationTx } from "@openedbot/execution/application/run-cancellation";
+import { hasPendingAccountDeletion } from "@openedbot/identity/application/deletions";
 
 const DELETE_CONFIRMATION = "DELETE";
 
@@ -54,7 +55,7 @@ export function accountDeletionRoutes(
     if (body.confirmation !== DELETE_CONFIRMATION && body.confirm !== DELETE_CONFIRMATION) {
       throw new HttpError(400, "DELETE_CONFIRMATION_REQUIRED", "Saisissez DELETE pour confirmer la suppression du compte.");
     }
-    const deletion = await scheduleAccountDeletion(db, scope(auth), config.billingGraceDays);
+    const deletion = await scheduleAccountDeletion(db, scope(auth), config.billingGraceDays, requestOrganizationCancellationTx);
     return context.json({ deletion, scheduled: true }, 202);
   });
 

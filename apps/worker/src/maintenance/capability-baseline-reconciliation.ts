@@ -9,7 +9,7 @@ import {
   baselineToolsetPlan,
 } from "@openedbot/roster/domain/capability-baseline";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
-import { withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
+import { withBotProfileLock } from "@openedbot/roster/application/profile-import-guard";
 import type { Db } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import type { WorkerConfig } from "../config";

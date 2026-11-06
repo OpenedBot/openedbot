@@ -11,7 +11,7 @@ import {
   replaceLinkTokenEmergency,
   setLinkFeatures,
   settleLinkTokenRotation,
-} from "@openedbot/runtimes/sql/runtime-link-rows";
+} from "@openedbot/runtimes/application/runtime-link-rows";
 import { hashCredential, randomCredential } from "@openedbot/platform-db/credential";
 import { logEvent } from "@openedbot/platform-observability";
 import { recordAuditAnchor } from "./audit-keys";

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { parseHermesBundleInput } from "../src/domain/validation";
-import { profileCreationFailureState } from "../src/application/provision";
+import { profileCreationFailureState } from "@openedbot/roster/application/host-profile-provision";
 import { HermesClientError } from "@openedbot/hermes";
 import { parseHermesProfileFiles } from "../src/domain/hermes-profile-bundle";
 import { importDigest } from "../src/sql/jobs";

@@ -24,7 +24,7 @@
 import type { SQL } from "bun";
 import { HermesClientError, type HermesClient } from "@openedbot/hermes";
 import { REVIEW_PROFILE } from "@openedbot/runtimes/domain/runtime-contract";
-import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
+import { readReviewProven } from "@openedbot/runtimes/application/review-profile";
 import type { GateDescriptor, GateKind } from "../domain/gate-identity";
 import type { ResolvedPermissionRuleSource } from "../domain/permission-rules";
 import {

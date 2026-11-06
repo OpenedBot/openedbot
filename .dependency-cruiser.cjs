@@ -33,8 +33,37 @@ const PRO_CONSOLE_SCREENS =
   "^apps/console/src/(components/agency/|screens/agency/|screens/settings/agency/|" +
   "screens/auth/agency-invitation\\.tsx$|screens/settings/dev/billing\\.tsx$|components/settings/permission-rules\\.tsx$)";
 
+/**
+ * Les modules métier et les modules qu'ils déclarent (`dependencies` de leur
+ * package.json) : un module n'importe que ceux-là (ADR 0001 S4). Le graphe
+ * déclaré est sans cycle (`tests/scripts/workspace-deps-contract.ts`) ; cette
+ * règle le tient fichier par fichier, tests des modules compris.
+ */
+const fs = require("node:fs");
+const path = require("node:path");
+const MODULES_DIR = path.join(__dirname, "modules");
+const MODULE_DEPENDENCIES = fs
+  .readdirSync(MODULES_DIR, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(MODULES_DIR, entry.name, "package.json")))
+  .map((entry) => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(MODULES_DIR, entry.name, "package.json"), "utf8"));
+    const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+      .filter((name) => name.startsWith("@openedbot/"))
+      .map((name) => name.slice("@openedbot/".length));
+    return { module: entry.name, declared };
+  });
+
 module.exports = {
   forbidden: [
+    ...MODULE_DEPENDENCIES.map(({ module, declared }) => ({
+      name: "module-par-ses-dependances",
+      comment:
+        `Le module ${module} n'importe que les modules que déclare son package.json (${declared.filter((name) => fs.existsSync(path.join(MODULES_DIR, name))).join(", ") || "aucun"}) : ` +
+        "le graphe des modules reste sans cycle (ADR 0001 S4). Une nouvelle dépendance se déclare, et ne doit pas en fermer un.",
+      severity: "error",
+      from: { path: `^modules/${module}/` },
+      to: { path: "^modules/[^/]+/", pathNot: `^modules/(${[module, ...declared].join("|")})/` },
+    })),
     {
       name: "pas-de-pro-statique",
       comment:
@@ -105,14 +134,27 @@ module.exports = {
           "^apps/worker/src/maintenance/approval-policy-reconciliation\\.ts$",
       },
       to: {
+        // Since S4 these reads are public through the application façades of
+        // the roster and of runtimes (their SQL files are private): both are named.
         path:
-          "^modules/roster/src/sql/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
-          "(^|/)node_modules/@openedbot/roster/src/sql/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
-          "^@openedbot/roster/sql/(permission-grants|tool-policies|permission-rules)$|" +
-          "^modules/runtimes/src/sql/permission-settings\\.ts$|" +
-          "(^|/)node_modules/@openedbot/runtimes/src/sql/permission-settings\\.ts$|" +
-          "^@openedbot/runtimes/sql/permission-settings$",
+          "^modules/roster/src/(sql|application)/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
+          "(^|/)node_modules/@openedbot/roster/src/(sql|application)/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
+          "^@openedbot/roster/(sql|application)/(permission-grants|tool-policies|permission-rules)$|" +
+          "^modules/runtimes/src/(sql|application)/permission-settings\\.ts$|" +
+          "(^|/)node_modules/@openedbot/runtimes/src/(sql|application)/permission-settings\\.ts$|" +
+          "^@openedbot/runtimes/(sql|application)/permission-settings$",
       },
+    },
+    {
+      name: "sql-prive-au-module",
+      comment:
+        "Le SQL d'un module (`modules/<module>/src/sql/`) ne s'importe que depuis ce module (ADR 0001 S4) : les " +
+        "autres paquets, les applications et les plug-ins passent par sa couche `application` publique, qui " +
+        "réexporte ce qu'elle ouvre. Les exports des paquets ne publient plus `./sql/*`. Les harnais de la racine " +
+        "(`tests/`, `scripts/`) lisent encore le code qu'ils éprouvent.",
+      severity: "error",
+      from: { path: "^(apps|platform|contracts|browser|modules)/([^/]+)/" },
+      to: { path: "^modules/[^/]+/src/sql/", pathNot: "^modules/$2/" },
     },
     {
       name: "primitives-de-creation-privees",

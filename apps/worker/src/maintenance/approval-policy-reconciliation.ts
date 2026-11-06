@@ -1,11 +1,11 @@
 import type { SQL } from "bun";
 import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
 import { applyHostApprovalPolicyWithClient, effectiveHostPolicy, hostBlockedToolsMatch } from "@openedbot/roster/application/approval-policy";
-import { readBlockedTools } from "@openedbot/roster/sql/tool-policies";
+import { readBlockedTools } from "@openedbot/roster/application/tool-policies";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
 import { approvalPolicyMode, permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
-import { withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
+import { withBotProfileLock } from "@openedbot/roster/application/profile-import-guard";
 import type { Db } from "@openedbot/platform-db";
 import type { WorkerConfig } from "../config";
 import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";

@@ -1,11 +1,11 @@
 import type { SQL } from "bun";
 import type { Db } from "@openedbot/platform-db";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
-import { withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
+import { withProfileNamesLock } from "@openedbot/roster/application/profile-import-guard";
 import { PROFILE_SERVE_WAIT } from "@openedbot/roster/application/profile-provisions";
 import { prepareReviewProfile } from "@openedbot/runtimes/application/review-profile";
 import { REVIEW_PROFILE } from "@openedbot/runtimes/domain/runtime-contract";
-import { claimReviewProfile, enqueueReviewProfiles, finishReviewProfile, type ReviewProfileJob } from "@openedbot/runtimes/sql/review-profiles";
+import { claimReviewProfile, enqueueReviewProfiles, finishReviewProfile, type ReviewProfileJob } from "@openedbot/runtimes/application/review-profile";
 import type { WorkerConfig } from "../config";
 import { logEvent } from "@openedbot/platform-observability";
 

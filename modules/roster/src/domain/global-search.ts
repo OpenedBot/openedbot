@@ -1,7 +1,7 @@
 import type { MessageContent } from "@openedbot/contracts-api";
-import { splitHandoff } from "@openedbot/roster/domain/bot-mode";
-import type { MentionableBot } from "@openedbot/roster/domain/mentions";
-import { splitAskUser } from "@openedbot/roster/domain/ask-user";
+import { splitHandoff } from "./bot-mode";
+import type { MentionableBot } from "./mentions";
+import { splitAskUser } from "./ask-user";
 
 export const GLOBAL_SEARCH_LIMITS = {
   defaultResults: 12,

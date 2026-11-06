@@ -7,8 +7,7 @@
   "exports": {
     "./application/*": "./src/application/*.ts",
     "./domain/*": "./src/domain/*.ts",
-    "./domain/email/*": "./src/domain/email/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/email/*": "./src/domain/email/*.ts"
   },
   "scripts": {
     "test": "bun test tests",

@@ -1,15 +1,15 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import type { TransactionSQL } from "bun";
 import type { HermesHostProfile, HermesProfileAvatar } from "@openedbot/hermes";
-import { insertImportedAvatarAttachment } from "@openedbot/conversation/sql/attachments";
-import { insertBotDefaultThread, insertGroupThread } from "@openedbot/conversation/sql/threads";
-import { insertDisabledRoutine } from "@openedbot/execution/sql/routines";
+import { insertImportedAvatarAttachment } from "@openedbot/conversation/application/attachments";
+import { insertBotDefaultThread, insertGroupThread } from "@openedbot/conversation/application/threads";
+import { insertDisabledRoutine } from "@openedbot/execution/application/routines";
 import {
   insertGroupMember,
   insertImportedBot,
   insertImportedBotGroup,
-} from "@openedbot/roster/sql/bot-import";
-import { defaultPermissionMode } from "@openedbot/roster/sql/bots";
+} from "@openedbot/roster/application/bot-import";
+import { defaultPermissionMode } from "@openedbot/roster/application/bot-reads";
 import { classifyHermesSchedule, mapHermesFace, scheduleLimitation } from "../domain/runtime-profile-import";
 import { GROUP_MEMBERS_MAX, GROUP_MEMBERS_MIN, type RuntimeProfileImportDto } from "@openedbot/contracts-api";
 

@@ -6,7 +6,7 @@ import {
   buildThreadFindIndex,
   searchThreadFindIndex,
   type ThreadFindDocument,
-} from "@openedbot/conversation/domain/thread-find";
+} from "@openedbot/roster/domain/thread-find";
 import { FindBar } from "../../components/find-bar";
 import { requestThreadReveal } from "./thread-reveal";
 import { useT } from "../i18n";

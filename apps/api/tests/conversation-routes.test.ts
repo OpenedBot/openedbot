@@ -22,7 +22,7 @@ import {
   readThreadGroup,
   runRoutes,
 } from "../src/routes/conversation/conversation-routes";
-import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
+import { dmHandoffMention } from "@openedbot/roster/domain/dm-handoff";
 import { organizationEventEnvelope } from "@openedbot/contracts-events";
 import { messageDto, publicRunStatus } from "@openedbot/conversation/domain/message-dto";
 import { createTestLogger, runWithLogger } from "@openedbot/platform-observability";

@@ -26,6 +26,13 @@ import {
 import { readDefaultSectionId, sectionExists } from "../sql/sections";
 import { pruneEmptySections } from "../sql/section-prune";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export {
+  clearGroupNeedsYou,
+  raiseGroupNeedsYou,
+  readGroups,
+} from "../sql/groups";
+
 export async function listGroups(db: Db, organizationId: string, userId: string): Promise<GroupDto[]> {
   return withTenant(db, organizationId, (tx) => readGroups(tx, organizationId, undefined, userId));
 }

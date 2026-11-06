@@ -8,9 +8,9 @@ import { requireOperator } from "../identity/auth";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { updateRuntimeHealthForFailure } from "@openedbot/runtimes/application/runtime-health";
 import { cleanupRevokedExposuresAfterCommit, revokeExposureForRuntime } from "@openedbot/runtimes/application/direct-exposure-lifecycle";
-import type { RuntimeExposureRow } from "@openedbot/runtimes/sql/runtime-exposures";
+import type { RuntimeExposureRow } from "@openedbot/runtimes/application/runtime-exposures";
 import { mapHermesError, probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtime-probe";
-import { readAllRuntimeRows, readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+import { readAllRuntimeRows, readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 import { assertLinkReachable, runtimeClientConfig } from "@openedbot/runtimes/application/runtime-access";
 import type { RuntimeRouteContext } from "./runtime-routes";
 import {
