@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { Profiler, useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { I18nProvider } from "../../../src/lib/i18n";
 import { BotsTable } from "../../../src/components/dashboard/bots-table";
 import { queryKeys } from "../../../src/lib/api";
@@ -34,6 +34,23 @@ function mountTable(client = new QueryClient()) {
   const router = createRouter({ routeTree: root, history: createMemoryHistory({ initialEntries: ["/"] }) });
   render(<QueryClientProvider client={client}><I18nProvider><RouterProvider router={router as never} /></I18nProvider></QueryClientProvider>);
 }
+
+// Settings › Activité renders this table beside the settings nav, where the
+// bot list and its « + » are not on screen: the empty state carries the action.
+test("an empty roster offers to create a bot, which leads to the home's creation form", async () => {
+  const client = new QueryClient();
+  clients.push(client);
+  const root = createRootRoute({ component: () => <><BotsTable flush /><Outlet /></> });
+  const home = createRoute({ getParentRoute: () => root, path: "/", component: () => null });
+  const settings = createRoute({ getParentRoute: () => root, path: "/settings", component: () => null });
+  const router = createRouter({ routeTree: root.addChildren([home, settings]), history: createMemoryHistory({ initialEntries: ["/settings"] }) });
+  render(<QueryClientProvider client={client}><I18nProvider><RouterProvider router={router as never} /></I18nProvider></QueryClientProvider>);
+  await screen.findByText("Aucun bot pour le moment.");
+  expect(screen.queryByText(/barre latérale/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Créer un bot" }));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(router.state.location.pathname).toBe("/");
+});
 
 test("a first 500 shows an unavailable list and retry rather than no bots", async () => {
   let unreadable = true;

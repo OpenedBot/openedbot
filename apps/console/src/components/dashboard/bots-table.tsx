@@ -29,6 +29,7 @@ import { listTimestamp } from "../../lib/format";
 import { BotFace } from "../bot-face";
 import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
+import { useNewBot } from "../../lib/bots/use-new-bot";
 
 const EMPTY_BOTS: BotDto[] = [];
 
@@ -69,6 +70,7 @@ function BotsTableSkeletonRows() {
  */
 export function BotsTable({ flush = false }: { flush?: boolean }) {
   const { t, locale } = useT();
+  const createBot = useNewBot();
   const roster = useQuery({ queryKey: queryKeys.roster, queryFn: api.roster, retry: false });
   // La colonne « Modèle » nommait le repli « défaut runtime » sans jamais dire
   // DE QUEL modèle il s'agit : deux écrans décrivaient le même état avec des
@@ -232,7 +234,14 @@ export function BotsTable({ flush = false }: { flush?: boolean }) {
               : table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  {t("botsTable.empty")}
+                  {/* Shown in Settings › Activité, whose sidebar is the settings
+                      nav: the « + » of the bot list is not on screen there. */}
+                  <div className="flex flex-col items-center gap-3">
+                    <span>{t("botsTable.empty")}</span>
+                    <button type="button" className={BUTTON.soft} onClick={() => createBot()}>
+                      {t("botsTable.create")}
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
