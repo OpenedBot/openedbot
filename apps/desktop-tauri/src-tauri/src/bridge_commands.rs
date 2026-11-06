@@ -19,6 +19,9 @@ pub const COMMANDS: &[&str] = &[
     "toggle_maximize",
     "report_diagnostic",
     "update_state",
-    "restart_to_update",
+    "check_for_updates",
+    "install_update",
     "report_update_required",
+    "report_runs_in_progress",
+    "set_update_auto_install",
 ];

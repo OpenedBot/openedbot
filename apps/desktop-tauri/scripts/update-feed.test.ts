@@ -31,6 +31,14 @@ describe("update feed", () => {
     expect(manifest.version).toBe("1.1.1-test");
   });
 
+  test("the floor travels in the manifest only when set", () => {
+    const base = { version: "0.0.18", url: "u", signature: "s", notes: "", pubDate: new Date("2026-11-06T12:00:00Z") };
+    expect(buildManifest({ ...base, minVersion: "0.0.17", maxAgeDays: 30 })).toMatchObject({ min_version: "0.0.17", max_age_days: 30 });
+    expect("min_version" in buildManifest(base)).toBe(false);
+    expect(() => buildManifest({ ...base, minVersion: "soon" })).toThrow();
+    expect(() => buildManifest({ ...base, maxAgeDays: 0 })).toThrow();
+  });
+
   test("a version or signature that cannot be served is refused", () => {
     const base = { url: "u", notes: "", pubDate: new Date() };
     expect(() => buildManifest({ ...base, version: "v1", signature: "s" })).toThrow();

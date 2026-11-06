@@ -85,6 +85,11 @@ pub trait PopupEvents: Send + Sync + 'static {
     fn gave_up(&self, reason: &GiveUp);
     /// "Quit" from the popup's own menu: the user no longer wants it.
     fn user_closed(&self) {}
+    /// Lines sent after `hello` and the session state, so that a popup that
+    /// (re)starts learns what it missed (the update state).
+    fn greeting(&self) -> Vec<HostToPopup> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -437,6 +442,9 @@ impl<T: TokenSource> PopupHost<T> {
                     console_url: self.console_url.clone(),
                 });
                 let _ = sender.send(if self.tokens.is_signed_in() { HostToPopup::SignedIn } else { HostToPopup::SignedOut });
+                for line in self.events.greeting() {
+                    let _ = sender.send(line);
+                }
                 None
             }
             PopupToHost::Token { id, force } => {

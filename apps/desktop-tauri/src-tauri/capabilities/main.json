@@ -27,7 +27,10 @@
     "allow-toggle-maximize",
     "allow-report-diagnostic",
     "allow-update-state",
-    "allow-restart-to-update",
-    "allow-report-update-required"
+    "allow-check-for-updates",
+    "allow-install-update",
+    "allow-report-update-required",
+    "allow-report-runs-in-progress",
+    "allow-set-update-auto-install"
   ]
 }

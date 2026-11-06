@@ -1,5 +1,6 @@
 import type { AuthStore } from "@openedbot/browser-api-client";
 import { createTauriBridge } from "./tauri-bridge";
+import type { NativeUpdatesBridge } from "./native-updates";
 
 /**
  * Le pont que la coque native (dépôt voisin `openedbot-desktop`, Electron) expose au
@@ -34,6 +35,8 @@ export type OpenedbotNativeBridge = {
    * console lui rend alors la main (`signOut`) et la coque montre sa page locale.
    */
   auth?: NativeAuthBridge;
+  /** La mise à jour de l'app (coque Tauri seulement, `native-updates.ts`). */
+  updates?: NativeUpdatesBridge;
 };
 
 /** L'état de connexion poussé par la coque (`SigninState` de `apps/desktop/src/shared/bridge.ts`). */

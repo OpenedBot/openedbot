@@ -119,7 +119,6 @@ const rootRoute = createRootRoute({
   ),
 });
 
-
 /**
  * `/onboarding/organization` : uniquement `?create=1` pour créer l'autre type.
  * Un premier compte sans organisation passe par `/onboarding`.
@@ -1023,6 +1022,7 @@ const routeTree = rootRoute.addChildren([
     agentsSettingsRoute,
     modelsSettingsRoute,
     appearanceSettingsRoute,
+    createRoute({ getParentRoute: () => settingsFrameRoute, path: "/updates", component: SETTINGS_SECTIONS["/settings/updates"] }), // app Tauri
     archivesSettingsRoute,
     supportSettingsRoute,
     connectorsSettingsRoute,

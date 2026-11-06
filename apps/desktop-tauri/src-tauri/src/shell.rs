@@ -10,7 +10,8 @@ use tauri_specta::Event;
 use url::Url;
 
 use crate::auth::{AuthEvents, GoogleSteps, SignedOutReason, SigninState, StepFailed};
-use crate::bridge::{Auth, Shell, SigninStateChanged};
+use crate::bridge::{Auth, Shell, SigninStateChanged, UpdateMenuAction, UpdateMenuChosen};
+use crate::update_state::{UpdateState, UpdateStatus};
 use crate::callback::Loopback;
 use crate::popup::{GiveUp, HostToPopup, PopupEvents, PopupHost};
 use crate::prefs::DisplayMode;
@@ -294,6 +295,37 @@ impl<R: Runtime> PopupEvents for ShellPopupEvents<R> {
 
     fn user_closed(&self) {
         set_display_mode(&self.app, DisplayMode::Window);
+    }
+
+    fn greeting(&self) -> Vec<HostToPopup> {
+        self.app.try_state::<Arc<UpdateStatus>>().map(|status| vec![update_line(&status.get())]).unwrap_or_default()
+    }
+}
+
+/// The notch's line for an update state.
+pub fn update_line(state: &UpdateState) -> HostToPopup {
+    let (status, version) = state.summary();
+    HostToPopup::UpdateState { status, version }
+}
+
+/// The app menu's update item: with an update ready, the console asks the
+/// user to restart (never a restart from here); otherwise a check starts and
+/// the console opens Settings › Mises à jour.
+pub fn update_menu_chosen<R: Runtime>(app: &AppHandle<R>) {
+    let Some(status) = app.try_state::<Arc<UpdateStatus>>() else { return };
+    let action = if status.get().ready_version().is_some() {
+        UpdateMenuAction::Install
+    } else {
+        if let Some(updates) = app.try_state::<crate::bridge::Updates>() {
+            let control = updates.0.clone();
+            tauri::async_runtime::spawn(async move { control.check().await });
+        }
+        UpdateMenuAction::Check
+    };
+    window::bring_to_front(app);
+    visibility_changed(app);
+    if let Err(error) = (UpdateMenuChosen { action }).emit(app) {
+        log::warn!("update menu choice not delivered ({error})");
     }
 }
 

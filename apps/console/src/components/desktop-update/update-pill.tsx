@@ -1,0 +1,79 @@
+import { RiDownloadCloud2Line, RiLoader4Line } from "@remixicon/react";
+import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@openedbot/browser-ui-kit";
+import { useT } from "../../lib/i18n";
+import { useNativeUpdateState } from "../../lib/platform/native-updates";
+import { openUpdateDialog } from "./update-hooks";
+import { menuRowVersion, pillView } from "./update-model";
+
+/**
+ * La pastille de mise à jour, en pied de barre à côté du compte (Grok Bot,
+ * `sand-update-pill`). Bleu informatif FIXE (`--state-info-*`, classes
+ * `info-*`), jamais `--primary` qui suit l'accent du bot ou de l'espace.
+ * Sans animation une fois prête ; pendant le téléchargement, un anneau qui
+ * tourne et le pourcentage en infobulle. Le clic ouvre le dialogue, jamais
+ * un redémarrage direct.
+ */
+export function UpdatePill() {
+  const { t } = useT();
+  const view = pillView(useNativeUpdateState());
+  if (view.kind === "hidden") return null;
+  if (view.kind === "downloading") {
+    const label = view.percent === null ? t("desktopUpdate.downloadingTooltipNoTotal") : t("desktopUpdate.downloadingTooltip", { percent: view.percent });
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span role="status" aria-label={label} data-desktop-update-pill="downloading" className="inline-flex size-[30px] shrink-0 items-center justify-center text-info-700">
+            <RiLoader4Line aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+  const tooltip = t("desktopUpdate.pillTooltip", { version: view.version });
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          data-desktop-update-pill="ready"
+          onClick={() => openUpdateDialog(view.version)}
+          className={cn(
+            "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[12px] leading-4 font-semibold whitespace-nowrap outline-none",
+            "bg-info-soft text-info-700 transition-colors hover:bg-info-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+          )}
+        >
+          <RiDownloadCloud2Line aria-hidden className="size-3.5" />
+          {t("desktopUpdate.pill")}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** La ligne du menu du compte (Grok Bot : « New update available » + Install). */
+export function UpdateMenuRow({ onSelect, mobileDrawer }: { onSelect: () => void; mobileDrawer: boolean }) {
+  const { t } = useT();
+  const version = menuRowVersion(useNativeUpdateState());
+  if (!version) return null;
+  return (
+    <div data-desktop-update-row="" className={cn("flex w-full items-center justify-between gap-2.5 rounded-2lg px-2 py-1", mobileDrawer && "min-h-11")}>
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <RiDownloadCloud2Line aria-hidden className="size-5 shrink-0 text-info-700" />
+        <span className="truncate text-body-medium text-text-primary">{t("desktopUpdate.menuRow")}</span>
+      </span>
+      <button
+        type="button"
+        data-closes-drawer=""
+        onClick={() => {
+          onSelect();
+          openUpdateDialog(version);
+        }}
+        className="inline-flex h-6 shrink-0 cursor-pointer items-center rounded-full bg-info-soft px-2 text-xs font-semibold text-info-700 outline-none transition-colors hover:bg-info-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+      >
+        {t("desktopUpdate.menuInstall")}
+      </button>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import {
   IconLayoutGrid,
   IconPlugConnected,
   IconPalette,
+  IconRefresh,
   IconServerBolt,
   IconTerminal2,
   IconShield,
@@ -79,6 +80,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     items: [
       { titleKey: "settingsSidebar.account", url: "/settings/account", icon: IconUserCircle },
       { titleKey: "settingsSidebar.appearance", url: "/settings/appearance", icon: IconPalette },
+      // App Tauri seulement : la mise à jour de l'app de bureau (constant au build).
+      ...(import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" ? [{ titleKey: "settingsSidebar.updates" as const, url: "/settings/updates", icon: IconRefresh }] : []),
     ],
   },
   {

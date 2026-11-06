@@ -137,6 +137,8 @@ const buildEnv: Record<string, string | undefined> = {
   TAURI_SIGNING_PRIVATE_KEY: path.join(updaterDir, "updater.key"),
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: readFileSync(path.join(updaterDir, "updater.key.pass"), "utf8").trim(),
   APPLE_SIGNING_IDENTITY: sign === "developer-id" ? identity : "-",
+  // Embedded by the shell (`option_env!`): the manifest's `max_age_days` measures the build's age from it.
+  OPENEDBOT_BUILT_AT: String(Math.floor(Date.now() / 1000)),
 };
 if (notarize) Object.assign(buildEnv, { APPLE_API_KEY_PATH: apple.keyPath, APPLE_API_KEY: apple.keyId, APPLE_API_ISSUER: apple.issuer });
 else for (const name of ["APPLE_API_KEY_PATH", "APPLE_API_KEY", "APPLE_API_ISSUER", "APPLE_ID", "APPLE_PASSWORD"]) delete buildEnv[name];

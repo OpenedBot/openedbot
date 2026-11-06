@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit, emitTo, listen, once } from "@tauri-apps/api/event";
 import { commands, events, installTauriRuntime, type BridgeError, type Platform } from "@openedbot/contracts-native-bridge";
 import type { NativeAuthBridge, NativeSigninState, OpenedbotNativeBridge } from "./native-bridge";
+import type { NativeUpdateState, NativeUpdatesBridge } from "./native-updates";
 import { installTauriShell } from "./tauri-shell";
 
 /**
@@ -26,7 +27,7 @@ declare global {
 }
 
 /** La version du pont que cette console sait parler (`BRIDGE_VERSION` de `bridge.rs`). */
-export const SUPPORTED_BRIDGE_VERSION = 1;
+export const SUPPORTED_BRIDGE_VERSION = 2;
 
 /** Un refus nommé de la coque (`BridgeError` côté Rust) : jamais un jeton, jamais un corps. */
 export class NativeBridgeError extends Error {
@@ -110,6 +111,7 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
   };
 
   return {
+    updates: createUpdatesBridge(),
     readAccessToken: async () => unwrap(await commands.readAccessToken()),
     refresh: async () => unwrap(await commands.refresh()),
     openExternal: async (url) => {
@@ -121,5 +123,58 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
     // La coque Tauri dit son vrai système ; celle d'Electron dit toujours "windows".
     shell: { platform: shell.platform, version: shell.version },
     auth,
+  };
+}
+
+/**
+ * Les mises à jour : comme la connexion, un seul abonnement pour la vie de la
+ * page, et `onState` rejoue le dernier état aussitôt. Le premier état vient
+ * de `update_state` une fois l'écoute posée, pour ne rien perdre entre les deux.
+ */
+function createUpdatesBridge(): NativeUpdatesBridge {
+  let last: NativeUpdateState | null = null;
+  const listeners = new Set<(state: NativeUpdateState) => void>();
+  const deliver = (state: NativeUpdateState) => {
+    last = state;
+    for (const listener of listeners) listener(state);
+  };
+  let started = false;
+  const start = () => {
+    if (started) return;
+    started = true;
+    void events.updateStateChanged
+      .listen((event) => deliver(event.payload as NativeUpdateState))
+      .then(async () => {
+        const current = await commands.updateState();
+        if (last === null) deliver(current as NativeUpdateState);
+      })
+      .catch((error: unknown) => console.warn("[openedbot] update state unavailable", error));
+  };
+  return {
+    onState: (listener) => {
+      listeners.add(listener);
+      start();
+      if (last) listener(last);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    check: () => commands.checkForUpdates(),
+    install: async (version) => {
+      unwrap(await commands.installUpdate(version));
+    },
+    reportRequired: async (minimum) => {
+      unwrap(await commands.reportUpdateRequired(minimum));
+    },
+    reportRuns: async (count) => {
+      unwrap(await commands.reportRunsInProgress(count));
+    },
+    setAutoInstall: (enabled) => commands.setUpdateAutoInstall(enabled),
+    onMenu: (listener) => {
+      const unlisten = events.updateMenuChosen.listen((event) => listener(event.payload.action));
+      return () => {
+        void unlisten.then((stop) => stop());
+      };
+    },
   };
 }

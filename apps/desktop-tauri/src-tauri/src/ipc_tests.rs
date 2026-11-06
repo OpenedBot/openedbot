@@ -56,7 +56,10 @@ fn app() -> tauri::App<MockRuntime> {
     let auth = AuthService::new(HttpAuthApi::new(&config.api_origin, "0.0.0"), Box::new(DisabledVault) as Box<dyn Vault>, Arc::new(NoEvents), callback::LOOPBACK_REDIRECT_URI, CLIENT_ID);
     auth.restore();
     app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())), google: Arc::new(NoBrowser), client_id: CLIENT_ID.into(), window: Box::new(NoWindow) });
-    app.manage(crate::update_state::UpdateStatus::new(Box::new(|_, _| {}), Box::new(|| panic!("no restart in a test"))));
+    let status = Arc::new(crate::update_state::UpdateStatus::new(true, Box::new(|_, _| {})));
+    app.manage(status.clone());
+    app.manage(bridge::Updates(Arc::new(crate::update_engine::NoUpdates(status))));
+    app.manage(WindowState::new(Arc::new(prefs::PreferenceStore::open(None))));
     app
 }
 
@@ -203,13 +206,38 @@ fn an_unknown_text_zoom_is_refused() {
 fn the_update_state_is_readable_and_its_actions_are_checked() {
     let app = app();
     let main = window(&app, window::MAIN_WINDOW);
-    assert_eq!(invoke(&main, "update_state", LOCAL, json!({})), Ok(json!({ "status": "idle" })));
-    let refused = invoke(&main, "restart_to_update", LOCAL, json!({})).expect_err("nothing installed");
+    let idle = json!({ "phase": { "status": "idle" }, "required": null, "lastError": null, "autoInstall": true, "lastCheck": null });
+    assert_eq!(invoke(&main, "update_state", LOCAL, json!({})), Ok(idle));
+    let refused = invoke(&main, "install_update", LOCAL, json!({ "version": "1.1.0" })).expect_err("nothing downloaded");
     assert!(refused.to_string().contains("UPDATE_NOT_READY"), "{refused}");
+    // A prerelease offered by the feed (D5's 1.1.1-test) is a version: refused only because nothing is ready.
+    let refused = invoke(&main, "install_update", LOCAL, json!({ "version": "1.1.1-test" })).expect_err("nothing downloaded");
+    assert!(refused.to_string().contains("UPDATE_NOT_READY"), "{refused}");
+    for forged in ["../1", "1.1", "v1.1.0", "1.1.0; rm", "1.1.0+build", ""] {
+        let refused = invoke(&main, "install_update", LOCAL, json!({ "version": forged })).expect_err(forged);
+        assert!(refused.to_string().contains("INVALID_VERSION"), "{forged}: {refused}");
+    }
     for forged in ["1.1.0; rm", "../1", "v1.1.0", "1.1.0.0", ""] {
         let refused = invoke(&main, "report_update_required", LOCAL, json!({ "minimum": forged })).expect_err(forged);
         assert!(refused.to_string().contains("INVALID_VERSION"), "{forged}: {refused}");
     }
     assert_eq!(invoke(&main, "report_update_required", LOCAL, json!({ "minimum": "1.1.0" })), Ok(Value::Null));
-    assert_eq!(invoke(&main, "update_state", LOCAL, json!({})), Ok(json!({ "status": "required", "minimum": "1.1.0" })));
+    let state = invoke(&main, "update_state", LOCAL, json!({})).unwrap();
+    assert_eq!(state["required"], json!({ "reason": "api", "minimum": "1.1.0" }));
+    assert_eq!(invoke(&main, "check_for_updates", LOCAL, json!({})), Ok(Value::Null));
+}
+
+#[test]
+fn the_runs_and_the_idle_setting_reach_the_shell() {
+    let app = app();
+    let main = window(&app, window::MAIN_WINDOW);
+    assert_eq!(invoke(&main, "report_runs_in_progress", LOCAL, json!({ "count": 2 })), Ok(Value::Null));
+    assert_eq!(app.state::<Arc<crate::update_state::UpdateStatus>>().runs(), Some(2));
+    assert!(invoke(&main, "report_runs_in_progress", LOCAL, json!({ "count": 99_999 })).is_err());
+    assert!(invoke(&main, "report_runs_in_progress", LOCAL, json!({ "count": -1 })).is_err());
+    assert_eq!(invoke(&main, "report_runs_in_progress", LOCAL, json!({ "count": null })), Ok(Value::Null));
+    assert_eq!(app.state::<Arc<crate::update_state::UpdateStatus>>().runs(), None, "unknown is not zero");
+    assert_eq!(invoke(&main, "set_update_auto_install", LOCAL, json!({ "enabled": false })), Ok(Value::Null));
+    assert_eq!(invoke(&main, "update_state", LOCAL, json!({})).unwrap()["autoInstall"], json!(false));
+    assert!(!app.state::<WindowState>().prefs.get().auto_install_updates, "kept in the preferences");
 }

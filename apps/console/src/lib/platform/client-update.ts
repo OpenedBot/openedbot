@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { nativeUpdates } from "./native-updates";
 
 /** Le code de l'API (`client-version.ts`) : l'app de bureau est plus vieille que le minimum servi. */
 export const CLIENT_UPDATE_REQUIRED = "CLIENT_UPDATE_REQUIRED";
@@ -26,6 +27,10 @@ export function reportClientUpdateRequired(details: unknown): void {
   };
   state = { minVersion: read("minVersion"), version: read("version") };
   for (const listener of listeners) listener();
+  // L'app Tauri passe en « mise à jour requise » et cherche la mise à jour
+  // aussitôt : son écran propose alors de l'installer, pas seulement le lien.
+  const minimum = state.minVersion && /^\d{1,4}(\.\d{1,4}){0,2}$/.test(state.minVersion) ? state.minVersion : null;
+  void nativeUpdates()?.reportRequired(minimum).catch(() => undefined);
 }
 
 /**

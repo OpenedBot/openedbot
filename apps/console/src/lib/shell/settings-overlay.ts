@@ -23,6 +23,7 @@ export const OVERLAY_SETTINGS_PATHS = [
   "/settings/runtime",
   "/settings/models",
   "/settings/appearance",
+  "/settings/updates",
   "/settings/archives",
   "/settings/connectors",
   "/settings/notifications",

@@ -1,7 +1,7 @@
 //! The shell's own preferences (`preferences.json` in the app data
 //! directory), as in the Electron shell (`apps/desktop/src/main/preferences.ts`):
-//! window placement, stay-on-top, display mode, the console's text zoom and
-//! the backend the WebView data belongs to. One object for the whole process,
+//! window placement, stay-on-top, display mode, the console's text zoom,
+//! the backend the WebView data belongs to and the idle install of updates. One object for the whole process,
 //! written whole (write then rename: a crash mid-write never truncates it).
 //!
 //! Also the placement rule of the window (`initial_bounds`): the last bounds
@@ -54,11 +54,14 @@ pub struct Preferences {
     /// next launch purges that data first (`window.rs`): one backend's query
     /// cache never shows on another.
     pub data_origin: Option<String>,
+    /// Installs a ready update when the Mac is idle (`update_idle.rs`); on
+    /// unless the user turned it off in Settings › Mises à jour.
+    pub auto_install_updates: bool,
 }
 
 impl Default for Preferences {
     fn default() -> Self {
-        Self { always_on_top: false, bounds: None, display_mode: None, text_zoom: DEFAULT_TEXT_ZOOM, data_origin: None }
+        Self { always_on_top: false, bounds: None, display_mode: None, text_zoom: DEFAULT_TEXT_ZOOM, data_origin: None, auto_install_updates: true }
     }
 }
 
@@ -229,7 +232,10 @@ mod tests {
             prefs.text_zoom = 12.0 / 14.0;
             prefs.display_mode = Some(DisplayMode::Both);
         });
+        assert!(store.get().auto_install_updates, "the idle install is on by default");
+        store.update(|prefs| prefs.auto_install_updates = false);
         let reopened = PreferenceStore::open(Some(&dir)).get();
+        assert!(!reopened.auto_install_updates);
         assert!(reopened.always_on_top);
         assert_eq!(reopened.display_mode, Some(DisplayMode::Both));
         assert!(is_text_zoom(reopened.text_zoom));

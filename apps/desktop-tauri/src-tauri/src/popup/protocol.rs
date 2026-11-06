@@ -35,9 +35,12 @@ pub enum HostToPopup {
     },
     SignedOut,
     SignedIn,
-    /// Where the self-update stands (`update_state.rs`): `idle`, `available`,
-    /// `downloading`, `ready`, `error` or `required`. Added within v1: a
-    /// popup that does not know it drops the line (logged, nothing else).
+    /// Where the self-update stands (`UpdateState::summary`): `idle`,
+    /// `checking`, `available`, `downloading`, `ready`, `installing`, `error`
+    /// or `required` (which wins over the others); `version` is the ready
+    /// one, or the minimum when required. Sent on each change and after
+    /// `hello`. Added within v1: a popup that does not know it drops the line
+    /// (logged, nothing else), and one that does ignores an unknown status.
     UpdateState { status: &'static str, version: Option<String> },
 }
 

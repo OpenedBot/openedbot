@@ -5,7 +5,8 @@
 //! `window.rs`). The session lives here (`auth.rs`, bearer, Keychain); the
 //! console reaches it through the typed bridge (`bridge.rs`) only. The notch
 //! popup is hosted over its stdin/stdout protocol (`popup.rs`), the app
-//! updates itself from a signed feed (`updater.rs`), and `shell.rs` ties
+//! updates itself from a signed feed (`updater.rs`, `update_engine.rs`,
+//! `update_idle.rs`), with the user's consent, and `shell.rs` ties
 //! session, window, popup and menus together like the Electron `main.ts`.
 //!
 //! The preview coexists with the Electron app: its own bundle identifier
@@ -25,6 +26,8 @@ mod macos;
 pub mod popup;
 pub mod prefs;
 pub mod shell;
+pub mod update_engine;
+pub mod update_idle;
 pub mod update_state;
 mod updater;
 pub mod vault;
@@ -32,7 +35,6 @@ pub mod window;
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
@@ -50,8 +52,6 @@ pub const BUNDLE_ID: &str = "app.openedbot.desktop.preview";
 pub const CLIENT_ID: &str = "openedbot-desktop-macos-preview";
 /// Show or hide the window from anywhere, as the Electron shell.
 pub const TOGGLE_SHORTCUT: &str = "CommandOrControl+Shift+O";
-/// How long an update waits for the popup to leave before it refuses to install.
-const POPUP_EXIT_LIMIT: Duration = Duration::from_secs(5);
 
 /// A keystore turned off (`OPENEDBOT_PREVIEW_VAULT=memory`, development runs
 /// whose ad hoc signature changes on every build): memory-only sessions.
@@ -119,27 +119,23 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
     let prefs = Arc::new(PreferenceStore::open(data_dir.as_deref()));
     app.manage(WindowState::new(prefs.clone()));
     app.manage(shell::Purging::default());
-    app.manage(update_state::UpdateStatus::new(
-        {
-            let app = app.handle().clone();
-            Box::new(move |state, status_changed| {
-                use tauri_specta::Event;
-                if let Err(error) = bridge::UpdateStateChanged(state.clone()).emit(&app) {
-                    log::warn!("update state not delivered ({error})");
+    let update_status = Arc::new(update_state::UpdateStatus::new(prefs.get().auto_install_updates, {
+        let app = app.handle().clone();
+        Box::new(move |state, summary_changed| {
+            use tauri_specta::Event;
+            if let Err(error) = bridge::UpdateStateChanged(state.clone()).emit(&app) {
+                log::warn!("update state not delivered ({error})");
+            }
+            if summary_changed {
+                if let Some(popup) = app.try_state::<PopupHandle>() {
+                    popup.0.notify(shell::update_line(state));
                 }
-                if status_changed {
-                    if let Some(popup) = app.try_state::<PopupHandle>() {
-                        let (status, version) = state.summary();
-                        popup.0.notify(popup::HostToPopup::UpdateState { status, version: version.map(str::to_string) });
-                    }
-                }
-            })
-        },
-        {
-            let app = app.handle().clone();
-            Box::new(move || app.restart())
-        },
-    ));
+                #[cfg(target_os = "macos")]
+                macos::menu::refresh_update_item(&app, state);
+            }
+        })
+    }));
+    app.manage(update_status.clone());
 
     let vault: Box<dyn Vault> = if std::env::var("OPENEDBOT_PREVIEW_VAULT").as_deref() == Ok("memory") {
         Box::new(DisabledVault)
@@ -258,57 +254,52 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
         });
     }
 
-    if let Some(manifest) = config.update_url.clone() {
-        updater::spawn_checks(handle.clone(), manifest, update_hooks(&handle));
-    }
+    start_updates(&handle, &config, update_status)?;
     Ok(())
 }
 
-fn update_hooks<R: Runtime>(app: &AppHandle<R>) -> updater::UpdateHooks {
-    let (stopping, resuming, asking, moving) = (app.clone(), app.clone(), app.clone(), app.clone());
-    updater::UpdateHooks {
-        before_install: Box::new(move || {
-            let app = stopping.clone();
-            Box::pin(async move {
-                let Some(popup) = app.try_state::<PopupHandle>().map(|popup| popup.0.clone()) else { return true };
-                log::info!("stopping the popup before the update replaces the bundle");
-                // Held until `resume` or the restart: a Dock choice cannot relaunch it mid-install.
-                let stopped = popup.hold_and_wait(POPUP_EXIT_LIMIT).await;
-                if !stopped {
-                    log::error!("the popup did not exit in time");
-                }
-                stopped
-            })
-        }),
-        resume: Box::new(move || {
-            let Some(popup) = resuming.try_state::<PopupHandle>() else { return };
-            popup.0.release();
-            if shell::display_mode(&resuming) != DisplayMode::Window {
-                popup.0.start();
-            }
-        }),
-        confirm_restart: Box::new(move |version| {
-            let app = asking.clone();
-            Box::pin(async move {
-                use tauri_plugin_dialog::MessageDialogButtons;
-                let (answer, answered) = tokio::sync::oneshot::channel();
-                shell::dialog(&app, format!("openedbot preview {version} est installée. Redémarrez pour l’utiliser ; sinon elle s’ouvrira au prochain lancement."))
-                .title("Mise à jour installée")
-                    .buttons(MessageDialogButtons::OkCancelCustom("Redémarrer".into(), "Plus tard".into()))
-                    .show(move |restart| {
-                        let _ = answer.send(restart);
-                    });
-                answered.await.unwrap_or(false)
-            })
-        }),
-        translocated: Box::new(move || {
-            shell::warn(
-                &moving,
-                "Déplacez openedbot preview dans Applications",
-                "macOS fait tourner cette copie depuis un emplacement en lecture seule : les mises à jour ne peuvent pas s’y installer. Quittez l’app, glissez-la dans le dossier Applications depuis le Finder, puis relancez-la.",
-            );
-        }),
+/// The update engine on the configured feed, its checks and the idle
+/// install; without a feed, a control that does nothing.
+fn start_updates<R: Runtime>(app: &AppHandle<R>, config: &config::ShellConfig, status: Arc<update_state::UpdateStatus>) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(manifest) = config.update_url.as_deref() else {
+        app.manage(bridge::Updates(Arc::new(update_engine::NoUpdates(status))));
+        return Ok(());
+    };
+    // A deb belongs to the package manager (D5): no check, no download.
+    #[cfg(target_os = "linux")]
+    if !linux::self_update_supported() {
+        log::info!("not an AppImage: updates come from the package manager, update check skipped");
+        app.manage(bridge::Updates(Arc::new(update_engine::NoUpdates(status))));
+        return Ok(());
     }
+    let endpoint: Url = manifest.parse()?;
+    let current = semver::Version::parse(&app.package_info().version.to_string())?;
+    // Unix seconds, set by `scripts/build-mac.ts`: the manifest's `max_age_days` reads it.
+    let built_at = option_env!("OPENEDBOT_BUILT_AT").and_then(|text| text.parse::<u64>().ok());
+    if built_at.is_none() {
+        log::info!("no build time embedded: the manifest's max_age_days does not apply");
+    }
+    let engine = update_engine::UpdateEngine::new(updater::TauriFeed::new(app.clone(), endpoint), status.clone(), updater::install_hooks(app), current, built_at);
+    let control: Arc<dyn update_engine::UpdateControl> = Arc::new(engine);
+    app.manage(bridge::Updates(control.clone()));
+    let moving = app.clone();
+    updater::spawn_checks(status.clone(), control.clone(), move || {
+        shell::warn(
+            &moving,
+            "Déplacez openedbot preview dans Applications",
+            "macOS fait tourner cette copie depuis un emplacement en lecture seule : les mises à jour ne peuvent pas s’y installer. Quittez l’app, glissez-la dans le dossier Applications depuis le Finder, puis relancez-la.",
+        );
+    });
+    #[cfg(target_os = "macos")]
+    let idle: Arc<dyn update_idle::IdleSource> = {
+        let waking = status.clone();
+        macos::idle::MacIdle::install(move || waking.wake())
+    };
+    #[cfg(not(target_os = "macos"))]
+    let idle: Arc<dyn update_idle::IdleSource> = Arc::new(update_idle::NeverIdle);
+    let threshold = update_idle::idle_threshold(std::env::var("OPENEDBOT_UPDATE_IDLE_SECONDS").ok().as_deref());
+    tauri::async_runtime::spawn(update_idle::run(status, control, idle, threshold));
+    Ok(())
 }
 
 fn on_run_event<R: Runtime>(app: &AppHandle<R>, event: tauri::RunEvent) {

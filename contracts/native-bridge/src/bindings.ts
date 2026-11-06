@@ -56,19 +56,36 @@ export const commands = {
 	reportDiagnostic: (level: Level, source: Source, message: string, detail: string | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_diagnostic", { level, source, message, detail })),
 	/**  Where the self-update stands now. */
 	updateState: () => __TAURI_INVOKE<UpdateState_Serialize>("update_state"),
-	/**  Restarts into the installed update; `UPDATE_NOT_READY` unless one is `ready`. */
-	restartToUpdate: () => typedError<null, BridgeError>(__TAURI_INVOKE("restart_to_update")),
+	/**  Checks the feed now (Settings › Mises à jour, « Rechercher »); the outcome arrives as `UpdateStateChanged`. */
+	checkForUpdates: () => __TAURI_INVOKE<void>("check_for_updates"),
+	/**
+	 *  The user agreed to restart into `version`, the one they were shown. The
+	 *  shell checks the feed once more and installs it, then restarts (the
+	 *  promise may never resolve). Refused when that version is no longer the
+	 *  one ready: `UPDATE_SUPERSEDED` (a newer one downloads instead),
+	 *  `UPDATE_WITHDRAWN`, `UPDATE_NOT_READY`, `UPDATE_FEED_UNREACHABLE`,
+	 *  `UPDATE_POPUP_RUNNING`, `UPDATE_INSTALL_FAILED`.
+	 */
+	installUpdate: (version: string) => typedError<null, BridgeError>(__TAURI_INVOKE("install_update", { version })),
 	/**
 	 *  The API refused this version (426, `minimum` when it named one): the
-	 *  state becomes `required` and the feed is checked now.
+	 *  update becomes `required` and the feed is checked now.
 	 */
 	reportUpdateRequired: (minimum: string | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_update_required", { minimum })),
+	/**
+	 *  How many runs the console sees in progress, `null` when it cannot tell
+	 *  (roster not loaded or failing): the idle install waits for a known zero.
+	 */
+	reportRunsInProgress: (count: number | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_runs_in_progress", { count })),
+	/**  Installs a ready update when the Mac is idle (Settings › Mises à jour); kept in the preferences. */
+	setUpdateAutoInstall: (enabled: boolean) => __TAURI_INVOKE<void>("set_update_auto_install", { enabled }),
 };
 
 /** Events */
 export const events = {
 	notificationClicked: makeEvent<NotificationClicked, NotificationClicked>("notification-clicked"),
 	signinStateChanged: makeEvent<SigninStateChanged_Serialize, SigninStateChanged_Deserialize>("signin-state-changed"),
+	updateMenuChosen: makeEvent<UpdateMenuChosen, UpdateMenuChosen>("update-menu-chosen"),
 	updateStateChanged: makeEvent<UpdateStateChanged_Serialize, UpdateStateChanged_Deserialize>("update-state-changed"),
 };
 
@@ -97,6 +114,15 @@ export type Persistence =
 
 /**  The operating system the shell runs on (`window.__OPENEDBOT_SHELL__.platform`). */
 export type Platform = "macos" | "windows" | "linux";
+
+/**  Who says an update is required. */
+export type RequiredReason = 
+/**  The API answered 426 (`DESKTOP_MIN_VERSION`). */
+"api" | 
+/**  The manifest's `min_version` is above this version. */
+"minimumVersion" | 
+/**  This build is older than the manifest's `max_age_days`. */
+"buildAge";
 
 export type ShellInfo = {
 	platform: Platform,
@@ -154,7 +180,93 @@ export type UpdateErrorCode =
 /**  macOS runs this copy from a read-only place: move it to Applications. */
 "TRANSLOCATED";
 
-/**  One state at a time; `Ready` lasts until the restart. */
+/**
+ *  What the app menu's update item asks the console: open Settings › Mises
+ *  à jour (a check runs), or ask the user to restart into the ready update.
+ */
+export type UpdateMenuAction = "check" | "install";
+
+/**  The app menu's update item was chosen: the console answers it (the menu never restarts by itself). */
+export type UpdateMenuChosen = {
+	action: UpdateMenuAction,
+};
+
+/**
+ *  The update's own progress. `Ready` holds a verified download, not yet
+ *  installed: nothing touches the bundle before the user's consent (or the
+ *  idle conditions, `update_idle.rs`).
+ */
+export type UpdatePhase = UpdatePhase_Serialize | UpdatePhase_Deserialize;
+
+/**
+ *  The update's own progress. `Ready` holds a verified download, not yet
+ *  installed: nothing touches the bundle before the user's consent (or the
+ *  idle conditions, `update_idle.rs`).
+ */
+export type UpdatePhase_Deserialize = 
+/**  Up to date, or not checked yet. */
+{ status: "idle" } | 
+/**  A check of the feed runs (no update downloaded yet). */
+{ status: "checking" } | 
+/**  The feed offers `version`; the download starts at once. */
+{ status: "available"; version: string } | 
+/**  Bytes received so far; `total` when the feed said it. */
+{ status: "downloading"; version: string; downloaded: number; total?: number | null } | 
+/**
+ *  Downloaded and its signature verified: installed by a restart the
+ *  user agreed to (`install_update`) or when the Mac is idle.
+ */
+{ status: "ready"; version: string } | 
+/**
+ *  Consent given: the feed is checked once more, the popup stopped, the
+ *  bundle replaced, then the app restarts.
+ */
+{ status: "installing"; version: string } | 
+/**  The last attempt failed and nothing is downloaded; the installed version is intact. */
+{ status: "error"; code: UpdateErrorCode };
+
+/**
+ *  The update's own progress. `Ready` holds a verified download, not yet
+ *  installed: nothing touches the bundle before the user's consent (or the
+ *  idle conditions, `update_idle.rs`).
+ */
+export type UpdatePhase_Serialize = 
+/**  Up to date, or not checked yet. */
+{ status: "idle" } | 
+/**  A check of the feed runs (no update downloaded yet). */
+{ status: "checking" } | 
+/**  The feed offers `version`; the download starts at once. */
+{ status: "available"; version: string } | 
+/**  Bytes received so far; `total` when the feed said it. */
+{ status: "downloading"; version: string; downloaded: number; total: number | null } | 
+/**
+ *  Downloaded and its signature verified: installed by a restart the
+ *  user agreed to (`install_update`) or when the Mac is idle.
+ */
+{ status: "ready"; version: string } | 
+/**
+ *  Consent given: the feed is checked once more, the popup stopped, the
+ *  bundle replaced, then the app restarts.
+ */
+{ status: "installing"; version: string } | 
+/**  The last attempt failed and nothing is downloaded; the installed version is intact. */
+{ status: "error"; code: UpdateErrorCode };
+
+export type UpdateRequirement = UpdateRequirement_Serialize | UpdateRequirement_Deserialize;
+
+export type UpdateRequirement_Deserialize = {
+	reason: RequiredReason,
+	/**  The minimum version, when the source named one. */
+	minimum?: string | null,
+};
+
+export type UpdateRequirement_Serialize = {
+	reason: RequiredReason,
+	/**  The minimum version, when the source named one. */
+	minimum: string | null,
+};
+
+/**  What the console reads (`update_state`) and is pushed on every change. */
 export type UpdateState = UpdateState_Serialize | UpdateState_Deserialize;
 
 /**  Pushed on every change of the update state (progress included). */
@@ -166,41 +278,37 @@ export type UpdateStateChanged_Deserialize = UpdateState_Deserialize;
 /**  Pushed on every change of the update state (progress included). */
 export type UpdateStateChanged_Serialize = UpdateState_Serialize;
 
-/**  One state at a time; `Ready` lasts until the restart. */
-export type UpdateState_Deserialize = 
-/**  Up to date, or not checked yet. */
-{ status: "idle" } | 
-/**  The feed offers `version`; the download starts at once. */
-{ status: "available"; version: string } | 
-/**  Bytes received so far; `total` when the feed said it. */
-{ status: "downloading"; version: string; downloaded: number; total?: number | null } | 
-/**  Installed: applied by a restart (`restart_to_update`) or at the next launch. */
-{ status: "ready"; version: string } | 
-/**  The last attempt failed; the installed version is intact. */
-{ status: "error"; code: UpdateErrorCode } | 
-/**
- *  The API refuses this version (426): an update is needed to go on.
- *  `minimum` when the API named it.
- */
-{ status: "required"; minimum?: string | null };
+/**  What the console reads (`update_state`) and is pushed on every change. */
+export type UpdateState_Deserialize = {
+	phase: UpdatePhase_Deserialize,
+	/**  Set, the console replaces the app with the "update required" screen. */
+	required?: UpdateRequirement_Deserialize | null,
+	/**
+	 *  The last failure, kept for Settings › Mises à jour even once a later
+	 *  phase replaced it; cleared by the next successful check.
+	 */
+	lastError?: UpdateErrorCode | null,
+	/**  Installs a ready update when the Mac is idle (preferences, on by default). */
+	autoInstall: boolean,
+	/**  When the feed last answered (RFC 3339), `null` before. */
+	lastCheck?: string | null,
+};
 
-/**  One state at a time; `Ready` lasts until the restart. */
-export type UpdateState_Serialize = 
-/**  Up to date, or not checked yet. */
-{ status: "idle" } | 
-/**  The feed offers `version`; the download starts at once. */
-{ status: "available"; version: string } | 
-/**  Bytes received so far; `total` when the feed said it. */
-{ status: "downloading"; version: string; downloaded: number; total: number | null } | 
-/**  Installed: applied by a restart (`restart_to_update`) or at the next launch. */
-{ status: "ready"; version: string } | 
-/**  The last attempt failed; the installed version is intact. */
-{ status: "error"; code: UpdateErrorCode } | 
-/**
- *  The API refuses this version (426): an update is needed to go on.
- *  `minimum` when the API named it.
- */
-{ status: "required"; minimum: string | null };
+/**  What the console reads (`update_state`) and is pushed on every change. */
+export type UpdateState_Serialize = {
+	phase: UpdatePhase_Serialize,
+	/**  Set, the console replaces the app with the "update required" screen. */
+	required: UpdateRequirement_Serialize | null,
+	/**
+	 *  The last failure, kept for Settings › Mises à jour even once a later
+	 *  phase replaced it; cleared by the next successful check.
+	 */
+	lastError: UpdateErrorCode | null,
+	/**  Installs a ready update when the Mac is idle (preferences, on by default). */
+	autoInstall: boolean,
+	/**  When the feed last answered (RFC 3339), `null` before. */
+	lastCheck: string | null,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

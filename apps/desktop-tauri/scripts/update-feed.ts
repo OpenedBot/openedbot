@@ -5,10 +5,11 @@
  * stands in for the future hosted feed (Q2: R2 behind a stable URL): nothing
  * here leaves this Mac.
  *
- *   bun apps/desktop-tauri/scripts/update-feed.ts serve [--port 8799]
+ *   bun apps/desktop-tauri/scripts/update-feed.ts serve [--port 8799] [--slow-kbps 300]
  *   bun apps/desktop-tauri/scripts/update-feed.ts publish --version 0.0.2
  *   bun apps/desktop-tauri/scripts/update-feed.ts publish --version 0.0.2 --announce 0.0.3 --forged-signature
  *   bun apps/desktop-tauri/scripts/update-feed.ts publish --version 1.1.1-test --platform linux-x86_64
+ *   bun apps/desktop-tauri/scripts/update-feed.ts publish --version 0.0.18 --min-version 0.0.17 --max-age-days 30
  *
  * `publish` copies the signed update artifact into `release/feed/<version>/`
  * and writes `release/feed/latest.json`: `release/<version>/*.app.tar.gz{,.sig}`
@@ -16,15 +17,20 @@
  * only the AppImage updates itself, a deb is left to the package manager).
  * `--forged-signature` signs the artifact with a throwaway key instead of the
  * update key: the installed app must refuse it and keep its version.
+ * `--min-version` and `--max-age-days` write the manifest's floor (ADR 0001,
+ * 4.3.3): an app under it shows « Mise à jour requise ». Announcing a version
+ * older than the installed one (`--announce 0.0.1`) stands for a withdrawn
+ * release: the app finds nothing newer.
  */
 import { $ } from "bun";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
 const APP_DIR = path.resolve(import.meta.dir, "..");
-const RELEASE = path.join(APP_DIR, "release");
+const RELEASE = process.env.OPENEDBOT_RELEASE_DIR ?? path.join(APP_DIR, "release");
 /** `release/<name>/`: `feed` for macOS, `feed-linux` for the Linux update test, so neither overwrites the other's manifest. */
 let FEED = path.join(RELEASE, "feed");
 const ARTIFACT_STEM = "openedbot-preview";
@@ -42,19 +48,29 @@ export type UpdateManifest = {
   notes: string;
   pub_date: string;
   platforms: Record<string, { signature: string; url: string }>;
+  /** Under this version the app must update (`update_engine.rs`). */
+  min_version?: string;
+  /** A build older than this many days must update. */
+  max_age_days?: number;
 };
 
-/** The manifest `tauri-plugin-updater` reads (static JSON format). */
-export function buildManifest(input: { version: string; url: string; signature: string; notes: string; pubDate: Date; platform?: Platform }): UpdateManifest {
-  // X.Y.Z, or X.Y.Z-tag for a test build (semver: 1.1.1-test sorts after 1.1.0).
-  if (!/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/.test(input.version)) throw new Error(`invalid version ${input.version}`);
+// X.Y.Z, or X.Y.Z-tag for a test build (semver: 1.1.1-test sorts after 1.1.0).
+const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
+
+/** The manifest `tauri-plugin-updater` reads (static JSON format), plus the floor the shell reads. */
+export function buildManifest(input: { version: string; url: string; signature: string; notes: string; pubDate: Date; platform?: Platform; minVersion?: string; maxAgeDays?: number }): UpdateManifest {
+  if (!VERSION.test(input.version)) throw new Error(`invalid version ${input.version}`);
   const signature = input.signature.trim();
   if (!signature) throw new Error("empty signature");
+  if (input.minVersion !== undefined && !VERSION.test(input.minVersion)) throw new Error(`invalid min version ${input.minVersion}`);
+  if (input.maxAgeDays !== undefined && !(Number.isFinite(input.maxAgeDays) && input.maxAgeDays > 0)) throw new Error(`invalid max age ${input.maxAgeDays}`);
   return {
     version: input.version,
     notes: input.notes,
     pub_date: input.pubDate.toISOString(),
     platforms: { [PLATFORMS[input.platform ?? "darwin-aarch64"].key]: { signature, url: input.url } },
+    ...(input.minVersion === undefined ? {} : { min_version: input.minVersion }),
+    ...(input.maxAgeDays === undefined ? {} : { max_age_days: input.maxAgeDays }),
   };
 }
 
@@ -71,26 +87,46 @@ export function feedFile(root: string, pathname: string): string | null {
   return resolved.startsWith(`${path.resolve(root)}${path.sep}`) ? resolved : null;
 }
 
-function serve(port: number): void {
-  mkdirSync(FEED, { recursive: true });
-  Bun.serve({
-    hostname: "127.0.0.1",
-    port,
-    async fetch(request) {
-      const url = new URL(request.url);
-      const file = feedFile(FEED, url.pathname);
-      const found = file !== null && existsSync(file) && Bun.file(file).size > 0;
-      console.log(JSON.stringify({ at: new Date().toISOString(), method: request.method, path: url.pathname, status: found ? 200 : 404, agent: request.headers.get("user-agent") }));
-      if (!found || request.method !== "GET") return new Response("not found", { status: 404 });
-      // The manifest must never be cached: a stale one would hide a release.
-      const headers = file.endsWith(".json") ? { "Cache-Control": "no-store", "Content-Type": "application/json" } : {};
-      return new Response(Bun.file(file), { headers });
-    },
-  });
-  console.log(`update feed on http://127.0.0.1:${port}/latest.json (${FEED})`);
+/** An artifact sent at `kbps` kilobytes per second: the download stays visible long enough to watch. */
+/**
+ * Artifacts at `kbps` KB/s, with their Content-Length: `node:http` keeps a
+ * declared length on a streamed body where `Bun.serve` turns it into chunked
+ * encoding, and without a length the app cannot show a percentage.
+ */
+async function sendSlowly(response: ServerResponse, bytes: Uint8Array, kbps: number): Promise<void> {
+  const chunk = 64 * 1024;
+  for (let offset = 0; offset < bytes.length && !response.destroyed; offset += chunk) {
+    await Bun.sleep((chunk / 1024 / kbps) * 1000);
+    response.write(bytes.subarray(offset, offset + chunk));
+  }
+  response.end();
 }
 
-async function publish(options: { version: string; announce: string; forged: boolean; port: number; platform: Platform; manifest: string }): Promise<void> {
+function serve(port: number, slowKbps: number | null): void {
+  mkdirSync(FEED, { recursive: true });
+  createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const file = feedFile(FEED, url.pathname);
+    const found = file !== null && existsSync(file) && statSync(file).size > 0;
+    console.log(JSON.stringify({ at: new Date().toISOString(), method: request.method, path: url.pathname, status: found ? 200 : 404, agent: request.headers["user-agent"] ?? null }));
+    if (!found || request.method !== "GET") {
+      response.writeHead(404).end("not found");
+      return;
+    }
+    const bytes = readFileSync(file);
+    // The manifest must never be cached: a stale one would hide a release.
+    if (file.endsWith(".json")) {
+      response.writeHead(200, { "Cache-Control": "no-store", "Content-Type": "application/json", "Content-Length": bytes.length }).end(bytes);
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": bytes.length });
+    if (slowKbps) void sendSlowly(response, bytes, slowKbps);
+    else response.end(bytes);
+  }).listen(port, "127.0.0.1");
+  console.log(`update feed on http://127.0.0.1:${port}/latest.json (${FEED})${slowKbps ? `, artifacts at ${slowKbps} KB/s` : ""}`);
+}
+
+async function publish(options: { version: string; announce: string; forged: boolean; port: number; platform: Platform; manifest: string; minVersion?: string; maxAgeDays?: number }): Promise<void> {
   const source = PLATFORMS[options.platform].artifact(options.version);
   const artifact = path.basename(source);
   if (!existsSync(source) || !existsSync(`${source}.sig`)) throw new Error(`build ${options.version} first: ${source}{,.sig} missing`);
@@ -118,9 +154,12 @@ async function publish(options: { version: string; announce: string; forged: boo
     notes: options.forged ? "forged signature, must be refused" : `prototype ${options.announce}`,
     pubDate: new Date(),
     platform: options.platform,
+    minVersion: options.minVersion,
+    maxAgeDays: options.maxAgeDays,
   });
   writeFileSync(path.join(FEED, options.manifest), `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`published ${options.announce}${options.forged ? " (forged signature)" : ""} -> ${path.join(FEED, options.manifest)}`);
+  const floor = [options.minVersion && `min ${options.minVersion}`, options.maxAgeDays && `max age ${options.maxAgeDays} d`].filter(Boolean).join(", ");
+  console.log(`published ${options.announce}${options.forged ? " (forged signature)" : ""}${floor ? ` (${floor})` : ""} -> ${path.join(FEED, options.manifest)}`);
 }
 
 if (import.meta.main) {
@@ -135,6 +174,9 @@ if (import.meta.main) {
       // Another manifest next to latest.json (forged.json): a test points one app at each.
       manifest: { type: "string", default: "latest.json" },
       feed: { type: "string", default: "feed" },
+      "min-version": { type: "string" },
+      "max-age-days": { type: "string" },
+      "slow-kbps": { type: "string" },
     },
   });
   const port = Number(values.port);
@@ -152,11 +194,12 @@ if (import.meta.main) {
     console.error(`--platform must be one of ${Object.keys(PLATFORMS).join(", ")}`);
     process.exit(1);
   }
-  if (positionals[0] === "serve") serve(port);
+  if (positionals[0] === "serve") serve(port, values["slow-kbps"] ? Number(values["slow-kbps"]) : null);
   else if (positionals[0] === "publish" && values.version) {
-    await publish({ version: values.version, announce: values.announce ?? values.version, forged: values["forged-signature"] ?? false, port, platform, manifest: values.manifest! });
+    const maxAgeDays = values["max-age-days"] === undefined ? undefined : Number(values["max-age-days"]);
+    await publish({ version: values.version, announce: values.announce ?? values.version, forged: values["forged-signature"] ?? false, port, platform, manifest: values.manifest!, minVersion: values["min-version"], maxAgeDays });
   } else {
-    console.error("usage: update-feed.ts serve [--port N] | publish --version X.Y.Z [--announce X.Y.Z] [--forged-signature] [--platform darwin-aarch64|linux-x86_64|linux-aarch64] [--manifest name.json] [--feed feed-<name>]");
+    console.error("usage: update-feed.ts serve [--port N] [--feed feed-<name>] [--slow-kbps N] | publish --version X.Y.Z [--announce X.Y.Z] [--forged-signature] [--platform darwin-aarch64|linux-x86_64|linux-aarch64] [--manifest name.json] [--feed feed-<name>] [--min-version X.Y.Z] [--max-age-days N]");
     process.exit(1);
   }
 }

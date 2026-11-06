@@ -16,6 +16,8 @@ const AccountProfileSettings = lazyRouteComponent(() => import("./account/accoun
 const OrganizationTeamSettings = lazyRouteComponent(() => import("./account/team"), "OrganizationTeamSettings");
 const DeveloperSettings = lazyRouteComponent(() => import("./dev/developer"), "DeveloperSettings");
 const AppearanceSettings = lazyRouteComponent(() => import("./general/appearance"), "AppearanceSettings");
+// The desktop app's updates, Tauri only: the web build has no nav entry, no chunk, an empty body.
+const UpdatesSettings = import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" ? lazyRouteComponent(() => import("./general/updates"), "UpdatesSettings") : () => null;
 const ArchivesSettings = lazyRouteComponent(() => import("./general/archives"), "ArchivesSettings");
 const NotificationsSettings = lazyRouteComponent(() => import("./general/notifications"), "NotificationsSettings");
 const AgentsSettings = lazyRouteComponent(() => import("./installation/agents"), "AgentsSettings");
@@ -96,6 +98,7 @@ export const SETTINGS_SECTIONS: Record<OverlaySettingsPath, SettingsSection> = {
   "/settings/agents": section("settingsSidebar.agents", AgentsSettings),
   "/settings/models": section("settingsSidebar.models", ModelsSettings, ModelsBodySkeleton),
   "/settings/appearance": section("settingsSidebar.appearance", AppearanceSettings),
+  "/settings/updates": section("settingsSidebar.updates", UpdatesSettings),
   "/settings/archives": section("settingsSidebar.archives", ArchivesSettings),
   "/settings/connectors": section("settingsSidebar.connectors", ConnectorsSettings),
   "/settings/notifications": section("settingsSidebar.notifications", NotificationsSettings),

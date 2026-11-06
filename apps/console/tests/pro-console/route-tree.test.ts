@@ -32,8 +32,8 @@ describe(`route tree (${pro ? "pro" : "solo"})`, () => {
     expect(paths.filter((path) => PRO_ROUTES.includes(path)).sort()).toEqual(pro ? PRO_ROUTES : []);
   });
 
-  test("keeps the core routes in both modes (40)", () => {
-    expect(paths.length).toBe(40 + (pro ? PRO_ROUTES.length : 0));
+  test("keeps the core routes in both modes (41)", () => {
+    expect(paths.length).toBe(41 + (pro ? PRO_ROUTES.length : 0));
     for (const route of ["/settings/decisions", "/settings/policies", "/settings/security", "/settings/connectors"]) {
       expect(paths).toContain(route);
     }

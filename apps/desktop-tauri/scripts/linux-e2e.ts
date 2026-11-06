@@ -18,8 +18,9 @@
  *              the tray; then the deb, installed, restores the same session.
  * memory-only  No Secret Service: the session lives in memory only, nothing
  *              in clear on disk, a relaunch asks to sign in again.
- * update       The AppImage replaces itself from the host's local feed
- *              (latest.json), restarts in the new version, then refuses a
+ * update       The AppImage downloads the update from the host's local feed
+ *              (latest.json) and waits; on consent (install_update) it
+ *              replaces itself, restarts in the new version, then refuses a
  *              manifest signed with another key (forged.json).
  * smoke        CI, no API: the AppImage, then the installed deb, start and
  *              show the embedded console's sign-in page.
@@ -207,11 +208,11 @@ const run = <T = unknown>(session: Session, script: string, scriptArgs: unknown[
   wd<T>("POST", `/session/${session.id}/execute/sync`, { script, args: scriptArgs });
 
 /** A bridge command from the page, like the console does (`tauri-bridge.ts`). */
-const invoke = <T = unknown>(session: Session, command: string) =>
+const invoke = <T = unknown>(session: Session, command: string, commandArgs: Record<string, unknown> = {}) =>
   wd<T>("POST", `/session/${session.id}/execute/async`, {
     script: `const done = arguments[arguments.length - 1];
-      window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}).then((value) => done({ ok: value }), (error) => done({ error: String(error) }));`,
-    args: [],
+      window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, arguments[0]).then((value) => done({ ok: value }), (error) => done({ error: String(error) }));`,
+    args: [commandArgs],
   }) as Promise<{ ok?: T; error?: string }>;
 
 async function find(session: Session, css: string, timeoutMs = 30_000): Promise<string> {
@@ -714,19 +715,33 @@ async function update(): Promise<void> {
   const appimage = prepareAppImage(from, "/tmp/update/openedbot-preview.AppImage");
   const fromSha = sha256(appimage);
   const expected = sha256(onlyFile(to, ".AppImage"));
-  // Launched like a user would, no driver: the updater checks 3 s after start.
+  // The forged manifest's app is launched like a user would, no driver: the
+  // updater checks 30 s after start and refuses on its own.
   const start = (manifest: string) =>
     spawn(appimage, [], { stdio: "ignore", detached: true, env: { ...process.env, ...APP_ENV, OPENEDBOT_UPDATE_URL: `http://127.0.0.1:${FEED_PORT}/${manifest}` } });
 
-  // 1. A genuine update: downloaded, verified, the file replaced, restarted in the new version.
-  start("latest.json");
-  const deadline = Date.now() + 180_000;
+  // 1. A genuine update: downloaded and verified in the background, installed
+  // only on consent (D2c: the shell never restarts on its own), the file
+  // replaced, restarted in the new version. The consent is the console's
+  // call, made through WebDriver like the dialog's « Redémarrer ».
+  Object.assign(APP_ENV, { OPENEDBOT_UPDATE_URL: `http://127.0.0.1:${FEED_PORT}/latest.json` });
+  startDriver();
+  const session = await launch(appimage);
+  const readyBy = Date.now() + 180_000;
+  while (Date.now() < readyBy && !readAppLog().includes(`update ${toVersion} downloaded`)) await sleep(1_000);
+  const waited = readAppLog().includes(`update ${toVersion} downloaded`);
+  const stillOld = sha256(appimage) === fromSha;
+  // The restart ends the WebDriver session: the call may not come back.
+  const consent = await invoke(session, "install_update", { version: toVersion }).catch((error) => ({ error: String(error) }));
+  log(`install_update: ${JSON.stringify(consent)}`);
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline && !readAppLog().includes(`openedbot preview ${toVersion},`)) await sleep(1_000);
   await sleep(4_000);
   const updatedLog = readAppLog();
   report.install = {
     fromSha,
     afterSha: sha256(appimage),
+    downloadedWithoutInstalling: waited && stillOld,
     replacedByTheNewVersion: sha256(appimage) === expected,
     downloadedAndVerified: updatedLog.includes("signature verified"),
     // The updater logs "update <version> installed" before it restarts the app.
@@ -742,19 +757,20 @@ async function update(): Promise<void> {
   const kept = sha256(appimage);
   start("forged.json");
   const refusedBy = Date.now() + 120_000;
-  while (Date.now() < refusedBy && !readAppLog().slice(before).includes("update refused or failed")) await sleep(1_000);
+  while (Date.now() < refusedBy && !/update \S+ refused: bad signature/.test(readAppLog().slice(before))) await sleep(1_000);
   const added = readAppLog().slice(before);
   report.forged = {
-    refused: added.includes("update refused or failed"),
-    reason: /update refused or failed, installed version kept \((.+)\)/.exec(added)?.[1] ?? null,
+    refused: /update \S+ refused: bad signature/.test(added),
+    reason: /update \S+ refused: bad signature \((.+)\)/.exec(added)?.[1] ?? null,
     fileUntouched: sha256(appimage) === kept,
     stillRunning: appPids().length,
   };
   await capture(null, "forged-refused");
   for (const pid of appPids()) process.kill(pid, "SIGTERM");
-  const installed = report.install as { replacedByTheNewVersion: boolean; downloadedAndVerified: boolean; restartedIn: string | null };
+  const installed = report.install as { downloadedWithoutInstalling: boolean; replacedByTheNewVersion: boolean; downloadedAndVerified: boolean; restartedIn: string | null };
   const forged = report.forged as { refused: boolean; reason: string | null; fileUntouched: boolean };
   verify({
+    downloadWaitsForConsent: installed.downloadedWithoutInstalling,
     updateReplacesTheAppImage: installed.replacedByTheNewVersion && installed.downloadedAndVerified,
     restartsInTheNewVersion: installed.restartedIn === toVersion,
     // tauri-plugin-updater: "The signature was created with a different key than the one provided".

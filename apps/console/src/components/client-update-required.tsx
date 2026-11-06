@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "../lib/i18n";
 import { nativeBridge } from "../lib/platform";
 import { desktopDownloadUrl, useClientUpdateRequired } from "../lib/platform/client-update";
+import { useNativeUpdateRequired } from "../lib/platform/native-updates";
+import { DesktopUpdateRequired } from "./desktop-update/entry";
 import { BUTTON } from "./settings/primitives";
 
 /**
@@ -14,9 +16,22 @@ import { BUTTON } from "./settings/primitives";
  * modale ouverts gardaient sinon leur piège de focus et le
  * `pointer-events: none` posé sur `body`, et le bouton de téléchargement
  * devenait inatteignable. Démontés avec l'app, ils libèrent tout.
+ *
+ * Dans l'app Tauri, deux déclencheurs mènent à l'écran de la coque, qui sait
+ * installer la mise à jour (`desktop-update/update-required.tsx`) : ce 426, ou
+ * le plancher du manifeste de mise à jour (`required` de l'état de la coque).
+ * Ailleurs (web, Electron), `DesktopUpdateRequired` vaut `null` et seul le 426 compte.
  */
 export function ClientUpdateGate({ children }: { children: ReactNode }) {
   const update = useClientUpdateRequired();
+  const nativeRequired = useNativeUpdateRequired();
+  if (DesktopUpdateRequired && (update || nativeRequired)) {
+    return (
+      <Suspense fallback={<div className="fixed inset-0 z-[1000] bg-background" />}>
+        <DesktopUpdateRequired api={update} />
+      </Suspense>
+    );
+  }
   return update ? <ClientUpdateRequired update={update} /> : children;
 }
 

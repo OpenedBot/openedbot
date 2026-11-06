@@ -16,6 +16,7 @@ const STATIC_TITLE_KEYS: Readonly<Record<string, MessageKey>> = {
   "/settings/agents": "settingsSidebar.agents",
   "/settings/models": "settingsSidebar.models",
   "/settings/appearance": "settingsSidebar.appearance",
+  "/settings/updates": "settingsSidebar.updates",
   "/settings/archives": "settingsSidebar.archives",
   "/settings/connectors": "settingsSidebar.connectors",
   "/settings/notifications": "settingsSidebar.notifications",

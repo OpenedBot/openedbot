@@ -684,8 +684,8 @@ runtime de la VM 240. Les captures sont gardées hors du dépôt.
 - Feux tricolores : la place réservée suit le zoom, mais les boutons ne sont pas déplacés selon
   le zoom comme sous Electron.
 - Silhouette de démarrage : le script inline de `index.html` ne voit pas encore le pont.
-- Écran « mise à jour requise » (426) : pas de bouton de mise à jour par le pont, seulement le
-  lien de téléchargement.
+- ~~Écran « mise à jour requise » (426) : pas de bouton de mise à jour par le pont, seulement le
+  lien de téléchargement.~~ Fait par D2c (section 4.3.4).
 - Manifeste par canal et variante, hébergement du flux (Q2).
 - Menu contextuel : copie sur un champ mot de passe à vérifier, sinon menu maison.
 - `navigator.clipboard` et le clic sur une notification à éprouver sur l'app signée.
@@ -697,8 +697,8 @@ runtime de la VM 240. Les captures sont gardées hors du dépôt.
 - Le raccourci global peut être déjà pris par l'app Electron : le second inscrit perd.
 - Linux et Windows : la purge n'a pas de confirmation (pause de 500 ms). La compilation Linux
   n'a pas été vérifiée ici, elle l'est par D5.
-- Interface de mise à jour (pastille) branchée sur `UpdateState`. La console doit aussi
-  appeler `report_update_required` sur un 426.
+- ~~Interface de mise à jour (pastille) branchée sur `UpdateState`. La console doit aussi
+  appeler `report_update_required` sur un 426.~~ Fait par D2c (section 4.3.4).
 - Version de la bascule : 1.1.0 (dmg de D3).
 
 **Reproduire.** `make desktop-tauri-check`, `make desktop-tauri-mac TAURI_VERSION=X.Y.Z
@@ -862,6 +862,108 @@ Linux ; le script refuse alors avec un message). L'app lit
 - Mesure sur une vraie machine Linux avec GPU ; RPM et Flatpak non faits.
 - Le deep link ne fait que ramener l'app au premier plan : le retour de connexion Google viendra
   avec D2b.
+
+### 4.3.4 Mises à jour (D2c, 2026-11-06)
+
+Branche `feat/d2c-update-badge` (et `feat/update-badge` dans openedbot-notch). La mise à jour
+devient visible et consentie, sur le modèle de Grok Bot : téléchargement silencieux, pastille
+bleue informative, redémarrage seulement sur un clic ou quand le Mac est inactif. La coque ne
+redémarre jamais seule pendant qu'on s'en sert. Rien de visible dans la version web (le code
+est retiré du build web, vérifié dans le bundle) ; pas de changement de CHANGELOG pour cette
+raison.
+
+**Moteur (`update_engine.rs`).** Le flux est un trait (`Feed`) ; `tauri-plugin-updater` en est
+l'implémentation (`updater.rs`), les tests utilisent un flux scripté. Une offre est téléchargée
+et sa signature vérifiée dès qu'elle paraît, puis gardée en mémoire (`Ready`). L'installation
+(`install_update(version)`) ne part que pour la version que l'utilisateur a vue ; elle relit le
+flux juste avant : version remplacée (autre numéro, ou même numéro signé à nouveau) → refus
+`UPDATE_SUPERSEDED` et téléchargement de la nouvelle ; version retirée → `UPDATE_WITHDRAWN` ;
+flux injoignable → refus, le téléchargement est gardé. Puis le popup est arrêté (sortie
+attendue), le bundle remplacé, l'app relancée. Une offre refusée sur sa signature n'est plus
+retéléchargée par ce processus tant que le flux propose la même (version, signature), et
+l'erreur reste affichée. Le pont passe en version 2 (`restart_to_update` retiré).
+
+**États.** Un seul état publié (`UpdateState` : phase, exigence, dernière erreur, réglage,
+dernière vérification), au pont et au notch :
+
+| État | App de bureau | Notch |
+|---|---|---|
+| Au repos, recherche, version annoncée | Rien | Rien |
+| Téléchargement | Indicateur discret à la place de la pastille (pourcentage en infobulle) | Rien |
+| Prête | Pastille bleue « Mettre à jour » (infobulle « openedbot X.Y.Z est prête »), ligne « Nouvelle mise à jour disponible » du menu du compte, menu de l'app « Redémarrer pour mettre à jour » | Point bleu ; déplié : « Mise à jour prête » |
+| Installation | Dialogue « Redémarrage… », menu de l'app désactivé | Point bleu |
+| Erreur | Seulement dans Réglages › Mises à jour (« Dernière erreur ») | Rien |
+| Requise (426 de l'API, `min_version` ou `max_age_days` du manifeste) | Écran « Mise à jour requise » à la place de l'app : « Mettre à jour maintenant » (progression, avertissement si des runs tournent), lien de téléchargement en repli | Point bleu ; déplié : « Mise à jour requise » |
+
+Le clic sur la pastille, la ligne du menu du compte, Réglages ou le menu de l'app ouvre
+« Mise à jour prête » (« Redémarrer » / « Plus tard »). S'il reste des runs en cours, le
+dialogue attend (« En attente de la fin de N run(s)… ») et propose « Redémarrer quand même ».
+Le clic sur le notch ouvre Réglages › Mises à jour ; le notch ne redémarre jamais rien. Couleur
+d'information fixe (`--state-info-*`), pas l'accent de l'app.
+
+**Inactivité.** Réglage « Installer quand le Mac est inactif », actif par défaut (préférences de
+la coque). Conditions : écran verrouillé, économiseur d'écran ou 10 minutes sans entrée
+(`CGEventSourceSecondsSinceLastEventType`, notifications `com.apple.screenIsLocked` et
+`com.apple.screensaver.didstart`), aucune exécution en cours selon la console, une version
+prête. Les conditions sont relues après la relecture du flux et après l'arrêt du popup ; si
+elles ne tiennent plus, le popup repart et la version reste prête. Hors macOS, jamais inactif.
+
+**Requise, deux sources.** Le 426 de l'API (`DESKTOP_MIN_VERSION`) : la console appelle
+`report_update_required`, la coque vérifie le flux aussitôt. Le manifeste : `min_version`, et
+`max_age_days` comparé à l'heure de build embarquée (`OPENEDBOT_BUILT_AT`). Le plancher du
+manifeste ne s'applique que s'il propose une version plus récente.
+
+**Cadence.** Première vérification 30 s après le lancement, puis toutes les heures plus 0 à
+5 minutes au hasard, au réveil, sur un 426 et à la demande (Réglages, menu de l'app).
+`OPENEDBOT_UPDATE_CHECK_SECONDS` et `OPENEDBOT_UPDATE_IDLE_SECONDS` raccourcissent les délais
+pour les tests.
+
+**Linux (D5).** Un deb n'a pas de moteur de mise à jour (« not an AppImage »). Le scénario
+`update` de `linux-e2e.ts` consent désormais par `install_update` (WebDriver) au lieu d'attendre
+un redémarrage spontané ; il n'a pas été rejoué ici.
+
+**Vérifié sur l'app signée et notarisée** (`app.openedbot.desktop.preview`, `spctl` :
+`Notarized Developer ID`), API locale de `make dev` et flux local bridé à 250 Ko/s, captures
+hors dépôt. 0.0.19 installée, puis : à jour (rien) ; 0.0.20 publiée : indicateur de
+téléchargement, pastille claire et sombre, point bleu du notch, Réglages, dialogue, « Plus
+tard » (l'app continue) ; 0.0.21 publiée dialogue ouvert puis « Redémarrer » : refus « version
+plus récente », la 0.0.21 se télécharge ; 0.0.21 retirée (`--announce 0.0.1`) puis
+« Redémarrer » : refus « n'est plus proposée » ; signature forgée : refusée, erreur dans
+Réglages ; un vrai run de Websearch en cours : « En attente de la fin de 1 run… », puis
+redémarrage en 0.0.20 à la fin du run, session et popup repris, plus de point bleu ;
+`min_version` 0.0.21 : écran requis, installé en 0.0.21 ; `max_age_days` : écran requis avec
+pourcentage, installé en 0.0.22 ; signature forgée sur la 0.0.22 corrigée : téléchargée une
+fois, l'erreur reste ; inactivité (seuil 20 s, aucune entrée) : installé en 0.0.23 ; un run en
+cours retient l'installation (« idle install waits: 1 run(s) in progress »), qui part après le
+run (0.0.24) ; API à `DESKTOP_MIN_VERSION=0.0.24` : écran requis, rien de plus récent, lien de
+téléchargement ; menu de l'app « Rechercher des mises à jour… », puis « Redémarrer pour mettre à
+jour », qui ouvre le dialogue sans redémarrer, installé en 0.0.25 ; pastille puis
+« Redémarrer » : 0.0.26, la dernière. Les builds 0.0.16 à 0.0.18 ont été jetés (code d'avant les
+revues), jamais publiés.
+
+**Non éprouvé à l'écran, couvert par des tests.** Verrouillage et économiseur d'écran (pas de
+faux verrouillage envoyé aux autres apps), réveil, translocation, infobulle de la pastille, ligne
+du menu du compte (absente de la disposition à rail de l'org de dev), notch déplié et clic sur le
+notch.
+
+**Constats.**
+- Le serveur de flux local perdait `Content-Length` sur un téléchargement bridé (`Bun.serve`) :
+  pas de pourcentage. Il passe par `node:http`.
+- Après la fin d'un run, l'installation à l'inactivité peut attendre jusqu'à un rafraîchissement
+  du roster (60 s) : le compte des runs vient de la console.
+- Après un redémarrage, la console rouvre sur l'accueil, pas sur le fil ouvert.
+
+**Écarts restants.**
+- Installation à la sortie de l'app (Grok Bot le fait) : non faite.
+- Hébergement et canaux du flux (Q2), comme avant.
+- Le notch rejette une version suffixée (`1.1.1-test`) dans `updateState` : la ligne est
+  ignorée, sans point bleu.
+- +1,5 Ko gzip au premier chargement (textes), 372,3 / 380 Ko.
+
+**Reproduire.** `make desktop-tauri-mac TAURI_VERSION=X.Y.Z TAURI_POPUP=…`, puis
+`bun apps/desktop-tauri/scripts/update-feed.ts serve --slow-kbps 250` et
+`… publish --version X.Y.Z [--announce A.B.C] [--forged-signature] [--min-version V]
+[--max-age-days N]`.
 
 ### 4.4 Console : origine, plateforme, performance
 
@@ -1391,3 +1493,17 @@ sous bail clôturé ; la route rend la même réponse en attendant le règlement
 avant la réclamation, reprise après la mort d'un worker, tentatives épuisées, arrêt propre,
 annulation, run concurrent, tenant, rétention). Les invariants des runs (0002) ne changent pas.
 Onze passes de revue Codex ; la dernière relève la limite connue de la section 4.6.
+
+**Mises à jour D2c (2026-11-06)** : résultats en section 4.3.4. Téléchargement silencieux,
+pastille bleue, consentement ou inactivité, double « requise » (426 et manifeste), notch. Éprouvé
+sur l'app signée et notarisée de 0.0.19 à 0.0.26. Sept passes de `codex review` (la dernière
+sans finding) ; leurs findings P1/P2 ont été corrigés dans la branche :
+- conditions d'inactivité relues avant et après l'arrêt du popup ;
+- écran requis sans rien à installer, et vérification déjà en cours au clic ;
+- dialogue fermé sous l'écran requis ;
+- compte des runs tenu à jour en arrière-plan ;
+- version suffixée refusée par `install_update` ;
+- écran requis bloqué quand la même erreur revient ;
+- compte des runs en cache qui n'expirait pas pendant une panne.
+Corrigé après l'épreuve sur l'app signée : une signature refusée était retéléchargée à chaque
+vérification et son erreur disparaissait de Réglages.

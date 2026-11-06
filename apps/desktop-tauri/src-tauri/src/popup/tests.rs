@@ -297,3 +297,40 @@ async fn a_popup_closed_by_its_user_is_reported_and_not_restarted() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(events.0.load(Ordering::SeqCst), 1);
 }
+
+/// Says what the update is at each greeting, like the shell (`ShellPopupEvents`).
+struct GreetingEvents;
+
+impl PopupEvents for GreetingEvents {
+    fn open_console(&self, _: &str) {}
+    fn gave_up(&self, _: &GiveUp) {}
+    fn greeting(&self) -> Vec<HostToPopup> {
+        vec![HostToPopup::UpdateState { status: "ready", version: Some("0.0.17".into()) }]
+    }
+}
+
+#[tokio::test]
+async fn a_popup_that_starts_learns_the_update_state_after_the_session() {
+    let out = std::env::temp_dir().join(format!("openedbot-popup-test-{}-greeting-out", std::process::id()));
+    let script = format!(
+        r#"echo '{{"type":"ready","protocol":1,"version":"test"}}'
+read hello; read state; read update
+printf '%s\n%s\n' "$state" "$update" > '{}'
+read eof
+exit 0"#,
+        out.display()
+    );
+    let bundle = fake_bundle("greeting", 1, &script);
+    let host = PopupHost::new(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), Arc::new(GreetingEvents));
+    host.start();
+    for _ in 0..100 {
+        if out.exists() && std::fs::read_to_string(&out).unwrap().lines().count() == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let written = std::fs::read_to_string(&out).expect("the fake popup wrote what it received");
+    assert_eq!(written, "{\"type\":\"signedIn\"}\n{\"type\":\"updateState\",\"status\":\"ready\",\"version\":\"0.0.17\"}\n");
+    host.stop();
+    let _ = std::fs::remove_file(out);
+}
