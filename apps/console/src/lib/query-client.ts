@@ -13,6 +13,22 @@ export function shouldRetryQuery(failureCount: number, error: unknown): boolean 
   return !isUnauthorized(error) && !isWorkspaceChanged(error) && failureCount < 1;
 }
 
+const localPatches = new WeakSet<object>();
+
+/**
+ * Marque une valeur construite EN PATCHANT celle du cache (le flux du fil,
+ * `useThreadStream`) : elle partage déjà la structure de l'ancienne, objet par
+ * objet. Le partage structurel par défaut la recopierait conteneur par
+ * conteneur (un nouveau tableau d'événements par patch) et casserait ce qui
+ * se fie à son identité : l'index des clés d'événements et la reconnaissance
+ * d'un ajout en queue (`eventsAppendedFrom`), qui évitent tous deux de
+ * reparcourir le fil à chaque patch.
+ */
+export function asLocalPatch<T extends object>(data: T): T {
+  localPatches.add(data);
+  return data;
+}
+
 /**
  * Singleton TanStack Query de l'app. Le garde de route y dépose
  * `GET /api/auth/me` ; la carte du compte (`account-menu.tsx`) et les autres observateurs lisent ce cache.
@@ -31,8 +47,13 @@ export const queryClient = new QueryClient({
       persister: persistQueryFn,
       // The first network read after a restore must hand out a new object even
       // when nothing changed: that reference is what tells the thread its
-      // snapshot is live and lets the stream start.
-      structuralSharing: (previous, next) => (isRestoredQueryData(previous) ? next : replaceEqualDeep(previous, next)),
+      // snapshot is live and lets the stream start. A local patch
+      // (`asLocalPatch`) already shares the cached structure: kept as is.
+      structuralSharing: (previous, next) => (
+        isRestoredQueryData(previous) || (typeof next === "object" && next !== null && localPatches.has(next))
+          ? next
+          : replaceEqualDeep(previous, next)
+      ),
     },
   },
 });

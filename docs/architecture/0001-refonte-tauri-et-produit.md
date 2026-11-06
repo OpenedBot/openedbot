@@ -211,6 +211,91 @@ même compte et même runtime que D0 ; console solo du commit de D1b. G3 et G4 n
 - Non fait, faute de gain mesuré suffisant : une seule librairie d'icônes (Q4) ; `@remixicon/react`
   pèse encore 38 ko (avant gzip) dans le premier chargement.
 
+### 3.3 Streaming (D1c, 2026-11-06)
+
+Même machine, même compte, même bot (Atlas), même runtime (VM 240) et même invite que D0 ; la
+réponse fait 8 919 caractères à chaque essai. Consoles : builds de production solo de `develop`
+(D1b, « avant ») et de D1c (« après »), servis comme en D0. Résultats bruts, non versionnés :
+`tmp/perf/stream-profile-2026-11-06T12-41-34-271Z.json` et `…T12-44-31-029Z.json` (1x),
+`…T12-47-36-260Z.json` et `…T12-49-26-185Z.json` (4x).
+
+**Conditions.**
+- Outil : `apps/console/scripts/perf/stream-profile.ts --build <build> --headed --cpu none`, qui
+  joue l'essai G4 de `d0-baseline.ts` (même sonde, `lib/streaming.ts`) sur un build donné. Le
+  Chromium headless de D0 cadence à 60 i/s quel que soit l'écran : la cible « p5 ≥ 90 % de la
+  fréquence » n'y était pas mesurable sur le web. Les essais tournent donc dans une vraie fenêtre
+  (120 Hz) ; `d0-baseline.ts` reçoit `--headed-stream` pour la même raison.
+- La sonde ajoute trois lectures : le fps de la page ouverte au repos pendant 3 s avant l'envoi
+  (le plancher de la mesure), la part de frames qui ont sauté un rafraîchissement (plus de 1,5 fois
+  la frame médiane) et le détail des frames longues (scripts, mise en page forcée, phase).
+- Deux allures : processeur normal (5 essais par build) et ralenti 4 fois par CDP
+  (`--throttle 4`, 3 essais par build), à défaut d'une vraie machine modeste. Le M5 Pro ne laisse
+  voir à peu près aucun coût à vitesse normale.
+
+**Profil d'abord** (`--cpu stream`, 4x, avant tout changement), puis décompte des rendus React
+par composant pendant une réponse (crochet `__REACT_DEVTOOLS_GLOBAL_HOOK__`, script jetable) :
+- chaque lot de fragments patché dans le snapshot re-rendait tout l'écran de conversation (54 à 93
+  fois par réponse) : en-tête, barre latérale (le roster bouge avec chaque fragment), composer,
+  timeline et son modèle, et plusieurs passes O(n) sur les 3 300 événements du fil
+  (`latestThreadReadThrough`, `runTimings`, signatures des tours) ;
+- le partage structurel de React Query recopiait chaque patch local conteneur par conteneur : l'index
+  des clés d'événements et la reconnaissance d'un ajout en queue (`eventsAppendedFrom`) ratait à
+  chaque lot, d'où un parcours du fil à chaque patch ;
+- le rail des tours relisait la position de chaque tour (`querySelector` + `getBoundingClientRect`)
+  à chaque défilement, donc à chaque frame quand le fil épinglé suit la réponse ;
+- chaque mot écrit gardait son animation (`animation-fill-mode: both`) : 1 200 animations encore
+  actives à la fin d'une réponse, restylées à chaque frame. Une trace Chromium à 4x mettait le style,
+  la mise en page, la peinture et la composition loin devant le JavaScript.
+
+**Ce qui a changé.**
+- Store du message en cours (`lib/stream/live-run-text.ts`) : tant que la fin du fil est une réponse
+  déjà confirmée (plus de `LIVE_NARRATION_MAX` caractères, sans notice, approbation ni balise
+  `MEDIA:`), ses fragments ne sont plus patchés dans le snapshot à chaque frame. `useThreadStream`
+  les retient et les patche tous, dans l'ordre du flux, au plus tard 1 s après, ou avant tout autre
+  événement. Seule la bulle de cette réponse s'abonne au store (`LiveTimelineEntry`), et y lit le
+  texte du run au-delà de sa dernière `sequence` dans le snapshot rendu : les fragments de texte
+  arrivent sans curseur (diffusés avant leur commit), le curseur ne pouvait pas servir de repère.
+  Le store est nourri avant le patch et coupe là où le modèle de la timeline couperait la bulle :
+  même rendue avec les props d'un snapshot plus ancien, la bulle n'affiche ni doublon ni recul.
+- Les patchs locaux du fil gardent leur identité dans le cache (`asLocalPatch`).
+- Découpage en blocs incrémental (`splitMarkdownBlocksFrom`) : seules les coupures dont la première
+  ligne du bloc est complète sont réutilisées ; un test compare la découpe incrémentale à la
+  découpe complète à chaque caractère de plusieurs réponses.
+- Le rail des tours mesure au plus toutes les 100 ms, la dernière demande n'étant jamais perdue.
+- Les animations d'apparition des mots et des blocs passent en `backwards` : leur dernière image
+  est le style propre de l'élément, aucun pixel ne change, mais elles ne restent plus actives
+  (une vingtaine au lieu de 1 200 en fin de réponse).
+
+| Indicateur (web, fenêtre réelle, 120 Hz) | Avant (D1b) | Après (D1c) |
+|---|---|---|
+| Rendus par réponse : écran de conversation / barre latérale / timeline | 54–93 / 53 / 53 | 17 / 16 / 16 |
+| 1x : fps moyen / p5 (plancher au repos) | 119,9 / 99–100 (99–102) | 120 / 98–99 (97–99) |
+| 1x : frame la plus longue ; frames sautées | 15–18 ms ; 0,1–0,2 % | 10 ms (18 une fois) ; 0–0,1 % |
+| 1x : frames longues (> 50 ms) avant / pendant le streaming | 0 / 0 | 0 / 0 |
+| 4x : fps moyen / p5 | 50–57 / 25–30 | 83–87 / 55 |
+| 4x : frames longues avant / pendant le streaming | 1–3 / 1 (74–91 ms) | 1–3 / 1 (74–93 ms) |
+
+**Lecture.**
+- G4 est atteint sur le web au sens des frames longues : aucune, avant comme pendant le streaming,
+  sur 5 essais. La cible de fps ne se lit pas à 120 Hz sur cette machine : le p5 mesure surtout la
+  gigue des horodatages de `requestAnimationFrame` (7 à 9 ms entre deux frames), et le plancher au
+  repos a varié de 97 à 110 i/s d'une série à l'autre dans la journée. Le p5 du streaming reste à
+  ce plancher, avant comme après ; la part de frames sautées, elle, est quasi nulle des deux côtés.
+  À vitesse normale, D1c ne change donc rien de visible sur un M5 Pro, sinon la frame la plus
+  longue (10 ms au lieu de 15 à 18).
+- Le gain se voit au ralenti : à 4x, fps moyen ×1,6 et p5 ×2. Ce n'est pas encore fluide : le
+  reparse du dernier bloc par `react-markdown` à chaque frame du lissage, puis le style, la mise
+  en page et la peinture de la bulle qui grandit, font l'essentiel du coût restant. Pistes, non
+  faites : cadencer le lissage à 60 Hz, un arbre markdown incrémental.
+- Les frames longues qui restent à 4x ne sont pas du streaming : l'envoi (le `keydown` puis le
+  rendu qui suit la réponse 202) et la fin du run (le rendu du message persisté). Elles valent 15 à
+  25 ms à vitesse normale. Elles relèvent de l'envoi et de D1d, pas de ce store.
+- Le texte retenu n'est pas encore dans le snapshot : pendant une réponse, la recherche dans le
+  fil, le rail des tours, l'aperçu de la barre latérale et le filigrane de lecture suivent avec au
+  plus 1 s de retard.
+- Non mesuré : Electron (le shell ne change rien à ce code ; la remesure attend D2), une vraie
+  machine modeste, les fils au-delà de la fenêtre de 40 tours (D1d), WKWebView.
+
 ## 4. Architecture cible
 
 ### 4.1 Vue d'ensemble

@@ -6,6 +6,8 @@ import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
 import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
+import { createLiveRunText, type ThreadLiveText } from "../../src/lib/stream/live-run-text";
+import { LIVE_NARRATION_MAX } from "../../src/lib/stream/live-answer";
 
 const speechAdapter: SpeechSynthesisAdapter = {
   supported: false,
@@ -34,6 +36,7 @@ function renderTimeline({
   approvals = [],
   onOpenBotErrors,
   outgoing = null,
+  liveText = null,
 }: {
   events?: StoredProductEvent[];
   userInputs?: Array<{
@@ -50,6 +53,7 @@ function renderTimeline({
   approvals?: ApprovalRequestDto[];
   onOpenBotErrors?: () => void;
   outgoing?: { id: string; text: string; failed?: boolean } | null;
+  liveText?: ThreadLiveText | null;
 }) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -65,6 +69,7 @@ function renderTimeline({
           scrollToBottomOnThreadKey={scrollToBottomOnThreadKey}
           onOpenBotErrors={onOpenBotErrors}
           outgoing={outgoing}
+          liveText={liveText}
         />
       </I18nProvider>
     </QueryClientProvider>,
@@ -581,6 +586,61 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(container.querySelector("[data-turn-activity]")).toBeNull();
     // Its text then smooths in from empty (`useSmoothText`): its PLACE is what counts here.
     expect(container.querySelector("[data-assistant-response]")).not.toBeNull();
+  });
+
+  test("la réponse en direct lit le texte retenu hors du snapshot, et lui seul, sans doublon une fois patché", () => {
+    const matchMedia = window.matchMedia;
+    // Mouvement réduit : le texte s'affiche tel quel, sans lissage à attendre.
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      const at = new Date("2026-10-24T10:00:00.000Z");
+      const fragment = (sequence: number, text: string, runId = "run-live") =>
+        ({ sequence, runId, type: "agent.message", payload: { text }, occurredAt: at }) as unknown as StoredProductEvent;
+      const old = [fragment(1, "Ancienne réponse.", "run-old")];
+      const committed = [...old, fragment(1, "a".repeat(LIVE_NARRATION_MAX + 1))];
+      const store = createLiveRunText();
+      for (const event of committed) store.record(event);
+      store.record(fragment(2, " SUITE"));
+      const runs = [run("run-old", "completed"), run("run-live", "running")];
+      const view = renderTimeline({ events: committed, runs, running: true, liveText: { store, events: committed } });
+      const answers = () => [...view.container.querySelectorAll("[data-assistant-response]")].map((node) => node.textContent ?? "");
+      expect(answers().at(-1)).toContain(" SUITE");
+      // Un fragment publié ne passe que par la bulle en direct.
+      store.record(fragment(3, " ENCORE"));
+      act(() => store.publish());
+      expect(answers().at(-1)).toContain(" SUITE ENCORE");
+      expect(answers()[0]).toContain("Ancienne réponse.");
+      // Le snapshot reçoit les fragments : le suffixe les lâche dans le même rendu.
+      const patched = [...committed, fragment(2, " SUITE"), fragment(3, " ENCORE")];
+      view.rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <I18nProvider>
+            <ThreadTimeline events={patched} userInputs={[]} runs={runs} approvals={[]} running speechAdapter={speechAdapter} liveText={{ store, events: patched }} />
+          </I18nProvider>
+        </QueryClientProvider>,
+      );
+      expect(answers().at(-1)!.split("SUITE")).toHaveLength(2);
+      expect(answers().at(-1)).toContain(" SUITE ENCORE");
+      view.unmount();
+      // Une balise MEDIA: à cheval sur le snapshot et le suffixe n'est jamais affichée brute.
+      const tagged = [fragment(1, `${"b".repeat(LIVE_NARRATION_MAX + 1)}\nMED`, "run-media")];
+      // Fil ouvert en cours de réponse : le store n'a pas vu le début de la balise.
+      const mediaStore = createLiveRunText();
+      mediaStore.record(fragment(2, "IA:/workspace/x.png", "run-media"));
+      const media = renderTimeline({ events: tagged, runs: [run("run-media", "running")], running: true, liveText: { store: mediaStore, events: tagged } });
+      expect(media.container.querySelector("[data-assistant-response]")?.textContent).not.toContain("workspace");
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 
   test("place une question interactive historique au-dessus de sa réponse opérateur", () => {

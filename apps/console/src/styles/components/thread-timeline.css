@@ -223,8 +223,9 @@
     transform: translateY(4px);
   }
 }
+/* `backwards`: the end is the block's own style; held, one animation per block stayed in effect (see `.grok-w`). */
 .openedbot-reveal {
-  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* The action row of a finished answer rises in (`chat-fade-up`). */

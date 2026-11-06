@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { notifyManager, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   applyProductEventToRoster,
@@ -23,7 +23,8 @@ import { nativeAuthStore, nativeRequestInit } from "../platform";
 import { CLIENT_UPDATE_REQUIRED, isClientUpdateRequired, reportClientUpdateRequired, reportingClientUpdate } from "../platform/client-update";
 import { activeFleetId, activeOrganizationId, reportWorkspaceRevoked, cloudSessionRevision, readCloudSession, subscribeCloudSession } from "../session/cloud-session";
 import { api, API_ORIGIN, queryKeys, type ThreadView } from "../api";
-import { scheduleInvalidate } from "../query-client";
+import { createLiveRunText, createLiveTextHold, type LiveRunText, type ThreadLiveText } from "./live-run-text";
+import { asLocalPatch, scheduleInvalidate } from "../query-client";
 import { isRestoredQueryData } from "../query-persister";
 import { mergeThreadHistory, readThreadHistoryHead } from "../thread/thread-history";
 import { nextReviewWatch, REVIEW_POLL_MS, type ReviewWatch } from "../thread/thread-review-poll";
@@ -247,6 +248,7 @@ export function useThreadStream(threadId: string | undefined) {
   const [olderState, setOlderState] = useState<{ threadId?: string; loading: boolean; error: boolean }>({ loading: false, error: false });
   // A gate under automatic review shows no card: poll until it settles (PERM2-7).
   const reviewWatch = useRef<ReviewWatch | null>(null);
+  const [liveText] = useState<LiveRunText>(createLiveRunText); // réponses en cours, hors du cache (`live-run-text.ts`)
 
   const thread = useQuery({
     ...(threadId
@@ -261,6 +263,7 @@ export function useThreadStream(threadId: string | undefined) {
     },
   });
 
+  const liveView = useMemo<ThreadLiveText>(() => ({ store: liveText, events: thread.data?.events ?? [] }), [liveText, thread.data?.events]);
   const loadOlder = useCallback((beforeMerge?: () => void): Promise<boolean> => {
     const pendingRequest = olderRequest.current;
     if (pendingRequest && pendingRequest.threadId === threadId) return pendingRequest.promise;
@@ -396,6 +399,9 @@ export function useThreadStream(threadId: string | undefined) {
       // en UN patch du roster et UN patch du fil par frame (`flushBuffered`),
       // sans changer ni l'ordre ni les décisions de relecture ci-dessous.
       let buffered: OrganizationEvent[] = [];
+      // Les fragments d'une réponse confirmée attendent ici ; seule sa bulle les lit (`liveText`).
+      const hold = createLiveTextHold(() => performance.now());
+      let holdTimer: ReturnType<typeof setTimeout> | null = null;
       // Runs de ce fil qui ont appelé l'outil de proposition de réglages : la
       // proposition est écrite côté serveur, le patch du `run.completed` ne la
       // porte pas, donc leur fin relit le fil (une seule fois par run).
@@ -412,9 +418,9 @@ export function useThreadStream(threadId: string | undefined) {
           flushTimer = null;
         }
       };
-      const flushBuffered = () => {
+      const flushBuffered = (releaseHeld = false) => {
         cancelScheduledFlush();
-        if (buffered.length === 0) return;
+        if (buffered.length === 0 && (!releaseHeld || hold.dueIn(0) === null)) return;
         const events = buffered;
         buffered = [];
         let roster = queryClient.getQueryData<RosterDto>(queryKeys.roster);
@@ -424,7 +430,7 @@ export function useThreadStream(threadId: string | undefined) {
         let invalidateThread = false;
         let invalidateRoster = false;
         const invalidateExtra = new Set<string>();
-        for (const event of events) {
+        const apply = (event: OrganizationEvent) => {
           const productEvent = event as unknown as StoredProductEvent;
           const terminal = isTerminalProductEvent(productEvent);
           // Un événement de curseur ≤ `roster.cursor` (le max lu en premier
@@ -468,7 +474,7 @@ export function useThreadStream(threadId: string | undefined) {
               }
             }
           }
-          if (event.threadId !== threadId) continue;
+          if (event.threadId !== threadId) return;
           if (typeof event.cursor === "number" && Number.isSafeInteger(event.cursor)) {
             cursorRef.current = Math.max(cursorRef.current, event.cursor);
           }
@@ -509,13 +515,28 @@ export function useThreadStream(threadId: string | undefined) {
             && event.payload.tool.includes("bot_settings_propose")
           ) proposalRuns.add(event.runId);
           if (terminal && proposalRuns.delete(event.runId)) invalidateThread = true;
+        };
+        const applyHeld = () => { for (const held of hold.release()) apply(held as unknown as OrganizationEvent); };
+        // La retenue est toujours la fin du flux : tout événement qu'elle ne
+        // prend pas la relâche d'abord, l'ordre du flux reste celui du patch.
+        for (const event of events) {
+          const mine = event.threadId === threadId;
+          if (mine) liveText.record(event as unknown as StoredProductEvent);
+          if (mine && hold.offer(event as unknown as StoredProductEvent, snapshot)) continue;
+          applyHeld();
+          apply(event);
         }
+        if (releaseHeld || hold.dueIn(performance.now()) === 0) applyHeld();
+        if (holdTimer !== null) clearTimeout(holdTimer);
+        const due = hold.dueIn(performance.now());
+        holdTimer = due === null ? null : setTimeout(() => flushBuffered(true), due);
+        liveText.publish();
         // One notification tick for both keys: the conversation
         // screen observes the roster and the thread, and two separate
         // `setQueryData` calls rendered it twice per flush.
         notifyManager.batch(() => {
           if (rosterTouched) queryClient.setQueryData<RosterDto>(queryKeys.roster, roster);
-          if (snapshotTouched) queryClient.setQueryData<ThreadView>(queryKeys.thread(threadId), snapshot);
+          if (snapshotTouched && snapshot) queryClient.setQueryData<ThreadView>(queryKeys.thread(threadId), asLocalPatch(snapshot));
         });
         for (const key of invalidateExtra) scheduleInvalidate(JSON.parse(key) as readonly unknown[]);
         if (invalidateThread) scheduleInvalidate(queryKeys.thread(threadId));
@@ -546,7 +567,8 @@ export function useThreadStream(threadId: string | undefined) {
       }, onStatus, initialStreamCursor, onGap);
       return () => {
         cancelScheduledFlush();
-        flushBuffered();
+        flushBuffered(true);
+        if (holdTimer !== null) clearTimeout(holdTimer);
       };
     };
     const disposeStart = start();
@@ -572,7 +594,7 @@ export function useThreadStream(threadId: string | undefined) {
     setSwitching(false);
   }, [thread.data, threadId, queryClient]);
 
-  return { thread, streaming, switching, loading: switching || thread.isPending, loadOlder,
+  return { thread, streaming, switching, loading: switching || thread.isPending, loadOlder, liveText: liveView,
     loadingOlder: olderState.threadId === threadId && olderState.loading,
     olderError: olderState.threadId === threadId && olderState.error };
 }

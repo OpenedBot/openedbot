@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 type Fence = { marker: "`" | "~"; length: number };
 
 /**
@@ -68,17 +70,26 @@ const HTML_LINE = /^ {0,3}</;
  * trop ne l'est pas.
  */
 export function splitMarkdownBlocks(text: string): string[] {
+  return splitBlocks(text).blocks;
+}
+
+/** Les blocs, l'indice de début de chacun dans le texte, et `whole` : une ligne interdit toute découpe. */
+function splitBlocks(text: string): { blocks: string[]; starts: number[]; whole: boolean } {
   const lines = text.split("\n");
   if (lines.some((line) => DEFINITION_LINE.test(line) || HTML_LINE.test(line))) {
-    return BLANK_LINE.test(text) ? [] : [text];
+    return BLANK_LINE.test(text) ? { blocks: [], starts: [], whole: true } : { blocks: [text], starts: [0], whole: true };
   }
   const blocks: string[] = [];
+  const starts: number[] = [];
   let current: string[] = [];
   let blanks: string[] = [];
   let currentHasList = false;
   let fence: Fence | null = null;
   let math = false;
+  let offset = 0;
   for (const line of lines) {
+    const lineStart = offset;
+    offset += line.length + 1;
     if (fence || math) {
       current.push(...blanks, line);
       blanks = [];
@@ -105,6 +116,7 @@ export function splitMarkdownBlocks(text: string): string[] {
       current.push(...blanks);
     }
     blanks = [];
+    if (current.length === 0) starts.push(lineStart);
     current.push(line);
     if (LIST_ITEM_LINE.test(line)) currentHasList = true;
     const marker = fenceMarker(line);
@@ -112,7 +124,52 @@ export function splitMarkdownBlocks(text: string): string[] {
     else if (MATH_FENCE_OPEN.test(line)) math = true;
   }
   if (current.length > 0) blocks.push(current.join("\n"));
-  return blocks;
+  return { blocks, starts, whole: false };
+}
+
+/** Une découpe et ce qu'il faut pour la prolonger (`splitMarkdownBlocksFrom`). */
+export type MarkdownBlockSplit = { text: string; blocks: string[]; starts: number[] };
+
+/**
+ * `splitMarkdownBlocks(text)`, en ne redécoupant que la fin quand `text`
+ * prolonge le texte de `previous` : pendant le flux, chaque frame coûtait une
+ * découpe de toute la réponse. Une coupe ne dépend que des lignes qui la
+ * précèdent et de la PREMIÈRE ligne du bloc qu'elle ouvre (indentée, élément
+ * de liste, fence) : les coupes dont cette ligne est complète sont
+ * définitives, la découpe reprend au début du premier bloc qui n'en a pas,
+ * dans l'état d'un début de texte. Seule exception, une définition de lien ou
+ * un bloc HTML arrivés dans la fin : tout se redécoupe (un seul bloc).
+ */
+export function splitMarkdownBlocksFrom(previous: MarkdownBlockSplit | undefined, text: string): MarkdownBlockSplit {
+  if (previous?.text === text) return previous;
+  let resume = 0;
+  if (previous && text.startsWith(previous.text)) {
+    const last = previous.blocks.length - 1;
+    // Un dernier bloc dont la première ligne s'écrit encore peut ne pas en
+    // être un (« 1 » deviendra « 1. », qui prolonge une liste) : on reprend
+    // alors au bloc d'avant, ouvert par une ligne complète.
+    resume = last > 0 && previous.text.indexOf("\n", previous.starts[last]) === -1 ? last - 1 : Math.max(0, last);
+  }
+  if (resume > 0) {
+    const from = previous!.starts[resume]!;
+    const tail = splitBlocks(text.slice(from));
+    if (!tail.whole) {
+      return {
+        text,
+        blocks: [...previous!.blocks.slice(0, resume), ...tail.blocks],
+        starts: [...previous!.starts.slice(0, resume), ...tail.starts.map((start) => start + from)],
+      };
+    }
+  }
+  const { blocks, starts } = splitBlocks(text);
+  return { text, blocks, starts };
+}
+
+/** Les blocs de `markdown`, redécoupés seulement à la fin quand il ne fait que s'allonger. */
+export function useMarkdownBlocks(markdown: string): string[] {
+  const split = useRef<MarkdownBlockSplit | undefined>(undefined);
+  split.current = splitMarkdownBlocksFrom(split.current, markdown);
+  return split.current.blocks;
 }
 
 function scanFences(text: string): Fence | null {

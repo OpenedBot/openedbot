@@ -38,6 +38,15 @@ connecteur hôte et le protocole tiennent le leur :
   réseau de 50 ms, le premier lancement passe d'environ 1,2 s à 0,9 s dans
   le navigateur, et le premier lancement après une mise à jour d'environ
   1 s à 0,65 s dans l'app de bureau.
+- Une réponse qui s'écrit ne fait plus travailler tout l'écran : seule sa
+  bulle suit le texte, et le reste de la conversation (en-tête, liste des
+  fils, fil) se met à jour une fois par seconde au plus pendant qu'elle
+  s'allonge. Les mots déjà apparus ne gardent plus leur animation, et le
+  rail des tours mesure le fil dix fois par seconde au plus. Sur un
+  processeur ralenti quatre fois, comme sur une machine modeste, une longue
+  réponse s'affiche à 85 images par seconde environ au lieu de 50 à 57.
+  Pendant l'écriture, la recherche dans le fil et l'aperçu de la liste des
+  fils suivent la réponse avec au plus une seconde de retard.
 - Plus aucun nom technique hérité de l'ancien nom du produit : base et rôles
   PostgreSQL, fonctions SQL, en-têtes, cookies, schéma d'URL de l'app de
   bureau (`openedbot://`), popup natif (`OpenedbotPopup.app`), classes CSS,

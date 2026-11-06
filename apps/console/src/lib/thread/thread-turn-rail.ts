@@ -60,3 +60,61 @@ export function requestThreadReveal(targetId: string) {
     new CustomEvent<ThreadRevealDetail>(THREAD_REVEAL_EVENT, { detail: { targetId } }),
   );
 }
+
+/**
+ * Au plus une mesure du rail par intervalle. Il lit la position de chaque
+ * tour (`getBoundingClientRect`, une requête par tour) à chaque défilement ;
+ * or le fil épinglé en bas défile à chaque frame pendant qu'une réponse
+ * s'écrit, et ces lectures de mise en page coûtaient plus que la réponse
+ * elle-même (profil D1c). La dernière demande n'est jamais perdue : elle part
+ * à la fin de l'intervalle.
+ */
+export const RAIL_MEASURE_INTERVAL_MS = 100;
+
+export type FrameIo = {
+  now: () => number;
+  requestFrame: (callback: () => void) => number;
+  cancelFrame: (id: number) => void;
+  setTimer: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer: (id: ReturnType<typeof setTimeout>) => void;
+};
+
+const browserFrameIo: FrameIo = {
+  now: () => performance.now(),
+  requestFrame: (callback) => requestAnimationFrame(callback),
+  cancelFrame: (id) => cancelAnimationFrame(id),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (id) => clearTimeout(id),
+};
+
+/** `run` à la prochaine frame, au plus une fois par `intervalMs`. */
+export function throttledFrame(run: () => void, intervalMs: number, io: FrameIo = browserFrameIo) {
+  let frame: number | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let last = Number.NEGATIVE_INFINITY;
+  const fire = () => {
+    frame = null;
+    last = io.now();
+    run();
+  };
+  return {
+    schedule() {
+      if (frame !== null || timer !== null) return;
+      const wait = last + intervalMs - io.now();
+      if (wait <= 0) {
+        frame = io.requestFrame(fire);
+        return;
+      }
+      timer = io.setTimer(() => {
+        timer = null;
+        frame = io.requestFrame(fire);
+      }, wait);
+    },
+    cancel() {
+      if (frame !== null) io.cancelFrame(frame);
+      if (timer !== null) io.clearTimer(timer);
+      frame = null;
+      timer = null;
+    },
+  };
+}

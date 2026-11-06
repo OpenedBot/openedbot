@@ -26,7 +26,7 @@ import {
   type GithubAlertType,
 } from "../lib/stream/assistant-article-sections";
 import { useT } from "../lib/i18n";
-import { splitMarkdownBlocks } from "../lib/stream/streaming-markdown";
+import { useMarkdownBlocks } from "../lib/stream/streaming-markdown";
 import { rehypeStreamWords } from "../lib/stream/stream-tail-rehype";
 import { itemsAfter, leadingText } from "../lib/stream/stream-word-text";
 import type { ThemeRegistration } from "shiki";
@@ -691,7 +691,7 @@ export const ThreadMarkdownBlock = memo(function ThreadMarkdownBlock({
 });
 
 /**
- * La réponse est rendue bloc par bloc (`splitMarkdownBlocks`) : pendant le
+ * La réponse est rendue bloc par bloc (`useMarkdownBlocks`) : pendant le
  * flux, chaque mise à jour ne reparse que le dernier bloc, dont seuls les
  * mots nouveaux sortent du flou (`rehypeStreamWords`), les blocs déjà
  * terminés gardent leur texte et leur `memo`. Le `"\n"` entre deux blocs est
@@ -711,7 +711,7 @@ export function ThreadMarkdown({
   streaming?: boolean;
 }) {
   const markdown = streaming ? children : promoteSummaryCallout(children);
-  const blocks = splitMarkdownBlocks(markdown);
+  const blocks = useMarkdownBlocks(markdown);
   // Blocks that exist when the stream is first seen (an answer opened
   // mid-run, a history reload) are not revealed; each block born after
   // that blurs in. Sticky: ending the stream must not cut a running reveal.

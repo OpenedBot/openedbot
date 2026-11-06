@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { requestThreadReveal, type ThreadRailTurn } from "../lib/thread/thread-turn-rail";
+import { RAIL_MEASURE_INTERVAL_MS, requestThreadReveal, throttledFrame, type ThreadRailTurn } from "../lib/thread/thread-turn-rail";
 import { useT } from "../lib/i18n";
 
 const targetSelector = (targetId: string) =>
@@ -26,9 +26,7 @@ export function ThreadTurnRail({ turns }: { turns: readonly ThreadRailTurn[] }) 
   useEffect(() => {
     const scroller = root.current?.parentElement?.querySelector<HTMLElement>("[role='log']");
     if (!scroller) return;
-    let frame = 0;
     const measure = () => {
-      frame = 0;
       const view = scroller.getBoundingClientRect();
       const tops = turnsRef.current.map((turn) => {
         const node = scroller.querySelector(targetSelector(turn.targetId));
@@ -44,14 +42,12 @@ export function ThreadTurnRail({ turns }: { turns: readonly ThreadRailTurn[] }) 
           ? previous
           : next);
     };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
+    const { schedule, cancel } = throttledFrame(measure, RAIL_MEASURE_INTERVAL_MS);
     schedule();
     scroller.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
-      if (frame) cancelAnimationFrame(frame);
+      cancel();
       scroller.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };

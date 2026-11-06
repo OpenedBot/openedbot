@@ -13,6 +13,7 @@ import type { MentionableBot } from "@openedbot/roster/domain/mentions";
 import type { OutgoingUserInput } from "../lib/thread/thread-anchor";
 import type { SpeechSynthesisAdapter } from "../lib/voice/web-speech-synthesis";
 import type { MessageAttachmentChip } from "./attachment-canvas";
+import type { ThreadLiveText } from "../lib/stream/live-run-text";
 
 export type ThreadTimelineProps = {
   events: StoredProductEvent[];
@@ -127,4 +128,9 @@ export type ThreadTimelineProps = {
    * signal, la bulle finale reste coupée derrière le panneau (mesuré).
    */
   resnap?: unknown;
+  /**
+   * Le texte des réponses en cours, hors du snapshot (`useThreadStream().liveText`) :
+   * seule la bulle du run en direct s'y abonne. Absent, la timeline ne lit que ses props.
+   */
+  liveText?: ThreadLiveText | null;
 };

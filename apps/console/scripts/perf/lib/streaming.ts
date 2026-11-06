@@ -20,10 +20,27 @@ const percentile = (values: number[], p: number) => {
 const STREAM_PROBE = `(() => {
   const origin = performance.timeOrigin;
   const known = new WeakSet(document.querySelectorAll("[data-assistant-response]"));
-  const state = { longTasks: [], loafs: [], frames: [], running: true, answerChars: 0, firstTextAt: null, lastGrowthAt: null };
+  const state = { longTasks: [], loafs: [], loafDetails: [], frames: [], running: true, answerChars: 0, firstTextAt: null, lastGrowthAt: null };
   window.__d0Stream = state;
   try { new PerformanceObserver((list) => { for (const e of list.getEntries()) state.longTasks.push([origin + e.startTime, e.duration]); }).observe({ type: "longtask", buffered: false }); } catch {}
-  try { new PerformanceObserver((list) => { for (const e of list.getEntries()) state.loafs.push([origin + e.startTime, e.duration]); }).observe({ type: "long-animation-frame", buffered: false }); } catch {}
+  try { new PerformanceObserver((list) => { for (const e of list.getEntries()) {
+    state.loafs.push([origin + e.startTime, e.duration]);
+    // What the frame spent its time on: the scripts it ran (who, how long,
+    // forced layout) and when rendering started, for the report.
+    state.loafDetails.push({
+      at: origin + e.startTime,
+      duration: Math.round(e.duration),
+      blockingDuration: Math.round(e.blockingDuration ?? 0),
+      renderMs: Math.round(e.renderStart ? e.startTime + e.duration - e.renderStart : 0),
+      styleAndLayoutMs: Math.round(e.styleAndLayoutStart ? e.startTime + e.duration - e.styleAndLayoutStart : 0),
+      scripts: (e.scripts ?? []).slice(0, 5).map((s) => ({
+        invoker: s.invoker,
+        source: (s.sourceFunctionName || "") + " " + (s.sourceURL || "").split("/").pop() + ":" + s.sourceCharPosition,
+        duration: Math.round(s.duration),
+        forcedStyleAndLayoutMs: Math.round(s.forcedStyleAndLayoutDuration ?? 0),
+      })),
+    });
+  } }).observe({ type: "long-animation-frame", buffered: false }); } catch {}
   const measure = () => {
     const fresh = [...document.querySelectorAll("[data-assistant-response]")].filter((node) => !known.has(node));
     const answer = fresh.at(-1);
@@ -59,6 +76,8 @@ type RunRow = { id: string; status: string; createdAt: string; error?: string | 
 const TERMINAL = new Set(["completed", "failed", "cancelled", "unknown"]);
 
 const TRIAL_DEADLINE_MS = 8 * 60_000;
+const IDLE_SETTLE_MS = 500;
+const IDLE_REFERENCE_MS = 3_000;
 
 /**
  * Sends the long prompt through the real composer, then watches the run by
@@ -85,12 +104,18 @@ export async function measureStreaming(page: Page, api: { base: string; cookie: 
     return fresh.at(-1) ?? null;
   };
   await page.evaluate(STREAM_PROBE);
+  // A few seconds of the open thread with nothing streaming: the frame rate
+  // this page and display give at rest, the floor the streaming fps compares to.
+  const idleFrom = Date.now() + IDLE_SETTLE_MS;
+  await Bun.sleep(IDLE_SETTLE_MS + IDLE_REFERENCE_MS);
+  const idleTo = Date.now();
   const composer = page.locator("[data-thread-composer] textarea").first();
   await composer.fill(STREAM_PROMPT);
   const before = await textLength();
   const sentAt = Date.now();
   await composer.press("Enter");
-  type Probe = { longTasks: Array<[number, number]>; loafs: Array<[number, number]>; frames: Array<[number, number]>; running: boolean; answerChars: number; firstTextAt: number | null; lastGrowthAt: number | null };
+  type LoafDetail = { at: number; duration: number; blockingDuration: number; renderMs: number; styleAndLayoutMs: number; scripts: Array<{ invoker: string; source: string; duration: number; forcedStyleAndLayoutMs: number }> };
+  type Probe = { longTasks: Array<[number, number]>; loafs: Array<[number, number]>; loafDetails: LoafDetail[]; frames: Array<[number, number]>; running: boolean; answerChars: number; firstTextAt: number | null; lastGrowthAt: number | null };
   const readProbe = () => page.evaluate(() => {
     const state = (window as unknown as { __d0Stream: { answerChars: number; firstTextAt: number | null; lastGrowthAt: number | null } }).__d0Stream;
     return { answerChars: state.answerChars, firstTextAt: state.firstTextAt, lastGrowthAt: state.lastGrowthAt };
@@ -132,6 +157,9 @@ export async function measureStreaming(page: Page, api: { base: string; cookie: 
   const preLongTasks = inWindow(probe.longTasks, sentAt, preTo);
   const preLoafs = inWindow(probe.loafs, sentAt, preTo);
   const framesMs = frames.reduce((sum, delta) => sum + delta, 0);
+  const medianFrame = percentile(frames, 50);
+  const idleFrames = probe.frames.filter(([at, delta]) => overlaps(at - delta, at, idleFrom, idleTo)).map(([, delta]) => delta);
+  const idleMs = idleFrames.reduce((sum, delta) => sum + delta, 0);
   return {
     runStatus: run?.status ?? null,
     runError: run?.error ? String(run.error).slice(0, 160) : null,
@@ -155,5 +183,17 @@ export async function measureStreaming(page: Page, api: { base: string; cookie: 
     fpsMean: frames.length ? Math.round((frames.length / (framesMs / 1000)) * 10) / 10 : null,
     fpsP5: frames.length ? Math.round(percentile(frames.map((d) => 1000 / d), 5)! * 10) / 10 : null,
     frameMaxMs: frames.length ? Math.round(Math.max(...frames)) : null,
+    // Missed refreshes: frames longer than 1.5 times the median frame. At
+    // 120 Hz the fps p5 mostly reads the timer's jitter (8 to 9 ms), this
+    // counts the frames that actually skipped a refresh.
+    droppedFramePct: frames.length ? Math.round((frames.filter((d) => d > 1.5 * medianFrame!).length / frames.length) * 1000) / 10 : null,
+    idle: {
+      fpsMean: idleFrames.length ? Math.round((idleFrames.length / (idleMs / 1000)) * 10) / 10 : null,
+      fpsP5: idleFrames.length ? Math.round(percentile(idleFrames.map((d) => 1000 / d), 5)! * 10) / 10 : null,
+    },
+    // Every long frame from Enter to the end of growth, with when it started
+    // (from Enter) and in which phase.
+    longAnimationFrameDetails: probe.loafDetails.filter((entry) => overlaps(entry.at, entry.at + entry.duration, sentAt, doneAt)).slice(0, 12)
+      .map(({ at, ...entry }) => ({ ...entry, phase: at + entry.duration > streamFrom ? "stream" : "preStream", afterSendMs: Math.round(at - sentAt) })),
   };
 }

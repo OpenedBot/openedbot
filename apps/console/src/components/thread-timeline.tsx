@@ -62,11 +62,12 @@ import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/run
 import { ToolActivity } from "./thread-tool-activity";
 import { PendingThinking } from "./thread-thinking-status";
 import { ActivityNarration, ActivityRow, ActivitySearch, TurnActivity } from "./thread-turn-activity";
-import { DateChip, Divider } from "./thread-timeline-chrome";
+import { AskUserDismissedMark, DateChip, Divider } from "./thread-timeline-chrome";
+import { LiveTimelineEntry } from "./thread-live-entry";
 import { useThreadRowEnter } from "../lib/thread/thread-motion";
 import type { ThreadTimelineProps } from "./thread-timeline-props";
 import { AskUserCard } from "./ask-user-card";
-import { dismissAskUser, useDismissedAskUserRuns } from "../lib/run/ask-user-dismissals";
+import { dismissAskUser } from "../lib/run/ask-user-dismissals";
 import { openSecondaryReads, THREAD_FIRST_PAINT_MARK } from "../lib/shell/after-first-paint";
 import { isConfirmedLiveAnswer } from "../lib/stream/live-answer";
 import { grokSpeaker, turnFeed } from "./grok/turn-feed";
@@ -158,6 +159,7 @@ function ThreadTimelineView({
   olderError = false,
   onLoadOlder,
   onOpenBotErrors,
+  liveText = null,
 }: ThreadTimelineProps) {
   // Les runs de SERVICE (brouillon de persona, compaction, et l'ancienne
   // extraction mémoire) partagent le fil du bot mais n'ont pas de bulle :
@@ -1153,6 +1155,9 @@ function ThreadTimelineView({
           const runId = entryRunId(entry);
           if (runId) lastEntryIndex.set(runId, index);
         });
+        // La réponse que le run en direct écrit encore : seule sa bulle lit le texte en cours (`LiveTimelineEntry`).
+        const liveTail = streamingRunId === null ? undefined : visible[lastEntryIndex.get(streamingRunId) ?? -1];
+        const liveTailKey = liveTail?.kind === "assistant" ? liveTail.key : null;
         const lastWorkIndex = new Map<string, number>();
         visible.forEach((entry, index) => {
           const runId = workRunId(entry);
@@ -1281,10 +1286,13 @@ function ThreadTimelineView({
           nodeCache.set(cacheKey, { sig, node });
           return node;
         };
-        const renderCached = (entry: Entry, settled: boolean): React.ReactNode =>
-          skipsCache(entry)
-            ? renderEntry(entry, false, settled)
-            : cached(entry.key, entryRenderSig(entry), () => renderEntry(entry, false, settled));
+        const renderCached = (entry: Entry, settled: boolean): React.ReactNode => {
+          const build = (live: typeof liveText) => entry.kind !== "assistant" ? renderEntry(entry, false, settled)
+            : <LiveTimelineEntry key={entry.key} entry={entry} live={live} render={(full) => renderEntry(full, false, settled)} />;
+          // La réponse en direct suit le snapshot à chaque rendu : hors du cache.
+          if (entry.key === liveTailKey) return build(liveText);
+          return skipsCache(entry) ? build(null) : cached(entry.key, entryRenderSig(entry), () => build(null));
+        };
 
         const nodes: React.ReactNode[] = [];
         // La carte dépend de la proposition seule (pas des callbacks ni des
@@ -1536,6 +1544,7 @@ function ThreadTimelineView({
           running,
           outgoingThinks,
           hiddenAssistantRunIds,
+          liveText,
         ])}
         {outgoing ? (
           // Une vraie boîte (pas un Fragment) : `useThreadRowEnter` la fait
@@ -1576,15 +1585,3 @@ function ThreadTimelineView({
 }
 
 export const ThreadTimeline = memo(ThreadTimelineView);
-
-/** « Ignorée » après une question repliée par le « x » de sa carte. */
-function AskUserDismissedMark({ runId }: { runId: string }) {
-  const { t } = useT();
-  const dismissed = useDismissedAskUserRuns();
-  if (!dismissed.includes(runId)) return null;
-  return (
-    <span className="shrink-0 rounded-full bg-background-secondary-default px-1.5 not-italic text-text-tertiary">
-      {t("threadTimeline.askUserDismissed")}
-    </span>
-  );
-}

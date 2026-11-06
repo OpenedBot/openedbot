@@ -8,6 +8,8 @@ import { api, queryKeys, type ThreadView } from "../../../src/lib/api";
 import { clearCloudSession, saveCloudSession } from "../../../src/lib/session/cloud-session";
 import { queryClient } from "../../../src/lib/query-client";
 import { stopOrganizationStream, useThreadStream } from "../../../src/lib/stream/use-thread-stream";
+import { LIVE_TEXT_COMMIT_MS } from "../../../src/lib/stream/live-run-text";
+import { LIVE_NARRATION_MAX } from "../../../src/lib/stream/live-answer";
 
 const organizationId = "org-stream-test";
 const threadId = "thread-stream-test";
@@ -294,4 +296,47 @@ test("fresh receipts refresh the thread, ambiguous steering wakes inbox, and rec
   expect(rosterFetch).not.toHaveBeenCalled();
   expect(queryClient.getQueryData<ThreadView>(queryKeys.thread(threadId))?.events.map((event) => event.type))
     .toEqual(["message.admitted", "run.steering"]);
+});
+
+test("a confirmed answer's fragments wait outside the cache, then reach it in stream order", async () => {
+  const answer = "x".repeat(LIVE_NARRATION_MAX + 1);
+  const fragment = (sequence: number, type: string, payload: Record<string, unknown>) => ({
+    // Text fragments are fanned out before their commit: no cursor.
+    ...(type === "agent.message" ? {} : { cursor: 10 + sequence }),
+    organizationId,
+    threadId,
+    runId,
+    sequence,
+    type,
+    payload,
+    occurredAt: "2026-10-04T00:00:01.000Z",
+  }) as unknown as StoredProductEvent;
+  const snapshot = { ...runSnapshot(), events: [fragment(1, "agent.message", { text: answer })] };
+  const threadFetch = spyOn(api, "thread").mockResolvedValue(snapshot);
+  const rosterFetch = spyOn(api, "roster").mockResolvedValue(emptyRoster);
+  restoreSpies.push(() => threadFetch.mockRestore(), () => rosterFetch.mockRestore());
+  queryClient.setQueryData(queryKeys.thread(threadId), snapshot);
+  queryClient.setQueryData(queryKeys.roster, emptyRoster);
+  const hook = renderHook(() => useThreadStream(threadId), { wrapper });
+  await waitFor(() => expect(hook.result.current.streaming).toBe(true));
+  const cachedEvents = () => queryClient.getQueryData<ThreadView>(queryKeys.thread(threadId))?.events.map((event) => event.sequence);
+  const liveAfter = (sequence: number) => hook.result.current.liveText.store.textAfter(runId, sequence);
+
+  await act(async () => { streams[0]!.controller.enqueue(sseFrame(fragment(2, "agent.message", { text: " suite" }))); });
+  await waitFor(() => expect(liveAfter(1)).toBe(" suite"));
+  expect(cachedEvents()).toEqual([1]);
+  // At most LIVE_TEXT_COMMIT_MS later, the snapshot has it.
+  await waitFor(() => expect(cachedEvents()).toEqual([1, 2]), { timeout: LIVE_TEXT_COMMIT_MS + 1_000 });
+
+  // Held again; a tool call lets the held text through first.
+  await act(async () => { streams[0]!.controller.enqueue(sseFrame(fragment(3, "agent.message", { text: " encore" }))); });
+  await waitFor(() => expect(liveAfter(2)).toBe(" encore"));
+  expect(cachedEvents()).toEqual([1, 2]);
+  await act(async () => { streams[0]!.controller.enqueue(sseFrame(fragment(4, "tool.call", { tool: "search" }))); });
+  await waitFor(() => expect(cachedEvents()).toEqual([1, 2, 3, 4]));
+  expect(liveAfter(4)).toBe("");
+  // After a tool call the next text is a new bubble: not held.
+  await act(async () => { streams[0]!.controller.enqueue(sseFrame(fragment(5, "agent.message", { text: "Après" }))); });
+  await waitFor(() => expect(cachedEvents()).toEqual([1, 2, 3, 4, 5]));
+  expect(threadFetch).not.toHaveBeenCalled();
 });

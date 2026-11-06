@@ -6,7 +6,7 @@
 //
 //   bun apps/console/scripts/perf/d0-baseline.ts --env-file <path to .env.local> [--runs 5]
 //     [--stream-runs 2] [--only web|electron] [--skip-stream] [--skip-g2]
-//     [--skip-memory]
+//     [--skip-memory] [--headed-stream]
 //
 // Needs: the dev API on :8790 and Mailpit on :8025 (`make dev`), a runtime
 // linked to the E2E account's org (lab VM 240) for G4, and `bun install` in
@@ -26,6 +26,9 @@
 //   - The console is a production build served like production (gzip, ETag,
 //     no-cache on the document: lib/static-server.ts), solo variant (no
 //     pro console plugins).
+//   - Web G4 runs in headless Chromium by default, which paces frames at
+//     60 fps whatever the display: `--headed-stream` opens a real window, at
+//     the display's own rate, the one G4's target is a share of.
 //   - Electron runs the compiled shell (`electron-vite build`) with a throwaway
 //     home (CFFIXED_USER_HOME) and Chromium's mock keychain, so it never
 //     touches the developer's own app profile or Keychain.
@@ -56,6 +59,7 @@ const { values: args } = parseArgs({
     "no-build": { type: "boolean", default: false },
     "skip-g2": { type: "boolean", default: false },
     "skip-memory": { type: "boolean", default: false },
+    "headed-stream": { type: "boolean", default: false },
     bot: { type: "string", default: "Atlas" },
     "wan-rtt": { type: "string", default: "50" },
     "wan-mbps": { type: "string", default: "50" },
@@ -191,10 +195,10 @@ async function webContext(profileDir: string, session: WebSession, headless = tr
   return context;
 }
 
-async function webLaunch(profileDir: string, server: StaticServer, session: WebSession) {
+async function webLaunch(profileDir: string, server: StaticServer, session: WebSession, headless = true) {
   await paceLaunch();
   const spawnedAt = Date.now();
-  const context = await webContext(profileDir, session);
+  const context = await webContext(profileDir, session, headless);
   const page = context.pages()[0] ?? await context.newPage();
   const apiErrors: string[] = [];
   page.on("response", (response) => {
@@ -452,7 +456,7 @@ async function main() {
         for (let run = 0; run < STREAM_RUNS; run++) {
           let launched: Awaited<ReturnType<typeof webLaunch>> | null = null;
           try {
-            launched = await webLaunch(join(WORK, "web-profile-local-0"), server, session);
+            launched = await webLaunch(join(WORK, "web-profile-local-0"), server, session, !args["headed-stream"]);
             await openBotThread(launched.page, bot.id);
             const measured = await measureStreaming(launched.page, { base: args.api!, cookie: session.cookieHeader, threadId: bot.threadId });
             log(`G4 web run ${run + 1}`, JSON.stringify(measured));
@@ -465,7 +469,7 @@ async function main() {
         }
       }
       results.web = {
-        engine: `Chromium ${chromium.name()} (Playwright, headless new mode)`,
+        engine: `Chromium ${chromium.name()} (Playwright, headless new mode${args["headed-stream"] ? "; G4 in a headed window" : ""})`,
         g1: Object.fromEntries(Object.entries(web).map(([key, values]) => [key, { median: median(values), values }])),
         g3: { medianMb: memory.length ? Math.round(median(memory)! / 1024) : null, valuesKb: memory, note: "headless Chromium, indicative only" },
         g4: stream,

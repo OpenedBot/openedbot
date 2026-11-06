@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ApiError, queryKeys } from "../../src/lib/api";
-import { createInvalidateScheduler, DEFAULT_INVALIDATE_DELAY_MS, shouldRetryQuery } from "../../src/lib/query-client";
+import { asLocalPatch, createInvalidateScheduler, DEFAULT_INVALIDATE_DELAY_MS, queryClient, shouldRetryQuery } from "../../src/lib/query-client";
 
 type FakeTimer = { callback: () => void; delayMs: number };
 
@@ -112,5 +112,25 @@ describe("queryKeys.globalSearch", () => {
     const inB = queryKeys.globalSearch("budget");
     expect(inA).toEqual(["organization", "org-a", "global-search", "budget"]);
     expect(inB).toEqual(["organization", "org-b", "global-search", "budget"]);
+  });
+});
+
+describe("asLocalPatch", () => {
+  test("un patch local garde son identité dans le cache ; une lecture du serveur reste partagée", () => {
+    const key = ["test", "local-patch"];
+    const first = { events: [{ id: 1 }], runs: [{ id: "r" }] };
+    queryClient.setQueryData(key, first);
+    // Ce que fait le flux du fil : mêmes objets devant, un tableau prolongé.
+    const patch = { ...first, events: [...first.events, { id: 2 }] };
+    queryClient.setQueryData(key, asLocalPatch(patch));
+    expect(queryClient.getQueryData<typeof patch>(key)).toBe(patch);
+    // Une valeur non marquée (réponse du serveur) passe par le partage
+    // structurel : les objets égaux gardent l'identité de ceux du cache.
+    const fetched = { events: [{ id: 1 }, { id: 2 }, { id: 3 }], runs: [{ id: "r" }] };
+    queryClient.setQueryData(key, fetched);
+    const cached = queryClient.getQueryData<typeof fetched>(key)!;
+    expect(cached).not.toBe(fetched);
+    expect(cached.runs).toBe(first.runs);
+    queryClient.removeQueries({ queryKey: key });
   });
 });
