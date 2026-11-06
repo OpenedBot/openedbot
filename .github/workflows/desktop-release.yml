@@ -199,7 +199,8 @@ jobs:
           dpkg-deb --field "$deb" Replaces | grep -qw openedbot-desktop
           dpkg-deb --field "$deb" Conflicts | grep -qw openedbot-desktop
           # The Google return (openedbot://auth/callback) needs the scheme handler.
-          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
+          # Tauri's deb lists `usr/…` without the `./` of electron-builder's: match either.
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards '*usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
           file "$appimage" | tee /dev/stderr | grep -q "ELF 64-bit.*$ELF"
           chmod +x "$appimage"
       - name: Start the installed deb, then the AppImage
