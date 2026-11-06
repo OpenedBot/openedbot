@@ -6,7 +6,8 @@ import type { WorkerConfig } from "../worker-config";
 import { MAX_RUN_ATTEMPTS } from "../queue";
 import { isModelUnavailableFailure } from "../../domain/provider-failure";
 import { appendNoticeTx, publish } from "./events";
-import { persistEvents } from "./persist";
+import { persistUnnumberedEvents } from "./persist";
+import { RunEventSequenceConflictError } from "../../domain/run-event-sequence";
 import type { RunContext } from "./types";
 import { describe, log } from "./util";
 
@@ -133,7 +134,7 @@ export function failureCode(error: unknown): string {
       ? MODEL_UNAVAILABLE_CODE
       : error.code;
   }
-  return error instanceof NamedRunError ? error.code : "WORKER_RUN_FAILED";
+  return error instanceof NamedRunError || error instanceof RunEventSequenceConflictError ? error.code : "WORKER_RUN_FAILED";
 }
 
 export async function handleFailure(db: SQL, config: WorkerConfig, context: RunContext, error: unknown): Promise<void> {
@@ -184,12 +185,7 @@ export async function handleFailure(db: SQL, config: WorkerConfig, context: RunC
      limit 1
   `;
   if (!existing[0]) {
-    const sequenceRows = await db<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${context.organizationId} and run_id = ${context.id}
-    `;
-    await persistEvents(db, config, context, context.lastHermesSequence, [{
-      sequence: Number(sequenceRows[0]?.next ?? 0),
+    await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
       type: "run.error",
       occurredAt: new Date(),
       payload: { ...(error instanceof NamedRunError ? error.details : {}), message, errorCode: code },

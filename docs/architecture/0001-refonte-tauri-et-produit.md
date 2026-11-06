@@ -591,7 +591,12 @@ verrouille le run (`persist.ts:208`) puis le curseur (`persist.ts:219`) sans rec
 une collision. Être « dans la transaction » ne suffit pas à sérialiser un `max+1`. Cible : une
 seule primitive d'allocation qui prend **les deux verrous dans cet ordre**, puis calcule dans une
 instruction séparée, dans la transaction qui insère, et un test de producteurs concurrents sur un
-même run (section 5).
+même run (section 5). **Fait en S2c** ([0002](0002-invariants-des-runs.md), section 9.2) :
+`modules/execution/src/sql/run-events.ts` est le seul écrivain de `run_events` (`appendRunEventsTx`
+alloue, `appendNumberedRunEventsTx` contrôle les séquences du flux du worker, déjà publiées avant
+le commit, et refuse une collision par `RUN_EVENT_SEQUENCE_CONFLICT`) ; les 14 calculs et les
+séquences en dur y passent ; garde `tests/scripts/run-events-contract.ts` ; test concurrent
+`tests/integration/run-event-sequences.ts`, qui reproduit D2 et D3 sur le code d'avant.
 
 **Découper `executeRun`** (fermeture de 1 250 lignes, `runner.ts:102-1357`) en étapes nommées :
 préflight, création, streaming, approbations, repli de fournisseur, réconciliation.
@@ -837,3 +842,12 @@ le contrat d'une route.
 `Origin: tauri://localhost`, accepté par le CORS de D1a ; aucun entitlement ; mise à jour réelle
 0.0.1 → 0.0.2 depuis un dmg notarisé, signature étrangère refusée. Le flux SSE manquait d'en-têtes
 CORS (corrigé dans la même étape).
+
+**Allocation d'événements S2c (2026-11-06)** : section 4.5 et [0002](0002-invariants-des-runs.md)
+section 9.2. Une primitive (`sql/run-events.ts`) prend la ligne de chaque run visé
+(`for no key update`, qui ne bloque pas les clés étrangères), puis le curseur de l'organisation,
+puis lit `max(sequence)` dans une instruction distincte, dans la transaction qui insère. D2 corrigé
+(un `run.error` de balayage n'est plus perdu), D3 corrigé (une collision du flux devient une erreur
+nommée ; la course réelle, un avis de complétion qui prenait la place d'un `tool.result.attached`,
+n'est plus possible). Le balayage des runtimes connecteurs injoignables passe de `runtime-link` à
+`execution`, propriétaire des tables qu'il écrit. Aucune migration.

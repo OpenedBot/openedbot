@@ -10,6 +10,7 @@ import { deliverHandoffReplyTx } from "./runner/handoff";
 import { advanceGroupTx, advanceLegacyGroupTx } from "./runner/rooms";
 import type { RunContext } from "./runner/types";
 import { log } from "./runner/util";
+import { appendRunEventsTx } from "../sql/run-events";
 import { advanceWorkflowFailureTx } from "./runner/workflows";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 
@@ -33,7 +34,7 @@ async function reapExpiredApprovalSends(db: SQL): Promise<void> {
     // A process can die after Hermes received an approval but before the DB
     // confirmation. Replaying that decision could duplicate a consequential
     // action, so an expired `sending` lease is always a review state.
-    await tx`
+    const ambiguous = await tx<Array<{ organizationId: string; threadId: string; runId: string }>>`
       with expired_gate_parents as (
         select distinct organization_id, run_id
           from approval_requests
@@ -85,28 +86,20 @@ async function reapExpiredApprovalSends(db: SQL): Promise<void> {
          where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
            and workflow.status not in ('completed','failed','cancelled','expired')
          returning workflow.organization_id, workflow.id
-      ), cursor_locks as materialized (
-        select organization_id,
-               pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked
-          from (select distinct organization_id from ambiguous_runs) organizations
-         order by organization_id
-      ), event_rows as (
-        select run.organization_id, run.thread_id, run.run_id,
-               coalesce((select max(event.sequence) + 1 from run_events event
-                          where event.organization_id = run.organization_id and event.run_id = run.run_id), 0) as sequence
-          from ambiguous_runs run
-          join cursor_locks cursor on cursor.organization_id = run.organization_id
       )
-      insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-      select organization_id, thread_id, run_id, sequence, 'run.error',
-             jsonb_build_object(
-               'message', 'Transmission d’autorisation incertaine : vérification requise.',
-               'errorCode', 'APPROVAL_FORWARD_OUTCOME_UNKNOWN',
-               'recoveryState', 'needs_review'
-             ), now()
-        from event_rows
-      on conflict (organization_id, run_id, sequence) do nothing
+      select organization_id as "organizationId", thread_id as "threadId", run_id as "runId" from ambiguous_runs
     `;
+    // The update holds every run's row: the primitive numbers each run.error
+    // after the cursor lock, in its own statement (D2).
+    await appendRunEventsTx(tx as unknown as SQL, ambiguous.map((run) => ({
+      ...run,
+      type: "run.error",
+      payload: {
+        message: "Transmission d’autorisation incertaine : vérification requise.",
+        errorCode: "APPROVAL_FORWARD_OUTCOME_UNKNOWN",
+        recoveryState: "needs_review",
+      },
+    })));
   });
 }
 

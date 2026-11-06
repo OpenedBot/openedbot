@@ -89,6 +89,16 @@ connecteur hôte et le protocole tiennent le leur :
   temps réel portait l'en-tête CORS des autres requêtes de l'API sauf le sien,
   et l'app se reconnectait sans fin. Le web et l'app actuelle, servis depuis
   l'origine de la console, n'étaient pas touchés.
+- Un message en échec s'affiche toujours dans sa conversation. Quand le
+  runtime ne répondait plus et qu'un autre événement arrivait au même
+  instant sur le même message, son erreur pouvait disparaître du fil : le
+  message était marqué en échec, mais le fil ne le montrait qu'après
+  rechargement. De même, le résultat d'un outil rattaché à la fin d'une
+  réponse ne se perd plus quand la réponse ajoute un avertissement (une
+  délégation hors plateforme, par exemple). Si deux écritures se disputent
+  encore la même place dans le journal d'un message, le message échoue avec
+  une erreur nommée (`RUN_EVENT_SEQUENCE_CONFLICT`) au lieu de perdre un
+  événement en silence.
 - Réglages › Activité : sans aucun bot, le tableau propose « Créer un bot ».
   L'ancien message renvoyait vers la barre latérale, absente de cet écran.
 - Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de

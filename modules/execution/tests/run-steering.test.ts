@@ -56,7 +56,12 @@ function fakeDb(respond: (sql: string) => unknown): { db: Bun.SQL; queries: Quer
       values: parameters,
       then(resolve, reject) {
         queries.push({ sql, values: parameters });
-        return Promise.resolve(respond(sql)).then(resolve, reject);
+        // An insert always returns its row (the allocation primitive builds the envelope from it).
+        return Promise.resolve(respond(sql))
+          .then((rows) => sql.includes("insert into run_events") && Array.isArray(rows) && rows.length === 0
+            ? [{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]
+            : rows)
+          .then(resolve, reject);
       },
     } satisfies FakeQuery;
   }) as unknown as Bun.SQL;
@@ -184,7 +189,7 @@ describe("steering Hermes", () => {
     expect(queries.some((query) => query.sql.includes("set status = 'confirmed'"))).toBe(false);
     const receipts = queries.filter((query) => query.sql.includes("insert into run_events"));
     expect(receipts).toHaveLength(2);
-    expect(receipts.map((query) => (query.values[4] as { status: string }).status)).toEqual(["sending", "ambiguous"]);
+    expect(receipts.map((query) => (query.values[5] as { status: string }).status)).toEqual(["sending", "ambiguous"]);
   });
 
   test("le repli d'un DM simple, sans workflow, se steere puis se confirme", async () => {

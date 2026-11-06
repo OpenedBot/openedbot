@@ -20,6 +20,10 @@
     "modules/execution/src/application/approval-review.ts": {
       "workflows": 1
     },
+    "modules/execution/src/application/disconnected-runtime-runs.ts": {
+      "runs": 1,
+      "workflows": 1
+    },
     "modules/execution/src/application/queue.ts": {
       "runs": 9,
       "workflows": 5
@@ -68,10 +72,6 @@
       "workflows": 6
     },
     "modules/execution/src/application/runtime-direct.ts": {
-      "runs": 1,
-      "workflows": 1
-    },
-    "modules/runtime-link/src/application/runtime-links.ts": {
       "runs": 1,
       "workflows": 1
     }

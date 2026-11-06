@@ -1,3 +1,4 @@
+import type { SQL } from "bun";
 import { Hono } from "hono";
 import {
   attachmentPayload,
@@ -18,6 +19,7 @@ import {
 import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
 import { type GroupFollowUp, type GroupSendState } from "@openedbot/execution/domain/group-send";
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
+import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
 import { admitUserTurnTx } from "@openedbot/execution/application/run-creation";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -485,23 +487,14 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
             }
           : null;
         if (delegationNotice && sentNotice && receivedNotice) {
-          await tx`
-            select pg_advisory_xact_lock(
-              hashtext(${auth.organizationId}), hashtext('openedbot-run-events-cursor')
-            )
-          `;
-          await tx`
-            insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-            values (${auth.organizationId}, ${thread.id}, ${runId}, 0, 'system.notice',
-                    ${sentNotice}, now())
-            on conflict (organization_id, run_id, sequence) do nothing
-          `;
-          await tx`
-            insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-            values (${auth.organizationId}, ${delegationNotice.threadId}, ${runId}, 1, 'system.notice',
-                    ${receivedNotice}, now())
-            on conflict (organization_id, run_id, sequence) do nothing
-          `;
+          // The run is new: the primitive numbers its notices 0 and 1.
+          await appendRunEventsTx(tx as unknown as SQL, [
+            { organizationId: auth.organizationId, threadId: thread.id, runId, type: "system.notice", payload: sentNotice },
+            {
+              organizationId: auth.organizationId, threadId: delegationNotice.threadId, runId,
+              type: "system.notice", payload: receivedNotice,
+            },
+          ]);
           await tx`
             update threads set updated_at = now()
              where organization_id = ${auth.organizationId} and id = ${delegationNotice.threadId}

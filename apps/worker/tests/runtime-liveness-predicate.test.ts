@@ -43,6 +43,9 @@ describe("prédicat de vitalité du lien connecteur", () => {
     expect(maintenance).toContain("interval '60 seconds'");
     expect(maintenance).toContain("inst.stopped_at is null");
     expect(maintenance).toContain("and not (");
-    expect(maintenance).toContain("failRunsOnDisconnectedRuntimes");
+    const queuedRuns = source("modules/execution/src/application/disconnected-runtime-runs.ts");
+    expect(queuedRuns).toContain("left join api_instances inst");
+    expect(queuedRuns).toContain("and not (");
+    expect(queuedRuns).toContain("failRunsOnDisconnectedRuntimes");
   });
 });

@@ -43,7 +43,8 @@ function fakeDb() {
     const sql = strings.join(" ? ").replace(/\s+/g, " ").trim();
     calls.push({ sql, values });
     if (sql.startsWith("select id as") && remaining) { remaining = false; return [{ ...row, organizationId: "org-1" }]; }
-    if (sql.startsWith("with stale_runtimes")) return [{ count: 1 }];
+    if (sql.startsWith("with stale_runtimes")) return [{ organizationId: "org-1", threadId: "thread-1", runId: "run-1" }];
+    if (sql.startsWith("insert into run_events")) return [{ cursor: "1", botId: null, turnId: "run-1", sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }];
     return [];
   }) as unknown as SQL;
   (tx as unknown as { begin: (fn: (inner: Bun.TransactionSQL) => Promise<unknown>) => Promise<unknown> }).begin = (fn) => fn(tx as unknown as Bun.TransactionSQL);
@@ -75,6 +76,10 @@ test("direct expiration settles queued runs, workflows and their event with the 
   expect(sql).toContain("interval '90 seconds'");
   expect(sql).toContain("run.status = 'queued' and run.hermes_run_id is null");
   expect(sql).toContain("update workflows");
-  expect(sql).toContain("insert into run_events");
   expect(sql).toContain("RUNTIME_DISCONNECTED");
+  // The run.error is numbered by the primitive, after the cursor lock, in its own statement (D2).
+  expect(sql).not.toContain("run_events");
+  const insert = calls.find((call) => call.sql.startsWith("insert into run_events"))!;
+  expect(insert.values).toContain("run.error");
+  expect(insert.values).toContainEqual(expect.objectContaining({ errorCode: "RUNTIME_DISCONNECTED" }));
 });

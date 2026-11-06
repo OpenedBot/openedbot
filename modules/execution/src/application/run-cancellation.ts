@@ -1,3 +1,5 @@
+import type { SQL } from "bun";
+import { appendRunEventsTx } from "../sql/run-events";
 import type { TransactionDb } from "@openedbot/platform-db";
 
 const ACTIVE_RUN_STATUSES = ["queued", "starting", "running", "awaiting_approval", "relaying"] as const;
@@ -263,12 +265,6 @@ export async function cancelMaintenanceRunsTx(
   reason: CancellationReason,
 ): Promise<void> {
   if (runs.length === 0) return;
-  await tx`
-    select pg_advisory_xact_lock(
-      hashtext(${organizationId}),
-      hashtext('openedbot-run-events-cursor')
-    )
-  `;
   for (const run of runs) {
     await tx`
       update runs set status = 'cancelled', external_state = 'settled', events_complete = true,
@@ -276,18 +272,10 @@ export async function cancelMaintenanceRunsTx(
         lease_owner = null, lease_expires_at = null, next_attempt_at = null, updated_at = now()
        where organization_id = ${organizationId} and id = ${run.id}
     `;
-    const sequenceRows = await tx<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${organizationId} and run_id = ${run.id}
-    `;
-    await tx`
-      insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-      values (
-        ${organizationId}, ${run.threadId}, ${run.id}, ${Number(sequenceRows[0]?.next ?? 0)},
-        'run.error',
-        ${{ message: reason.message, errorCode: reason.code }},
-        now()
-      )
-    `;
   }
+  // The updates hold every row: the primitive then takes the cursor once.
+  await appendRunEventsTx(tx as unknown as SQL, runs.map((run) => ({
+    organizationId, threadId: run.threadId, runId: run.id,
+    type: "run.error", payload: { message: reason.message, errorCode: reason.code },
+  })));
 }

@@ -127,6 +127,9 @@ function deletionDb(calls: string[], active: boolean | "late" | "memory", inGrou
     if (sql.includes('workflow_id as "workflowId"')) {
       return Promise.resolve([{ workflowId: "workflow-1" }]);
     }
+    if (sql.includes("insert into run_events")) {
+      return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
+    }
     return Promise.resolve([]);
   }) as unknown as SQL;
   (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =
@@ -550,7 +553,9 @@ describe("bot purge while a legacy memory extract run is still queued", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ id: "bot-1" });
     expect(calls.some((sql) => sql.includes("update runs set status = 'cancelled'"))).toBe(true);
-    expect(calls.some((sql) => sql.includes("insert into run_events") && sql.includes("'run.error'"))).toBe(true);
+    // The run.error goes through the allocation primitive after the update (its type is a parameter).
+    expect(calls.findIndex((sql) => sql.includes("insert into run_events")))
+      .toBeGreaterThan(calls.findIndex((sql) => sql.includes("update runs set status = 'cancelled'")));
     expect(calls.some((sql) => sql.includes("delete from bots"))).toBe(true);
     const lock = calls.find((sql) => sql.includes("from runs r") && sql.includes("for update of r"));
     expect(lock).toContain('r.step_kind as "stepKind"');

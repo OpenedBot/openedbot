@@ -23,11 +23,14 @@ import { fileURLToPath } from "node:url";
  * pour chaque occurrence d'`insert into run_events`, la présence dans le même
  * fichier, à une position antérieure dans le texte, soit :
  *   - d'un `pg_advisory_xact_lock(` portant la clé `'openedbot-run-events-cursor'`
- *     (inline ou dans une CTE SQL, comme `modules/execution/src/application/queue.ts`) ;
+ *     (inline, comme dans la primitive `modules/execution/src/sql/run-events.ts`) ;
  *   - soit d'un APPEL à un helper dont le nom contient `lockRunEventCursor` ou
- *     `RunEventCursorLock` (comme `lockRunEventCursorTx` dans
- *     `modules/execution/src/application/runner/events.ts`). La DÉFINITION du helper ne
- *     compte pas : c'est l'appel qui prend le verrou.
+ *     `RunEventCursorLock`. La DÉFINITION du helper ne compte pas : c'est
+ *     l'appel qui prend le verrou.
+ *
+ * Depuis S2c, la primitive est le seul écrivain de `run_events`, et
+ * `tests/scripts/run-events-contract.ts` le garde plus strictement (écritures,
+ * `max(sequence)`, clé du curseur) ; ce test reste le filet de l'ordre.
  *
  * Limites assumées : « antérieur dans le fichier » n'est pas « dans la même
  * transaction » : le test attrape l'oubli franc (nouveau site sans verrou, ou

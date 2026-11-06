@@ -42,6 +42,7 @@ function harness(mode: Mode) {
   const published: Array<Record<string, unknown>> = [];
   let inserts = 0;
   const tx = (strings: TemplateStringsArray) => {
+    if (!("raw" in strings)) return strings;
     const text = strings.join("?");
     if (text.includes("insert into run_events")) {
       inserts += 1;
@@ -62,6 +63,7 @@ function harness(mode: Mode) {
       }];
     }
     if (text.includes("pg_advisory_xact_lock")) return [];
+    if (text.includes("max(sequence)")) return [];
     if (text.includes("last_hermes_sequence")) return [];
     if (text.includes("select id from runs")) return [{ id: context.id }];
     throw new Error(`unexpected query: ${text}`);

@@ -1,13 +1,15 @@
 # 0002 — Invariants des écritures de `runs` (inventaire S2a)
 
 - **Statut :** inventaire S2a de l'ADR [0001](0001-refonte-tauri-et-produit.md) (section 4.5, étapes
-  S2a à S2e) ; **S2b réalisé** (section 9.1) : les références `fichier:ligne` des sections 3 à 8
-  décrivent l'état d'avant S2b
+  S2a à S2e) ; **S2b réalisé** (section 9.1), **S2c réalisé** (section 9.2) : les références
+  `fichier:ligne` des sections 3 à 8 décrivent l'état d'avant S2b
 - **Date :** 2026-11-06
 - **Référence :** `develop` au commit `c1edc11`. Toutes les références `fichier:ligne` pointent ce
   commit ; `O` = observé dans le code ou par un test, `I` = déduit, à confirmer
 - **Preuve exécutable :** `tests/integration/orphan-unknown-runs.ts` (cible `make test-integration`),
-  qui caractérisait D1 en S2a et prouve sa correction depuis S2b
+  qui caractérisait D1 en S2a et prouve sa correction depuis S2b ;
+  `tests/integration/run-event-sequences.ts`, qui reproduit D2 et D3 sur `develop` d'avant S2c et
+  prouve leur correction
 - **Entrée de :** S2b (primitives de création), S2c (allocation d'événements), S2d (transitions)
 
 Ce document recense chaque écriture qui crée un run (et le workflow qui l'accompagne), la façon
@@ -161,6 +163,11 @@ curseur et insère la séquence 0 d'un run sans valider ; une seconde connexion 
 `runtime-direct.ts:87-106` et reste bloquée sur le verrou (`pg_locks` : 1 verrou consultatif non
 accordé) ; au commit de la première, la seconde calcule encore `0`, son `on conflict do nothing`
 n'insère rien, et le journal ne contient que la ligne de la première. S2c doit en faire un test.
+
+**Depuis S2c** (section 9.2), les quatre familles passent par une seule primitive : plus aucun
+`max+1` hors d'elle, ni dans l'instruction qui attend le verrou, ni hors transaction ; la famille D
+n'a plus de valeur en dur (un run neuf reçoit 0 et 1 de l'allocation). Le test de la famille B est
+`tests/integration/run-event-sequences.ts`, partie 2.
 
 ## 6. Le trigger 0091 et les runs en `unknown`
 
@@ -332,17 +339,24 @@ livrer le courrier d'un handoff abandonné.
 
 ### Moyen
 
-**D2 — `max+1` sous un instantané périmé (O, sonde).** Les trois sites de la famille B (section 5)
+**D2 — `max+1` sous un instantané périmé (O, test). Corrigé en S2c** (section 9.2). Les trois sites de la famille B (section 5)
 prennent le curseur dans la même instruction que le calcul. En course avec un écrivain du même run
 (un reçu `message.admitted` sur un run `queued` replié, par exemple), l'événement `run.error` est
 perdu sans erreur : le run est `failed` en base mais le journal ne le dit pas, et un client en
 direct ne voit pas l'échec avant de relire le fil.
 
-**D3 — Séquences du worker allouées hors transaction, collisions jetées en silence (I).** Six
+**D3 — Séquences du worker allouées hors transaction, collisions jetées en silence (O, test).
+Corrigé en S2c** (section 9.2). Six
 sites (famille C) calculent `max+1` hors transaction. `persistEvents` insère avec `on conflict do
 nothing` puis `continue` : une collision avec un **autre** événement fait sauter l'écriture de
 `runs` qui l'accompagne (`completed`, `failed`, `awaiting_approval`). Aucune course n'est connue
 aujourd'hui (seul le porteur du bail écrit, section 5), mais rien ne la refuse. Cible S2c.
+*Constaté en S2c* : une course existait bien, dans le **même** lot. Le normaliseur numérote les
+`tool.result.attached` d'un tour **après** son `run.completed` ; `persistEvents` traitait
+`run.completed` (qui peut ajouter un avis : délégation hors plateforme, passe de salon, étape de
+workflow) avant d'insérer la suite, et l'avis prenait la séquence du premier
+`tool.result.attached`, perdu (test, partie 4). Le repli de fournisseur en avait déjà connu une
+forme (« ello » pour « hello », 2026-10-24, contournée par `normalizer.skipPast`).
 
 **D4 — Arrêt du worker : remise en file sans `polling` (I).** `worker-registry.ts:38` remet en
 `queued` un run qui a un id Hermes en laissant `external_state` tel quel (`streaming`), alors que
@@ -482,8 +496,7 @@ tour de salon hérité réconcilié, qu'aucune étape de workflow ne règle, cl�
 
 Reste ouvert :
 
-- **S2c** : allocation des séquences (sections 5, D2, D3) ; les notices à séquence en dur de 1 et 2
-  (famille D) restent dans leurs routes ;
+- ~~**S2c**~~ : fait (section 9.2) ;
 - **S2d** : fonction de transition et vidage du cliquet ; D4, D6, D9 ; l'ancien workflow d'une
   relance réglé par la route ;
 - un abandon de la revue d'un run entrant ne livre pas son courrier : le fil d'origine reste
@@ -492,10 +505,87 @@ Reste ouvert :
   demandent de déplacer des verrous de route ; D7 ; D8 (runs sans enveloppe : 6, 11, 12, 16) ;
 - retrait de 11, 12, 13, 16 après comptage en production.
 
+### 9.2 Réalisé en S2c (2026-11-06)
+
+**Primitive.** `modules/execution/src/sql/run-events.ts`, seul écrivain de `run_events` (règles
+pures dans `domain/run-event-sequence.ts`). Dans la transaction de l'appelant, elle prend, dans cet
+ordre : la ligne de chaque run visé (`for no key update`, par organisation puis id), le verrou du
+curseur de chaque organisation (ordre des organisations), puis lit `max(sequence)` dans une
+instruction distincte, et insère sans `on conflict`.
+
+| Fonction | Pour | Règle |
+|---|---|---|
+| `appendRunEventsTx(tx, drafts)` | tout écrivain sauf le flux du worker | numérote après le dernier événement de chaque run, séquences contiguës ; un lot peut viser plusieurs runs et organisations : toutes les lignes avant tout curseur |
+| `appendNumberedRunEventsTx(tx, cible, événements)` | le flux du worker (`persistEvents`) : séquences du normaliseur, déjà publiées avant le commit | mêmes verrous, puis contrôle : chaque séquence au moins égale à la prochaine libre et strictement croissante (trous permis : un tour de salon muet saute ses deltas) ; sinon `RunEventSequenceConflictError` (`RUN_EVENT_SEQUENCE_CONFLICT`) avant toute écriture |
+| `lockRunEventsTx(tx, cibles)` | un écrivain qui doit prendre d'autres verrous avant d'écrire | les deux premiers verrous seuls, réentrants. `persistEvents` l'appelle juste après le verrou du workflow : le curseur garde sa place, **avant** les `for share` des portes (organisation, bot). Le prendre après eux ouvrirait une impasse avec la purge d'un bot, qui tient le curseur puis écrit `bots` |
+| `readNextRunEventSequence(db, org, run)` | la graine du normaliseur (`runner.ts`) | une proposition, hors transaction, revérifiée par `appendNumberedRunEventsTx` à chaque écriture |
+
+`for no key update` plutôt que `for update` : ce verrou sérialise les écrivains d'un run entre eux
+et avec tout `update runs`, sans entrer en conflit avec le `for key share` qu'une clé étrangère
+(message, approbation, événement) prend sur la même ligne. Les reçus prenaient `for key share`,
+qui ne sérialisait rien avec la famille B (D2) ; un `for update` aurait en plus créé une impasse de
+montée de verrou entre deux transactions ayant chacune inséré une ligne qui référence le run. Le
+`for update` du bail de `persistEvents` (`fence`) reste, la primitive le reprend sans attendre.
+
+**Sites migrés** (les 14 calculs de la section 1, recomptés : 14, plus l'insertion du flux) :
+
+| Famille | Site | Après S2c |
+|---|---|---|
+| A | `runner/events.ts` `appendEventTx` (toutes les notices) | `appendRunEventsTx` |
+| A | `runner/handoff.ts` `deliverHandoffReplyTx` | `appendRunEventsTx` (courrier, après son `for update`) |
+| A | `conversation-followup.ts` `settleCancelledHandoffsTx` | `appendRunEventsTx`, après l'`update` du courrier |
+| A | `run-cancellation.ts` `cancelMaintenanceRunsTx` | les `update runs` d'abord, puis une seule `appendRunEventsTx` ; le curseur n'est plus pris avant les lignes |
+| A | `run-receipts.ts` `flushRunJournalTx` | une seule `appendRunEventsTx` pour toutes les organisations (`for key share` remplacé par le verrou de la primitive) |
+| B | `queue.ts` `reapExpiredApprovalSends`, `runtime-direct.ts` `failRunsOnUnhealthyDirectRuntimes`, `runtime-links.ts` `failRunsOnDisconnectedRuntimes` | la CTE rend les runs réglés, la primitive numérote leurs `run.error` dans une seconde instruction de la même transaction (D2). Le troisième vit désormais dans `modules/execution/src/application/disconnected-runtime-runs.ts` : `runtime-link` ne peut pas importer `execution` (cycle par `runtimes`), et n'écrit plus ni `runs`, ni `workflows`, ni `run_events` (`db/ownership.json`) |
+| C | `runner.ts` graine du normaliseur ; `reconcile.ts`, lot réconcilié terminé (texte + `run.completed`) | `readNextRunEventSequence` (proposition), puis `persistEvents` : le texte retrouvé part avant le commit comme un delta, sa séquence est revérifiée sous les verrous (`run-crash-replay.ts` le garde) |
+| C | `runner.ts` `completeGroupTurnWithoutHermes`, `provider-recovery.ts` (repli, absence de fournisseur), `failure.ts` `handleFailure`, `reconcile.ts` (échec réconcilié) | `persistUnnumberedEvents` : même transaction que `persistEvents`, numérotation par `appendRunEventsTx` sous ses verrous ; aucun de ces événements n'était publié avant le commit. Le repli rend la séquence obtenue (nulle si le bail a été perdu) au normaliseur (`skipPast`) |
+| — | `persist.ts` insertion du flux | `appendNumberedRunEventsTx` ; le lot entier est écrit **avant** ses effets (portes, transitions, avis), qui gardent leur ordre : un avis ajouté par `run.completed` vient après le lot (D3) |
+| D | `conversation-message-routes.ts` (0 et 1), `message-version-routes.ts` (0) | `appendRunEventsTx` : le run est neuf, il reçoit 0 et 1 comme avant, sans valeur en dur |
+
+**Comportement.** Identique par ailleurs, à trois détails près : un avis d'une complétion vient
+après tout le lot qui la porte (avant, il prenait la place d'un `tool.result.attached`, perdu) ;
+l'horodatage par défaut d'une allocation sans date est `clock_timestamp()` (celui des reçus) au lieu
+de `now()` pour les balayages et la famille D ; une collision d'un lot numéroté est une erreur
+nommée qui fait échouer le run par le chemin d'échec, lequel journalise son `run.error` (test,
+partie 3). Le golden `apps/worker/tests/fixtures/unattended-golden.json` ne change que par le texte
+de l'insertion : ses 2 400 cas gardent leurs écritures et leurs journaux.
+
+**Garde.** `tests/scripts/run-events-contract.ts` (`make test-unit`, testé par mutation dans
+`run-events-contract.test.ts`), strict, sur le code livré (`apps/*/src`, `modules/*/src`,
+`platform/*/src`, `scripts/`) : hors de la primitive, ni `insert into run_events`, ni
+`update run_events`, ni `max(sequence)` (aliasé ou non) dans une instruction qui lit `run_events`,
+ni la clé du curseur ; dans `db/migrations`, aucune insertion, et seul le rattrapage d'identité de
+0092 met la table à jour. Hors périmètre, justifié : `delete from run_events` (la purge de
+rétention ne numérote rien) et les tests (leurs fixtures écrivent la table directement). Joué sur
+les sites d'avant S2c, il relève les 14 calculs, les 12 insertions et les 9 prises du curseur.
+
+**Tests.** `tests/integration/run-event-sequences.ts`, connexions séparées sur une base jetable :
+(1) quatre producteurs de notices, deux d'API (reçus) et deux lots sur deux runs, en même temps,
+pendant qu'un lecteur suit le curseur : séquences uniques et contiguës, ordre des curseurs égal à
+celui des séquences, aucun événement sauté par le lecteur ; (2) D2 : un balayage du runtime direct
+contre un écrivain qui tient un événement non validé du même run ; (3) D3 : une écriture numérotée
+dont la séquence est prise est refusée, puis le chemin d'échec journalise le `run.error` ; (4) D3
+tel qu'il arrivait : complétion + avis + `tool.result.attached`. Sur `develop` d'avant S2c, les
+parties 2, 3 et 4 échouent (`run.error` perdu ; collision avalée, run resté `running` ;
+`tool.result.attached` perdu) ; la partie 1 passait déjà (famille A sérialisée par le curseur) et
+garde le nouvel ordre des verrous.
+
+Reste ouvert :
+
+- deux prises de verrou de run **après** le curseur subsistent, antérieures à S2c :
+  `deliverHandoffReplyTx` verrouille le courrier dans la transaction de `persistEvents` (données
+  héritées seulement, section 3.1), et le vidage d'un journal de reçus peut viser un run après un
+  avis écrit plus tôt dans la même transaction. Une impasse y serait détectée par PostgreSQL (une
+  transaction échoue), jamais silencieuse ;
+- la graine du normaliseur et celle du lot réconcilié restent des lectures hors transaction : des
+  propositions, imposées par la publication avant le commit, désormais contrôlées à chaque
+  écriture ;
+- S2d : fonction de transition et vidage du cliquet de S2b ; D4 à D11 inchangés.
+
 ## 10. Ce qui reste incertain
 
-- D3, D4, D5, D9 et la forme « agence » de D1 sont déduits de la lecture ; D1 (persona, handoff
-  hérité) est prouvé par le test et D2 par la sonde.
+- D4, D5, D9 et la forme « agence » de D1 sont déduits de la lecture ; D1 (persona, handoff
+  hérité) est prouvé par le test, D2 et D3 par `run-event-sequences.ts` (S2c).
 - Le nombre de runs hérités (salon 11, 16 ; DM sans `step_kind` qui mènent au handoff 12, 13) et de
   runs `unknown` sans workflow en production n'est pas compté.
 - Le comportement d'un client devant un run `needs_review` sans workflow n'a pas été regardé dans
@@ -518,3 +608,5 @@ Reste ouvert :
   (`queued` → `unknown`, `unknown` → `cancelled`). Revue de branche : aucune régression.
 - 2026-11-06, S2b : commandes et primitives de création (section 9.1), garde
   `run-writes-contract.ts`, D1 corrigé par 0175.
+- 2026-11-06, S2c : primitive d'allocation des événements (section 9.2), garde
+  `run-events-contract.ts`, test concurrent `run-event-sequences.ts` ; D2 et D3 corrigés.

@@ -104,19 +104,9 @@
   "push_subscriptions": "notifications",
   "routine_executions": "execution",
   "routines": "execution",
-  "run_events": {
-    "owner": "execution",
-    "writers": [
-      "runtime-link"
-    ]
-  },
+  "run_events": "execution",
   "run_steering_attempts": "execution",
-  "runs": {
-    "owner": "execution",
-    "writers": [
-      "runtime-link"
-    ]
-  },
+  "runs": "execution",
   "runtime_a2a_audit": "runtimes",
   "runtime_audit_anchors": "runtime-link",
   "runtime_audit_keys": "runtime-link",
@@ -231,10 +221,5 @@
   "webhook_deliveries": "webhooks",
   "webhook_endpoints": "webhooks",
   "webhook_management_operations": "webhooks",
-  "workflows": {
-    "owner": "execution",
-    "writers": [
-      "runtime-link"
-    ]
-  }
+  "workflows": "execution"
 }

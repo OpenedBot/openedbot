@@ -1,6 +1,8 @@
+import type { SQL } from "bun";
 import {
   type BotIdentity,
 } from "@openedbot/roster/domain/bot-mode";
+import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
 import { SERVICE_STEP_KINDS } from "@openedbot/execution/domain/run-step";
 import type { MessageContent } from "@openedbot/contracts-api";
 import { logEvent } from "@openedbot/platform-observability";
@@ -385,21 +387,11 @@ export async function settleCancelledHandoffsTx(
       update runs set status = 'completed', ended_at = now(), updated_at = now()
        where organization_id = ${organizationId} and id = ${origin.id}
     `;
-    await tx`
-      select pg_advisory_xact_lock(
-        hashtext(${organizationId}),
-        hashtext('openedbot-run-events-cursor')
-      )
-    `;
-    const sequenceRows = await tx<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${organizationId} and run_id = ${origin.id}
-    `;
-    const first = Number(sequenceRows[0]?.next ?? 0);
+    // The update above holds the courier's row: the primitive takes the cursor after it.
     const occurredAt = new Date();
-    const events: Array<{ sequence: number; type: string; payload: Record<string, unknown> }> = [
+    await appendRunEventsTx(tx as unknown as SQL, [
       {
-        sequence: first,
+        organizationId, threadId: origin.threadId, runId: origin.id, occurredAt,
         type: "bot.message",
         payload: {
           messageId,
@@ -410,16 +402,11 @@ export async function settleCancelledHandoffsTx(
           ok: false,
         },
       },
-      { sequence: first + 1, type: "run.completed", payload: { output: null, usage: null } },
-    ];
-    for (const event of events) {
-      await tx`
-        insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-        values (${organizationId}, ${origin.threadId}, ${origin.id}, ${event.sequence},
-                ${event.type}, ${event.payload}, ${occurredAt})
-        on conflict (organization_id, run_id, sequence) do nothing
-      `;
-    }
+      {
+        organizationId, threadId: origin.threadId, runId: origin.id, occurredAt,
+        type: "run.completed", payload: { output: null, usage: null },
+      },
+    ]);
     await tx`
       update threads set updated_at = now()
        where organization_id = ${organizationId} and id = ${origin.threadId}

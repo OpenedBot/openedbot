@@ -134,9 +134,14 @@ describe("durable run cancellation", () => {
       code: "CANCELLED_BY_DELETE",
       message: "Passe de maintenance annulée : le bot est supprimé.",
     });
-    expect(calls.some(({ sql }) => sql.includes("openedbot-run-events-cursor"))).toBe(true);
-    expect(calls.some(({ sql }) => sql.includes("update runs set status = 'cancelled'") && sql.includes("external_state = 'settled'"))).toBe(true);
-    expect(calls.some(({ sql }) => sql.includes("insert into run_events") && sql.includes("'run.error'"))).toBe(true);
+    const at = (match: (call: Call) => boolean) => calls.findIndex(match);
+    const update = at(({ sql }) => sql.includes("update runs set status = 'cancelled'") && sql.includes("external_state = 'settled'"));
+    const cursor = at(({ sql }) => sql.includes("openedbot-run-events-cursor"));
+    const insert = at(({ sql, values }) => sql.includes("insert into run_events") && values.includes("run.error"));
+    // The update holds the run's row before the cursor is taken (S2c lock order).
+    expect(update).toBeGreaterThanOrEqual(0);
+    expect(update).toBeLessThan(cursor);
+    expect(cursor).toBeLessThan(insert);
   });
 });
 
@@ -153,6 +158,9 @@ function fakeTx(calls: Call[], row: RunFixture, sending = false): TransactionDb 
     }
     if (sql.includes("select run_id") && sql.includes("forward_state = 'sending'")) {
       return Promise.resolve(sending ? [{ runId: "run-1" }] : []);
+    }
+    if (sql.includes("insert into run_events")) {
+      return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
     }
     return Promise.resolve([]);
   }) as unknown as TransactionDb;

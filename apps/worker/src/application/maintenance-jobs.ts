@@ -31,7 +31,6 @@ import { purgeStaleRuntimeEnrollments } from "@openedbot/runtimes/sql/runtime-en
 import { expireRotatedLinkTokens } from "@openedbot/runtimes/sql/runtime-link-rows";
 import { purgeClosedSupportConversations, purgeOldSupportEvents } from "@openedbot/support/sql/support-retention";
 import {
-  failRunsOnDisconnectedRuntimes,
   LINK_SECURITY_TICK_MS,
   purgeOldRuntimeLinkEvents,
   reconcileRuntimeSessions,
@@ -40,6 +39,7 @@ import {
 } from "@openedbot/runtime-link/application/runtime-links";
 import { evaluateRuntimeLinkAlerts } from "@openedbot/runtime-link/application/link-alerts";
 import { DIRECT_PROBE_TICK_MS, probeDirectRuntimes, failRunsOnUnhealthyDirectRuntimes } from "@openedbot/execution/application/runtime-direct";
+import { failRunsOnDisconnectedRuntimes } from "@openedbot/execution/application/disconnected-runtime-runs";
 import { MANAGED_EXPOSURE_TICK_MS, cleanupRevokedManagedExposures, reconcileManagedExposures } from "@openedbot/runtimes/application/managed-exposure-reconciliation";
 
 /** Poison leases only exist once a 30 s lease has expired: a second is ample. */

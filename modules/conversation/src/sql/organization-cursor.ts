@@ -8,7 +8,7 @@ import type { TransactionDb } from "@openedbot/platform-db";
  * (pas dans un `Promise.all`). READ COMMITTED : chaque SELECT voit ce qui est
  * commité à SON instant. Le worker prend `pg_advisory_xact_lock` par
  * organisation avant son premier insert et le tient jusqu'au commit
- * (`modules/execution/src/application/runner/events.ts`, `lockRunEventCursorTx`) : l'ordre
+ * (`modules/execution/src/sql/run-events.ts`, `lockRunEventsTx`) : l'ordre
  * des curseurs est l'ordre des commits, donc tout curseur ≤ un max lu à T1
  * est visible par un SELECT à T2 > T1. Lu d'abord, ce max est une borne
  * BASSE sûre : tout ce que les SELECT suivants ne voient pas a un curseur

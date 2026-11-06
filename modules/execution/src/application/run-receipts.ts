@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { appendRunEventsTx } from "../sql/run-events";
 
 type ReceiptRow = {
   runId: string;
@@ -97,25 +98,10 @@ async function flushRunJournalTx(tx: SQL, inputs: ReceiptInput[], events: RunJou
   for (const event of events) {
     organizations.set(event.organizationId, [...(organizations.get(event.organizationId) ?? []), event]);
   }
-  const batches = [...organizations].sort(([left], [right]) => left.localeCompare(right));
-  // Acquire every source key before any organization cursor lock. A receipt
-  // never uses the active target's sequence, owned by its Hermes normalizer.
-  for (const [organizationId, rows] of batches) {
-    const runIds = [...new Set(rows.map((row) => row.runId))].sort();
-    await tx`select id from runs where organization_id = ${organizationId} and id in ${tx(runIds)}
-      order by id for key share`;
-  }
-  for (const [organizationId] of batches) {
-    await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-run-events-cursor'))`;
-  }
-  for (const [organizationId, rows] of batches) {
-    for (const row of rows) {
-      await tx`
-        insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-        select ${organizationId}, ${row.threadId}, ${row.runId}, coalesce(max(sequence), -1) + 1,
-               ${row.type}, ${row.payload}, clock_timestamp()
-          from run_events where organization_id = ${organizationId} and run_id = ${row.runId}
-      `;
-    }
-  }
+  // One append for every organization: the primitive locks every source run,
+  // then every cursor, before numbering. A receipt never uses the active
+  // target's sequence, owned by its Hermes normalizer.
+  await appendRunEventsTx(tx, [...organizations].flatMap(([organizationId, rows]) => rows.map((row) => ({
+    organizationId, threadId: row.threadId, runId: row.runId, type: row.type, payload: row.payload,
+  }))));
 }

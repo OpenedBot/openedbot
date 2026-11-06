@@ -53,7 +53,8 @@ import { createApprovalForwarder } from "./runner/approval-forwarder";
 import { lockWorkflowTx, permissionRuleSourceFor } from "./runner/permission-rule-sources";
 import { checkBeforeForwardTx } from "./runner/permission-gate";
 import type { GateIdentity } from "../domain/gate-identity";
-import { persistEvents } from "./runner/persist";
+import { persistEvents, persistUnnumberedEvents } from "./runner/persist";
+import { readNextRunEventSequence } from "../sql/run-events";
 import {
   gatherIndependentPreflight,
   linkInstant,
@@ -904,11 +905,8 @@ export async function executeRun(
       activeContext.externalState = "streaming";
       trace.set("resume_mode", "event_replay");
     }
-    const sequenceRows = await db<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${context.organizationId} and run_id = ${context.id}
-    `;
-    const nextSequence = Number(sequenceRows[0]?.next ?? 0);
+    // A proposal: every write checks it again under the run's locks.
+    const nextSequence = await readNextRunEventSequence(db, context.organizationId, context.id);
     const priorToolRows = nextSequence > 0
       ? await db<Array<{ tool: string; toolCallId: string; unfinished: boolean }>>`
           select call_row.payload->>'tool' as tool, call_row.payload->>'toolCallId' as "toolCallId",
@@ -1034,7 +1032,7 @@ export async function executeRun(
             );
             if (recovered.action === "auth_required") authRequiredProvider = recovered.provider;
             if (recovered.action === "retry") {
-              normalizer.skipPast(recovered.fallbackSequence);
+              if (recovered.fallbackSequence !== null) normalizer.skipPast(recovered.fallbackSequence);
               activeSelection = recovered.selection;
               retryState = recovered.state;
               // Intention durable AVANT le POST, curseur remis à zéro : un
@@ -1413,12 +1411,7 @@ async function expirePendingApprovalTx(
  * répondu par Hermes.
  */
 async function completeGroupTurnWithoutHermes(db: SQL, config: WorkerConfig, context: RunContext): Promise<void> {
-  const sequenceRows = await db<Array<{ next: number }>>`
-    select coalesce(max(sequence), -1) + 1 as next from run_events
-     where organization_id = ${context.organizationId} and run_id = ${context.id}
-  `;
-  await persistEvents(db, config, context, context.lastHermesSequence, [{
-    sequence: Number(sequenceRows[0]?.next ?? 0),
+  await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
     type: "run.completed",
     occurredAt: new Date(),
     payload: { output: "" },

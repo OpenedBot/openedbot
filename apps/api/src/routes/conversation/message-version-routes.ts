@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SQL } from "bun";
 import { Hono } from "hono";
 import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@openedbot/roster/domain/bot-mode";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { branchTurnTx } from "@openedbot/execution/application/run-creation";
+import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { messageVersionPrecondition } from "@openedbot/conversation/domain/message-version";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -325,16 +327,11 @@ export function messageVersionRoutes(
           )
         `;
         if (mention) {
-          await tx`select pg_advisory_xact_lock(hashtext(${auth.organizationId}), hashtext('openedbot-run-events-cursor'))`;
-          await tx`
-            insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-            values (${auth.organizationId}, ${branchThreadId}, ${runId}, 0, 'system.notice',
-                    ${{
-                      message: handoffSentNotice(mention),
-                      kind: HANDOFF_NOTICE_KIND.sent,
-                      targetBotId: mention.botId,
-                    }}, now())
-          `;
+          // The run is new: the primitive numbers its notice 0.
+          await appendRunEventsTx(tx as unknown as SQL, [{
+            organizationId: auth.organizationId, threadId: branchThreadId, runId, type: "system.notice",
+            payload: { message: handoffSentNotice(mention), kind: HANDOFF_NOTICE_KIND.sent, targetBotId: mention.botId },
+          }]);
         }
         await tx`
           insert into message_versions (

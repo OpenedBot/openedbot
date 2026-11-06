@@ -14,6 +14,9 @@ function journalTransaction() {
       const organizationId = String(values[0]);
       return Promise.resolve([{ runId: `source-${organizationId}`, threadId: "thread", payload: { status: "confirmed" } }]);
     }
+    if (sql.includes("insert into run_events")) {
+      return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
+    }
     return Promise.resolve([]);
   }) as unknown as SQL;
   return { tx, queries };
@@ -34,11 +37,15 @@ describe("durable run receipt journal", () => {
       return "claimed";
     });
     expect(result).toBe("claimed");
-    const parents = queries.map((query, index) => query.sql.includes("for key share") ? index : -1).filter((index) => index >= 0);
-    const cursors = queries.map((query, index) => query.sql.includes("pg_advisory_xact_lock") ? index : -1).filter((index) => index >= 0);
+    const at = (fragment: string) => queries.map((query, index) => query.sql.includes(fragment) ? index : -1).filter((index) => index >= 0);
+    const parents = at("for no key update");
+    const cursors = at("pg_advisory_xact_lock");
+    const sequences = at("max(sequence)");
     expect(parents).toHaveLength(3);
     expect(cursors).toHaveLength(3);
+    // Every run row, then every cursor, then the sequences (S2c), each in its own statement.
     expect(Math.max(...parents)).toBeLessThan(Math.min(...cursors));
+    expect(Math.max(...cursors)).toBeLessThan(Math.min(...sequences));
     expect(queries[cursors[0]!]!.values[0]).toBe("org-a");
     expect(queries[cursors[2]!]!.values[0]).toBe("org-c");
     expect(queries.filter((query) => query.sql.includes("insert into run_events"))).toHaveLength(3);

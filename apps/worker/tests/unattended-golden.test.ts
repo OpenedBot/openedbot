@@ -88,6 +88,7 @@ const clean = (value: unknown): unknown => JSON.parse(JSON.stringify(value, func
 function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes: unknown[]): SQL {
   const tenant: string[] = [];
   return ((strings: TemplateStringsArray, ...parameters: unknown[]) => {
+    if (!("raw" in strings)) return strings;
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     if (text.startsWith("insert") || text.startsWith("update")) {
       writes.push({ sql: text, parameters: clean(parameters) });
@@ -100,7 +101,8 @@ function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes
     if (text.includes("set_config('app.organization_id'")) { tenant.push(String(parameters[0])); return Promise.resolve([{ set_config: parameters[0] }]); }
     if (text.includes("pg_advisory_xact_lock")) return Promise.resolve([]);
     const visible = () => tenant.at(-1) === parameters[0];
-    if (text.includes("from runs") && text.includes("for update")) return Promise.resolve([{ id: "run-1" }]);
+    if (text.includes("from runs") && (text.includes("for update") || text.includes("for no key update"))) return Promise.resolve([{ id: "run-1" }]);
+    if (text.includes("max(sequence)")) return Promise.resolve([]);
     if (text.includes("from workflows")) return Promise.resolve(workflow && parameters[1] === WORKFLOW ? [{ id: WORKFLOW, neverWait: workflow.neverWait }] : []);
     if (text.includes("from bot_permission_tool_policies")) {
       const policy = state.toolPolicies?.[String(parameters[2])];

@@ -350,6 +350,7 @@ describe("admission d'un DM sans workflow", () => {
           autonomyMaxHandoffs: 4, autonomyTimeoutSeconds: bot.timeoutSeconds ?? 1_800, autonomyTokenBudget: 50_000,
         })));
       }
+      if (sql.includes("insert into run_events")) return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
       return Promise.resolve([]);
     }) as unknown as SQL;
     (tag as unknown as { begin: (callback: (tx: SQL) => unknown) => Promise<unknown> }).begin =
@@ -1274,6 +1275,7 @@ describe("création du courrier de hand-off par l'opérateur", () => {
           },
         ]);
       }
+      if (sql.includes("insert into run_events")) return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
       return Promise.resolve([]);
     }) as unknown as SQL;
     (tag as unknown as { begin: (callback: (tx: SQL) => unknown) => Promise<unknown> }).begin =
@@ -1318,11 +1320,15 @@ describe("création du courrier de hand-off par l'opérateur", () => {
     // Le flag et les limites viennent du caller; la mention humaine ne réserve
     // que ses minima protocolaires, sans réactiver l'autonomie du workflow.
     expect([row.autonomy_enabled, row.max_depth, row.max_steps, row.max_handoffs, row.timeout_seconds, row.token_budget, row.used_handoffs]).toEqual([false, 1, 2, 1, 60, 1_000, 1]);
-    // La séquence est allouée sous le verrou de curseur, comme partout ailleurs.
+    // La séquence est allouée par la primitive : verrou du run, puis du curseur, puis max(sequence) (S2c).
+    const runLock = statements.findIndex((sql) => sql.includes("for no key update"));
     const lock = statements.findIndex((sql) => sql.includes("pg_advisory_xact_lock"));
-    expect(lock).toBeGreaterThanOrEqual(0);
-    expect(lock).toBeLessThan(noticeIndex);
-    expect(statements[noticeIndex]).toContain("'system.notice'");
+    const next = statements.findIndex((sql) => sql.includes("max(sequence)"));
+    expect(runLock).toBeGreaterThanOrEqual(0);
+    expect(runLock).toBeLessThan(lock);
+    expect(lock).toBeLessThan(next);
+    expect(next).toBeLessThan(noticeIndex);
+    expect(parametersByStatement[noticeIndex]).toContain("system.notice");
     expect(values).toContainEqual({
       message: "Transmis à 🤖 Trinity (@trinity)…",
       kind: "handoff.sent",

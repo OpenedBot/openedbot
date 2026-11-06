@@ -435,6 +435,9 @@ function recoveryDb(
     if (sql.includes("select id, hermes_run_id")) {
       return Promise.resolve([{ id: "run-1", hermesRunId: options.hermesRunId ?? null }]);
     }
+    if (sql.includes("insert into run_events")) {
+      return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
+    }
     return Promise.resolve([]);
   }) as unknown as SQL;
   (tx as unknown as { begin: (callback: (inner: SQL) => unknown) => Promise<unknown> }).begin =

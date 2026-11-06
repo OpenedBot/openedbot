@@ -84,7 +84,7 @@ export function assistantContent(
 export async function storeRuntimeArtifacts(
   config: WorkerConfig,
   context: Pick<RunContext, "id" | "organizationId" | "sessionId" | "workflowId">,
-  event: RunEvent,
+  event: Pick<RunEvent, "payload">,
   client: HermesClient | undefined,
   delivered: readonly RuntimeArtifact[] = [],
 ): Promise<StoredRuntimeArtifact[]> {
