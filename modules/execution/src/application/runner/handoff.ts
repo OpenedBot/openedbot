@@ -11,6 +11,7 @@ import type { OrganizationEvent } from "@openedbot/contracts-events";
 import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/sql/messages";
 import { touchThread } from "@openedbot/conversation/sql/threads";
 import { appendRunEventsTx } from "../../sql/run-events";
+import { NOW, transitionRuns } from "../../sql/run-transitions";
 import { appendNoticeTx } from "./events";
 import { openHandoffTx } from "./workflow-steps";
 import type { HandoffChildContext, RunContext } from "./types";
@@ -226,10 +227,10 @@ export async function deliverHandoffReplyTx(
   });
   // Le statut AVANT les événements : un client qui reçoit `run.completed`
   // et relit le fil doit y trouver un courrier déjà terminé.
-  await tx`
-    update runs set status = 'completed', ended_at = now(), updated_at = now()
-     where organization_id = ${context.organizationId} and id = ${origin.id} and status = 'relaying'
-  `;
+  await transitionRuns(tx, {
+    target: { organizationId: context.organizationId, id: origin.id }, fence: "unleased",
+    transition: { from: ["relaying"], to: { status: "completed" } }, set: { endedAt: NOW },
+  });
   const occurredAt = new Date();
   const event = (type: string, payload: Record<string, unknown>) => ({
     organizationId: context.organizationId, threadId: origin.threadId, runId: origin.id, type, payload, occurredAt,

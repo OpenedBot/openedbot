@@ -2,6 +2,8 @@ import type { SQL } from "bun";
 import { HermesClient, HermesClientError, RelayDialError } from "@openedbot/hermes";
 import { FOLDED_COMPLETION_KIND, mergeFollowupInputs } from "@openedbot/conversation/domain/followup";
 import { captureSteeringReceiptTx, withRunReceiptJournal } from "./run-receipts";
+import { recordRunCompletionKindTx } from "../sql/run-columns";
+import { NOW, RELEASE_LEASE, transitionRuns } from "../sql/run-transitions";
 
 export const RUN_STEER_POLL_MS = 250;
 
@@ -435,12 +437,11 @@ async function confirmRunSteerEffectTx(
       error_code = null, forwarding_owner = null, forwarding_lease_expires_at = null, updated_at = now()
    where organization_id = ${organizationId} and id = ${attemptId}
   `;
-  await tx`
-    update runs set status = 'cancelled', external_state = 'settled', events_complete = true,
-      completion_kind = 'steered_into_active', error_code = null, error_message = null,
-      ended_at = now(), lease_owner = null, lease_expires_at = null, next_attempt_at = null, updated_at = now()
-     where organization_id = ${organizationId} and id = ${sourceRunId} and status = 'queued'
-  `;
+  // The fallback never left the queue: no lease to hold.
+  await transitionRuns(tx, {
+    target: { organizationId, id: sourceRunId }, fence: "unleased", transition: { from: ["queued"], to: { status: "cancelled", externalState: "settled" } },
+    set: { eventsComplete: true, completionKind: "steered_into_active", errorCode: null, errorMessage: null, endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null },
+  });
   if (sourceWorkflowId) await tx`
     update workflows set status = 'completed', final_output = null,
       recovery_state = ${{ steeredIntoRunId: targetRunId, steeringAttemptId: attemptId }},
@@ -888,13 +889,13 @@ export async function replayUndeliveredRunSteers(
        where organization_id = ${context.organizationId}
          and id in ${tx(replayable.map((attempt) => attempt.id))}
     `;
-    await tx`
-      update runs set status = 'queued', completion_kind = null, external_state = 'not_started',
-        events_complete = true, error_code = null, error_message = null, ended_at = null,
-        next_attempt_at = null, input = ${mergeFollowupInputs(replayable.map((attempt) => attempt.text))},
-        updated_at = now()
-       where organization_id = ${context.organizationId} and id = ${lead.sourceRunId}
-    `;
+    // `cancelled` → `queued`: legal only for a run `steered_into_active`, as the filter above read under lock.
+    await transitionRuns(tx, {
+      target: { organizationId: context.organizationId, id: lead.sourceRunId }, fence: "unleased",
+      transition: { from: ["cancelled"], fromExternalState: ["settled"], to: { status: "queued", externalState: "not_started" } },
+      set: { completionKind: null, eventsComplete: true, errorCode: null, errorMessage: null, endedAt: null, nextAttemptAt: null,
+        input: mergeFollowupInputs(replayable.map((attempt) => attempt.text)) },
+    });
     if (lead.sourceWorkflowId) await tx`
       update workflows set status = 'queued', final_output = null,
         recovery_state = ${{ steeredIntoRunId: context.id, steeringAttemptId: lead.id, replayedAfterRunId: context.id }},
@@ -902,11 +903,7 @@ export async function replayUndeliveredRunSteers(
        where organization_id = ${context.organizationId} and id = ${lead.sourceWorkflowId}
          and status = 'completed'
     `;
-    if (rest.length > 0) await tx`
-      update runs set completion_kind = ${FOLDED_COMPLETION_KIND}, updated_at = now()
-       where organization_id = ${context.organizationId}
-         and id in ${tx(rest.map((attempt) => attempt.sourceRunId))}
-    `;
+    await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: rest.map((attempt) => attempt.sourceRunId) }, FOLDED_COMPLETION_KIND);
     for (const row of replayable) captureSteeringReceiptTx(tx, context.organizationId, row.id);
     return replayable.length;
   }) as Promise<number>;

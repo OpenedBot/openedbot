@@ -55,6 +55,23 @@ import { checkBeforeForwardTx } from "./runner/permission-gate";
 import type { GateIdentity } from "../domain/gate-identity";
 import { persistEvents, persistUnnumberedEvents } from "./runner/persist";
 import { readNextRunEventSequence } from "../sql/run-events";
+import { advanceHermesWatermark, recordCreatingRunModel, renewRunLease } from "../sql/run-columns";
+import { RELEASE_LEASE, transitionRuns } from "../sql/run-transitions";
+import { ACTIVE_RUN_STATUSES } from "../domain/run-transitions";
+import {
+  confirmFallbackCreate,
+  confirmFirstCreate,
+  confirmRemoteStop,
+  heldLease,
+  markFallbackCreateIntent,
+  markRemoteStopAmbiguous,
+  requestRemoteStop,
+  resumeAfterApproval,
+  resumeAnnouncedReplay,
+  runKey,
+  settleResumedRunStatus,
+  switchToPolling,
+} from "./runner/lease-transitions";
 import {
   gatherIndependentPreflight,
   linkInstant,
@@ -218,29 +235,16 @@ export async function executeRun(
   }, Math.max(1_000, Math.floor((config.leaseSeconds * 1_000) / 3)));
 
   async function maintainLeaseAndApprovals(): Promise<void> {
-    const rows = await db<Array<{
-      status: string;
-      remoteStopState: RunContext["remoteStopState"];
-      errorCode: string | null;
-      errorMessage: string | null;
-    }>>`
-      update runs set heartbeat_at = now(),
-        lease_expires_at = now() + (${config.leaseSeconds} * interval '1 second'), updated_at = now()
-       where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${activeContext.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-       returning status, remote_stop_state as "remoteStopState",
-         error_code as "errorCode", error_message as "errorMessage"
-    `;
-    if (!rows[0]) {
+    const lease = await renewRunLease(db, runKey(activeContext), heldLease(config, activeContext), config.leaseSeconds);
+    if (!lease) {
       controller.abort("lease_lost_or_cancelled");
       return;
     }
-    if (rows[0].remoteStopState === "requested") {
+    if (lease.remoteStopState === "requested") {
       cancelRequested = true;
       activeContext.remoteStopState = "requested";
-      activeContext.errorCode = rows[0].errorCode;
-      activeContext.errorMessage = rows[0].errorMessage;
+      activeContext.errorCode = lease.errorCode;
+      activeContext.errorMessage = lease.errorMessage;
       controller.abort("cancel_requested");
       return;
     }
@@ -257,7 +261,7 @@ export async function executeRun(
     // Un run en streaming muet trop longtemps est avorté (jamais pendant une approbation),
     // sauf si Hermes le dit encore actif (`silentRunStillWorking`). En polling, aucune frame
     // n'arrive par construction : la réconciliation a sa propre limite.
-    if (rows[0].status === "running" && activeContext.externalState === "streaming" && Date.now() - lastFrameAt > config.runInactivityMs) {
+    if (lease.status === "running" && activeContext.externalState === "streaming" && Date.now() - lastFrameAt > config.runInactivityMs) {
       if (await silentRunStillWorking(client, hermesRunId, controller.signal, activeContext.id, lastFrameAt)) lastFrameAt = Date.now();
       else { idleTimedOut = true; controller.abort("stream_idle"); return; }
     }
@@ -406,15 +410,18 @@ export async function executeRun(
              where id = ${approval.id} and organization_id = ${activeContext.organizationId}
                and forward_state <> 'confirmed'
           `;
-          await tx`
-            update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-              remote_stop_state = case when remote_stop_state = 'requested' then 'ambiguous' else remote_stop_state end,
-              error_code = 'APPROVAL_FORWARD_OUTCOME_UNKNOWN',
-              error_message = 'Hermes a reçu la décision mais sa confirmation locale a été perdue.',
-              lease_owner = null, lease_expires_at = null, ended_at = null, updated_at = now()
-             where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-               and status in ('starting','running','awaiting_approval','cancelled')
-          `;
+          // Unleased on purpose: the decision reached Hermes whoever holds the run now.
+          await transitionRuns(tx as unknown as SQL, {
+            target: runKey(activeContext), fence: "unleased",
+            transition: {
+              from: [...ACTIVE_RUN_STATUSES, "cancelled"],
+              to: { status: "unknown", externalState: "ambiguous", remoteStopState: { map: { requested: "ambiguous" } } },
+            },
+            set: {
+              eventsComplete: false, errorCode: "APPROVAL_FORWARD_OUTCOME_UNKNOWN",
+              errorMessage: "Hermes a reçu la décision mais sa confirmation locale a été perdue.", ...RELEASE_LEASE, endedAt: null,
+            },
+          });
           if (run[0]?.workflowId) await tx`
             update workflows set status = 'unknown', error_code = 'APPROVAL_FORWARD_OUTCOME_UNKNOWN',
               error_message = 'Hermes a reçu la décision mais sa confirmation locale a été perdue.',
@@ -424,12 +431,7 @@ export async function executeRun(
           `;
           return false;
         }
-        await tx`
-          update runs set status = 'running', updated_at = now()
-          where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-            and lease_owner = ${config.workerId} and lease_generation = ${activeContext.leaseGeneration}
-            and status = 'awaiting_approval'
-        `;
+        await resumeAfterApproval(tx as unknown as SQL, config, activeContext);
         if (activeContext.workflowId && workflow) await tx`
           update workflows set status = 'running', updated_at = now()
            where organization_id = ${activeContext.organizationId} and id = ${activeContext.workflowId}
@@ -548,24 +550,12 @@ export async function executeRun(
     unknownMessage: string,
     stopCause?: ReconcileStopCause,
   ): Promise<void> {
-    await db`
-      update runs set external_state = 'stopping', remote_stop_state = 'requested', updated_at = now()
-       where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${activeContext.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-    `;
+    await requestRemoteStop(db, config, activeContext);
     activeContext.externalState = "stopping";
     activeContext.remoteStopState = "requested";
     try {
       await client.stopRun(knownHermesRunId);
-      const confirmed = await db<Array<{ id: string }>>`
-        update runs set remote_stop_state = 'confirmed', external_state = 'polling', updated_at = now()
-         where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${activeContext.leaseGeneration}
-           and status in ('starting','running','awaiting_approval')
-         returning id
-      `;
-      if (!confirmed[0]) return;
+      if (!await confirmRemoteStop(db, config, activeContext)) return;
       activeContext.externalState = "polling";
       activeContext.remoteStopState = "confirmed";
       const pollController = new AbortController();
@@ -579,11 +569,7 @@ export async function executeRun(
         clearTimeout(pollTimeout);
       }
     } catch (error) {
-      await db`
-        update runs set remote_stop_state = 'ambiguous', updated_at = now()
-         where id = ${activeContext.id} and organization_id = ${activeContext.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${activeContext.leaseGeneration}
-      `;
+      await markRemoteStopAmbiguous(db, config, activeContext);
       await markRunUnknown(
         db,
         config,
@@ -846,26 +832,13 @@ export async function executeRun(
           activeSelection = recovered.selection;
           retryState = recovered.state;
           createKey = fallbackIdempotencyKey(context.id, retryState.extraModelTried);
-          await db`
-            update runs set model = ${activeSelection.model}, updated_at = now()
-             where id = ${context.id} and organization_id = ${context.organizationId}
-               and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-               and status = 'starting' and external_state = 'creating'
-          `;
+          await recordCreatingRunModel(db, runKey(context), heldLease(config, context), activeSelection.model);
         }
       }
       trace.mark("hermes.run_created");
       context.provider = activeSelection.provider;
       context.model = activeSelection.model;
-      const updated = await db<Array<{ id: string }>>`
-        update runs set hermes_run_id = ${hermesRunId}, status = 'running', started_at = coalesce(started_at, now()),
-          input = ${input}, external_state = 'streaming', events_complete = false, updated_at = now()
-         where id = ${context.id} and organization_id = ${context.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-           and status = 'starting' and external_state = 'creating'
-         returning id
-      `;
-      if (!updated[0]) {
+      if (!await confirmFirstCreate(db, config, context, hermesRunId, input)) {
         await settleOrphanCreate(db, context, client, hermesRunId);
         return;
       }
@@ -893,15 +866,7 @@ export async function executeRun(
       // A known Hermes id can recover its uncommitted journal after a worker
       // restart. Only an announced, freshly gated replay capability permits
       // this transition; the create POST is never repeated.
-      const resumed = await db<Array<{ id: string }>>`
-        update runs set external_state = 'streaming', events_complete = false, updated_at = now()
-         where id = ${context.id} and organization_id = ${context.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-           and hermes_run_id = ${hermesRunId} and external_state = 'polling'
-           and remote_stop_state is null and status in ('running','awaiting_approval')
-         returning id
-      `;
-      if (!resumed[0]) return;
+      if (!await resumeAnnouncedReplay(db, config, context, hermesRunId)) return;
       activeContext.externalState = "streaming";
       trace.set("resume_mode", "event_replay");
     }
@@ -1039,16 +1004,8 @@ export async function executeRun(
               // worker perdu pendant cette création laisse `creating` sans
               // identifiant, une issue ambiguë à réconcilier, jamais l'ancien
               // run suivi pendant que le nouveau tourne sans suivi.
-              const intent = await db<Array<{ id: string }>>`
-                update runs set hermes_run_id = null, external_state = 'creating', last_hermes_sequence = 0,
-                  model = ${activeSelection.model}, events_complete = false, updated_at = now()
-                 where id = ${context.id} and organization_id = ${context.organizationId}
-                   and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-                   and status in ('starting','running','awaiting_approval')
-                 returning id
-              `;
               // Bail perdu avant tout envoi : le repreneur réconcilie l'ancien run.
-              if (!intent[0]) return;
+              if (!await markFallbackCreateIntent(db, config, context, activeSelection.model)) return;
               hermesRunId = null;
               activeContext.externalState = "creating";
               context.lastHermesSequence = 0;
@@ -1066,16 +1023,7 @@ export async function executeRun(
                 signal: controller.signal,
               });
               hermesRunId = nextId;
-              const confirmed = await db<Array<{ id: string }>>`
-                update runs set hermes_run_id = ${nextId}, model = ${activeSelection.model},
-                  status = 'running', external_state = 'streaming', events_complete = false, updated_at = now()
-                 where id = ${context.id} and organization_id = ${context.organizationId}
-                   and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-                   and status in ('starting','running','awaiting_approval')
-                   and external_state = 'creating' and hermes_run_id is null
-                 returning id
-              `;
-              if (!confirmed[0]) {
+              if (!await confirmFallbackCreate(db, config, context, nextId, activeSelection.model)) {
                 await settleOrphanCreate(db, context, client, nextId);
                 return;
               }
@@ -1202,11 +1150,7 @@ export async function executeRun(
           // séparément obligerait une écriture PostgreSQL par fragment et,
           // après crash, ferait sauter du texte jamais persisté. Le flush
           // groupe texte et watermark dans la même transaction.
-          await db`
-            update runs set last_hermes_sequence = ${rawSequence}, updated_at = now()
-             where id = ${context.id} and organization_id = ${context.organizationId}
-               and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-            `;
+          await advanceHermesWatermark(db, runKey(context), heldLease(config, context), rawSequence);
         }
       }
     } catch (error) {
@@ -1264,11 +1208,7 @@ export async function executeRun(
       return;
     }
     if (!terminal && !controller.signal.aborted) {
-      await db`
-        update runs set external_state = 'polling', events_complete = false, updated_at = now()
-         where id = ${context.id} and organization_id = ${context.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-      `;
+      await switchToPolling(db, config, context);
       activeContext.externalState = "polling";
       await reconcileHermesRun(db, config, activeContext, client, streamRunId, controller.signal, trace);
       terminal = true;
@@ -1327,12 +1267,7 @@ export async function executeRun(
       const code = failureCode(error);
       const message = error instanceof Error ? error.message : "Panne locale après la création Hermes.";
       log("worker.local_failure_reconcile", { runId: context.id, organizationId: context.organizationId, code });
-      await db`
-        update runs set external_state = 'polling', events_complete = false,
-          error_code = ${code}, error_message = ${message}, updated_at = now()
-         where id = ${context.id} and organization_id = ${context.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-      `;
+      await switchToPolling(db, config, context, { code, message });
       activeContext.externalState = "polling";
       // The link failed during the resume itself, before the run left
       // `starting`: an open gate must still read `awaiting_approval`, or the
@@ -1352,29 +1287,6 @@ export async function executeRun(
     clearInterval(heartbeat);
     shutdownSignal?.removeEventListener("abort", stopForExternalSignal);
   }
-}
-
-/**
- * Reprise après perte de bail : une gate encore ouverte garde le run en
- * `awaiting_approval`. Repasser en `running` cachait la gate à l'API (le clic
- * l'expirait comme inactive) et au heartbeat, qui ne transmettait plus la
- * réponse. Sans effet hors de `starting` : un run déjà réattaché garde son état.
- */
-async function settleResumedRunStatus(db: SQL, config: WorkerConfig, context: RunContext): Promise<void> {
-  await db`
-    update runs set
-      status = case when exists (
-        select 1 from approval_requests gate
-         where gate.organization_id = runs.organization_id and gate.run_id = runs.id
-           and gate.status in ('pending','approved','denied')
-           and gate.forward_state in ('pending','ready','sending')
-      ) then 'awaiting_approval' else 'running' end,
-      external_state = case when external_state = 'polling' then 'polling' else 'streaming' end,
-      events_complete = false, updated_at = now()
-     where id = ${context.id} and organization_id = ${context.organizationId}
-       and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-       and status = 'starting'
-  `;
 }
 
 /**

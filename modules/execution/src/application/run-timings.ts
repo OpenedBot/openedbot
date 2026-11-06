@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { saveRunTimingsRecord } from "../sql/run-columns";
 
 /**
  * Garde la latence d'un run (`runLatencyRecord`) sur sa ligne, pour
@@ -15,11 +16,7 @@ export function saveRunTimings(
   record: Record<string, unknown>,
 ): Promise<void> {
   const { runId: _runId, organizationId: _organizationId, ...timings } = record;
-  return db`
-    update runs set timings = ${timings}::jsonb
-     where organization_id = ${run.organizationId} and id = ${run.id}
-       and lease_generation = ${run.leaseGeneration}
-  `.then(
+  return saveRunTimingsRecord(db, run, timings).then(
     () => undefined,
     () => {
       console.error(JSON.stringify({ event: "run.timings_write_failed", runId: run.id }));

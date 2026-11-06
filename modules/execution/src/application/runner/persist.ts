@@ -43,6 +43,10 @@ import { extractOutputMedia, workspaceMediaNames } from "../../domain/output-med
 import { fetchWorkspaceMedia } from "./output-media-fetch";
 import type { GroupRunContext, RunContext } from "./types";
 import { log } from "./util";
+import { ACTIVE_RUN_STATUSES } from "../../domain/run-transitions";
+import { advanceHermesWatermark } from "../../sql/run-columns";
+import { lockLeasedRunTx, NOW, RELEASE_LEASE, transitionRuns } from "../../sql/run-transitions";
+import { heldLease, runKey } from "./lease-transitions";
 import { chainLegacyRoomTurnTx } from "./workflow-steps";
 import {
   advanceWorkflowCompletionTx,
@@ -207,15 +211,8 @@ async function persistBatch(
   let envelopes: OrganizationEvent[];
   try {
   envelopes = await db.begin(async (tx) => {
-    const fence = await tx<Array<{ id: string }>>`
-      select id from runs
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-         and remote_stop_state is distinct from 'requested'
-       for update
-    `;
-    if (!fence[0]) return [] as OrganizationEvent[];
+    const lease = heldLease(config, context);
+    if (!await lockLeasedRunTx(tx as unknown as SQL, runKey(context), lease)) return [] as OrganizationEvent[];
     // PERM2-9: the workflow's snapshot of "Never wait", read under its lock.
     const neverWait = await lockWorkflowTx(tx as unknown as SQL, context.organizationId, context.workflowId, unattendedFrom);
     // The run is held since the fence: its cursor next, in the order of the
@@ -343,11 +340,9 @@ async function persistBatch(
           where organization_id = ${context.organizationId} and run_id = ${context.id}
         `;
 
-        await tx`
-          update runs set status = 'awaiting_approval', updated_at = now()
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease, transition: { from: ACTIVE_RUN_STATUSES, to: { status: "awaiting_approval" } },
+        });
         // The workflow status is what notifies (0039 push): only a gate that
         // waits for a person moves it. A policy answer or a gate under review
         // (the reviewer moves it if it escalates) notifies nobody.
@@ -363,15 +358,15 @@ async function persistBatch(
         const state = service ? null : groupSendState(context);
         const hide = await hiddenGroupOutput(tx, context, state, output);
         const message = service || hide ? null : assistantMessageForCompletion(output, state);
-        await tx`
-          update runs set status = 'completed', output = ${output || null}, usage = ${payload.usage ?? null},
-            external_state = 'settled', events_complete = ${payload.reconciled !== true},
-            completion_kind = ${payload.reconciled === true ? "reconciled" : "normal"},
-            error_code = null, error_message = null,
-            ended_at = now(), updated_at = now(), lease_owner = null, lease_expires_at = null
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease,
+          transition: { from: ACTIVE_RUN_STATUSES, to: { status: "completed", externalState: "settled" } },
+          set: {
+            output: output || null, usage: payload.usage ?? null, eventsComplete: payload.reconciled !== true,
+            completionKind: payload.reconciled === true ? "reconciled" : "normal", errorCode: null, errorMessage: null,
+            endedAt: NOW, ...RELEASE_LEASE,
+          },
+        });
         if (context.workflowId) {
           const totalTokens = event === completion && accounting
             ? accounting.effectiveTokens
@@ -508,14 +503,14 @@ async function persistBatch(
       if (event.type === "run.error") {
         const message = typeof payload.message === "string" ? payload.message : "Erreur Hermes.";
         const errorCode = typeof payload.errorCode === "string" ? payload.errorCode : "HERMES_RUN_FAILED";
-        await tx`
-          update runs set status = 'failed', error_code = ${errorCode}, error_message = ${message},
-            external_state = 'settled', events_complete = ${payload.reconciled !== true},
-            completion_kind = ${payload.reconciled === true ? "reconciled_failure" : "failed"},
-            ended_at = now(), updated_at = now(), lease_owner = null, lease_expires_at = null
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease,
+          transition: { from: ACTIVE_RUN_STATUSES, to: { status: "failed", externalState: "settled" } },
+          set: {
+            errorCode, errorMessage: message, eventsComplete: payload.reconciled !== true,
+            completionKind: payload.reconciled === true ? "reconciled_failure" : "failed", endedAt: NOW, ...RELEASE_LEASE,
+          },
+        });
         // Un tour de salon échoué vaut un pass : l'erreur reste visible sur le
         // run, et l'envoi continue avec le membre suivant.
         const state = isServiceStepKind(context.stepKind) ? null : groupSendState(context);
@@ -535,11 +530,7 @@ async function persistBatch(
         }
       }
     }
-    await tx`
-      update runs set last_hermes_sequence = ${rawSequence}, heartbeat_at = now(), updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_generation = ${context.leaseGeneration}
-    `;
+    await advanceHermesWatermark(tx as unknown as SQL, runKey(context), { generation: context.leaseGeneration }, rawSequence);
     return result;
   }) as OrganizationEvent[];
   } catch (error) {

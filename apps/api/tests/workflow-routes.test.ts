@@ -93,7 +93,10 @@ describe("workflow recovery routes", () => {
     expect(runUpdate).toBeLessThan(workflowUpdate);
     expect(calls[runUpdate]?.sql).toContain("lease_owner = null");
     expect(calls[runUpdate]?.sql).toContain("lease_expires_at = null");
-    expect(calls[runUpdate]?.sql).toContain("status = 'unknown'");
+    expect(calls[runUpdate]?.sql).toContain("status in ('unknown')");
+    // D9: the abandoned run's external outcome is settled by the operator, no longer to review.
+    expect(calls[runUpdate]?.sql).toContain("external_state = 'settled'");
+    expect(calls[runUpdate]?.values).toContain("EXTERNAL_OUTCOME_ABANDONED");
     expect(calls[workflowUpdate]?.sql).toContain("EXTERNAL_OUTCOME_ABANDONED");
     expect(calls[workflowUpdate]?.values).toContainEqual({ resolution: "abandoned", duplicateRisk: true });
   });
@@ -109,8 +112,8 @@ describe("workflow recovery routes", () => {
     expect(calls.some(({ sql }) =>
       sql.includes("update run_steering_attempts") && sql.includes("STEER_FALLBACK_ABANDONED"),
     )).toBe(true);
-    expect(calls.some(({ sql }) =>
-      sql.includes("Follow-up incertain abandonné") && sql.includes("status = 'queued'"),
+    expect(calls.some(({ sql, values }) =>
+      values.includes("Follow-up incertain abandonné par un administrateur.") && sql.includes("status in ('queued')"),
     )).toBe(true);
   });
 

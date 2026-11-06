@@ -96,6 +96,19 @@ connecteur hôte et le protocole tiennent le leur :
   conversation, le bot et la place qu'il occupait chez le runtime. Un
   brouillon de persona ne se relance pas d'ici (on le relance depuis la
   fiche du bot), ni un message transmis (on le renvoie).
+- Un travail « à vérifier » qu'un administrateur abandonne (ou remplace par
+  une relance) ne s'affiche plus « à vérifier » dans sa conversation : il
+  apparaît en échec, comme dans la boîte de réception.
+- Un message transmis à un autre bot par un ancien `@bot` ne reçoit plus sa
+  réponse en double quand on annule la conversation au moment même où le
+  bot répond : le fil d'origine reçoit une seule réponse.
+- Un message repris après l'arrêt d'un worker (mise à jour, redémarrage)
+  relit d'abord l'état du run chez Hermes quand le runtime n'annonce pas de
+  rejeu, comme après la perte de son bail, au lieu de se raccrocher au flux
+  en cours sans savoir ce qu'il a manqué.
+- Un worker dont le bail a expiré n'écrit plus rien sur le message qu'il
+  traitait, même si aucun autre worker ne l'a encore repris : sa réponse
+  tardive ne peut plus clore un message que la reprise va réconcilier.
 - Les mises à jour en direct (réponses en cours, fils, notifications) arrivent
   aussi à la future app de bureau, dont la console est embarquée : le flux
   temps réel portait l'en-tête CORS des autres requêtes de l'API sauf le sien,

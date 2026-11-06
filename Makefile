@@ -514,6 +514,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/dm-without-workflow.ts
 	bun tests/integration/orphan-unknown-runs.ts
 	bun tests/integration/run-event-sequences.ts
+	bun tests/integration/run-transitions.ts
 	bun tests/integration/permission-policy-preflight.ts
 	bun tests/integration/review-profiles.ts
 	bun tests/integration/approval-review.ts

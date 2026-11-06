@@ -1,6 +1,6 @@
 /**
- * Contract of the run creation primitives, offline (`make test-unit`).
- * ADR 0001 (S2b), inventory docs/architecture/0002-invariants-des-runs.md.
+ * Contract of the run write primitives, offline (`make test-unit`).
+ * ADR 0001 (S2b, S2d), inventory docs/architecture/0002-invariants-des-runs.md.
  *
  * 1. Creation, strict. In the shipped code (`apps/*\/src`, `modules/*\/src`,
  *    `platform/*\/src`, `scripts/`), `insert into runs`, `insert into
@@ -10,12 +10,18 @@
  *    appears only in the review trigger's migrations (REVIEW_TRIGGER).
  * 2. Privacy, strict. Only COMMANDS import the primitives (also held by the
  *    dependency-cruiser rule `primitives-de-creation-privees`).
- * 3. Transitions, dated ratchet. Every other `update runs` / `update
- *    workflows` (status, external state, remote stop, and the columns that
- *    travel with them) belongs to S2d (transition function with fencing) and
- *    is counted per file in DEBT. A count may go down (`--record` lowers it),
- *    never up; a file that is not listed may not start writing. Past the
- *    debt's `until` date the contract warns, it does not fail.
+ * 3. Run transitions, strict (S2d). `update runs` appears only in
+ *    TRANSITIONS (the transition function, sole writer of `status`,
+ *    `external_state` and `remote_stop_state`, with its fencing) and in
+ *    COLUMNS (named writes of the other columns), and COLUMNS never names one
+ *    of the three columns in an assignment or a comparison (`=`). In
+ *    `db/migrations`, no statement assigns them on `runs`.
+ * 4. Workflow writes, dated ratchet. Every other `update workflows` (its
+ *    status and the columns that travel with it) is counted per file in
+ *    DEBT, until a transition function of workflows takes them. A count may
+ *    go down (`--record` lowers it), never up; a file that is not listed may
+ *    not start writing. Past the debt's `until` date the contract warns, it
+ *    does not fail.
  *
  * Comments are blanked before matching, so a sentence that names a statement
  * is not a write. Out of reach: SQL built from a dynamic table name.
@@ -31,6 +37,9 @@ const root = rootFlag >= 0 ? resolve(args[rootFlag + 1] ?? ".") : resolve(import
 const recording = args.includes("--record");
 
 const PRIMITIVES = "modules/execution/src/sql/run-writes.ts";
+const TRANSITIONS = "modules/execution/src/sql/run-transitions.ts";
+const COLUMNS = "modules/execution/src/sql/run-columns.ts";
+const TRANSITION_COLUMNS = /\b(?:status|external_state|remote_stop_state)\s*=(?!=)/u;
 const COMMANDS = new Set([
   "modules/execution/src/application/run-creation.ts",
   "modules/execution/src/application/runner/workflow-steps.ts",
@@ -38,7 +47,7 @@ const COMMANDS = new Set([
 const REVIEW_TRIGGER = new Set(["0091_run_admission_envelope.sql", "0175_review_path_for_every_unknown_run.sql"]);
 const DEBT_FILE = join(root, "tests/scripts/run-writes-debt.json");
 
-type Debt = { until: string; step: string; reason: string; files: Record<string, { runs?: number; workflows?: number }> };
+type Debt = { until: string; step: string; reason: string; files: Record<string, { workflows?: number }> };
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
@@ -83,7 +92,7 @@ const STEP_CLAIM = /\b(?:used_steps|used_handoffs)\s*=/u;
 const IMPORTS_PRIMITIVES = /from\s+["'][^"']*sql\/run-writes(?:\.ts)?["']/u;
 
 const errors: string[] = [];
-const counted: Record<string, { runs: number; workflows: number }> = {};
+const counted: Record<string, { workflows: number }> = {};
 
 for (const file of sources()) {
   const text = code(readFileSync(join(root, file), "utf8"));
@@ -102,8 +111,20 @@ for (const file of sources()) {
       continue;
     }
     if (primitive) continue;
-    counted[file] ??= { runs: 0, workflows: 0 };
-    counted[file][table] += 1;
+    if (table === "runs") {
+      if (file !== TRANSITIONS && file !== COLUMNS) {
+        errors.push(`${file}:${line(text, match.index)} : « ${match[0]} » hors de la fonction de transition (${TRANSITIONS}) et des écritures nommées (${COLUMNS}). Une transition passe par transitionRuns ; une autre colonne, par une écriture nommée.`);
+      }
+      continue;
+    }
+    counted[file] ??= { workflows: 0 };
+    counted[file].workflows += 1;
+  }
+  if (file === COLUMNS) {
+    const assigned = TRANSITION_COLUMNS.exec(text);
+    if (assigned) {
+      errors.push(`${file}:${line(text, assigned.index)} : « ${assigned[0]} » ; status, external_state et remote_stop_state ne s'écrivent ni ne se comparent ici : seule la fonction de transition (${TRANSITIONS}) les touche.`);
+    }
   }
   if (IMPORTS_PRIMITIVES.test(text) && !primitive && !COMMANDS.has(file)) {
     errors.push(`${file} : importe les primitives privées ${PRIMITIVES} ; seules les commandes (${[...COMMANDS].join(", ")}) les importent.`);
@@ -119,10 +140,16 @@ if (existsSync(migrations)) {
         errors.push(`db/migrations/${name}:${line(text, match.index)} : « ${match[0]} » ; seul le trigger de revue (${[...REVIEW_TRIGGER].join(", ")}) crée un workflow en SQL.`);
       }
     }
+    for (const match of text.matchAll(/\bupdate\s+(?:public\.)?"?runs"?\b[^;]*/giu)) {
+      const set = /\bset\b([\s\S]*?)(?:\bwhere\b|$)/iu.exec(match[0])?.[1] ?? "";
+      if (TRANSITION_COLUMNS.test(set)) {
+        errors.push(`db/migrations/${name}:${line(text, match.index)} : une migration écrit status, external_state ou remote_stop_state de runs ; ces transitions passent par ${TRANSITIONS}.`);
+      }
+    }
   }
 }
 
-// 3. The S2d ratchet.
+// 4. The ratchet of workflow writes.
 const debt = JSON.parse(readFileSync(DEBT_FILE, "utf8")) as Debt;
 if (!/^\d{4}-\d{2}-\d{2}$/u.test(debt.until) || !debt.step || !debt.reason) {
   errors.push(`${relative(root, DEBT_FILE)} : until (AAAA-MM-JJ), step et reason sont requis.`);
@@ -130,28 +157,24 @@ if (!/^\d{4}-\d{2}-\d{2}$/u.test(debt.until) || !debt.step || !debt.reason) {
 if (recording) {
   const files: Debt["files"] = {};
   for (const [file, ceiling] of Object.entries(debt.files).sort(([a], [b]) => a.localeCompare(b))) {
-    const now = counted[file] ?? { runs: 0, workflows: 0 };
-    const runs = Math.min(now.runs, ceiling.runs ?? 0);
-    const workflows = Math.min(now.workflows, ceiling.workflows ?? 0);
-    if (runs + workflows > 0) files[file] = { ...(runs ? { runs } : {}), ...(workflows ? { workflows } : {}) };
+    const workflows = Math.min(counted[file]?.workflows ?? 0, ceiling.workflows ?? 0);
+    if (workflows > 0) files[file] = { workflows };
   }
   debt.files = files;
   await Bun.write(DEBT_FILE, `${JSON.stringify(debt, null, 2)}\n`);
   console.log(`run-writes-contract: plafonds abaissés dans ${relative(root, DEBT_FILE)}.`);
 }
 for (const [file, now] of Object.entries(counted).sort(([a], [b]) => a.localeCompare(b))) {
-  const ceiling = debt.files[file];
-  for (const table of ["runs", "workflows"] as const) {
-    const allowed = ceiling?.[table] ?? 0;
-    if (now[table] > allowed) {
-      errors.push(`${file} : ${now[table]} « update ${table} » pour un plafond de ${allowed} (cliquet ${debt.step}). Une transition nouvelle attend la fonction de transition de ${debt.step} ; sinon justifiez-la et relevez le plafond en revue.`);
-    }
+  const allowed = debt.files[file]?.workflows ?? 0;
+  if (now.workflows > allowed) {
+    errors.push(`${file} : ${now.workflows} « update workflows » pour un plafond de ${allowed} (cliquet ${debt.step}). Une écriture nouvelle attend la fonction de transition des workflows ; sinon justifiez-la et relevez le plafond en revue.`);
   }
 }
 for (const [file, ceiling] of Object.entries(debt.files)) {
-  const now = counted[file] ?? { runs: 0, workflows: 0 };
-  if (now.runs < (ceiling.runs ?? 0) || now.workflows < (ceiling.workflows ?? 0)) {
-    errors.push(`${file} : moins d'écritures que le plafond (${now.runs} runs, ${now.workflows} workflows) ; constatez-le avec --record.`);
+  if ("runs" in ceiling) errors.push(`${file} : plafond « runs » dans le cliquet ; les écritures de runs sont strictes depuis S2d, retirez-le.`);
+  const now = counted[file] ?? { workflows: 0 };
+  if (now.workflows < (ceiling.workflows ?? 0)) {
+    errors.push(`${file} : moins d'écritures que le plafond (${now.workflows} workflows) ; constatez-le avec --record.`);
   }
 }
 if (new Date(`${debt.until}T23:59:59Z`).getTime() < Date.now()) {
@@ -160,5 +183,5 @@ if (new Date(`${debt.until}T23:59:59Z`).getTime() < Date.now()) {
 
 for (const message of errors) console.error(`run-writes-contract: ${message}`);
 if (errors.length) process.exit(1);
-const total = Object.values(counted).reduce((sum, now) => sum + now.runs + now.workflows, 0);
-console.log(`run-writes-contract: créations de runs et workflows dans ${PRIMITIVES} seulement ; ${total} transitions sous le cliquet ${debt.step} (jusqu'au ${debt.until}).`);
+const total = Object.values(counted).reduce((sum, now) => sum + now.workflows, 0);
+console.log(`run-writes-contract: créations de runs et workflows dans ${PRIMITIVES} seulement ; transitions de runs dans ${TRANSITIONS} seulement ; ${total} écritures de workflows sous le cliquet ${debt.step} (jusqu'au ${debt.until}).`);

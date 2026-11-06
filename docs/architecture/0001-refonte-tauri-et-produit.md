@@ -691,7 +691,16 @@ remplacé par 0175, qui ouvre la revue de tout run sans workflow passé en `unkn
 **Transitions explicites.** Les changements de `runs.status`, `external_state` et
 `remote_stop_state` (51 instructions `update runs`, dont 38 posent `status`, inventaire 0002
 section 7) passent par une fonction de transition qui refuse une transition illégale et garde le
-fencing par bail (`lease_owner`, `lease_generation`).
+fencing par bail (`lease_owner`, `lease_generation`). **Fait en S2d**
+([0002](0002-invariants-des-runs.md), section 9.3) : `modules/execution/src/sql/run-transitions.ts`
+(`transitionRuns`) est le seul écrivain des trois colonnes. Il refuse avant d'écrire une transition
+absente des tables de `domain/run-transitions.ts` (statut, état externe, arrêt distant) et garde
+dans son `where` l'état d'origine et le bail du worker (propriétaire, génération **et échéance** :
+un bail expiré n'écrit plus, même avant d'être repris) ; il rend les lignes qui ont bougé. Les autres
+colonnes passent par des écritures nommées (`sql/run-columns.ts`). Les 66 `update runs` du cliquet
+S2b en sortent tous ; la garde `run-writes-contract.ts` est stricte pour `runs`, et ne compte plus
+que les 36 `update workflows` (cliquet daté). D4, D6 et D9 corrigés ; test
+`tests/integration/run-transitions.ts` (deux workers, transitions illégales, D4, D6, D9).
 
 **Événements.** Deux choses distinctes à préserver : la `sequence` par run (calcul
 `max(sequence)+1` présent à 14 endroits sur `run_events`) et l'ordre de commit du curseur global.
@@ -797,10 +806,10 @@ préflight, création, streaming, approbations, repli de fournisseur, réconcili
 | Écran débranché entre deux lancements | Fenêtre ramenée sur un écran visible | Test Rust |
 | Worker qui plante pendant la création, avant d'enregistrer l'identifiant Hermes | Run en `unknown` (`HERMES_CREATE_OUTCOME_UNKNOWN`, `queue.ts:270`), **jamais** relancé automatiquement : revue par l'utilisateur | Test d'intégration |
 | Worker qui plante après l'enregistrement de l'identifiant, rejeu annoncé par l'hôte | Reprise par rejeu depuis `last_hermes_sequence`, sans doublon d'événement | Test d'intégration |
-| Idem, rejeu **non** annoncé par l'hôte | Réconciliation par lecture du statut (`runner.ts:885`), puis `unknown` si l'issue reste incertaine | Test d'intégration |
+| Idem, rejeu **non** annoncé par l'hôte | Réconciliation par lecture du statut (`runner.ts:885`), puis `unknown` si l'issue reste incertaine ; l'arrêt propre du worker remet aussi le run en `polling` depuis S2d (D4) | Test d'intégration ; `run-transitions.ts`, partie 4 |
 | Deux producteurs d'événements concurrents sur un même run | Séquences uniques et contiguës, curseur global ordonné | Test d'intégration concurrent |
 | Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible. État S2b : insertion directe **impossible** en production (seule la primitive insère, statut `queued` ou `relaying`) ; tout run sans workflow qui passe en `unknown` reçoit son workflow de revue (0175) : DM racine, brouillon de persona, DM sans initiateur (agence), run entrant d'un handoff hérité, tour de salon hérité ; l'abandon libère fil, capacité et bot | `tests/integration/orphan-unknown-runs.ts` (S2a caractérisait D1, S2b prouve le chemin de revue) |
-| Ancien worker qui écrit après expiration de son bail | Écriture refusée par le fencing | Test d'intégration |
+| Ancien worker qui écrit après expiration de son bail | Écriture refusée par le fencing, avant et après la reprise par un autre worker (S2d : le fencing compte aussi l'échéance du bail) | `tests/integration/run-transitions.ts`, partie 1 |
 | Coupure de la connexion LISTEN | Réabonnement, rattrapage depuis le curseur durable | Test d'intégration |
 | Deux répliques d'API | Les deltas arrivent à tous les clients en < 1 s | Test d'intégration à deux instances |
 | Jeton de lien volé | Ne permet plus d'imposer une nouvelle clé d'appareil | Test du gateway |
@@ -846,7 +855,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **S2a** Inventaire | Inventaire des invariants des 16 écritures de `runs` ([0002](0002-invariants-des-runs.md)) | Document d'invariants relu |
 | **S2b** Primitives de création | Primitives transactionnelles + commandes explicites ; trigger 0091 conservé | Garde : aucune écriture de `runs`/`workflows` hors des primitives |
 | **S2c** Allocation d'événements | Une seule primitive : verrou du run puis verrou du curseur, puis calcul, dans la transaction qui insère | Garde sur `max(sequence)` hors primitive ; test de producteurs concurrents |
-| **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales |
+| **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales. **Fait** (2026-11-06) ; reste : transitions de `workflows` (cliquet daté) |
 | **S2e** `executeRun` | Découpage en étapes nommées | Comportement identique (tests existants) + taille sous le cliquet |
 | **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution |
 | **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert |
@@ -965,3 +974,12 @@ puis lit `max(sequence)` dans une instruction distincte, dans la transaction qui
 nommée ; la course réelle, un avis de complétion qui prenait la place d'un `tool.result.attached`,
 n'est plus possible). Le balayage des runtimes connecteurs injoignables passe de `runtime-link` à
 `execution`, propriétaire des tables qu'il écrit. Aucune migration.
+
+**Transitions S2d (2026-11-06)** : section 4.5 et [0002](0002-invariants-des-runs.md) section 9.3.
+Une fonction (`sql/run-transitions.ts`) écrit seule `status`, `external_state` et
+`remote_stop_state`, d'après une table déduite de 0002 section 7 et testée paire par paire ; le
+fencing du worker ajoute l'échéance du bail au propriétaire et à la génération. Les 66 écritures de
+`runs` du cliquet passent par elle ou par une écriture nommée ; la garde est stricte. Corrigés : D4
+(arrêt du worker remis en `polling`), D6 (courrier clos sous garde : la double livraison est
+reproduite sur le code d'avant), D9 (abandon et relance règlent l'état externe). D5, D7, D8, D10,
+D11 restent ouverts (verrous de route, admission, données héritées). Aucune migration.

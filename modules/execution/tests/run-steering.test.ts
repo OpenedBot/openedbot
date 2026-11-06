@@ -93,7 +93,7 @@ describe("steering Hermes", () => {
     await reconcileRunSteerEvent(db, { id: target, organizationId: org }, true);
 
     expect(queries.some((query) => query.sql.includes("set status = 'confirmed'"))).toBe(true);
-    expect(queries.some((query) => query.sql.includes("completion_kind = 'steered_into_active'"))).toBe(true);
+    expect(queries.some((query) => query.sql.includes("update runs set status = 'cancelled'") && query.values.includes("steered_into_active"))).toBe(true);
     expect(queries.some((query) => query.sql.includes("set status = 'completed'"))).toBe(true);
   });
 
@@ -153,7 +153,7 @@ describe("steering Hermes", () => {
     )).resolves.toBe("none");
 
     expect(posts).toEqual([]);
-    expect(queries.some((query) => query.sql.includes("update runs set") && query.sql.includes("steered_into_active"))).toBe(false);
+    expect(queries.some((query) => query.sql.includes("update runs set") && query.values.includes("steered_into_active"))).toBe(false);
     expect(queries.some((query) => query.sql.includes("update workflows set"))).toBe(false);
     expect(queries.some((query) => query.sql.includes("set status = 'sending'"))).toBe(false);
     expect(queries.some((query) => query.sql.includes("insert into run_events"))).toBe(false);
@@ -236,7 +236,7 @@ describe("steering Hermes", () => {
     expect(claim.sql).toContain("left join workflows workflow");
     expect(claim.sql).toContain("source.workflow_id is null or workflow.status = 'queued'");
     expect(claim.sql).toContain("coalesce(workflow.created_at, source.created_at)");
-    expect(queries.some((query) => query.sql.includes("completion_kind = 'steered_into_active'"))).toBe(true);
+    expect(queries.some((query) => query.sql.includes("update runs set status = 'cancelled'") && query.values.includes("steered_into_active"))).toBe(true);
     expect(queries.some((query) => query.sql.includes("update workflows set"))).toBe(false);
   });
 
@@ -256,7 +256,7 @@ describe("steering Hermes", () => {
     await expect(reconcileRunSteerEvent(db, { id: target, organizationId: org }, true)).resolves.toBe("confirmed");
     expect(queries.find((query) => query.sql.includes("from run_steering_attempts steer"))!.sql)
       .not.toContain("source.workflow_id is not null");
-    expect(queries.some((query) => query.sql.includes("completion_kind = 'steered_into_active'"))).toBe(true);
+    expect(queries.some((query) => query.sql.includes("update runs set status = 'cancelled'") && query.values.includes("steered_into_active"))).toBe(true);
     expect(queries.some((query) => query.sql.includes("update workflows set"))).toBe(false);
   });
 

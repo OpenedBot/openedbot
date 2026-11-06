@@ -29,6 +29,7 @@ import { NamedRunError } from "./failure";
 import { persistUnnumberedEvents } from "./persist";
 import type { RunContext } from "./types";
 import { describe, log } from "./util";
+import { markCreateIntent } from "./lease-transitions";
 
 /**
  * Le couple que ce run demandera, selon le mode d'attribution de l'organisation.
@@ -221,14 +222,7 @@ export async function persistResolvedRunModel(
   context: Pick<RunContext, "id" | "organizationId" | "leaseGeneration">,
   model: string | null,
 ): Promise<boolean> {
-  const rows = await db<Array<{ id: string }>>`
-    update runs set model = ${model}, external_state = 'creating', events_complete = false, updated_at = now()
-     where id = ${context.id} and organization_id = ${context.organizationId}
-       and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-       and status = 'starting' and external_state = 'not_started'
-     returning id
-  `;
-  return Boolean(rows[0]);
+  return markCreateIntent(db, config, context, model);
 }
 
 export function fallbackAwareError(error: unknown, retryState: ProviderRetryState): unknown {

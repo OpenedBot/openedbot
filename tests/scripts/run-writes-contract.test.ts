@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 const SCRIPT = resolve(import.meta.dir, "run-writes-contract.ts");
 const roots: string[] = [];
 
-/** A minimal tree the contract accepts: primitives, one command, one counted transition, the review trigger. */
+/** A minimal tree the contract accepts: primitives, one command, the transition function, a named column write, one counted workflow write, the review trigger. */
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "run-writes-contract-"));
   roots.push(root);
@@ -18,13 +18,18 @@ function fixture(): string {
       "export const c = (tx: any) => tx`update workflows set used_steps = used_steps + 1 where id = ${1}`;",
     ].join("\n"),
     "modules/execution/src/application/run-creation.ts": 'import { a } from "../sql/run-writes";\nexport { a };\n',
+    "modules/execution/src/sql/run-transitions.ts": "export const t = (tx: any) => tx`update runs set status = 'failed' where id = ${1}`;\n",
+    "modules/execution/src/sql/run-columns.ts": [
+      "// status = 'x' named in a comment only",
+      "export const k = (tx: any) => tx`update runs set completion_kind = ${1} where id = ${2} and status in ('queued')`;",
+    ].join("\n"),
     "modules/execution/src/application/queue.ts": [
-      "// insert into runs is named here, in a comment only",
-      "export const d = (tx: any) => tx`update runs set status = 'failed' where id = ${1}`;",
+      "// insert into runs and update runs are named here, in a comment only",
+      "export const d = (tx: any) => tx`update workflows set status = 'failed' where id = ${1}`;",
     ].join("\n"),
     "tests/scripts/run-writes-debt.json": JSON.stringify({
-      until: "2999-12-31", step: "S2d", reason: "fixture",
-      files: { "modules/execution/src/application/queue.ts": { runs: 1 } },
+      until: "2999-12-31", step: "workflows", reason: "fixture",
+      files: { "modules/execution/src/application/queue.ts": { workflows: 1 } },
     }),
     "db/migrations/0091_run_admission_envelope.sql": "insert into public.workflows (id) values (gen_random_uuid());\n",
   };
@@ -47,10 +52,40 @@ afterEach(() => {
 });
 
 describe("run-writes-contract", () => {
-  test("accepts creations in the primitives and the counted transitions", () => {
+  test("accepts creations in the primitives, transitions in the transition function and the counted workflow writes", () => {
     const result = run(fixture());
-    expect(result.output).toContain("1 transitions sous le cliquet S2d");
+    expect(result.output).toContain("1 écritures de workflows sous le cliquet workflows");
     expect(result.code).toBe(0);
+  });
+
+  test("refuses an update of runs outside the transition function and the named column writes", () => {
+    for (const statement of ["update runs set status = 'queued' where id = 1", "UPDATE public.runs set input = 'x'", "update runs r set heartbeat_at = now()"]) {
+      const root = fixture();
+      write(root, "modules/execution/src/application/runner/cancel.ts", `export const e = (tx: any) => tx\`${statement}\`;\n`);
+      const result = run(root);
+      expect(result.code).toBe(1);
+      expect(result.output).toContain("modules/execution/src/application/runner/cancel.ts:1");
+      expect(result.output).toContain("hors de la fonction de transition");
+    }
+  });
+
+  test("refuses one of the three columns in a named column write", () => {
+    for (const column of ["status = 'running'", "external_state = 'polling'", "remote_stop_state = null"]) {
+      const root = fixture();
+      write(root, "modules/execution/src/sql/run-columns.ts", `export const k = (tx: any) => tx\`update runs set model = \${1} where ${column}\`;\n`);
+      const result = run(root);
+      expect(result.code).toBe(1);
+      expect(result.output).toContain("ne s'écrivent ni ne se comparent ici");
+    }
+  });
+
+  test("refuses a migration that writes a run transition", () => {
+    const root = fixture();
+    write(root, "db/migrations/0176_backfill.sql", "update runs set error_code = 'X' where status = 'unknown';\nupdate public.runs\n   set external_state = 'settled' where id = 1;\n");
+    const result = run(root);
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("db/migrations/0176_backfill.sql:2");
+    expect(result.output).not.toContain("db/migrations/0176_backfill.sql:1 ");
   });
 
   test("refuses an insert into runs or workflows outside the primitives", () => {
@@ -81,18 +116,23 @@ describe("run-writes-contract", () => {
     expect(result.output).toContain("importe les primitives privées");
   });
 
-  test("refuses a new transition and an insert from another migration", () => {
+  test("refuses a new workflow write, a runs ceiling and an insert from another migration", () => {
     const root = fixture();
     write(root, "modules/execution/src/application/queue.ts",
-      "export const d = (tx: any) => tx`update runs set status = 'failed'`;\nexport const g = (tx: any) => tx`update runs set status = 'queued'`;\n");
+      "export const d = (tx: any) => tx`update workflows set status = 'failed'`;\nexport const g = (tx: any) => tx`update workflows set status = 'queued'`;\n");
     write(root, "db/migrations/0176_backfill.sql", "insert into runs (id) select id from x;\n");
+    write(root, "tests/scripts/run-writes-debt.json", JSON.stringify({
+      until: "2999-12-31", step: "workflows", reason: "fixture",
+      files: { "modules/execution/src/application/queue.ts": { workflows: 1, runs: 1 } },
+    }));
     const result = run(root);
     expect(result.code).toBe(1);
-    expect(result.output).toContain("2 « update runs » pour un plafond de 1");
+    expect(result.output).toContain("2 « update workflows » pour un plafond de 1");
+    expect(result.output).toContain("plafond « runs » dans le cliquet");
     expect(result.output).toContain("db/migrations/0176_backfill.sql:1");
   });
 
-  test("a transition that disappears must be recorded, and --record only lowers", () => {
+  test("a workflow write that disappears must be recorded, and --record only lowers", () => {
     const root = fixture();
     write(root, "modules/execution/src/application/queue.ts", "export const d = 1;\n");
     expect(run(root).output).toContain("constatez-le avec --record");

@@ -162,6 +162,8 @@ function fakeTx(calls: Call[], row: RunFixture, sending = false): TransactionDb 
     if (sql.includes("insert into run_events")) {
       return Promise.resolve([{ cursor: "1", botId: null, turnId: null, sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
     }
+    // The transition answers the row it moved (S2d).
+    if (sql.startsWith("update runs")) return Promise.resolve([{ id: values[values.length - 1], organizationId: "org-1", threadId: "thread-1", workflowId: null, leaseGeneration: 0 }]);
     return Promise.resolve([]);
   }) as unknown as TransactionDb;
   return tag;

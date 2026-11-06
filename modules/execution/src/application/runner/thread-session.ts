@@ -11,6 +11,8 @@ import {
 } from "@openedbot/conversation/sql/threads";
 import type { ClaimedRun } from "../queue";
 import { log } from "./util";
+import { pinRunSessionKey } from "../../sql/run-columns";
+import { leaseFence } from "../../sql/run-transitions";
 
 export type ThreadSessionRow = {
   organizationId: string;
@@ -83,12 +85,6 @@ export async function pinThreadSession(
 
   const sessionId = threadSessionKey(row.threadSessionId, generation);
   if (generation === 0) return sessionId;
-  const pinned = await db<{ id: string }[]>`
-    update runs set execution_session_key = ${sessionId}, updated_at = now()
-     where id = ${claimed.id} and organization_id = ${claimed.organizationId}
-       and lease_owner = ${workerId} and lease_generation = ${claimed.leaseGeneration}
-       and execution_session_key is null and hermes_run_id is null
-    returning id
-  `;
-  return pinned[0] ? sessionId : null;
+  const pinned = await pinRunSessionKey(db, claimed, leaseFence(workerId, claimed.leaseGeneration), sessionId);
+  return pinned ? sessionId : null;
 }

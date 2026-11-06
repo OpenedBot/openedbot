@@ -20,6 +20,7 @@ import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
 import { type GroupFollowUp, type GroupSendState } from "@openedbot/execution/domain/group-send";
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
 import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
+import { foldQueuedRunInputTx } from "@openedbot/execution/sql/run-columns";
 import { admitUserTurnTx } from "@openedbot/execution/application/run-creation";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -302,12 +303,7 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
           // `enqueue` est le même geste sur le repli déjà posé d'un steer
           // pending : on allonge aussi le texte de la tentative, sans second
           // workflow.
-          await tx`
-            update runs set input = case when input = '' then ${runInput} else input || E'\n\n' || ${runInput} end,
-              updated_at = now()
-             where organization_id = ${auth.organizationId} and id = ${disposition.runId}
-               and status = 'queued' and hermes_run_id is null and lease_owner is null
-          `;
+          await foldQueuedRunInputTx(tx as unknown as SQL, { organizationId: auth.organizationId, id: disposition.runId }, runInput);
           if (disposition.kind === "enqueue") await tx`
             update run_steering_attempts set text = text || E'\n\n' || ${input}, updated_at = now()
              where organization_id = ${auth.organizationId} and id = ${disposition.attemptId}

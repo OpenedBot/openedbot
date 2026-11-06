@@ -1,15 +1,16 @@
 # 0002 — Invariants des écritures de `runs` (inventaire S2a)
 
 - **Statut :** inventaire S2a de l'ADR [0001](0001-refonte-tauri-et-produit.md) (section 4.5, étapes
-  S2a à S2e) ; **S2b réalisé** (section 9.1), **S2c réalisé** (section 9.2) : les références
-  `fichier:ligne` des sections 3 à 8 décrivent l'état d'avant S2b
+  S2a à S2e) ; **S2b réalisé** (section 9.1), **S2c réalisé** (section 9.2), **S2d réalisé**
+  (section 9.3) : les références `fichier:ligne` des sections 3 à 8 décrivent l'état d'avant S2b
 - **Date :** 2026-11-06
 - **Référence :** `develop` au commit `c1edc11`. Toutes les références `fichier:ligne` pointent ce
   commit ; `O` = observé dans le code ou par un test, `I` = déduit, à confirmer
 - **Preuve exécutable :** `tests/integration/orphan-unknown-runs.ts` (cible `make test-integration`),
   qui caractérisait D1 en S2a et prouve sa correction depuis S2b ;
   `tests/integration/run-event-sequences.ts`, qui reproduit D2 et D3 sur `develop` d'avant S2c et
-  prouve leur correction
+  prouve leur correction ; `tests/integration/run-transitions.ts`, fencing à deux workers,
+  transitions illégales, D4, D6 et D9 (S2d)
 - **Entrée de :** S2b (primitives de création), S2c (allocation d'événements), S2d (transitions)
 
 Ce document recense chaque écriture qui crée un run (et le workflow qui l'accompagne), la façon
@@ -298,7 +299,8 @@ workflow, sauf l'annulation de maintenance des types morts `memory` / `compactio
 ## 8. Défauts relevés
 
 Classés par gravité. Aucun n'est corrigé en S2a : D1 demande un chemin de revue, donc une
-décision de produit, et les autres relèvent de S2b à S2d.
+décision de produit, et les autres relèvent de S2b à S2d. État après S2d : D1 à D4, D6 et D9
+corrigés ; D5, D7, D8, D10 et D11 ouverts (section 9.3, « Défauts »).
 
 ### Élevé
 
@@ -365,6 +367,7 @@ le faucheur fait passer le même cas à `polling` et `events_complete = false` (
 (`runner.ts:885-890`) ne s'applique qu'à `polling`. Avec un rejeu annoncé, le flux reprend depuis
 `last_hermes_sequence` (`runner.ts:937`, `:958`) ; **sans** rejeu annoncé, il se raccroche au flux
 sans `since` au lieu de lire le statut. À confirmer par un test en S2d (ADR 0001, section 5, lignes « worker qui plante »).
+*Corrigé en S2d* (section 9.3) : confirmé (O, test) puis corrigé.
 
 ### Faible
 
@@ -378,6 +381,9 @@ sans `since` au lieu de lire le statut. À confirmer par un test en S2d (ADR 000
 - **D6 — Courrier clos sans garde (`conversation-followup.ts:363-386`).** Lecture sans verrou,
   `update` sans `status = 'relaying'`. Sûr aujourd'hui parce que le run entrant est verrouillé
   avant (`run-cancellation.ts:33-55`, `:70-98`), donc sérialisé avec `deliverHandoffReplyTx`.
+  *Corrigé en S2d* (section 9.3). La sérialisation ne tenait pas : la lecture sans verrou voit
+  encore `relaying` pendant que le worker livre, et l'`update` sans garde attend puis passe ; le
+  test reproduit la double livraison (deux réponses, deux `run.completed` sur le courrier, O).
 - **D7 — Branche morte du handoff.** `createHandoffTx` annonce `created: false` « si le fil de la
   cible est occupé » (`handoff.ts:138`) mais renvoie toujours `created: true` (`:178`) : l'avis
   « est occupé » de `persist.ts:453-461` ne part jamais.
@@ -391,7 +397,10 @@ sans `since` au lieu de lire le statut. À confirmer par un test en S2d (ADR 000
   (`workflow-routes.ts:208`, `:353`) : il reste dans `runs_reconciliation_idx`. Si son état externe
   était `ambiguous`, le fil le présente encore `needs_review` (`conversation-thread-routes.ts:128`) ;
   un run passé en `unknown` avec `polling` (`settleOrphanCreate`, `runner/failure.ts:237-239`) ne
-  l'est plus. Peut-être voulu (risque de doublon) ; à trancher en S2d.
+  l'est plus. Peut-être voulu (risque de doublon) ; à trancher en S2d. *Tranché et corrigé en S2d*
+  (section 9.3) : l'opérateur a réglé l'incertitude, l'état externe passe à `settled` ; le risque
+  de doublon reste écrit sur le workflow (`recovery_state.duplicateRisk`) et `events_complete`
+  reste faux.
 - **D10 — Politique de routine lue sans verrou.** `fireDueRoutine` (`routines.ts:126-146`) et le
   lancement manuel (`routine-routes.ts:398-421`, membres d'un salon à `:874`) lisent l'autonomie du
   bot sans verrouiller le bot, quand l'envoi la relit `for update` ; une modification
@@ -497,8 +506,8 @@ tour de salon hérité réconcilié, qu'aucune étape de workflow ne règle, cl�
 Reste ouvert :
 
 - ~~**S2c**~~ : fait (section 9.2) ;
-- **S2d** : fonction de transition et vidage du cliquet ; D4, D6, D9 ; l'ancien workflow d'une
-  relance réglé par la route ;
+- ~~**S2d**~~ : fonction de transition et vidage du cliquet ; D4, D6, D9 : fait (section 9.3) ;
+  l'ancien workflow d'une relance reste réglé par la route (écriture de `workflows`, cliquet) ;
 - un abandon de la revue d'un run entrant ne livre pas son courrier : le fil d'origine reste
   `relaying` jusqu'à son arrêt par l'opérateur (inchangé, données héritées seulement) ;
 - D5 (ordre des verrous abonnement / fil) et D10 (politique de routine lue sans verrou), qui
@@ -580,12 +589,136 @@ Reste ouvert :
 - la graine du normaliseur et celle du lot réconcilié restent des lectures hors transaction : des
   propositions, imposées par la publication avant le commit, désormais contrôlées à chaque
   écriture ;
-- S2d : fonction de transition et vidage du cliquet de S2b ; D4 à D11 inchangés.
+- ~~S2d~~ : fonction de transition et vidage du cliquet de S2b : fait (section 9.3).
+
+### 9.3 Réalisé en S2d (2026-11-06)
+
+**Table.** `modules/execution/src/domain/run-transitions.ts` : les mouvements légaux des trois
+colonnes, ceux que le code écrit (section 7), rien de plus ; `modules/execution/tests/run-transitions.test.ts`
+vérifie chacune des 81 + 49 + 25 paires contre une liste réécrite à part.
+
+| Origine | `status` légal | Remarque |
+|---|---|---|
+| `queued` | `queued`, `starting`, `cancelled`, `failed`, `unknown` | la réclamation crée le bail |
+| `starting`, `running`, `awaiting_approval` | `running`, `awaiting_approval`, `completed`, `failed`, `cancelled`, `queued`, `unknown` | `starting` ne revient jamais à `starting` |
+| `relaying` | `completed`, `cancelled` | courrier |
+| `unknown` | `unknown`, `queued`, `failed`, `cancelled` | revue (reconcile, abandon, relance) ou maintenance |
+| `cancelled` | `queued` **si** `completion_kind = 'steered_into_active'`, `unknown` | condition d'arête ajoutée au `where` |
+| `completed`, `failed` | aucun (aucune des trois colonnes ne bouge plus) | 0081 |
+
+`external_state` : rester est toujours légal ; `ambiguous` est accessible de partout ;
+`not_started` seulement depuis `creating` (création refusée ou jamais envoyée) et `settled` (rejeu
+d'un steer jamais parti) ; `settled` ne mène qu'à `not_started` et `ambiguous` ; `ambiguous` se
+règle par `polling` (réconciliation) ou `settled` (abandon) ; `stopping` → `polling`, `settled`.
+`remote_stop_state` : jamais de retour à `null` (une demande d'arrêt ne s'oublie pas) ; un arrêt
+confirmé, incertain ou en échec peut être redemandé ; tout arrêt peut devenir incertain.
+
+**Primitive.** `modules/execution/src/sql/run-transitions.ts`, `transitionRuns(sql, { target,
+fence, transition, set?, where? })` : une instruction, dans la transaction de l'appelant ou seule.
+Elle refuse avant d'écrire une transition dont une origine déclarée n'est pas légale (erreur de
+programmation), puis garde dans le `where` : les statuts d'origine, la condition d'arête, l'état
+externe parmi les origines légales de sa cible (pour un choix selon l'id Hermes, chaque branche
+garde les siennes), l'arrêt distant de même, le fencing, et le prédicat propre à l'appelant. Elle
+rend les lignes qui ont bougé (`id`, organisation, fil, workflow, génération) : une réponse vide dit
+que le run n'était plus dans un état accepté, jamais une erreur. Les états sont écrits en
+littéraux (contrôlés contre leur ensemble fermé), les autres valeurs liées.
+
+| Fencing | `where` | Qui |
+|---|---|---|
+| `{ lease: { owner, generation } }` | `lease_owner`, `lease_generation` **et** `lease_expires_at > now()` | le worker qui tient le run (runner, persistance, arrêt, échec, repli de fournisseur, arrêt du worker) |
+| `lease_expired` | bail expiré ou absent | balayages du bail (`queue-sweeps.ts`) et poison |
+| `unleased` | aucun | l'API sur des lignes qu'elle a verrouillées (annulation, revue, steer, courrier), un run `queued` (réclamation, échéances, runtime injoignable), et deux issues du worker écrites sans bail par construction : le run Hermes orphelin (`settleOrphanCreate`) et la décision de porte reçue par Hermes (`runner.ts`) |
+
+`lockLeasedRunTx` prend la ligne pour `persistEvents` sous le même fencing ; `sql/run-columns.ts`
+porte les écritures des autres colonnes, chacune nommée et sous le même bail quand c'est le worker
+qui écrit : battement de bail (`renewRunLease`), modèle d'un repli en création, filigrane du flux
+(par génération seule en fin de `persistEvents`, dont un événement terminal a déjà rendu le bail),
+`completion_kind` (et la sortie gardée), mesures de latence, clé de session, entrée repliée d'un
+run en file. Aucune ne nomme les trois colonnes.
+
+**Sites migrés** (les 66 `update runs` du cliquet S2b) :
+
+| Fichier (avant) | Intention | Après S2d |
+|---|---|---|
+| `runner.ts` (15) | battement, création confirmée, repli (intention, confirmation), rejeu annoncé, `polling`, arrêt (demandé, confirmé, incertain), porte confirmée, reprise, décision perdue (`unknown`), modèle, filigrane | `runner/lease-transitions.ts` (intentions nommées, partagées avec `cancel.ts`) ; `run-columns.ts` |
+| `runner/persist.ts` (4) | `awaiting_approval`, `completed`, `failed`, filigrane | `transitionRuns` sous `lockLeasedRunTx` ; `advanceHermesWatermark` |
+| `runner/cancel.ts` (6) | arrêt à retransmettre (`queued`), arrêt confirmé (`cancelled`), étapes sœurs jamais parties | `transitionRuns`, `lease-transitions.ts` |
+| `runner/failure.ts` (3) | `markRunUnknown`, nouvel essai différé, run Hermes orphelin | `transitionRuns` |
+| `runner/provider-recovery.ts` (1) | `not_started` → `creating` | `markCreateIntent` |
+| `runner/handoff.ts` (1) | livraison du courrier | `transitionRuns` (`relaying` → `completed`) |
+| `runner/workflows.ts` (7) | `completion_kind` d'une étape | `recordRunCompletionKindTx` |
+| `runner/thread-session.ts`, `run-timings.ts` (1 + 1) | clé de session, mesures | `pinRunSessionKey`, `saveRunTimingsRecord` |
+| `queue.ts` (9) | transmission de porte expirée, bail expiré (deux formes), échéances avant et après Hermes, création perdue, réclamation, poison (deux issues) | balayages déplacés dans `queue-sweeps.ts` ; chaque CTE qui verrouillait et écrivait garde son `select … for update` et ses verrous, la transition suit dans la même transaction ; la réclamation de même |
+| `runtime-direct.ts`, `disconnected-runtime-runs.ts` (1 + 1) | run en file d'un runtime injoignable | `transitionRuns` (le runtime dans le prédicat) |
+| `run-cancellation.ts` (4) | annulation sûre, arrêt demandé, annulation incertaine, maintenance | `transitionRuns` depuis le statut verrouillé |
+| `run-steering.ts` (3) | steer confirmé, rejeu, repli replié | `transitionRuns` ; `recordRunCompletionKindTx` |
+| `apps/worker/.../worker-registry.ts` (2) | arrêt du worker | `application/worker-shutdown.ts` |
+| `apps/api/.../workflow-routes.ts` (5) | reconcile, abandon (et repli de steer), relance (et repli de steer) | `application/run-review.ts` |
+| `apps/api/.../conversation-followup.ts` (1) | courrier d'un handoff annulé | `transitionRuns` (garde `relaying`) |
+| `apps/api/.../conversation-message-routes.ts` (1) | message replié dans un run en file | `foldQueuedRunInputTx` |
+
+**Garde.** `tests/scripts/run-writes-contract.ts` (testé par mutation) : `update runs` n'existe
+que dans `sql/run-transitions.ts` et `sql/run-columns.ts` ; ce dernier ne nomme `status`,
+`external_state` ni `remote_stop_state` dans aucun `=` ; aucune migration n'assigne ces colonnes ;
+un plafond `runs` dans le cliquet est refusé. Le cliquet (`run-writes-debt.json`, jusqu'au
+2026-12-31) ne compte plus que les 36 `update workflows` : leur statut et ses colonnes, écrits à
+côté de la transition de run qui les entraîne. Deux fichiers y entrent par déplacement, sans
+écriture nouvelle : `queue-sweeps.ts` (4, venus de `queue.ts`) et `worker-shutdown.ts` (1, venu de
+`worker-registry.ts`).
+
+**Comportement.** Identique par ailleurs (tests unitaires et d'intégration existants, golden des
+2 400 portes qui ne change que par le texte de la transition `awaiting_approval`), sauf :
+
+- un bail **expiré** n'écrit plus, même avant d'être repris : battement, événements et leur
+  transition, `polling`, `unknown`, arrêt. Le balayage reprend le run comme avant. Un worker
+  vivant renouvelle son bail tous les tiers de bail et ne le voit pas expirer en marche normale ;
+  après l'échéance, son battement est refusé lui aussi et l'arrête (`lease_lost_or_cancelled`) ;
+- une écriture du worker qui n'avait que le bail pour garde (`polling`, arrêt incertain,
+  `awaiting_approval`, fin de run) garde aussi les statuts actifs : équivalent sous bail ;
+- la reprise d'un run (`settleResumedRunStatus`) fait passer `creating` et `streaming` à
+  `streaming` et garde les autres états, au lieu de forcer `streaming` partout sauf `polling` : ces
+  autres états n'arrivent pas sur un run repris (`stopping` passe par l'arrêt, `ambiguous` sans
+  id ne se reprend pas) ;
+- l'annulation de maintenance n'écrit le `run.error` que des runs qu'elle a annulés ;
+- les balayages et la réclamation sont deux instructions (verrouiller, puis transiter) au lieu
+  d'une, dans la même transaction et avec les mêmes verrous, dans le même ordre (run puis
+  workflow) ; le `queuedMs` de la réclamation est lu juste avant la transition.
+
+**Défauts.**
+
+| Défaut | État | Preuve ou raison |
+|---|---|---|
+| D4 | **corrigé** : l'arrêt du worker remet un run qui a un id Hermes en `polling` avec `events_complete = false`, comme le balayage, sous le bail de chaque run | `run-transitions.ts`, partie 4 ; sur le code d'avant : `streaming / true` |
+| D6 | **corrigé** : le courrier est clos d'abord, sous garde `relaying`, avant la réponse et les événements ; un courrier livré entre-temps ne reçoit rien | partie 3 ; sur le code d'avant : deux réponses, journal `0:bot.message,1:run.completed,2:bot.message,3:run.completed` |
+| D9 | **corrigé** : abandon et relance passent les runs `unknown` en `failed` et `settled` | partie 5 ; sur le code d'avant : `needs_review` |
+| D5 | ouvert | ordre des verrous abonnement / fil des routes d'admission : rien à voir avec une transition, demande de déplacer des verrous de route (ADR 0001, S4) |
+| D7 | ouvert | `createHandoffTx` ne sert que des données héritées (section 3.1) : la branche morte part avec le retrait de 12 et 13, après comptage en production |
+| D8 | ouvert | enveloppe d'admission (`deadline_at`) des runs de service et hérités : une question de création, pas de transition |
+| D10 | ouvert | politique de routine lue sans verrou : un verrou de lecture à l'admission |
+| D11 | ouvert | types morts : leur retrait attend le comptage en production (section 10) |
+
+**Tests.** `tests/integration/run-transitions.ts` (`make test-integration`), connexions séparées :
+(1) deux workers : le bail de A expiré, toutes ses écritures sont refusées avant le balayage, puis
+après la reprise par B (génération 2), qui finit le run seul ; (2) transitions illégales sur des
+lignes réelles : `completed` → `running` refusé, `cancelled` → `queued` sans steer et `unknown` →
+`streaming` sans effet, une demande d'arrêt jamais oubliée, la ligne intacte ; (3) D6 ; (4) D4 ;
+(5) D9. Rejoués sur `develop` d'avant S2d (mêmes scénarios, API d'alors) : la partie 1 (écriture
+après expiration acceptée, le run passe `completed`), 3, 4 et 5 échouent ; la partie 2 n'a pas
+d'équivalent (la fonction n'existait pas, chaque `update` portait sa garde).
+
+Reste ouvert :
+
+- les 36 écritures de `workflows` (statut, erreur, `recovery_state`, jetons), comptées : une
+  fonction de transition des workflows sur le même modèle ;
+- l'ancien workflow d'une relance reste réglé par la route ;
+- D5, D7, D8, D10, D11 (ci-dessus) ;
+- S2e : découpage d'`executeRun` (`runner.ts`, 1 331 lignes).
 
 ## 10. Ce qui reste incertain
 
-- D4, D5, D9 et la forme « agence » de D1 sont déduits de la lecture ; D1 (persona, handoff
-  hérité) est prouvé par le test, D2 et D3 par `run-event-sequences.ts` (S2c).
+- D5 et la forme « agence » de D1 sont déduits de la lecture ; D1 (persona, handoff
+  hérité) est prouvé par le test, D2 et D3 par `run-event-sequences.ts` (S2c), D4, D6 et D9 par
+  `run-transitions.ts` (S2d).
 - Le nombre de runs hérités (salon 11, 16 ; DM sans `step_kind` qui mènent au handoff 12, 13) et de
   runs `unknown` sans workflow en production n'est pas compté.
 - Le comportement d'un client devant un run `needs_review` sans workflow n'a pas été regardé dans
@@ -610,3 +743,5 @@ Reste ouvert :
   `run-writes-contract.ts`, D1 corrigé par 0175.
 - 2026-11-06, S2c : primitive d'allocation des événements (section 9.2), garde
   `run-events-contract.ts`, test concurrent `run-event-sequences.ts` ; D2 et D3 corrigés.
+- 2026-11-06, S2d : fonction de transition et fencing par bail (section 9.3), garde stricte pour
+  `runs`, test `run-transitions.ts` ; D4, D6 et D9 corrigés.

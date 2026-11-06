@@ -10,6 +10,9 @@ import { persistUnnumberedEvents } from "./persist";
 import { RunEventSequenceConflictError } from "../../domain/run-event-sequence";
 import type { RunContext } from "./types";
 import { describe, log } from "./util";
+import { ACTIVE_RUN_STATUSES } from "../../domain/run-transitions";
+import { RELEASE_LEASE, sqlExpr, transitionRuns } from "../../sql/run-transitions";
+import { heldLease, runKey } from "./lease-transitions";
 
 export function shouldRetryHermesRun(error: unknown, attempts: number): boolean {
   if (attempts >= MAX_RUN_ATTEMPTS || !(error instanceof HermesClientError)) return false;
@@ -79,19 +82,14 @@ export async function markRunUnknown(
   message: string,
 ): Promise<boolean> {
   const result = await db.begin(async (tx) => {
-    const rows = await tx<Array<{ workflowId: string | null }>>`
-      update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-        remote_stop_state = case
-          when remote_stop_state in ('requested','confirmed','failed') then 'ambiguous'
-          else remote_stop_state
-        end,
-        error_code = ${code}, error_message = ${message}, lease_owner = null, lease_expires_at = null,
-        updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-       returning workflow_id as "workflowId"
-    `;
+    const rows = await transitionRuns(tx as unknown as SQL, {
+      target: runKey(context), fence: heldLease(config, context),
+      transition: {
+        from: ACTIVE_RUN_STATUSES,
+        to: { status: "unknown", externalState: "ambiguous", remoteStopState: { map: { requested: "ambiguous", confirmed: "ambiguous", failed: "ambiguous" } } },
+      },
+      set: { eventsComplete: false, errorCode: code, errorMessage: message, ...RELEASE_LEASE },
+    });
     const row = rows[0];
     if (!row) return null;
     if (row.workflowId) {
@@ -158,20 +156,20 @@ export async function handleFailure(db: SQL, config: WorkerConfig, context: RunC
     // increment is handed back, within a bounded patience so a gateway stuck
     // there still ends the run.
     const patienceMinutes = attemptPatienceMinutes(error);
-    await db`
-      update runs set status = 'queued', lease_owner = null, lease_expires_at = null,
-        attempts = case
+    await transitionRuns(db, {
+      target: runKey(context), fence: heldLease(config, context),
+      transition: { from: ACTIVE_RUN_STATUSES, to: { status: "queued", externalState: { withHermesRun: "polling", withoutHermesRun: "not_started" } } },
+      set: {
+        ...RELEASE_LEASE,
+        attempts: sqlExpr`case
           when ${patienceMinutes} > 0 and created_at > now() - (${patienceMinutes} * interval '1 minute')
             then greatest(attempts - 1, 0)
           else attempts
-        end,
-        next_attempt_at = now() + (${delaySeconds} * interval '1 second'),
-        external_state = case when hermes_run_id is null then 'not_started' else 'polling' end,
-        error_code = ${error.code}, error_message = ${error.message}, updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-    `;
+        end`,
+        nextAttemptAt: sqlExpr`now() + (${delaySeconds} * interval '1 second')`,
+        errorCode: error.code, errorMessage: error.message,
+      },
+    });
     return;
   }
   const code = failureCode(error);
@@ -229,17 +227,20 @@ export async function settleOrphanCreate(db: SQL, context: RunContext, client: H
     });
   }
   await db.begin(async (tx) => {
-    const rows = await tx<Array<{ workflowId: string | null }>>`
-      update runs set hermes_run_id = coalesce(hermes_run_id, ${hermesRunId}),
-        status = 'unknown', external_state = ${remoteStopState === "confirmed" ? "polling" : "ambiguous"},
-        remote_stop_state = ${remoteStopState}, events_complete = false,
-        error_code = 'HERMES_CREATE_COMMIT_LOST',
-        error_message = 'Hermes a créé le run mais le lease local a été perdu avant la confirmation.',
-        lease_owner = null, lease_expires_at = null, ended_at = null, updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and status in ('starting','running','awaiting_approval','unknown')
-       returning workflow_id as "workflowId"
-    `;
+    // Unleased: the lease was lost by definition; the Hermes run exists whoever holds the row.
+    const rows = await transitionRuns(tx as unknown as SQL, {
+      target: runKey(context), fence: "unleased",
+      transition: {
+        from: [...ACTIVE_RUN_STATUSES, "unknown"],
+        to: { status: "unknown", externalState: remoteStopState === "confirmed" ? "polling" : "ambiguous", remoteStopState },
+      },
+      set: {
+        hermesRunId: sqlExpr`coalesce(hermes_run_id, ${hermesRunId})`, eventsComplete: false,
+        errorCode: "HERMES_CREATE_COMMIT_LOST",
+        errorMessage: "Hermes a créé le run mais le lease local a été perdu avant la confirmation.",
+        ...RELEASE_LEASE, endedAt: null,
+      },
+    });
     if (rows[0]?.workflowId) await tx`
       update workflows set status = 'unknown', error_code = 'HERMES_CREATE_COMMIT_LOST',
         error_message = 'Le run Hermes existe mais sa création locale doit être réconciliée.',

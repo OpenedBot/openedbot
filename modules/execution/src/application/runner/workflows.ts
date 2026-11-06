@@ -21,6 +21,7 @@ import { handoffRoster } from "./handoff";
 import { startWorkflowStepTx } from "./workflow-steps";
 import type { RunContext, WorkflowFailureContext } from "./types";
 import { describe, log } from "./util";
+import { recordRunCompletionKindTx } from "../../sql/run-columns";
 
 /** A workflow snapshot is an immutable ceiling; the current bot flag can only reduce it. */
 export function workflowAutonomyAllowsDelegation(
@@ -83,10 +84,7 @@ export async function advanceWorkflowCompletionTx(
   const workflow = rows[0];
   if (!workflow || ["completed", "failed", "cancelled", "expired", "unknown"].includes(workflow.status)) return [];
   if (!output.trim()) {
-    await tx`
-      update runs set completion_kind = 'empty_output', updated_at = now()
-       where organization_id = ${context.organizationId} and id = ${context.id}
-    `;
+    await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "empty_output");
     return advanceWorkflowFailureTx(
       tx,
       context,
@@ -121,10 +119,7 @@ export async function advanceWorkflowCompletionTx(
       budget: workflowBudget(workflow),
     });
     if (decision.accepted) {
-      await tx`
-        update runs set completion_kind = 'delegated', output = ${split.body.trim() || null}, updated_at = now()
-         where organization_id = ${context.organizationId} and id = ${context.id}
-      `;
+      await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "delegated", split.body.trim() || null);
       const childId = await startWorkflowStepTx(tx, {
         kind: "delegated",
         organizationId: context.organizationId,
@@ -166,10 +161,7 @@ export async function advanceWorkflowCompletionTx(
           error_message = ${delegationRefusalMessage(decision.reason)}, ended_at = now(), updated_at = now()
          where organization_id = ${context.organizationId} and id = ${workflow.id}
       `;
-      await tx`
-        update runs set completion_kind = 'delegation_refused', updated_at = now()
-         where organization_id = ${context.organizationId} and id = ${context.id}
-      `;
+      await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "delegation_refused");
       return result;
     }
   }
@@ -205,10 +197,7 @@ export async function advanceWorkflowCompletionTx(
       ended_at = now(), updated_at = now()
      where organization_id = ${context.organizationId} and id = ${workflow.id}
   `;
-  await tx`
-    update runs set completion_kind = 'final', output = ${completion || null}, updated_at = now()
-     where organization_id = ${context.organizationId} and id = ${context.id}
-  `;
+  await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "final", completion || null);
   return result;
 }
 
@@ -224,10 +213,7 @@ export async function settleSimpleDmCompletionTx(
   output: string,
 ): Promise<OrganizationEvent[]> {
   if (!output.trim()) {
-    await tx`
-      update runs set completion_kind = 'empty_output', updated_at = now()
-       where organization_id = ${context.organizationId} and id = ${context.id}
-    `;
+    await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "empty_output");
     return [];
   }
   const result: OrganizationEvent[] = [];
@@ -245,18 +231,12 @@ export async function settleSimpleDmCompletionTx(
       });
       if (refusal) result.push(refusal);
       if (!completion) {
-        await tx`
-          update runs set completion_kind = 'delegation_refused', updated_at = now()
-           where organization_id = ${context.organizationId} and id = ${context.id}
-        `;
+        await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "delegation_refused");
         return result;
       }
     }
   }
-  await tx`
-    update runs set completion_kind = 'final', output = ${completion}, updated_at = now()
-     where organization_id = ${context.organizationId} and id = ${context.id}
-  `;
+  await recordRunCompletionKindTx(tx, { organizationId: context.organizationId, ids: [context.id] }, "final", completion);
   return result;
 }
 

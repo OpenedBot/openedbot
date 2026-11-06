@@ -1,8 +1,10 @@
 import type { SQL } from "bun";
-import { APPROVAL_LEASE_EXPIRED_CODE, APPROVAL_MAX_ATTEMPTS_CODE } from "@openedbot/contracts-errors";
+import { APPROVAL_MAX_ATTEMPTS_CODE } from "@openedbot/contracts-errors";
 import type { WorkerConfig } from "./worker-config";
-import { recoverRunSteersBeforeClaim } from "./run-steering";
-import { captureRunEventTx, withRunReceiptJournal, type RunJournalEvent } from "./run-receipts";
+import { withRunReceiptJournal } from "./run-receipts";
+import { MAX_RUN_ATTEMPTS, reapExpiredApprovalSends, sweepExpiredRunsTx } from "./queue-sweeps";
+import { ACTIVE_RUN_STATUSES } from "../domain/run-transitions";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import { isGroupSendState } from "../domain/group-send";
 import { appendNoticeTx, appendRunErrorTx, publishBatch } from "./runner/events";
@@ -10,7 +12,6 @@ import { deliverHandoffReplyTx } from "./runner/handoff";
 import { advanceGroupTx, advanceLegacyGroupTx } from "./runner/rooms";
 import type { RunContext } from "./runner/types";
 import { log } from "./runner/util";
-import { appendRunEventsTx } from "../sql/run-events";
 import { advanceWorkflowFailureTx } from "./runner/workflows";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 
@@ -22,274 +23,7 @@ export type ClaimedRun = {
   queuedMs?: number;
 };
 
-/** Plafond de tentatives partagé (reaper de baux + retry Hermes). Au-delà: échec terminal. */
-export const MAX_RUN_ATTEMPTS = 5;
-
-/**
- * Commit the approval reaper before acquiring unrelated claim candidates: a
- * transaction must never keep a gate lock and then go looking for another run.
- */
-async function reapExpiredApprovalSends(db: SQL): Promise<void> {
-  await db.begin(async (tx) => {
-    // A process can die after Hermes received an approval but before the DB
-    // confirmation. Replaying that decision could duplicate a consequential
-    // action, so an expired `sending` lease is always a review state.
-    const ambiguous = await tx<Array<{ organizationId: string; threadId: string; runId: string }>>`
-      with expired_gate_parents as (
-        select distinct organization_id, run_id
-          from approval_requests
-         where forward_state = 'sending' and forwarding_lease_expires_at <= now()
-      ), locked_runs as (
-        select run.organization_id, run.id, run.workflow_id
-          from runs run
-          join expired_gate_parents parent
-            on parent.organization_id = run.organization_id and parent.run_id = run.id
-         order by run.organization_id, run.id
-         for update of run
-      ), locked_workflows as (
-        select workflow.organization_id, workflow.id
-          from workflows workflow
-          join locked_runs run
-            on run.organization_id = workflow.organization_id and run.workflow_id = workflow.id
-         order by workflow.organization_id, workflow.id
-         for update of workflow
-      ), locked_gates as (
-        select approval.id, approval.organization_id, approval.run_id
-          from approval_requests approval
-          join locked_runs run
-            on run.organization_id = approval.organization_id and run.id = approval.run_id
-          left join locked_workflows workflow
-            on workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-         where approval.forward_state = 'sending' and approval.forwarding_lease_expires_at <= now()
-           and (run.workflow_id is null or workflow.id is not null)
-         order by approval.organization_id, approval.run_id, approval.gate_ordinal
-         for update of approval
-      ), ambiguous_gates as (
-        update approval_requests approval set forward_state = 'ambiguous', forwarding_owner = null,
-          forwarding_lease_expires_at = null
-         from locked_gates locked
-         where approval.id = locked.id and approval.organization_id = locked.organization_id
-         returning approval.organization_id, approval.run_id
-      ), ambiguous_runs as (
-        update runs r set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-          error_code = 'APPROVAL_FORWARD_OUTCOME_UNKNOWN',
-          error_message = 'La transmission de la décision Hermes est incertaine.',
-          lease_owner = null, lease_expires_at = null, updated_at = now()
-         from ambiguous_gates gate
-         where r.organization_id = gate.organization_id and r.id = gate.run_id
-           and r.status in ('starting','running','awaiting_approval')
-         returning r.organization_id, r.thread_id, r.id as run_id, r.workflow_id
-      ), ambiguous_workflows as (
-        update workflows workflow set status = 'unknown', error_code = 'APPROVAL_FORWARD_OUTCOME_UNKNOWN',
-          error_message = 'La transmission de la décision Hermes est incertaine.', updated_at = now()
-         from ambiguous_runs run
-         where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-           and workflow.status not in ('completed','failed','cancelled','expired')
-         returning workflow.organization_id, workflow.id
-      )
-      select organization_id as "organizationId", thread_id as "threadId", run_id as "runId" from ambiguous_runs
-    `;
-    // The update holds every run's row: the primitive numbers each run.error
-    // after the cursor lock, in its own statement (D2).
-    await appendRunEventsTx(tx as unknown as SQL, ambiguous.map((run) => ({
-      ...run,
-      type: "run.error",
-      payload: {
-        message: "Transmission d’autorisation incertaine : vérification requise.",
-        errorCode: "APPROVAL_FORWARD_OUTCOME_UNKNOWN",
-        recoveryState: "needs_review",
-      },
-    })));
-  });
-}
-
-/**
- * One expiry pass over the queue, in the single transaction `claimRun` opens
- * before it claims: steering recovery, lease recovery of `starting`/`running`
- * and `awaiting_approval` runs, workflow deadlines before and after Hermes,
- * and the lease lost during a Hermes create. Idempotent, shared by the dedicated
- * sweep job and the head of `claimRun`.
- */
-async function sweepExpiredRunsTx(tx: SQL): Promise<void> {
-  // Recover steering before holding an unrelated expired target. A late ACK
-  // locks source/target in id order; requeueing the target first would invert
-  // that order when recovery later waits for the ACK's source lock.
-  await recoverRunSteersBeforeClaim(tx);
-  // Inclure awaiting_approval: un worker mort pendant une approbation laissait
-  // sinon le run orphelin à vie (bail expiré, jamais réclamé, fil bloqué). À la
-  // reprise, executeRun reconnecte le stream Hermes et le heartbeat transmet la
-  // réponse déjà saisie. Un worker vivant renouvelle son bail, donc n'est pas volé.
-  // `error_code` garde la cause la plus explicative pour l'opérateur : un run
-  // dont l'arrêt était DÉJÀ demandé a été arrêté par lui, et le bail n'a fait
-  // que retarder la clôture. Écraser avec 'WORKER_LEASE_EXPIRED' affichait un
-  // code de panne interne sous le « Run annulé. » qu'il venait de demander.
-  await tx`
-    update runs set status = 'queued', lease_owner = null, lease_expires_at = null,
-      next_attempt_at = null,
-      error_code = case when remote_stop_state = 'requested'
-        then coalesce(error_code, 'CANCELLED_BY_USER') else 'WORKER_LEASE_EXPIRED' end,
-      external_state = case when hermes_run_id is null then 'not_started' else 'polling' end,
-      events_complete = case when hermes_run_id is null then events_complete else false end,
-      updated_at = now()
-     where status in ('starting','running')
-       and (lease_expires_at < now() or lease_owner is null or lease_expires_at is null)
-       and attempts < ${MAX_RUN_ATTEMPTS}
-       and (external_state = 'not_started' or hermes_run_id is not null)
-  `;
-  // A workflow can spend its entire lifetime waiting for capacity or a runtime.
-  // Once its deadline passes, that pre-Hermes run can never be claimed, so
-  // settle the run and its workflow together while keeping run -> workflow
-  // lock order. Runs that may have crossed Hermes are deliberately excluded.
-  // A plain DM run has no workflow and carries its own `deadline_at`.
-  const expiredEvents = await tx<RunJournalEvent[]>`
-    with overdue_runs as (
-      select run.organization_id, run.id, run.workflow_id
-        from runs run
-        left join workflows workflow
-          on workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-       where run.status = 'queued' and run.external_state = 'not_started'
-         and run.hermes_run_id is null and run.remote_stop_state is null
-         and (
-           (workflow.status in ('queued','running','awaiting_approval') and workflow.deadline_at <= now())
-           or (run.workflow_id is null and run.deadline_at <= now())
-         )
-       order by run.organization_id, run.id
-       for update of run skip locked
-       limit 50
-    ), overdue_workflows as (
-      select workflow.organization_id, workflow.id
-        from workflows workflow
-        join overdue_runs run
-          on run.organization_id = workflow.organization_id and run.workflow_id = workflow.id
-       where workflow.status in ('queued','running','awaiting_approval')
-         and workflow.deadline_at <= now()
-       order by workflow.organization_id, workflow.id
-       for update of workflow
-    ), expired_runs as (
-      update runs run set status = 'failed', external_state = 'settled', events_complete = true,
-        completion_kind = 'workflow_deadline_before_start',
-        error_code = 'WORKFLOW_DEADLINE_EXCEEDED',
-        error_message = 'La durée maximale du workflow est atteinte avant son démarrage.',
-        ended_at = now(), lease_owner = null, lease_expires_at = null,
-        next_attempt_at = null, updated_at = now()
-       from overdue_runs overdue
-       left join overdue_workflows workflow
-         on workflow.organization_id = overdue.organization_id and workflow.id = overdue.workflow_id
-       where run.organization_id = overdue.organization_id and run.id = overdue.id
-         and run.status = 'queued' and run.external_state = 'not_started'
-         and (overdue.workflow_id is null or workflow.id is not null)
-       returning run.organization_id, run.thread_id, run.id as run_id, run.workflow_id
-    ), expired_workflows as (
-      update workflows workflow set status = 'expired',
-        error_code = 'WORKFLOW_DEADLINE_EXCEEDED',
-        error_message = 'La durée maximale du workflow est atteinte avant son démarrage.',
-        ended_at = now(), updated_at = now()
-       from expired_runs run
-       where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-         and workflow.status in ('queued','running','awaiting_approval')
-       returning workflow.organization_id, workflow.id
-    )
-    select organization_id as "organizationId", thread_id as "threadId", run_id as "runId",
-           'run.error' as type,
-           jsonb_build_object(
-             'message', 'La durée maximale du workflow est atteinte avant son démarrage.',
-             'errorCode', 'WORKFLOW_DEADLINE_EXCEEDED'
-           ) as payload
-      from expired_runs
-  `;
-  for (const event of expiredEvents) captureRunEventTx(tx, event);
-  // A requeued run with a durable Hermes id also must not stay behind the
-  // deadline guard forever. If no stop boundary was ever persisted, schedule
-  // the first stop. Otherwise force `polling + requested`, whose runner path is
-  // GET-only, so a crash can never replay an ambiguous POST /stop.
-  const stopEvents = await tx<RunJournalEvent[]>`
-    with overdue_external_runs as (
-      select run.organization_id, run.id, run.workflow_id, run.remote_stop_state
-        from runs run
-        left join workflows workflow
-          on workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-       where run.status = 'queued' and run.hermes_run_id is not null
-         and run.external_state <> 'settled' and run.remote_stop_state is distinct from 'requested'
-         and (
-           (workflow.status in ('queued','running','awaiting_approval') and workflow.deadline_at <= now())
-           or (run.workflow_id is null and run.deadline_at <= now())
-         )
-       order by run.organization_id, run.id
-       for update of run skip locked
-       limit 50
-    ), overdue_external_workflows as (
-      select workflow.organization_id, workflow.id
-        from workflows workflow
-        join overdue_external_runs run
-          on run.organization_id = workflow.organization_id and run.workflow_id = workflow.id
-       where workflow.status in ('queued','running','awaiting_approval')
-         and workflow.deadline_at <= now()
-       order by workflow.organization_id, workflow.id
-       for update of workflow
-    ), requested_runs as (
-      update runs run set
-        external_state = case when overdue.remote_stop_state is null then 'stopping' else 'polling' end,
-        remote_stop_state = 'requested', events_complete = false,
-        error_code = 'WORKFLOW_DEADLINE_EXCEEDED',
-        error_message = 'La durée maximale du workflow est atteinte; arrêt Hermes requis.',
-        next_attempt_at = now(), updated_at = now()
-       from overdue_external_runs overdue
-       left join overdue_external_workflows workflow
-         on workflow.organization_id = overdue.organization_id and workflow.id = overdue.workflow_id
-       where run.organization_id = overdue.organization_id and run.id = overdue.id
-         and run.status = 'queued' and run.hermes_run_id is not null
-         and (overdue.workflow_id is null or workflow.id is not null)
-       returning run.organization_id, run.thread_id, run.id as run_id, run.workflow_id
-    ), requested_workflows as (
-      update workflows workflow set error_code = 'WORKFLOW_DEADLINE_EXCEEDED',
-        error_message = 'La durée maximale du workflow est atteinte; arrêt Hermes requis.',
-        recovery_state = ${{ cancelRequested: true, reason: "deadline" }}, updated_at = now()
-       from requested_runs run
-       where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-         and workflow.status in ('queued','running','awaiting_approval')
-       returning workflow.organization_id, workflow.id
-    )
-    select organization_id as "organizationId", thread_id as "threadId", run_id as "runId",
-           'system.notice' as type,
-           jsonb_build_object(
-             'message', 'Délai du workflow atteint : arrêt et vérification Hermes en cours.',
-             'kind', 'workflow.deadline_stop_requested',
-             'errorCode', 'WORKFLOW_DEADLINE_EXCEEDED',
-             'workflowId', workflow_id
-           ) as payload
-      from requested_runs
-  `;
-  for (const event of stopEvents) captureRunEventTx(tx, event);
-  // Sending POST /v1/runs without receiving/storing a run id is the unsafe
-  // boundary: the old request may have executed, so never create again.
-  await tx`
-    with ambiguous as (
-      update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-        error_code = 'HERMES_CREATE_OUTCOME_UNKNOWN',
-        error_message = 'Le worker a perdu son bail pendant la création Hermes; aucune relance automatique.',
-        lease_owner = null, lease_expires_at = null, updated_at = now()
-       where status in ('starting','running','awaiting_approval')
-         and (lease_expires_at < now() or lease_owner is null or lease_expires_at is null)
-         and hermes_run_id is null and external_state in ('creating','streaming','stopping')
-       returning organization_id, workflow_id
-    )
-    update workflows w set status = 'unknown', error_code = 'HERMES_CREATE_OUTCOME_UNKNOWN',
-      error_message = 'L’effet de la création Hermes est incertain.', updated_at = now()
-     from ambiguous a
-     where w.organization_id = a.organization_id and w.id = a.workflow_id
-  `;
-  await tx`
-    update runs set status = 'queued', lease_owner = null, lease_expires_at = null,
-      next_attempt_at = null, error_code = ${APPROVAL_LEASE_EXPIRED_CODE},
-      error_message = 'Le worker a expiré pendant l’approbation; reprise de la demande.',
-      external_state = case when hermes_run_id is null then 'ambiguous' else 'polling' end,
-      events_complete = false, updated_at = now()
-     where status = 'awaiting_approval'
-       and (lease_expires_at < now() or lease_owner is null or lease_expires_at is null)
-       and hermes_run_id is not null
-       and attempts < ${MAX_RUN_ATTEMPTS}
-  `;
-}
+export { MAX_RUN_ATTEMPTS };
 
 /**
  * Requeues or settles every run whose lease or deadline has expired, without
@@ -308,7 +42,7 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
   return withRunReceiptJournal(db, async (tx) => {
     // Guard: keep the pass at the head of the claim, in the claim's own transaction.
     await sweepExpiredRunsTx(tx);
-    const rows = await tx<ClaimedRun[]>`
+    const candidates = await tx<Array<{ id: string; organizationId: string; queuedMs: number }>>`
       with candidate_run as (
         select r.id, r.organization_id, r.workflow_id, r.remote_stop_state
           from runs r
@@ -435,17 +169,22 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
                  and workflow.id = candidate_run.workflow_id
             )
       )
-      update runs r set
-        status = 'starting', lease_owner = ${config.workerId},
-        lease_expires_at = now() + (${config.leaseSeconds} * interval '1 second'),
-        heartbeat_at = now(), attempts = attempts + 1,
-        lease_generation = lease_generation + 1, updated_at = now()
-      from candidate
-      where r.id = candidate.id
-      returning r.id, r.organization_id as "organizationId", r.lease_generation as "leaseGeneration",
+      select r.id, r.organization_id as "organizationId",
         (extract(epoch from (clock_timestamp() - r.created_at)) * 1000)::float8 as "queuedMs"
+        from runs r join candidate on candidate.id = r.id
     `;
-    return rows[0] ? { ...rows[0], leaseGeneration: Number(rows[0].leaseGeneration) } : null;
+    const candidate = candidates[0];
+    if (!candidate) return null;
+    // The candidate is locked: the claim takes it, and creates the lease.
+    const [claimed] = await transitionRuns(tx, {
+      target: { organizationId: candidate.organizationId, id: candidate.id }, fence: "unleased",
+      transition: { from: ["queued"], to: { status: "starting" } },
+      set: {
+        leaseOwner: config.workerId, leaseExpiresAt: sqlExpr`now() + (${config.leaseSeconds} * interval '1 second')`,
+        heartbeatAt: NOW, attempts: sqlExpr`attempts + 1`, leaseGeneration: sqlExpr`lease_generation + 1`,
+      },
+    });
+    return claimed ? { id: claimed.id, organizationId: claimed.organizationId, leaseGeneration: claimed.leaseGeneration, queuedMs: candidate.queuedMs } : null;
   }) as Promise<ClaimedRun | null>;
 }
 
@@ -540,14 +279,14 @@ export async function reapPoisonRuns(db: SQL, config: WorkerConfig): Promise<num
       const approval = row.status === "awaiting_approval";
 
       if (poisonRunNeedsRecovery(row.externalState)) {
-        await tx`
-          update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-            remote_stop_state = case when external_state = 'stopping' then 'ambiguous' else remote_stop_state end,
-            error_code = ${POISON_OUTCOME_UNKNOWN_CODE}, error_message = ${POISON_OUTCOME_UNKNOWN_MESSAGE},
-            ended_at = null, lease_owner = null, lease_expires_at = null, updated_at = now()
-           where organization_id = ${row.organizationId} and id = ${row.id}
-             and status in ('starting','running','awaiting_approval')
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: { organizationId: row.organizationId, id: row.id }, fence: "lease_expired",
+          transition: {
+            from: ACTIVE_RUN_STATUSES,
+            to: { status: "unknown", externalState: "ambiguous", ...(row.externalState === "stopping" ? { remoteStopState: "ambiguous" } : {}) },
+          },
+          set: { eventsComplete: false, errorCode: POISON_OUTCOME_UNKNOWN_CODE, errorMessage: POISON_OUTCOME_UNKNOWN_MESSAGE, endedAt: null, ...RELEASE_LEASE },
+        });
         if (approval) {
           await tx`
             update approval_requests set
@@ -592,11 +331,11 @@ export async function reapPoisonRuns(db: SQL, config: WorkerConfig): Promise<num
 
       const errorCode = approval ? APPROVAL_MAX_ATTEMPTS_CODE : "WORKER_MAX_ATTEMPTS";
       const message = approval ? APPROVAL_MAX_ATTEMPTS_MESSAGE : WORKER_MAX_ATTEMPTS_MESSAGE;
-      await tx`
-        update runs set status = 'failed', error_code = ${errorCode}, error_message = ${message},
-          ended_at = now(), lease_owner = null, lease_expires_at = null, updated_at = now()
-         where organization_id = ${row.organizationId} and id = ${row.id}
-      `;
+      await transitionRuns(tx as unknown as SQL, {
+        target: { organizationId: row.organizationId, id: row.id }, fence: "lease_expired",
+        transition: { from: ACTIVE_RUN_STATUSES, to: { status: "failed" } },
+        set: { errorCode, errorMessage: message, endedAt: NOW, ...RELEASE_LEASE },
+      });
       if (approval) {
         await tx`
           update approval_requests set

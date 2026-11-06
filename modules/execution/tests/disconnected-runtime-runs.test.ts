@@ -12,7 +12,7 @@ function fakeDb(captured: Captured[], failed: unknown[] = []): SQL {
     if (sql.includes("insert into run_events")) {
       return Promise.resolve([{ cursor: "1", botId: null, turnId: "run-1", sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }]);
     }
-    return Promise.resolve(sql.includes("with stale_runtimes") ? failed : []);
+    return Promise.resolve(sql.startsWith("update runs set status = 'failed'") ? failed : []);
   };
   return { begin: async (fn: (inner: typeof tx) => Promise<unknown>) => fn(tx) } as unknown as SQL;
 }
@@ -23,6 +23,7 @@ describe("failRunsOnDisconnectedRuntimes", () => {
     expect(await failRunsOnDisconnectedRuntimes(fakeDb(captured), 900_000)).toBe(0);
     expect(captured).toHaveLength(1);
     const sql = captured[0]!.sql;
+    expect(sql).toStartWith("update runs set status = 'failed', external_state = 'settled'");
     expect(sql).toContain("left join api_instances inst");
     expect(sql).toContain("interval '60 seconds'");
     expect(sql).toContain("inst.instance_id is not null");
@@ -34,7 +35,7 @@ describe("failRunsOnDisconnectedRuntimes", () => {
 
   test("numérote le run.error de chaque run échoué par la primitive, après le verrou du run puis du curseur", async () => {
     const captured: Captured[] = [];
-    const failed = [{ organizationId: "org-1", threadId: "thread-1", runId: "run-1" }];
+    const failed = [{ id: "run-1", organizationId: "org-1", threadId: "thread-1", workflowId: null, leaseGeneration: 0 }];
     expect(await failRunsOnDisconnectedRuntimes(fakeDb(captured, failed), 900_000)).toBe(1);
     const steps = captured.map(({ sql }) => sql.includes("for no key update") ? "run"
       : sql.includes("pg_advisory_xact_lock") ? "cursor"

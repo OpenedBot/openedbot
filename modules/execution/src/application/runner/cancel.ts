@@ -18,6 +18,9 @@ import { deliverHandoffReplyTx } from "./handoff";
 import { assistantMessageForCompletion, groupSendState } from "./rooms";
 import type { RunContext } from "./types";
 import { pollWait } from "./util";
+import { ACTIVE_RUN_STATUSES } from "../../domain/run-transitions";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../../sql/run-transitions";
+import { confirmRemoteStop, heldLease, markRemoteStopAmbiguous, requestRemoteStop, runKey } from "./lease-transitions";
 
 export function requestedCancellationRecoveryMode(
   externalState: RunContext["externalState"],
@@ -67,14 +70,7 @@ export async function processRequestedCancellation(
     return;
   }
 
-  const stopping = await db<Array<{ id: string }>>`
-    update runs set external_state = 'stopping', remote_stop_state = 'requested', updated_at = now()
-     where id = ${context.id} and organization_id = ${context.organizationId}
-       and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-       and status in ('starting','running','awaiting_approval')
-     returning id
-  `;
-  if (!stopping[0]) return;
+  if (!await requestRemoteStop(db, config, context)) return;
   context.externalState = "stopping";
 
   try {
@@ -86,24 +82,18 @@ export async function processRequestedCancellation(
       context.attempts < MAX_RUN_ATTEMPTS
     ) {
       const delaySeconds = retryDelaySeconds(error, context.attempts);
-      await db`
-        update runs set status = 'queued', lease_owner = null, lease_expires_at = null,
-          next_attempt_at = now() + (${delaySeconds} * interval '1 second'),
-          external_state = 'stopping', remote_stop_state = 'requested',
-          error_code = coalesce(error_code, 'CANCEL_REQUESTED'),
-          error_message = coalesce(error_message, 'Annulation en attente de transmission à Hermes.'),
-          updated_at = now()
-         where id = ${context.id} and organization_id = ${context.organizationId}
-           and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-           and status in ('starting','running','awaiting_approval')
-      `;
+      await transitionRuns(db, {
+        target: runKey(context), fence: heldLease(config, context),
+        transition: { from: ACTIVE_RUN_STATUSES, to: { status: "queued", externalState: "stopping", remoteStopState: "requested" } },
+        set: {
+          ...RELEASE_LEASE, nextAttemptAt: sqlExpr`now() + (${delaySeconds} * interval '1 second')`,
+          errorCode: sqlExpr`coalesce(error_code, 'CANCEL_REQUESTED')`,
+          errorMessage: sqlExpr`coalesce(error_message, 'Annulation en attente de transmission à Hermes.')`,
+        },
+      });
       return;
     }
-    await db`
-      update runs set remote_stop_state = 'ambiguous', updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-    `;
+    await markRemoteStopAmbiguous(db, config, context);
     await markRunUnknown(
       db,
       config,
@@ -114,14 +104,7 @@ export async function processRequestedCancellation(
     return;
   }
 
-  const confirmed = await db<Array<{ id: string }>>`
-    update runs set remote_stop_state = 'confirmed', external_state = 'polling', updated_at = now()
-     where id = ${context.id} and organization_id = ${context.organizationId}
-       and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-       and status in ('starting','running','awaiting_approval')
-     returning id
-  `;
-  if (!confirmed[0]) return;
+  if (!await confirmRemoteStop(db, config, context)) return;
   context.externalState = "polling";
   context.remoteStopState = "confirmed";
 
@@ -233,18 +216,15 @@ async function settleRequestedCancellation(
     // Remplacé par le message suivant (politique de rafale) : le run s'arrête
     // sans erreur, son message reste dans le fil, et le repère est muet.
     const superseded = errorCode === FOLLOWUP_SUPERSEDE_CODE;
-    const fenced = await tx<Array<{ id: string }>>`
-      update runs set status = 'cancelled', output = ${cancelledOutput || null}, usage = ${details.usage},
-        external_state = 'settled', events_complete = true, remote_stop_state = 'confirmed',
-        completion_kind = ${superseded ? SUPERSEDED_COMPLETION_KIND : `cancelled_after_${details.status}`},
-        error_code = ${errorCode},
-        error_message = ${errorMessage},
-        ended_at = now(), lease_owner = null, lease_expires_at = null, updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-       returning id
-    `;
+    const fenced = await transitionRuns(tx as unknown as SQL, {
+      target: runKey(context), fence: heldLease(config, context),
+      transition: { from: ACTIVE_RUN_STATUSES, to: { status: "cancelled", externalState: "settled", remoteStopState: "confirmed" } },
+      set: {
+        output: cancelledOutput || null, usage: details.usage, eventsComplete: true,
+        completionKind: superseded ? SUPERSEDED_COMPLETION_KIND : `cancelled_after_${details.status}`,
+        errorCode, errorMessage, endedAt: NOW, ...RELEASE_LEASE,
+      },
+    });
     if (!fenced[0]) return null;
     const partialMessage = !superseded && !isServiceStepKind(context.stepKind)
       ? assistantMessageForCompletion(cancelledOutput, groupSendState(context))
@@ -278,14 +258,15 @@ async function settleRequestedCancellation(
     `;
     if (context.workflowId) {
       const workflowTerminalStatus = errorCode === "WORKFLOW_DEADLINE_EXCEEDED" ? "expired" : "cancelled";
-      await tx`
-        update runs set status = 'cancelled', external_state = 'settled', events_complete = true,
-          error_code = ${errorCode},
-          error_message = ${context.errorMessage ?? persisted[0]?.errorMessage ?? "Workflow annulé."}, ended_at = now(),
-          lease_owner = null, lease_expires_at = null, updated_at = now()
-         where organization_id = ${context.organizationId} and workflow_id = ${context.workflowId}
-           and status = 'queued' and external_state = 'not_started'
-      `;
+      // The workflow's steps that never started: no lease to hold.
+      await transitionRuns(tx as unknown as SQL, {
+        target: { organizationId: context.organizationId, workflowId: context.workflowId }, fence: "unleased",
+        transition: { from: ["queued"], fromExternalState: ["not_started"], to: { status: "cancelled", externalState: "settled" } },
+        set: {
+          eventsComplete: true, errorCode,
+          errorMessage: context.errorMessage ?? persisted[0]?.errorMessage ?? "Workflow annulé.", endedAt: NOW, ...RELEASE_LEASE,
+        },
+      });
       await tx`
         update workflows set status = ${workflowTerminalStatus},
           error_code = ${errorCode},

@@ -43,7 +43,7 @@ function fakeDb() {
     const sql = strings.join(" ? ").replace(/\s+/g, " ").trim();
     calls.push({ sql, values });
     if (sql.startsWith("select id as") && remaining) { remaining = false; return [{ ...row, organizationId: "org-1" }]; }
-    if (sql.startsWith("with stale_runtimes")) return [{ organizationId: "org-1", threadId: "thread-1", runId: "run-1" }];
+    if (sql.startsWith("update runs set status = 'failed'")) return [{ id: "run-1", organizationId: "org-1", threadId: "thread-1", workflowId: "wf-1", leaseGeneration: 0 }];
     if (sql.startsWith("insert into run_events")) return [{ cursor: "1", botId: null, turnId: "run-1", sessionKey: null, leaseGeneration: "0", occurredAt: new Date() }];
     return [];
   }) as unknown as SQL;
@@ -71,12 +71,17 @@ test("direct health probe records success or bounded failure without leaking exc
 test("direct expiration settles queued runs, workflows and their event with the shared disconnected code", async () => {
   const { db, calls } = fakeDb();
   expect(await failRunsOnUnhealthyDirectRuntimes(db, 90_000)).toBe(1);
+  // One transition (S2d): queued -> failed, settled, for the organizations of a stale direct runtime.
   const sql = calls[0]!.sql;
+  expect(sql).toStartWith("update runs set status = 'failed', external_state = 'settled'");
   expect(sql).toContain("rt.last_health_status <> 'healthy'");
   expect(sql).toContain("interval '90 seconds'");
-  expect(sql).toContain("run.status = 'queued' and run.hermes_run_id is null");
-  expect(sql).toContain("update workflows");
-  expect(sql).toContain("RUNTIME_DISCONNECTED");
+  expect(sql).toContain("status in ('queued')");
+  expect(sql).toContain("hermes_run_id is null");
+  expect(calls[0]!.values).toContain("RUNTIME_DISCONNECTED");
+  // Then its workflow, after the run.
+  expect(calls[1]!.sql).toStartWith("update workflows set status = 'failed'");
+  expect(calls[1]!.values).toContain("wf-1");
   // The run.error is numbered by the primitive, after the cursor lock, in its own statement (D2).
   expect(sql).not.toContain("run_events");
   const insert = calls.find((call) => call.sql.startsWith("insert into run_events"))!;

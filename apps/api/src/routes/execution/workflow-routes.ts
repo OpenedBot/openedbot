@@ -1,3 +1,4 @@
+import type { SQL } from "bun";
 import { isUuid, isoInstant } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
 import type { AppVariables } from "../identity/auth";
@@ -9,6 +10,12 @@ import { requestWorkflowCancellationTx } from "@openedbot/execution/application/
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
 import { openWorkflowRetryTx } from "@openedbot/execution/application/run-creation";
 import { isRetryableRootStepKind } from "@openedbot/execution/domain/run-creation";
+import {
+  failAbandonedSteerFallbackTx,
+  failUnknownRunsTx,
+  requeueForReconciliationTx,
+  requeueSteerFallbackTx,
+} from "@openedbot/execution/application/run-review";
 import { readRetrySource } from "./workflow-retry-source";
 
 type WorkflowRow = {
@@ -155,12 +162,7 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
           "Hermes n’a rendu aucun identifiant fiable; abandonnez ou relancez explicitement avec risque de doublon.",
         );
       }
-      await tx`
-        update runs set status = 'queued', external_state = 'polling', lease_owner = null,
-          lease_expires_at = null, next_attempt_at = now(), error_code = null, error_message = null,
-          updated_at = now()
-         where organization_id = ${auth.organizationId} and id = ${run.id} and status = 'unknown'
-      `;
+      await requeueForReconciliationTx(tx as unknown as SQL, { organizationId: auth.organizationId, id: run.id });
       await tx`
         update workflows set status = 'reconciling', error_code = null, error_message = null, updated_at = now()
          where organization_id = ${auth.organizationId} and id = ${workflow.id}
@@ -196,21 +198,12 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
             forwarding_owner = null, forwarding_lease_expires_at = null, updated_at = now()
            where organization_id = ${auth.organizationId} and id = ${ambiguousSteer.id} and status = 'ambiguous'
         `;
-        await tx`
-          update runs set status = 'failed', external_state = 'settled', events_complete = true,
-            error_code = 'EXTERNAL_OUTCOME_ABANDONED',
-            error_message = 'Follow-up incertain abandonné par un administrateur.',
-            lease_owner = null, lease_expires_at = null, ended_at = now(), updated_at = now()
-           where organization_id = ${auth.organizationId} and id = ${ambiguousSteer.sourceRunId}
-             and status = 'queued'
-        `;
+        await failAbandonedSteerFallbackTx(tx as unknown as SQL, { organizationId: auth.organizationId, id: ambiguousSteer.sourceRunId });
       }
-      await tx`
-        update runs set status = 'failed', error_code = 'EXTERNAL_OUTCOME_ABANDONED',
-          error_message = 'Résultat externe incertain; workflow abandonné par un administrateur.',
-          lease_owner = null, lease_expires_at = null, ended_at = now(), updated_at = now()
-         where organization_id = ${auth.organizationId} and workflow_id = ${workflow.id} and status = 'unknown'
-      `;
+      await failUnknownRunsTx(tx as unknown as SQL, { organizationId: auth.organizationId, workflowId: workflow.id }, {
+        errorCode: "EXTERNAL_OUTCOME_ABANDONED",
+        errorMessage: "Résultat externe incertain; workflow abandonné par un administrateur.",
+      });
       if (workflow.status === "unknown") {
         await tx`
           update workflows set status = 'failed', error_code = 'EXTERNAL_OUTCOME_ABANDONED',
@@ -283,15 +276,7 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
             forwarding_owner = null, forwarding_lease_expires_at = null, updated_at = now()
            where organization_id = ${auth.organizationId} and id = ${ambiguousSteer.id} and status = 'ambiguous'
         `;
-        const requeued = await tx<Array<{ id: string }>>`
-          update runs set status = 'queued', external_state = 'not_started', events_complete = true,
-            error_code = null, error_message = null, next_attempt_at = now(), ended_at = null,
-            lease_owner = null, lease_expires_at = null, updated_at = now()
-           where organization_id = ${auth.organizationId} and id = ${ambiguousSteer.sourceRunId}
-             and status = 'queued'
-          returning id
-        `;
-        if (!requeued[0]) {
+        if (!await requeueSteerFallbackTx(tx as unknown as SQL, { organizationId: auth.organizationId, id: ambiguousSteer.sourceRunId })) {
           throw new HttpError(
             409,
             "STEER_FALLBACK_MISSING",
@@ -357,12 +342,9 @@ export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
       }
       const workflowId = crypto.randomUUID();
       const runId = crypto.randomUUID();
-      await tx`
-        update runs set status = 'failed', error_code = 'RETRIED_WITH_DUPLICATE_RISK',
-          error_message = 'Remplacé par une relance explicitement confirmée.', ended_at = now(),
-          lease_owner = null, lease_expires_at = null, updated_at = now()
-         where organization_id = ${auth.organizationId} and workflow_id = ${workflow.id} and status = 'unknown'
-      `;
+      await failUnknownRunsTx(tx as unknown as SQL, { organizationId: auth.organizationId, workflowId: workflow.id }, {
+        errorCode: "RETRIED_WITH_DUPLICATE_RISK", errorMessage: "Remplacé par une relance explicitement confirmée.",
+      });
       await tx`
         update workflows set status = 'failed', error_code = 'RETRIED_WITH_DUPLICATE_RISK',
           error_message = 'Un nouveau workflow a été créé avec risque de doublon.',

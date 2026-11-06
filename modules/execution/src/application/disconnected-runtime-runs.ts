@@ -1,5 +1,6 @@
 import type { SQL } from "bun";
 import { appendRunEventsTx } from "../sql/run-events";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
 
 const DISCONNECTED_MESSAGE = "Le runtime n’a pas rouvert son lien connecteur à temps ; le run n’a pas démarré.";
 
@@ -15,53 +16,53 @@ const DISCONNECTED_MESSAGE = "Le runtime n’a pas rouvert son lien connecteur �
  */
 export async function failRunsOnDisconnectedRuntimes(db: SQL, timeoutMs: number): Promise<number> {
   return db.begin(async (tx) => {
-    const failed = await tx<Array<{ organizationId: string; threadId: string; runId: string }>>`
-      with stale_runtimes as (
-        select rt.organization_id, rt.id
-          from runtimes rt
-          left join api_instances inst on inst.instance_id = rt.link_instance_id
-         where rt.reachability = 'connector'
-           and rt.revoked_at is null
-           and rt.is_active
-           and rt.last_health_status = 'disconnected'
-           and (
-             coalesce(rt.link_last_seen_at, rt.updated_at) < now() - (${timeoutMs} * interval '1 millisecond')
-             or inst.instance_id is null
-             or inst.stopped_at is not null
-             or inst.last_seen_at < now() - interval '60 seconds'
-           )
-           and not (
-             inst.instance_id is not null
-             and inst.stopped_at is null
-             and inst.last_seen_at > now() - interval '60 seconds'
-             and rt.link_last_seen_at is not null
-             and rt.link_last_seen_at > now() - interval '45 seconds'
-           )
-      ), failed_runs as (
-        update runs run set status = 'failed', external_state = 'settled', events_complete = true,
-          error_code = 'RUNTIME_DISCONNECTED',
-          error_message = ${DISCONNECTED_MESSAGE},
-          ended_at = now(), lease_owner = null, lease_expires_at = null,
-          next_attempt_at = null, updated_at = now()
-         from stale_runtimes stale
-         where run.organization_id = stale.organization_id
-           and run.status = 'queued' and run.hermes_run_id is null
-           and run.created_at < now() - (${timeoutMs} * interval '1 millisecond')
-         returning run.organization_id, run.thread_id, run.id as run_id, run.workflow_id
-      ), failed_workflows as (
-        update workflows workflow set status = 'failed',
+    const sql = tx as unknown as SQL;
+    // Queued, never sent to Hermes: no lease to hold. Every run of an
+    // organization with a stale runtime, as the join on the organization did.
+    const failed = await transitionRuns(sql, {
+      target: { sweep: true }, fence: "unleased",
+      transition: { from: ["queued"], to: { status: "failed", externalState: "settled" } },
+      set: {
+        eventsComplete: true, errorCode: "RUNTIME_DISCONNECTED", errorMessage: DISCONNECTED_MESSAGE,
+        endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null,
+      },
+      where: sqlExpr`hermes_run_id is null and created_at < now() - (${timeoutMs} * interval '1 millisecond')
+        and organization_id in (
+          select rt.organization_id
+            from runtimes rt
+            left join api_instances inst on inst.instance_id = rt.link_instance_id
+           where rt.reachability = 'connector'
+             and rt.revoked_at is null
+             and rt.is_active
+             and rt.last_health_status = 'disconnected'
+             and (
+               coalesce(rt.link_last_seen_at, rt.updated_at) < now() - (${timeoutMs} * interval '1 millisecond')
+               or inst.instance_id is null
+               or inst.stopped_at is not null
+               or inst.last_seen_at < now() - interval '60 seconds'
+             )
+             and not (
+               inst.instance_id is not null
+               and inst.stopped_at is null
+               and inst.last_seen_at > now() - interval '60 seconds'
+               and rt.link_last_seen_at is not null
+               and rt.link_last_seen_at > now() - interval '45 seconds'
+             )
+        )`,
+    });
+    for (const run of failed) {
+      if (!run.workflowId) continue;
+      await sql`
+        update workflows set status = 'failed',
           error_code = 'RUNTIME_DISCONNECTED',
           error_message = 'Le runtime n’a pas rouvert son lien connecteur à temps.',
           ended_at = now(), updated_at = now()
-         from failed_runs run
-         where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-           and workflow.status in ('queued','running','awaiting_approval')
-         returning workflow.organization_id, workflow.id
-      )
-      select organization_id as "organizationId", thread_id as "threadId", run_id as "runId" from failed_runs
-    `;
-    await appendRunEventsTx(tx as unknown as SQL, failed.map((run) => ({
-      ...run, type: "run.error", payload: { message: DISCONNECTED_MESSAGE, errorCode: "RUNTIME_DISCONNECTED" },
+         where organization_id = ${run.organizationId} and id = ${run.workflowId}
+           and status in ('queued','running','awaiting_approval')
+      `;
+    }
+    await appendRunEventsTx(sql, failed.map((run) => ({
+      organizationId: run.organizationId, threadId: run.threadId, runId: run.id, type: "run.error", payload: { message: DISCONNECTED_MESSAGE, errorCode: "RUNTIME_DISCONNECTED" },
     })));
     return failed.length;
   }) as Promise<number>;
