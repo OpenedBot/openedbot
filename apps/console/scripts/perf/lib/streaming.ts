@@ -12,11 +12,11 @@ const percentile = (values: number[], p: number) => {
 
 // Installed before the prompt is sent. Besides frames and long frames, it
 // follows the ANSWER itself: the newest `[data-assistant-response]` that did
-// not exist before sending. The whole thread's text is no measure: past 40
-// turns the timeline unmounts the oldest turn while the answer grows
-// (lib/thread/thread-window.ts). Growth is timestamped in the page, by a
-// MutationObserver, so an answer that lands in one burst between two polls
-// still has a real start and end.
+// not exist before sending. The whole thread's text is no measure: the
+// timeline unmounts turns while the answer grows (a 40-turn window before
+// D1d, the virtual rows of lib/thread/use-thread-virtual-rows.ts since).
+// Growth is timestamped in the page, by a MutationObserver, so an answer
+// that lands in one burst between two polls still has a real start and end.
 const STREAM_PROBE = `(() => {
   const origin = performance.timeOrigin;
   const known = new WeakSet(document.querySelectorAll("[data-assistant-response]"));

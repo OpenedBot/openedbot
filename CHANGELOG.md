@@ -47,6 +47,18 @@ connecteur hôte et le protocole tiennent le leur :
   réponse s'affiche à 85 images par seconde environ au lieu de 50 à 57.
   Pendant l'écriture, la recherche dans le fil et l'aperçu de la liste des
   fils suivent la réponse avec au plus une seconde de retard.
+- Un long fil reste fluide, même après avoir chargé tout son historique.
+  Seuls les tours visibles, avec un écran de marge, sont affichés ; les
+  autres gardent leur place, et la barre de défilement ne saute plus. Avec
+  750 tours chargés, le défilement reste à 120 images par seconde au lieu
+  de 92 (avec des creux à 30), et la page occupe 34 Mo de mémoire au lieu
+  de 115. La lecture ne change pas : le fil reste en bas pendant une
+  réponse, et charger les messages précédents ne déplace plus le message
+  qu'on lit. Un lien vers un message, la recherche (⌘K et ⌘F) et le rail
+  des tours atteignent aussi un tour lointain. Une sélection de texte ou le
+  focus clavier gardent leurs tours affichés : copier plusieurs messages
+  fonctionne toujours. « Charger les messages précédents » annonce
+  désormais 40 messages, la taille réelle d'une page.
 - Plus aucun nom technique hérité de l'ancien nom du produit : base et rôles
   PostgreSQL, fonctions SQL, en-têtes, cookies, schéma d'URL de l'app de
   bureau (`openedbot://`), popup natif (`OpenedbotPopup.app`), classes CSS,

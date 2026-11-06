@@ -8,6 +8,7 @@ import {
   type ThreadFindDocument,
 } from "@openedbot/conversation/domain/thread-find";
 import { FindBar } from "../../components/find-bar";
+import { requestThreadReveal } from "./thread-reveal";
 import { useT } from "../i18n";
 
 const NO_DOCUMENTS: readonly ThreadFindDocument[] = [];
@@ -41,11 +42,11 @@ export function useThreadFind(input: {
   );
   const activeMatch = open && result.currentIndex >= 0 ? result.matches[result.currentIndex] ?? null : null;
 
+  // The thread lands on the match, mounting its turn when it is out of the
+  // mounted rows (`thread-timeline.tsx`, virtual rows).
   useEffect(() => {
     if (!activeMatch) return;
-    const target = [...globalThis.document.querySelectorAll<HTMLElement>("[data-thread-find-target]")]
-      .find((element) => element.dataset.threadFindTarget === activeMatch.targetId);
-    target?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    requestThreadReveal(activeMatch.targetId, { block: "center", behavior: "smooth" });
   }, [activeMatch]);
 
   return {

@@ -975,13 +975,13 @@ export function buildTimelineModel(input: TimelineModelInput): TimelineModel {
   });
 }
 
-/** Rebuilds render-only summaries for the trailing window and its preceding turn. */
+/** Rebuilds render-only summaries for the mounted slice (`shown` from `visibleStart`) and its preceding turn. */
 export function deriveTimelineWindow(
   model: TimelineModel,
   input: TimelineModelInput,
   visible: readonly Entry[],
+  visibleStart = model.shown.length - visible.length,
 ): TimelineModel {
-  const visibleStart = model.shown.length - visible.length;
   let prefixStart = visibleStart;
   while (prefixStart > 0 && model.shown[prefixStart - 1]?.kind !== "user") prefixStart -= 1;
   if (prefixStart > 0) prefixStart -= 1;

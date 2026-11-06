@@ -22,6 +22,8 @@ export const TYPING_EXIT_MS = 140;
 
 /** Ce qui suit une rangée ajoutée sans en faire un ajout « au milieu ». */
 const TRAILING_CHROME = "[data-thread-scroll-anchor], [data-thread-outgoing], [data-thread-exit-ghost]";
+/** La rangée d'un tour (`use-thread-virtual-rows.ts`). */
+const TURN_ROW = "data-thread-turn";
 /** Une rangée de message ; un séparateur de date ou un repère n'anime pas. */
 const MESSAGE_ROW = "[data-user-bubble], [data-assistant-layout], [data-assistant-response], [data-room-answer], [data-inbound-from]";
 
@@ -49,7 +51,13 @@ function userBubbleText(node: Element): string | null {
  *   changement de fil (`threadKey`, l'observateur est réarmé) ;
  * - l'historique plus ancien, ajouté AVANT des rangées déjà là ;
  * - la rangée enregistrée qui remplace la bulle optimiste
- *   (`data-thread-outgoing`) : même texte, la bulle a déjà monté.
+ *   (`data-thread-outgoing`) : même texte, la bulle a déjà monté ;
+ * - un tour remonté par le défilement (`data-thread-turn` déjà vu, rangées
+ *   virtuelles) : il n'arrive pas, il revient.
+ *
+ * Les messages d'un tour vivent dans sa rangée (`data-thread-turn`) : un
+ * tour neuf fait monter ses messages, une réponse ajoutée à la rangée du
+ * dernier tour monte seule.
  */
 export function useThreadRowEnter(content: RefObject<HTMLElement | null>, threadKey: string | null) {
   useEffect(() => {
@@ -66,22 +74,38 @@ export function useThreadRowEnter(content: RefObject<HTMLElement | null>, thread
         { duration: ROW_ENTER_MS, easing: ROW_ENTER_EASING, delay },
       );
     };
+    const seenTurns = new Set<string>();
+    for (const turn of root.querySelectorAll(`:scope > [${TURN_ROW}]`)) seenTurns.add(turn.getAttribute(TURN_ROW)!);
+    const isLast = (node: Element, added: ReadonlySet<Element>) => {
+      for (let next = node.nextElementSibling; next; next = next.nextElementSibling) {
+        if (!added.has(next) && !next.matches(TRAILING_CHROME)) return false;
+      }
+      return true;
+    };
     const observer = new MutationObserver((records) => {
       const added = new Set<Element>();
+      // What arrived: a direct child, or a message added to a turn's row.
+      // A new turn row stands for its messages; a row seen before is a
+      // virtual row mounted back by scrolling, not an arrival.
+      const candidates: Element[] = [];
       for (const record of records) {
         for (const node of record.addedNodes) if (node instanceof Element) added.add(node);
       }
       for (const node of added) {
-        let next = node.nextElementSibling;
-        let appended = true;
-        while (next) {
-          if (!added.has(next) && !next.matches(TRAILING_CHROME)) {
-            appended = false;
-            break;
-          }
-          next = next.nextElementSibling;
+        const parent = node.parentElement;
+        const turn = node.getAttribute(TURN_ROW);
+        if (parent === root && turn !== null) {
+          const fresh = !seenTurns.has(turn);
+          seenTurns.add(turn);
+          if (fresh && isLast(node, added)) candidates.push(...node.children);
+          continue;
         }
-        if (!appended || !isMessageRow(node)) continue;
+        if (parent === root) candidates.push(node);
+        else if (parent?.parentElement === root && parent.hasAttribute(TURN_ROW) && !added.has(parent) && isLast(parent, added)) candidates.push(node);
+      }
+      for (const node of candidates) {
+        if (!isLast(node, added) && !added.has(node.parentElement!)) continue;
+        if (!isMessageRow(node)) continue;
         const text = userBubbleText(node);
         if (node.matches("[data-thread-outgoing]")) {
           outgoingText = text;
@@ -100,7 +124,7 @@ export function useThreadRowEnter(content: RefObject<HTMLElement | null>, thread
         rise(node);
       }
     });
-    observer.observe(root, { childList: true });
+    observer.observe(root, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [content, threadKey]);
 }

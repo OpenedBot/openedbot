@@ -150,55 +150,11 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("ThreadTimeline", () => {
-  test("reveals local turns before fetching history and preserves the anchor when older turns arrive", async () => {
-    const inputs = Array.from({ length: 50 }, (_, index) => ({ id: `history-${index}`, runId: null,
-      text: `Question historique ${index}`, createdAt: new Date(Date.UTC(2026, 9, 5, 0, 0, index)).toISOString() }));
-    let requests = 0;
-    let captureHeight: (() => void) | undefined;
-    let resolvePage!: (loaded: boolean) => void;
-    const onLoadOlder = (capture?: () => void) => {
-      requests += 1;
-      captureHeight = capture;
-      return new Promise<boolean>((resolve) => { resolvePage = resolve; });
-    };
-    const view = (userInputs: typeof inputs, loadingOlder = false, hasOlderHistory = true) => (
-      <I18nProvider><ThreadTimeline events={[]} userInputs={userInputs} approvals={[]} running={false}
-        speechAdapter={speechAdapter} speechScope="history" hasOlderHistory={hasOlderHistory}
-        loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} /></I18nProvider>
-    );
-    const rendered = render(view(inputs));
-    const node = rendered.container.querySelector<HTMLElement>('[role="log"]')!;
-    Object.defineProperty(node, "scrollHeight", { configurable: true,
-      get: () => rendered.container.querySelectorAll('[data-thread-find-target^="message:history-"]').length * 20 });
-    Object.defineProperty(node, "clientHeight", { configurable: true, value: 100 });
-    expect(screen.queryByText("Question historique 0")).toBeNull();
-    // The first paint mounts a few turns; the live window follows when idle.
-    fireEvent.click(await screen.findByRole("button", { name: "Charger 10 tours plus anciens" }));
-    expect(screen.getByText("Question historique 0")).toBeTruthy();
-    expect(requests).toBe(0);
-    fireEvent.click(screen.getByRole("button", { name: "Charger 30 tours plus anciens" }));
-    expect(requests).toBe(1);
-    rendered.rerender(view(inputs, true));
-    expect(screen.getByRole("button", { name: "Chargement des tours plus anciens…" }).hasAttribute("disabled")).toBe(true);
-    node.scrollTop = 120;
-    const older = Array.from({ length: 4 }, (_, index) => ({ id: `history-old-${index}`, runId: null,
-      text: `Ancienne question ${index}`, createdAt: new Date(Date.UTC(2026, 9, 4, 0, 0, index)).toISOString() }));
-    await act(async () => {
-      captureHeight?.();
-      rendered.rerender(view([...older, ...inputs], false, false));
-      resolvePage(true);
-    });
-    await waitFor(() => expect(screen.getByText("Ancienne question 0")).toBeTruthy());
-    expect(screen.getByText("Question historique 0")).toBeTruthy();
-    expect(node.scrollTop).toBe(200);
-    expect(screen.queryByRole("button", { name: /Charger .* tours plus anciens/ })).toBeNull();
-  });
-
   test("a history error remains visible with a retry control", () => {
     render(<I18nProvider><ThreadTimeline events={[]} userInputs={[]} approvals={[]} running={false}
       speechAdapter={speechAdapter} hasOlderHistory olderError onLoadOlder={async () => false} /></I18nProvider>);
     expect(screen.getByRole("alert").textContent).toContain("Impossible de charger les tours plus anciens");
-    expect(screen.getByRole("button", { name: "Charger 30 tours plus anciens" }).hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "Charger 40 tours plus anciens" }).hasAttribute("disabled")).toBe(false);
   });
 
   test("épingle le fil au montage avant la première frame", () => {
@@ -248,16 +204,19 @@ describe("ThreadTimeline", () => {
     const originalResizeObserver = globalThis.ResizeObserver;
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
     const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    let callback: ResizeObserverCallback | null = null;
-    const observed: Element[] = [];
+    // Two observers: the pin's (the messages column) and the virtual rows' (each turn, the viewport).
+    const observers: Array<{ callback: ResizeObserverCallback; observed: Element[] }> = [];
     const frames: FrameRequestCallback[] = [];
     class FakeResizeObserver {
+      private readonly record: { callback: ResizeObserverCallback; observed: Element[] };
       constructor(next: ResizeObserverCallback) {
-        callback = next;
+        this.record = { callback: next, observed: [] };
+        observers.push(this.record);
       }
       observe(target: Element) {
-        observed.push(target);
+        this.record.observed.push(target);
       }
+      unobserve() {}
       disconnect() {}
     }
     globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
@@ -274,9 +233,12 @@ describe("ThreadTimeline", () => {
       expect(scroller).not.toBeNull();
       expect(content).not.toBeNull();
       if (!scroller || !content) throw new Error("ThreadTimeline test nodes are missing");
-      expect(observed).toEqual([content]);
+      const pin = observers.find((observer) => observer.observed.includes(content));
+      // Compared by identity: a failed `toEqual` on DOM nodes would print the whole tree.
+      expect(pin?.observed.length).toBe(1);
+      const callback = pin?.callback;
       frames.splice(0).forEach((frame) => frame(0));
-      expect(callback).not.toBeNull();
+      expect(callback).toBeDefined();
 
       act(() => {
         callback?.([{ target: scroller } as unknown as ResizeObserverEntry], {} as ResizeObserver);
@@ -304,58 +266,6 @@ describe("ThreadTimeline", () => {
       globalThis.ResizeObserver = originalResizeObserver;
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-    }
-  });
-
-  test("reste au bas quand la fenêtre idle passe de 8 à 40 tours", () => {
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    const originalRequestIdleCallback = window.requestIdleCallback;
-    const originalCancelIdleCallback = window.cancelIdleCallback;
-    const frames: FrameRequestCallback[] = [];
-    let idleCallback: IdleRequestCallback | null = null;
-    const restoreScrollMetrics = mockThreadScrollMetrics(
-      () => document.querySelectorAll('[data-thread-find-target^="message:long-"]').length * 100,
-      200,
-      true,
-    );
-    globalThis.requestAnimationFrame = ((next: FrameRequestCallback) => {
-      frames.push(next);
-      return frames.length;
-    }) as typeof requestAnimationFrame;
-    globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
-    window.requestIdleCallback = ((callback: IdleRequestCallback) => {
-      idleCallback = callback;
-      return 1;
-    }) as typeof window.requestIdleCallback;
-    window.cancelIdleCallback = (() => {}) as typeof window.cancelIdleCallback;
-
-    try {
-      const userInputs = Array.from({ length: 50 }, (_, index) => ({
-        id: `long-${index}`,
-        runId: null,
-        text: `Question ${index}`,
-        createdAt: new Date(Date.UTC(2026, 9, 5, 0, 0, index)).toISOString(),
-      }));
-      const rendered = renderTimeline({ userInputs, scrollToBottomOnThreadKey: "thread-long" });
-      const scroller = rendered.container.querySelector<HTMLElement>('[role="log"]');
-      if (!scroller) throw new Error("ThreadTimeline test scroller is missing");
-      expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight);
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
-
-      expect(idleCallback).not.toBeNull();
-      act(() => idleCallback?.({ didTimeout: false, timeRemaining: () => 50 }));
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
-
-      expect(rendered.container.querySelectorAll('[data-thread-find-target^="message:long-"]')).toHaveLength(40);
-      expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight);
-    } finally {
-      cleanup();
-      restoreScrollMetrics();
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-      window.requestIdleCallback = originalRequestIdleCallback;
-      window.cancelIdleCallback = originalCancelIdleCallback;
     }
   });
 

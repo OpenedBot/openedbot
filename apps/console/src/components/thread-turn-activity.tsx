@@ -112,7 +112,6 @@ export const TurnActivity = memo(function TurnActivity({
   author,
   showAuthorLabel,
   children,
-  settled = false,
   workedMs = null,
   since = null,
   answering = false,
@@ -129,8 +128,6 @@ export const TurnActivity = memo(function TurnActivity({
   author: MessageAuthorBot | null;
   showAuthorLabel: boolean;
   children: React.ReactNode;
-  /** Hors des derniers tours et du direct : `content-visibility: auto`. */
-  settled?: boolean;
   /** The run's real start (epoch ms): where the thinking timer counts from. */
   since?: number | null;
   /** The answer has started streaming below: the feed empties, « Réflexions ». */
@@ -183,7 +180,7 @@ export const TurnActivity = memo(function TurnActivity({
       data-thinking={rolling ? "" : undefined}
       aria-label={t("threadTimeline.activityFeed")}
       aria-busy={live}
-      className={cn("flex w-full min-w-0 max-w-full flex-col self-start", settled && "openedbot-turn-contain")}
+      className={"flex w-full min-w-0 max-w-full flex-col self-start"}
     >
       <GrokAgentsHeader
         agents={agents}

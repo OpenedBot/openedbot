@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ThreadMessageDto } from "@openedbot/contracts-api";
-import { buildThreadRailTurns, throttledFrame, type FrameIo } from "../../../src/lib/thread/thread-turn-rail";
+import { buildThreadRailTurns, litRailTurns, throttledFrame, type FrameIo } from "../../../src/lib/thread/thread-turn-rail";
 
 function message(
   id: string,
@@ -99,5 +99,21 @@ describe("throttledFrame", () => {
     advance(200);
     frame();
     expect(runs).toBe(1);
+  });
+});
+
+describe("litRailTurns", () => {
+  const view = { top: 0, bottom: 500 };
+
+  test("a turn is lit while its section, up to the next turn, crosses the view", () => {
+    expect([...litRailTurns([-300, 100, 400, 900], view)]).toEqual([0, 1, 2]);
+    expect([...litRailTurns([-900, -300, 600], view)]).toEqual([1]);
+  });
+
+  test("turns out of the mounted rows sit above them, or below them, never across the view", () => {
+    // Turns 0-1 are above the mounted rows, 4-5 below: the view shows 2 and 3.
+    expect([...litRailTurns([null, null, -200, 300, null, null], view)]).toEqual([2, 3]);
+    // The last mounted turn runs to the end of the view: the turns after it stay dark.
+    expect([...litRailTurns([null, -100, 200, null], view)]).toEqual([1, 2]);
   });
 });

@@ -12,11 +12,8 @@ import { replyPreviewSnippet } from "@openedbot/conversation/domain/message-repl
  *
  * Le rail ne passe aucune prop au fil (`ThreadTimeline` est `memo`, cache par
  * tour) : il lit le DOM par `data-thread-find-target`, et demande au fil de
- * monter un tour sorti de la fenêtre par l'événement `THREAD_REVEAL_EVENT`.
+ * monter un tour hors des rangées montées par `requestThreadReveal` (`thread-reveal.ts`).
  */
-export const THREAD_REVEAL_EVENT = "openedbot:thread-reveal";
-
-export type ThreadRevealDetail = { targetId: string };
 
 export type ThreadRailTurn = {
   targetId: string;
@@ -55,10 +52,24 @@ export function buildThreadRailTurns(
   return turns;
 }
 
-export function requestThreadReveal(targetId: string) {
-  document.dispatchEvent(
-    new CustomEvent<ThreadRevealDetail>(THREAD_REVEAL_EVENT, { detail: { targetId } }),
-  );
+/**
+ * The ticks to light: a turn's section runs from its top to the next turn's
+ * top, lit when it crosses the view. `null` is a turn without a node, out of
+ * the mounted rows: above them when a later turn is mounted, below otherwise.
+ */
+export function litRailTurns(tops: ReadonlyArray<number | null>, view: { top: number; bottom: number }): Set<number> {
+  const placed = [...tops];
+  let mountedAfter = false;
+  for (let index = placed.length - 1; index >= 0; index -= 1) {
+    if (placed[index] !== null) mountedAfter = true;
+    else placed[index] = mountedAfter ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+  }
+  const lit = new Set<number>();
+  placed.forEach((top, index) => {
+    const bottom = placed[index + 1] ?? Number.POSITIVE_INFINITY;
+    if (top! < view.bottom && bottom! > view.top) lit.add(index);
+  });
+  return lit;
 }
 
 /**

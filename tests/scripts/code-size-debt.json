@@ -17,7 +17,7 @@
   "apps/console/src/components/support/support-panel.tsx": 1292,
   "apps/console/src/components/thread-context-tab.tsx": 728,
   "apps/console/src/components/thread-markdown.tsx": 735,
-  "apps/console/src/components/thread-timeline.tsx": 1587,
+  "apps/console/src/components/thread-timeline.tsx": 1486,
   "apps/console/src/lib/dev/thread-perf-probe.ts": 807,
   "apps/console/src/lib/thread/thread-timeline-model.ts": 1342,
   "apps/console/src/route-tree.tsx": 1111,

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useRouterState } from "@tanstack/react-router";
+import { requestThreadReveal } from "../lib/thread/thread-reveal";
 
 const FOCUS_CLASSES = ["ring-2", "ring-primary", "ring-offset-2"];
 
@@ -23,6 +24,11 @@ export function GlobalSearchFocus() {
     const focus = () => {
       if (cancelled) return;
       target = find();
+      if (!target) {
+        // Out of the thread's mounted rows: the thread mounts its turn.
+        requestThreadReveal(targetId, { block: "center" });
+        target = find();
+      }
       if (!target) {
         if (attempts++ < 30) timer = window.setTimeout(focus, 100);
         return;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { RAIL_MEASURE_INTERVAL_MS, requestThreadReveal, throttledFrame, type ThreadRailTurn } from "../lib/thread/thread-turn-rail";
+import { litRailTurns, RAIL_MEASURE_INTERVAL_MS, throttledFrame, type ThreadRailTurn } from "../lib/thread/thread-turn-rail";
+import { requestThreadReveal } from "../lib/thread/thread-reveal";
 import { useT } from "../lib/i18n";
 
 const targetSelector = (targetId: string) =>
@@ -8,8 +9,8 @@ const targetSelector = (targetId: string) =>
 /**
  * Le rail des tours, posé à gauche du fil (bureau). Il ne lit le fil que par
  * le DOM : un trait est « visible » quand la section de son tour (de sa bulle
- * à la bulle suivante) croise la zone défilante. Un tour hors de la fenêtre
- * montée n'a pas de nœud : il est plus ancien que tout ce qui est affiché.
+ * à la bulle suivante) croise la zone défilante. Un tour hors des rangées
+ * montées n'a pas de nœud : plus ancien qu'elles, ou plus récent.
  *
  * Il se superpose au bord gauche du fil sans lui réserver de gouttière
  * (`thread-timeline.css`) : 2.5rem, la marge du fil (1rem) plus le débord du
@@ -30,13 +31,9 @@ export function ThreadTurnRail({ turns }: { turns: readonly ThreadRailTurn[] }) 
       const view = scroller.getBoundingClientRect();
       const tops = turnsRef.current.map((turn) => {
         const node = scroller.querySelector(targetSelector(turn.targetId));
-        return node ? node.getBoundingClientRect().top : Number.NEGATIVE_INFINITY;
+        return node ? node.getBoundingClientRect().top : null;
       });
-      const next = new Set<number>();
-      tops.forEach((top, index) => {
-        const bottom = tops[index + 1] ?? Number.POSITIVE_INFINITY;
-        if (top < view.bottom && bottom > view.top) next.add(index);
-      });
+      const next = litRailTurns(tops, view);
       setVisible((previous) =>
         previous.size === next.size && [...next].every((index) => previous.has(index))
           ? previous

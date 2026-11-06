@@ -296,7 +296,121 @@ par composant pendant une réponse (crochet `__REACT_DEVTOOLS_GLOBAL_HOOK__`, sc
 - Non mesuré : Electron (le shell ne change rien à ce code ; la remesure attend D2), une vraie
   machine modeste, les fils au-delà de la fenêtre de 40 tours (D1d), WKWebView.
 
-## 4. Architecture cible
+### 3.4 Longs fils (D1d, 2026-11-06)
+
+Même machine, même compte, même bot (Atlas, sur le runtime de la VM 240). Consoles : builds de
+production solo de `develop` (D1c, « avant ») et de D1d (« après »), servis comme en D0. Résultats
+bruts, non versionnés : `tmp/perf/long-thread-2026-11-06T13-25-55-399Z.json` (avant),
+`…T14-49-24-788Z.json` (après), `tmp/perf/stream-profile-2026-11-06T14-45-58-244Z.json` (G4 après).
+
+**Conditions.**
+- Outil : `apps/console/scripts/perf/long-thread.ts --headed --turns 300`. Le vrai fil d'Atlas
+  (environ 450 tours) reçoit 300 tours synthétiques plus anciens, servis par pages de 40 comme
+  l'API (`lib/long-thread-fixture.ts`) : prose, code, tableaux, titres, et une image sur cinq tours
+  servie avec 150 à 400 ms de retard, pour qu'elle change de hauteur après le rendu. Environ
+  750 tours une fois tout chargé.
+- Phases d'un essai : ouverture du fil ; défilement régulier (40 px par frame) dans ce qui est
+  monté, vers le haut puis vers le bas ; « Charger les messages précédents » jusqu'au bout ; même
+  défilement dans tout le fil (trois passes de 120 s au plus) ; mémoire (nœuds DOM du fil, tas JS
+  après un GC, métriques Chromium). Frames par `requestAnimationFrame`, frames longues par l'API
+  Long Animation Frames. Un « saut » est un `scrollTop` qui bouge entre deux frames de plus que le
+  pas, ou à rebours : la page bouge sous le lecteur.
+- Fenêtre réelle à 120 Hz, processeur normal ; pas d'essai au ralenti pour ce fil.
+
+**Avant.** La console montait les 40 derniers tours (8 au premier rendu, le reste quand le
+navigateur était libre), puis 30 de plus à chaque clic et chaque page reçue, sans jamais en
+démonter. Les tours hors de l'écran avaient `content-visibility: auto` avec une taille réservée de
+120 px. Mesuré :
+- le fil grandit sous le lecteur : la hauteur estimée de 120 px est bien en dessous de la vraie
+  (une fois tout mesuré, un tour fait 840 px en moyenne), et chaque tour rendu en arrivant à l'écran repousse la
+  page. Remonter les 40 tours montés fait 64 sauts, jusqu'à 4 585 px d'un coup ; la hauteur du fil
+  passe de 47 000 à 194 000 px pendant qu'on le lit ;
+- une fois tout chargé : 47 700 nœuds dans le fil, 40 000 à 64 000 objets de mise en page, 115 Mo
+  de tas ; le défilement tombe à 92 i/s de moyenne, 30 au p5, 11 % de frames sautées ;
+- presque chaque chargement d'une page coûte une frame longue (50 à 147 ms).
+
+**Ce qui a changé.**
+- La timeline est virtualisée par tour (`lib/thread/thread-virtual.ts`, arithmétique pure, et
+  `use-thread-virtual-rows.ts`). Une ligne est un tour ; deux espaceurs tiennent la place des tours
+  démontés. Est monté ce qui croise l'écran, plus un écran de marge de chaque côté (600 px au
+  moins). Épinglé en bas, la plage part de la fin.
+- Hauteurs : mesurées (`offsetHeight`, `ResizeObserver`) et gardées quand un tour est démonté ; un
+  tour jamais vu est estimé d'après son contenu (lignes, blocs de code, titres, tableaux, images,
+  approbations). `content-visibility` est retiré : c'était lui qui faisait sauter la page.
+- Ancrage manuel du lecteur quand il n'est pas en bas : avant chaque changement, l'élément le plus
+  profond en haut de l'écran est retenu (pas une puce de date, qui peut disparaître) ; après, le
+  défilement compense son déplacement. WKWebView n'a pas `overflow-anchor`, et la colonne le coupe
+  déjà : l'ancrage ne dépend pas du navigateur. Un tour qui fusionne avec le précédent après un
+  chargement (un run d'accueil) est retrouvé par la clé de son entrée.
+- Sélection et focus : les tours qui portent les deux bouts d'une sélection, et le tour du focus
+  clavier (`:focus-visible` seulement, un clic de souris ne retient rien), restent montés, avec
+  tout ce qui est entre eux. La copie sur plusieurs messages marche donc comme avant.
+- Aller à un message : un seul événement (`lib/thread/thread-reveal.ts`, sans dépendance, pour ne
+  pas grossir le premier chargement) monte le tour de la cible puis la fait défiler. Il sert à
+  `focus=`, à la recherche globale (⌘K), à la recherche dans le fil (⌘F) et au rail des tours, qui
+  allume les repères des tours démontés d'après leur rang.
+- L'animation d'arrivée ne joue que pour un tour nouveau en fin de fil, jamais pour un tour remonté
+  par le défilement.
+- « Charger les messages précédents » demande directement la page suivante à l'API (40 tours) :
+  il n'y a plus de tours retenus en mémoire sans être montés.
+
+**Pourquoi pas `@tanstack/react-virtual`.** Le fil a déjà un découpage en tours, une colonne
+`justify-end` épinglée en bas, des pages ajoutées au-dessus, des approbations et une réponse en
+direct (D1c) qui grandissent en bas, et des cibles à atteindre par identifiant. La bibliothèque
+gère des index et des tailles, pas l'ancrage sur l'élément lu, l'épinglage, la retenue de la
+sélection ni la révélation par cible : il aurait fallu écrire ces parties autour d'elle. Le code
+maison fait environ 600 lignes, testées sans navigateur, et n'ajoute rien au bundle.
+
+| Indicateur (web, fenêtre réelle, 120 Hz, 1x) | Avant (D1c) | Après (D1d) |
+|---|---|---|
+| Ouverture : premier rendu / tours montés complets | 399 / 545 ms | 344 / 355 ms |
+| Ouverture : frames longues ; nœuds du fil ; tas JS | 2 (99 et 135 ms) ; 5 405 ; 25 Mo | 0 ; 140 ; 17 Mo |
+| Défilement dans ce qui est monté : sauts (le plus grand) | 64 (4 585 px) | 0 |
+| Défilement dans ce qui est monté : fps moyen / p5 | 120 / 101 | 120 / 100–101 |
+| Chargement d'une page : durée ; frames longues | 450–852 ms ; 13 sur 17 clics (50–147 ms) | 455–774 ms ; 0 sur 10 clics |
+| Tout chargé (~750 tours) : nœuds du fil ; objets de mise en page | 47 689 ; 40 319 (64 351 après défilement) | 211 ; 1 472 |
+| Tout chargé : tas JS après GC ; mémoire des processus Chromium | 112–115 Mo ; 1 417–1 650 Mo | 32–34 Mo ; 1 064–1 211 Mo |
+| Tout le fil, 3 passes de 120 s : fps moyen / p5 ; frames sautées | 92 / 30 ; 10,5–10,9 % | 120 / 99–110 ; 0 % |
+| Tout le fil : sauts ; frames longues | 0 ; 2 (50 et 57 ms, script) | 1 (256 px) ; 1 (269 ms, ni script ni mise en page) |
+| G4, streaming d'une réponse de ~9 000 caractères, 3 essais : fps p5 ; frames longues | 98–99 ; 0 (D1c) | 98–101 ; 0 |
+
+**Lecture.**
+- Le fil long est fluide : avec 750 tours chargés, le défilement reste au niveau du fil court
+  (120 i/s, p5 à la gigue de `requestAnimationFrame`, aucune frame sautée), là où l'avant
+  tombait à 30 au p5. Le DOM ne dépend plus de la longueur du fil : 140 à 211 nœuds dans le fil
+  au lieu de 47 700, 34 Mo de tas au lieu de 115. Le streaming (G4) ne régresse pas.
+- La page ne saute plus sous le lecteur. Le seul saut restant (256 px, une fois sur trois passes)
+  coïncide avec une image de la fixture qui arrive pendant que son tour entre dans la marge ;
+  la sonde compte comme saut une compensation égale au pas, d'où des faux positifs possibles. À
+  la main, dans le navigateur, aucun saut vu (chargements successifs, images, fil épinglé).
+- La hauteur totale grossit encore pendant le premier passage (586 000 → 650 000 px) : les
+  estimations d'un tour jamais vu sont environ 10 à 23 % sous la hauteur réelle des tours
+  d'Atlas. L'ancrage compense, la lecture ne bouge pas ; seul le pouce de la barre de défilement
+  change de taille. Les estimations se règlent dans `thread-virtual.ts`.
+- Une frame de 163 à 269 ms par essai pendant le défilement complet, sans script ni mise en page
+  (Long Animation Frames n'attribue rien) : cause non établie, probablement hors de la page (GC du
+  navigateur ou compositeur). L'avant n'en avait pas de ce type, mais avait deux frames longues de
+  script ; à surveiller sur WKWebView.
+- Le premier rendu gagne peu (399 → 344 ms) : il ne montait déjà que 8 tours avant de compléter la fenêtre.
+- Vérifié à la main, dans un vrai navigateur (Chromium, Playwright, build de production, fil de
+  750 tours) : `focus=` vers un message démonté (centré, anneau, repère du rail allumé) ; ⌘K vers
+  un message ; ⌘F vers le 150e tour et le résultat suivant ; clic sur le rail ; cinq chargements
+  successifs sans que le message lu bouge ; sélection à la souris sur deux tours gardée après un
+  aller-retour en bas, copie complète (559 caractères) ; arbre d'accessibilité (`log`, bouton,
+  tours dans l'ordre, espaceurs `aria-hidden`) ; 80 Tab traversent 12 tours sans quitter le fil ;
+  coque mobile 390×844 ; pièce jointe image ; vraie carte d'approbation reçue en défilant
+  3 000 px plus haut (le fil revient en bas, refus fonctionnel) ; une vraie réponse d'Atlas suivie
+  en bas, au plus 4 tours montés, 0 frame longue sur 40 s. Pas de styles d'impression dans la
+  console : rien à faire régresser.
+- Limites connues :
+  - une sélection qui va d'un bout à l'autre du fil garde monté tout ce qui est entre ses bouts ;
+  - la recherche native du navigateur (⌘F hors de la console, ou dans le desktop sans la barre de
+    recherche du fil) ne voit que les tours montés ; la recherche du fil couvre tout ;
+  - un bloc d'activité déplié se replie si son tour est démonté puis remonté ;
+  - la recherche globale vers un message d'une page pas encore chargée reste limitée comme avant ;
+  - non vérifié : VoiceOver, l'inertie du défilement sur iOS, WKWebView et WebKitGTK (D2, D5),
+    une vraie machine modeste.
+
 
 ### 4.1 Vue d'ensemble
 
@@ -545,7 +659,7 @@ desktop-tauri-publish TAURI_VERSION=0.0.2` ; l'app installée lit
 2. Streaming : l'état du message en cours vit dans un store dédié auquel seul ce message
    s'abonne ; le découpage en blocs devient incrémental ; la timeline cesse de se re-rendre à
    chaque frame.
-3. Longs fils : virtualisation de la timeline.
+3. Longs fils : virtualisation de la timeline (faite en D1d, section 3.4).
 4. L'interrogation d'un fil ouvert toutes les 5 s (`use-thread-stream.ts:237-249`) a une raison
    documentée (revue automatique) : elle n'est retirée qu'une fois S6 livrée et la couverture
    par événements prouvée.

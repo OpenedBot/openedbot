@@ -1,18 +1,4 @@
 /**
- * Tours réglés du fil (thread-timeline.tsx) : ni parmi les derniers, ni le
- * tour en direct, ni la bulle sortante. `content-visibility: auto` laisse le
- * navigateur sauter la mise en page et la peinture de ce qui est hors écran,
- * c'est ce qui rend bon marché la lecture de `scrollHeight` (envoi, SSE)
- * sur un fil de plusieurs milliers de nœuds. `contain-intrinsic-size` pose
- * une taille de repli : sans elle, un bloc pas encore mesuré vaudrait 0 et
- * le scroll sauterait à chaque tour qui entre ou sort du viewport.
- */
-.openedbot-turn-contain {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
-}
-
-/**
  * Le conteneur défilant du fil (`role="log"`, thread-timeline.tsx). Une
  * mutation à l'intérieur (bulle sortante, tour en direct qui grandit) ne doit
  * pas faire recalculer la mise en page du composer ou de la coque au-dessus :

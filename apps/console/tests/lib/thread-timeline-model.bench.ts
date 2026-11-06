@@ -18,7 +18,10 @@ import {
   type TimelineModel,
   type TimelineModelInput,
 } from "../../src/lib/thread/thread-timeline-model";
-import { THREAD_LIVE_TURN_WINDOW, windowTimelineEntries } from "../../src/lib/thread/thread-window";
+import { timelineTurns } from "../../src/lib/thread/thread-virtual";
+
+/** The last 40 turns: the window the timeline mounted before D1d, kept so the bench reads the same work. */
+const tailTurns = (shown: readonly Entry[]) => shown.slice(timelineTurns(shown).at(-40)?.start ?? 0);
 import { appendEvent, modelInput, threadFixture } from "./thread-timeline-fixture";
 
 const DELTAS = 300;
@@ -42,7 +45,7 @@ function deltas(input: TimelineModelInput): StoredProductEvent[] {
 
 /** Les lectures du rendu à chaque tick, telles que `thread-timeline.tsx` les faisait avant. */
 function renderReadsBefore(model: TimelineModel, input: TimelineModelInput) {
-  const visible = windowTimelineEntries(model.shown, THREAD_LIVE_TURN_WINDOW).visible;
+  const visible = tailTurns(model.shown);
   for (const entry of visible) JSON.stringify(entry);
   for (const entry of model.shown) {
     if (entry.kind !== "assistant") continue;
@@ -58,7 +61,7 @@ function renderReadsBefore(model: TimelineModel, input: TimelineModelInput) {
 
 const signatures = new WeakMap<Entry, string>();
 function renderReadsAfter(model: TimelineModel, input: TimelineModelInput) {
-  const visible = windowTimelineEntries(model.shown, THREAD_LIVE_TURN_WINDOW).visible;
+  const visible = tailTurns(model.shown);
   for (const entry of visible) {
     if (!signatures.has(entry)) signatures.set(entry, JSON.stringify(entry));
   }

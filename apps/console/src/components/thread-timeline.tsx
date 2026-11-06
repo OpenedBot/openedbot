@@ -27,14 +27,9 @@ import {
   THREAD_MESSAGES_CLASS,
   THREAD_SCROLL_ANCHOR_CLASS,
 } from "../lib/thread/thread-anchor";
-import { THREAD_REVEAL_EVENT, type ThreadRevealDetail } from "../lib/thread/thread-turn-rail";
-import {
-  countTimelineTurns,
-  growTimelineWindow,
-  THREAD_FIRST_PAINT_TURN_WINDOW, THREAD_LIVE_TURN_WINDOW,
-  THREAD_WINDOW_PAGE,
-  windowTimelineEntries,
-} from "../lib/thread/thread-window";
+import { THREAD_REVEAL_EVENT, type ThreadRevealDetail } from "../lib/thread/thread-reveal";
+import { isTimelineTurnStart, THREAD_HISTORY_PAGE_TURNS } from "../lib/thread/thread-virtual";
+import { THREAD_ROW_ATTRIBUTE, useThreadVirtualRows } from "../lib/thread/use-thread-virtual-rows";
 import { useT } from "../lib/i18n";
 import { runClockStart, runTimings } from "../lib/run/run-timing";
 import { speechRateFor } from "../lib/voice/speech-rates";
@@ -79,19 +74,6 @@ const EMPTY_MENTIONABLES: MentionableBot[] = [];
 const EMPTY_SETTING_PROPOSALS: readonly BotSettingProposalDto[] = [];
 
 
-/**
- * Distance (en entrées, pas en tours) au bas du fil sous laquelle une entrée
- * n'est JAMAIS contenue (`openedbot-turn-contain`) : le run en direct grandit vite,
- * et un tour encore visible pourrait se voir donner une taille de repli
- * fausse par `contain-intrinsic-size`. La région NON contenue est aussi ce
- * que le `ResizeObserver` du fil (plus bas) doit remettre en page à chaque
- * mutation, contenue ou pas : mesuré, un `Enter` sur un fil de ~3500 nœuds
- * gardait 169 ms de mise en page forcée avec une marge de 12 entrées (aucune
- * lecture de géométrie individuelle > 8 ms : le coût vient du calcul natif
- * du `ResizeObserver`, pas d'un `scrollHeight` explicite). 6 entrées reste
- * largement au-delà des « ~3 derniers tours » demandés.
- */
-const THREAD_SETTLED_ENTRY_MARGIN = 6;
 
 /**
  * Le fil, mémoïsé.
@@ -202,8 +184,6 @@ function ThreadTimelineView({
   // (comme `ThreadPrimitive.ScrollToBottom` d'assistant-ui) : les deux ne
   // doivent jamais se confondre.
   const [atBottom, setAtBottom] = useState(true);
-  const [liveTurns, setLiveTurns] = useState(THREAD_FIRST_PAINT_TURN_WINDOW);
-  const restoreScrollHeight = useRef<number | null>(null);
   const pinFrame = useRef<number | null>(null);
   const schedulePin = useCallback(() => {
     if (pinFrame.current !== null) return;
@@ -222,7 +202,7 @@ function ThreadTimelineView({
   /**
    * Cache de nœuds React par tour : la clé est celle du tableau `nodes`
    * (`entry.key`, ou `activity:${entry.key}` pour un bloc d'activité). Un
-   * SSE isolé change `windowed.visible` (nouvelle référence), donc rebâtit
+   * SSE isolé change `visible` (nouvelle référence), donc rebâtit
    * `timelineModel` entier ; sans ce cache, l'useMemo de rendu reconstruisait
    * TOUS les nœuds (markdown, journaux d'outils) à chaque tick, y compris
    * ceux de tours réglés depuis longtemps, mesuré à 160-480 ms par tick sur
@@ -398,17 +378,19 @@ function ThreadTimelineView({
     return timelineModelBuilder.current(timelineInput, { deferDerived: true });
   }, [timelineInput]);
 
-  useEffect(() => {
-    setLiveTurns(THREAD_FIRST_PAINT_TURN_WINDOW);
-    restoreScrollHeight.current = null;
-  }, [speechScope, scrollToBottomOnThreadKey]);
-  const windowed = useMemo(
-    () => windowTimelineEntries(timelineModelBase.shown, liveTurns),
-    [timelineModelBase.shown, liveTurns],
-  );
+  // Only the turns around the viewport are mounted (`use-thread-virtual-rows.ts`).
+  const virtualRows = useThreadVirtualRows({
+    scroller,
+    entries: timelineModelBase.shown,
+    pinned,
+    atBottom,
+    resetKey: `${speechScope}\u0000${scrollToBottomOnThreadKey ?? ""}`,
+    gap: THREAD_ENTRY_GAP_PX,
+  });
+  const { visible, visibleStart, rowRef, spacers: { top: spacerTop, bottom: spacerBottom } } = virtualRows;
   const timelineModel = useMemo(
-    () => deriveTimelineWindow(timelineModelBase, timelineInput, windowed.visible),
-    [timelineModelBase, timelineInput, windowed.visible],
+    () => deriveTimelineWindow(timelineModelBase, timelineInput, visible, visibleStart),
+    [timelineModelBase, timelineInput, visible, visibleStart],
   );
   const {
     shown,
@@ -424,12 +406,12 @@ function ThreadTimelineView({
   } = timelineModel;
   const visibleRunIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const entry of windowed.visible) {
+    for (const entry of visible) {
       const runId = entryRunId(entry);
       if (runId) ids.add(runId);
     }
     return ids;
-  }, [windowed.visible]);
+  }, [visible]);
   // Les propositions du bot se posent à la fin du tour de leur run. Une
   // proposition dont le run est inconnu du fil n'a pas de tour où se poser :
   // elle ferme le fil plutôt que de disparaître.
@@ -449,7 +431,7 @@ function ThreadTimelineView({
   );
   // First messages on screen: the secondary reads of the frame may start
   // (`lib/shell/after-first-paint.ts`). One frame later, so they follow the paint.
-  const hasEntries = windowed.visible.length > 0;
+  const hasEntries = visible.length > 0;
   useEffect(() => {
     if (!hasEntries) return;
     const frame = requestAnimationFrame(() => {
@@ -459,122 +441,42 @@ function ThreadTimelineView({
     });
     return () => cancelAnimationFrame(frame);
   }, [hasEntries]);
-  // Then the rest of the live window, once the browser is idle. A reader who
-  // scrolled up keeps their viewport; a pinned reader follows the new bottom.
-  const growToLiveWindow = liveTurns < THREAD_LIVE_TURN_WINDOW && windowed.hasOlder;
-  // Until that growth, the top of the first window must stay out of view. It
-  // is often barely taller than the viewport, so whatever opened it (the day
-  // separator of its oldest turn, the "load earlier" button) was painted at
-  // the top of the screen, then pushed thousands of pixels up by the growth:
-  // on every refresh it appeared, then vanished. A spacer stands in for the
-  // turns the growth will add, at their estimated height (the
-  // `contain-intrinsic-size` of `.openedbot-turn-contain`) and never less than a
-  // screen: the reader pinned to the bottom never sees the swap.
-  const pendingGrowthTurns = growToLiveWindow
-    ? Math.min(windowed.turnCount, THREAD_LIVE_TURN_WINDOW) - liveTurns
-    : 0;
-  const showOlder = !growToLiveWindow && (windowed.hasOlder || hasOlderHistory);
-  // A day chip opens a day of the THREAD, not of the window: the oldest turn
-  // mounted only gets one when the turn hidden before it is from another day.
-  // Otherwise the first window opened on a chip ("5 oct. 2026") that the
-  // growth then replaced by older turns of that same day.
+  const showOlder = hasOlderHistory;
+  // A day chip opens a day of the THREAD, not of the mounted rows: the oldest
+  // turn mounted only gets one when the turn before it is from another day.
   // The same holds for a gap chip: the hidden turn's instant is the one the
   // first mounted turn is measured against.
   const isoBeforeWindow = useMemo(() => {
-    for (let index = shown.length - windowed.visible.length - 1; index >= 0; index -= 1) {
+    for (let index = visibleStart - 1; index >= 0; index -= 1) {
       const iso = entryDayIso(shown[index]!, turnTimeByRun);
       if (iso) return iso;
     }
     return null;
-  }, [shown, windowed.visible.length, turnTimeByRun]);
-  useEffect(() => {
-    if (!growToLiveWindow) return;
-    const grow = () => {
-      const node = scroller.current;
-      if (node) restoreScrollHeight.current = node.scrollHeight;
-      setLiveTurns((current) => Math.max(current, THREAD_LIVE_TURN_WINDOW));
-    };
-    if (typeof window.requestIdleCallback === "function") {
-      const idle = window.requestIdleCallback(grow, { timeout: 600 });
-      return () => window.cancelIdleCallback(idle);
-    }
-    const timer = window.setTimeout(grow, 50);
-    return () => window.clearTimeout(timer);
-  }, [growToLiveWindow]);
-  useLayoutEffect(() => {
-    const previous = restoreScrollHeight.current;
-    if (previous == null) return;
-    restoreScrollHeight.current = null;
-    const node = scroller.current;
-    if (!node) return;
-    if (pinned.current) {
-      // Before the paint: a frame drawn between this commit and the next
-      // animation frame would show the top of the grown window.
-      node.scrollTop = node.scrollHeight;
-      schedulePin();
-      return;
-    }
-    node.scrollTop += node.scrollHeight - previous;
-    scrollBox.current = readThreadScrollBox(node);
-  }, [liveTurns, shown, schedulePin]);
-  // A first window that does not fill the screen grows before its paint: on a
-  // tall screen, or a thread of short turns, eight turns left the spacer in
-  // view and the growth then filled the top of the screen under the reader.
-  // One layout read per commit until the idle growth ends it. Declared after
-  // the pin above: a growth commit is pinned before the next one is asked.
-  const growthSpacer = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (!growToLiveWindow) return;
-    const node = scroller.current;
-    const body = content.current;
-    if (!node || !body) return;
-    const ownHeight = body.scrollHeight - (growthSpacer.current?.offsetHeight ?? 0);
-    if (ownHeight >= node.clientHeight) return;
-    // Just enough turns to fill the screen, doubling each commit: rendering
-    // the whole live window here put every one of its turns on the critical
-    // path of the refresh.
-    restoreScrollHeight.current = node.scrollHeight;
-    setLiveTurns((current) => Math.min(THREAD_LIVE_TURN_WINDOW, current * 2));
-  });
+  }, [shown, visibleStart, turnTimeByRun]);
 
-  // Le rail des tours (`thread-turn-rail.tsx`) demande un tour sorti de la
-  // fenêtre montée : la fenêtre grandit jusqu'à lui, puis le fil s'y pose.
-  // `shown` est lu par ref : l'écouteur ne se réabonne pas à chaque SSE.
-  const shownRef = useRef(shown);
-  shownRef.current = shown;
-  const pendingReveal = useRef<string | null>(null);
+  // Le rail des tours, la recherche dans le fil et la recherche globale
+  // demandent une cible (`THREAD_REVEAL_EVENT`) : montée si elle ne l'est pas,
+  // puis le fil s'y pose. `revealTarget` lit les tours par ref : l'écouteur ne
+  // se réabonne pas à chaque SSE.
+  const { revealTarget } = virtualRows;
   useEffect(() => {
     const onReveal = (event: Event) => {
-      const targetId = (event as CustomEvent<ThreadRevealDetail>).detail?.targetId;
-      const entries = shownRef.current;
-      const index = entries.findIndex((entry) => "targetId" in entry && entry.targetId === targetId);
-      if (!targetId || index < 0) return;
-      pinned.current = false;
-      setAtBottom(false);
-      // Déjà monté : posé tout de suite, sans animation (une animation
-      // repasse par la zone « en bas » et pourrait y recoller le fil).
+      const detail = (event as CustomEvent<ThreadRevealDetail>).detail;
+      const targetId = detail?.targetId;
+      if (!targetId) return;
       const mounted = scroller.current?.querySelector<HTMLElement>(
         `[data-thread-find-target="${CSS.escape(targetId)}"]`,
       );
-      if (mounted) {
-        mounted.scrollIntoView({ block: "start" });
-        return;
-      }
-      pendingReveal.current = targetId;
-      const needed = countTimelineTurns(entries.slice(index));
-      setLiveTurns((current) => Math.max(current, needed));
+      if (!mounted && !revealTarget(targetId, detail.block)) return;
+      pinned.current = false;
+      setAtBottom(false);
+      // Déjà monté : posé tout de suite, sans animation par défaut (une
+      // animation repasse par la zone « en bas » et pourrait y recoller le fil).
+      mounted?.scrollIntoView({ block: detail.block ?? "start", behavior: detail.behavior ?? "auto" });
     };
     document.addEventListener(THREAD_REVEAL_EVENT, onReveal);
     return () => document.removeEventListener(THREAD_REVEAL_EVENT, onReveal);
-  }, []);
-  useLayoutEffect(() => {
-    const targetId = pendingReveal.current;
-    if (!targetId) return;
-    pendingReveal.current = null;
-    scroller.current
-      ?.querySelector<HTMLElement>(`[data-thread-find-target="${CSS.escape(targetId)}"]`)
-      ?.scrollIntoView({ block: "start" });
-  }, [windowed.visible]);
+  }, [revealTarget]);
 
   const withTurnAuthor = useCallback((entryKey: string, runId: string, content: React.ReactNode): React.ReactNode => {
     const trail = trailPositions.get(entryKey);
@@ -651,13 +553,13 @@ function ThreadTimelineView({
   // « sans accroc » quand un outil du même run a échoué.
   const toolFailuresByRun = useMemo(() => {
     const failures = new Map<string, number>();
-    for (const entry of windowed.visible) {
+    for (const entry of visible) {
       if (entry.kind !== "tools") continue;
       const count = entry.calls.filter((call) => !isTodoTool(call.tool) && call.failed).length;
       if (count > 0) failures.set(entry.runId, (failures.get(entry.runId) ?? 0) + count);
     }
     return failures;
-  }, [windowed.visible]);
+  }, [visible]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -682,12 +584,10 @@ function ThreadTimelineView({
         pinned.current = stay;
         setAtBottom((prev) => (prev === stay ? prev : stay));
         scrollBox.current = next;
+        virtualRows.onScroll();
       }}
     >
       <div ref={content} data-thread-messages="" className={THREAD_MESSAGES_CLASS}>
-        {pendingGrowthTurns > 0 ? (
-          <div ref={growthSpacer} aria-hidden="true" data-thread-growth-spacer="" style={{ height: `max(100vh, ${pendingGrowthTurns * 120}px)` }} />
-        ) : null}
         {truncated && !hasOlderHistory ? (
           <p className="py-2 text-center text-xs text-muted-foreground">
             {t("threadTimeline.truncatedNotice")}
@@ -699,24 +599,16 @@ function ThreadTimelineView({
             className={`${BUTTON.secondary} mx-auto my-1`}
             disabled={loadingOlder}
             aria-busy={loadingOlder}
-            onClick={async () => {
+            onClick={() => {
+              // The turns read now stay under the eyes: the older page lands
+              // above them, and the anchor absorbs its height.
               pinned.current = false;
               setAtBottom(false);
-              const captureHeight = () => {
-                const node = scroller.current;
-                if (node) restoreScrollHeight.current = node.scrollHeight;
-              };
-              if (windowed.hasOlder) {
-                captureHeight();
-                setLiveTurns((current) => growTimelineWindow(current, THREAD_WINDOW_PAGE, windowed.turnCount));
-              } else if (await onLoadOlder?.(captureHeight)) {
-                setLiveTurns((current) => current + THREAD_WINDOW_PAGE);
-              }
+              virtualRows.captureAnchor();
+              void onLoadOlder?.();
             }}
           >
-            {loadingOlder ? t("threadTimeline.loadingEarlier") : t("threadTimeline.loadEarlier", {
-              count: windowed.hasOlder ? Math.min(THREAD_WINDOW_PAGE, windowed.hiddenTurns) : THREAD_WINDOW_PAGE,
-            })}
+            {loadingOlder ? t("threadTimeline.loadingEarlier") : t("threadTimeline.loadEarlier", { count: THREAD_HISTORY_PAGE_TURNS })}
           </button>
         ) : null}
         {olderError ? <p role="alert" className="py-2 text-center text-xs text-destructive-text">{t("threadTimeline.earlierLoadFailed")}</p> : null}
@@ -724,7 +616,6 @@ function ThreadTimelineView({
         const renderEntry = (
           entry: Entry,
           inActivity = false,
-          settled = false,
         ): React.ReactNode => {
           // Dans le bloc d'activité, l'en-tête d'auteur et le tronc de trace
           // appartiennent au bloc, pas à chacune de ses entrées.
@@ -763,7 +654,6 @@ function ThreadTimelineView({
                     authorBot={entry.authorBot}
                     findTargetId={entry.targetId}
                     findActive={entry.targetId === activeFindTargetId}
-                    settled={settled}
                   />
                 ) : (
                   <UserMessage
@@ -774,7 +664,6 @@ function ThreadTimelineView({
                     mentionSlugs={mentionSlugs}
                     findTargetId={entry.targetId}
                     findActive={entry.targetId === activeFindTargetId}
-                    settled={settled}
                     onEdit={onEditMessage ? () => onEditMessage(entry.key) : undefined}
                   />
                 )}
@@ -883,8 +772,7 @@ function ThreadTimelineView({
                       findTargetId={entry.messageId ? `message:${entry.messageId}` : entry.targetId}
                       findActive={(entry.messageId ? `message:${entry.messageId}` : entry.targetId) === activeFindTargetId}
                       hover={turnEnd ? cardHover : undefined}
-                      settled={settled}
-                    />
+                      />
                   </MessageInteractionShell>
                 ) : null}
                 {relayed ? (
@@ -1139,7 +1027,6 @@ function ThreadTimelineView({
         // qui relèvent du travail (plan, recherches, outils, décisions) et les
         // phrases de narration écrites avant le dernier outil. La réponse est
         // le texte qui suit ce dernier outil : elle reste hors du bloc.
-        const visible = windowed.visible;
         const workRunId = (entry: Entry): string | null => {
           if (entry.kind === "plan" || entry.kind === "search") return entry.runId;
           if (entry.kind === "tools") {
@@ -1182,16 +1069,6 @@ function ThreadTimelineView({
             ? entry.runId
             : null;
         };
-        // Rien au-delà des `THREAD_SETTLED_ENTRY_MARGIN` dernières entrées, et
-        // rien du run en direct : ces tours reçoivent `content-visibility:
-        // auto` (voir `openedbot-turn-contain`, thread-timeline.css). La marge
-        // couvre large plutôt que de risquer de contenir un tour encore
-        // proche du bas, là où une taille de repli approximative se verrait.
-        // Nor anything of the first window: its height decides, before its
-        // paint, whether it fills the screen, and a contained turn only
-        // measures its fallback size there (120 px for a 45 px turn).
-        const isSettledIndex = (endIndex: number, runId: string | null): boolean =>
-          !growToLiveWindow && runId !== streamingRunId && visible.length - 1 - endIndex >= THREAD_SETTLED_ENTRY_MARGIN;
         // Le compte de tokens transmis (bloc « relayed ») relit `events`/`runs`
         // en entier : les inclure dans la signature de cache viderait le
         // cache à CHAQUE tick SSE. Ce cas reste rare (une directive de
@@ -1286,15 +1163,20 @@ function ThreadTimelineView({
           nodeCache.set(cacheKey, { sig, node });
           return node;
         };
-        const renderCached = (entry: Entry, settled: boolean): React.ReactNode => {
-          const build = (live: typeof liveText) => entry.kind !== "assistant" ? renderEntry(entry, false, settled)
-            : <LiveTimelineEntry key={entry.key} entry={entry} live={live} render={(full) => renderEntry(full, false, settled)} />;
+        const renderCached = (entry: Entry): React.ReactNode => {
+          const build = (live: typeof liveText) => entry.kind !== "assistant" ? renderEntry(entry, false)
+            : <LiveTimelineEntry key={entry.key} entry={entry} live={live} render={(full) => renderEntry(full, false)} />;
           // La réponse en direct suit le snapshot à chaque rendu : hors du cache.
           if (entry.key === liveTailKey) return build(liveText);
           return skipsCache(entry) ? build(null) : cached(entry.key, entryRenderSig(entry), () => build(null));
         };
 
-        const nodes: React.ReactNode[] = [];
+        // One row per turn (`data-thread-turn`, measured by the virtual rows);
+        // what follows the last turn (orphan proposals, the thinking status)
+        // comes after the bottom spacer, at the end of the thread.
+        const rows: { key: string; nodes: React.ReactNode[] }[] = [];
+        const trailing: React.ReactNode[] = [];
+        let nodes = trailing;
         // La carte dépend de la proposition seule (pas des callbacks ni des
         // libellés du contexte) : elle vit dans le cache par tour avec sa propre
         // signature, jamais dans `contextEpochDeps`.
@@ -1380,13 +1262,17 @@ function ThreadTimelineView({
           // groupe d'activité) est la dernière traitée.
           pushProposalsAfter(index - 1);
           const entry = visible[index]!;
+          if (isTimelineTurnStart(entry, index)) {
+            flushRoom();
+            nodes = [];
+            rows.push({ key: entry.key, nodes });
+          }
           pushDay(entry);
           const runId = activityRunId(entry, index);
           if (!runId) {
-            pushNode(renderCached(entry, isSettledIndex(index, entryRunId(entry))), entry);
+            pushNode(renderCached(entry), entry);
             continue;
           }
-          const groupStartIndex = index;
           const members: Entry[] = [entry];
           while (index + 1 < visible.length && activityRunId(visible[index + 1]!, index + 1) === runId) {
             index += 1;
@@ -1397,9 +1283,7 @@ function ThreadTimelineView({
           // la suit. Every turn with work, even a single tool call, gets the
           // same Agent Activity block: one way to read a turn's work.
           if (runId !== streamingRunId && !members.some((member) => workRunId(member) !== null)) {
-            members.forEach((member, offset) => {
-              pushNode(renderCached(member, isSettledIndex(groupStartIndex + offset, entryRunId(member))), member);
-            });
+            members.forEach((member) => pushNode(renderCached(member), member));
             continue;
           }
           const live = runId === streamingRunId;
@@ -1420,7 +1304,6 @@ function ThreadTimelineView({
             || (member.kind === "assistant" && member.messageId != null && `message:${member.messageId}` === activeFindTargetId),
           );
           const showAuthorLabel = members.some((member) => authorLabelEntryKeys.has(member.key));
-          const groupSettled = isSettledIndex(index, runId);
           const groupRun = runsById.get(runId);
           const runStart = groupRun ? runClockStart(groupRun) : Number.NaN;
           const workedMs = !live && groupRun?.createdAt && groupRun.endedAt
@@ -1435,7 +1318,6 @@ function ThreadTimelineView({
             forceOpen,
             showAuthorLabel,
             authorRenderKey(runAuthors?.get(runId) ?? defaultAuthor),
-            groupSettled,
             members.map((member) => entryRenderSig(member)).join(""),
           ].join("");
           pushNode(
@@ -1452,7 +1334,6 @@ function ThreadTimelineView({
                 forceOpen={forceOpen}
                 author={runAuthors?.get(runId) ?? defaultAuthor ?? null}
                 showAuthorLabel={showAuthorLabel}
-                settled={groupSettled}
               >
                 {members.map((member) => {
                   // The feed, in the runtime's order. Tool passages and web
@@ -1478,6 +1359,8 @@ function ThreadTimelineView({
           );
         }
         pushProposalsAfter(visible.length - 1);
+        flushRoom();
+        nodes = trailing;
         for (const [runId, proposals] of proposalsByRun) {
           if (!runsById.has(runId)) for (const proposal of proposals) pushNode(proposalNode(proposal));
         }
@@ -1504,12 +1387,26 @@ function ThreadTimelineView({
         for (const key of nodeCache.keys()) {
           if (!liveCacheKeys.has(key)) nodeCache.delete(key);
         }
-        return nodes;
+        // The unmounted turns are two spacers, at their measured or estimated height.
+        return (
+          <>
+            {spacerTop > 0 ? <div aria-hidden="true" data-thread-spacer="top" className="shrink-0" style={{ height: spacerTop }} /> : null}
+            {rows.map((row) => (
+              <div key={row.key} ref={rowRef(row.key)} {...{ [THREAD_ROW_ATTRIBUTE]: row.key }} className="flex w-full min-w-0 flex-col gap-3">
+                {row.nodes}
+              </div>
+            ))}
+            {spacerBottom > 0 ? <div aria-hidden="true" data-thread-spacer="bottom" className="shrink-0" style={{ height: spacerBottom }} /> : null}
+            {trailing}
+          </>
+        );
         }, [
-          windowed.visible,
+          visible,
+          spacerTop,
+          spacerBottom,
+          rowRef,
           proposalsByRun,
           isoBeforeWindow,
-          growToLiveWindow,
           assistantTurns,
           answeredQuestionByUserKey,
           attachedQuestionEntryKeys,
@@ -1575,7 +1472,9 @@ function ThreadTimelineView({
           if (!node) return;
           pinned.current = true;
           setAtBottom(true);
-          node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+          // From far up, a smooth scroll would cross the spacers of unmounted turns: a jump instead.
+          const far = node.scrollHeight - node.scrollTop - node.clientHeight > 2 * node.clientHeight;
+          node.scrollTo({ top: node.scrollHeight, behavior: far ? "auto" : "smooth" });
           scrollBox.current = readThreadScrollBox(node);
         }}
       />
