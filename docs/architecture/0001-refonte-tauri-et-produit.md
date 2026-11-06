@@ -40,15 +40,15 @@ l'utilisateur veut traiter dans le même chantier (sections 4.5 à 4.7).
 
 ### Objectifs mesurables
 
-Les cibles chiffrées sont fixées **après** la mesure de référence (D0) ; celles-ci sont des
-hypothèses de départ.
+Cibles fixées après la mesure de référence D0 (section 3.1, après les non-objectifs). La colonne « Electron aujourd'hui »
+reprend la médiane mesurée.
 
-| # | Objectif | Cible de départ |
-|---|---|---|
-| G1 | Temps jusqu'à la liste des fils utilisable, mesuré dans trois cas : premier lancement, lancement suivant, premier lancement après mise à jour (le cache de requêtes est invalidé à chaque build, `query-persister.ts:23`) | ≤ 800 ms au lancement suivant ; les deux autres mesurés et bornés en D0 |
-| G2 | JS d'entrée de la console | ≤ 200 ko gzip (411 aujourd'hui) |
-| G3 | Mémoire au repos, tous processus de l'app | −50 % par rapport à Electron |
-| G4 | Streaming d'une réponse de 2 000 tokens | aucune tâche longue > 50 ms, ≥ 55 fps |
+| # | Objectif | Electron aujourd'hui (D0) | Cible |
+|---|---|---|---|
+| G1 | Temps du lancement à la liste des fils utilisable, dans trois cas : premier lancement, lancement suivant, premier lancement après mise à jour (le cache de requêtes est invalidé à chaque build, `query-persister.ts:23`) | suivant 452 ms (573 ms en réseau simulé) ; premier 564 ms (1 399 ms en réseau simulé) ; après mise à jour 482 ms (987 ms en réseau simulé) | **≤ 450 ms** au lancement suivant et **≤ 600 ms** au premier lancement comme après une mise à jour, **quel que soit le réseau** |
+| G2 | JS chargé par la console | entrée 398 ko gzip ; 859 ko gzip de JS sur 54 fichiers avant la liste des fils | entrée **≤ 200 ko gzip** ; JS chargé avant la liste des fils **≤ 400 ko gzip** |
+| G3 | Mémoire au repos, tous processus de l'app, 30 s après l'ouverture d'un fil | 660 Mo (4 processus) | **≤ 330 Mo** (−50 %) |
+| G4 | Streaming d'une réponse longue (~9 000 caractères, environ 2 000 tokens) | 0 frame longue pendant le streaming à la remesure (une première série en comptait 2 et 9, sur une fenêtre plus large) ; fps moyen 120, p5 98 à 100 sur un écran à 120 Hz | **aucune frame longue > 50 ms**, avant comme pendant le streaming ; fps p5 ≥ 90 % de la fréquence de l'écran (82 à 83 % aujourd'hui) |
 | G5 | Une seule source de vérité par concept : écritures de création d'un tour, transitions d'un run, contrat du pont natif, contrat du connecteur | vérifiée par un garde en CI |
 
 ### Non-objectifs
@@ -60,6 +60,106 @@ hypothèses de départ.
 - Pas de changement du connecteur Go ni de Hermes au-delà des sections 4.7 (clé d'appareil,
   corrélation, contrat unique).
 - Pas d'application mobile dans ce chantier.
+
+### 3.1 Mesure de référence (D0, 2026-11-06)
+
+Outil : `apps/console/scripts/perf/d0-baseline.ts` (rejouable, écrit `tmp/perf/d0-<date>.json`).
+Résultats bruts, non versionnés : G2 et G3 dans `tmp/perf/d0-2026-11-06T09-11-49-579Z.json` ;
+G1 dans `tmp/perf/d0-2026-11-06T09-32-03-846Z.json` et G4 dans
+`tmp/perf/d0-2026-11-06T10-06-38-327Z.json`, remesurés après les revues Codex de l'outil (voir
+« Corrections de l'outil » plus bas).
+
+**Conditions.**
+- Machine : Apple M5 Pro, 48 Go, macOS 26.6.2, écran à 120 Hz.
+- Logiciels : Electron 44.7.0 (shell compilé, `electron-vite build`) ; Chromium de Playwright 1.64
+  en mode headless.
+- Console : build de production solo du commit `fe6574f`, servie par un serveur statique qui
+  imite la prod (gzip, ETag, `Cache-Control: no-cache` sur le document, comme
+  `openedbot-pro/infra/shuttle/web-gate.js` ; les assets hachés, `immutable` en prod, gardent ici
+  la fraîcheur heuristique du navigateur, ce qui ne peut que ralentir la mesure) ; `/api` relayé vers
+  l'API de dev locale, runtime de la VM de lab 240.
+- Essais : 5 par cas de G1 (médiane ci-dessous), 3 pour G3, 2 pour G4. Aucun échec. Aucun essai
+  rejeté pour mauvais build : chaque essai vérifie le chunk d'entrée réellement chargé.
+- **Marqueur de G1** : le premier lien de la barre latérale vers le fil d'un bot
+  (`a[href*="/bot/"]`) est présent et visible. Temps mesuré du lancement du processus (navigateur
+  ou Electron) jusqu'au marqueur.
+- **Les trois cas de G1** :
+  - *premier lancement* : session présente, mais aucun cache HTTP, aucun IndexedDB ni
+    localStorage (côté Electron, on garde seulement le fichier de jetons) ;
+  - *lancement suivant* : même profil, relancé ;
+  - *après mise à jour* : même profil et même origine, après un **second build** dont le build id
+    et le chunk d'entrée diffèrent.
+- **Réseau** : « local » n'a aucune latence ; le « réseau simulé » ajoute 50 ms d'aller-retour
+  par réponse et 50 Mbit/s pour les fichiers. Le serveur parle HTTP/1.1 (6 connexions), là où la
+  prod passe par HTTP/2 : la simulation pénalise un peu trop les nombreux petits chunks.
+
+| Indicateur | Web (Chromium headless) | Electron 44 |
+|---|---|---|
+| G1 premier lancement, local / réseau simulé | 538 / 1 174 ms | 564 / 1 399 ms |
+| G1 lancement suivant, local / réseau simulé | 445 / 589 ms | 452 / 573 ms |
+| G1 après mise à jour, local / réseau simulé | 455 / 1 083 ms | 482 / 987 ms |
+| G1 côté page seulement (depuis la navigation), local : premier / suivant / mise à jour | 244 / 170 / 172 ms | non mesuré (*) |
+| G2 chunk d'entrée | 1 356 ko brut, 398 ko gzip | même build |
+| G2 avant la liste des fils | JS : 54 fichiers, 2 855 ko brut, 859 ko gzip, 713 ko brotli ; CSS : 2 fichiers, 69 ko gzip | même build |
+| G3 mémoire au repos | 1 135 Mo (***) | **660 Mo**, 4 processus |
+| G4 délai avant le premier texte | 9,6 et 12,8 s (modèle et hôte compris) | 9,2 et 9,6 s |
+| G4 frames longues (> 50 ms) avant le premier texte (envoi, « réflexion ») | 0 | 0 |
+| G4 frames longues (> 50 ms) pendant le streaming | 0 | 0 |
+| G4 fps moyen / p5, pendant le streaming | 60 / 59,5 à 59,9 (headless plafonné à 60) | 120 / 98 à 100 |
+
+(*) Electron charge la console avant qu'une sonde puisse s'attacher : seul le temps total est mesuré.
+(***) Chromium headless sans vraie composition GPU, à titre indicatif seulement ; non comparable à
+Electron.
+
+**Ce que ça dit.**
+- Sur cette machine, le lancement d'Electron n'est **pas** lent quand le réseau est rapide :
+  452 ms au lancement suivant. Le coût vient du réseau. Avec 50 ms d'aller-retour, un premier
+  lancement monte à 1,4 s, dont environ 850 ms de téléchargement des 54 fichiers de la console,
+  et le premier lancement après une mise à jour à environ 1 s. C'est exactement ce que la
+  console embarquée supprime.
+- La console télécharge plus du double de son chunk d'entrée avant d'afficher la liste : 859 ko
+  gzip. L'écran d'accueil (`overview`) entraîne avec lui les échelles d3 de recharts, le
+  markdown du support et KaTeX (liste complète dans le JSON).
+- La mémoire (660 Mo) est le vrai écart mesuré. Le streaming est fluide sur cette machine, mais
+  les fps p5 restent à 82–83 % de la fréquence de l'écran, et une première série a compté des frames
+  longues : à revérifier sur une machine modeste.
+- **Cache du document en prod (vérifié le 2026-11-06) :** la prod sert `index.html` en
+  `Cache-Control: no-cache` (`web-gate.js`, `cacheControlFor` ; en-tête relu sur
+  `https://openedbot.app/`). Le `web.Caddyfile`, sans `Cache-Control`, ne sert plus que l'ancien
+  stack du lab : le défaut de fraîcheur qui faussait la première mesure n'existe pas en prod.
+
+**Non mesuré dans D0.**
+- La vraie prod sur Internet (latence, TLS, Cloudflare) : uniquement le local et la VM 240.
+- Une machine moins puissante que ce M5 Pro.
+- La navigation d'un fil à l'autre, la latence de frappe dans le composer, le défilement d'un
+  long fil.
+- Le premier lancement avec connexion : il dépend de l'e-mail et n'a pas de sens en temps.
+- Chaque réponse de G4 allonge le fil de test d'Atlas (de 12 000 à plus de 100 000 caractères
+  affichés au fil des essais, au-delà de la fenêtre de 40 tours de la timeline). Les mesures de G3 et G4 ont donc été faites sur un fil qui grandit.
+
+**Corrections de l'outil (revue Codex de `perf/d0-baseline`).** Les trois défauts relevés touchaient
+la validité des chiffres ; G1 et G4 ont été remesurés après correction.
+- Le cas « après mise à jour » pouvait mesurer l'ancien build : sans `Cache-Control`, Chromium
+  réutilisait le `index.html` du build A. Le serveur de mesure revalide maintenant le document
+  (`no-cache`, comme la prod) en gardant le cache des assets, et chaque essai vérifie le chunk d'entrée chargé ;
+  un essai sur le mauvais build est rejeté et compté. Effet : en réseau simulé, le cas passe de
+  531 à 1 083 ms côté web, et de 562 à 987 ms côté Electron. La dispersion inexpliquée de la
+  première série venait de là. La revalidation coûte aussi un aller-retour au lancement suivant
+  (+10 à 50 ms en réseau simulé).
+- G4 comptait les frames longues depuis l'envoi, mais les fps depuis le premier texte. Les deux
+  utilisent maintenant la fenêtre du streaming ; l'activité entre l'envoi et le premier texte est
+  rapportée à part.
+- G4 suivait le texte de tout le fil, qui peut diminuer au-delà de 40 tours, et datait la
+  croissance au moment des sondages de l'API. La sonde suit maintenant la réponse elle-même (le
+  nouveau `[data-assistant-response]`) et horodate sa croissance dans la page ; la fenêtre
+  s'étend de 250 ms après la dernière croissance pour mesurer le rendu d'une réponse arrivée d'un
+  bloc. Les intervalles (frames, frames longues) comptent dès qu'ils chevauchent la fenêtre,
+  pour ne pas perdre un blocage qui se termine juste après. Remesure : fps p5 d'Electron de 98 à
+  100 (contre 102 à 103), toujours aucune frame longue.
+- Les échecs d'initialisation d'Electron arrêtent le processus lancé ; les essais de streaming
+  ont leur propre boucle, pour respecter `--stream-runs` ; chaque sondage de l'API est borné par
+  l'échéance de l'essai.
+- Les contextes de navigateur des boucles mémoire et streaming sont fermés dans un `finally`.
 
 ## 4. Architecture cible
 
@@ -488,3 +588,10 @@ concerne Tauri sont à confirmer en D2a.
 **Décisions de l'utilisateur (2026-11-06)** : desktop solo (Q8), reconnexion unique avec perte
 des brouillons annoncée (Q1), refus immédiat du changement de clé implicite (Q6). Q3 (CI pro) et
 Q7 (signature Windows) restent ouvertes.
+
+**Mesure de référence D0 (2026-11-06)** : chiffres en section 3.1. Cibles G1 à G4 corrigées. Le
+démarrage local d'Electron est déjà sous 500 ms sur la machine de mesure (remesuré après la revue
+Codex de l'outil, qui a corrigé le cas « après mise à jour » : 987 ms en réseau simulé) : G1 vise désormais
+l'indépendance au réseau. G2 borne aussi le JS chargé avant la liste des fils (859 ko gzip
+mesurés). G4 compte les frames longues (Long Animation Frames), l'API `longtask` ne rapportant
+rien pendant le streaming.
