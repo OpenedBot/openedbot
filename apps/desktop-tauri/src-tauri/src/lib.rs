@@ -9,8 +9,10 @@
 //! `update_idle.rs`), with the user's consent, and `shell.rs` ties
 //! session, window, popup and menus together like the Electron `main.ts`.
 //!
-//! The preview coexists with the Electron app: its own bundle identifier
-//! (Keychain service), its own name, no `openedbot://` scheme.
+//! Which app it is comes from the bundle configuration (`identity.rs`): the
+//! preview coexists with the Electron app (its own bundle identifier and
+//! Keychain service, its own name, no `openedbot://` scheme); the production
+//! build (D3) takes over Electron's identifier, name and scheme.
 
 pub mod auth;
 pub mod bridge;
@@ -18,6 +20,7 @@ pub mod callback;
 pub mod config;
 pub mod csp;
 pub mod diagnostics;
+pub mod identity;
 #[cfg(target_os = "linux")]
 mod linux;
 mod logger;
@@ -47,9 +50,11 @@ use shell::{PopupHandle, ShellEvents, ShellGoogle, ShellPopupEvents};
 use vault::{KeychainVault, Vault, VaultError};
 use window::WindowState;
 
-pub const BUNDLE_ID: &str = "app.openedbot.desktop.preview";
-/// The OAuth client id the API records for this build.
-pub const CLIENT_ID: &str = "openedbot-desktop-macos-preview";
+/// The preview's identifier, for tests that need a Keychain service; the app
+/// itself reads its identity from the bundle configuration (`identity.rs`).
+pub const PREVIEW_BUNDLE_ID: &str = "app.openedbot.desktop.preview";
+/// The preview's OAuth client id on macOS, for the IPC tests.
+pub const PREVIEW_CLIENT_ID: &str = "openedbot-desktop-macos-preview";
 /// Show or hide the window from anywhere, as the Electron shell.
 pub const TOGGLE_SHORTCUT: &str = "CommandOrControl+Shift+O";
 
@@ -84,8 +89,8 @@ impl<A: AuthApi, V: Vault> TokenSource for AuthService<A, V> {
 /// Whether the OS hands `openedbot://` links to this app. macOS reads the
 /// scheme from the bundle's Info.plist at install; elsewhere it is registered
 /// at run time, and a refusal falls back to the loopback page.
-fn deep_link_registered<R: Runtime>(app: &AppHandle<R>) -> bool {
-    if callback::DECLARED_SCHEME != Some(callback::SCHEME) {
+fn deep_link_registered<R: Runtime>(app: &AppHandle<R>, identity: &identity::Identity) -> bool {
+    if !identity.declares_scheme {
         return false;
     }
     if cfg!(target_os = "macos") {
@@ -101,20 +106,51 @@ fn deep_link_registered<R: Runtime>(app: &AppHandle<R>) -> bool {
     }
 }
 
+/// The exit status after a refused configuration (EX_CONFIG).
+const EXIT_CONFIG: i32 = 78;
+
+/// What the user reads when the configuration is refused: the app cannot
+/// start, and a silent exit would look like a crash.
+pub fn config_refused_message(product: &str, error: &config::ConfigError, file: Option<&std::path::Path>) -> String {
+    let file = file.map(|path| path.display().to_string()).unwrap_or_else(|| "config.json".into());
+    format!(
+        "{product} ne peut pas démarrer : sa configuration est refusée ({error}).\n\nCorrigez ou supprimez {file}, ou la variable d’environnement en cause, puis relancez l’app."
+    )
+}
+
 fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
+    let identity = identity::Identity::from_config(app.config(), &app.package_info().name);
     if let Ok(dir) = app.path().app_log_dir() {
-        logger::init(dir);
+        logger::init(dir, identity.log_file());
     }
+    let product = identity.product.clone();
     let version = app.package_info().version.to_string();
     let data_dir = app.path().app_data_dir().ok();
     if let Some(dir) = &data_dir {
         let _ = std::fs::create_dir_all(dir);
-        diagnostics::open(&dir.join("diagnostics.sqlite"), &format!("openedbot preview {version}, {} {}", std::env::consts::OS, std::env::consts::ARCH));
+        diagnostics::open(&dir.join("diagnostics.sqlite"), &format!("{product} {version}, {} {}", std::env::consts::OS, std::env::consts::ARCH));
     }
     let env = |name: &str| std::env::var(name).ok();
-    let config = config::load(app.path().app_config_dir().ok().as_deref(), &env).inspect_err(|error| log::error!("configuration refused: {error}"))?;
-    log::info!("openedbot preview {version}, API {}", config.api_origin);
+    let config_dir = app.path().app_config_dir().ok();
+    let config = match config::load(config_dir.as_deref(), &env, identity.production) {
+        Ok(config) => config,
+        Err(error) => {
+            log::error!("configuration refused: {error}");
+            use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+            let file = config_dir.as_ref().map(|dir| dir.join("config.json"));
+            // Not blocking: the dialog needs the event loop this callback runs
+            // on. Nothing else starts (no window, session, popup or update);
+            // the app quits once the dialog is closed.
+            app.dialog()
+                .message(config_refused_message(&product, &error, file.as_deref()))
+                .title("Configuration refusée")
+                .kind(MessageDialogKind::Error)
+                .show(|_| std::process::exit(EXIT_CONFIG));
+            return Ok(());
+        }
+    };
+    log::info!("{product} {version}, API {}, updates {}", config.api_origin, config.update_url.as_deref().unwrap_or("off"));
 
     let prefs = Arc::new(PreferenceStore::open(data_dir.as_deref()));
     app.manage(WindowState::new(prefs.clone()));
@@ -140,9 +176,9 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
     let vault: Box<dyn Vault> = if std::env::var("OPENEDBOT_PREVIEW_VAULT").as_deref() == Ok("memory") {
         Box::new(DisabledVault)
     } else {
-        Box::new(KeychainVault::new(BUNDLE_ID, &config.api_origin))
+        Box::new(KeychainVault::new(&identity.bundle_id, &config.api_origin))
     };
-    let registered = deep_link_registered(&handle);
+    let registered = deep_link_registered(&handle, &identity);
     let redirect_uri = callback::redirect_uri(registered);
     let returned = handle.clone();
     let google = Arc::new(ShellGoogle {
@@ -151,7 +187,7 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
         uses_loopback: !registered,
     });
     let events: Arc<dyn AuthEvents> = Arc::new(ShellEvents { app: handle.clone() });
-    let auth: Arc<Auth> = Arc::new(AuthService::new(HttpAuthApi::new(&config.api_origin, &version), vault, events, redirect_uri, CLIENT_ID));
+    let auth: Arc<Auth> = Arc::new(AuthService::new(HttpAuthApi::new(&config.api_origin, &version), vault, events, redirect_uri, &identity.client_id));
     let restored = auth.restore();
     log::info!("session {} ({:?}), browser return by {redirect_uri}", if restored { "restored" } else { "absent" }, auth.persistence());
 
@@ -165,7 +201,7 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
             opener_handle.opener().open_url(url.as_str(), None::<&str>).map_err(|error| error.to_string())
         }),
         google,
-        client_id: CLIENT_ID.into(),
+        client_id: identity.client_id.clone(),
         window: Box::new(window::MainWindowControl(handle.clone())),
     });
 
@@ -227,13 +263,8 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
     linux::setup(app);
     shell::visibility_changed(&handle);
 
-    {
-        use tauri_plugin_global_shortcut::GlobalShortcutExt;
-        // Not fatal: the Dock icon still works. Another app may own the shortcut.
-        if let Err(error) = app.global_shortcut().register(TOGGLE_SHORTCUT) {
-            log::warn!("global shortcut {TOGGLE_SHORTCUT} unavailable ({error})");
-        }
-    }
+    app.manage(ToggleShortcut::default());
+    ensure_toggle_shortcut(&handle);
     {
         use tauri_plugin_notification::NotificationExt;
         // A click on the notification itself (`tap`); the page's notifications carry no actions.
@@ -254,13 +285,46 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
         });
     }
 
-    start_updates(&handle, &config, update_status)?;
+    start_updates(&handle, &config, update_status, &product)?;
+    app.manage(identity);
     Ok(())
+}
+
+/// Whether the show/hide shortcut is ours. Another app may hold it (the
+/// Electron app during the switch, D3): then the window works without it,
+/// and the shortcut is asked for again each time the window gains focus, so
+/// it comes back once that app has quit.
+#[derive(Default)]
+pub struct ToggleShortcut {
+    registered: std::sync::atomic::AtomicBool,
+    warned: std::sync::atomic::AtomicBool,
+}
+
+/// Registers the shortcut unless already ours; never fatal.
+pub fn ensure_toggle_shortcut<R: Runtime>(app: &AppHandle<R>) {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let Some(state) = app.try_state::<ToggleShortcut>() else { return };
+    if state.registered.load(Ordering::SeqCst) {
+        return;
+    }
+    match app.global_shortcut().register(TOGGLE_SHORTCUT) {
+        Ok(()) => {
+            state.registered.store(true, Ordering::SeqCst);
+            if state.warned.load(Ordering::SeqCst) {
+                log::info!("global shortcut {TOGGLE_SHORTCUT} registered after all");
+            }
+        }
+        // Once: the retry runs on every focus.
+        Err(error) if !state.warned.swap(true, Ordering::SeqCst) => {
+            log::warn!("global shortcut {TOGGLE_SHORTCUT} unavailable ({error}), asked again when the window gains focus");
+        }
+        Err(_) => {}
+    }
 }
 
 /// The update engine on the configured feed, its checks and the idle
 /// install; without a feed, a control that does nothing.
-fn start_updates<R: Runtime>(app: &AppHandle<R>, config: &config::ShellConfig, status: Arc<update_state::UpdateStatus>) -> Result<(), Box<dyn std::error::Error>> {
+fn start_updates<R: Runtime>(app: &AppHandle<R>, config: &config::ShellConfig, status: Arc<update_state::UpdateStatus>, product: &str) -> Result<(), Box<dyn std::error::Error>> {
     let Some(manifest) = config.update_url.as_deref() else {
         app.manage(bridge::Updates(Arc::new(update_engine::NoUpdates(status))));
         return Ok(());
@@ -283,10 +347,11 @@ fn start_updates<R: Runtime>(app: &AppHandle<R>, config: &config::ShellConfig, s
     let control: Arc<dyn update_engine::UpdateControl> = Arc::new(engine);
     app.manage(bridge::Updates(control.clone()));
     let moving = app.clone();
+    let title = format!("Déplacez {product} dans Applications");
     updater::spawn_checks(status.clone(), control.clone(), move || {
         shell::warn(
             &moving,
-            "Déplacez openedbot preview dans Applications",
+            &title,
             "macOS fait tourner cette copie depuis un emplacement en lecture seule : les mises à jour ne peuvent pas s’y installer. Quittez l’app, glissez-la dans le dossier Applications depuis le Finder, puis relancez-la.",
         );
     });
@@ -305,8 +370,10 @@ fn start_updates<R: Runtime>(app: &AppHandle<R>, config: &config::ShellConfig, s
 fn on_run_event<R: Runtime>(app: &AppHandle<R>, event: tauri::RunEvent) {
     match event {
         tauri::RunEvent::ExitRequested { .. } => {
-            let state = app.state::<WindowState>();
-            state.quitting.store(true, Ordering::SeqCst);
+            // Absent when the configuration was refused: nothing to save.
+            if let Some(state) = app.try_state::<WindowState>() {
+                state.quitting.store(true, Ordering::SeqCst);
+            }
             window::save_placement(app);
         }
         // Quit from the app menu did not keep the placement through `ExitRequested` alone (observed): save here too.
@@ -375,9 +442,20 @@ pub fn run() {
             setup(app)
         })
         .build(tauri::generate_context!())
-        .expect("openedbot preview failed to start");
+        .expect("openedbot desktop failed to start");
     app.run(on_run_event);
 }
 
 #[cfg(test)]
 mod ipc_tests;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_refused_configuration_says_what_and_where() {
+        let message = super::config_refused_message("openedbot", &super::config::ConfigError::Insecure("OPENEDBOT_API_ORIGIN"), Some(std::path::Path::new("/Users/x/Library/Application Support/app.openedbot.desktop/config.json")));
+        assert!(message.starts_with("openedbot ne peut pas démarrer"));
+        assert!(message.contains("OPENEDBOT_API_ORIGIN must be https"));
+        assert!(message.contains("app.openedbot.desktop/config.json"));
+    }
+}

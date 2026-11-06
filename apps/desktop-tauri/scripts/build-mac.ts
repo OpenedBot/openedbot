@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Builds the macOS prototype (ADR 0001, D2a): the solo console embedded, the
+ * Builds the macOS app (ADR 0001, D2a, D3): the solo console embedded, the
  * notch popup in `Contents/Helpers`, signed with the Developer ID (hardened
  * runtime, no App Sandbox, no entitlements), notarised and stapled, plus the
  * signed update artifact (`.app.tar.gz` + `.sig`, update key distinct from
@@ -8,7 +8,14 @@
  * `apps/desktop-tauri/release/<version>/` (`make desktop-tauri-mac`).
  *
  *   bun apps/desktop-tauri/scripts/build-mac.ts --version 0.0.2 [--sign developer-id|adhoc]
- *       [--popup /path/OpenedbotPopup.app] [--no-notarize]
+ *       [--identity preview|production] [--popup /path/OpenedbotPopup.app] [--no-notarize]
+ *
+ * `--identity production` (D3) builds the app that replaces Electron, from
+ * the overlay `src-tauri/tauri.production.conf.json`: bundle id
+ * `app.openedbot.desktop`, name « openedbot », executable `openedbot`,
+ * `openedbot://` declared; artifacts `openedbot_<version>_aarch64.*`. The
+ * default stays the preview, which installs next to the Electron app. A test
+ * build may carry a suffix (`1.1.1-test`): a number is never reused.
  *
  * Secrets are read from files and handed to the tools through the
  * environment, never printed:
@@ -19,15 +26,14 @@
  *     (`OPENEDBOT_UPDATER_KEY_DIR`).
  */
 import { $ } from "bun";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { artifactNames, BUILD_VERSION, IDENTITIES, identityOverlay, mergeConfig, type IdentityName } from "./mac-identity";
 
 const ROOT = path.resolve(import.meta.dir, "../../..");
 const APP_DIR = path.join(ROOT, "apps/desktop-tauri");
-const PRODUCT = "openedbot preview";
-const ARTIFACT_STEM = "openedbot-preview";
 const DEFAULT_IDENTITY = "Developer ID Application: kevin aubrée (QDC76LMF29)";
 const PLACEHOLDER = "openedbot-console-placeholder";
 const API_ORIGIN_PLACEHOLDER = "__OPENEDBOT_DESKTOP_API_ORIGIN__";
@@ -37,12 +43,16 @@ const { values } = parseArgs({
     version: { type: "string" },
     sign: { type: "string", default: "developer-id" },
     popup: { type: "string" },
+    identity: { type: "string", default: "preview" },
     "no-notarize": { type: "boolean", default: false },
   },
 });
 
 const version = values.version ?? "";
-if (!/^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(version)) fail("--version X.Y.Z is required");
+if (!BUILD_VERSION.test(version)) fail("--version X.Y.Z[-tag] is required");
+if (!Object.hasOwn(IDENTITIES, values.identity ?? "")) fail("--identity must be preview or production");
+const bundle = IDENTITIES[values.identity as IdentityName];
+const PRODUCT = bundle.product;
 const sign = values.sign;
 if (sign !== "developer-id" && sign !== "adhoc") fail("--sign must be developer-id or adhoc");
 const notarize = sign === "developer-id" && !values["no-notarize"];
@@ -106,6 +116,11 @@ const popupExecutable = path.join(popupSource, "Contents/MacOS/OpenedbotPopup");
 if (!existsSync(popupExecutable)) fail(`popup bundle missing: ${popupSource} (make -C openedbot-notch bundle)`);
 const declared = (await $`/usr/libexec/PlistBuddy -c "Print :OpenedbotHostedProtocol" ${path.join(popupSource, "Contents/Info.plist")}`.nothrow().text()).trim();
 if (declared !== "1") fail(`${popupSource} does not declare OpenedbotHostedProtocol 1`);
+// The notch commit the popup was built from (`<repo>/dist/OpenedbotPopup.app`,
+// `make bundle`), for the release record; null for a bundle from elsewhere.
+const notchRepo = realpathSync(path.resolve(popupSource, "../.."));
+const notchTop = (await $`git -C ${notchRepo} rev-parse --show-toplevel`.nothrow().quiet().text()).trim();
+const popupCommit = notchTop && realpathSync(notchTop) === notchRepo ? (await $`git -C ${notchRepo} rev-parse HEAD`.quiet().text()).trim() : null;
 const popup = path.join(staging, "OpenedbotPopup.app");
 await $`ditto ${popupSource} ${popup}`;
 const popupIdentity = sign === "developer-id" ? identity : "-";
@@ -114,7 +129,7 @@ await $`codesign --force --options runtime --timestamp --sign ${popupIdentity} $
 // 3. The Tauri build: version, popup and update public key come from here,
 // never from the committed config. The local feed is plain http on loopback
 // (`config.rs` refuses http anywhere else), hence the transport flag.
-const overlay = {
+const overlay = mergeConfig(identityOverlay(APP_DIR, bundle), {
   version,
   bundle: {
     createUpdaterArtifacts: true,
@@ -129,7 +144,7 @@ const overlay = {
       dangerousInsecureTransportProtocol: true,
     },
   },
-};
+});
 const overlayFile = path.join(staging, "tauri.overlay.json");
 writeFileSync(overlayFile, JSON.stringify(overlay, null, 2));
 const buildEnv: Record<string, string | undefined> = {
@@ -162,9 +177,10 @@ if (notarize) {
 }
 
 // 5. Collect the artifacts under names without spaces.
+const names = artifactNames(bundle, version);
 const artifacts = {
-  dmg: path.join(out, `${ARTIFACT_STEM}_${version}_aarch64.dmg`),
-  tarball: path.join(out, `${ARTIFACT_STEM}_${version}_aarch64.app.tar.gz`),
+  dmg: path.join(out, names.dmg),
+  tarball: path.join(out, names.tarball),
 };
 await $`cp ${dmg} ${artifacts.dmg}`;
 await $`cp ${tarball} ${artifacts.tarball}`;
@@ -172,6 +188,15 @@ await $`cp ${tarball}.sig ${artifacts.tarball}.sig`;
 rmSync(staging, { recursive: true, force: true });
 
 // 6. Checks, printed for the record (ADR 4.3.1).
+// The identity really built: Electron's bundle id, name and scheme for production.
+const plist = path.join(app, "Contents/Info.plist");
+const read = async (key: string) => (await $`/usr/libexec/PlistBuddy -c ${`Print :${key}`} ${plist}`.nothrow().quiet().text()).trim();
+const built = { bundleId: await read("CFBundleIdentifier"), name: await read("CFBundleName"), executable: await read("CFBundleExecutable"), version: await read("CFBundleShortVersionString"), schemes: await read("CFBundleURLTypes:0:CFBundleURLSchemes:0") };
+console.log(`[build-mac] built ${JSON.stringify(built)}`);
+if (built.bundleId !== bundle.bundleId || built.name !== bundle.product || built.executable !== bundle.executable) fail(`unexpected identity in ${plist}`);
+if (bundle.scheme && built.schemes !== bundle.scheme) fail(`${bundle.scheme}:// is not declared in ${plist}`);
+if (!bundle.scheme && built.schemes) fail(`the preview must not declare a URL scheme (${built.schemes})`);
+
 const checks = [
   $`codesign --verify --deep --strict --verbose=2 ${app}`,
   $`codesign -d --entitlements - ${app}`,
@@ -185,5 +210,5 @@ for (const check of checks) {
   const result = await check.nothrow().quiet();
   console.log(`[build-mac] check exit ${result.exitCode}\n${result.stdout.toString()}${result.stderr.toString()}`.trimEnd());
 }
-writeFileSync(path.join(out, "build.json"), JSON.stringify({ version, sign, notarized: notarize, timings, artifacts }, null, 2));
+writeFileSync(path.join(out, "build.json"), JSON.stringify({ version, identity: values.identity, bundleId: built.bundleId, sign, notarized: notarize, popupCommit, timings, artifacts }, null, 2));
 console.log(`[build-mac] done: ${out}\n${JSON.stringify(timings)}`);

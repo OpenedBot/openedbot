@@ -53,9 +53,9 @@ fn app() -> tauri::App<MockRuntime> {
         .build(tauri::generate_context!(test = true))
         .expect("mock app");
     let config = test_config();
-    let auth = AuthService::new(HttpAuthApi::new(&config.api_origin, "0.0.0"), Box::new(DisabledVault) as Box<dyn Vault>, Arc::new(NoEvents), callback::LOOPBACK_REDIRECT_URI, CLIENT_ID);
+    let auth = AuthService::new(HttpAuthApi::new(&config.api_origin, "0.0.0"), Box::new(DisabledVault) as Box<dyn Vault>, Arc::new(NoEvents), callback::LOOPBACK_REDIRECT_URI, PREVIEW_CLIENT_ID);
     auth.restore();
-    app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())), google: Arc::new(NoBrowser), client_id: CLIENT_ID.into(), window: Box::new(NoWindow) });
+    app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())), google: Arc::new(NoBrowser), client_id: PREVIEW_CLIENT_ID.into(), window: Box::new(NoWindow) });
     let status = Arc::new(crate::update_state::UpdateStatus::new(true, Box::new(|_, _| {})));
     app.manage(status.clone());
     app.manage(bridge::Updates(Arc::new(crate::update_engine::NoUpdates(status))));

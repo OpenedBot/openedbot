@@ -1,4 +1,5 @@
-//! A small file logger: `~/Library/Logs/<bundle id>/preview.log`, one line per
+//! A small file logger: `~/Library/Logs/<bundle id>/<file>` (`preview.log`,
+//! `openedbot.log` for the production app, `identity.rs`), one line per
 //! record, never a token (callers log kinds and codes only). Warnings and
 //! errors are copied to the diagnostics journal (`diagnostics.rs`).
 
@@ -49,9 +50,9 @@ impl log::Log for FileLogger {
 }
 
 /// Installs the logger once; a second call (tests) is a no-op.
-pub fn init(dir: PathBuf) -> Option<PathBuf> {
+pub fn init(dir: PathBuf, file_name: &str) -> Option<PathBuf> {
     std::fs::create_dir_all(&dir).ok()?;
-    let path = dir.join("preview.log");
+    let path = dir.join(file_name);
     let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).ok()?;
     let logger = Box::leak(Box::new(FileLogger { file: Mutex::new(file) }));
     if log::set_logger(logger).is_ok() {

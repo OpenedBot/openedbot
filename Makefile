@@ -567,17 +567,21 @@ test: test-unit test-integration ## Unitaires et intégration.
 
 check: env-audit typecheck deps-check test build-cloud ## Garde complète: environnement, code, tests et builds cloud.
 
-# ─── Desktop Tauri (prototype D2a, ADR 0001 §4.3.1) ──────────────────────────
+# ─── Desktop Tauri (ADR 0001 §4.3.1 à §4.3.5) ────────────────────────────────
 # Le shell Rust (`apps/desktop-tauri/src-tauri`) embarque la console solo en
-# mode desktop. Rien n'est publié : le build signé reste dans
-# `apps/desktop-tauri/release/<version>/`, le flux de mise à jour est servi en
-# boucle locale. Clés : Developer ID dans le trousseau, notarisation et clé de
-# mise à jour hors du dépôt (`scripts/build-mac.ts`).
-.PHONY: desktop-tauri-bindings desktop-tauri-check desktop-tauri-mac desktop-tauri-feed desktop-tauri-publish
+# mode desktop. Rien n'est publié d'ici : le build signé reste dans
+# `apps/desktop-tauri/release/<version>/`, le flux de mise à jour de test est
+# servi en boucle locale. Clés : Developer ID dans le trousseau, notarisation
+# et clé de mise à jour hors du dépôt (`scripts/build-mac.ts`).
+# TAURI_IDENTITY=production (D3) : l'app qui remplace Electron
+# (app.openedbot.desktop, « openedbot », openedbot://) ; preview par défaut.
+.PHONY: desktop-tauri-bindings desktop-tauri-check desktop-tauri-mac desktop-tauri-release desktop-tauri-feed desktop-tauri-publish
 DESKTOP_TAURI_DIR := apps/desktop-tauri
 TAURI_VERSION ?=
 TAURI_SIGN ?= developer-id
 TAURI_POPUP ?=
+TAURI_IDENTITY ?= preview
+TAURI_NOTES ?=
 
 desktop-tauri-bindings: ## [DESKTOP] Régénère le contrat du pont natif (contracts/native-bridge) depuis les commandes Rust.
 	cd $(DESKTOP_TAURI_DIR)/src-tauri && cargo run --quiet --example export-bindings -- ../../../contracts/native-bridge/src/bindings.ts
@@ -585,9 +589,13 @@ desktop-tauri-bindings: ## [DESKTOP] Régénère le contrat du pont natif (contr
 desktop-tauri-check: ## [DESKTOP] cargo test (refus IPC, refresh mono-vol, coffre, popup, bindings à jour) et cargo clippy -D warnings.
 	cd $(DESKTOP_TAURI_DIR)/src-tauri && cargo test --quiet && cargo clippy --all-targets --quiet -- -D warnings
 
-desktop-tauri-mac: ## [DESKTOP] Build macOS signé Developer ID, notarisé, agrafé + artefact de mise à jour signé : TAURI_VERSION=X.Y.Z [TAURI_SIGN=adhoc] [TAURI_POPUP=…/OpenedbotPopup.app].
+desktop-tauri-mac: ## [DESKTOP] Build macOS signé Developer ID, notarisé, agrafé + artefact de mise à jour signé : TAURI_VERSION=X.Y.Z[-test] [TAURI_IDENTITY=production] [TAURI_SIGN=adhoc] [TAURI_POPUP=…/OpenedbotPopup.app].
 	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
-	bun $(DESKTOP_TAURI_DIR)/scripts/build-mac.ts --version "$(TAURI_VERSION)" --sign "$(TAURI_SIGN)" $(if $(TAURI_POPUP),--popup "$(TAURI_POPUP)")
+	bun $(DESKTOP_TAURI_DIR)/scripts/build-mac.ts --version "$(TAURI_VERSION)" --sign "$(TAURI_SIGN)" --identity "$(TAURI_IDENTITY)" $(if $(TAURI_POPUP),--popup "$(TAURI_POPUP)")
+
+desktop-tauri-release: ## [DESKTOP] Rassemble une release macOS (build de production notarisé) à publier : dmg, .app.tar.gz + .sig, manifestes beta/stable, SHA256SUMS. Ne publie rien : TAURI_VERSION=X.Y.Z [TAURI_NOTES=notes.md].
+	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/release-mac.ts --version "$(TAURI_VERSION)" $(if $(TAURI_NOTES),--notes "$(TAURI_NOTES)")
 
 desktop-tauri-feed: ## [DESKTOP] Sert le flux de mise à jour local sur http://127.0.0.1:8799/latest.json.
 	bun $(DESKTOP_TAURI_DIR)/scripts/update-feed.ts serve --port 8799

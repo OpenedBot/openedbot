@@ -5,7 +5,7 @@
 //! - closing hides (the Dock icon, the shortcut or a second launch bring it
 //!   back); only quitting closes it;
 //! - no title bar: the console's 46 px top bar is the window's, the traffic
-//!   lights float over it (macOS);
+//!   lights float over it, centred on it at every zoom (macOS);
 //! - navigation locked on the local origin; web links go to the system
 //!   browser, nothing else does;
 //! - signing out unloads the console and purges the WebView's data before
@@ -47,6 +47,12 @@ const MAX_PREFERENCE_LENGTH: usize = 4096;
 /// A page the shell serves itself (never the console): it writes the carried
 /// preferences into the fresh storage, then opens its target.
 pub const RESTORE_PATH: &str = "/__openedbot/restore";
+/// An empty page of the local origin, served by the shell: a purge that does
+/// not start from the console (a launch on another backend) loads it to read
+/// the device preferences from the origin's storage, without running the
+/// console and its persister.
+pub const EMPTY_PATH: &str = "/__openedbot/empty";
+const EMPTY_PAGE: &str = "<!doctype html><meta charset=utf-8><title>openedbot</title>";
 
 /// What a purge carries to the next page.
 #[derive(Debug, Default)]
@@ -258,7 +264,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>, config: &ShellConfig, version: &str
     let api_origin = config.api_origin.clone();
     let (navigating, opening, loads, serving) = (app.clone(), app.clone(), app.clone(), app.clone());
     let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW, url)
-        .title("openedbot preview")
+        .title(&app.package_info().name)
         .inner_size(bounds.width, bounds.height)
         .position(bounds.x, bounds.y)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
@@ -271,6 +277,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>, config: &ShellConfig, version: &str
                 let carry = std::mem::take(&mut *serving.state::<WindowState>().carry.lock().unwrap_or_else(|poisoned| poisoned.into_inner()));
                 let target = if carry.target.is_empty() { LOGIN_PATH } else { carry.target.as_str() };
                 *response.body_mut() = Cow::Owned(restore_page(&carry.preferences, target).into_bytes());
+                return;
+            }
+            if request.uri().path() == EMPTY_PATH {
+                *response.body_mut() = Cow::Borrowed(EMPTY_PAGE.as_bytes());
                 return;
             }
             let html = response.headers().get("content-type").and_then(|value| value.to_str().ok()).is_some_and(|value| value.starts_with("text/html"));
@@ -311,11 +321,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>, config: &ShellConfig, version: &str
     #[cfg(target_os = "macos")]
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
-        // 14 pt buttons centred on the 46 px top bar (`native-titlebar.css`).
-        .traffic_light_position(tauri::LogicalPosition::new(16.0, 16.0));
+        // No tao inset: the shell centres the buttons on the zoomed top bar
+        // itself (`macos/traffic_lights.rs`), tao would put its own back.
+        .hidden_title(true);
     let window = builder.build()?;
-    let _ = window.set_zoom(*state.zoom.lock().unwrap_or_else(|poisoned| poisoned.into_inner()));
+    let zoom = *state.zoom.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _ = window.set_zoom(zoom);
+    place_traffic_lights(&window, zoom, true);
     paint_background(&window);
     Ok(window)
 }
@@ -348,6 +360,7 @@ pub fn on_window_event<R: Runtime>(window: &tauri::Window<R>, event: &tauri::Win
                 *app.state::<WindowState>().placed.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(bounds);
             }
         }
+        tauri::WindowEvent::Focused(true) => crate::ensure_toggle_shortcut(app),
         tauri::WindowEvent::ThemeChanged(_) => {
             if let Some(main) = main_window(app) {
                 paint_background(&main);
@@ -375,8 +388,29 @@ fn apply_zoom<R: Runtime>(app: &AppHandle<R>, factor: f64) {
     if let Some(window) = main_window(app) {
         let _ = window.set_zoom(factor);
         publish_zoom(&window, factor);
+        place_traffic_lights(&window, factor, false);
     }
 }
+
+/// macOS: the traffic lights centred on the top bar, 46 × `zoom` points high;
+/// `install` also watches what makes AppKit move them back (window built).
+#[cfg(target_os = "macos")]
+fn place_traffic_lights<R: Runtime>(window: &WebviewWindow<R>, zoom: f64, install: bool) {
+    let target = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Ok(pointer) = target.ns_window() else { return };
+        // SAFETY: tao's NSWindow for this window, alive while the window is
+        // (built once, only hidden), read on the main thread.
+        let Some(ns_window) = (unsafe { pointer.cast::<objc2_app_kit::NSWindow>().as_ref() }) else { return };
+        crate::macos::traffic_lights::set_zoom(ns_window, zoom);
+        if install {
+            crate::macos::traffic_lights::install(ns_window);
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn place_traffic_lights<R: Runtime>(_window: &WebviewWindow<R>, _zoom: f64, _install: bool) {}
 
 /// The zoom in force, for `native-titlebar.css`: the traffic lights are not
 /// zoomed, the space kept for them is divided by it. Sent on every change
@@ -476,8 +510,15 @@ async fn read_device_preferences<R: Runtime>(window: &WebviewWindow<R>) -> BTree
 /// carried over. `false`: nothing opens, the user quit.
 pub async fn purge_then_open<R: Runtime>(app: &AppHandle<R>, target: impl FnOnce() -> String) -> bool {
     let Some(window) = main_window(app) else { return false };
-    let on_console = !app.state::<WindowState>().loaded.borrow().is_empty() && app.state::<WindowState>().loaded.borrow().as_str() != BLANK;
-    let preferences = if on_console { read_device_preferences(&window).await } else { BTreeMap::new() };
+    let on_local_page = {
+        let state = app.state::<WindowState>();
+        let loaded = state.loaded.borrow();
+        !loaded.is_empty() && loaded.as_str() != BLANK
+    };
+    // A launch on another backend starts from the blank page: the storage of
+    // the local origin is read from the shell's empty page instead, so the
+    // theme and the text size survive a change of backend too.
+    let preferences = if on_local_page || open_empty_page(app).await { read_device_preferences(&window).await } else { BTreeMap::new() };
     if !crate::shell::purge_confirmed(app).await {
         return false;
     }
@@ -490,6 +531,17 @@ pub async fn purge_then_open<R: Runtime>(app: &AppHandle<R>, target: impl FnOnce
         navigate(app, RESTORE_PATH);
     }
     true
+}
+
+/// Loads the shell's empty page on the local origin; `false` if it did not load.
+async fn open_empty_page<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.state::<WindowState>().loaded.send_replace(String::new());
+    navigate(app, EMPTY_PATH);
+    let opened = loaded(app, EMPTY_PATH).await;
+    if !opened {
+        log::warn!("the empty page did not load: device preferences not carried");
+    }
+    opened
 }
 
 /// Unloads the console (so its persister cannot write back), then clears the

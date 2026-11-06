@@ -26,16 +26,19 @@ import { OperatorBlob } from "../operator-blob";
 import { percentTone, useProviderLimits } from "../dashboard/provider-limits-panel";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import packageJson from "../../../package.json";
-import { DesktopUpdateMenuRow, DesktopUpdatePill } from "../desktop-update/entry";
+import { DesktopUpdateMenuRow, DesktopUpdatePill, ElectronMacSwitchPill } from "../desktop-update/entry";
 
 type IconType = ComponentType<{ className?: string }>;
+
+/** La pastille du pied de barre : mise à jour de l'app Tauri, ou passage d'Electron à l'app native (Mac). */
+const FooterPill = DesktopUpdatePill ?? ElectronMacSwitchPill;
 
 /**
  * La pastille de mise à jour de l'app Tauri, seule au pied de la barre quand
  * le compte est ailleurs (dispositions « b » et « c ») ; rien sur le web.
  */
 export function AccountUpdatePill() {
-  return DesktopUpdatePill ? <div className="flex justify-end"><Suspense fallback={null}><DesktopUpdatePill /></Suspense></div> : null;
+  return FooterPill ? <div className="flex justify-end"><Suspense fallback={null}><FooterPill /></Suspense></div> : null;
 }
 
 /**
@@ -415,7 +418,7 @@ export const AccountMenu = memo(function AccountMenu({
         </BuiPopoverContent>
       </BuiPopover>
       {/* App Tauri : la pastille « Mettre à jour », à côté du compte (Grok Bot). */}
-      {DesktopUpdatePill ? <Suspense fallback={null}><DesktopUpdatePill /></Suspense> : null}
+      {FooterPill ? <Suspense fallback={null}><FooterPill /></Suspense> : null}
       <button
         type="button"
         aria-label={t("navUser.settings")}

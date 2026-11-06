@@ -17,11 +17,10 @@ pub const PROTOCOL_REDIRECT_URI: &str = "openedbot://auth/callback";
 pub const LOOPBACK_PORT: u16 = 47813;
 pub const LOOPBACK_REDIRECT_URI: &str = "http://127.0.0.1:47813/callback";
 
-/// The scheme this build declares to the OS (`plugins.deep-link.desktop.schemes`
-/// of `tauri.conf.json`, checked by a test). The preview declares none: it
-/// must never take `openedbot://` from the installed Electron app, so it
-/// always uses the loopback page.
-pub const DECLARED_SCHEME: Option<&str> = None;
+// Whether this build declares `openedbot://` is part of its identity
+// (`identity.rs`): the preview never does, so it never takes the scheme from
+// the installed Electron app and always uses the loopback page; the
+// production app, which replaces Electron, does.
 
 /// The redirect URI to announce to the API, decided once at startup: the deep
 /// link only when the scheme is really ours, the loopback page otherwise.
@@ -168,18 +167,6 @@ mod tests {
     fn an_unregistered_deep_link_falls_back_to_the_loopback_page() {
         assert_eq!(redirect_uri(false), LOOPBACK_REDIRECT_URI);
         assert_eq!(redirect_uri(true), PROTOCOL_REDIRECT_URI);
-        // The preview never claims the scheme of the installed Electron app.
-        assert_eq!(redirect_uri(DECLARED_SCHEME == Some(SCHEME)), LOOPBACK_REDIRECT_URI);
-    }
-
-    #[test]
-    fn the_declared_scheme_matches_the_bundle_configuration() {
-        let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
-        let schemes: Vec<String> = config["plugins"]["deep-link"]["desktop"]["schemes"]
-            .as_array()
-            .map(|list| list.iter().filter_map(|value| value.as_str().map(str::to_string)).collect())
-            .unwrap_or_default();
-        assert_eq!(schemes, DECLARED_SCHEME.map(|scheme| vec![scheme.to_string()]).unwrap_or_default());
     }
 
     #[test]

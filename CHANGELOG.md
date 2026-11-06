@@ -10,6 +10,23 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Ajouté
 
+- **openedbot 1.1.0 pour Mac : une nouvelle app de bureau, native.** Elle
+  remplace l'app actuelle (même nom, même place dans Applications) : la
+  console est embarquée au lieu d'être téléchargée à chaque ouverture, et
+  l'app se met à jour seule (pastille bleue « Mettre à jour », redémarrage
+  avec votre accord). Elle occupe environ un tiers de mémoire en moins
+  (456 Mo contre 660 Mo, fil ouvert) ; son temps d'ouverture reste proche de
+  celui de l'app actuelle.
+  Les boutons de fenêtre de macOS restent centrés sur la barre du haut,
+  quelle que soit la taille du texte. Le notch, la connexion par e-mail ou
+  Google, les notifications et le raccourci ⌘⇧O sont repris. **À l'installation, une seule fois** : il faut
+  se reconnecter, et les brouillons non envoyés de l'ancienne app ne sont
+  pas repris (envoyez-les ou copiez-les avant de la remplacer). Windows et
+  Linux gardent l'app actuelle.
+- L'app Electron sur Mac peut annoncer la nouvelle app (pastille « Nouvelle
+  app » vers la page de téléchargement) ; l'annonce reste éteinte jusqu'à la
+  publication de la 1.1.0.
+
 - L'app de bureau indique sa version à l'API. Quand une version devient
   trop ancienne pour être servie, l'app affiche « Mettez openedbot à jour »
   avec un lien vers la page de téléchargement, au lieu d'erreurs en cascade.

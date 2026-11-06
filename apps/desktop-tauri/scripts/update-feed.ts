@@ -28,6 +28,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { artifactNames, IDENTITIES } from "./mac-identity";
 
 const APP_DIR = path.resolve(import.meta.dir, "..");
 const RELEASE = process.env.OPENEDBOT_RELEASE_DIR ?? path.join(APP_DIR, "release");
@@ -35,9 +36,19 @@ const RELEASE = process.env.OPENEDBOT_RELEASE_DIR ?? path.join(APP_DIR, "release
 let FEED = path.join(RELEASE, "feed");
 const ARTIFACT_STEM = "openedbot-preview";
 
+/**
+ * The macOS update artifact of a version: the production build's
+ * (`openedbot_…`, D3) when there is one, the preview's otherwise. One version
+ * is only ever built under one identity (numbers are never reused).
+ */
+export function macArtifact(release: string, version: string): string {
+  const candidates = (["production", "preview"] as const).map((name) => path.join(release, version, artifactNames(IDENTITIES[name], version).tarball));
+  return candidates.find((file) => existsSync(file)) ?? candidates[0]!;
+}
+
 /** Where a platform's signed artifact is, and the manifest key the updater looks up (`{os}-{arch}[-{installer}]`). */
 export const PLATFORMS = {
-  "darwin-aarch64": { key: "darwin-aarch64", artifact: (version: string) => path.join(RELEASE, version, `${ARTIFACT_STEM}_${version}_aarch64.app.tar.gz`) },
+  "darwin-aarch64": { key: "darwin-aarch64", artifact: (version: string) => macArtifact(RELEASE, version) },
   "linux-x86_64": { key: "linux-x86_64-appimage", artifact: (version: string) => path.join(APP_DIR, "dist-linux", version, "x86_64", `${ARTIFACT_STEM}_${version}_x86_64.AppImage`) },
   "linux-aarch64": { key: "linux-aarch64-appimage", artifact: (version: string) => path.join(APP_DIR, "dist-linux", version, "aarch64", `${ARTIFACT_STEM}_${version}_aarch64.AppImage`) },
 } as const;

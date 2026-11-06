@@ -77,7 +77,7 @@ fn tray<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let sign_out = MenuItem::with_id(app, "sign-out", "Se déconnecter", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&toggle, &PredefinedMenuItem::separator(app)?, &sign_out, &PredefinedMenuItem::separator(app)?, &quit])?;
-    let mut builder = TrayIconBuilder::with_id("main").tooltip("openedbot preview").menu(&menu).on_menu_event(|app, event| match event.id().as_ref() {
+    let mut builder = TrayIconBuilder::with_id("main").tooltip(&app.package_info().name).menu(&menu).on_menu_event(|app, event| match event.id().as_ref() {
         "toggle" => {
             window::toggle(app);
             shell::visibility_changed(app);
@@ -147,7 +147,7 @@ mod tests {
     #[ignore = "run in a child process by without_a_secret_service_the_vault_refuses_and_writes_nothing"]
     fn child_vault_without_keystore() {
         assert_eq!(std::env::var(CHILD).as_deref(), Ok("1"), "only meaningful in the child process");
-        let vault = KeychainVault::new(crate::BUNDLE_ID, "http://127.0.0.1:8790");
+        let vault = KeychainVault::new(crate::PREVIEW_BUNDLE_ID, "http://127.0.0.1:8790");
         assert!(vault.load().is_err(), "a missing Secret Service must be an error, not an empty vault");
         assert!(vault.save("refresh-token-that-must-not-persist").is_err());
         assert!(vault.load().is_err());
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     #[ignore = "needs a running, unlocked Secret Service"]
     fn secret_service_round_trip() {
-        let vault = KeychainVault::new(crate::BUNDLE_ID, &format!("http://127.0.0.1:{}", 10_000 + std::process::id() % 50_000));
+        let vault = KeychainVault::new(crate::PREVIEW_BUNDLE_ID, &format!("http://127.0.0.1:{}", 10_000 + std::process::id() % 50_000));
         vault.clear().unwrap();
         assert_eq!(vault.load().unwrap(), None);
         vault.save("{\"refreshToken\":\"round-trip\"}").unwrap();

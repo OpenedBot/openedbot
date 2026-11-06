@@ -15,6 +15,42 @@ use url::Url;
 
 pub const PRODUCTION_API_ORIGIN: &str = "https://api.openedbot.app";
 pub const PRODUCTION_CONSOLE_URL: &str = "https://console.openedbot.app";
+/// The hosted update feed of the production app (ADR 0001, Q2): the R2 bucket
+/// behind `releases.openedbot.app`, one manifest per variant (`solo`, Q8) and
+/// channel, `<base>/<channel>/latest.json`; the artifacts it names are
+/// immutable, under `desktop/v<version>/`.
+pub const PRODUCTION_UPDATE_BASE: &str = "https://releases.openedbot.app/desktop/solo";
+
+/// Which manifest the production app follows: `stable` by default, `beta`
+/// for testers (`updateChannel` in `config.json`, `OPENEDBOT_UPDATE_CHANNEL`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UpdateChannel {
+    #[default]
+    Stable,
+    Beta,
+}
+
+impl UpdateChannel {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim() {
+            "stable" => Some(Self::Stable),
+            "beta" => Some(Self::Beta),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stable => "stable",
+            Self::Beta => "beta",
+        }
+    }
+
+    /// The channel's manifest on the hosted feed.
+    pub fn manifest_url(self) -> String {
+        format!("{PRODUCTION_UPDATE_BASE}/{}/latest.json", self.as_str())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellConfig {
@@ -38,6 +74,8 @@ pub enum ConfigError {
     NotAnOrigin(&'static str),
     #[error("{0} must be https, or http on a loopback host")]
     InsecureUpdate(&'static str),
+    #[error("{0} must be stable or beta")]
+    UnknownChannel(&'static str),
 }
 
 /// `config.json` in the app config directory. Unknown fields are ignored.
@@ -47,6 +85,7 @@ struct FileConfig {
     api_origin: Option<String>,
     public_console_url: Option<String>,
     update_url: Option<String>,
+    update_channel: Option<String>,
     popup: Option<bool>,
 }
 
@@ -117,7 +156,9 @@ pub fn validate_update_url(name: &'static str, raw: &str) -> Result<String, Conf
 }
 
 /// Resolves the configuration from the environment and `config.json`.
-pub fn load(config_dir: Option<&Path>, env: &dyn Fn(&str) -> Option<String>) -> Result<ShellConfig, ConfigError> {
+/// `hosted_updates`: the production app, whose feed defaults to the hosted
+/// one; the preview has no feed unless one is configured.
+pub fn load(config_dir: Option<&Path>, env: &dyn Fn(&str) -> Option<String>, hosted_updates: bool) -> Result<ShellConfig, ConfigError> {
     let file = config_dir.map(|dir| read_file(&dir.join("config.json"))).unwrap_or_default();
     let pick = |var: &str, from_file: &Option<String>| -> Option<String> {
         env(var).filter(|value| !value.trim().is_empty()).or_else(|| from_file.clone().filter(|value| !value.trim().is_empty()))
@@ -130,9 +171,15 @@ pub fn load(config_dir: Option<&Path>, env: &dyn Fn(&str) -> Option<String>) -> 
         "OPENEDBOT_PUBLIC_CONSOLE_URL",
         &pick("OPENEDBOT_PUBLIC_CONSOLE_URL", &file.public_console_url).unwrap_or_else(|| PRODUCTION_CONSOLE_URL.into()),
     )?;
-    let update_url = pick("OPENEDBOT_UPDATE_URL", &file.update_url)
-        .map(|raw| validate_update_url("OPENEDBOT_UPDATE_URL", &raw))
-        .transpose()?;
+    let channel = pick("OPENEDBOT_UPDATE_CHANNEL", &file.update_channel)
+        .map(|raw| UpdateChannel::parse(&raw).ok_or(ConfigError::UnknownChannel("OPENEDBOT_UPDATE_CHANNEL")))
+        .transpose()?
+        .unwrap_or_default();
+    // An explicit manifest (a local feed, a test) wins over the channel.
+    let update_url = match pick("OPENEDBOT_UPDATE_URL", &file.update_url) {
+        Some(raw) => Some(validate_update_url("OPENEDBOT_UPDATE_URL", &raw)?),
+        None => hosted_updates.then(|| channel.manifest_url()),
+    };
     let popup = match env("OPENEDBOT_POPUP").as_deref() {
         Some("1") | Some("true") => true,
         Some("0") | Some("false") => false,
@@ -202,7 +249,7 @@ mod tests {
 
     #[test]
     fn defaults_to_production_and_lets_the_environment_win_over_the_file() {
-        let defaults = load(None, &no_env).unwrap();
+        let defaults = load(None, &no_env, false).unwrap();
         assert_eq!(defaults.api_origin, PRODUCTION_API_ORIGIN);
         assert_eq!(defaults.public_console_url, PRODUCTION_CONSOLE_URL);
         assert_eq!(defaults.update_url, None);
@@ -211,13 +258,31 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("openedbot-config-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("config.json"), r#"{"apiOrigin":"http://127.0.0.1:8790","popup":true}"#).unwrap();
-        let from_file = load(Some(&dir), &no_env).unwrap();
+        let from_file = load(Some(&dir), &no_env, false).unwrap();
         assert_eq!(from_file.api_origin, "http://127.0.0.1:8790");
         assert!(from_file.popup);
         let env = |name: &str| (name == "OPENEDBOT_API_ORIGIN").then(|| "http://localhost:9000".to_string());
-        assert_eq!(load(Some(&dir), &env).unwrap().api_origin, "http://localhost:9000");
+        assert_eq!(load(Some(&dir), &env, false).unwrap().api_origin, "http://localhost:9000");
         std::fs::write(dir.join("config.json"), r#"{"apiOrigin":"http://example.com"}"#).unwrap();
-        assert_eq!(load(Some(&dir), &no_env), Err(ConfigError::Insecure("OPENEDBOT_API_ORIGIN")));
+        assert_eq!(load(Some(&dir), &no_env, false), Err(ConfigError::Insecure("OPENEDBOT_API_ORIGIN")));
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_production_app_follows_its_channel_on_the_hosted_feed() {
+        assert_eq!(load(None, &no_env, true).unwrap().update_url.as_deref(), Some("https://releases.openedbot.app/desktop/solo/stable/latest.json"));
+        let beta = |name: &str| (name == "OPENEDBOT_UPDATE_CHANNEL").then(|| "beta".to_string());
+        assert_eq!(load(None, &beta, true).unwrap().update_url.as_deref(), Some("https://releases.openedbot.app/desktop/solo/beta/latest.json"));
+        // The preview has no hosted feed, whatever the channel.
+        assert_eq!(load(None, &beta, false).unwrap().update_url, None);
+        let odd = |name: &str| (name == "OPENEDBOT_UPDATE_CHANNEL").then(|| "nightly".to_string());
+        assert_eq!(load(None, &odd, true), Err(ConfigError::UnknownChannel("OPENEDBOT_UPDATE_CHANNEL")));
+        // A local feed wins over the channel (the update tests).
+        let local = |name: &str| match name {
+            "OPENEDBOT_UPDATE_URL" => Some("http://127.0.0.1:8799/latest.json".to_string()),
+            "OPENEDBOT_UPDATE_CHANNEL" => Some("beta".to_string()),
+            _ => None,
+        };
+        assert_eq!(load(None, &local, true).unwrap().update_url.as_deref(), Some("http://127.0.0.1:8799/latest.json"));
     }
 }

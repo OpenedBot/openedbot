@@ -28,7 +28,9 @@ pub fn display_mode<R: Runtime>(app: &AppHandle<R>) -> DisplayMode {
         return DisplayMode::Window;
     }
     let configured = app.try_state::<Shell>().is_some_and(|shell| shell.config.popup);
-    app.state::<WindowState>().prefs.get().display_mode.unwrap_or(if configured { DisplayMode::Both } else { DisplayMode::Window })
+    let fallback = if configured { DisplayMode::Both } else { DisplayMode::Window };
+    // No window state: the configuration was refused and nothing started.
+    app.try_state::<WindowState>().and_then(|state| state.prefs.get().display_mode).unwrap_or(fallback)
 }
 
 fn signed_in<R: Runtime>(app: &AppHandle<R>) -> bool {
@@ -37,6 +39,9 @@ fn signed_in<R: Runtime>(app: &AppHandle<R>) -> bool {
 
 /// Popup-only mode: no Dock icon while the window is hidden, back as soon as it shows.
 pub fn visibility_changed<R: Runtime>(app: &AppHandle<R>) {
+    if app.try_state::<WindowState>().is_none() {
+        return;
+    }
     #[cfg(target_os = "macos")]
     {
         let hidden_dock = display_mode(app) == DisplayMode::Popup && !window::is_visible(app);
@@ -191,7 +196,7 @@ async fn ask_retry_purge<R: Runtime>(app: &AppHandle<R>) -> bool {
     let (answer, answered) = tokio::sync::oneshot::channel();
     dialog(
         app,
-        "openedbot preview n’a pas pu effacer les données de la session précédente. La console reste fermée tant qu’elles sont là. Réessayez, ou quittez : l’effacement sera repris au prochain lancement.")
+        format!("{} n’a pas pu effacer les données de la session précédente. La console reste fermée tant qu’elles sont là. Réessayez, ou quittez : l’effacement sera repris au prochain lancement.", app.package_info().name))
         .title("Effacement des données impossible")
         .kind(MessageDialogKind::Error)
         .buttons(MessageDialogButtons::OkCancelCustom("Réessayer".into(), "Quitter".into()))
@@ -305,7 +310,14 @@ impl<R: Runtime> PopupEvents for ShellPopupEvents<R> {
 /// The notch's line for an update state.
 pub fn update_line(state: &UpdateState) -> HostToPopup {
     let (status, version) = state.summary();
-    HostToPopup::UpdateState { status, version }
+    HostToPopup::UpdateState { status, version: version.filter(|version| notch_version(version)) }
+}
+
+/// The notch takes a version of digits and dots only (`HostProtocol.isVersion`,
+/// 1 to 32 characters) and drops the whole line otherwise: a test build
+/// (`1.1.1-test`) is announced without its number, so its dot still shows.
+fn notch_version(version: &str) -> bool {
+    (1..=32).contains(&version.len()) && version.bytes().all(|byte| byte.is_ascii_digit() || byte == b'.')
 }
 
 /// The app menu's update item: with an update ready, the console asks the
@@ -420,6 +432,15 @@ mod tests {
         .await;
         assert!(!purged, "quitting never reports a purge");
         assert_eq!(attempts.get(), PURGE_ATTEMPTS);
+    }
+
+    #[test]
+    fn the_notch_hears_of_a_test_build_without_its_number() {
+        let ready = |version: &str| crate::update_state::UpdateState { phase: crate::update_state::UpdatePhase::Ready { version: version.into() }, required: None, last_error: None, auto_install: true, last_check: None };
+        assert_eq!(update_line(&ready("1.1.0")), HostToPopup::UpdateState { status: "ready", version: Some("1.1.0".into()) });
+        // The notch drops a line whose version is not digits and dots: no dot at all.
+        assert_eq!(update_line(&ready("1.1.1-test")), HostToPopup::UpdateState { status: "ready", version: None });
+        assert!(!notch_version(&"1.".repeat(17)));
     }
 
     #[test]

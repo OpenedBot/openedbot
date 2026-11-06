@@ -58,21 +58,27 @@
         document.documentElement.setAttribute("data-openedbot-text-zoom", String(size / 14));
       })();
       // La silhouette du cadre (`#openedbot-boot`, plus bas) ne se montre qu'à qui
-      // entre DANS l'application : une session existe (navigateur, ou pont de
-      // la coque native posé par son preload avant ce script) et le chemin
-      // n'est pas une page publique ni un parcours sans barre latérale.
-      // `main.tsx` la retire au premier rendu du routeur.
+      // entre DANS l'application : une session existe (navigateur, ou coque
+      // native) et le chemin n'est pas une page publique ni un parcours sans
+      // barre latérale. `main.tsx` la retire au premier rendu du routeur.
+      // La coque Electron pose son pont par son preload, avant ce script ; la
+      // coque Tauri ne pose ici que `__OPENEDBOT_SHELL__` (son script
+      // d'initialisation), le pont étant construit par un module, plus tard.
+      // Elle n'ouvre la console hors de `/login` qu'avec une session.
       (function () {
+        var shell = window.__OPENEDBOT_SHELL__;
+        var native = !!window.__OPENEDBOT_NATIVE__ || !!(shell && shell.platform);
         // Match nativeTitlebarFor without setting the app's titlebar attribute.
-        if (window.__OPENEDBOT_NATIVE__) {
-          var nativeTitlebar = /^Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent) ? "mac"
+        if (native) {
+          var nativeTitlebar = shell && shell.platform === "macos" ? "mac"
+            : /^Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent) ? "mac"
             : /^Win/.test(navigator.platform) || /Windows/.test(navigator.userAgent) ? "windows" : null;
           if (nativeTitlebar) document.documentElement.setAttribute("data-openedbot-boot-titlebar", nativeTitlebar);
         }
         try {
           var path = location.pathname;
           var outside = /(^|\/)(login|legal|change-password|onboarding)(\/|$)/.test(path);
-          var session = !!window.__OPENEDBOT_NATIVE__ || !!localStorage.getItem("openedbot:cloud-session");
+          var session = native || !!localStorage.getItem("openedbot:cloud-session");
           // `/` is the app on every host (the public page lives on the public
           // site, `src/lib/session/public-site.ts`): it gets the app silhouette too.
           if (session && !outside) document.documentElement.setAttribute("data-openedbot-booting", "");

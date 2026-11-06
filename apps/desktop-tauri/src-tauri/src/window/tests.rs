@@ -55,3 +55,10 @@ fn the_initialization_script_escapes_its_values() {
     assert!(script.contains(r#""version":"0.0.1""#));
     assert!(script.contains(&format!(r#""platform":"{}""#, crate::bridge::Platform::current().as_str())));
 }
+
+#[test]
+fn the_empty_page_runs_nothing_and_stays_local() {
+    assert!(!EMPTY_PAGE.contains("<script"));
+    assert_eq!(local_url(EMPTY_PATH).unwrap().as_str(), format!("{}__openedbot/empty", local_origin()));
+    assert_eq!(navigation_decision(&local_url(EMPTY_PATH).unwrap()), NavigationDecision::Allow);
+}

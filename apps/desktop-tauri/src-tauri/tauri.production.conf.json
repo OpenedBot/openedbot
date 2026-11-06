@@ -1,0 +1,13 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "openedbot",
+  "mainBinaryName": "openedbot",
+  "identifier": "app.openedbot.desktop",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["openedbot"]
+      }
+    }
+  }
+}

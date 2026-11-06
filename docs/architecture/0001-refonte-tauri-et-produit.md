@@ -965,6 +965,255 @@ notch.
 `… publish --version X.Y.Z [--announce A.B.C] [--forged-signature] [--min-version V]
 [--max-age-days N]`.
 
+### 4.3.5 Release et bascule macOS (D3, 2026-11-06)
+
+Branche `feat/d3-macos-release`. L'app Tauri devient **openedbot 1.1.0** pour Mac et remplace
+l'app Electron. Tout est prêt à publier ; **rien n'est publié** (ni R2, ni GitHub, ni tag, ni
+lien du site) : la publication attend l'accord de l'utilisateur.
+
+**Identité de production.** `build-mac.ts --identity production` (`make desktop-tauri-mac
+TAURI_IDENTITY=production`) applique `src-tauri/tauri.production.conf.json` : identifiant
+`app.openedbot.desktop` et nom « openedbot », ceux d'Electron (`apps/desktop/electron-builder.yml`,
+vérifié par un test), exécutable `openedbot`, schéma `openedbot://` déclaré. La coque lit son
+identité dans la configuration compilée (`identity.rs`) : service Keychain, `clientId` OAuth
+(`openedbot-desktop-macos`), noms des menus et dialogues, fichier de journal (`openedbot.log`).
+Le build vérifie l'`Info.plist` produit (identifiant, nom, exécutable, schéma) et refuse sinon.
+La preview reste le défaut, installable à côté d'Electron. Les builds de test portent un
+suffixe (`1.1.1-test`) : un numéro n'est jamais réutilisé.
+
+**Données à la bascule (Q1), sans collision.** Electron garde sa session dans
+`~/Library/Application Support/openedbot` (fichier chiffré par `safeStorage`, clé dans l'item
+Keychain « openedbot Safe Storage »). L'app Tauri utilise `~/Library/Application Support/app.openedbot.desktop`,
+`~/Library/WebKit/app.openedbot.desktop`, `~/Library/Caches/app.openedbot.desktop`,
+`~/Library/Logs/app.openedbot.desktop` et l'item Keychain de service `app.openedbot.desktop`
+(compte par origine d'API). Aucun chemin commun, et la coque ne lit jamais les données
+d'Electron : au premier lancement l'app est déconnectée (une reconnexion), les brouillons
+(localStorage de la console distante) ne sont pas repris, et les deux apps n'ont jamais le même
+refresh token (deux connexions distinctes, deux lignées). Seul fichier partagé par l'identifiant :
+`~/Library/Preferences/app.openedbot.desktop.plist` (NSUserDefaults) ; la coque Tauri n'y écrit
+pas (la preview n'a jamais créé le sien), vérifié par sa date et sa taille avant et après les essais.
+Le refresh token d'Electron reste dans son dossier jusqu'à son expiration côté serveur ; il n'est
+plus utilisé une fois l'app remplacée.
+
+**Flux de mise à jour hébergé (Q2), proposé.** Le bucket R2 d'edge-setup, servi par
+`https://releases.openedbot.app` :
+
+```
+ releases.openedbot.app/desktop/
+   v1.1.0/                                  immuable, jamais réécrit
+     openedbot_1.1.0_aarch64.dmg
+     openedbot_1.1.0_aarch64.app.tar.gz     artefact de mise à jour
+     openedbot_1.1.0_aarch64.app.tar.gz.sig signature minisign (clé hors de l'hébergement)
+     SHA256SUMS
+   solo/                                    variante (Q8)
+     beta/latest.json                       manifeste du canal bêta
+     stable/latest.json                     manifeste du canal stable (promotion)
+```
+
+L'app de production lit `desktop/solo/stable/latest.json` par défaut, `beta` avec
+`"updateChannel": "beta"` dans `config.json` (ou `OPENEDBOT_UPDATE_CHANNEL`) ; un canal inconnu
+est une configuration refusée. `updateUrl` reste prioritaire (flux local des essais). Le manifeste
+liste les architectures (`darwin-aarch64` aujourd'hui) ; il s'écrit en dernier, après les fichiers
+qu'il nomme. Le domaine sert le JSON en `Cache-Control: public, max-age=60` (relu le
+2026-11-06) : une nouvelle version peut mettre une minute à apparaître, ce que le moteur tolère
+(il relit le flux avant d'installer). `make desktop-tauri-release TAURI_VERSION=X.Y.Z`
+(`release-mac.ts`) rassemble ces fichiers depuis un build de production notarisé, sans rien
+envoyer.
+
+**Pipeline GitHub.** `desktop-release.yml` ne construit plus Electron pour macOS : sur un tag
+`desktop/vX.Y.Z`, le job `mac` télécharge le dmg publié sur R2, vérifie sa somme, Gatekeeper,
+le ticket agrafé, l'identifiant et la version, puis le joint à la release GitHub sous
+`openedbot-mac-arm64.dmg`, le nom que le site lie (`releases/latest/download/…`). Sans dmg sur
+R2 pour cette version, le job échoue et rien n'est publié. Linux garde Electron (même tag, même
+numéro). La clé de mise à jour ne quitte pas le Mac : le build signé se fait en local.
+`actionlint` (avec shellcheck) ne relève rien de nouveau.
+
+**Comment les utilisateurs d'Electron reçoivent la 1.1.0.** Electron 1.0.x n'a **aucun**
+mécanisme de mise à jour (pas d'electron-updater, `electron-builder.yml` : « No auto-update
+feed ») : il n'y a pas de flux Squirrel à détourner, donc ni zip ni `latest-mac.yml` de
+bascule. Deux chemins :
+1. le site : `releases/latest/download/openedbot-mac-arm64.dmg` sert la 1.1.0 dès que la release
+   `desktop/v1.1.0` est la dernière ; le dmg se glisse sur l'ancienne app (même nom), le
+   Finder propose de la remplacer ;
+2. l'app Electron elle-même : elle charge la console web distante, qui peut donc lui parler.
+   Une pastille « Nouvelle app » (`electron-switch.tsx`, même bleu que la pastille de mise à
+   jour) ouvre la page de téléchargement, seulement dans Electron sur Mac, avant 1.1.0. Elle est
+   éteinte (`ELECTRON_MAC_SWITCH_LIVE = false`, rien dans le build web) : la publication
+   l'allume, puis déploie la console web.
+`DESKTOP_MIN_VERSION` ne sert pas à forcer la bascule : Electron annonce `desktop/1.0.3` sans
+plateforme, et couperait aussi Windows et Linux, qui restent sous Electron.
+
+**Perte de la clé de mise à jour (risque, section 5).** La clé minisign
+(`~/.config/openedbot-tauri-updater/`, 0700/0600) n'est ni dans le dépôt ni sur R2, ni en CI.
+Procédure écrite pour D3 : (1) une copie chiffrée hors de ce Mac (coffre de mots de passe de
+l'utilisateur, avec sa phrase de passe à part) — à faire avant la publication de la 1.1.0, non
+faite ici ; (2) rotation prévue : une version N signée par l'ancienne clé embarque la nouvelle
+clé publique, puis N+1 est signée par la nouvelle ; (3) clé perdue sans copie : plus aucune
+mise à jour automatique possible, les utilisateurs réinstallent depuis le dmg (lien de l'écran
+« Mise à jour requise » et du site), et `DESKTOP_MIN_VERSION` sur l'API pousse les retardataires
+vers ce lien. L'exercice de rotation n'a pas été fait.
+
+**Version qui plante après une mise à jour (risque, section 5).** Pas de retour arrière
+automatique : le bundle précédent est remplacé. Parade : canal bêta d'abord (testeurs avec
+`updateChannel: beta`), promotion en stable après vérification ; une version stable cassée se
+corrige en publiant N+1 (le moteur se relance au démarrage, 30 s après) ou, si l'app ne démarre
+plus, par le dmg de la version précédente, toujours servi sous `desktop/vX.Y.Z/` (immuable). Un
+retour arrière automatique (garder `openedbot.app` précédent jusqu'à un premier démarrage
+réussi) reste à concevoir.
+
+**Étapes de publication (en attente d'accord, rien n'est fait).**
+1. Commit de release sur `develop` puis `main` : `apps/desktop/package.json` en 1.1.0 (le tag
+   doit correspondre, Linux Electron est reconstruit au même numéro), `CHANGELOG.md` « Non
+   publié » → `## 1.1.0 — <date>`.
+2. Copie chiffrée de la clé de mise à jour hors du Mac (voir plus haut).
+3. R2, depuis le Mac (jeton Cloudflare à droits R2, jamais en argument) : les quatre fichiers
+   de `artifacts/desktop-1.1.0/macos/` sous `desktop/v1.1.0/` (dmg, `.app.tar.gz`, `.sig`,
+   `SHA256SUMS` en dernier), relus depuis `https://releases.openedbot.app/desktop/v1.1.0/` et
+   comparés à `SHA256SUMS`.
+4. Canal bêta : `manifests/beta/latest.json` → `desktop/solo/beta/latest.json`. Une app 1.1.0
+   configurée en bêta (`updateChannel: beta`) ne voit rien de plus récent ; la première vraie
+   épreuve du flux hébergé sera la 1.1.1.
+5. Tag `desktop/v1.1.0` poussé : `desktop-release.yml` reconstruit Linux, recopie le dmg depuis R2
+   après vérification et publie la release GitHub (`--latest`). Le site (`openedbot-site`,
+   `releases/latest/download/openedbot-mac-arm64.dmg`) sert alors la 1.1.0 sans changement de
+   code ; vérifier la page `/download` et `/fr/download`.
+6. Promotion stable : `manifests/stable/latest.json` → `desktop/solo/stable/latest.json`.
+7. Annonce dans Electron : `ELECTRON_MAC_SWITCH_LIVE = true`
+   (`apps/console/src/components/desktop-update/entry.ts`, test à mettre à jour), puis
+   déploiement de la console web.
+
+**Construit (2026-11-06, develop 6902337 + cette branche jusqu'au correctif des feux tricolores, popup du notch `feat/update-badge` 34dcdca).**
+arm64 seulement. Developer ID, hardened runtime, aucun entitlement, popup re-signé de l'intérieur ;
+app notarisée et agrafée (64 s), dmg signé, notarisé et agrafé (28 s). Gardés hors du dépôt
+(`artifacts/desktop-1.1.0/macos/`) :
+
+| Fichier | Taille | sha256 |
+|---|---|---|
+| `openedbot_1.1.0_aarch64.dmg` | 19 568 233 o | `93ef1dc0c46d25c7343002b63ced6c28ece3098de4ea0cca9ced2ae92cec70fa` |
+| `openedbot_1.1.0_aarch64.app.tar.gz` | 19 778 636 o | `3282fd17ae475eec53223cdcdbbae3f47d5c64167b0bf2f69fa0db648fa5567c` |
+| `openedbot_1.1.0_aarch64.app.tar.gz.sig` | 428 o | `ad2f8015dda0b56573ca941700525d524de9f1443d8be3f0c8e86e1674d33556` |
+
+Vérifié : `codesign --verify --deep --strict` valide ; `spctl -a -vv` sur l'app : `accepted,
+source=Notarized Developer ID` ; dmg marqué `com.apple.quarantine` : `spctl -a -t open --context
+context:primary-signature` → `accepted, source=Notarized Developer ID` ; `stapler validate` sur l'app
+et le dmg ; copié dans `/Applications/openedbot.app` (il n'y en avait pas) : accepté, notarisé,
+`Identifier=app.openedbot.desktop`, `TeamIdentifier=QDC76LMF29`. Ces vérifications ont été refaites sur ce
+build reconstruit (même numéro, jamais publié) après le correctif des feux tricolores ; le build d'avant,
+sur lequel portent G1, G3 et la mise à jour réelle ci-dessous, reste dans `release/1.1.0-superseded/`.
+Deux builds de test,
+`1.1.1-test` (notarisé, cible de la mise à jour), `1.1.2-test` (non notarisé, autre build id de
+la console, build B de G1) et `1.1.3-test` (non notarisé, mise au point des feux tricolores), jamais publiés.
+
+`OPENEDBOT_API_ORIGIN=http://example.com` sur le 1.1.0 installé : alerte « Configuration
+refusée » (texte avec la variable et le chemin de `config.json`), puis sortie ; journal
+`configuration refused: OPENEDBOT_API_ORIGIN must be https…`. Cette alerte, montrée à l'écran
+pendant une session de l'utilisateur, a été prise pour une erreur : les essais suivants à l'écran
+ont été suspendus à sa demande.
+
+Les essais à l'écran ont repris avec l'accord de l'utilisateur, sur le 1.1.0 installé dans
+`/Applications`, connecté une fois par le relais d'API (API locale seulement).
+
+**G1 et G3 sur l'app signée (2026-11-06).** `apps/desktop-tauri/scripts/perf/perf-mac.ts`, M5 Pro,
+macOS 26.6.2 ; A = 1.1.0 notarisé dans `/Applications`, B = 1.1.2-test (autre build id de la
+console) ; relais d'API local, sans délai puis avec 50 ms ; 5 essais par cas, 3 pour G3, aucun
+échec. Le marqueur est celui de D0 (premier lien `a[href*="/bot/"]` visible), lu par l'arbre
+d'accessibilité de WKWebView (`ax-marker.swift`, interrogé en boucle) : la sonde ajoute un coût
+que la mesure CDP d'Electron n'avait pas, les chiffres sont donc plutôt pessimistes. Résultats
+bruts, non versionnés : `tmp/perf/d3-2026-11-06T19-08-34-460Z.json`.
+
+| Mesure | Electron 1.0.3 (D0) | Tauri 1.1.0 signé | Cible | Verdict |
+|---|---|---|---|---|
+| G1 premier lancement, local / réseau simulé | 564 / 1 399 ms | 604 / 1 256 ms | ≤ 600 ms | Manquée de peu en local, nettement en réseau simulé |
+| G1 lancement suivant, local / réseau simulé | 452 / 573 ms | 540 / 637 ms | ≤ 450 ms | Manquée, et plus lent qu'Electron |
+| G1 après mise à jour, local / réseau simulé | 482 / 987 ms | 557 / 754 ms | ≤ 600 ms | Atteinte en local, manquée en réseau simulé (−24 % face à Electron) |
+| G3 mémoire au repos, fil ouvert depuis 30 s | 660 Mo, 4 processus | 456 Mo, 4 processus (app ≈ 120 Mo, WebKit 295 à 450 Mo) | ≤ 330 Mo | Manquée, −31 % face à Electron |
+
+Lecture : la mémoire baisse d'un tiers sans atteindre la moitié visée. Au lancement, la coque
+native ne fait pas gagner de temps en local ; en réseau simulé, elle gagne au premier lancement et
+après une mise à jour, où la console part d'un cache froid, et perd au lancement suivant. Le
+premier essai « après mise à jour » (1 088 ms) est le premier lancement du build B, non notarisé :
+l'évaluation de Gatekeeper y entre, la médiane l'écarte. En réseau simulé, l'écart vient des
+appels d'API en cascade au démarrage de la console (même constat qu'en D1b), pas de la coque.
+Les cibles restent ouvertes : elles ne bloquent pas la bascule (mémoire et premier lancement en
+réseau meilleurs qu'Electron), mais le lancement suivant est à reprendre côté console (requêtes
+parallèles, cache persistant servi avant le réseau).
+
+**Mise à jour réelle sur l'identité de production (2026-11-06).** `config.json` de l'app vers
+l'API locale et un flux local (`update-feed.ts`), notch actif :
+- 1.1.0 → 1.1.1-test : premier contrôle à 30 s, téléchargement de 19 779 989 o, journal
+  `signature verified: ready` ; point bleu dans le notch (`notch-dot-update.png`) ; pastille
+  « Mettre à jour », dialogue « Mise à jour prête » puis « Redémarrer » ; popup arrêté avant le
+  remplacement ; relancé en 1.1.1-test en moins d'une seconde, session reprise sans reconnexion.
+  Après coup, `/Applications/openedbot.app` : `CFBundleShortVersionString` 1.1.1-test, `spctl` →
+  `accepted, source=Notarized Developer ID`, `stapler validate` valide, `TeamIdentifier=QDC76LMF29`,
+  hardened runtime.
+- Manifeste 1.1.2-test signé par une autre clé, contrôle demandé par le menu : journal
+  `update 1.1.2-test refused: bad signature (… different key …)`, réglages « La signature de la
+  mise à jour a été refusée : rien n'a été installé. », app restée en 1.1.1-test ; au contrôle
+  suivant, le même manifeste n'est pas retéléchargé.
+
+**Autres preuves à l'écran.**
+- `openedbot://` : Launch Services liste `/Applications/openedbot.app` parmi les gestionnaires du
+  schéma. Sur ce Mac, le gestionnaire par défaut reste l'Electron de développement
+  (`apps/desktop/node_modules/electron`), qui n'a pas été touché : l'URL
+  `openedbot://auth/callback` a donc été remise à l'app installée par `open -g -a` (sans
+  l'activer), app masquée ; elle est revenue au premier plan par son gestionnaire de deep link,
+  une seule instance. Chez un utilisateur, le 1.1.0 remplace Electron au même chemin et sous le
+  même identifiant : pas de concurrence.
+- Changement de backend : thème « Sombre » choisi sur l'API du relais (port 4180), relance sur
+  l'API 8790 : journal `WebView data of another backend purged`, page de connexion toujours en
+  sombre (`theme-after-backend-change.png`).
+- Déconnexion : jetons révoqués, données WebView purgées (journal).
+- Restent non éprouvés à l'écran (tests seulement) : raccourci global repris au focus,
+  presse-papiers, clic sur une notification, copie sur un champ mot de passe.
+- La date et la taille de `~/Library/Preferences/app.openedbot.desktop.plist` (Electron) sont
+  inchangées après les lancements du 1.1.0 (149 o, 28 oct.).
+
+Captures, non versionnées : `/tmp/d3-evidence/`.
+
+**Feux tricolores (2026-11-06, retour de l'utilisateur).** Sur le 1.1.0 d'avant, le centre des
+feux était à 14 pt du haut à tous les zooms (l'inset de tao `{16, 16}` ne vaut pas celui
+d'Electron), la barre du haut à 23 × zoom pt. Mesuré après correction sur le build signé, par
+l'arbre d'accessibilité (cadres des boutons et du bouton « Masquer la barre latérale ») et sur
+les captures (centre des pixels rouges du bouton de fermeture, centre de l'encre de l'icône de la
+barre) :
+
+| Zoom | Centre de la barre (23 × zoom) | Feux, AX / capture | Icône de la barre, AX / capture | Écart vert → logo |
+|---|---|---|---|---|
+| 0,71 (texte 10 px) | 16,43 pt | 16,50 / 16,25 pt | 16,50 / 16,25 pt | 10,0 pt |
+| 0,86 (texte 12 px) | 19,71 pt | 19,50 / 19,25 pt | 19,50 / 19,50 pt | 12,0 pt |
+| 0,91 (Zoom Out) | 20,91 pt | 21,00 / 20,75 pt | 21,00 / 21,00 pt | 12,5 pt |
+| 1,00 | 23,00 pt | 23,00 / 22,75 pt | 23,00 / 22,75 pt | 14,0 pt |
+| 1,10 (Zoom In) | 25,30 pt | 25,50 / 25,25 pt | 25,00 / 24,75 pt | 15,0 pt |
+| 1,21 | 27,83 pt | 28,00 / 27,75 pt | 28,00 / 27,50 pt | 16,5 pt |
+| 1,33 | 30,61 pt | 30,50 / 30,25 pt | 30,50 / 30,75 pt | 22,5 pt |
+
+Clair et sombre identiques ; à 1,21 après un redimensionnement (1 100 × 720) et après un aller-retour
+en plein écran : 28,00 pt. Le feu vert finit à 76 pt à tout zoom ; de 0,71 à 1,21, l'écart jusqu'au
+logo vaut 14 px de page (`native-titlebar.css` réserve 76 / zoom), la géométrie d'Electron. À 1,33,
+il passe à 22,5 pt (17 px de page) : le logo se décale, sans chevauchement. Le CSS est celui
+d'Electron ; cet écart n'a pas été comparé dans Electron. Captures avant / après,
+non versionnées : `/tmp/d3-evidence/lights/` (`before-*.png`, `after-*.png`). Le correctif ne touche
+que la coque native : G1 et G3 ont été mesurés sur le 1.1.0 d'avant et n'ont pas été remesurés
+(quelques cadres AppKit posés à l'ouverture, sans effet attendu sur le temps ni la mémoire).
+
+**Écarts de D2b, état à la fin de D3.**
+
+| Écart | État | Preuve ou raison |
+|---|---|---|
+| Schéma `openedbot://` au remplacement d'Electron | Fait | Déclaré par l'overlay de production, relu dans l'`Info.plist` du 1.1.0 par `build-mac.ts` ; le retour Google passe par le deep link (`identity.declares_scheme`) |
+| Manifeste par canal et variante, hébergement (Q2) | Préparé | Disposition ci-dessus, `release-mac.ts`, manifestes beta et stable du 1.1.0 ; rien d'envoyé |
+| Configuration invalide | Fait | Dialogue « Configuration refusée » (fichier ou variable en cause), puis sortie 78 ; non bloquant pour la boucle d'événements (revue Codex). Vu sur le 1.1.0 signé |
+| Changer de backend efface thème et taille du texte | Fait | Le lancement sur un autre backend lit d'abord les préférences de l'appareil depuis une page vide de l'origine locale (`/__openedbot/empty`), puis purge et les réécrit, comme à la déconnexion. Thème sombre gardé à l'écran de 4180 à 8790 |
+| Raccourci global déjà pris | Fait en partie | Redemandé à chaque prise de focus de la fenêtre, journalisé une fois. Limite : `RegisterEventHotKey` sans option exclusive ne signale pas toujours un raccourci déjà pris par une autre app ; Electron, remplacé au même endroit, ne tourne plus après la bascule |
+| Silhouette de démarrage | Fait | Le script inline de `index.html` voit `__OPENEDBOT_SHELL__` (posé avant tout script) ; barre macOS d'après la plateforme de la coque. Test `boot-silhouette.test.ts` |
+| Point bleu du notch sur une version de test | Fait | La coque n'envoie plus au notch une version suffixée (`1.1.1-test`) : elle part sans numéro, le point s'affiche (vu à l'écran pendant la mise à jour 1.1.0 → 1.1.1-test) |
+| Feux tricolores déplacés selon le zoom | Fait | Ni `traffic_light_position` (fixé à la construction) ni l'inset de tao (réappliqué à chaque `drawRect:`) : la coque ne pose aucun inset et place elle-même les boutons, comme le `WindowButtonsProxy` d'Electron (`macos/traffic_lights.rs`) : conteneur de la barre de titre haut de 46 × zoom points, boutons centrés dedans, calés sur le pixel. Réappliqué à chaque zoom et dès qu'AppKit déplace le bouton de fermeture ou le conteneur (redimensionnement, sortie du plein écran, apparence). Voir « Feux tricolores » ci-dessus |
+| Copie interdite sur un champ mot de passe, `navigator.clipboard`, clic sur une notification | Reste | Non éprouvés à l’écran, tests seulement (voir plus haut) |
+| Google réel | Reste | Pas d'identifiants OAuth en local |
+| Linux et Windows : purge sans confirmation | Reste | Hors macOS (D4, D5) |
+| Universel ou x86_64 | Non fait | arm64 seul, comme Electron 1.0.3 : le popup du notch n'est construit qu'en arm64 (`make bundle`), et aucun Mac Intel pour l'essayer |
+
 ### 4.4 Console : origine, plateforme, performance
 
 **Découpler la console de son origine** (bloquant pour l'embarquement, O) :
@@ -1335,8 +1584,8 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
 | Desktop plus vieux que la version minimale de l'API | `426` + code stable, écran « mise à jour requise », bouton de mise à jour et lien de réinstallation | Test API + test du shell |
 | Mise à jour : signature invalide, manifeste périmé, mauvaise architecture ou variante | Refus, version installée intacte, erreur journalisée | Tests du flux de mise à jour |
 | Mise à jour : disque plein, app non inscriptible, popup encore actif | Refus avant d'écrire, popup arrêté avant le remplacement, message clair | Test sur machine de test |
-| Nouvelle version qui démarre puis plante | Détection au lancement suivant, lien de réinstallation manuelle ; retour arrière à étudier en D3 (I) | Test en canal bêta |
-| Perte ou rotation de la clé de mise à jour | Procédure écrite : nouvelle clé livrée par une version signée avec l'ancienne, sinon réinstallation manuelle | Exercice avant la bascule |
+| Nouvelle version qui démarre puis plante | Canal bêta avant stable ; correction par N+1, ou réinstallation du dmg précédent, gardé sous `desktop/vX.Y.Z/` (section 4.3.5). Pas de retour arrière automatique (à concevoir) | Test en canal bêta |
+| Perte ou rotation de la clé de mise à jour | Procédure écrite (section 4.3.5) : copie chiffrée hors du Mac, nouvelle clé livrée par une version signée avec l'ancienne, sinon réinstallation manuelle | Exercice avant la bascule : non fait |
 | Coffre indisponible (Linux sans Secret Service, Keychain verrouillé) | Session en mémoire seulement, message clair, jamais de jeton en clair sur le disque | Test Rust |
 | Révocation distante ratée à la déconnexion | Session locale effacée quand même, échec journalisé | Test Rust |
 | Deep link non enregistré | Repli sur la boucle locale | Test Rust |
@@ -1423,7 +1672,7 @@ Recommandations issues de la revue Codex ; celles marquées **(décision)** atte
 | # | Question | Recommandation |
 |---|---|---|
 | Q1 **tranchée** | Session et brouillons à la bascule | Reconnexion unique ; perte des brouillons annoncée ; jamais Electron et Tauri connectés en même temps avec le même refresh token |
-| Q2 | Hébergement du flux de mise à jour | R2 derrière une URL publique stable, artefacts immuables, manifeste par canal / architecture / variante, clé de signature hors de l'hébergement |
+| Q2 | Hébergement du flux de mise à jour | R2 derrière une URL publique stable, artefacts immuables, manifeste par canal / architecture / variante, clé de signature hors de l'hébergement. Proposé en D3 (section 4.3.5) : `releases.openedbot.app/desktop/v<version>/` et `desktop/solo/<canal>/latest.json`, en attente d'accord |
 | Q3 **(décision)** | CI du cœur avec pro | Recommandé : job avec références appariées, sans secret exposé aux PR non fiables. En attendant : `test-dual` et `solo-check` en local (section 4.8) |
 | Q4 | Librairie d'icônes à garder | Tabler (migration la plus petite), sous réserve de l'analyse du bundle, ui-kit et pro compris |
 | Q5 | LISTEN | `listen` de Bun 1.4.4 d'abord ; un autre pilote seulement sur défaut reproductible |
@@ -1582,3 +1831,22 @@ gelées par un cliquet, 543 après réduction. `bot-host` et la sonde d'enrôlem
 `runtimeAdminClient`. `make solo-check` (deps-check, test-dual) au vert hors des trois
 « silhouettes du cadre » connues en mode pro ; `make test-integration` au vert. Une passe de
 `codex review` par dépôt, sans finding. Aucune migration.
+
+**Release et bascule macOS D3 (2026-11-06, prête à publier)** : section 4.3.5. Identité de production
+(celle d'Electron), flux hébergé par canal proposé (Q2), pipeline GitHub qui recopie le dmg depuis
+R2, annonce dans Electron prête mais éteinte, 1.1.0 signé, notarisé et agrafé, rien de publié.
+Quatre passes de `codex review` ; leurs findings P1/P2 ont été corrigés dans la branche :
+- alerte de configuration refusée qui bloquait la boucle d'événements ;
+- dossier de sortie de `release-mac.ts` effacé sans garde (option retirée) ;
+- sonde d'accessibilité synchrone qui bloquait le relais d'API qu'elle mesurait ;
+- dmg recopié par la CI sans contrôle de l'équipe de signature (`TeamIdentifier` vérifié) ;
+- arrêt de `perf-mac.ts` en préparation qui laissait tourner ce qu'il avait lancé.
+Mesuré sur le 1.1.0 signé : G1 604 / 540 / 557 ms en local (premier, suivant, après mise à
+jour), 1 256 / 637 / 754 ms en réseau simulé ; G3 456 Mo. Cibles manquées sauf « après mise à
+jour » en local ; mémoire −31 % et premier lancement en réseau meilleurs qu'Electron. Mise à jour
+réelle 1.1.0 → 1.1.1-test réussie (signature vérifiée, toujours notarisée, point du notch),
+manifeste signé par une autre clé refusé, `openedbot://` reçu par l'app installée.
+Retour de l'utilisateur : feux tricolores décentrés (14 pt contre 23 × zoom). Corrigés, mesurés de
+0,71 à 1,33 (écart au centre de la barre ≤ 0,5 pt), 1.1.0 reconstruit, renotarisé, revérifié.
+Le notch actif par défaut et son choix dans les Réglages sont en attente : le comportement cible
+viendra de l'analyse du notch d'OpenBot (patch gardé hors du dépôt).

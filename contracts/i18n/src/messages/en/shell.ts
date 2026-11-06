@@ -307,6 +307,11 @@ export const clientUpdate = {
   linkHint: "If the browser does not open, go to {url}.",
 } as const;
 
+export const desktopSwitch = {
+  pill: "New app",
+  tooltip: "openedbot {version} for Mac is out: a lighter native app that updates itself. Download it and replace this one in Applications. You will sign in once more; unsent drafts are not carried over.",
+} as const;
+
 export const desktopUpdate = {
   pill: "Update",
   pillTooltip: "openedbot {version} is ready",

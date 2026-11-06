@@ -42,12 +42,13 @@ pub fn refresh_update_item<R: Runtime>(app: &AppHandle<R>, state: &crate::update
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     use tauri::Manager;
-    let about = AboutMetadata { name: Some("openedbot preview".into()), version: Some(app.package_info().version.to_string()), ..Default::default() };
+    let product = app.package_info().name.clone();
+    let about = AboutMetadata { name: Some(product.clone()), version: Some(app.package_info().version.to_string()), ..Default::default() };
     let updates = MenuItem::with_id(app, UPDATES, CHECK_LABEL, true, None::<&str>)?;
     app.manage(UpdateMenuItem(updates.clone()));
     let app_menu = Submenu::with_items(
         app,
-        "openedbot preview",
+        &product,
         true,
         &[
             &PredefinedMenuItem::about(app, None, Some(about))?,
