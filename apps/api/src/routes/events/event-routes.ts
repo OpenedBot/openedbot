@@ -25,10 +25,16 @@ import { attachTerminalCompletions } from "@openedbot/execution/application/term
 import { logger } from "@openedbot/platform-observability";
 import { SSE_HEARTBEAT_INTERVAL_MS } from "../../interfaces/http/sse-heartbeat";
 import { fleetWorkspacesEnabled, type ProductFeatureSource } from "@openedbot/identity/application/entitlements";
+import {
+  acquireReplayPoller,
+  REPLAY_LIMIT,
+  shouldEmitSseCursor,
+  wakeReplayPoller,
+  type CursoredEvent,
+} from "./replay-pollers";
 
 export { SSE_HEARTBEAT_INTERVAL_MS };
-
-const REPLAY_LIMIT = 1_000;
+export { createOrderedReplayPump, shouldEmitSseCursor, type CursoredEvent, type OrderedReplayPump } from "./replay-pollers";
 
 /**
  * Seuil (en octets) de la file d'une connexion. Le rejeu attend qu'elle
@@ -88,49 +94,6 @@ const DEFAULT_EVENTS: EventsConfig = {
   replayWindowEvents: DEFAULT_EVENTS_REPLAY_WINDOW_EVENTS,
 };
 
-// Le poller de base de données est l'unique publieur live : une seule source
-// ordonnée empêche deux commits worker concurrents de livrer un curseur plus
-// haut avant un plus bas.
-//
-// Deux chemins le réveillent :
-// - le hint HTTP post-commit du worker (`POST /internal/events/publish`),
-//   chemin NOMINAL : le texte arrive dès le commit, sans attendre un tick ;
-// - le sondage périodique (`API_EVENTS_FALLBACK_POLL_MS`, 5 s par défaut),
-//   FILET seulement : hint perdu, API redémarrée entre l'insert et le hint,
-//   réplique qui n'a pas reçu la requête. Il ne porte plus la latence : à
-//   150 ms il faisait un SELECT par organisation connectée sans aucune
-//   activité, en permanence.
-//
-// LISTEN/NOTIFY remplacerait les deux (multi-process sans hint HTTP) ; c'est
-// différé tant que le support de LISTEN par Bun SQL n'est pas établi.
-
-type ReplayPoller = {
-  references: number;
-  pump: OrderedReplayPump;
-  timer: ReturnType<typeof setInterval>;
-};
-
-export type OrderedReplayPump = {
-  /** Coalesces any number of commit notifications into one ordered DB read. */
-  wake(): void;
-  /** Prevents a released organization's in-flight read from scheduling more work. */
-  close(): void;
-};
-
-/**
- * Le minimum qu'une source doit porter pour passer dans la pompe : un curseur
- * monotone. `run_events` et `support_events` le portent tous deux, et c'est la
- * seule chose que l'ordonnancement regarde.
- */
-export type CursoredEvent = { cursor: number };
-
-type ReplayPumpOptions = {
-  pageLimit?: number;
-  schedule?: (drain: () => Promise<void>) => void;
-  onError?: (error: unknown) => void;
-};
-
-const replayPollers = new Map<string, ReplayPoller>();
 
 export function eventRoutes(
   db: Db,
@@ -373,7 +336,9 @@ export function eventRoutes(
           flushBufferedSseEvents(buffered, push);
           if (closed) return;
           advanceSkippedCursor();
-          releaseReplayPoller = acquireReplayPoller(db, hub, organizationId, pollerCursor, events.fallbackPollMs);
+          releaseReplayPoller = acquireReplayPoller(
+            hub, organizationId, pollerCursor, (pageCursor) => replay(db, organizationId, pageCursor), events.fallbackPollMs,
+          );
           heartbeat = setInterval(() => {
             if (closed || queuedBytes() >= SSE_QUEUE_HIGH_WATER_BYTES) return;
             // Le contrôle d'accès tombe au même rythme et peut être en vol :
@@ -406,10 +371,6 @@ export function eventRoutes(
     });
   });
   return routes;
-}
-
-export function shouldEmitSseCursor(eventCursor: number, lastCursor: number): boolean {
-  return Number.isSafeInteger(eventCursor) && eventCursor > lastCursor;
 }
 
 /** Curseur durable, ou `null` tant que la ligne n'est pas committée. */
@@ -563,11 +524,21 @@ async function fanOutUncommitted(db: Db, hub: EventHub, events: OrganizationEven
   }
 }
 
+/**
+ * `POST /internal/events/publish` : les trames pré-commit du worker (deltas
+ * sans curseur, qu'aucune table ne porte encore) et ses hints post-commit.
+ *
+ * Le hint post-commit n'est plus que le REPLI de LISTEN (ADR 0001, S6) : tant
+ * que `commitHintsNeeded()` est faux, LISTEN réveille déjà cette réplique et
+ * toutes les autres ; le suivre doublerait la lecture. Il reste le chemin de
+ * la seule réplique visée par `API_INTERNAL_URL` quand LISTEN est coupé.
+ */
 export function internalEventRoutes(
   db: Db,
   config: ApiConfig,
-  _hub: EventHub,
-  wake: (organizationId: string) => void = wakeReplayPoller,
+  hub: EventHub,
+  wake: (organizationId: string) => void = (organizationId) => wakeReplayPoller(hub, organizationId),
+  commitHintsNeeded: () => boolean = () => true,
 ): Hono {
   const routes = new Hono();
   routes.post("/publish", async (context) => {
@@ -594,7 +565,8 @@ export function internalEventRoutes(
     // Un réveil joint à un lot pré-commit est celui du flush précédent : il
     // passe après le fan-out, un seul par organisation suffit (idempotent).
     const uncommitted = events.filter(isUncommitted);
-    if (uncommitted.length > 0) await fanOutUncommitted(db, _hub, uncommitted);
+    if (uncommitted.length > 0) await fanOutUncommitted(db, hub, uncommitted);
+    if (!commitHintsNeeded()) return context.body(null, 204);
     const woken = new Set<string>();
     for (const event of events) {
       if (isUncommitted(event) || woken.has(event.organizationId)) continue;
@@ -604,124 +576,6 @@ export function internalEventRoutes(
     return context.body(null, 204);
   });
   return routes;
-}
-
-function acquireReplayPoller(
-  db: Db,
-  hub: EventHub,
-  organizationId: string,
-  initialCursor: number,
-  fallbackPollMs: number,
-): () => void {
-  const existing = replayPollers.get(organizationId);
-  if (existing) {
-    existing.references += 1;
-    return () => releaseReplayPoller(organizationId, existing);
-  }
-
-  const pump = createOrderedReplayPump(
-    initialCursor,
-    (cursor) => replay(db, organizationId, cursor),
-    (event) => hub.publish(event),
-    {
-      onError: (error) => {
-        logger.error({ event: "sse.replay_failed", organizationId, error: String(error) }, "sse replay failed");
-      },
-    },
-  );
-  const poller: ReplayPoller = {
-    references: 1,
-    pump,
-    timer: setInterval(() => pump.wake(), fallbackPollMs),
-  };
-  replayPollers.set(organizationId, poller);
-  // Closes the max-cursor/replay/acquire window without waiting for the first
-  // interval when a worker commit landed during initial connection replay.
-  poller.pump.wake();
-  return () => releaseReplayPoller(organizationId, poller);
-}
-
-function wakeReplayPoller(organizationId: string): void {
-  const poller = replayPollers.get(organizationId);
-  if (!poller) return;
-  poller.pump.wake();
-}
-
-function releaseReplayPoller(organizationId: string, poller: ReplayPoller): void {
-  poller.references -= 1;
-  if (poller.references > 0) return;
-  clearInterval(poller.timer);
-  poller.pump.close();
-  replayPollers.delete(organizationId);
-}
-
-/**
- * Serial DB replay pump used by both commit hints and the fallback timer.
- *
- * A hint received while a SELECT is in flight sets one pending bit. Once that
- * SELECT completes, exactly one new read starts from its advanced cursor. This
- * avoids overlap (and cursor inversion), does not lose an in-flight commit,
- * and naturally applies backpressure when PostgreSQL is slower than hints.
- */
-export function createOrderedReplayPump<T extends CursoredEvent>(
-  initialCursor: number,
-  fetchPage: (cursor: number) => Promise<T[]>,
-  emit: (event: T) => void,
-  options: ReplayPumpOptions = {},
-): OrderedReplayPump {
-  const pageLimit = options.pageLimit ?? REPLAY_LIMIT;
-  const schedule = options.schedule ?? ((drain: () => Promise<void>) => {
-    queueMicrotask(() => { void drain(); });
-  });
-  let cursor = initialCursor;
-  let pending = false;
-  let scheduled = false;
-  let inFlight = false;
-  let closed = false;
-
-  const scheduleDrain = () => {
-    if (closed || !pending || scheduled || inFlight) return;
-    scheduled = true;
-    schedule(drain);
-  };
-  const drain = async () => {
-    scheduled = false;
-    if (closed || !pending || inFlight) return;
-    pending = false;
-    inFlight = true;
-    const cursorBefore = cursor;
-    try {
-      const events = await fetchPage(cursor);
-      // SQL already orders, but sorting here keeps this safety boundary sound
-      // if a future data source or test double does not.
-      events.sort((left, right) => left.cursor - right.cursor);
-      for (const event of events) {
-        if (!shouldEmitSseCursor(event.cursor, cursor)) continue;
-        cursor = event.cursor;
-        emit(event);
-      }
-      // Drain a full page immediately instead of adding one fallback interval
-      // per 1,000 events. Require progress to prevent a malformed source loop.
-      if (events.length >= pageLimit && cursor > cursorBefore) pending = true;
-    } catch (error) {
-      options.onError?.(error);
-    } finally {
-      inFlight = false;
-      scheduleDrain();
-    }
-  };
-
-  return {
-    wake() {
-      if (closed) return;
-      pending = true;
-      scheduleDrain();
-    },
-    close() {
-      closed = true;
-      pending = false;
-    },
-  };
 }
 
 /** Curseur global max de l'org (0 si aucun événement) pour amorcer le poller. */

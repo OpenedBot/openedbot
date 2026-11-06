@@ -662,7 +662,8 @@ desktop-tauri-publish TAURI_VERSION=0.0.2` ; l'app installée lit
 3. Longs fils : virtualisation de la timeline (faite en D1d, section 3.4).
 4. L'interrogation d'un fil ouvert toutes les 5 s (`use-thread-stream.ts:237-249`) a une raison
    documentée (revue automatique) : elle n'est retirée qu'une fois S6 livrée et la couverture
-   par événements prouvée.
+   par événements prouvée. S6 est livrée ; la preuve de couverture (tout ce que relit cette
+   interrogation passe-t-il par un événement ?) reste à faire, l'interrogation est gardée.
 5. Garde en CI : budget du chunk d'entrée (script de contrat, comme le cliquet des 600 lignes).
 
 ### 4.5 Serveur : création des tours et états des runs
@@ -755,6 +756,41 @@ préflight, création, streaming, approbations, repli de fournisseur, réconcili
   reçoit enfin un écouteur. Une notification ne fait que réveiller une lecture depuis le curseur
   durable : le journal et le rattrapage restent la source de vérité.
 
+  **État S6 (livré).** Chaque processus d'API tient **une** connexion LISTEN dédiée sur
+  `openedbot_events` (`apps/api/src/infrastructure/event-notifications.ts`). Une notification
+  `<organisation>:<curseur>` réveille la pompe ordonnée de cette organisation, si un flux SSE de
+  la réplique la suit ; chaque accusé de LISTEN (premier abonnement, puis chaque réabonnement que
+  Bun refait seul après une coupure) réveille toutes les pompes, qui relisent depuis leur curseur.
+  Les pompes vivent par hub (`routes/events/replay-pollers.ts`) et non plus dans un registre
+  global au module, qui faisait publier deux instances d'un même processus dans le seul hub de la
+  première. Le trigger 0005 n'a pas bougé : il est par ligne sur `run_events`, donc il notifie
+  toutes les écritures de la primitive S2c (worker, API, plug-ins), au commit seulement ; les
+  événements écrits par l'API elle-même (annulation, version d'un message, relance), qui
+  n'avaient aucun réveil et attendaient le sondage de 5 s, arrivent maintenant en direct.
+  `run_events` est la seule source du curseur du flux SSE ; `support_events` (guichet pro) garde
+  son propre sondage, hors S6.
+
+  Bun ne signale pas la perte d'une connexion LISTEN avant le réabonnement : un ping
+  (`pg_notify` par le pool ordinaire, toutes les 5 s) prouve le lien de bout en bout et mesure son
+  retard. Sans réponse, le lien est dit non confirmé. Le worker n'écoute pas ce canal (il ne lit
+  pas le flux) ; il garde sa connexion LISTEN de file.
+
+  L'alerte HTTP post-commit du worker est **gardée en repli** : l'API ne la suit que tant que
+  son lien n'est pas confirmé (indisponible au démarrage, coupé, ping sans réponse), ce qui rend
+  dans ce cas le comportement d'avant S6 au lieu de tout laisser au sondage. Le `POST` lui-même
+  reste nécessaire pour les trames pré-commit (deltas sans curseur, qu'aucune table ne porte) ;
+  le réveil post-commit y voyage déjà sans requête de plus. Retirer les `POST` qui ne portent
+  qu'un réveil touche `modules/execution` (persist, cancel, failure, queue) : étape suivante.
+  Le sondage de repli de l'API (`API_EVENTS_FALLBACK_POLL_MS`, 5 s) reste le filet.
+
+  Observabilité, par processus : `GET /internal/metrics` porte `eventLink` (état, `connected`,
+  abonnements, réabonnements, échecs, pings sans réponse, notifications, retard `lagMs` et
+  `maxLagMs`) ; en Prometheus : `openedbot_api_events_listen_connected`,
+  `openedbot_api_events_listen_{resubscriptions,failures,stalls,notifications}_total`,
+  `openedbot_api_events_listen_lag_ms`. Journaux : `api.events_listener_ready` (`resubscribed`),
+  `api.events_listener_failed` (essai, délai, `fallback: "poll"`), `api.events_listener_stalled`,
+  `api.events_listener_recovered`, `api.events_listener_unsupported`. Aucune variable nouvelle.
+
 ### 4.7 Sécurité, protocole, observabilité
 
 - **Changement de clé de l'appareil** (confirmé, `gateway.ts:417-467`). Sous le jeton de lien
@@ -810,8 +846,9 @@ préflight, création, streaming, approbations, repli de fournisseur, réconcili
 | Deux producteurs d'événements concurrents sur un même run | Séquences uniques et contiguës, curseur global ordonné | Test d'intégration concurrent |
 | Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible. État S2b : insertion directe **impossible** en production (seule la primitive insère, statut `queued` ou `relaying`) ; tout run sans workflow qui passe en `unknown` reçoit son workflow de revue (0175) : DM racine, brouillon de persona, DM sans initiateur (agence), run entrant d'un handoff hérité, tour de salon hérité ; l'abandon libère fil, capacité et bot | `tests/integration/orphan-unknown-runs.ts` (S2a caractérisait D1, S2b prouve le chemin de revue) |
 | Ancien worker qui écrit après expiration de son bail | Écriture refusée par le fencing, avant et après la reprise par un autre worker (S2d : le fencing compte aussi l'échéance du bail) | `tests/integration/run-transitions.ts`, partie 1 |
-| Coupure de la connexion LISTEN | Réabonnement, rattrapage depuis le curseur durable | Test d'intégration |
-| Deux répliques d'API | Les deltas arrivent à tous les clients en < 1 s | Test d'intégration à deux instances |
+| Coupure de la connexion LISTEN | Réabonnement, rattrapage depuis le curseur durable. État S6 : `pg_terminate_backend` des deux connexions, porte TCP tenue fermée ; rien n'arrive pendant la coupure, puis les événements écrits entre-temps arrivent une fois chacun, dans l'ordre, au réabonnement (150 à 400 ms après le retour de la base, mesuré) | `tests/integration/realtime-listen.ts` (2) |
+| Deux répliques d'API | Les deltas arrivent à tous les clients en < 1 s. État S6 : deux serveurs HTTP, deux hubs, deux connexions LISTEN ; le delta du worker (pré-commit vers la seule réplique visée) arrive commité à l'autre, et une écriture de l'API aux deux, en ~1 ms après le commit (local). En réel (2026-11-06, `make dev` sur develop en :8790 et une réplique de branche en :8797 sur la même base, réponse d'Atlas) : la réplique que le worker ne prévient pas reçoit chaque delta commité 6 à 21 ms (médiane 9 à 12) après la trame pré-commit de l'autre, sans doublon ; les événements écrits par l'API (`message.admitted`, `run.steering`) y arrivent 0,2 à 3,3 s plus tôt que sur develop | `tests/integration/realtime-listen.ts` (1) |
+| LISTEN indisponible au démarrage | L'API démarre, journalise le repli, sert par le sondage, réessaie (1 s à 30 s) et s'abonne quand la base répond | `tests/integration/realtime-listen.ts` (3) |
 | Jeton de lien volé | Ne permet plus d'imposer une nouvelle clé d'appareil | Test du gateway |
 
 ## 6. Plan par étapes

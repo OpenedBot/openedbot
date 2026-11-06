@@ -116,11 +116,19 @@ describe("API runtime metrics", () => {
       new EventHub(),
       blobs,
       new ApiRuntimeMetrics(),
+      () => ({
+        state: "listening", connected: true, subscriptions: 3, resubscriptions: 2, failures: 1, stalls: 1,
+        notifications: 40, ignored: 0, lagMs: 4, maxLagMs: 9, listeningSince: "2026-11-06T00:00:00.000Z",
+      }),
     );
 
     const jsonResponse = await app.request("/", { headers: { Authorization: "Bearer metrics-secret" } });
     expect(jsonResponse.status).toBe(200);
-    const json = await jsonResponse.json() as { operations: ReturnType<typeof normalizeOperationalMetrics> };
+    const json = await jsonResponse.json() as {
+      operations: ReturnType<typeof normalizeOperationalMetrics>;
+      eventLink: { connected: boolean; resubscriptions: number };
+    };
+    expect(json.eventLink).toMatchObject({ connected: true, resubscriptions: 2 });
     expect(json.operations.queue).toEqual({ depth: 3, oldestAgeSeconds: 12.5 });
     expect(json.operations.runs.byStatus.unknown).toBe(1);
 
@@ -130,6 +138,9 @@ describe("API runtime metrics", () => {
     const text = await textResponse.text();
     expect(text).toContain('openedbot_runs_by_status{status="unknown"} 1');
     expect(text).toContain("openedbot_run_leases_expired 1");
+    expect(text).toContain("openedbot_api_events_listen_connected 1");
+    expect(text).toContain("openedbot_api_events_listen_resubscriptions_total 2");
+    expect(text).toContain("openedbot_api_events_listen_lag_ms 4");
     expect(statements.some((sql) => sql.includes("internal_operational_metrics()"))).toBe(true);
   });
 });

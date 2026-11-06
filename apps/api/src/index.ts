@@ -12,6 +12,7 @@ import { assertProductionConfig, readApiConfig } from "./infrastructure/config";
 import { createDatabase } from "@openedbot/platform-db";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import { createOrderedReplayPump, eventRoutes, internalEventRoutes, replayPagesUntil, shouldEmitSseCursor } from "./routes/events/event-routes";
+import { createEventRealtime } from "./routes/events/replay-pollers";
 import { runtimeRoutes } from "./routes/runtimes/runtime-routes";
 import { connectorReleaseRoutes } from "./routes/runtimes/connector-release-routes";
 import { createConnectorReleaseFeed } from "@openedbot/runtime-link/application/connector-release-feed";
@@ -238,6 +239,11 @@ const isPaymentWebhookPath = (path: string) => paymentWebhook !== null && path =
 const impersonation = impersonationSourceOf(installedPlugins, (event) =>
   logger.warn({ event: "api.pro_impersonation_ignored", ...event }, "second impersonation source ignored"));
 const hub = new EventHub();
+// Une connexion LISTEN par réplique (ADR 0001, S6) : chaque commit de
+// `run_events` réveille les flux SSE de toutes les répliques. Indisponible,
+// l'API sert quand même, par les hints du worker et le sondage de repli.
+const eventRealtime = createEventRealtime(db, baseConfig.databaseUrl, hub);
+eventRealtime.start();
 // Le guichet de support (étape 11.3) : celui d'un plug-in, le premier qui en apporte un ; en solo, aucun.
 const supportDesk = supportDeskOf(installedPlugins, (event) =>
   logger.warn({ event: "api.pro_support_desk_ignored", ...event }, "second support desk ignored"));
@@ -339,12 +345,12 @@ app.route("/api/waitlist", waitlistRoutes(db, config));
 // Depuis l'étape 11.3, le plug-in qui apporte `supportDesk` y répond ; sans
 // lui, 404 `NOT_FOUND` sur tout le préfixe (solo).
 app.route("/", supportDeskRoutes(supportDesk, proContext, proMountWarning, { trustProxy: config.trustProxy }));
-app.route("/internal/events", internalEventRoutes(db, config, hub));
+app.route("/internal/events", internalEventRoutes(db, config, hub, undefined, () => !eventRealtime.connected()));
 app.route("/internal/runtime-inventory", internalInventoryRoutes(config, inventoryWarmer));
 // Relais du lien connecteur pour le worker : même bearer interne, flux dans
 // les deux sens, jamais compressé (hors `/api/*`, et exclu par chemin).
 app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(config, linkBroker, linkLocator));
-app.route("/internal/metrics", internalMetricsRoutes(config, db, hub, blobs, runtimeMetrics));
+app.route("/internal/metrics", internalMetricsRoutes(config, db, hub, blobs, runtimeMetrics, () => eventRealtime.status()));
 
 app.route("/api/hooks", webhookIngressRoutes(db, config));
 // Retour OAuth d'un serveur MCP : le fournisseur y renvoie le navigateur, sans
@@ -567,6 +573,7 @@ async function shutdown(signal: string): Promise<void> {
     } finally { clearTimeout(timer); }
   }
   await instanceRegistry.stop().catch(() => undefined);
+  await eventRealtime.stop();
   server.stop(false);
   await db`delete from service_instances where id = ${instanceId}`.catch(() => undefined);
   await db.close({ timeout: 5 });

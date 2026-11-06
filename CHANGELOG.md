@@ -28,6 +28,17 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- Le direct ne dépend plus de la réplique d'API à laquelle on est connecté.
+  Chaque réplique écoute les nouveaux événements dans PostgreSQL (LISTEN) :
+  une réponse qui s'écrit, une annulation ou un message ajouté par l'API
+  arrivent à tous les clients quelques millisecondes après leur
+  enregistrement, au lieu d'attendre
+  jusqu'à 5 s le sondage de secours sur les répliques que le worker ne
+  prévient pas, ou pour les événements écrits par l'API elle-même. Après une
+  coupure de la connexion, la réplique se réabonne seule et relit ce qui
+  s'est passé entre-temps, sans perte ni doublon. Si l'écoute est
+  indisponible, l'API démarre quand même, le signale dans ses journaux et ses
+  métriques, et retombe sur l'ancien chemin (alerte du worker, sondage).
 - La console s'ouvre plus vite : avant d'afficher la liste des fils, elle
   télécharge moitié moins de code (environ 390 ko compressés au lieu de
   860) et en 27 fichiers au lieu de 54. L'écran de conversation, la page
