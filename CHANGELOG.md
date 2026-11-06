@@ -8,9 +8,11 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 1.1.1 — 2026-11-06
+
 ### Ajouté
 
-- **openedbot 1.1.0 : l'app de bureau devient native, sur Mac et sous
+- **openedbot 1.1.1 : l'app de bureau devient native, sur Mac et sous
   Linux.** La console est embarquée au lieu d'être téléchargée à chaque
   ouverture, et l'app se met à jour seule (pastille bleue « Mettre à jour »,
   redémarrage avec votre accord ; sous Linux, l'AppImage se met à jour seule,
@@ -28,9 +30,9 @@ connecteur hôte et le protocole tiennent le leur :
   seule : remplacez-la par le nouveau téléchargement.** Sur Mac, le dmg
   s'installe à la même place dans Applications ; sous Linux, le nouveau deb
   remplace l'ancien paquet (`sudo apt install ./openedbot-linux-amd64.deb`).
-  Une fois la console web mise à jour, l'ancienne app ne sait plus utiliser
-  sa propre connexion : elle affiche la page de connexion web, puis la sienne
-  avec un message d'erreur. **À l'installation, une seule fois** : il faut se
+  Une fois la console web mise à jour, l'ancienne app affiche « Cette
+  version d'openedbot n'est plus prise en charge », avec les liens de
+  téléchargement et « Continuer dans le navigateur ». **À l'installation, une seule fois** : il faut se
   reconnecter, et les brouillons non envoyés de l'ancienne app ne sont pas
   repris (envoyez-les ou copiez-les avant de la remplacer).
 

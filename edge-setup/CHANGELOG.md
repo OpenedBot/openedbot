@@ -14,6 +14,8 @@ deux releases différentes.
 
 ## Non publié
 
+## v1.5.1 - 2026-11-06
+
 ### Ajouté
 
 - Chaque échange d'une conversation porte désormais l'identifiant de suivi qu'openedbot lui donne, et le connecteur l'inscrit dans son journal avant de le transmettre à l'agent. Un incident se retrouve ainsi d'un bout à l'autre, de la conversation jusqu'à la machine. Rien à faire après la mise à jour ; une version plus ancienne d'edge-setup continue de fonctionner sans ce suivi.
