@@ -937,8 +937,7 @@ Le jeton de lien est en clair sur l'hôte (`link.json`, credential systemd) :
 volé, il ouvrirait une session. La preuve de possession lie chaque session à
 une **clé device** Ed25519 que seul cet hôte détient.
 
-- **Clé.** Générée par `edge-setup link` (une par enrôlement) ou
-  `edge-setup link --rekey --yes`. Le seed de 32 octets ne touche jamais le
+- **Clé.** Générée par `edge-setup link` (une par enrôlement). Le seed de 32 octets ne touche jamais le
   disque en clair : il part sur stdin de `systemd-creds encrypt
   --name=device.key --with-key=tpm2|host` (TPM2 si `/dev/tpmrm0` existe,
   sinon la clé hôte de `/var/lib/systemd/credential.secret`) et le résultat
@@ -963,8 +962,10 @@ une **clé device** Ed25519 que seul cet hôte détient.
   (systemd 257 et plus).
   Sans ce credential, le démon refuse de démarrer (code 2).
 - **Hello.** Chaque session, enrôlement compris, annonce `devicePublicKey`.
-  openedbot l'enregistre à l'enrôlement (et au `--rekey`) puis exige
-  qu'il ne change plus.
+  openedbot l'enregistre à l'enrôlement puis exige qu'il ne change plus :
+  une session dont `hello` porte une autre clé est fermée `4401`
+  `LINK_POP_FAILED` avant tout `link.challenge`, quel que soit le jeton, et
+  journalisée `pop_failed` (`rekey_refused`).
 - **Challenge.** Juste après `hello`, openedbot envoie `link.challenge
   {nonce}` (32 octets aléatoires). L'hôte répond aussitôt `link.proof
   {signature}` = Ed25519 sur le message exact
@@ -987,14 +988,15 @@ une **clé device** Ed25519 que seul cet hôte détient.
   requêtes, pour qu'un connecteur neuf reste utilisable pendant le
   déploiement de l'API ; l'API, elle, refuse une session sans preuve dès que
   `RUNTIME_LINK_REQUIRE_POP=1`.
-- **Rekey.** `link --rekey --yes` (root, console) scelle une nouvelle clé,
-  arrête l'unité, ouvre une session dont `hello` porte la nouvelle clé
-  publique, s'arrête après `link.proof` (ou après la première trame d'un
-  broker ancien), puis relance l'unité. C'est le seul moment où une clé
-  publique atteint openedbot sans preuve préalable : il est réservé au
-  geste de l'opérateur, et openedbot journalise le changement de clé
-  sur le runtime. Un hôte lié avant l'existence de la preuve reçoit sa clé à
-  la première mise à jour (`up`/`upgrade` la scellent si `link.json` existe).
+- **Changement de clé.** Aucun. La nouvelle clé ne prouverait que sa propre
+  possession : un jeton de lien volé suffirait à remplacer celle de la
+  machine. Une machine qui doit changer de clé (clé hôte régénérée, VPS
+  cloné, soupçon de fuite) est réenrôlée avec un nouveau ticket, ce qui
+  scelle et enregistre une nouvelle clé, puis remplace l'ancien runtime.
+  `link --rekey` est retiré et refuse sans rien changer. Seule exception :
+  un runtime lié avant l'existence de la preuve, qui n'a encore aucune clé
+  enregistrée, reçoit la sienne à la première mise à jour (`up`/`upgrade` la
+  scellent si `link.json` existe), sous le jeton courant seulement.
 
 ## Changement d'origine annoncé par `link.context`
 
@@ -1101,7 +1103,6 @@ edge-setup link --openedbot https://link.openedbot.app --yes
 edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot
 # garder les deux liens vivants en même temps : une instance nommée
 edge-setup link --openedbot http://127.0.0.1:8790 --yes --insecure-openedbot --name dev
-edge-setup link --rekey --yes --name dev
 edge-setup status          # une ligne par instance : origine, runtime, unité, clé
 journalctl -u hermes-connector@dev
 ```

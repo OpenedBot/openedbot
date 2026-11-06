@@ -98,12 +98,11 @@ export type LinkCredential =
     }
   | { kind: "enrollment"; enrollment: LinkEnrollment };
 
-/** Le défi de possession en cours : le nonce, la clé attendue, et son inscription ou remplacement. */
+/** Le défi de possession en cours : le nonce, la clé attendue, et si elle est à inscrire. */
 export type LinkPopState = {
   nonce: string;
   devicePublicKey: string;
   firstKey: boolean;
-  rekey: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 };
 
@@ -399,29 +398,35 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
    *   - clé offerte égale à l'enregistrée : idem ;
    *   - première clé offerte : seulement sous le jeton COURANT, et enregistrée
    *     après la preuve de possession ;
-   *   - clé offerte différente (rekey) : seulement sous le jeton COURANT, et
-   *     la preuve se fait avec la nouvelle clé, qui remplace l'ancienne ;
+   *   - clé offerte différente de l'enregistrée : refusée sous tout jeton (la
+   *     nouvelle clé ne prouverait que sa propre possession : un jeton volé
+   *     suffirait). Une machine qui change de clé se réenrôle ;
    *   - aucune des deux : en production (`RUNTIME_LINK_REQUIRE_POP`) refus,
    *     ailleurs liaison avec `pop_missing` au journal.
    */
   function decidePop(ws: LinkWebSocket, connection: LinkConnection, identity: LinkIdentity, registered: string | null): "bind" | "challenge" | "refuse" {
     const offered = connection.devicePublicKey;
+    const peer = { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent };
     if (!registered && !offered) {
       if (config.linkSecurity.requirePop) {
-        broker.journal(identity, "pop_failed", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent, reason: "no_device_key" });
+        broker.journal(identity, "pop_failed", { ...peer, reason: "no_device_key" });
         return "refuse";
       }
-      broker.journal(identity, "pop_missing", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent });
+      broker.journal(identity, "pop_missing", peer);
       return "bind";
     }
-    const firstKey = registered === null;
-    const rekey = Boolean(registered && offered && offered !== registered);
-    if ((firstKey || rekey) && identity.expiresAt !== null) {
-      // Un ancien jeton en grâce ne peut ni inscrire ni changer la clé de la machine.
-      broker.journal(identity, "pop_failed", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent, reason: firstKey ? "first_key_with_previous_token" : "rekey_with_previous_token" });
+    if (registered && offered && offered !== registered) {
+      broker.journal(identity, "pop_failed", { ...peer, reason: "rekey_refused" });
+      log("runtime_link.rekey_refused", { runtimeId: identity.runtimeId, previousToken: identity.expiresAt !== null });
       return "refuse";
     }
-    ws.data.pop = { nonce: linkPopNonce(), devicePublicKey: (offered ?? registered)!, firstKey, rekey, timer: null };
+    const firstKey = registered === null;
+    if (firstKey && identity.expiresAt !== null) {
+      // Un ancien jeton en grâce ne peut pas inscrire la clé de la machine.
+      broker.journal(identity, "pop_failed", { ...peer, reason: "first_key_with_previous_token" });
+      return "refuse";
+    }
+    ws.data.pop = { nonce: linkPopNonce(), devicePublicKey: (offered ?? registered)!, firstKey, timer: null };
     return "challenge";
   }
 
@@ -448,7 +453,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
     if (!pop) return refusePop(ws, identity, "no_challenge");
     const accepted = ws.data.devTunnelWsUrl && !wsUrls.includes(ws.data.devTunnelWsUrl) ? [...wsUrls, ws.data.devTunnelWsUrl] : wsUrls;
     const signedUrl = verifyLinkProof({ devicePublicKey: pop.devicePublicKey, nonce: pop.nonce, runtimeId: identity.runtimeId, signature, wsUrls: accepted });
-    if (!signedUrl) return refusePop(ws, identity, pop.rekey ? "rekey_signature" : "signature");
+    if (!signedUrl) return refusePop(ws, identity, "signature");
     clearPopTimer(ws);
     ws.data.pop = null;
     // La preuve est acquise : quitter `awaiting_proof` tout de suite. Les
@@ -457,23 +462,17 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
     // manquante (`proof_expected`, 4401) : mesuré 2026-10-13, edge-setup
     // v0.5.10 derrière la passerelle séparée, refusé à chaque montée.
     ws.data.state = "binding";
-    if (pop.firstKey || pop.rekey) {
-      // Si le jeton a tourné (ou le runtime a été révoqué) entre le défi et
-      // la preuve, l'UPDATE ne touche aucune ligne : la clé n'est pas
-      // enregistrée, donc ni succès journalisé ni admission.
+    if (pop.firstKey) {
+      // Jeton tourné, runtime révoqué ou autre clé inscrite entre le défi et
+      // la preuve : l'UPDATE ne touche aucune ligne, ni succès ni admission.
       const persisted = await withCredential(db, identity.tokenHash, async (tx) => {
         return registerLinkDevicePublicKey(tx, identity, pop.devicePublicKey);
       });
-      if (!persisted) return refusePop(ws, identity, pop.firstKey ? "first_key_not_persisted" : "rekey_not_persisted");
-      if (pop.firstKey) {
-        broker.journal(identity, "device_key_registered", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent });
-        log("runtime_link.device_key_registered", { runtimeId: identity.runtimeId });
-      } else {
-        broker.journal(identity, "rotated", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent, reason: "device_key" });
-        log("runtime_link.device_key_rotated", { runtimeId: identity.runtimeId });
-      }
+      if (!persisted) return refusePop(ws, identity, "first_key_not_persisted");
+      broker.journal(identity, "device_key_registered", { ip: ws.data.peer.ip, agent: connection.agent ?? ws.data.peer.agent });
+      log("runtime_link.device_key_registered", { runtimeId: identity.runtimeId });
     }
-    log("runtime_link.pop_verified", { runtimeId: identity.runtimeId, wsUrl: signedUrl, rekey: pop.rekey });
+    log("runtime_link.pop_verified", { runtimeId: identity.runtimeId, wsUrl: signedUrl });
     const origin = linkSignedOrigin(signedUrl);
     if (origin) {
       // La session continue même si l'écriture rate : l'origine sert à l'écran,

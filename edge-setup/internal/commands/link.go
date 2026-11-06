@@ -287,7 +287,7 @@ func runLink(env cli.Env, args []string) int {
 	openedbot := fs.String("openedbot", "", "openedbot origin, https://… (default "+DefaultOpenedbotOrigin+")")
 	ticketFile := fs.String("ticket-file", "", "0600 file holding the enrollment ticket (default: stdin, or a prompt without echo)")
 	insecureOpenedbot := fs.Bool("insecure-openedbot", false, "development only: also accept an http:// loopback origin, reached through an SSH reverse tunnel (never a public origin)")
-	rekey := fs.Bool("rekey", false, "regenerate the device key of an already linked runtime, without a ticket; the new public key is presented to openedbot on one session")
+	rekey := fs.Bool("rekey", false, "retired: openedbot no longer replaces a registered device key; re-link this host with a new ticket instead")
 	name := fs.String("name", "", "named connector instance (^[a-z][a-z0-9-]{0,31}$): its own link, device key and native service, next to the default link; e.g. --name dev for a development openedbot")
 	yes := fs.Bool("yes", false, "confirm the mutation")
 	if err := fs.Parse(args); err != nil {
@@ -298,13 +298,17 @@ func runLink(env cli.Env, args []string) int {
 		return fail(env, cli.ExitUsage, "%v", err)
 	}
 	if *rekey {
-		if fs.NArg() != 0 || *openedbot != "" || *ticketFile != "" {
-			return fail(env, cli.ExitUsage, "--rekey takes no ticket and no --openedbot: it reuses the link already persisted on this host")
+		// openedbot refuses a device key that differs from the registered one
+		// (a stolen link token must not be enough to impose a key), so a new
+		// key can only arrive with a new enrollment. Refuse before touching
+		// anything: replacing the sealed key first would lock this host out.
+		relink := "edge-setup link --openedbot https://… --yes"
+		if !inst.IsDefault() {
+			relink += " --name " + string(inst)
 		}
-		if !*yes {
-			return fail(env, cli.ExitRefused, "link --rekey replaces the device key and re-presents it to openedbot; add --yes (nothing was changed)")
-		}
-		return runLinkRekey(env, inst)
+		return fail(env, cli.ExitRefused,
+			"link --rekey is retired: openedbot no longer replaces a registered device key. To give this host a new key, open Settings › Runtime › Replace the runtime in openedbot, run `%s` with the ticket it shows, then confirm the replacement there. Nothing was changed.",
+			relink)
 	}
 	if fs.NArg() != 0 {
 		return fail(env, cli.ExitUsage, "the ticket is a secret: it never travels in argv. Run `edge-setup link --openedbot https://… --yes` and paste it at the hidden prompt, or use --ticket-file <0600 file>")
@@ -488,84 +492,6 @@ func runLink(env cli.Env, args []string) int {
 	if runtime.GOOS != "darwin" {
 		printAutoUpgradeHint(env)
 	}
-	return cli.ExitOK
-}
-
-// runLinkRekey is `link --rekey --yes`: a new device key, sealed, then one
-// session whose hello presents its public half so openedbot replaces the
-// registered key. This is the one moment a public key is accepted without a
-// prior proof of possession, hence the native owner and --yes; check the
-// runtime's link journal in openedbot afterwards.
-func runLinkRekey(env cli.Env, inst layout.ConnectorInstance) int {
-	if code := prepareConnectorHost(env); code != 0 {
-		return code
-	}
-	lf, err := readLinkFile(inst)
-	if err != nil {
-		return fail(env, cli.ExitFailure, "%v", err)
-	}
-	if lf == nil {
-		if inst.IsDefault() {
-			return fail(env, cli.ExitRefused, "this host is not linked (%s absent); run `edge-setup link --openedbot https://… --yes` with a ticket", linkPathOf(inst))
-		}
-		return fail(env, cli.ExitRefused, "instance %s is not linked (%s absent); run `edge-setup link --openedbot https://… --name %s --yes` with a ticket", inst.Label(), linkPathOf(inst), inst.Label())
-	}
-	if err := validateWSURL(lf.WSURL); err != nil {
-		return fail(env, cli.ExitRefused, "link.json: %v (nothing was changed)", err)
-	}
-	if rotated, err := loadRotatedLinkToken(filepath.Join(stateDirOf(inst), "link-token.json"), lf.RuntimeID); err != nil {
-		return fail(env, cli.ExitFailure, "rotated link credential: %v", err)
-	} else if rotated != "" {
-		lf.LinkToken = rotated
-	}
-	if moved, err := loadMovedLinkOrigin(filepath.Join(stateDirOf(inst), "link-origin.json"), lf.RuntimeID); err != nil {
-		return fail(env, cli.ExitFailure, "%v (nothing was changed)", err)
-	} else if moved != "" {
-		lf.WSURL = moved
-	}
-	token, err := connectorGatewayToken()
-	if err != nil {
-		return fail(env, cli.ExitFailure, "%v", err)
-	}
-	ctx, cancel := ctxWithSignals()
-	defer cancel()
-	ctx, cancelTimeout := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancelTimeout()
-	if err := preflightDeviceKey(ctx, inst); err != nil {
-		return fail(env, cli.ExitRefused, "device key storage: %v (the device key was not replaced)", err)
-	}
-	service, err := connectorService(inst)
-	if err != nil {
-		return fail(env, cli.ExitFailure, "%v", err)
-	}
-	// The running link must not race the session that presents the new key.
-	if err := service.Stop(ctx); err != nil {
-		return fail(env, cli.ExitFailure, "stop previous connector: %v (the device key was not replaced)", err)
-	}
-	log := func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }
-	deviceKey, err := newDeviceKey(ctx, runner, inst, log)
-	if err != nil {
-		return fail(env, cli.ExitFailure, "link --rekey: %v", err)
-	}
-	c := connector.New(lf.WSURL, connector.Auth{RuntimeID: lf.RuntimeID, LinkToken: lf.LinkToken}, "http://127.0.0.1:8642", token, nil)
-	c.Agent = "edge-setup/" + env.Version
-	c.HermesVersion = pins.HermesVersion
-	c.Logf = log
-	c.DeviceKey = deviceKey
-	printf(env.Stdout, "presenting the new device key to openedbot on one session")
-	if err := c.Rekey(ctx); err != nil {
-		return fail(env, cli.ExitFailure, "link --rekey: %v (the stored device key was replaced; run --rekey again once openedbot is reachable)", err)
-	}
-	if err := clearLinkRefusal(stateDirOf(inst)); err != nil {
-		return fail(env, cli.ExitFailure, "link was rekeyed but its refusal marker could not be cleared; the connector was not started")
-	}
-	if err := refreshConnectorDefinition(ctx, inst, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }); err != nil {
-		return fail(env, cli.ExitFailure, "%v", err)
-	}
-	if err := service.Restart(ctx); err != nil {
-		return fail(env, cli.ExitFailure, "%v", err)
-	}
-	printf(env.Stdout, "rekeyed ✓  %s restarted with the new device key; check the runtime's link journal in openedbot", inst.Unit())
 	return cli.ExitOK
 }
 

@@ -100,7 +100,7 @@ func TestDarwinWaitingJobIsNotActive(t *testing.T) {
 	}
 }
 
-func TestDarwinRekeyRestartBootstrapsAfterBootout(t *testing.T) {
+func TestDarwinRestartBootstrapsAfterBootout(t *testing.T) {
 	ctx := context.Background()
 	r := exectest.NewFake()
 	cfg := testConfig(t, r)

@@ -209,9 +209,7 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
       Math.max(1, databaseMaxConnections - 2),
       "WORKER_MAX_ACTIVE_RUNS",
     ),
-    apiInternalToken:
-      env.WORKER_INTERNAL_TOKEN?.trim() ||
-      (environment === "production" ? required(undefined, "WORKER_INTERNAL_TOKEN") : "openedbot-worker-dev-token"),
+    apiInternalToken: readInternalToken(env.WORKER_INTERNAL_TOKEN, environment),
     tokenEncryption,
     hermesMtls: readHermesMtlsIdentity(env),
     hermesTimeouts: readHermesTimeouts(env),
@@ -331,6 +329,22 @@ function decodeEncryptionKey(value: string, name: string): Uint8Array {
   const bytes = Uint8Array.from(Buffer.from(value, "base64"));
   if (bytes.byteLength !== 32) throw new Error(`${name} must be 32 bytes in base64.`);
   return bytes;
+}
+
+const DEV_WORKER_INTERNAL_TOKEN = "openedbot-worker-dev-token";
+
+/**
+ * The secret the worker shares with the API and the link gateway. Both refuse
+ * the development default in production (`assertProductionApiConfig`); the
+ * worker refuses it too, so a worker started alone never runs on a public
+ * value.
+ */
+function readInternalToken(value: string | undefined, environment: WorkerConfig["environment"]): string {
+  const token = value?.trim() || (environment === "production" ? required(undefined, "WORKER_INTERNAL_TOKEN") : DEV_WORKER_INTERNAL_TOKEN);
+  if (environment === "production" && token === DEV_WORKER_INTERNAL_TOKEN) {
+    throw new Error("WORKER_INTERNAL_TOKEN must not be the development default in production.");
+  }
+  return token;
 }
 
 function required(value: string | undefined, name: string): string {

@@ -157,14 +157,17 @@ func TestConnectorDaemonRefusesToStartWithoutDeviceKey(t *testing.T) {
 	}
 }
 
-func TestLinkRekeyGates(t *testing.T) {
-	var out, errb bytes.Buffer
-	env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}
-	if code := runLink(env, []string{"--rekey"}); code != cli.ExitRefused || !strings.Contains(errb.String(), "add --yes") {
-		t.Fatalf("code=%d stderr=%q", code, errb.String())
-	}
-	errb.Reset()
-	if code := runLink(env, []string{"--rekey", "--yes", "--openedbot", "https://openedbot.example"}); code != cli.ExitUsage || !strings.Contains(errb.String(), "takes no ticket") {
-		t.Fatalf("code=%d stderr=%q", code, errb.String())
+// The refusal comes before any host access: replacing the sealed key first
+// would lock the host out, since openedbot refuses a different key.
+func TestLinkRekeyIsRetired(t *testing.T) {
+	for _, args := range [][]string{{"--rekey"}, {"--rekey", "--yes"}, {"--rekey", "--yes", "--name", "dev"}} {
+		var out, errb bytes.Buffer
+		env := cli.Env{Version: "test", Stdout: &out, Stderr: &errb}
+		if code := runLink(env, args); code != cli.ExitRefused || !strings.Contains(errb.String(), "link --rekey is retired") || !strings.Contains(errb.String(), "Nothing was changed") {
+			t.Fatalf("args=%v code=%d stderr=%q", args, code, errb.String())
+		}
+		if strings.Contains(strings.Join(args, " "), "--name dev") && !strings.Contains(errb.String(), "--name dev") {
+			t.Fatalf("named instance not carried into the re-link command: %q", errb.String())
+		}
 	}
 }

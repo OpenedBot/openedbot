@@ -327,22 +327,32 @@ Depuis la preuve de possession (docs/CONNECTOR.md), chaque hôte lié détient
 une clé device Ed25519 scellée par `systemd-creds` (TPM2 si présent, sinon la
 clé hôte) dans `/etc/hermes/connector/device.key.cred`. `link` la crée ;
 `up` et `upgrade` la créent après coup sur un hôte lié avant son existence.
-Pour la remplacer sans nouveau ticket (clé hôte régénérée, VPS cloné,
-soupçon de fuite) :
+Pour la remplacer (clé hôte régénérée, VPS cloné, soupçon de fuite), il faut
+réenrôler la machine : openedbot refuse toute clé différente de celle qu'il a
+enregistrée, pour qu'un jeton de lien volé ne suffise jamais à imposer une
+autre clé. Dans openedbot, *Réglages › Runtime › Remplacer le runtime* ouvre
+un ticket ; sur l'hôte :
 
 ```bash
-edge-setup link --rekey --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 edge-setup status
 ```
 
-`--rekey` arrête le connecteur, scelle une nouvelle clé, la présente à
-openedbot sur une session, puis relance l'unité. Vérifier ensuite le
-journal du lien du runtime dans openedbot : c'est le seul geste qui fait
-accepter une clé publique sans preuve préalable.
+Coller le ticket à l'invite masquée : l'enrôlement scelle une nouvelle clé et
+la fait enregistrer. Si le nouveau runtime apparaît en attente dans openedbot,
+confirmer le remplacement ; si l'ancien connecteur était déjà déconnecté,
+openedbot bascule tout seul. Si `link` échoue après avoir consommé le ticket,
+retirer dans openedbot le runtime en attente, puis recommencer avec un nouveau
+ticket.
+
+`link --rekey` est retiré : il refuse sans rien changer. edge-setup v1.5.0 et
+antérieurs le proposent encore et remplacent la clé de l'hôte avant de la
+présenter : ne pas le lancer, mettre d'abord edge-setup à jour. Un hôte sur
+lequel il a déjà été lancé se réenrôle comme ci-dessus.
 
 Un hôte peut porter plusieurs liens, par exemple une production et un
 développement. Chaque instance a alors sa propre clé device, son unité et son état,
-et `--rekey` prend le même `--name` que `link` ; `status` les liste toutes.
+et le réenrôlement prend le même `--name` que `link` ; `status` les liste toutes.
 Voir [Instances nommées](/fr/docs/commands#instances-nommées).
 
 ## Sauvegarde, destruction

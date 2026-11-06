@@ -163,36 +163,6 @@ func TestSessionContinuesWhenBrokerNeverChallenges(t *testing.T) {
 	}
 }
 
-func TestRekeyEndsAfterProofOrFirstFrame(t *testing.T) {
-	for _, challenged := range []bool{true, false} {
-		broker := newBroker(t)
-		c, pub, _ := popClient(t, broker)
-		done := make(chan error, 1)
-		go func() { done <- c.Rekey(context.Background()) }()
-		<-broker.ready
-		if _, err := enroll.ParseDevicePublicKey(broker.hello.DevicePublicKey); err != nil {
-			t.Fatal(err)
-		}
-		if challenged {
-			encoded, nonce := nonceB64(4)
-			broker.send(Text{T: TLinkChallenge, Nonce: encoded})
-			if p := broker.next(t); !enroll.VerifyPoP(pub, nonce, "rt-1", c.WSURL, p.Signature) {
-				t.Fatalf("%+v", p)
-			}
-		} else {
-			broker.send(Text{T: TPing})
-		}
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Fatal(err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatalf("rekey session (challenged=%v) did not end", challenged)
-		}
-	}
-}
-
 // The enrollment probe arrives before any challenge can exist: the runtime is
 // created by the enrollment, which registers the key from hello. Refusing it
 // would refuse every enrollment made with a device key.

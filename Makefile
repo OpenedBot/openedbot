@@ -520,6 +520,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/steer-lock-order.ts
 	bun tests/integration/worker-queue-lease.ts
 	bun tests/integration/runtime-link-generation.ts
+	bun tests/integration/runtime-link-device-key.ts
 	bun tests/integration/runtime-link-diagnostics.ts
 	bun tests/integration/runtime-read-snapshots-store.ts
 	bun tests/integration/a2a-audit.ts

@@ -8,6 +8,14 @@ uses [semantic versioning](https://semver.org/) as described in
 ## [Unreleased]
 
 ### Changed
+- **Breaking.** A `hello` whose `devicePublicKey` differs from the key
+  registered for the runtime is closed `4401` `LINK_POP_FAILED` before any
+  `link.challenge`, under the current token as under a previous one, and
+  journaled `pop_failed` with reason `rekey_refused`. openedbot used to
+  register the new key after a proof made with that same key, which a stolen
+  link token was enough to pass. A host gets a new key only through a new
+  enrollment; a runtime with no registered key still registers its first one
+  under the current token.
 - **Breaking.** `link.context` carries the public origin as `openedbot`
   (was the product's former short name). The proof of possession signs a
   message prefixed `openedbot-link-pop/v1`, and the creation audit file is

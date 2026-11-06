@@ -85,6 +85,17 @@ connecteur hôte et le protocole tiennent le leur :
   démarrer quand l'un d'eux est posé, et `make env-prune` ne les réécrit
   plus sous leur nouveau nom. Un ancien nom est simplement ignoré.
 
+
+### Sécurité
+
+- Une machine liée ne peut plus changer de clé d'appareil par son lien :
+  openedbot refuse toute autre clé que celle enregistrée à l'enrôlement, même
+  présentée avec le jeton de lien courant. Un jeton de lien volé ne suffit
+  donc plus à imposer la clé d'un attaquant. Pour donner une nouvelle clé à
+  une machine, on la réenrôle (Réglages › Runtime › Remplacer le runtime).
+  Deux montées simultanées d'une machine sans clé ne peuvent plus non plus
+  s'écraser l'une l'autre.
+
 ## 1.0.2 — 2026-11-04
 
 ### Corrigé
