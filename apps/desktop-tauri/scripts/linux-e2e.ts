@@ -35,11 +35,9 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { homedir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import { IDENTITIES, type IdentityName } from "./mac-identity";
 
 const ROOT = path.resolve(import.meta.dir, "../../..");
-const IDENTIFIER = "app.openedbot.desktop.preview";
-const BINARY = "openedbot-desktop-preview";
-const SCHEME = "openedbot-preview";
 const DRIVER = "http://127.0.0.1:4444";
 const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
 const PROBE_PORT = 8790;
@@ -66,8 +64,18 @@ const { values: args } = parseArgs({
     relaunches: { type: "string", default: "5" },
     "skip-stream": { type: "boolean", default: false },
     "skip-deb": { type: "boolean", default: false },
+    // The build under test: the preview (default) or the released app (`openedbot`, D6).
+    identity: { type: "string", default: "preview" },
   },
 });
+if (!Object.hasOwn(IDENTITIES, args.identity!)) throw new Error("--identity must be preview or production");
+const BUILD = IDENTITIES[args.identity as IdentityName];
+const IDENTIFIER = BUILD.bundleId;
+const BINARY = BUILD.executable;
+/** The Linux scheme: the preview declares its own (`tauri.linux.conf.json`), never `openedbot://`. */
+const SCHEME = BUILD.scheme ?? "openedbot-preview";
+/** `identity.rs` `log_file`. */
+const LOG_FILE = BUILD.scheme ? "openedbot.log" : "preview.log";
 const FEED_PORT = Number(args["feed-port"]);
 const EVIDENCE = path.join(path.resolve(args.evidence!), args.scenario!);
 rmSync(EVIDENCE, { recursive: true, force: true });
@@ -299,7 +307,7 @@ function filesContaining(dir: string, needle: string): string[] {
   return result.out ? result.out.split("\n").filter(Boolean) : [];
 }
 
-const appLog = () => path.join(process.env.XDG_DATA_HOME ?? path.join(homedir(), ".local/share"), IDENTIFIER, "logs/preview.log");
+const appLog = () => path.join(process.env.XDG_DATA_HOME ?? path.join(homedir(), ".local/share"), IDENTIFIER, "logs", LOG_FILE);
 const readAppLog = () => (existsSync(appLog()) ? readFileSync(appLog(), "utf8") : "");
 
 function wipeAppData(): void {
@@ -530,7 +538,7 @@ function originChecks(): Record<string, boolean> {
 
 async function signedIn(): Promise<void> {
   const artifacts = args.artifacts ?? fail("--artifacts is required");
-  const appimage = prepareAppImage(artifacts, "/tmp/apps/openedbot-preview.AppImage");
+  const appimage = prepareAppImage(artifacts, `/tmp/apps/${BUILD.stem}.AppImage`);
   wipeAppData();
   await startProbe();
   // An XEmbed tray for the tray icon (libayatana-appindicator falls back to it without a StatusNotifier host).
@@ -582,7 +590,20 @@ async function signedIn(): Promise<void> {
   const afterDeepLink = await capture(first, "after-deep-link");
 
   // 5. The close button hides the window; a second launch shows the same one again.
-  const visible = () => sh("xdotool", ["search", "--onlyvisible", "--name", "openedbot preview"]).out.split("\n").filter(Boolean);
+  // The icon docked in the XEmbed tray is a window too, and `--name` is a
+  // regex: « openedbot » matches it, « openedbot preview » did not. Windows
+  // under stalonetray are not the app's.
+  const docked = () => {
+    const ids = new Set<number>();
+    for (const tray of sh("xdotool", ["search", "--class", "stalonetray"]).out.split("\n").filter(Boolean)) {
+      for (const match of sh("xwininfo", ["-tree", "-id", tray]).out.matchAll(/^\s+(0x[0-9a-f]+)\s/gm)) ids.add(Number.parseInt(match[1]!, 16));
+    }
+    return ids;
+  };
+  const visible = () => {
+    const tray = docked();
+    return sh("xdotool", ["search", "--onlyvisible", "--name", BUILD.product]).out.split("\n").filter((id) => id && !tray.has(Number(id)));
+  };
   const [mainWindow] = visible();
   const closeSent = mainWindow ? sh("python3", [path.join(ROOT, "apps/desktop-tauri/linux/wm-close.py"), mainWindow]).code === 0 : false;
   await sleep(2_000);
@@ -657,7 +678,7 @@ async function signedIn(): Promise<void> {
     report.deb = {
       dpkgExit: installed.code,
       desktopEntry: desktop.out,
-      dependsOk: sh("dpkg", ["-s", "openedbot-preview"]).out.includes("Status: install ok installed"),
+      dependsOk: sh("dpkg", ["-s", BUILD.stem]).out.includes("Status: install ok installed"),
       relaunchWallMs: Math.round(ready - session.spawnedAt),
       skippedUpdates: readAppLog().includes("not an AppImage"),
     };
@@ -675,7 +696,7 @@ async function signedIn(): Promise<void> {
 
 async function memoryOnly(): Promise<void> {
   const artifacts = args.artifacts ?? fail("--artifacts is required");
-  const appimage = prepareAppImage(artifacts, "/tmp/apps/openedbot-preview.AppImage");
+  const appimage = prepareAppImage(artifacts, `/tmp/apps/${BUILD.stem}.AppImage`);
   wipeAppData();
   await startProbe();
   startDriver();
@@ -712,7 +733,7 @@ async function update(): Promise<void> {
   wipeAppData();
   await startProbe();
   startFeedForwarder();
-  const appimage = prepareAppImage(from, "/tmp/update/openedbot-preview.AppImage");
+  const appimage = prepareAppImage(from, `/tmp/update/${BUILD.stem}.AppImage`);
   const fromSha = sha256(appimage);
   const expected = sha256(onlyFile(to, ".AppImage"));
   // The forged manifest's app is launched like a user would, no driver: the
@@ -735,7 +756,7 @@ async function update(): Promise<void> {
   const consent = await invoke(session, "install_update", { version: toVersion }).catch((error) => ({ error: String(error) }));
   log(`install_update: ${JSON.stringify(consent)}`);
   const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline && !readAppLog().includes(`openedbot preview ${toVersion},`)) await sleep(1_000);
+  while (Date.now() < deadline && !readAppLog().includes(`${BUILD.product} ${toVersion},`)) await sleep(1_000);
   await sleep(4_000);
   const updatedLog = readAppLog();
   report.install = {
@@ -745,7 +766,7 @@ async function update(): Promise<void> {
     replacedByTheNewVersion: sha256(appimage) === expected,
     downloadedAndVerified: updatedLog.includes("signature verified"),
     // The updater logs "update <version> installed" before it restarts the app.
-    restartedIn: /openedbot preview (\S+), API/.exec(updatedLog.split(/update \S+ installed/).at(-1) ?? "")?.[1] ?? null,
+    restartedIn: new RegExp(`${BUILD.product} (\\S+), API`).exec(updatedLog.split(/update \S+ installed/).at(-1) ?? "")?.[1] ?? null,
     running: appPids().length,
   };
   await capture(null, "updated-running");
@@ -793,9 +814,9 @@ async function smoke(): Promise<void> {
     await capture(session, name);
     await quit(session);
     if (info.ok?.platform !== "linux") fail(`${name}: shell_info ${JSON.stringify(info)}`);
-    return { signInPageMs: Math.round(shown - session.spawnedAt), shellInfo: info.ok, log: readAppLog().includes("openedbot preview") };
+    return { signInPageMs: Math.round(shown - session.spawnedAt), shellInfo: info.ok, log: readAppLog().includes(BUILD.product) };
   };
-  report.appimage = await check(prepareAppImage(artifacts, "/tmp/apps/openedbot-preview.AppImage"), "smoke-appimage");
+  report.appimage = await check(prepareAppImage(artifacts, `/tmp/apps/${BUILD.stem}.AppImage`), "smoke-appimage");
   const installed = installDeb(onlyFile(artifacts, ".deb"));
   if (installed.code !== 0) fail(`dpkg -i failed: ${installed.out.slice(-500)}`);
   report.deb = await check(`/usr/bin/${BINARY}`, "smoke-deb");
@@ -818,7 +839,7 @@ try {
 } finally {
   report.origin = originSummary();
   report.finishedAt = new Date().toISOString();
-  if (existsSync(appLog())) copyFileSync(appLog(), path.join(EVIDENCE, "preview.log"));
+  if (existsSync(appLog())) copyFileSync(appLog(), path.join(EVIDENCE, LOG_FILE));
   writeFileSync(path.join(EVIDENCE, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   for (const child of children) child.kill("SIGTERM");
   for (const pid of appPids()) process.kill(pid, "SIGTERM");
