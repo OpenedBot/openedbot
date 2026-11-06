@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
+import type { HermesClient, HermesClientConfig } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { BotSettingsToolDto } from "@openedbot/contracts-api";
 import { BOT_SETTINGS_TOOL_NAME, BOT_SETTINGS_TOOL_SERVER } from "@openedbot/execution/domain/bot-settings-tool";
 import type { Db } from "@openedbot/platform-db";
@@ -32,7 +33,7 @@ export function botSettingsToolRoutes(
 ): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
   const readRuntime = deps.readRuntime ?? readRuntimeSecret;
-  const clientFactory = deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig));
+  const clientFactory = deps.clientFactory ?? runtimeAdminClient;
 
   const readBot = async (organizationId: string, botId: string): Promise<BotTarget> => {
     const rows = await withTenant(db, organizationId, (tx) => tx<BotTarget[]>`

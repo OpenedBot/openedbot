@@ -393,7 +393,7 @@ UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et scripts, sans réseau ni PostgreSQL.
 	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
-	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts tests/scripts/run-events-contract.test.ts apps/desktop-tauri/scripts
+	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts tests/scripts/run-events-contract.test.ts tests/scripts/runtime-client-contract.test.ts apps/desktop-tauri/scripts
 	python3 -B tests/scripts/provider-fault-cleanup.test.py
 	# Découverte automatique : tout *.test.ts(x) sous apps/console/tests joue,
 	# sauf tests/e2e/ (parcours applicatifs complets, déjà couverts nommément
@@ -422,6 +422,7 @@ test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et
 	bash tests/scripts/db-ownership-contract.sh
 	bun tests/scripts/run-writes-contract.ts
 	bun tests/scripts/run-events-contract.ts
+	bun tests/scripts/runtime-client-contract.ts
 	bun tests/scripts/code-structure-contract.ts
 	bash tests/scripts/migration-record-contract.sh
 	bash tests/scripts/pro-migrations-contract.sh
@@ -515,6 +516,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/orphan-unknown-runs.ts
 	bun tests/integration/run-event-sequences.ts
 	bun tests/integration/run-transitions.ts
+	bun tests/integration/execution-commands.ts
 	bun tests/integration/permission-policy-preflight.ts
 	bun tests/integration/review-profiles.ts
 	bun tests/integration/approval-review.ts

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import {
-  HermesClient,
   HermesClientError,
+  type HermesClient,
   type HermesClientConfig,
   type HermesProviderUsageDocument,
 } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import { RELAY_FEATURE_PROVIDER_USAGE } from "@openedbot/contracts-connector";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
@@ -103,7 +104,7 @@ export function runtimeProviderUsageRoutes(
   const routes = new Hono<{ Variables: AppVariables }>();
   const cache = deps.cache ?? sharedCache;
   const now = deps.now ?? (() => new Date());
-  const createClient = deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig));
+  const createClient = deps.clientFactory ?? runtimeAdminClient;
   const locator = deps.locator ?? runtimeLinkLocator();
 
   routes.get("/:runtimeId/provider-usage", async (context) => {

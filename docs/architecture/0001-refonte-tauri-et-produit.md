@@ -979,6 +979,70 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
   - les **lectures et l'administration** du runtime, qui restent synchrones via `modules/runtimes` ;
   - les **mutations d'exécution** (compaction, nouvelle version d'un message…), qui deviennent des
     commandes durables exécutées par le worker.
+
+  **État S3 (livré).** Inventaire des 13 constructions (12 dans `apps/api/src`, plus
+  `apps/api/scripts/seed.ts`) : douze sont des lectures ou de l'administration de l'hôte (sondes,
+  modèles, usage, fenêtre de contexte, inventaire, MCP, OAuth, profils, outils `openedbot_routines`
+  et `openedbot_bot_settings` posés sur l'hôte, import de profils, seed). La nouvelle version d'un
+  message était **déjà** une commande durable : la route crée un run de branche
+  (`branchTurnTx`) que le worker exécute, et son seul appel Hermes est une lecture du contrat des
+  toolsets. Une seule mutation d'exécution tournait dans l'API : la compaction d'un salon à la
+  demande (`thread-compact-routes.ts`), qui ouvrait une session et des runs de résumé pendant la
+  requête.
+  - **Lectures et administration** : un seul client, `runtimeAdminClient`
+    (`modules/runtimes/src/application/runtime-admin-client.ts`). Son type n'a aucun verbe
+    d'exécution (`ensureSession`, `createRun`, `getRunStatus`, `events`, `steerRun`, `stopRun`,
+    `respondApproval`) et son proxy les refuse à l'appel, même par un transtypage. Les onze
+    routes et le seed l'utilisent ; comportement inchangé.
+  - **Compaction** : commande durable `thread.compact` dans `execution_commands` (0176, propriété
+    `execution`). La route garde comme avant (droits, abonnement, salon, run actif, seuil,
+    runtime), enregistre la commande, puis attend son règlement en relisant la ligne : la réponse
+    HTTP est la même qu'avant, la console n'a pas changé. Le worker (passe `execution-commands`,
+    250 ms, deux commandes au plus par processus, non bloquantes) la réclame sous bail clôturé
+    (propriétaire, génération, échéance de 60 s, battement de 15 s), relit le salon (un run a pu
+    commencer), exécute `compactThreadNow` sur le profil et le modèle du dernier membre qui a
+    parlé, avec la clé Hermes `compact:<commande>:<séquence>`, puis règle la commande. Défaillances :
+    une commande active par salon et par type (index unique, `COMPACTION_IN_PROGRESS` sur toutes
+    les répliques) ; rejeu par `Idempotency-Key` avant les gardes ; API perdue entre
+    l'enregistrement et la réclamation : la commande attend, un worker l'exécute, un rejeu rend
+    son résultat ; jamais réclamée avant l'échéance de la requête : retirée
+    (`COMPACTION_NOT_STARTED`), et toute commande jamais démarrée en file depuis 5 min est échouée
+    (`COMMAND_EXPIRED`), une commande rendue par un worker qui s'arrête restant en file ; deux
+    requêtes simultanées sous une même clé n'enregistrent qu'une commande ; worker mort : bail expiré, reprise (tentative 2, génération 2), ses
+    écritures refusées, échec nommé après 3 tentatives (`COMMAND_ATTEMPTS_EXHAUSTED`), ou succès
+    si la dernière avait déjà écrit son résumé ; un run de résumé laissé sur l'hôte vaut une
+    reprise de plus, pour l'arrêter avant de régler la commande ; une reprise qui ne peut
+    pas réutiliser le run de la tentative précédente (clé déplacée) l'arrête, comme une reprise
+    refusée par le salon (un tour a démarré entre-temps) ; arrêt
+    propre : commande rendue sans compter la tentative ; annulation
+    (`DELETE /api/threads/:threadId/compact`) : immédiate pour une commande jamais démarrée ; en
+    cours, par le battement, et l'écriture du résumé comme le règlement en succès la refusent même
+    entre deux battements ; le run de résumé sur l'hôte, enregistré sur la commande
+    (`hermes_run`), est arrêté avant de libérer le salon, y compris par le worker suivant pour une
+    commande rendue à l'arrêt (un bail perdu ou un arrêt du worker le laissent tourner : la
+    tentative suivante le reprend par sa clé).
+    Le résumé de chaque passe s'écrit dans la même transaction que la progression de la commande
+    (`progress`), sous son bail : un worker dont le bail a expiré n'écrit rien, et un worker mort
+    entre le résumé et le règlement laisse une progression que la tentative suivante règle au lieu
+    de refuser un salon passé sous le seuil. Le filigrane de `thread_compactions` ne recule plus :
+    un résumé tardif (compaction automatique d'un run) ne remplace pas un résumé plus avancé. Test
+    `tests/integration/execution-commands.ts`.
+    Limite connue : un worker qui meurt entre l'acceptation du run de résumé par l'hôte et
+    l'écriture de son `hermes_run` (une requête SQL) laisse ce run sans poignée ; une reprise le
+    retrouve par sa clé, mais une annulation demandée entre-temps règle la commande sans
+    l'arrêter. Le run s'arrête seul à son échéance et le filigrane monotone protège l'historique ;
+    le combler demande de lire un run par sa clé d'idempotence sur l'hôte, que `HermesClient`
+    n'expose pas.
+  - **Garde** : `tests/scripts/runtime-client-contract.ts` refuse `new HermesClient` dans l'API
+    (routes et scripts), l'appel d'un verbe d'exécution, l'import du client du worker et des
+    points d'entrée de l'exécution ; dans les modules, `new HermesClient` n'est permis que dans
+    cinq fichiers classés ; chaque méthode de `HermesClient` doit être classée exécution ou
+    lecture/administration. Sur `develop` avant S3, elle relève les 13 constructions et l'import
+    de `compactThreadNow`.
+  - Restent hors de l'API mais construits dans des modules qu'elle appelle, classés
+    lecture/administration : `roster/application/bot-host.ts` (profils et sessions d'un bot) et
+    `runtime-link/application/gateway.ts` (sonde d'enrôlement). Ils passeront par la fabrique
+    avec S4.
 - **Frontières des modules.** Les exports de packages ne publient plus `./sql/*` ; un module
   n'importe un autre module que par sa couche `application` publique ; règles dependency-cruiser ;
   cycles de packages cassés (roster ↔ conversation, roster ↔ portability, runtimes ↔ runtime-link,
@@ -1166,7 +1230,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **S2c** Allocation d'événements | Une seule primitive : verrou du run puis verrou du curseur, puis calcul, dans la transaction qui insère | Garde sur `max(sequence)` hors primitive ; test de producteurs concurrents |
 | **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales. **Fait** (2026-11-06) ; reste : transitions de `workflows` (cliquet daté) |
 | **S2e** `executeRun` | Découpage en étapes nommées | Comportement identique (tests existants) + taille sous le cliquet. **Fait** (2026-11-06) |
-| **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution |
+| **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution. **Fait** (2026-11-06) |
 | **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert |
 | **S6** Temps réel | LISTEN par processus, trigger gardé, rattrapage durable | Tests LISTEN de la section 5 |
 | **S7** Protocole et corrélation | Contrat du connecteur unique, `traceparent`, logger commun | Un run se suit d'un bout à l'autre dans les logs. **Fait** (2026-11-06) ; reste : publier edge-setup, copier `protocol/connector` dans l'image pro, spans par étape après S2e |
@@ -1317,3 +1381,13 @@ findings P1/P2 ont été corrigés dans la branche :
 inchangé ; tests ajoutés pour la complétion d'une trame et l'échéance du workflow. Relevé sans
 correction : un double enveloppement du message de repli à la création, latent tant qu'un refus de
 création ne peut pas être classé `quota`. Aucune migration.
+
+**Propriété de l'exécution S3 (2026-11-06)** : section 4.6. Sur 13 `HermesClient` de l'API, douze
+lisent ou administrent l'hôte et passent par `runtimeAdminClient` (sans verbe d'exécution) ; la
+nouvelle version d'un message était déjà un run du worker. La compaction d'un salon devient la
+commande durable `thread.compact` (`execution_commands`, migration 0176), exécutée par le worker
+sous bail clôturé ; la route rend la même réponse en attendant le règlement. Garde
+`runtime-client-contract.ts` ; test `tests/integration/execution-commands.ts` (doublon, API perdue
+avant la réclamation, reprise après la mort d'un worker, tentatives épuisées, arrêt propre,
+annulation, run concurrent, tenant, rétention). Les invariants des runs (0002) ne changent pas.
+Onze passes de revue Codex ; la dernière relève la limite connue de la section 4.6.

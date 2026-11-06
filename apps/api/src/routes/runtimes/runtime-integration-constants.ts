@@ -1,6 +1,4 @@
-import {
-  HermesClient,
-} from "@openedbot/hermes";
+import type { HermesClient } from "@openedbot/hermes";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 
 export type RuntimeReader = typeof readRuntimeSecret;

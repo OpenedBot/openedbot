@@ -1,6 +1,7 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig, type HermesMcpOauthSession } from "@openedbot/hermes";
+import type { HermesClientConfig, HermesMcpOauthSession } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { RuntimeMcpOauthDto } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import { requestOrigin, requireOperator } from "../identity/auth";
@@ -126,7 +127,7 @@ export function mcpOauthCallbackRoutes(
 ): Hono {
   const routes = new Hono();
   const readRuntime = dependencies.readRuntime ?? readRuntimeSecret;
-  const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
+  const clientFactory = dependencies.clientFactory ?? runtimeAdminClient;
   const snapshots = dependencies.snapshotStore ?? postgresSnapshotStore(db);
 
   routes.get("/callback/:organizationId/:runtimeId/:name", async (context) => {

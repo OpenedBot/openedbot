@@ -58,6 +58,7 @@
     ]
   },
   "email_outbox_events": "notifications",
+  "execution_commands": "execution",
   "group_member_read_positions": {
     "owner": "conversation",
     "writers": [

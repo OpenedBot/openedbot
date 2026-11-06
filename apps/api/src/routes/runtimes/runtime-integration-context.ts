@@ -1,4 +1,5 @@
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
+import type { HermesClientConfig } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { HttpError } from "../../interfaces/http/http-error";
@@ -26,7 +27,7 @@ export type IntegrationRouteDependencies = {
  */
 export function integrationRouteContext(db: Db, config: ApiConfig, dependencies: IntegrationRouteDependencies) {
   const readRuntime = dependencies.readRuntime ?? readRuntimeSecret;
-  const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
+  const clientFactory = dependencies.clientFactory ?? runtimeAdminClient;
   const timeoutMs = safeTimeout(dependencies.timeoutMs);
   const now = dependencies.now ?? (() => new Date());
   const snapshots = dependencies.snapshotStore ?? postgresSnapshotStore(db);

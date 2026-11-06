@@ -4,6 +4,7 @@ import {
   normalizeHermesEndpoint,
   type HermesClientConfig,
 } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { ApiConfig } from "../../infrastructure/config";
 import {
   encryptSecret,
@@ -78,7 +79,7 @@ export function insertRuntime(
 }
 
 export function defaultProbeClient(clientConfig: HermesClientConfig): RuntimeProbeClient {
-  return new HermesClient(clientConfig);
+  return runtimeAdminClient(clientConfig);
 }
 
 export type DirectRuntimeProbe = {

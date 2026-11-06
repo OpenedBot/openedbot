@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type { SQL } from "bun";
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
+import type { HermesClient, HermesClientConfig } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import {
   composeRunInput,
   documentAttachment,
@@ -20,13 +21,7 @@ import { appendRunEventsTx } from "@openedbot/execution/sql/run-events";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { messageVersionPrecondition } from "@openedbot/conversation/domain/message-version";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
-import type {
-  CreateMessageVersionInput,
-  MessageVersionCreatedDto,
-  MessageVersionFamilyDto,
-  MessageVersionLinkDto,
-} from "@openedbot/contracts-api";
-import type { MessageContent } from "@openedbot/contracts-api";
+import type { CreateMessageVersionInput, MessageContent, MessageVersionCreatedDto, MessageVersionFamilyDto, MessageVersionLinkDto } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import type { BlobStore } from "../../infrastructure/blob-store";
 import type { ApiConfig } from "../../infrastructure/config";
@@ -406,7 +401,7 @@ async function assertPveReady(
   const runtime = await (dependencies.readRuntime ?? readRuntimeSecret)(db, config, organizationId);
   if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Aucun runtime Hermes actif n’est configuré.");
   try {
-    const client = (dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig)))(runtime.client);
+    const client = (dependencies.clientFactory ?? runtimeAdminClient)(runtime.client);
     const violation = runtimeToolsetContractViolation(await client.toolsets());
     if (violation) throw new HttpError(409, violation.code, runtimeToolsetContractMessage(violation));
   } catch (error) {

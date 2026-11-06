@@ -11,12 +11,13 @@ import type { BlobStore } from "../../infrastructure/blob-store";
 import type { Db } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import {
-  HermesClient,
   HermesClientError,
+  type HermesClient,
   type HermesClientConfig,
   type HermesModelOptions,
   type HermesProfileAvatar,
 } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { hermesBundleImportRoutes } from "./hermes-bundle-import-routes";
@@ -49,7 +50,7 @@ export function teamImportRoutes(
     put: (key: string, bytes: Uint8Array, contentType: string) => blobs.put(key, bytes, contentType),
     delete: (key: string) => blobs.delete(key, blobs.driver),
   };
-  const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
+  const clientFactory = dependencies.clientFactory ?? runtimeAdminClient;
   routes.route("/hermes-bundle", hermesBundleImportRoutes(db, config, readRuntime));
 
   routes.post("/runtime", async (context) => {

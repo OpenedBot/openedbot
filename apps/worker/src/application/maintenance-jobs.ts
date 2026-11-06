@@ -26,6 +26,9 @@ import { reconcileHostApprovalPolicies } from "../maintenance/approval-policy-re
 import { reconcileCapabilityBaselines } from "../maintenance/capability-baseline-reconciliation";
 import { processReviewProfiles } from "../maintenance/review-profiles";
 import { processApprovalReviews } from "../maintenance/approval-reviews";
+import { processExecutionCommands } from "../maintenance/execution-commands";
+import { COMMAND_RETENTION_DAYS } from "@openedbot/execution/application/execution-commands";
+import { purgeSettledExecutionCommands } from "@openedbot/execution/sql/execution-commands";
 import { fireDueRoutine, purgeOldRunEvents } from "@openedbot/execution/application/routines";
 import { purgeStaleRuntimeEnrollments } from "@openedbot/runtimes/sql/runtime-enrollments";
 import { expireRotatedLinkTokens } from "@openedbot/runtimes/sql/runtime-link-rows";
@@ -45,6 +48,8 @@ import { logEvent } from "@openedbot/platform-observability";
 
 /** Poison leases only exist once a 30 s lease has expired: a second is ample. */
 const POISON_REAP_TICK_MS = 1_000;
+/** A recorded command is claimed within this, LISTEN or not: the API is waiting for it. */
+const EXECUTION_COMMAND_TICK_MS = 250;
 const EVENT_RETENTION_TICK_MS = 60_000;
 
 /**
@@ -120,6 +125,12 @@ export function maintenanceJobs(
       name: "approval-reviews",
       everyMs: Math.min(config.pollMs * 5, 500),
       run: (signal, track) => guardedPass("approval.review_worker_failed", () => processApprovalReviews(db, config, signal, track)),
+    },
+    {
+      // ADR 0001 S3: the execution mutations the API recorded (room compaction).
+      name: "execution-commands",
+      everyMs: Math.max(config.pollMs, EXECUTION_COMMAND_TICK_MS),
+      run: (signal, track) => guardedPass("execution_command.pass_failed", () => processExecutionCommands(db, config, signal, track), { withError: true }),
     },
     {
       name: "review-profiles",
@@ -250,6 +261,7 @@ export function maintenanceJobs(
       run: async () => {
         await purgeOldProfileImports(db);
         await purgeOldProfileDeletes(db);
+        await purgeSettledExecutionCommands(db, COMMAND_RETENTION_DAYS);
         await purgeOldRunEvents(db, config.runEventsRetentionDays);
         await purgeOldToolErrors(db, config.toolErrorsRetentionDays);
         await purgeStaleRuntimeEnrollments(db);

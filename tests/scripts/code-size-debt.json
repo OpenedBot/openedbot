@@ -1,6 +1,6 @@
 {
   "apps/api/src/routes/conversation/conversation-message-routes.ts": 602,
-  "apps/api/src/routes/conversation/message-version-routes.ts": 638,
+  "apps/api/src/routes/conversation/message-version-routes.ts": 633,
   "apps/api/src/routes/events/event-routes.ts": 677,
   "apps/api/src/routes/execution/routine-routes.ts": 910,
   "apps/api/src/routes/identity/auth.ts": 722,

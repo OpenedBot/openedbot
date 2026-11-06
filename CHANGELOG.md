@@ -108,6 +108,16 @@ connecteur hôte et le protocole tiennent le leur :
   Developer ID et notarisées par Apple. Le dmg téléchargé s'ouvre sans
   alerte, sans passer par « Ouvrir quand même » dans Réglages › Confidentialité
   et sécurité. Les builds des pull requests restent signés ad hoc.
+- « Compacter l'historique du salon » s'exécute désormais dans le worker,
+  comme une réponse, et plus dans la requête de la console. Fermer l'onglet
+  ou le dialogue n'arrête plus un résumé déjà lancé : il se termine et
+  l'historique se met à jour. Un seul résumé par salon à la fois, quelle que
+  soit la réplique d'API qui reçoit la demande ; un résumé interrompu par un
+  redémarrage du worker reprend sur un autre. La réponse ne change pas.
+  Nouveaux cas, chacun avec son message : `COMPACTION_NOT_STARTED` (aucun
+  worker n'a pris le résumé), `COMPACTION_STILL_RUNNING` (le résumé continue
+  au-delà de l'attente de la requête), `COMPACTION_CANCELLED` (arrêté par
+  `DELETE /api/threads/:threadId/compact`).
 
 ### Corrigé
 

@@ -7,14 +7,15 @@ import {
 import { Hono } from "hono";
 import { setModelAssignmentMode } from "@openedbot/identity/sql/organizations";
 import {
-  HermesClient,
   HermesClientError,
   hermesProviderAcceptsApiKey,
+  type HermesClient,
   hermesProviderAcceptsOauth,
   type HermesModelOptions,
   type HermesProviderSdk,
   type HermesClientConfig,
 } from "@openedbot/hermes";
+import { runtimeAdminClient, type RuntimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import {
   OPENAI_FREE_TIER_PROVIDER,
   openAiFreeTokensPerDay,
@@ -414,7 +415,7 @@ export async function resolveRuntime(
   config: ApiConfig,
   organizationId: string,
   runtimeId: string,
-): Promise<{ row: RuntimeRow; client: HermesClient; clientConfig: HermesClientConfig }> {
+): Promise<{ row: RuntimeRow; client: RuntimeAdminClient; clientConfig: HermesClientConfig }> {
   const row = await withTenant(db, organizationId, async (tx) => {
     const rows = await readRuntimeRows(tx, organizationId);
     return rows.find((entry) => entry.id === runtimeId) ?? null;
@@ -422,7 +423,7 @@ export async function resolveRuntime(
   if (!row) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
   const secret = await readRuntimeSecret(db, config, organizationId);
   if (!secret || secret.id !== runtimeId) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
-  return { row, client: new HermesClient(secret.client), clientConfig: secret.client };
+  return { row, client: runtimeAdminClient(secret.client), clientConfig: secret.client };
 }
 
 function normalizedOptional(value: unknown, max: number, label: string): string | null {

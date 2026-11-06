@@ -10,7 +10,7 @@ import {
 import { devEnvFilePath, ensureDevPasswords } from "./dev-passwords";
 import { seedDefaultSection } from "./seed-sections";
 import { withAuthenticatingUser, withTenant } from "@openedbot/platform-db";
-import { HermesClient } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { initializeProductFeatures, isExplicitDevelopmentEnvironment } from "@openedbot/identity/application/product-features";
 
@@ -54,7 +54,7 @@ let runtimeRowSeeded = false;
 try {
   await initializeProductFeatures(db, isExplicitDevelopmentEnvironment());
   if (seedRuntimeRow && token && config.developmentHermesUrl) {
-    const client = new HermesClient({
+    const client = runtimeAdminClient({
       endpoint: config.developmentHermesUrl,
       token,
       policy: config.hermesEndpointPolicy,
