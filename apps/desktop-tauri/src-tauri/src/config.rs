@@ -3,8 +3,7 @@
 //!
 //! Nothing here is frozen at build time (ADR 0001, 4.3 "Backend configurable"):
 //! an environment variable beats `config.json` in the app config directory,
-//! which beats the built-in production defaults. Every value is validated the
-//! same way as the Electron shell (`apps/desktop/src/main/config.ts`): https,
+//! which beats the built-in production defaults. Every value must be https,
 //! or plain http for a loopback or local-network host only, since the bearer
 //! token travels on these URLs.
 
@@ -89,8 +88,7 @@ struct FileConfig {
     popup: Option<bool>,
 }
 
-/// The lab runs over plain http on a LAN or loopback host. Same list as the
-/// Electron shell's `isLabHost`.
+/// The lab runs over plain http on a LAN or loopback host.
 pub fn is_lab_host(host: &url::Host<&str>) -> bool {
     match host {
         url::Host::Domain(name) => {

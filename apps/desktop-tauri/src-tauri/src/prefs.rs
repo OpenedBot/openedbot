@@ -1,5 +1,5 @@
 //! The shell's own preferences (`preferences.json` in the app data
-//! directory), as in the Electron shell (`apps/desktop/src/main/preferences.ts`):
+//! directory):
 //! window placement, stay-on-top, display mode, the console's text zoom,
 //! the backend the WebView data belongs to and the idle install of updates. One object for the whole process,
 //! written whole (write then rename: a crash mid-write never truncates it).
@@ -160,7 +160,7 @@ fn overlap(bounds: &Bounds, area: &Area) -> f64 {
 /// never past its usable area.
 pub fn initial_bounds(saved: Option<Bounds>, areas: &[Area], primary: Area) -> Bounds {
     if let Some(saved) = saved.filter(|saved| saved.width >= MIN_WIDTH && saved.height >= MIN_HEIGHT) {
-        // The screen it overlaps most, as Electron's `getDisplayMatching`.
+        // The screen it overlaps most.
         let best = areas.iter().map(|area| (overlap(&saved, area), area)).filter(|(shared, _)| *shared > 0.0).max_by(|a, b| a.0.total_cmp(&b.0));
         if let Some((_, area)) = best {
             let visible = saved.x < area.x + area.width - SCREEN_MARGIN

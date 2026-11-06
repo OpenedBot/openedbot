@@ -10,12 +10,12 @@
  *   bun apps/desktop-tauri/scripts/build-mac.ts --version 0.0.2 [--sign developer-id|adhoc]
  *       [--identity preview|production] [--popup /path/OpenedbotPopup.app] [--no-notarize]
  *
- * `--identity production` (D3) builds the app that replaces Electron, from
- * the overlay `src-tauri/tauri.production.conf.json`: bundle id
- * `app.openedbot.desktop`, name « openedbot », executable `openedbot`,
- * `openedbot://` declared; artifacts `openedbot_<version>_aarch64.*`. The
- * default stays the preview, which installs next to the Electron app. A test
- * build may carry a suffix (`1.1.1-test`): a number is never reused.
+ * `--identity production` (D3) builds the released app, from the overlay
+ * `src-tauri/tauri.production.conf.json`: bundle id `app.openedbot.desktop`,
+ * name « openedbot », executable `openedbot`, `openedbot://` declared;
+ * artifacts `openedbot_<version>_aarch64.*`. The default stays the preview,
+ * which installs next to it. A test build may carry a suffix (`1.1.1-test`):
+ * a number is never reused.
  *
  * Secrets are read from files and handed to the tools through the
  * environment, never printed:
@@ -188,7 +188,7 @@ await $`cp ${tarball}.sig ${artifacts.tarball}.sig`;
 rmSync(staging, { recursive: true, force: true });
 
 // 6. Checks, printed for the record (ADR 4.3.1).
-// The identity really built: Electron's bundle id, name and scheme for production.
+// The identity really built: bundle id, name and scheme.
 const plist = path.join(app, "Contents/Info.plist");
 const read = async (key: string) => (await $`/usr/libexec/PlistBuddy -c ${`Print :${key}`} ${plist}`.nothrow().quiet().text()).trim();
 const built = { bundleId: await read("CFBundleIdentifier"), name: await read("CFBundleName"), executable: await read("CFBundleExecutable"), version: await read("CFBundleShortVersionString"), schemes: await read("CFBundleURLTypes:0:CFBundleURLSchemes:0") };

@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { hostArch, isLinuxVersion, onlyFile } from "./build-linux";
+import { bundlerNames, expectedPackage, hostArch, isLinuxVersion } from "./build-linux";
 import { bumpPatch } from "./linux-docker";
 
 describe("Linux build", () => {
@@ -23,17 +20,13 @@ describe("Linux build", () => {
     expect(hostArch("ia32")).toBeNull();
   });
 
-  test("an artifact is collected only when the bundle directory has exactly one", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "openedbot-bundle-"));
-    try {
-      expect(() => onlyFile(dir, ".deb")).toThrow(/found none/);
-      writeFileSync(path.join(dir, "openedbot preview_1.1.0_amd64.deb"), "");
-      expect(onlyFile(dir, "_1.1.0_amd64.deb")).toBe(path.join(dir, "openedbot preview_1.1.0_amd64.deb"));
-      writeFileSync(path.join(dir, "openedbot preview_1.0.9_amd64.deb"), "");
-      expect(() => onlyFile(dir, ".deb")).toThrow(/expected one \*\.deb .*, found .*1\.0\.9.*/);
-      expect(() => onlyFile(path.join(dir, "missing"), ".deb")).toThrow(/found none/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  test("the bundle collected is the identity's own, never a stale one of the other", () => {
+    expect(bundlerNames("preview", "1.1.0", "x86_64")).toEqual({ deb: "openedbot preview_1.1.0_amd64.deb", appimage: "openedbot preview_1.1.0_amd64.AppImage" });
+    expect(bundlerNames("production", "1.1.0", "aarch64")).toEqual({ deb: "openedbot_1.1.0_arm64.deb", appimage: "openedbot_1.1.0_aarch64.AppImage" });
+  });
+
+  test("what each deb must say about itself", () => {
+    expect(expectedPackage("production")).toEqual({ name: "openedbot", binary: "/usr/bin/openedbot", scheme: "openedbot", replaces: "openedbot-desktop" });
+    expect(expectedPackage("preview")).toEqual({ name: "openedbot-preview", binary: "/usr/bin/openedbot-desktop-preview", scheme: "openedbot-preview", replaces: null });
   });
 });

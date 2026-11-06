@@ -10,7 +10,7 @@ import {
 } from "../src/sql/sessions";
 
 /**
- * La coque openedbot-desktop tourne son refresh token toutes les 15 minutes. Chaque
+ * L'app de bureau tourne son refresh token toutes les 15 minutes. Chaque
  * rotation insère une ligne : l'écran « Sécurité du compte » ne doit y voir
  * qu'UNE connexion, avec son appareil, son adresse et sa date d'ouverture.
  */
@@ -57,11 +57,11 @@ describe("createNativeSession", () => {
     const bindings: unknown[][] = [];
     const before = Date.now();
     await createNativeSession(fakeDb({ calls, bindings }), "org-1", "user-1", {
-      userAgent: "openedbot/0.1.0 Electron/44",
+      userAgent: "openedbot/1.1.0 (macOS)",
       ip: "203.0.113.7",
     });
     const row = insertedRow(calls, bindings);
-    expect(row).toContain("openedbot/0.1.0 Electron/44");
+    expect(row).toContain("openedbot/1.1.0 (macOS)");
     expect(row).toContain("203.0.113.7");
     const createdAt = row.find((value): value is Date => value instanceof Date && value.getTime() >= before
       && value.getTime() <= Date.now());
@@ -88,7 +88,7 @@ describe("refreshNativeSession", () => {
     userId: "user-1",
     familyId: "family-1",
     createdAt: OPENED_AT,
-    userAgent: "openedbot/0.1.0 Electron/44",
+    userAgent: "openedbot/1.1.0 (macOS)",
     ip: "198.51.100.4",
   };
 
@@ -96,7 +96,7 @@ describe("refreshNativeSession", () => {
     const calls: string[] = [];
     const bindings: unknown[][] = [];
     await refreshNativeSession(fakeDb({ calls, bindings, rotated }), "refresh-token", {
-      userAgent: "openedbot/0.1.0 Electron/44",
+      userAgent: "openedbot/1.1.0 (macOS)",
       ip: "203.0.113.9",
     });
     expect(calls.some((sql) => sql.includes("revoked_reason = 'refresh_rotation'"))).toBe(true);
@@ -111,7 +111,7 @@ describe("refreshNativeSession", () => {
     const bindings: unknown[][] = [];
     await refreshNativeSession(fakeDb({ calls, bindings, rotated }), "refresh-token", { userAgent: null, ip: null });
     const row = insertedRow(calls, bindings);
-    expect(row).toContain("openedbot/0.1.0 Electron/44");
+    expect(row).toContain("openedbot/1.1.0 (macOS)");
     expect(row).toContain("198.51.100.4");
   });
 

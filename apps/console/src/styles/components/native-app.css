@@ -1,5 +1,5 @@
 /*
-  Coque native (`openedbot-desktop`) : l'interface se comporte comme une app de
+  App de bureau : l'interface se comporte comme une app de
   bureau, pas comme une page. Navigateur et PWA ne voient aucune de ces
   règles (`:root[data-native-titlebar]`, posé par `lib/platform/native-titlebar.ts`).
 

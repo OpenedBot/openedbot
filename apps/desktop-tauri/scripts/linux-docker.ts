@@ -23,11 +23,12 @@ import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
+import type { LinuxArch } from "./mac-identity";
 
 const ROOT = path.resolve(import.meta.dir, "../../..");
 const APP_DIR = path.join(ROOT, "apps/desktop-tauri");
 
-export type LinuxArch = "x86_64" | "aarch64";
+export type { LinuxArch };
 export const DOCKER_PLATFORM: Record<LinuxArch, string> = { x86_64: "linux/amd64", aarch64: "linux/arm64" };
 
 export function imageFor(arch: LinuxArch): string {

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { api } from "../../../src/lib/api";
+import { asDesktopBuild } from "../../support/desktop-build";
+
+// These tests drive the desktop app's bridge, which only the desktop build reads.
+asDesktopBuild();
 
 const realFetch = globalThis.fetch;
 

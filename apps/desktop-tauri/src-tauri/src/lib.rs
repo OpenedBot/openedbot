@@ -7,12 +7,12 @@
 //! popup is hosted over its stdin/stdout protocol (`popup.rs`), the app
 //! updates itself from a signed feed (`updater.rs`, `update_engine.rs`,
 //! `update_idle.rs`), with the user's consent, and `shell.rs` ties
-//! session, window, popup and menus together like the Electron `main.ts`.
+//! session, window, popup and menus together.
 //!
 //! Which app it is comes from the bundle configuration (`identity.rs`): the
-//! preview coexists with the Electron app (its own bundle identifier and
+//! preview coexists with the production app (its own bundle identifier and
 //! Keychain service, its own name, no `openedbot://` scheme); the production
-//! build (D3) takes over Electron's identifier, name and scheme.
+//! build (D3) is `app.openedbot.desktop`, « openedbot », `openedbot://`.
 
 pub mod auth;
 pub mod bridge;
@@ -55,7 +55,7 @@ use window::WindowState;
 pub const PREVIEW_BUNDLE_ID: &str = "app.openedbot.desktop.preview";
 /// The preview's OAuth client id on macOS, for the IPC tests.
 pub const PREVIEW_CLIENT_ID: &str = "openedbot-desktop-macos-preview";
-/// Show or hide the window from anywhere, as the Electron shell.
+/// Show or hide the window from anywhere.
 pub const TOGGLE_SHORTCUT: &str = "CommandOrControl+Shift+O";
 
 /// A keystore turned off (`OPENEDBOT_PREVIEW_VAULT=memory`, development runs
@@ -290,8 +290,8 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-/// Whether the show/hide shortcut is ours. Another app may hold it (the
-/// Electron app during the switch, D3): then the window works without it,
+/// Whether the show/hide shortcut is ours. Another app may hold it (an older
+/// openedbot still running): then the window works without it,
 /// and the shortcut is asked for again each time the window gains focus, so
 /// it comes back once that app has quit.
 #[derive(Default)]

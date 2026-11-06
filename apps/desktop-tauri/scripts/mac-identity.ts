@@ -1,9 +1,9 @@
 /**
- * The two builds of the macOS app (ADR 0001, D3), twin of
- * `src-tauri/src/identity.rs`: the preview, installed next to the Electron
- * app, and the production app that replaces it (same bundle id and name as
- * `apps/desktop/electron-builder.yml`). Shared by `build-mac.ts`,
- * `update-feed.ts` and `release-mac.ts`.
+ * The two builds of the desktop app (ADR 0001, D3, D6), twin of
+ * `src-tauri/src/identity.rs`: the preview, which installs next to the
+ * released app, and the production app (`app.openedbot.desktop`,
+ * « openedbot », `openedbot://`). Shared by `build-mac.ts`, `build-linux.ts`,
+ * `update-feed.ts` and `release.ts`.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -42,4 +42,11 @@ export function identityOverlay(appDir: string, identity: Identity): Record<stri
 /** The artifact names of a build: `<stem>_<version>_aarch64.{dmg,app.tar.gz}`. */
 export function artifactNames(identity: Identity, version: string): { dmg: string; tarball: string } {
   return { dmg: `${identity.stem}_${version}_aarch64.dmg`, tarball: `${identity.stem}_${version}_aarch64.app.tar.gz` };
+}
+
+export type LinuxArch = "x86_64" | "aarch64";
+
+/** The Linux artifact names of a build: `<stem>_<version>_<arch>.{deb,AppImage}`. */
+export function linuxArtifactNames(identity: Identity, version: string, arch: LinuxArch): { deb: string; appimage: string } {
+  return { deb: `${identity.stem}_${version}_${arch}.deb`, appimage: `${identity.stem}_${version}_${arch}.AppImage` };
 }

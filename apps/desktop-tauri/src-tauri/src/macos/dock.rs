@@ -1,6 +1,5 @@
-//! The Dock menu (right click on the Dock icon), as in the Electron shell
-//! (`apps/desktop/src/main/tray.ts`, `createDockMenu`): display mode, stay on
-//! top, sign out. macOS adds Show and Quit itself.
+//! The Dock menu (right click on the Dock icon): display mode, stay on top,
+//! sign out. macOS adds Show and Quit itself.
 //!
 //! Tauri has no Dock menu API. AppKit asks the application delegate
 //! (`applicationDockMenu:`) each time the menu opens: the method is added to

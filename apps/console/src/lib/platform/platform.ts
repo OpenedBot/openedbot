@@ -39,10 +39,9 @@ function isWebOrigin(origin: string): boolean {
 /**
  * L'origine publique de la console web (`https://openedbot.app`), sans barre
  * finale. Dans un navigateur, c'est l'origine de la page. Dans l'app de
- * bureau : la valeur posée par l'app, sinon `VITE_PUBLIC_CONSOLE_URL`, sinon
- * l'origine de la page tant qu'elle est web (l'app Electron charge la console
- * distante). Une console locale sans aucune des deux est une app mal
- * construite : l'erreur le dit au lieu de fabriquer un lien `tauri://`.
+ * bureau : la valeur posée par l'app, sinon `VITE_PUBLIC_CONSOLE_URL`. Une app
+ * sans aucune des deux est mal construite : l'erreur le dit au lieu de
+ * fabriquer un lien `tauri://`.
  */
 export function publicConsoleOrigin(): string {
   const pageOrigin = globalThis.window?.location.origin ?? "";
@@ -54,7 +53,6 @@ export function publicConsoleOrigin(): string {
     if (!isWebOrigin(origin)) throw new Error(`The public console URL must be http(s), got ${JSON.stringify(trimmed)}.`);
     return origin;
   }
-  if (isWebOrigin(pageOrigin)) return pageOrigin;
   throw new Error("The desktop app serves the console locally but sets no public console URL (__OPENEDBOT_PUBLIC_CONSOLE_URL__ or VITE_PUBLIC_CONSOLE_URL).");
 }
 

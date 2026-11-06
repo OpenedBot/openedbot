@@ -1,25 +1,25 @@
-//! Which app this build is (ADR 0001, D3): the preview, which coexists with
-//! the Electron app, or the production app that replaces it.
+//! Which app this build is (ADR 0001, D3, D6): the preview, which coexists
+//! with the released app, or the production app.
 //!
 //! The identity is the bundle configuration compiled into the binary
 //! (`tauri.conf.json`, plus `tauri.production.conf.json` for a release built
-//! by `scripts/build-mac.ts --identity production`), never a second constant
+//! by `scripts/build-{mac,linux}.ts --identity production`), never a second constant
 //! that could drift from it:
 //!
 //! | | preview | production |
 //! |---|---|---|
-//! | identifier (Keychain service, data directories) | `app.openedbot.desktop.preview` | `app.openedbot.desktop`, as Electron (`apps/desktop/electron-builder.yml`) |
+//! | identifier (Keychain service, data directories) | `app.openedbot.desktop.preview` | `app.openedbot.desktop` |
 //! | name | « openedbot preview » | « openedbot » |
 //! | `openedbot://` | never declared | declared |
 //! | update feed by default | none | `config::PRODUCTION_UPDATE_BASE` |
 //!
-//! The Electron app keeps its session in `~/Library/Application Support/openedbot`
-//! (`safeStorage`, Keychain item « openedbot Safe Storage »): nothing here ever
-//! reads it, so the switch signs the user in once (Q1) and the two apps never
-//! share a refresh token.
+//! The 1.0.x app kept its session in `~/Library/Application Support/openedbot`
+//! (Keychain item « openedbot Safe Storage »): nothing here ever reads it, so
+//! the switch signs the user in once (Q1) and the two apps never share a
+//! refresh token.
 
 pub const PRODUCTION_BUNDLE_ID: &str = "app.openedbot.desktop";
-/// The scheme the production app answers (Google's return, as Electron).
+/// The scheme the production app answers (Google's return).
 pub const SCHEME: &str = crate::callback::SCHEME;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,14 +105,14 @@ mod tests {
         assert_eq!(identity.bundle_id, "app.openedbot.desktop.preview");
         assert_eq!(identity.product, "openedbot preview");
         assert!(!identity.production);
-        // The preview never claims the scheme of the installed Electron app.
+        // The preview never claims the scheme of the installed production app.
         assert!(!identity.declares_scheme);
         assert!(identity.client_id.ends_with("-preview"));
         assert_eq!(identity.log_file(), "preview.log");
     }
 
     #[test]
-    fn the_production_overlay_takes_over_the_electron_identity() {
+    fn the_production_overlay_is_the_released_identity() {
         let overlay = json(include_str!("../tauri.production.conf.json"));
         let identity = Identity::new(overlay["identifier"].as_str().unwrap(), overlay["productName"].as_str().unwrap(), &declared_schemes(&plugins(&overlay)));
         assert_eq!(identity.bundle_id, PRODUCTION_BUNDLE_ID);
@@ -121,10 +121,9 @@ mod tests {
         assert!(identity.declares_scheme);
         assert_eq!(identity.client_id, format!("openedbot-desktop-{}", os_name()));
         assert_eq!(overlay["mainBinaryName"], "openedbot");
-        // Same bundle identifier and name as the Electron app it replaces.
-        let electron = include_str!("../../../desktop/electron-builder.yml");
-        assert!(electron.lines().any(|line| line.trim() == format!("appId: {PRODUCTION_BUNDLE_ID}")));
-        assert!(electron.lines().any(|line| line.trim() == "productName: openedbot"));
+        // The deb takes over the 1.0.x package's files instead of failing on them.
+        assert_eq!(overlay["bundle"]["linux"]["deb"]["replaces"], serde_json::json!(["openedbot-desktop"]));
+        assert_eq!(overlay["bundle"]["linux"]["deb"]["conflicts"], serde_json::json!(["openedbot-desktop"]));
     }
 
     #[test]

@@ -8,10 +8,10 @@ import { useSyncExternalStore } from "react";
  * zoome au lieu de réécrire ses tailles : texte, icônes, marges et contrôles
  * gardent leurs proportions.
  *
- * - App de bureau (`openedbot-desktop`) : toute la fenêtre est zoomée par Electron
- *   (`webContents.setZoomFactor`), menus et fenêtres compris. La console pose
- *   le facteur voulu sur `<html data-openedbot-text-zoom>` ; le preload de la coque
- *   le transmet et, une fois appliqué, pose `data-native-zoom` et
+ * - App de bureau : toute la WebView est zoomée par la coque, menus et
+ *   fenêtres compris. La console pose le facteur voulu sur
+ *   `<html data-openedbot-text-zoom>` ; `lib/platform/tauri-shell.ts` le
+ *   transmet et, une fois appliqué, pose `data-native-zoom` et
  *   `--openedbot-native-zoom` sur `<html>` (`native-titlebar.css` s'en sert pour la
  *   place des boutons du système, qui ne zooment pas).
  * - Navigateur : une page ne peut pas régler son propre zoom (le zoom du
@@ -27,7 +27,7 @@ export const DEFAULT_TEXT_SIZE: TextSize = 14;
 const DESIGN_TEXT_SIZE = 14;
 /** La clé d'avant l'extension à toute l'app : le choix déjà fait est gardé. */
 const STORAGE_KEY = "openedbot:settings-text-size";
-/** Lu par le preload d'`openedbot-desktop` : renommer l'un sans l'autre coupe le zoom. */
+/** Lu par `lib/platform/tauri-shell.ts` : renommer l'un sans l'autre coupe le zoom. */
 export const TEXT_ZOOM_ATTRIBUTE = "data-openedbot-text-zoom";
 
 const listeners = new Set<() => void>();

@@ -1,8 +1,7 @@
 import { commands, events, type Level, type Source } from "@openedbot/contracts-native-bridge";
 
 /**
- * Ce que le preload d'Electron faisait pour la page, dans l'app Tauri : la
- * console embarquée dit à la coque son thème et sa taille de texte, sert de
+ * Ce que la page fait pour l'app Tauri : la console embarquée dit à la coque son thème et sa taille de texte, sert de
  * barre de titre (WKWebView ignore `-webkit-app-region`) et lui confie ses
  * erreurs pour le journal SQLite (`diagnostics.rs`). Tout passe par les
  * commandes typées du pont (`@openedbot/contracts-native-bridge`).
@@ -127,8 +126,8 @@ function installDragRegions(doc: Document): void {
 
 /**
  * Les erreurs de la page et les appels à l'API qui échouent (réponse ≥ 400,
- * ou aucune réponse), comme le journal d'Electron les relevait sur sa
- * WebContents. Les messages sont expurgés côté Rust.
+ * ou aucune réponse), pour le journal de la coque. Les messages sont expurgés
+ * côté Rust.
  */
 function installDiagnostics(win: Window, apiOrigin: string): void {
   win.addEventListener("error", (event) => {

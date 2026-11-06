@@ -20,7 +20,7 @@ import { BUTTON } from "./settings/primitives";
  * Dans l'app Tauri, deux déclencheurs mènent à l'écran de la coque, qui sait
  * installer la mise à jour (`desktop-update/update-required.tsx`) : ce 426, ou
  * le plancher du manifeste de mise à jour (`required` de l'état de la coque).
- * Ailleurs (web, Electron), `DesktopUpdateRequired` vaut `null` et seul le 426 compte.
+ * Sur le web, `DesktopUpdateRequired` vaut `null` et seul le 426 compte.
  */
 export function ClientUpdateGate({ children }: { children: ReactNode }) {
   const update = useClientUpdateRequired();

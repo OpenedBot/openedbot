@@ -1,5 +1,4 @@
-//! The browser's way back after a Google sign-in, as in the Electron shell
-//! (`apps/desktop/src/main/deep-link.ts`): the `openedbot://auth/callback`
+//! The browser's way back after a Google sign-in: the `openedbot://auth/callback`
 //! deep link when the app owns that scheme, otherwise a loopback page on
 //! `127.0.0.1:47813`. Both URIs are the only ones the API accepts as
 //! `redirectUri` (`nativeRedirectUris`, `platform/config/src/api-config.ts`).
@@ -19,8 +18,8 @@ pub const LOOPBACK_REDIRECT_URI: &str = "http://127.0.0.1:47813/callback";
 
 // Whether this build declares `openedbot://` is part of its identity
 // (`identity.rs`): the preview never does, so it never takes the scheme from
-// the installed Electron app and always uses the loopback page; the
-// production app, which replaces Electron, does.
+// the installed production app and always uses the loopback page; the
+// production app does.
 
 /// The redirect URI to announce to the API, decided once at startup: the deep
 /// link only when the scheme is really ours, the loopback page otherwise.

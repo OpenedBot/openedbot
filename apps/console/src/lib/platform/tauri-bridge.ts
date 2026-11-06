@@ -8,8 +8,8 @@ import { installTauriShell } from "./tauri-shell";
 /**
  * Le pont natif de l'app de bureau Tauri (`apps/desktop-tauri`), construit sur
  * les commandes Rust typées (`@openedbot/contracts-native-bridge`, généré par
- * tauri-specta). Il prend la forme du pont Electron (`OpenedbotNativeBridge`) :
- * le reste de la console ne voit pas la différence.
+ * tauri-specta), sous la forme `OpenedbotNativeBridge` que lit le reste de la
+ * console.
  *
  * N'entre que dans le build desktop (`VITE_OPENEDBOT_SHELL=tauri`,
  * `native-bridge.ts`) : le build web n'embarque ni ce module ni `@tauri-apps/api`.
@@ -71,7 +71,7 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
   installTauriShell(globalThis.window, globalThis.window.__OPENEDBOT_API_ORIGIN__ ?? "");
 
   // Un seul abonnement pour la vie de la page : la coque pousse chaque état,
-  // et `onState` doit rejouer le dernier aussitôt (contrat d'Electron).
+  // et `onState` doit rejouer le dernier aussitôt (contrat de `NativeAuthBridge`).
   let last: NativeSigninState | null = null;
   const listeners = new Set<(state: NativeSigninState) => void>();
   const deliver = (state: NativeSigninState) => {
@@ -120,7 +120,6 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
     signOut: async () => {
       unwrap(await commands.signOut());
     },
-    // La coque Tauri dit son vrai système ; celle d'Electron dit toujours "windows".
     shell: { platform: shell.platform, version: shell.version },
     auth,
   };

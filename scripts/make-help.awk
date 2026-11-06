@@ -58,6 +58,5 @@ END {
   mode("PROD", "production : les vrais clients", prod)
   mode("AVANT DE POUSSER", "aucun mode : code, tests, contrats", check)
   printf "\n  Premier lancement   make setup, puis make dev, puis make link-dev-up HOST=user@hôte (autre terminal)\n"
-  printf "  App desktop         make desktop (autre terminal, une fois make dev lancé)\n"
   printf "  Tout le reste       make help-all (e2e, build, worktrees, fragments privés)\n\n"
 }

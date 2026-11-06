@@ -307,11 +307,6 @@ export const clientUpdate = {
   linkHint: "Si le navigateur ne s’ouvre pas, rendez-vous sur {url}.",
 } as const;
 
-export const desktopSwitch = {
-  pill: "Nouvelle app",
-  tooltip: "openedbot {version} pour Mac est disponible : une app native, plus légère, qui se met à jour seule. Téléchargez-la et remplacez celle-ci dans Applications. Vous vous reconnecterez une fois ; les brouillons non envoyés ne sont pas repris.",
-} as const;
-
 export const desktopUpdate = {
   pill: "Mettre à jour",
   pillTooltip: "openedbot {version} est prête",

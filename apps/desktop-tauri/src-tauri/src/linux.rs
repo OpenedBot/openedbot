@@ -1,6 +1,6 @@
-//! Linux specifics of the shell (ADR 0001, step D5), kept out of the shared
-//! modules: the preview's deep link, the tray, and which installs may
-//! replace themselves. One instance, the close button (hides) and the
+//! Linux specifics of the shell (ADR 0001, steps D5 and D6), kept out of the
+//! shared modules: the deep link, the tray, and which installs may replace
+//! themselves. One instance, the close button (hides) and the
 //! global shortcut are shared with macOS (`lib.rs`, `window.rs`).
 //!
 //! The session vault is the shared `vault.rs`: on Linux the `keyring` crate
@@ -17,8 +17,8 @@ use url::Url;
 
 use crate::{shell, window};
 
-/// The preview's URL scheme (`tauri.linux.conf.json`). Not `openedbot://`:
-/// the Electron app owns that one on Linux until the switch (D3).
+/// The preview's URL scheme (`tauri.linux.conf.json`), so that it never takes
+/// `openedbot://` from the installed production app (`tauri.production.conf.json`).
 pub const SCHEME: &str = "openedbot-preview";
 
 /// Deep link and tray, once the main window exists.
@@ -59,10 +59,11 @@ fn is_appimage() -> bool {
     tauri::utils::platform::bundle_type() == Some(BundleType::AppImage)
 }
 
-/// What a preview deep link does today: bring the app to the front. Only the
-/// scheme and host are logged, never the query.
+/// What a deep link of this app does: bring it to the front (the Google
+/// return also reaches `lib.rs`, which ends the sign-in). Only the scheme and
+/// host are logged, never the query.
 fn open_url<R: Runtime>(app: &AppHandle<R>, url: &Url) {
-    if url.scheme() != SCHEME {
+    if url.scheme() != SCHEME && url.scheme() != crate::callback::SCHEME {
         return;
     }
     log::info!("deep link {}://{}", url.scheme(), url.host_str().unwrap_or(""));
@@ -70,8 +71,7 @@ fn open_url<R: Runtime>(app: &AppHandle<R>, url: &Url) {
     shell::visibility_changed(app);
 }
 
-/// The tray menu of the Electron shell on Linux (`apps/desktop/src/main/tray.ts`),
-/// reduced to what the preview has: show or hide, sign out, quit.
+/// The tray menu: show or hide, sign out, quit.
 fn tray<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let toggle = MenuItem::with_id(app, "toggle", "Afficher / Masquer", true, None::<&str>)?;
     let sign_out = MenuItem::with_id(app, "sign-out", "Se déconnecter", true, None::<&str>)?;

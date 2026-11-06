@@ -1,4 +1,4 @@
-//! Google sign-in, as in the Electron shell (`auth.ts`, `runSignIn`): the API
+//! Google sign-in: the API
 //! starts an attempt bound to a PKCE challenge, the system browser shows
 //! Google (which refuses embedded web views), and the shell polls the claim
 //! until the API says done, failed, or the attempt times out. The browser's

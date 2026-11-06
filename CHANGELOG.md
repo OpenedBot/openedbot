@@ -10,22 +10,29 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Ajouté
 
-- **openedbot 1.1.0 pour Mac : une nouvelle app de bureau, native.** Elle
-  remplace l'app actuelle (même nom, même place dans Applications) : la
-  console est embarquée au lieu d'être téléchargée à chaque ouverture, et
-  l'app se met à jour seule (pastille bleue « Mettre à jour », redémarrage
-  avec votre accord). Elle occupe environ un tiers de mémoire en moins
-  (456 Mo contre 660 Mo, fil ouvert) ; son temps d'ouverture reste proche de
-  celui de l'app actuelle.
-  Les boutons de fenêtre de macOS restent centrés sur la barre du haut,
-  quelle que soit la taille du texte. Le notch, la connexion par e-mail ou
-  Google, les notifications et le raccourci ⌘⇧O sont repris. **À l'installation, une seule fois** : il faut
-  se reconnecter, et les brouillons non envoyés de l'ancienne app ne sont
-  pas repris (envoyez-les ou copiez-les avant de la remplacer). Windows et
-  Linux gardent l'app actuelle.
-- L'app Electron sur Mac peut annoncer la nouvelle app (pastille « Nouvelle
-  app » vers la page de téléchargement) ; l'annonce reste éteinte jusqu'à la
-  publication de la 1.1.0.
+- **openedbot 1.1.0 : l'app de bureau devient native, sur Mac et sous
+  Linux.** La console est embarquée au lieu d'être téléchargée à chaque
+  ouverture, et l'app se met à jour seule (pastille bleue « Mettre à jour »,
+  redémarrage avec votre accord ; sous Linux, l'AppImage se met à jour seule,
+  le paquet deb par l'installation du suivant). Sur Mac, elle occupe environ
+  un tiers de mémoire en moins (456 Mo contre 660 Mo, fil ouvert) et ses
+  boutons de fenêtre restent centrés sur la barre du haut, quelle que soit la
+  taille du texte. Le notch, la connexion par e-mail ou Google, les
+  notifications et le raccourci ⌘⇧O sont repris. Sous Linux : un deb et une
+  AppImage, pour x86_64 et désormais aussi pour ARM (arm64), avec l'icône
+  dans la zone de notification.
+  **L'app de bureau Windows n'est plus proposée pour l'instant**, le temps
+  de livrer sa version native ; la console web reste disponible dans le
+  navigateur.
+  **L'ancienne app de bureau (versions 1.0.x) ne se met pas à jour toute
+  seule : remplacez-la par le nouveau téléchargement.** Sur Mac, le dmg
+  s'installe à la même place dans Applications ; sous Linux, le nouveau deb
+  remplace l'ancien paquet (`sudo apt install ./openedbot-linux-amd64.deb`).
+  Une fois la console web mise à jour, l'ancienne app ne sait plus utiliser
+  sa propre connexion : elle affiche la page de connexion web, puis la sienne
+  avec un message d'erreur. **À l'installation, une seule fois** : il faut se
+  reconnecter, et les brouillons non envoyés de l'ancienne app ne sont pas
+  repris (envoyez-les ou copiez-les avant de la remplacer).
 
 - L'app de bureau indique sa version à l'API. Quand une version devient
   trop ancienne pour être servie, l'app affiche « Mettez openedbot à jour »

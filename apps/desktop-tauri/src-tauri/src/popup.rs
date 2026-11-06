@@ -1,9 +1,8 @@
 //! Host of the notch popup (OpenedBot/openedbot-notch), protocol v1 over the
-//! popup's stdin/stdout. Port of the Electron shell's
-//! `apps/desktop/src/main/popup-host.ts` and `src/shared/popup-protocol.ts`:
-//! one JSON object per line, an unknown protocol version ends the session, a
-//! malformed line is dropped and logged without its content, the refresh
-//! token never crosses this channel and no token is ever logged.
+//! popup's stdin/stdout (`popup/protocol.rs`): one JSON object per line, an
+//! unknown protocol version ends the session, a malformed line is dropped and
+//! logged without its content, the refresh token never crosses this channel
+//! and no token is ever logged.
 //!
 //! Life cycle: one launch, then up to `MAX_FAILURES` restarts with a growing
 //! delay; a missing or incompatible bundle stops at once.

@@ -345,11 +345,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    // apps/desktop is a standalone client with its own dependencies (not a
-    // Bun workspace of the core): its boundaries are not the core's.
     // apps/desktop-tauri is a workspace: only its build outputs are skipped
     // (the embedded console build, the Rust target, the signed releases).
-    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop/|^apps/desktop-tauri/(console-dist|src-tauri|release)/" },
+    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop-tauri/(console-dist|src-tauri|release)/" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {

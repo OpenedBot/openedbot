@@ -28,13 +28,12 @@ import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { artifactNames, IDENTITIES } from "./mac-identity";
+import { artifactNames, IDENTITIES, linuxArtifactNames, type LinuxArch } from "./mac-identity";
 
 const APP_DIR = path.resolve(import.meta.dir, "..");
 const RELEASE = process.env.OPENEDBOT_RELEASE_DIR ?? path.join(APP_DIR, "release");
 /** `release/<name>/`: `feed` for macOS, `feed-linux` for the Linux update test, so neither overwrites the other's manifest. */
 let FEED = path.join(RELEASE, "feed");
-const ARTIFACT_STEM = "openedbot-preview";
 
 /**
  * The macOS update artifact of a version: the production build's
@@ -46,11 +45,17 @@ export function macArtifact(release: string, version: string): string {
   return candidates.find((file) => existsSync(file)) ?? candidates[0]!;
 }
 
+/** The Linux update artifact of a version (an AppImage): the production build's first, as on macOS. */
+export function linuxArtifact(distLinux: string, version: string, arch: LinuxArch): string {
+  const candidates = (["production", "preview"] as const).map((name) => path.join(distLinux, version, arch, linuxArtifactNames(IDENTITIES[name], version, arch).appimage));
+  return candidates.find((file) => existsSync(file)) ?? candidates[0]!;
+}
+
 /** Where a platform's signed artifact is, and the manifest key the updater looks up (`{os}-{arch}[-{installer}]`). */
 export const PLATFORMS = {
   "darwin-aarch64": { key: "darwin-aarch64", artifact: (version: string) => macArtifact(RELEASE, version) },
-  "linux-x86_64": { key: "linux-x86_64-appimage", artifact: (version: string) => path.join(APP_DIR, "dist-linux", version, "x86_64", `${ARTIFACT_STEM}_${version}_x86_64.AppImage`) },
-  "linux-aarch64": { key: "linux-aarch64-appimage", artifact: (version: string) => path.join(APP_DIR, "dist-linux", version, "aarch64", `${ARTIFACT_STEM}_${version}_aarch64.AppImage`) },
+  "linux-x86_64": { key: "linux-x86_64-appimage", artifact: (version: string) => linuxArtifact(path.join(APP_DIR, "dist-linux"), version, "x86_64") },
+  "linux-aarch64": { key: "linux-aarch64-appimage", artifact: (version: string) => linuxArtifact(path.join(APP_DIR, "dist-linux"), version, "aarch64") },
 } as const;
 export type Platform = keyof typeof PLATFORMS;
 
@@ -68,18 +73,31 @@ export type UpdateManifest = {
 // X.Y.Z, or X.Y.Z-tag for a test build (semver: 1.1.1-test sorts after 1.1.0).
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
 
-/** The manifest `tauri-plugin-updater` reads (static JSON format), plus the floor the shell reads. */
+/** The manifest `tauri-plugin-updater` reads (static JSON format), plus the floor the shell reads: one platform. */
 export function buildManifest(input: { version: string; url: string; signature: string; notes: string; pubDate: Date; platform?: Platform; minVersion?: string; maxAgeDays?: number }): UpdateManifest {
+  const { url, signature, platform, ...rest } = input;
+  return buildPlatformsManifest({ ...rest, platforms: { [platform ?? "darwin-aarch64"]: { url, signature } } });
+}
+
+/** The same manifest for several platforms (a release names all of them, `release.ts`). */
+export function buildPlatformsManifest(input: { version: string; notes: string; pubDate: Date; platforms: Partial<Record<Platform, { url: string; signature: string }>>; minVersion?: string; maxAgeDays?: number }): UpdateManifest {
   if (!VERSION.test(input.version)) throw new Error(`invalid version ${input.version}`);
-  const signature = input.signature.trim();
-  if (!signature) throw new Error("empty signature");
+  const entries = Object.entries(input.platforms) as Array<[Platform, { url: string; signature: string }]>;
+  if (entries.length === 0) throw new Error("a manifest names at least one platform");
+  const platforms: UpdateManifest["platforms"] = {};
+  for (const [platform, { url, signature }] of entries) {
+    if (!(platform in PLATFORMS)) throw new Error(`unknown platform ${platform}`);
+    const trimmed = signature.trim();
+    if (!trimmed) throw new Error(`empty signature for ${platform}`);
+    platforms[PLATFORMS[platform].key] = { signature: trimmed, url };
+  }
   if (input.minVersion !== undefined && !VERSION.test(input.minVersion)) throw new Error(`invalid min version ${input.minVersion}`);
   if (input.maxAgeDays !== undefined && !(Number.isFinite(input.maxAgeDays) && input.maxAgeDays > 0)) throw new Error(`invalid max age ${input.maxAgeDays}`);
   return {
     version: input.version,
     notes: input.notes,
     pub_date: input.pubDate.toISOString(),
-    platforms: { [PLATFORMS[input.platform ?? "darwin-aarch64"].key]: { signature, url: input.url } },
+    platforms,
     ...(input.minVersion === undefined ? {} : { min_version: input.minVersion }),
     ...(input.maxAgeDays === undefined ? {} : { max_age_days: input.maxAgeDays }),
   };

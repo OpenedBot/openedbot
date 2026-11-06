@@ -1,22 +1,21 @@
 import { nativeBridge, type OpenedbotNativeBridge } from "./native-bridge";
 
 /**
- * La barre de titre de la coque native, sous macOS et sous Windows.
+ * La barre de titre de l'app de bureau.
  *
- * `openedbot-desktop` ouvre sa fenêtre sans barre de titre (`titleBarStyle:
- * "hidden"`) : la console monte jusqu'au bord haut et sa barre du haut
- * (`board-chrome.tsx`, 46 px) devient celle de la fenêtre, comme Codex,
- * ChatGPT ou T3 Code. C'est donc la console qui sert de poignée pour déplacer
- * la fenêtre et qui laisse la place aux boutons du système
- * (`styles/components/native-titlebar.css`) :
+ * L'app ouvre sa fenêtre sans barre de titre : la console monte jusqu'au bord
+ * haut et sa barre du haut (`board-chrome.tsx`, 46 px) devient celle de la
+ * fenêtre, comme Codex, ChatGPT ou T3 Code. C'est donc la console qui sert de
+ * poignée pour déplacer la fenêtre et qui laisse la place aux boutons du
+ * système (`styles/components/native-titlebar.css`) :
  *
  * - macOS (`"mac"`) : les feux tricolores flottent dans le coin haut gauche ;
- * - Windows (`"windows"`) : la coque dessine réduire, agrandir et fermer
- *   par-dessus le coin haut droit (`titleBarOverlay`, 46 px de haut).
+ * - Windows (`"windows"`) : la place de réduire, agrandir et fermer dans le
+ *   coin haut droit (`env(titlebar-area-*)`, 46 px de haut), pour la coque
+ *   Windows à venir (D4).
  *
- * Détection : le pont présent ET sa plateforme. La coque Tauri la dit
- * (`"macos"`) ; celle d'Electron dit toujours `"windows"` (contrat figé),
- * la plateforme se lit alors sur le navigateur. Dans un navigateur ou une
+ * Détection : le pont présent ET le système qu'il annonce (`shell.platform`).
+ * Sous Linux, la fenêtre garde la barre du système. Dans un navigateur ou une
  * PWA, rien ne change.
  */
 export type NativeTitlebar = "mac" | "windows";
@@ -24,17 +23,15 @@ export type NativeTitlebar = "mac" | "windows";
 export const NATIVE_TITLEBAR_ATTRIBUTE = "data-native-titlebar";
 export const NATIVE_TITLEBAR_BAND_ATTRIBUTE = "data-native-titlebar-band";
 
-export function nativeTitlebarFor(
-  bridge: OpenedbotNativeBridge | null,
-  nav: { platform: string; userAgent: string },
-): NativeTitlebar | null {
-  if (!bridge) return null;
-  if (bridge.shell?.platform === "macos") return "mac";
-  // `MacIntel` aussi sur Apple Silicon ; l'UA d'Electron porte « Macintosh ».
-  if (nav.platform.startsWith("Mac") || /Macintosh/.test(nav.userAgent)) return "mac";
-  // `Win32` aussi en 64 bits ; l'UA d'Electron porte « Windows NT ».
-  if (nav.platform.startsWith("Win") || /Windows/.test(nav.userAgent)) return "windows";
-  return null;
+export function nativeTitlebarFor(bridge: OpenedbotNativeBridge | null): NativeTitlebar | null {
+  switch (bridge?.shell?.platform) {
+    case "macos":
+      return "mac";
+    case "windows":
+      return "windows";
+    default:
+      return null;
+  }
 }
 
 /**
@@ -45,7 +42,7 @@ export function nativeTitlebarFor(
  * après peut s'y découper.
  */
 export function applyNativeTitlebar(doc: Document = document): NativeTitlebar | null {
-  const titlebar = nativeTitlebarFor(nativeBridge(), doc.defaultView?.navigator ?? navigator);
+  const titlebar = nativeTitlebarFor(nativeBridge());
   if (!titlebar) return null;
   doc.documentElement.setAttribute(NATIVE_TITLEBAR_ATTRIBUTE, titlebar);
   if (!doc.querySelector(`[${NATIVE_TITLEBAR_BAND_ATTRIBUTE}]`)) {

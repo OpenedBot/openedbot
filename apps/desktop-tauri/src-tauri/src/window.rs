@@ -1,5 +1,4 @@
-//! The main window: the embedded console on the local origin, as the Electron
-//! shell's `apps/desktop/src/main/window.ts` does for the remote one.
+//! The main window: the embedded console on the local origin.
 //!
 //! - placement remembered, brought back onto a connected screen (`prefs.rs`);
 //! - closing hides (the Dock icon, the shortcut or a second launch bring it
@@ -11,7 +10,7 @@
 //! - signing out unloads the console and purges the WebView's data before
 //!   `/login` shows (no account's data is left for the next one); only the
 //!   device's own preferences (theme, language, text size, layout) are carried
-//!   over, as the Electron shell kept them; a backend other than the one the
+//!   over; a backend other than the one the
 //!   data belongs to purges it at launch.
 
 use std::borrow::Cow;
@@ -27,7 +26,7 @@ use crate::config::ShellConfig;
 use crate::prefs::{initial_bounds, Area, Bounds, PreferenceStore, MIN_HEIGHT, MIN_WIDTH};
 
 pub const MAIN_WINDOW: &str = "main";
-/// The full console, as in the Electron shell (`appUrl`).
+/// The full console.
 pub const START_PATH: &str = "/";
 pub const LOGIN_PATH: &str = "/login";
 const BLANK: &str = "about:blank";
@@ -116,7 +115,7 @@ pub fn navigation_decision(url: &Url) -> NavigationDecision {
 }
 
 /// Only web links go to the OS: `file:`, custom schemes and the like would let
-/// a page launch arbitrary local handlers (Electron's `openInSystemBrowser`).
+/// a page launch arbitrary local handlers.
 pub fn web_link(url: &Url) -> bool {
     matches!(url.scheme(), "https" | "http") && url.host_str().is_some() && url.username().is_empty() && url.password().is_none()
 }

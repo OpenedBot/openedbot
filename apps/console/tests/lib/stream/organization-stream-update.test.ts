@@ -2,6 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import type { OpenedbotNativeBridge } from "../../../src/lib/platform/native-bridge";
 import { isClientUpdateRequired, resetClientUpdateRequired } from "../../../src/lib/platform/client-update";
 import { subscribeToOrganizationEvents } from "../../../src/lib/stream/use-thread-stream";
+import { asDesktopBuild } from "../../support/desktop-build";
+
+// These tests drive the desktop app's bridge, which only the desktop build reads.
+asDesktopBuild();
 
 const realFetch = globalThis.fetch;
 const bridge: OpenedbotNativeBridge = {

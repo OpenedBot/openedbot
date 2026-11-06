@@ -3,6 +3,16 @@
   "productName": "openedbot",
   "mainBinaryName": "openedbot",
   "identifier": "app.openedbot.desktop",
+  "bundle": {
+    "shortDescription": "openedbot",
+    "longDescription": "openedbot desktop: drive your AI agents from a native window.",
+    "linux": {
+      "deb": {
+        "conflicts": ["openedbot-desktop"],
+        "replaces": ["openedbot-desktop"]
+      }
+    }
+  },
   "plugins": {
     "deep-link": {
       "desktop": {

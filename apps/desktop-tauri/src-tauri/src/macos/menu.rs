@@ -1,4 +1,4 @@
-//! The macOS menu bar, as in the Electron shell (`main.ts`): the app menu,
+//! The macOS menu bar: the app menu,
 //! Edit (without it Cmd+C / Cmd+V / Cmd+A never reach the page's text
 //! fields), View and Window. No Reload: Cmd+R would drop a half-typed message
 //! for nothing. View › Actual Size goes back to the console's text size, not

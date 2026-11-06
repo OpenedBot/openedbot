@@ -2,7 +2,7 @@
   "name": "desktop-tauri",
   "version": "0.0.1",
   "private": true,
-  "description": "openedbot desktop, Tauri 2 prototype (ADR 0001, D2a): the solo console embedded, native bridge in Rust",
+  "description": "openedbot desktop app for macOS and Linux (ADR 0001): the solo console embedded in a Tauri 2 shell, native bridge in Rust",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

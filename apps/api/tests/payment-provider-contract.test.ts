@@ -49,7 +49,7 @@ describe("payment-provider-contract scan (step 11.5)", () => {
       "platform/plugins/src/fixtures/a.ts": "// stripe\n",
       "apps/api/src/a.test.ts": "// stripe\n",
       "db/migrations/0002_billing.sql": "create table stripe_events ();\n",
-      "apps/desktop/native/SettingsView.swift": "// stripe\n",
+      "native/notch/SettingsView.swift": "// stripe\n",
     });
     expect([code, out.trim()]).toEqual([0, "payment-provider-contract: ok (1 files)"]);
   });

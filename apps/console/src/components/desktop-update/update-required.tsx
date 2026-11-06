@@ -21,7 +21,7 @@ const CHECK_UNDER_WAY = "\u0000check";
  * L'écran « Mise à jour requise » de l'app Tauri : l'API refuse cette version
  * (426) ou le manifeste fixe un plancher que ce build ne tient pas
  * (`min_version`, `max_age_days`). Il remplace l'app entière, comme l'écran
- * du 426 d'Electron (`client-update-required.tsx`), mais propose d'installer
+ * du 426 (`client-update-required.tsx`), mais propose d'installer
  * par la coque : « Mettre à jour maintenant » attend la fin du
  * téléchargement s'il le faut (progression affichée), avertit si des runs
  * sont en cours, puis installe et redémarre. Si la coque n'y arrive pas, le

@@ -1061,7 +1061,8 @@ plus, par le dmg de la version précédente, toujours servi sous `desktop/vX.Y.Z
 retour arrière automatique (garder `openedbot.app` précédent jusqu'à un premier démarrage
 réussi) reste à concevoir.
 
-**Étapes de publication (en attente d'accord, rien n'est fait).**
+**Étapes de publication (en attente d'accord, rien n'est fait).** Remplacées par celles de la
+section 4.3.6 (D6 : Linux en Tauri, plus d'Electron, plus d'annonce dans Electron).
 1. Commit de release sur `develop` puis `main` : `apps/desktop/package.json` en 1.1.0 (le tag
    doit correspondre, Linux Electron est reconstruit au même numéro), `CHANGELOG.md` « Non
    publié » → `## 1.1.0 — <date>`.
@@ -1213,6 +1214,136 @@ que la coque native : G1 et G3 ont été mesurés sur le 1.1.0 d'avant et n'ont 
 | Google réel | Reste | Pas d'identifiants OAuth en local |
 | Linux et Windows : purge sans confirmation | Reste | Hors macOS (D4, D5) |
 | Universel ou x86_64 | Non fait | arm64 seul, comme Electron 1.0.3 : le popup du notch n'est construit qu'en arm64 (`make bundle`), et aucun Mac Intel pour l'essayer |
+
+### 4.3.6 Retrait d'Electron (D6, 2026-11-06)
+
+Branche `chore/d6-remove-electron`. Décisions de l'utilisateur : Electron supprimé sans trace
+(code, build, CI, Makefile, docs, tests) ; **Windows retiré du site et des releases** jusqu'à
+une app Tauri pour Windows (D4) ; **Linux publié en Tauri** (deb et AppImage, x86_64 et
+aarch64), malgré le risque WebKitGTK de la section 7, qui reste à mesurer sur une vraie machine.
+Rien n'est publié par cette étape (ni R2, ni tag, ni release).
+
+**Retiré.** `apps/desktop` entier (coque, tests, scripts, design lab, maquettes,
+`electron-builder*.yml`, son `bun.lock` ; ce n'était pas un workspace, le `bun.lock` racine ne
+change pas) ; `make desktop` et l'arrêt d'Electron dans `make stop` ; l'exclusion `^apps/desktop/`
+de dependency-cruiser ; le mode Electron de `d0-baseline.ts` (le web reste, l'app se mesure par
+`perf-mac.ts`) ; dans la console, la pastille « Nouvelle app » de D3 (`electron-switch.tsx`,
+`desktop-switch.ts`, textes `desktopSwitch`, jamais allumée), la lecture de la plateforme dans
+l'agent utilisateur (`native-titlebar.ts`, `index.html`) et le repli de `publicConsoleOrigin`
+sur l'origine web de la page. Les icônes passent dans `apps/desktop-tauri/src-tauri/icons/`. Les
+commentaires qui renvoyaient à Electron décrivent le comportement lui-même. Restent comme
+histoire : ce document, les sections publiées du `CHANGELOG.md`, l'historique git.
+
+**Le pont n'existe que dans le build desktop.** `nativeBridge()` rend `null` dans le build web,
+quoi que la page hôte pose sur `window.__OPENEDBOT_NATIVE__` : `VITE_OPENEDBOT_SHELL` est remplacé
+au build, et le nom du pont n'apparaît plus dans le bundle web (vérifié). Le script de démarrage
+de `index.html` ne croit que `__OPENEDBOT_SHELL__`, que seule la coque Tauri pose. Les tests qui
+simulent la coque passent par `apps/console/tests/support/desktop-build.ts`.
+
+**Une app 1.0.x (Electron) après le déploiement de la console web.** Elle n'a aucun mécanisme de
+mise à jour et charge la console distante (`${consoleUrl}/` avec une session, `/login` sans), son
+preload posant l'ancien pont. La console la sert désormais comme un navigateur. Prouvé dans
+Chromium sur le build web de cette branche, pont de la 1.0.3 simulé avant tout script (gelé,
+`platform: "windows"`, `version: "1.0.3"`, `auth`) : `/` et `/compact` redirigent vers `/login`
+web, aucun appel au pont, aucune requête avec `Authorization` ni `X-OpenedBot-Client`, ni
+`data-native-titlebar` ni silhouette, aucune erreur de page ; la connexion web par code e-mail
+ouvre la console (cookie), rechargement compris. Déduit du code de la 1.0.3 (`window.ts`,
+`main.ts`, `ipc.ts` au commit 21a8337 ; l'app 1.0.3 n'a pas été lancée : au démarrage elle se
+déclare gestionnaire d'`openedbot://` auprès de Launch Services, ce qui aurait touché le Mac de
+l'utilisateur) :
+- **session ouverte** (le cas courant) : l'app charge `/`, la console affiche sa page de
+  connexion web ; 10 s après le chargement, faute d'appel au pont (`BRIDGE_PROBE_MS`), l'app
+  remplace la page par sa propre page de connexion avec « La console openedbot.app ne prend pas
+  encore en charge l'application de bureau… ». S'y connecter recharge la console, et le cycle
+  recommence. Ni plantage ni écran blanc, mais une impasse ;
+- **déconnectée** (ou après « Se déconnecter » dans le menu de l'icône, puis une relance de l'app) :
+  l'app charge `/login`, la connexion web par code e-mail fonctionne et la console reste utilisable
+  comme dans un navigateur (pas de sonde dans cet état). Google s'ouvre dans le navigateur du
+  système et ne revient pas dans l'app ;
+- sur Mac les feux tricolores recouvrent le coin haut gauche de la console, sur Windows les boutons
+  le coin haut droit, et la barre du haut ne déplace plus la fenêtre : la console ne réserve plus
+  leur place ;
+- la sortie prévue est le nouveau téléchargement (Mac, Linux) ; sous Windows, la console web dans
+  le navigateur (ou la déconnexion puis la connexion web ci-dessus). `DESKTOP_MIN_VERSION` ne
+  s'applique pas : la console n'envoie plus l'en-tête client depuis l'ancienne app.
+
+**Linux de production.** `build-linux.ts --identity production` (`make desktop-tauri-linux
+TAURI_IDENTITY=production`) applique l'overlay de production comme sur macOS : paquet `openedbot`,
+`/usr/bin/openedbot`, `openedbot://` dans l'entrée `.desktop`, données sous
+`~/.config/app.openedbot.desktop`, artefacts `openedbot_<version>_<arch>.{deb,AppImage}` ;
+`build-linux.ts` relit le paquet produit (nom, version, binaire, schéma, `Replaces` et
+`Conflicts`) et refuse sinon. Le deb de la 1.0.x s'appelait `openedbot-desktop` et partage
+`/usr/share/applications/openedbot.desktop` et les icônes `openedbot.png` : le deb de production
+déclare `Replaces` et `Conflicts: openedbot-desktop` (`tauri.production.conf.json`), sans quoi son
+installation échouerait sur ces fichiers. Les liens profonds de production (`openedbot://`)
+ramènent l'app au premier plan comme ceux de la preview (`linux.rs`). La preview reste le défaut,
+et le parcours `linux-e2e.ts` la vise.
+Éprouvé dans `ubuntu:24.04` (amd64) avec le deb 1.0.3 publié (`openedbot-linux-amd64.deb`, somme
+vérifiée) puis un build de production de cette branche (`1.1.0-d6`, non signé) : par
+`apt install ./openedbot_…deb`, apt retire `openedbot-desktop` et installe `openedbot` en une
+passe ; par `dpkg -i`, le paquet est déballé, `openedbot-desktop` retiré, et seules les
+dépendances WebKitGTK manquent jusqu'à `apt -f install`. Dans les deux cas : `/usr/bin/openedbot`
+est le binaire Tauri (ELF, plus le lien d'alternatives vers `/opt/openedbot`, que le retrait de
+la 1.0.3 supprime), l'entrée `.desktop` et les icônes appartiennent à `openedbot`, `/opt/openedbot`
+a disparu ; il ne reste de la 1.0.3 que l'état `config-files` dans dpkg.
+
+**Release multiplateforme.** `make desktop-tauri-release TAURI_VERSION=X.Y.Z` (`release.ts`,
+anciennement `release-mac.ts`) rassemble le build macOS de production notarisé et les deux builds
+Linux de production signés dans `apps/desktop-tauri/release/X.Y.Z/publish/`, disposé comme le
+préfixe `desktop/` du bucket :
+
+```
+ publish/
+   vX.Y.Z/                               -> desktop/vX.Y.Z/   (immuable)
+     openedbot_X.Y.Z_aarch64.dmg
+     openedbot_X.Y.Z_aarch64.app.tar.gz  (+ .sig)   mise à jour darwin-aarch64
+     openedbot_X.Y.Z_x86_64.deb
+     openedbot_X.Y.Z_x86_64.AppImage     (+ .sig)   mise à jour linux-x86_64-appimage
+     openedbot_X.Y.Z_aarch64.deb
+     openedbot_X.Y.Z_aarch64.AppImage    (+ .sig)   mise à jour linux-aarch64-appimage
+     SHA256SUMS                          les neuf fichiers, envoyé en dernier
+   solo/beta/latest.json                 -> desktop/solo/beta/latest.json
+   solo/stable/latest.json               -> desktop/solo/stable/latest.json (promotion)
+   records/, RELEASE_NOTES.md            gardés en local
+```
+
+Chaque manifeste nomme les trois plateformes ; sous Linux, seule l'AppImage se met à jour (clé
+`-appimage` : un deb n'y trouve rien et reste au gestionnaire de paquets). Avant d'écrire un
+manifeste, `release.ts` vérifie chaque `.sig` avec la moitié publique de la clé de mise à jour,
+désormais dans le dépôt (`apps/desktop-tauri/updater.pub`, la clé que chaque app embarque déjà),
+par `minisign.ts` (Ed25519 sur BLAKE2b-512, format de `tauri signer`, sans l'outil minisign ;
+éprouvé sur les artefacts signés de D3 et D5) : une signature d'une autre clé, ou d'une autre
+version (`version:` du commentaire de confiance), est refusée.
+
+**Pipeline GitHub.** `desktop-release.yml` ne construit plus rien : sur un tag `desktop/vX.Y.Z`
+(ou une relance sur ce tag), il télécharge les fichiers que `SHA256SUMS` liste sur R2, lance
+`release.ts verify` (liste exacte, sommes, signatures de mise à jour), vérifie le dmg (Gatekeeper,
+ticket agrafé, équipe QDC76LMF29, identifiant, version), les debs (paquet, version, architecture,
+`Replaces`/`Conflicts`, schéma) et démarre deb installé puis AppImage sous Xvfb sur un runner de
+chaque architecture (`ubuntu-24.04`, `ubuntu-24.04-arm`), puis publie la release sous des noms
+stables : `openedbot-mac-arm64.dmg`, `openedbot-linux-amd64.deb`,
+`openedbot-linux-x86_64.AppImage` (ceux que le site lie déjà), `openedbot-linux-arm64.deb`,
+`openedbot-linux-aarch64.AppImage`, et `SHA256SUMS`. Plus de fichier Windows. Aucun fichier ne
+porte plus le numéro de version de l'app : le tag, `TAURI_VERSION` et les artefacts doivent
+concorder, ce que vérifient la version du dmg, celle des debs et celle des signatures.
+
+**Étapes de publication (remplacent celles de 4.3.5 ; rien n'est fait).**
+1. Commit de release : `CHANGELOG.md` « Non publié » → `## X.Y.Z — <date>`.
+2. Builds de production, sur le Mac : `make desktop-tauri-mac TAURI_VERSION=X.Y.Z
+   TAURI_IDENTITY=production TAURI_POPUP=…/OpenedbotPopup.app`, puis `make desktop-tauri-linux
+   TAURI_VERSION=X.Y.Z TAURI_IDENTITY=production TAURI_LINUX_ARCH=x86_64` et de même pour
+   `aarch64` (Docker, clé de mise à jour montée en lecture seule).
+3. `make desktop-tauri-release TAURI_VERSION=X.Y.Z [TAURI_NOTES=notes.md]`.
+4. R2 (jeton Cloudflare à droits R2, jamais en argument) : le contenu de `publish/vX.Y.Z/` sous
+   `desktop/vX.Y.Z/`, `SHA256SUMS` en dernier ; relire depuis
+   `https://releases.openedbot.app/desktop/vX.Y.Z/` (`release.ts verify --dir` sur une copie).
+5. `publish/solo/beta/latest.json` → `desktop/solo/beta/latest.json`.
+6. Tag `desktop/vX.Y.Z` poussé : `desktop-release.yml` vérifie et publie la release GitHub
+   (`--latest`). Le site sert alors la nouvelle version par `releases/latest/download/…` ; ses
+   liens Windows sont à retirer (dépôt `openedbot-site`), ses liens arm64 Linux à ajouter.
+7. Promotion stable : `publish/solo/stable/latest.json` → `desktop/solo/stable/latest.json`.
+8. Déploiement de la console web : c'est lui qui fait passer les apps 1.0.x à l'état décrit plus
+   haut ; le faire après l'étape 6, pour que le téléchargement existe.
 
 ### 4.4 Console : origine, plateforme, performance
 
@@ -1636,9 +1767,10 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **D1d** Virtualisation | Timeline virtualisée | Long fil fluide, aucune régression de lecture |
 | **D2a** Prototype vertical signé | Console locale → auth bearer → SSE → notch → signature, notarisation, quarantaine → **vraie mise à jour** ; mesure de l'en-tête `Origin` ; entitlements | Le prototype installé depuis un dmg téléchargé se met à jour seul |
 | **D2b** Parité macOS | Tableau de la section 4.3 entier, pont typé, tests de refus IPC | Parcours de test : connexion e-mail et Google, fil, streaming, notch, déconnexion, relance |
-| **D3** Release et bascule macOS | Pipeline complet, canal bêta, puis bascule des liens de téléchargement | G1 et G3 mesurés sur l'app signée ; liens du site à jour ; Electron retiré pour macOS |
+| **D3** Release et bascule macOS | Pipeline complet, canal bêta, puis bascule des liens de téléchargement | G1 et G3 mesurés sur l'app signée ; liens du site à jour ; Electron retiré pour macOS. **Fait pour toutes les plateformes par D6** (2026-11-06) |
 | **D4** Windows | WebView2, signature (Q7) | Build CI, installation et mise à jour d'un artefact téléchargé |
 | **D5** Linux | WebKitGTK, deb et AppImage, lancement sous xvfb | Build CI + parcours de test ; perf WebKitGTK mesurée |
+| **D6** Retrait d'Electron | `apps/desktop` et toute trace supprimés ; Linux publié en Tauri ; Windows retiré jusqu'à D4 ; release unique macOS + Linux (section 4.3.6) | Plus aucune mention hors historique ; `release.ts` et `desktop-release.yml` vérifient sommes et signatures. **Fait** (2026-11-06), rien de publié |
 | **S1** Sûreté | Refus du changement de clé implicite (après comptage en prod) ; secrets séparés ; worker aligné sur le refus de la valeur de dev | Tests de la section 5 |
 | **S2a** Inventaire | Inventaire des invariants des 16 écritures de `runs` ([0002](0002-invariants-des-runs.md)) | Document d'invariants relu |
 | **S2b** Primitives de création | Primitives transactionnelles + commandes explicites ; trigger 0091 conservé | Garde : aucune écriture de `runs`/`workflows` hors des primitives |
@@ -1656,7 +1788,7 @@ Chaque étape met à jour `CHANGELOG.md` (et `protocol/CHANGELOG.md` pour S1 et 
 
 | Risque | Impact | Parade |
 |---|---|---|
-| WebKitGTK lent ou incomplet sur Linux | D5 bloquée | Linux en dernier ; Electron gardé pour Linux si la mesure de D5 est mauvaise |
+| WebKitGTK lent ou incomplet sur Linux | D5 bloquée | Linux en dernier ; Electron gardé pour Linux si la mesure de D5 est mauvaise. Décision du 2026-11-06 (D6) : Linux passe à Tauri sans attendre ; la mesure sur une vraie machine avec GPU reste à faire |
 | Différences de rendu WKWebView / WebView2 / Chromium | Régressions visuelles | Parcours de test et captures sur chaque moteur à D2b, D4, D5 |
 | La console embarquée prend du retard sur l'API | Erreurs chez les utilisateurs desktop | Mise à jour signée + garde `426` + fenêtre de compatibilité |
 | La chaîne de distribution (notch imbriqué, notarisation, mise à jour) bloque tard | Bascule repoussée | Prototype vertical signé dès D2a |
@@ -1850,3 +1982,13 @@ Retour de l'utilisateur : feux tricolores décentrés (14 pt contre 23 × zoom).
 0,71 à 1,33 (écart au centre de la barre ≤ 0,5 pt), 1.1.0 reconstruit, renotarisé, revérifié.
 Le notch actif par défaut et son choix dans les Réglages sont en attente : le comportement cible
 viendra de l'analyse du notch d'OpenBot (patch gardé hors du dépôt).
+
+**Electron retiré (D6, 2026-11-06)** : section 4.3.6. `apps/desktop` et toute trace d'Electron
+supprimés du code, du build, de la CI et des docs ; le pont natif n'existe plus que dans le build
+desktop, une app 1.0.x se comporte comme un navigateur après le déploiement de la console (prouvé
+dans Chromium, pont 1.0.3 simulé). Linux publié en Tauri (identité de production, deb qui
+remplace `openedbot-desktop`, éprouvé par apt et dpkg dans Ubuntu 24.04), Windows retiré jusqu'à
+D4. Une seule release macOS et Linux (`release.ts`, signatures vérifiées contre `updater.pub`),
+pipeline GitHub qui vérifie puis publie depuis R2. Rien de publié. `make solo-check` au vert hors
+des trois « silhouettes du cadre » connues en mode pro ; une passe de `codex review`, sans
+finding.

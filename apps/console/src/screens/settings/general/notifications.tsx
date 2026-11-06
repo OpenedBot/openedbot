@@ -1,5 +1,5 @@
 // TODO(notifications): l'abonnement Web Push dépendait du service worker PWA, retiré.
-// Les notifications push doivent migrer vers Electron (openedbot-desktop) / APNs ;
+// Les notifications push doivent migrer vers l'app de bureau / APNs ;
 // l'envoi côté API (/api/push-subscriptions, @openedbot/notifications) reste en place.
 import { useEffect, useState } from "react";
 import { useIsMobile } from "@openedbot/browser-ui-kit";

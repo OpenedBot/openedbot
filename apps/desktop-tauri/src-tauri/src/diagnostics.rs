@@ -1,5 +1,4 @@
-//! The shell's own journal, as in the Electron shell
-//! (`apps/desktop/src/main/diagnostics.ts`): `diagnostics.sqlite` in the app
+//! The shell's own journal: `diagnostics.sqlite` in the app
 //! data directory, so an error seen in the window can be read back after the
 //! fact. The shell's warnings and errors, the page's errors and failed API
 //! calls (relayed by the bridge, `report_diagnostic`), and a WebView content
@@ -61,8 +60,8 @@ impl Source {
 
 /// Removes what must never be persisted: bearer tokens, JWTs, long opaque
 /// strings (refresh tokens, codes, verifiers), URL queries and fragments (an
-/// OAuth callback carries its code there) and e-mail addresses. Same rules as
-/// the Electron journal, without a regex engine.
+/// OAuth callback carries its code there) and e-mail addresses, without a
+/// regex engine.
 pub fn redact(text: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     // Any whitespace separates words: a URL after a line break is still a URL.

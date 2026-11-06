@@ -1,7 +1,6 @@
 //! The native session: e-mail code and Google sign-in (PKCE), single-flight
-//! refresh, proactive refresh before expiry, sign-out. Port of the Electron
-//! shell's `apps/desktop/src/main/auth.ts` (without the password door of its
-//! local fallback page, which the embedded console does not have).
+//! refresh, proactive refresh before expiry, sign-out. No password door: the
+//! embedded console's `/login` signs in by e-mail code or Google only.
 //!
 //! The access token stays here and is handed out on request only
 //! (`read_access_token`); the refresh token never leaves this module, except
@@ -22,7 +21,7 @@ use time::OffsetDateTime;
 use crate::vault::Vault;
 
 /// Refresh this long before expiry so a request in flight never carries a
-/// token that dies on the way (same margin as Electron).
+/// token that dies on the way.
 const REFRESH_MARGIN: Duration = Duration::from_secs(60);
 /// A proactive refresh that failed on the network or a 5xx is tried again
 /// this long after: the refresh token is still valid.
@@ -160,7 +159,7 @@ fn lock(mutex: &Mutex<Inner>) -> MutexGuard<'_, Inner> {
 const GENERIC_FAILURE: &str = "La connexion a échoué. Réessayez, et prévenez le support si cela se reproduit.";
 
 /// The French fallback of a known failure code (the console translates the
-/// code itself; same wording as the Electron shell's `FAILURE_MESSAGES`).
+/// code itself).
 fn known_message(code: &str) -> Option<&'static str> {
     Some(match code {
         "EMAIL_LOGIN_CODE_INVALID" => "Code invalide ou expiré. Demandez un nouveau code.",

@@ -61,18 +61,15 @@
       // entre DANS l'application : une session existe (navigateur, ou coque
       // native) et le chemin n'est pas une page publique ni un parcours sans
       // barre latérale. `main.tsx` la retire au premier rendu du routeur.
-      // La coque Electron pose son pont par son preload, avant ce script ; la
-      // coque Tauri ne pose ici que `__OPENEDBOT_SHELL__` (son script
+      // L'app de bureau pose ici `__OPENEDBOT_SHELL__` (son script
       // d'initialisation), le pont étant construit par un module, plus tard.
       // Elle n'ouvre la console hors de `/login` qu'avec une session.
       (function () {
         var shell = window.__OPENEDBOT_SHELL__;
-        var native = !!window.__OPENEDBOT_NATIVE__ || !!(shell && shell.platform);
+        var native = !!(shell && shell.platform);
         // Match nativeTitlebarFor without setting the app's titlebar attribute.
         if (native) {
-          var nativeTitlebar = shell && shell.platform === "macos" ? "mac"
-            : /^Mac/.test(navigator.platform) || /Macintosh/.test(navigator.userAgent) ? "mac"
-            : /^Win/.test(navigator.platform) || /Windows/.test(navigator.userAgent) ? "windows" : null;
+          var nativeTitlebar = shell.platform === "macos" ? "mac" : shell.platform === "windows" ? "windows" : null;
           if (nativeTitlebar) document.documentElement.setAttribute("data-openedbot-boot-titlebar", nativeTitlebar);
         }
         try {

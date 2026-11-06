@@ -221,8 +221,9 @@ function isRevocable(session: AccountSessionDto): boolean {
 export function describeDevice(session: AccountSessionDto | null, t: T): string {
   if (!session) return t("settingsSecurity.unknownValue");
   const { browser, platform } = describeUserAgent(session.userAgent);
-  // Une session native est la coque openedbot-desktop : son User-Agent est celui
-  // d'Electron, qui se lirait « Chrome », pas le nom de l'application.
+  // Une session native est l'app de bureau : son User-Agent est celui de sa
+  // WebView ou de son client HTTP, qui se lirait comme un navigateur, pas comme
+  // le nom de l'application.
   if (session.kind === "native") {
     return platform ? `${t("settingsSecurity.desktopApp")} · ${platform}` : t("settingsSecurity.desktopApp");
   }

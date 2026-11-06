@@ -1,5 +1,5 @@
 /**
- * Coque native (`openedbot-desktop`) : le champ du composer prend le focus quand un
+ * App de bureau : le champ du composer prend le focus quand un
  * fil s'ouvre et quand on revient dans la fenêtre, comme Slack ou ChatGPT
  * sur le bureau : on tape tout de suite. Navigateur et PWA n'y touchent pas
  * (au doigt, le focus ouvrirait le clavier).

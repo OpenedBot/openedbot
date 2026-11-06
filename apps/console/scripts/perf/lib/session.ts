@@ -26,7 +26,7 @@ export function readEnvFile(path: string): Record<string, string> {
 
 const MAILPIT = "http://localhost:8025";
 
-// Two sign-ins a second apart (the web one, then Electron's) send two codes:
+// Two sign-ins a second apart send two codes:
 // a message already read is never read again, or the second sign-in would
 // replay the first, consumed code.
 const consumedMessages = new Set<string>();
@@ -94,10 +94,4 @@ export async function signOutWeb(apiBase: string, session: WebSession): Promise<
     method: "POST",
     headers: { cookie: session.cookieHeader, "x-csrf-token": session.cloudSession.csrfToken },
   });
-}
-
-export function e2eEmail(envFile: string): string {
-  const email = readEnvFile(envFile).E2E_EMAIL;
-  if (!email) throw new Error(`E2E_EMAIL must be set in ${envFile}`);
-  return email;
 }

@@ -59,14 +59,6 @@ ADMIN_DIR ?= $(if $(plugins_dir),$(plugins_dir)/admin)
 DEV_ADMIN_COMMAND ?= bun run --cwd $(ADMIN_DIR) --silent dev
 REQUIRE_ADMIN = if [ ! -f "$(ADMIN_DIR)/package.json" ]; then printf '$(C_ERR)[make]$(C_RESET) backoffice introuvable : %s (checkout des plug-ins en ./plugins, ou ADMIN_DIR=...).\n' "$(ADMIN_DIR)" >&2; exit 2; fi
 
-# L'app desktop (coque Electron autour de la console) vit hors des workspaces
-# bun de la racine : son propre bun.lock, ses propres node_modules, son propre
-# Makefile (packaging, journal, design lab : `make -C apps/desktop help`).
-DESKTOP_DIR := apps/desktop
-DESKTOP_DEPS := $(DESKTOP_DIR)/node_modules/.make-installed
-# La console que vise `make desktop` : celle de `make dev` (WEB_APP_URL).
-DESKTOP_CONSOLE_URL ?= $(or $(call env_file_value,WEB_APP_URL),http://localhost:1420)
-
 # ─── Couleurs ────────────────────────────────────────────────────────────────
 # Définies une fois, réutilisées par les recettes qui parlent à l'utilisateur.
 # `NO_COLOR` les vide, comme le fait déjà `help`.
@@ -99,7 +91,7 @@ endif
 .PHONY: help help-all
 
 # Les cibles du quotidien, par mode ; toutes les autres restent dans help-all.
-HELP_DEV     := setup dev desktop stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
+HELP_DEV     := setup dev stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
 # Les fragments privés (plugins/make/*.mk, en fin de fichier) y ajoutent leurs cibles.
 HELP_PREPROD :=
 HELP_PROD    := link-prod
@@ -194,7 +186,7 @@ runtime-token-rotate: db-migrate env-check ## Ré-encrypte atomiquement les toke
 	$(LOAD_ENV) bun apps/api/scripts/rotate-runtime-token-key.ts
 
 # ─── Dev : lancer les apps ───────────────────────────────────────────────────
-.PHONY: dev dev-api dev-console dev-worker dev-admin desktop preview-console stop
+.PHONY: dev dev-api dev-console dev-worker dev-admin preview-console stop
 
 dev: env-check ## [API + CONSOLE + WORKER] Valide .env.local puis lance les trois apps; ni infra, ni migration. MODE=fake|bundled|external force le profil.
 	@set -eo pipefail; $(LOAD_ENV) \
@@ -230,23 +222,11 @@ dev-admin: ## [ADMIN] Lance le backoffice staff (ADMIN_DIR, plugins/admin, plug-
 	@$(REQUIRE_ADMIN)
 	$(LOAD_ENV_OPT) $(DEV_ADMIN_COMMAND)
 
-# Les dépendances de l'app desktop, réinstallées dès que son package.json ou
-# son bun.lock bouge (le témoin est dans node_modules : un rm -rf le relance).
-$(DESKTOP_DEPS): $(DESKTOP_DIR)/package.json $(DESKTOP_DIR)/bun.lock
-	@$(MAKE) --no-print-directory -C $(DESKTOP_DIR) install
-	@touch $@
-
-# Rechargement à chaud : le main et le preload sont recompilés et Electron
-# relancé à chaque sauvegarde ; l'UI vient de la console de `make dev` (HMR de
-# Vite). Pour viser la production : `make -C apps/desktop dev`.
-desktop: $(DESKTOP_DEPS) ## [DESKTOP] Lance l'app desktop en dev (Electron rechargé à chaud) sur la console locale de make dev.
-	@$(MAKE) --no-print-directory -C $(DESKTOP_DIR) dev-local LOCAL_CONSOLE_URL="$(DESKTOP_CONSOLE_URL)"
-
 preview-console: build-console ## Sert le dist de la console sur :1420 (même origine que make dev). Incompatible avec vite.
 	$(LOAD_ENV_OPT) bun run --filter console preview
 
 # `make stop` arrête l'environnement de dev local en entier : API, worker,
-# console, backoffice et app desktop. Le port ne suffisait pas. Le worker
+# console et backoffice. Le port ne suffisait pas. Le worker
 # n'écoute rien, il survivait donc à chaque arrêt, et deux `make dev` empilés
 # finissaient par poser deux workers sur la même file : un run pouvait rester
 # en file sans que personne ne le prenne.
@@ -254,14 +234,11 @@ preview-console: build-console ## Sert le dist de la console sur :1420 (même or
 # Les processus sont reconnus à leur répertoire de travail sous `apps/`, pas
 # à un motif de ligne de commande : `bun --watch src/index.ts` est le même
 # texte pour l'API, le worker et n'importe quel autre dépôt ouvert à côté.
-# L'app desktop compte deux choses : son lanceur bun (cwd apps/desktop) et
-# Electron lui-même, reconnu au chemin de son exécutable : electron-vite ne le
-# ferme pas quand il reçoit SIGTERM, Electron survivrait sinon à `make stop`.
 # Ce qui a sa propre cible n'est pas touché : ni le faux Hermes, ni le lien
 # connecteur (`make link-dev-down`).
 #
 # PORT=<n> garde l'ancien usage : libérer ce seul port, et rien d'autre.
-stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice, app desktop). PORT=<n> pour ne libérer qu'un port.
+stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice). PORT=<n> pour ne libérer qu'un port.
 	@set -eo pipefail; $(LOAD_ENV_OPT) \
 	if ! command -v lsof >/dev/null 2>&1; then \
 		printf '$(C_ERR)[make]$(C_RESET) lsof est requis pour trouver les processus à arrêter.\n' >&2; exit 1; \
@@ -306,16 +283,13 @@ stop: ## [DEV] Arrête l'environnement local (API, worker, console, backoffice, 
 		cwd="$$(lsof -a -p "$$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"; \
 		[ -n "$$cwd" ] || continue; \
 		case "$$cwd" in \
-			"$$root"/apps/api|"$$root"/apps/worker|"$$root"/apps/console|"$$root"/$(DESKTOP_DIR)|"$(ADMIN_DIR)") \
+			"$$root"/apps/api|"$$root"/apps/worker|"$$root"/apps/console|"$(ADMIN_DIR)") \
 				targets="$$targets $$pid" ;; \
 			"$$root") \
 				case "$$(ps -o command= -p "$$pid" 2>/dev/null)" in \
 					*--filter*dev*) targets="$$targets $$pid" ;; \
 				esac ;; \
 		esac; \
-	done; \
-	for pid in $$(pgrep -f "^$$root/$(DESKTOP_DIR)/node_modules/electron/dist/" 2>/dev/null || true); do \
-		targets="$$targets $$pid"; \
 	done; \
 	if [ -n "$$targets" ]; then \
 		printf '$(C_WARN)[make]$(C_RESET) Arrêt des apps de ce dépôt :%s\n' "$$targets"; \
@@ -567,14 +541,17 @@ test: test-unit test-integration ## Unitaires et intégration.
 
 check: env-audit typecheck deps-check test build-cloud ## Garde complète: environnement, code, tests et builds cloud.
 
-# ─── Desktop Tauri (ADR 0001 §4.3.1 à §4.3.5) ────────────────────────────────
+# ─── Desktop Tauri (ADR 0001 §4.3.1 à §4.3.6) ────────────────────────────────
 # Le shell Rust (`apps/desktop-tauri/src-tauri`) embarque la console solo en
 # mode desktop. Rien n'est publié d'ici : le build signé reste dans
 # `apps/desktop-tauri/release/<version>/`, le flux de mise à jour de test est
 # servi en boucle locale. Clés : Developer ID dans le trousseau, notarisation
-# et clé de mise à jour hors du dépôt (`scripts/build-mac.ts`).
-# TAURI_IDENTITY=production (D3) : l'app qui remplace Electron
-# (app.openedbot.desktop, « openedbot », openedbot://) ; preview par défaut.
+# et clé de mise à jour hors du dépôt (`scripts/build-mac.ts`) ; la moitié
+# publique de la clé de mise à jour est `apps/desktop-tauri/updater.pub`.
+# TAURI_IDENTITY=production (D3, D6) : l'app publiée (app.openedbot.desktop,
+# « openedbot », openedbot://) ; preview par défaut.
+# Une release : desktop-tauri-mac, puis desktop-tauri-linux pour x86_64 et
+# aarch64, tous en TAURI_IDENTITY=production, puis desktop-tauri-release.
 .PHONY: desktop-tauri-bindings desktop-tauri-check desktop-tauri-mac desktop-tauri-release desktop-tauri-feed desktop-tauri-publish
 DESKTOP_TAURI_DIR := apps/desktop-tauri
 TAURI_VERSION ?=
@@ -593,9 +570,9 @@ desktop-tauri-mac: ## [DESKTOP] Build macOS signé Developer ID, notarisé, agra
 	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
 	bun $(DESKTOP_TAURI_DIR)/scripts/build-mac.ts --version "$(TAURI_VERSION)" --sign "$(TAURI_SIGN)" --identity "$(TAURI_IDENTITY)" $(if $(TAURI_POPUP),--popup "$(TAURI_POPUP)")
 
-desktop-tauri-release: ## [DESKTOP] Rassemble une release macOS (build de production notarisé) à publier : dmg, .app.tar.gz + .sig, manifestes beta/stable, SHA256SUMS. Ne publie rien : TAURI_VERSION=X.Y.Z [TAURI_NOTES=notes.md].
+desktop-tauri-release: ## [DESKTOP] Rassemble la release macOS + Linux (builds de production) à publier sur R2 : desktop/vX.Y.Z/ (SHA256SUMS, signatures vérifiées), manifestes beta/stable de toutes les plateformes. Ne publie rien : TAURI_VERSION=X.Y.Z [TAURI_NOTES=notes.md].
 	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
-	bun $(DESKTOP_TAURI_DIR)/scripts/release-mac.ts --version "$(TAURI_VERSION)" $(if $(TAURI_NOTES),--notes "$(TAURI_NOTES)")
+	bun $(DESKTOP_TAURI_DIR)/scripts/release.ts --version "$(TAURI_VERSION)" $(if $(TAURI_NOTES),--notes "$(TAURI_NOTES)")
 
 desktop-tauri-feed: ## [DESKTOP] Sert le flux de mise à jour local sur http://127.0.0.1:8799/latest.json.
 	bun $(DESKTOP_TAURI_DIR)/scripts/update-feed.ts serve --port 8799
@@ -609,14 +586,15 @@ desktop-tauri-publish: ## [DESKTOP] Publie localement une version construite dan
 # WebKitGTK 4.1) : x86_64 émulé sur un Mac arm64 (OrbStack), aarch64 natif.
 # Les paquets restent dans `apps/desktop-tauri/dist-linux/<version>/<arch>/`
 # (ignoré), les preuves du parcours dans `dist-linux/e2e/`. Rien n'est publié.
+# Le parcours (e2e, update) vise la preview.
 .PHONY: desktop-tauri-linux desktop-tauri-linux-check desktop-tauri-linux-e2e desktop-tauri-linux-update
 TAURI_LINUX_ARCH ?= x86_64
 TAURI_FROM ?=
 TAURI_TO ?=
 
-desktop-tauri-linux: ## [DESKTOP] Paquets Linux deb + AppImage (+ artefact de mise à jour signé) construits dans Docker : TAURI_VERSION=X.Y.Z [TAURI_LINUX_ARCH=x86_64|aarch64].
+desktop-tauri-linux: ## [DESKTOP] Paquets Linux deb + AppImage (+ artefact de mise à jour signé) construits dans Docker : TAURI_VERSION=X.Y.Z [TAURI_LINUX_ARCH=x86_64|aarch64] [TAURI_IDENTITY=production].
 	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
-	bun $(DESKTOP_TAURI_DIR)/scripts/build-linux.ts --docker --version "$(TAURI_VERSION)" --arch "$(TAURI_LINUX_ARCH)"
+	bun $(DESKTOP_TAURI_DIR)/scripts/build-linux.ts --docker --version "$(TAURI_VERSION)" --arch "$(TAURI_LINUX_ARCH)" --identity "$(TAURI_IDENTITY)"
 
 desktop-tauri-linux-check: ## [DESKTOP] Dans Docker, comme la CI : cargo test, coffre Secret Service, cargo clippy -D warnings (Linux).
 	bun $(DESKTOP_TAURI_DIR)/scripts/linux-docker.ts check --arch "$(TAURI_LINUX_ARCH)"

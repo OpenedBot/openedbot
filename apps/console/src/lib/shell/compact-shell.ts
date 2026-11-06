@@ -4,9 +4,9 @@ import { NATIVE_SESSION_MARK } from "../platform";
 
 /**
  * La route compacte (DEV-139) : le fil et le composer d'UN bot, sans barre
- * latérale, sans réglages, sans onboarding. C'est ce que la coque native
- * `openedbot-desktop` charge dans sa fenêtre ; elle reste ouvrable dans un
- * navigateur avec le cookie de session, pour la recette sans Electron.
+ * latérale, sans réglages, sans onboarding. Le notch de l'app de bureau
+ * l'ouvre sur un fil ; elle reste ouvrable dans un navigateur avec le cookie
+ * de session.
  */
 export const COMPACT_PATH = "/compact";
 

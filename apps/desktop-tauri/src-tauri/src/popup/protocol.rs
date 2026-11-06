@@ -1,5 +1,5 @@
-//! The popup protocol v1: one JSON object per line, both ways
-//! (`apps/desktop/src/shared/popup-protocol.ts`).
+//! The popup protocol v1: one JSON object per line, both ways (the notch's
+//! `OpenedbotHostedProtocol` 1).
 
 use serde::{Deserialize, Serialize};
 

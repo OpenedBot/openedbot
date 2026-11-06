@@ -1,4 +1,4 @@
-//! What ties the parts together, as the Electron shell's `main.ts` does: the
+//! What ties the parts together: the
 //! session's events move the window and the popup, the display mode (window,
 //! popup or both) starts and stops the popup and hides the Dock icon, the
 //! Google door gets its browser and loopback listener.

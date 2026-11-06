@@ -1,12 +1,11 @@
-//! The traffic lights centred on the console's top bar at every page zoom, as
-//! the Electron shell places them (`apps/desktop/src/main/window.ts`,
-//! `trafficLightPosition`, re-applied on each zoom change).
+//! The traffic lights centred on the console's top bar at every page zoom,
+//! re-applied on each zoom change.
 //!
 //! The top bar is 46 page pixels high, so 46 × zoom points on screen; the
 //! buttons do not zoom. Tauri 2.12 only sets tao's inset when the window is
 //! built (no setter at run time), and tao re-applies that inset on every
 //! `drawRect:`, so the shell sets no inset at all and moves the standard
-//! buttons itself, the way Electron's `WindowButtonsProxy` does: the titlebar
+//! buttons itself: the titlebar
 //! container is made as high as the bar, the buttons are centred in it.
 //!
 //! AppKit puts the buttons back where it wants on some events (resize, leaving
@@ -23,7 +22,7 @@ use objc2_foundation::{NSNotification, NSNotificationCenter, NSNotificationName,
 
 /// The console's top bar (`board-chrome.tsx`), in page pixels.
 pub const TITLE_BAR_HEIGHT: f64 = 46.0;
-/// The close button's left edge, in points, as in Electron.
+/// The close button's left edge, in points.
 pub const LIGHTS_X: f64 = 16.0;
 
 /// The zoom in force, as `f64` bits (read from the AppKit observers).
@@ -44,8 +43,8 @@ pub struct Layout {
     pub origins: [(f64, f64); 3],
 }
 
-/// Electron's `{ x: 16, y: round(46 × zoom / 2 − 7) }` for 14 pt buttons,
-/// written for the buttons' real size: their centre is the bar's centre,
+/// `{ x: 16, y: round(46 × zoom / 2 − 7) }` for 14 pt buttons, written for the
+/// buttons' real size: their centre is the bar's centre,
 /// snapped to the device pixel (`scale`) rather than to the point.
 pub fn layout(zoom: f64, button: (f64, f64), stride: f64, scale: f64) -> Layout {
     let snap = |value: f64| (value * scale).round() / scale;
@@ -146,8 +145,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn electron_position_at_100_percent() {
-        // Electron: { x: 16, y: round(46 / 2 - 7) } = { 16, 16 }, centre y 23.
+    fn position_at_100_percent() {
+        // { x: 16, y: round(46 / 2 - 7) } = { 16, 16 }, centre y 23.
         let plan = layout(1.0, (14.0, 14.0), 20.0, 2.0);
         assert_eq!(plan.origins, [(16.0, 16.0), (36.0, 16.0), (56.0, 16.0)]);
         assert_eq!(plan.container_height, 46.0);
@@ -167,10 +166,10 @@ mod tests {
     }
 
     #[test]
-    fn matches_electron_rounding_where_it_lands_on_a_point() {
+    fn rounds_to_the_point_where_it_lands_on_one() {
         for zoom in [1.0, 1.25, 1.5] {
-            let electron = (TITLE_BAR_HEIGHT * zoom / 2.0 - 7.0).round();
-            assert_eq!(layout(zoom, (14.0, 14.0), 20.0, 1.0).origins[0].1, electron);
+            let rounded = (TITLE_BAR_HEIGHT * zoom / 2.0 - 7.0).round();
+            assert_eq!(layout(zoom, (14.0, 14.0), 20.0, 1.0).origins[0].1, rounded);
         }
     }
 

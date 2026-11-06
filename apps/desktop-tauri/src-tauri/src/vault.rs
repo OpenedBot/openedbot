@@ -19,8 +19,8 @@ pub trait Vault: Send + Sync + 'static {
     fn clear(&self) -> Result<(), VaultError>;
 }
 
-/// The Keychain item of one API: service = the app's bundle identifier (so the
-/// prototype never reads the Electron app's session), account = the API origin.
+/// The Keychain item of one API: service = the app's bundle identifier (the
+/// preview and the production app never share a session), account = the API origin.
 pub struct KeychainVault {
     service: String,
     account: String,

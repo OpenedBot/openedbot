@@ -63,7 +63,7 @@ runtime.
 | `apps/worker` | Claims queued runs and executes them on the bot's runtime; maintenance jobs | Bun workspace |
 | `apps/link-gateway` | Ends the outbound links that hosts open | Bun workspace |
 | `apps/console` | Web console (React, Vite) | Bun workspace |
-| `apps/desktop` | Desktop app for macOS, Windows and Linux; on macOS it embeds the notch popup from [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Electron, own toolchain |
+| `apps/desktop-tauri` | Desktop app for macOS and Linux: the console embedded in a native shell; on macOS it embeds the notch popup from [openedbot-notch](https://github.com/OpenedBot/openedbot-notch) | Tauri 2 (Rust), Bun workspace |
 | `modules/` | One package per business context: `identity`, `roster`, `conversation`, `execution`, `runtimes`, … | Bun workspaces |
 | `platform/` | Server foundations: database, configuration, observability, Hermes client, integrations | Bun workspaces |
 | `contracts/` | Pure contracts shared by servers and browser: API DTOs, events, errors, i18n (`zod` only) | Bun workspaces |
@@ -89,6 +89,8 @@ module never imports an app, the browser never imports a server package) are enf
   never creates PostgreSQL itself.
 - OpenSSL and curl.
 - Go 1.26, only to work on `edge-setup/`.
+- Rust (stable, with clippy), only to work on the desktop app (`apps/desktop-tauri/`); its Linux
+  builds run in Docker.
 
 **First run**
 
@@ -96,7 +98,6 @@ module never imports an app, the browser never imports a server package) are enf
 make setup          # .env.local, dependencies, PostgreSQL schema and a development account
 make fake-hermes    # terminal 1: a fake Hermes gateway on 127.0.0.1:18642
 make dev            # terminal 2: API, worker and console on http://localhost:1420
-make desktop        # optional, terminal 3: the desktop app on the local console
 ```
 
 Sign-in sends a one-time code by e-mail: in development it lands in the Mailpit of your
@@ -117,6 +118,7 @@ make test-unit        # no network, no PostgreSQL
 make test-integration # disposable PostgreSQL: migrations, row-level security, imports
 make check            # environment audit, typecheck, boundaries, tests, cloud builds
 make contract-check   # wire fixtures, then the Go and TypeScript halves of the connector
+make desktop-tauri-check # the desktop app's Rust shell: cargo test and clippy
 
 (cd edge-setup && make check)    # Go: lint, tests, release checks
 (cd protocol && bun run check)

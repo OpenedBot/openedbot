@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * G1 and G3 of ADR 0001 (section 3) on the signed macOS app (D3), with the
- * definitions of the D0 baseline (`apps/console/scripts/perf/d0-baseline.ts`)
- * so the numbers compare with Electron's:
+ * definitions of the D0 baseline (ADR 0001, section 3.1), so the numbers
+ * compare with it:
  *
  *   - G1 marker: the first sidebar link to a bot's thread (`a[href*="/bot/"]`)
  *     visible; wall clock from the process spawn to the poll that saw it.

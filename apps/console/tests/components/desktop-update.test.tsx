@@ -18,6 +18,10 @@ import { RUNS_UNKNOWN_AFTER_MS, useRunsInProgress, useUpdateDialog } from "../..
 import { menuRowVersion, pillView, runsInProgress, seenVersion } from "../../src/components/desktop-update/update-model";
 import * as entry from "../../src/components/desktop-update/entry";
 import { ClientUpdateGate } from "../../src/components/client-update-required";
+import { asDesktopBuild } from "../support/desktop-build";
+
+// These tests drive the desktop app's bridge, which only the desktop build reads.
+asDesktopBuild();
 
 type Phase = NativeUpdateState["phase"];
 

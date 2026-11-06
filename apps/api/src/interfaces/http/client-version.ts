@@ -17,10 +17,10 @@ export function desktopClientVersion(header: string | undefined): SemVer | null 
 /**
  * Refuse en `426` une app de bureau plus vieille que `DESKTOP_MIN_VERSION`.
  *
- * Seule une app qui s'annonce est concernée : un navigateur, une ancienne app
- * Electron (qui n'envoie pas l'en-tête) ou un en-tête illisible passent comme
- * avant, la garde ne coupe jamais un client qu'elle ne sait pas dater. Le
- * bilan de santé reste ouvert à tous.
+ * Seule une app qui s'annonce est concernée : un navigateur, un client qui
+ * n'envoie pas l'en-tête ou un en-tête illisible passent comme avant, la garde
+ * ne coupe jamais un client qu'elle ne sait pas dater. Le bilan de santé reste
+ * ouvert à tous.
  */
 export function clientVersionGate(minDesktopVersion: SemVer | null): MiddlewareHandler {
   return async (context, next) => {

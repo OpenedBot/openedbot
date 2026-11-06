@@ -33,6 +33,19 @@ describe("silhouette de démarrage", () => {
     expect(root.hasAttribute("data-openedbot-boot-titlebar")).toBe(false);
   });
 
+  test("un pont posé par la page hôte, sans coque, reste un navigateur", () => {
+    // Le build web ne fait confiance qu'à `__OPENEDBOT_SHELL__` (`native-bridge.ts`).
+    window.__OPENEDBOT_NATIVE__ = { shell: { platform: "windows", version: "1.0.3" } } as unknown as Window["__OPENEDBOT_NATIVE__"];
+    Object.defineProperty(navigator, "platform", { value: "MacIntel", configurable: true });
+    try {
+      run();
+      expect(root.hasAttribute("data-openedbot-booting")).toBe(false);
+      expect(root.hasAttribute("data-openedbot-boot-titlebar")).toBe(false);
+    } finally {
+      delete (navigator as { platform?: string }).platform;
+    }
+  });
+
   test("un navigateur sans session n'a pas de silhouette", () => {
     run();
     expect(root.hasAttribute("data-openedbot-booting")).toBe(false);

@@ -174,13 +174,12 @@ describe("CloudSecuritySettings", () => {
     });
   });
 
-  test("une session native courante se nomme « Application de bureau openedbot », pas « Chrome »", async () => {
-    // La coque openedbot-desktop porte le User-Agent d'Electron : lu tel quel, il dirait Chrome.
+  test("une session native courante se nomme « Application de bureau openedbot », pas « Safari »", async () => {
+    // L'app de bureau porte le User-Agent de sa WebView : lu tel quel, il dirait Safari.
     const desktop = {
       ...CURRENT_SESSION,
       kind: "native" as const,
-      userAgent:
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) openedbot/0.1.0 Chrome/140.0.0.0 Electron/44.7.0 Safari/537.36",
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
     };
     stubFetch({ ...SECURITY_WITH_PASSWORD, sessions: [desktop, OTHER_SESSION] });
     renderSecurity();
@@ -188,7 +187,7 @@ describe("CloudSecuritySettings", () => {
       expect(screen.getByText(/^Application de bureau openedbot/)).toBeTruthy();
     });
     expect(screen.getByText("203.0.113.7")).toBeTruthy();
-    expect(screen.queryByText(/^Chrome/)).toBeNull();
+    expect(screen.queryByText(/^Safari · macOS/)).toBeNull();
   });
 
   test("les trois onglets existent et ne montent que le panneau actif", async () => {

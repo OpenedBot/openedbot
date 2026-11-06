@@ -373,7 +373,7 @@ function useGoogleLink(email: string) {
       // Sur le web, l'onglet s'ouvre DANS le clic, avant la réponse de l'API :
       // ouvert après un `await`, le navigateur le bloque comme fenêtre
       // surgissante. Dans la coque, `window.open` part au navigateur système
-      // (`setWindowOpenHandler` d'openedbot-desktop) et rend toujours `null` : on
+      // et rend toujours `null` : on
       // ouvre donc l'URL Google elle-même, une fois connue.
       const native = isNativeShell();
       const tab = native ? null : globalThis.window?.open("", "_blank") ?? null;

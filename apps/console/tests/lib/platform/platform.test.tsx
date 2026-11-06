@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OpenedbotNativeBridge } from "../../../src/lib/platform/native-bridge";
 import { appUrl, clientHeaders, desktopClientId, nativeRequestInit, openInBrowser, publicConsoleOrigin, publicConsoleUrl, withClientHeaders } from "../../../src/lib/platform";
 import { act, fireEvent, render, screen } from "@testing-library/react";
@@ -10,6 +10,10 @@ import { request } from "../../../src/lib/api/http";
 import { threadsApi } from "../../../src/lib/api/threads";
 import { supportApi } from "../../../src/lib/api/support";
 import { absoluteIngressUrl } from "../../../src/components/bot-webhooks-panel";
+import { asDesktopBuild } from "../../support/desktop-build";
+
+// The bridge only exists in the desktop build; the last block checks the web build.
+asDesktopBuild();
 
 const opened: string[] = [];
 function bridge(version = "1.2.3"): OpenedbotNativeBridge {
@@ -18,7 +22,7 @@ function bridge(version = "1.2.3"): OpenedbotNativeBridge {
     refresh: async () => "token",
     openExternal: async (url) => { opened.push(url); },
     signOut: async () => undefined,
-    shell: { platform: "windows", version },
+    shell: { platform: "macos", version },
   };
 }
 
@@ -44,10 +48,10 @@ describe("origine publique de la console", () => {
     expect(publicConsoleUrl("/bot/1")).toBe("https://console.openedbot.app/bot/1");
   });
 
-  test("app Electron qui charge la console distante, sans URL posée : l'origine web de la page", () => {
+  test("sans URL posée, une page servie en https n'en tient pas lieu : erreur nommée", () => {
     window.__OPENEDBOT_NATIVE__ = bridge();
     window.location.href = "https://console.openedbot.app/";
-    expect(publicConsoleOrigin()).toBe("https://console.openedbot.app");
+    expect(() => publicConsoleOrigin()).toThrow(/sets no public console URL/);
   });
 
   test("console servie localement sous Windows (http://tauri.localhost) sans URL posée : erreur nommée, jamais un lien local", () => {
@@ -220,5 +224,26 @@ describe("un 426 sur un flux", () => {
     });
     expect(view.queryByRole("alertdialog")).toBeNull();
     view.unmount();
+  });
+});
+
+describe("build web : un pont posé par la page hôte", () => {
+  const realOpen = window.open;
+  beforeEach(() => { delete process.env.VITE_OPENEDBOT_SHELL; });
+  afterEach(() => { window.open = realOpen; });
+
+  test("la page reste un navigateur : origine de la page, cookie, ni en-tête client ni pont", async () => {
+    window.__OPENEDBOT_NATIVE__ = bridge("1.0.3");
+    window.location.href = "https://openedbot.app/o/acme";
+    expect(publicConsoleOrigin()).toBe("https://openedbot.app");
+    expect(desktopClientId()).toBeNull();
+    expect(clientHeaders()).toEqual({});
+    const init: RequestInit = { credentials: "include" };
+    expect(nativeRequestInit(init)).toBe(init);
+    const tabs: string[] = [];
+    window.open = ((url?: string | URL) => { tabs.push(String(url)); return null; }) as typeof window.open;
+    openInBrowser("/settings");
+    expect(tabs).toEqual(["https://openedbot.app/settings"]);
+    expect(opened).toEqual([]);
   });
 });
