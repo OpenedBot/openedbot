@@ -47,6 +47,8 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Corrigé
 
+- Réglages › Activité : sans aucun bot, le tableau propose « Créer un bot ».
+  L'ancien message renvoyait vers la barre latérale, absente de cet écran.
 - Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de
   nouveau en glissant depuis le bord : il ne saute plus d'un coup à 320 px
   en décalant le fil.
