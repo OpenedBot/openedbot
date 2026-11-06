@@ -16,7 +16,6 @@ import {
   fallbackFailureMessage,
   loadActiveIncidents,
   planProviderRetry,
-  PROFILE_MANAGEMENT_FEATURE,
   providerAuthRequiredPayload,
   providerFallbackPayload,
   PROVIDER_FALLBACK_EVENT,
@@ -30,6 +29,7 @@ import { persistUnnumberedEvents } from "./persist";
 import type { RunContext } from "./types";
 import { describe, log } from "./util";
 import { markCreateIntent } from "./lease-transitions";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /**
  * Le couple que ce run demandera, selon le mode d'attribution de l'organisation.
@@ -332,7 +332,7 @@ export async function recoverProviderFailure(
       profile: context.hermesProfile,
       provider: fallback.provider,
       model: fallback.model,
-      capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
+      capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
     });
     // Le repli repartirait chez le fournisseur du profil, celui qui vient
     // d'échouer : pas de nouvelle tentative sous une étiquette fausse.
@@ -457,7 +457,7 @@ export async function resolveSelectionForNewRun(
         model: selection.model,
         profileProvider: catalog.provider,
         profileModel: catalog.model,
-        capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
+        capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
       });
       // Le gateway route sur le fournisseur du profil, pas sur celui du corps
       // du run : lancer quand même afficherait le modèle demandé pendant qu'un

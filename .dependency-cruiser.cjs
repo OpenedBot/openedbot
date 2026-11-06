@@ -231,6 +231,15 @@ module.exports = {
       to: { path: "^(apps|platform|browser|modules|tests|scripts)/" },
     },
     {
+      name: "protocole-autonome",
+      comment:
+        "La référence du protocole (`protocol/connector`) fait foi et se publie seule : elle n'importe rien du dépôt " +
+        "(c'est `contracts/connector` qui la réexporte, jamais l'inverse).",
+      severity: "error",
+      from: { path: "^protocol/" },
+      to: { path: "^(apps|platform|contracts|browser|modules|tests|scripts)/" },
+    },
+    {
       name: "contrat-sans-bun",
       comment: "Un contrat n'importe aucun module intégré de Bun, sauf ses tests (`bun:test`).",
       severity: "error",

@@ -12,6 +12,7 @@
     "apps/link-gateway",
     "apps/worker",
     "contracts/*",
+    "protocol/connector",
     "browser/*",
     "platform/*",
     "modules/*"

@@ -899,9 +899,36 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
   copies ; les noms de fonctionnalités sont une liste en Go et des constantes éparses dans 10
   fichiers TS. Cible : `protocol/connector` fait foi, `contracts/connector` le réexporte, un test
   compare la liste Go à la liste TS.
+  **État (S7, 2026-11-06)** : `protocol/connector` (`@openedbot/protocol-connector`, workspace de
+  la racine) fait foi ; `contracts/connector` n'en garde que des réexports (prouvé par
+  `protocol-allowlist-sync.test.ts`), le script de synchronisation ne copie plus le codec, et
+  dependency-cruiser interdit à `protocol/` d'importer le dépôt. Les 28 noms vivent dans
+  `protocol/connector/src/relay-features.ts` (`RELAY_HOST_FEATURES` dans l'ordre de priorité de
+  l'hôte, `RELAY_LINK_FEATURES`) ; `relay-features.test.ts` lit `frames.go` et compare les deux
+  listes, ordre compris, et refuse un nom écrit en dur ailleurs dans le code livré (vérifié par
+  mutation des deux côtés). Déploiement : l'image de production doit désormais copier
+  `protocol/connector` (Dockerfiles et `.dockerignore` du dépôt pro, qui l'excluent) ;
+  `bun install --frozen-lockfile` échoue tant que ce n'est pas fait.
 - **Corrélation de bout en bout.** Aucun identifiant ne traverse worker → gateway → connecteur
   → Hermes. Cible : `traceparent` transmis par le relais et ajouté à la liste blanche des en-têtes
   du connecteur ; logger commun dans le worker (aujourd'hui `console.info`).
+  **État (S7, 2026-11-06)** : le trace-id d'un run est son UUID sans tirets
+  (`platform/observability/src/trace-context.ts`) : il naît à l'admission (`run.admission`),
+  sans colonne. Le worker ouvre le contexte de trace autour de chaque prise de run
+  (`runWithTrace`, un span par prise) ; le mixin du logger colle `traceId`/`spanId` à chaque
+  ligne écrite dedans, et le dialer du relais pose un `traceparent` neuf par requête
+  (`worker.relay_request`). La passerelle le journalise (`runtime_link.relay_request`) et le
+  relaie, le connecteur (Go) le valide, le journalise (`relay … trace=… span=…`) et le transmet
+  au gateway Hermes ; une valeur invalide est écartée partout. Le worker passe entièrement par
+  `@openedbot/platform-observability` (y compris le `log()` des étapes du runner) ; les lignes
+  de l'API ne changent pas. Preuve : `tests/integration/run-trace-correlation.ts` (API, worker,
+  passerelle et connecteur Go réels, Hermes factice : même trace-id et même span de
+  `POST /v1/runs` partout) ; `make test-trace-legacy` rejoue la même preuve avec le connecteur
+  publié v1.5.0, qui écarte l'en-tête sans rien casser. Point d'accroche après S2e : le
+  contexte passe aujourd'hui par AsyncLocalStorage, sans toucher `runner.ts` ; une fois
+  `executeRun` découpé en étapes nommées, chaque étape ouvrira son span enfant
+  (`childTraceContext`) et journalisera son nom, et le contexte du run pourra être passé
+  explicitement à `createRuntimeClient`.
 
 ### 4.8 Garde-fous du dépôt
 
@@ -985,7 +1012,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution |
 | **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert |
 | **S6** Temps réel | LISTEN par processus, trigger gardé, rattrapage durable | Tests LISTEN de la section 5 |
-| **S7** Protocole et corrélation | Contrat du connecteur unique, `traceparent`, logger commun | Un run se suit d'un bout à l'autre dans les logs |
+| **S7** Protocole et corrélation | Contrat du connecteur unique, `traceparent`, logger commun | Un run se suit d'un bout à l'autre dans les logs. **Fait** (2026-11-06) ; reste : publier edge-setup, copier `protocol/connector` dans l'image pro, spans par étape après S2e |
 
 Chaque étape met à jour `CHANGELOG.md` (et `protocol/CHANGELOG.md` pour S1 et S7).
 

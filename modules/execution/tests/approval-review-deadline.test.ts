@@ -1,6 +1,7 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { reviewGate, type ReviewDeps, type ReviewJob } from "../src/application/approval-review";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
 
 const APPROVE = '{"verdict":"approve","reason":"Fits the goal."}';
 
@@ -48,13 +49,8 @@ function client(calls: Calls, getRunStatus: (signal: AbortSignal | undefined) =>
 }
 
 async function quietly<T>(work: () => Promise<T>): Promise<{ result: T; logs: Array<Record<string, unknown>> }> {
-  const logs: Array<Record<string, unknown>> = [];
-  const info = spyOn(console, "info").mockImplementation((line: unknown) => { logs.push(JSON.parse(String(line))); });
-  try {
-    return { result: await work(), logs };
-  } finally {
-    info.mockRestore();
-  }
+  const { result, events } = await captureLogEvents(work);
+  return { result, logs: events };
 }
 
 describe("reviewer budget (PERM2-7)", () => {

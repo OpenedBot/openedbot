@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { provisionCapabilityBaseline, reconcileCapabilityBaselines } from "../src/maintenance/capability-baseline-reconciliation";
+import { createTestLogger, eventFields, runWithLogger } from "@openedbot/platform-observability/log/test-logger";
 import type { WorkerConfig } from "../src/config";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
 import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
@@ -122,15 +123,8 @@ const runLocked = <T>(_org: string, _bot: string, run: () => Promise<T>) => run(
 
 async function captureInfo(run: (lines: Array<Record<string, unknown>>) => Promise<void>): Promise<Array<Record<string, unknown>>> {
   const lines: Array<Record<string, unknown>> = [];
-  const originalInfo = console.info;
-  console.info = (...args: Parameters<typeof console.info>) => {
-    if (typeof args[0] === "string") lines.push(JSON.parse(args[0]) as Record<string, unknown>);
-  };
-  try {
-    await run(lines);
-  } finally {
-    console.info = originalInfo;
-  }
+  const { logger } = createTestLogger({ onRecord: (record) => { lines.push(eventFields(record)); } });
+  await runWithLogger(logger, () => run(lines));
   return lines;
 }
 
@@ -381,7 +375,8 @@ describe("capability baseline reconciliation", () => {
     expect(select.sql).toContain("b.capability_baseline_version <");
     expect(select.sql).toContain("rt.link_features @>");
     expect(select.sql).toContain("p.status in ('queued','running')");
-    expect(select.sql).toContain("rt.link_features @> array['approval_policy']::text[] as host_holds_policy");
+    expect(select.sql).toMatch(/rt\.link_features @> array\[ \]::text\[\] as host_holds_policy/);
+    expect(select.values).toContain("approval_policy");
     expect(select.values).toContain(CAPABILITY_BASELINE_VERSION);
     expect(select.values).toContain('{"profile_capabilities","profile_bundled_skills"}');
     expect(select.values).toContain(50);

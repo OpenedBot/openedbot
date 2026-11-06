@@ -7,6 +7,8 @@ import { saveRunTimings } from "@openedbot/execution/application/run-timings";
 import { createLoopHealth, type LoopHealth } from "../infrastructure/loop-health";
 import { createWorkerRegistry, type WorkerRegistry } from "../infrastructure/worker-registry";
 import { endRunTrace, RunTrace, runLatencyRecord, startRunTrace } from "@openedbot/platform-observability/run-trace";
+import { logEvent } from "@openedbot/platform-observability";
+import { runTraceContext, runWithTrace } from "@openedbot/platform-observability/trace-context";
 import { createBackgroundJobs, type BackgroundJob } from "./background-jobs";
 import { maintenanceJobs } from "./maintenance-jobs";
 import { createClaimWakeup, type RunQueueNotifications } from "./claim-wakeup";
@@ -68,7 +70,7 @@ export function createWorkerService(
     const metricsHeartbeat = setInterval(() => {
       track(Promise.resolve(health.report()));
       track(registry.recordHeartbeat(activeRuns.size).catch((error) => {
-        console.error(JSON.stringify({ event: "worker.metrics_heartbeat_failed", error: String(error) }));
+        logEvent("worker.metrics_heartbeat_failed", { error: String(error) }, "error");
       }));
     }, 5_000);
 
@@ -80,11 +82,11 @@ export function createWorkerService(
       cancellationWatch = interruptRuns(db, config.workerId, runControllers)
         .then((interrupted) => {
           if (interrupted > 0) {
-            console.info(JSON.stringify({ event: "worker.cancellation_interrupted", interrupted }));
+            logEvent("worker.cancellation_interrupted", { interrupted });
           }
         })
         .catch((error) => {
-          console.error(JSON.stringify({ event: "worker.cancellation_watch_failed", error: String(error) }));
+          logEvent("worker.cancellation_watch_failed", { error: String(error) }, "error");
         })
         .finally(() => {
           cancellationWatch = null;
@@ -110,32 +112,43 @@ export function createWorkerService(
           activeRuns.add(run.id);
           const controller = new AbortController();
           runControllers.set(run.id, controller);
-          const execution = executeClaimedRun(db, config, run, controller.signal)
-            .catch((error) => {
-              console.error(JSON.stringify({ event: "worker.execute_unhandled", runId: run.id, error: String(error) }));
-            })
-            .finally(() => {
-              activeRuns.delete(run.id);
-              runControllers.delete(run.id);
-              wakeup.notify();
-              const finished = endRunTrace(run.id);
-              if (finished) {
-                const latency = runLatencyRecord({
-                  runId: run.id,
-                  organizationId: run.organizationId,
-                  queuedMs: run.queuedMs ?? null,
-                  trace: finished,
-                });
-                console.info(JSON.stringify({ event: "run.latency", ...latency }));
-                // Sans attendre : la boucle de réclamation ne ralentit pas pour une mesure.
-                track(saveRunTimings(db, run, latency));
-              }
+          // The run's trace context (trace id = run id, one span per claim)
+          // covers the whole execution, its relay requests and its last lines:
+          // every one of them carries traceId/spanId (S7, ADR 0001 §4.7).
+          const execution = runWithTrace(runTraceContext(run.id), () => {
+            logEvent("worker.run_claimed", {
+              runId: run.id,
+              organizationId: run.organizationId,
+              leaseGeneration: run.leaseGeneration,
+              workerId: config.workerId,
             });
+            return executeClaimedRun(db, config, run, controller.signal)
+              .catch((error) => {
+                logEvent("worker.execute_unhandled", { runId: run.id, error: String(error) }, "error");
+              })
+              .finally(() => {
+                activeRuns.delete(run.id);
+                runControllers.delete(run.id);
+                wakeup.notify();
+                const finished = endRunTrace(run.id);
+                if (finished) {
+                  const latency = runLatencyRecord({
+                    runId: run.id,
+                    organizationId: run.organizationId,
+                    queuedMs: run.queuedMs ?? null,
+                    trace: finished,
+                  });
+                  logEvent("run.latency", latency);
+                  // Sans attendre : la boucle de réclamation ne ralentit pas pour une mesure.
+                  track(saveRunTimings(db, run, latency));
+                }
+              });
+          });
           track(execution);
           continue;
         }
       } catch (error) {
-        console.error(JSON.stringify({ event: "worker.loop_failed", error: String(error) }));
+        logEvent("worker.loop_failed", { error: String(error) }, "error");
         await wait(1_000, shutdown.signal);
       }
       await wakeup.wait(beforeClaim, config.pollMs, shutdown.signal);
@@ -146,7 +159,7 @@ export function createWorkerService(
     await cancellationWatch;
     clearInterval(metricsHeartbeat);
     await runQueueNotifications?.stop().catch(() => {
-      console.error(JSON.stringify({ event: "worker.queue_listener_close_failed" }));
+      logEvent("worker.queue_listener_close_failed", {}, "error");
     });
     for (const controller of runControllers.values()) controller.abort("worker_shutdown");
     // A pass still in flight may track more work (a review it just started):

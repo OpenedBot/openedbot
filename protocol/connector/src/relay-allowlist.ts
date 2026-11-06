@@ -253,6 +253,15 @@ export function matchRelayRoute(method: string, path: string): RelayRoute | null
   return null;
 }
 
+/**
+ * Corrélation W3C Trace Context (version `00`) d'une requête relayée. Facultatif
+ * dans les deux sens : openedbot le pose sur les requêtes d'un run, un hôte qui
+ * le connaît le journalise et le transmet tel quel au gateway s'il est bien
+ * formé (il l'écarte sinon), un hôte plus ancien l'écarte avec tout en-tête
+ * hors de cette liste. Son absence ne change rien.
+ */
+export const RELAY_TRACEPARENT_HEADER = "traceparent";
+
 /** Les seuls en-têtes de requête relayés vers le gateway ; le bearer est ajouté sur l'hôte. */
 export const RELAY_FORWARDED_REQUEST_HEADERS: ReadonlySet<string> = new Set([
   "accept",
@@ -262,6 +271,7 @@ export const RELAY_FORWARDED_REQUEST_HEADERS: ReadonlySet<string> = new Set([
   "content-type",
   "idempotency-key",
   "last-event-id",
+  RELAY_TRACEPARENT_HEADER,
 ]);
 
 /** Les seuls en-têtes de réponse relayés vers openedbot. */

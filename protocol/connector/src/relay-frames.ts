@@ -1,9 +1,10 @@
 /**
  * Trames du lien connecteur : contrat de fil partagé avec `edge-setup`
- * (`internal/connector/frames.go`). Les règles de validation sont celles de
- * `DecodeText` côté Go, et les vecteurs de
+ * (`internal/connector/frames.go`). Ce paquet (`protocol/connector`) fait foi ;
+ * `contracts/connector` le réexporte pour le reste du dépôt. Les règles de
+ * validation sont celles de `DecodeText` côté Go, et les vecteurs de
  * `platform/hermes/tests/fixtures/relay-frames.vectors.json`
- * sont identiques dans les deux dépôts : une divergence casse un test des deux
+ * sont identiques des deux côtés : une divergence casse un test des deux
  * côtés.
  */
 
@@ -35,36 +36,8 @@ export type RelayErrStage = "before_dispatch" | "after_dispatch";
 /** En-tête posé par le relais interne quand la réponse décrit une panne du LIEN, pas une réponse gateway. */
 export const RELAY_STAGE_HEADER = "X-OpenedBot-Relay-Stage";
 
-/**
- * Capacité annoncée dans `hello.features` : l'hôte sert les quatre routes
- * `/hermes-setup/providers/…` (dépôt d'un credential fournisseur par le lien).
- * Toute capacité inconnue est ignorée, jamais refusée.
- */
-export const RELAY_FEATURE_PROVIDER_MANAGEMENT = "provider_management";
-/** L'hôte sert aussi la sonde strictement lecture seule `/hermes-setup/usage`. */
-export const RELAY_FEATURE_PROVIDER_USAGE = "provider_usage";
-/**
- * L'hôte sert `GET /hermes-setup/model-context` : la fenêtre de contexte que
- * ce runtime applique au modèle configuré. Le gateway ne la publie nulle part,
- * et un hôte plus ancien ne l'annonce pas : l'appelant retombe alors sur sa
- * propre table de fenêtres par modèle.
- */
-export const RELAY_FEATURE_MODEL_CONTEXT = "model_context";
-/**
- * L'hôte sert la lecture nommée des profils Hermes déjà présents
- * (`GET /hermes-setup/profiles` et l'avatar borné). Pas d'écriture de profil.
- */
-export const RELAY_FEATURE_PROFILE_INVENTORY = "profile_inventory";
-/**
- * Feature du LIEN (jamais de l'opérateur) : l'hôte tient un audit de création
- * scellé et attend `audit.key` avant de dispatcher une création
- * (`docs/CONNECTOR.md`, « Audit de création chiffré »).
- */
-export const RELAY_FEATURE_CREATION_AUDIT_V2 = "creation_audit_v2";
-/** L'hôte sert la mémoire d'un profil (`GET`/`POST /hermes-setup/profiles/{slug}/memory`) par le magasin amont. */
-export const RELAY_FEATURE_PROFILE_MEMORY = "profile_memory";
-/** L'hôte sert `GET /hermes-setup/sessions-inventory` (identifiants de session par profil, bornés). */
-export const RELAY_FEATURE_SESSIONS_INVENTORY = "sessions_inventory";
+// Les noms de fonctionnalités vivent dans `relay-features.ts`.
+
 /**
  * Bornes de `hello.features` et de `capabilities.features` : au plus 64
  * entrées, chacune `^[a-z0-9_]{1,64}$`. C'est la borne que l'API ANNONCE à

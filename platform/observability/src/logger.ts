@@ -100,10 +100,16 @@ export function channel(name: LogChannel): pino.Logger {
  */
 const WARN_EVENT_SUFFIX = /(failed|expired|suspected|unexpected|dropped_overrun|ignored|unreadable|refused)$/;
 
-export function logEvent(event: string, fields: Record<string, unknown> = {}): void {
+export type LogEventLevel = "info" | "warn" | "error";
+
+/**
+ * `level` force le niveau quand le nom ne le dit pas (une panne inattendue du
+ * worker est une `error`, pas un `info`) ; sans lui, la règle du suffixe.
+ */
+export function logEvent(event: string, fields: Record<string, unknown> = {}, level?: LogEventLevel): void {
   const log = currentLogger();
-  if (WARN_EVENT_SUFFIX.test(event)) log.warn({ event, ...fields }, event);
-  else log.info({ event, ...fields }, event);
+  const chosen = level ?? (WARN_EVENT_SUFFIX.test(event) ? "warn" : "info");
+  log[chosen]({ event, ...fields }, event);
 }
 
 /**

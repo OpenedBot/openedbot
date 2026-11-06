@@ -1,5 +1,6 @@
 import type { BotPermissionMode, BotReplyLanguage } from "@openedbot/contracts-api";
 import { approvalPolicyMode, permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
 
 export function hostApprovalPolicyProven(input: {
   linkFeatures: readonly string[];
@@ -9,7 +10,7 @@ export function hostApprovalPolicyProven(input: {
   policyMode: string | null;
   effectiveAt: Date | string | null;
 }): boolean {
-  return input.linkFeatures.includes("approval_policy")
+  return input.linkFeatures.includes(RELAY_FEATURE_APPROVAL_POLICY)
     && input.managedProfile
     && input.permissionMode !== null
     && input.policyMode === approvalPolicyMode(input.permissionMode as BotPermissionMode, permissionPipelineOf(input.permissionPipeline))

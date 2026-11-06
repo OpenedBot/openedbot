@@ -44,10 +44,9 @@ import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-acces
 import { cancelModelSelectionProof, enqueueModelSelectionProof } from "@openedbot/runtimes/application/model-selection-proof";
 import { readProvenRuntimeModel } from "@openedbot/runtimes/sql/model-selection-proofs";
 import { followingInDb, startProfileModelSync } from "@openedbot/roster/application/bot-model-reset";
-import { PROFILE_MODEL_BATCH_FEATURE } from "@openedbot/roster/domain/bot-capabilities";
+import { RELAY_FEATURE_PROFILE_MODEL_BATCH, RELAY_FEATURE_PROVIDER_SDKS } from "@openedbot/contracts-connector/features";
 
 const ALWAYS_AUTHENTICATED_PROVIDERS = new Set(["moa"]);
-const PROVIDER_SDKS_FEATURE = "provider_sdks";
 export async function resolvedHostProfileModel(
   bot: { model?: string | null; provider?: string | null },
   runtime: { selectedProvider?: string | null; selectedModel?: string | null },
@@ -92,7 +91,7 @@ export async function readProviderSdks(
   row: Pick<RuntimeRow, "linkFeatures">,
   client: Pick<HermesClient, "hostProviderSdks">,
 ): Promise<HermesProviderSdk[] | null> {
-  if (!row.linkFeatures?.includes(PROVIDER_SDKS_FEATURE)) return null;
+  if (!row.linkFeatures?.includes(RELAY_FEATURE_PROVIDER_SDKS)) return null;
   return client.hostProviderSdks().catch(() => null);
 }
 
@@ -356,7 +355,7 @@ export function runtimeModelRoutes(db: Db, config: ApiConfig, dependencies: { sn
         const profileModelSync = candidates.length === 0 || !current ? null : startProfileModelSync(auth.organizationId, candidates, {
           client: resolved.client,
           runtime: { selectedProvider: current?.selectedProvider ?? null, selectedModel: current?.selectedModel ?? null },
-          batch: resolved.row.linkFeatures?.includes(PROFILE_MODEL_BATCH_FEATURE) ?? false,
+          batch: resolved.row.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MODEL_BATCH) ?? false,
           stillFollowing: followingInDb(db, auth.organizationId),
         }, "global_selection");
         await invalidateSnapshots(snapshots, auth.organizationId, "models");

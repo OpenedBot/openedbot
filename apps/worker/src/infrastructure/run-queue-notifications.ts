@@ -1,5 +1,6 @@
 import { SQL } from "bun";
 import type { RunQueueNotifications } from "../application/claim-wakeup";
+import { logEvent } from "@openedbot/platform-observability";
 
 export const RUN_QUEUE_CHANNEL = "openedbot_run_queue_v1";
 /** Probe cadence while no LISTEN is acknowledged. */
@@ -49,7 +50,7 @@ export function createRunQueueNotifications(databaseUrl: string, options: Listen
           if (!stopped && !listening && lastSignature !== null && signature !== lastSignature) wake();
           lastSignature = signature;
         } catch {
-          if (!probeFailing) console.warn(JSON.stringify({ event: "worker.queue_probe_failed" }));
+          if (!probeFailing) logEvent("worker.queue_probe_failed", {}, "warn");
           probeFailing = true;
         }
       })().finally(() => {
@@ -74,24 +75,23 @@ export function createRunQueueNotifications(databaseUrl: string, options: Listen
         url: databaseUrl, max: 1, idleTimeout: 0, connectionTimeout: 2,
         onclose: (error) => {
           if (stopped || !error) return;
-          console.warn(JSON.stringify({ event: "worker.queue_listener_disconnected" }));
+          logEvent("worker.queue_listener_disconnected", {}, "warn");
           listenerLost(wake);
         },
       });
       client = current;
       if (typeof current.listen !== "function") {
-        console.error(JSON.stringify({
-          event: "worker.queue_listener_unsupported",
+        logEvent("worker.queue_listener_unsupported", {
           code: "BUN_SQL_LISTEN_UNAVAILABLE",
           fallback: options.probe ? "probe" : "poll",
-        }));
+        }, "error");
         await current.close({ timeout: 1 });
         client = null;
         return;
       }
       await current.listen(RUN_QUEUE_CHANNEL, () => { if (!stopped) wake(); }, () => {
         if (stopped) return;
-        console.info(JSON.stringify({ event: "worker.queue_listener_ready", channel: RUN_QUEUE_CHANNEL }));
+        logEvent("worker.queue_listener_ready", { channel: RUN_QUEUE_CHANNEL });
         listening = true;
         if (probeTimer) clearTimeout(probeTimer);
         probeTimer = null;
@@ -101,7 +101,7 @@ export function createRunQueueNotifications(databaseUrl: string, options: Listen
       await current?.close({ timeout: 1 }).catch(() => undefined);
       if (client === current) client = null;
       if (!stopped) {
-        console.warn(JSON.stringify({ event: "worker.queue_listener_failed" }));
+        logEvent("worker.queue_listener_failed", {}, "warn");
         listenerLost(wake);
         retry = setTimeout(() => { retry = null; connecting = subscribe(wake); }, options.retryMs ?? 1_000);
       }

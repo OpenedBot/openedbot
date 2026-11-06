@@ -7,7 +7,9 @@ import {
   type RelayDialer,
   type RelayRequest,
 } from "@openedbot/hermes";
-import { RELAY_STAGE_HEADER, relayStageOf, type RelayErrStage } from "@openedbot/contracts-connector";
+import { RELAY_STAGE_HEADER, RELAY_TRACEPARENT_HEADER, relayStageOf, type RelayErrStage } from "@openedbot/contracts-connector";
+import { logEvent } from "@openedbot/platform-observability";
+import { childTraceContext, currentTrace, formatTraceparent, type TraceContext } from "@openedbot/platform-observability/trace-context";
 import type { WorkerConfig } from "./worker-config";
 
 /**
@@ -73,6 +75,12 @@ export function relayProxyUrl(apiInternalUrl: string, runtimeId: string, path: s
  * interne. Une réponse marquée `X-OpenedBot-Relay-Stage` est une panne du lien,
  * rendue comme `RelayDialError` datée de son étape pour que le transport la
  * classe (`not_sent` / `ambiguous`). Sans marque, c'est la réponse du gateway.
+ *
+ * Dans le contexte de trace d'un run (`runWithTrace`, ouvert par le worker),
+ * chaque requête part avec un `traceparent` neuf (même trace, span enfant) et
+ * laisse une ligne `worker.relay_request` : le relais (`runtime_link.relay_request`)
+ * et le connecteur (`relay … trace=… span=…`) journalisent le même couple.
+ * Hors d'un run, rien n'est ajouté.
  */
 export function createWorkerRelayDialer(
   runtimeId: string,
@@ -82,6 +90,13 @@ export function createWorkerRelayDialer(
   return async (request: RelayRequest, signal?: AbortSignal): Promise<Response> => {
     const headers = new Headers(request.headers);
     headers.set("Authorization", `Bearer ${config.apiInternalToken}`);
+    const parent = currentTrace();
+    const trace = parent ? childTraceContext(parent) : null;
+    if (trace) headers.set(RELAY_TRACEPARENT_HEADER, formatTraceparent(trace));
+    const startedAt = performance.now();
+    const journal = (outcome: { status: number } | { error: string; stage?: RelayErrStage }) => {
+      if (trace) logRelayRequest(runtimeId, request, trace, Math.round(performance.now() - startedAt), outcome);
+    };
     let response: Response;
     try {
       response = await fetchImpl(relayProxyUrl(config.runtimeLinkInternalUrl ?? config.apiInternalUrl, runtimeId, request.path), {
@@ -95,20 +110,51 @@ export function createWorkerRelayDialer(
         ...(request.body instanceof ReadableStream ? { duplex: "half" as const } : {}),
       } as RequestInit);
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") throw error;
+      if (error instanceof Error && error.name === "AbortError") {
+        journal({ error: "aborted" });
+        throw error;
+      }
       if (isConnectionRefused(error)) {
+        journal({ error: "RELAY_UNREACHABLE", stage: "before_dispatch" });
         throw new RelayDialError("Le relais du lien connecteur est injoignable.", "before_dispatch", "RELAY_UNREACHABLE", { cause: error });
       }
       // Panne réseau à une étape inconnue : sans étape, le transport classe
       // une mutation `ambiguous` : on ne prétend pas que rien n'est parti.
+      journal({ error: "RELAY_FAILED" });
       throw error;
     }
     const stage = relayStageOf(response.headers);
     if (stage === "before_dispatch" || stage === "after_dispatch") {
-      throw await relayFailure(response, stage);
+      const failure = await relayFailure(response, stage);
+      journal({ error: failure.code ?? "LINK_FAILED", stage });
+      throw failure;
     }
+    journal({ status: response.status });
     return response;
   };
+}
+
+/**
+ * La ligne du worker sur la piste d'un run : la route sans sa query (ni texte,
+ * ni identifiant de session au-delà du chemin), l'issue et le couple trace/span.
+ */
+function logRelayRequest(
+  runtimeId: string,
+  request: RelayRequest,
+  trace: TraceContext,
+  durationMs: number,
+  outcome: { status: number } | { error: string; stage?: RelayErrStage },
+): void {
+  logEvent("worker.relay_request", {
+    runtimeId,
+    method: request.method,
+    path: request.path.split("?")[0],
+    ...outcome,
+    durationMs,
+    traceId: trace.traceId,
+    spanId: trace.spanId,
+    parentSpanId: trace.parentSpanId,
+  }, "error" in outcome ? "warn" : "info");
 }
 
 async function relayFailure(response: Response, stage: RelayErrStage): Promise<RelayDialError> {

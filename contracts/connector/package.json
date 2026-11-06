@@ -10,7 +10,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./a2a": "./src/a2a.ts"
+    "./a2a": "./src/a2a.ts",
+    "./features": "./src/features.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -19,6 +20,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@openedbot/contracts-primitives": "workspace:*"
+    "@openedbot/protocol-connector": "workspace:*"
   }
 }

@@ -28,6 +28,19 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- Un message se suit d'un bout à l'autre dans les journaux d'exploitation.
+  Son run porte un identifiant de trace (l'identifiant du run sans ses
+  tirets), présent sur la ligne `run.admission` de l'API, sur chaque ligne
+  du worker pendant le run (`worker.run_claimed`, les étapes, `run.latency`),
+  sur une nouvelle ligne par requête envoyée à l'hôte
+  (`worker.relay_request`, `runtime_link.relay_request` côté passerelle) et
+  dans le journal du connecteur à partir de la prochaine version
+  d'edge-setup ; l'en-tête `traceparent` (W3C) le porte jusqu'à Hermes. Le
+  worker écrit désormais ses journaux comme l'API (pino : JSON horodaté et
+  nivelé en production, lisible en développement, mêmes noms d'événements et
+  mêmes champs) au lieu de lignes `console` ; les lignes de l'API ne changent
+  pas, `run.admission` gagne seulement `traceId`. Un connecteur déjà installé
+  continue de fonctionner : il ignore l'en-tête.
 - Le direct ne dépend plus de la réplique d'API à laquelle on est connecté.
   Chaque réplique écoute les nouveaux événements dans PostgreSQL (LISTEN) :
   une réponse qui s'écrit, une annulation ou un message ajouté par l'API

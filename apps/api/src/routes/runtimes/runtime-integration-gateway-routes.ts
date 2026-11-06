@@ -5,8 +5,9 @@ import type { AppVariables } from "../identity/auth";
 import { requireOperator } from "../identity/auth";
 import { HttpError } from "../../interfaces/http/http-error";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
-import { FEATURE_GATEWAY_RESTART, SESSION_ID_PATTERN } from "./runtime-integration-constants";
+import { SESSION_ID_PATTERN } from "./runtime-integration-constants";
 import { publicWriteError, withDeadline } from "./runtime-integration-public";
+import { RELAY_FEATURE_GATEWAY_RESTART } from "@openedbot/contracts-connector/features";
 
 /** L’état du gateway Hermes et son redémarrage. */
 export function runtimeGatewayRoutes(ctx: IntegrationRouteContext): Hono<{ Variables: AppVariables }> {
@@ -24,7 +25,7 @@ export function runtimeGatewayRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
   routes.get("/integrations/gateway", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_GATEWAY_RESTART);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_GATEWAY_RESTART);
     try {
       return context.json<RuntimeGatewayStatusDto>(publicGatewayStatus(await withDeadline(client.gatewayStatus(), timeoutMs)));
     } catch (error) {
@@ -35,7 +36,7 @@ export function runtimeGatewayRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
   routes.post("/integrations/gateway/restart", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_GATEWAY_RESTART);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_GATEWAY_RESTART);
     try {
       return context.json<RuntimeGatewayRestartDto>(publicGatewayRestart(await client.gatewayRestart()), 202);
     } catch (error) {
@@ -52,7 +53,7 @@ export function runtimeGatewayRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
     if (!SESSION_ID_PATTERN.test(jobId)) {
       throw new HttpError(404, "GATEWAY_RESTART_NOT_FOUND", "Ce redémarrage n’existe plus.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_GATEWAY_RESTART);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_GATEWAY_RESTART);
     try {
       return context.json<RuntimeGatewayRestartDto>(publicGatewayRestart(await client.gatewayRestartPoll(jobId)));
     } catch (error) {

@@ -33,7 +33,7 @@
   "modules/execution/src/application/run-steering.ts": 910,
   "modules/execution/src/application/runner/rooms.ts": 701,
   "modules/portability/src/domain/team-markdown.ts": 618,
-  "modules/roster/src/application/bots.ts": 686,
+  "modules/roster/src/application/bots.ts": 685,
   "modules/roster/src/sql/bots.ts": 640,
   "modules/runtime-link/src/application/gateway.ts": 703,
   "modules/runtime-link/src/application/link-connection.ts": 777,

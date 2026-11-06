@@ -16,7 +16,8 @@
     "./log/files": "./src/log/files.ts",
     "./log/redact": "./src/log/redact.ts",
     "./log/test-logger": "./src/log/test-logger.ts",
-    "./run-trace": "./src/run-trace.ts"
+    "./run-trace": "./src/run-trace.ts",
+    "./trace-context": "./src/trace-context.ts"
   },
   "scripts": {
     "test": "bun test tests",

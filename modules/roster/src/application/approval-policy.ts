@@ -1,6 +1,7 @@
 import { HermesClientError, type HermesApprovalPolicyMode, type HermesApprovalPolicyState, type HermesClient, type HermesClientConfig } from "@openedbot/hermes";
 import { approvalPolicyMode, type PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-contract";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
 
 export type ApprovalPolicyClient = Pick<HermesClient, "hostSetApprovalPolicy" | "hostApprovalPolicy">;
 
@@ -61,7 +62,7 @@ export async function applyHostApprovalPolicy(
   clientFactory: (config: HermesClientConfig) => ApprovalPolicyClient,
   blockedTools?: readonly string[],
 ): Promise<HermesApprovalPolicyState | null> {
-  if (!runtime.linkFeatures?.includes("approval_policy")) return null;
+  if (!runtime.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)) return null;
   return applyHostApprovalPolicyWithClient(clientFactory(runtime.client), profile, permissionMode, pipeline, blockedTools);
 }
 

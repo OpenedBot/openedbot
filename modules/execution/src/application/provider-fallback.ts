@@ -12,6 +12,7 @@ import { withTenant } from "@openedbot/platform-db";
 import { enqueueEmailReturningId } from "@openedbot/notifications/sql/email-outbox";
 import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/sql/model-selection-proofs";
 import { defaultTierModel } from "@openedbot/runtimes/domain/runtime/default-model";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 export type RunModelSelection = {
   provider: string | null;
   model: string | null;
@@ -401,9 +402,6 @@ export function providerFallbackPayload(
   };
 }
 
-/** Capacité hôte qui porte `POST /hermes-setup/profiles/<slug>/model`. */
-export const PROFILE_MANAGEMENT_FEATURE = "profile_management" as const;
-
 /**
  * Le bloc `model` du profil est la SEULE chose que le gateway lit pour router un
  * run multiplexé : sous `/p/<slug>` il ignore le `provider` du corps du run.
@@ -423,7 +421,7 @@ export async function applyFallbackProfileModel(
   capability: { linkFeatures: ReadonlyArray<string> },
   selection: { provider: string; model: string },
 ): Promise<boolean> {
-  if (!profile || !capability.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE)) return false;
+  if (!profile || !capability.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) return false;
   try {
     const result = await client.hostSetProfileModel(profile, selection);
     return result.applied;

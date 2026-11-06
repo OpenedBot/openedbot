@@ -17,9 +17,9 @@ import type { BotPermissionMode } from "@openedbot/contracts-api";
 import type { PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-contract";
 import { applyHostApprovalPolicy } from "./approval-policy";
 import type { HermesApprovalPolicyState } from "@openedbot/hermes";
-import { PROFILE_MANAGEMENT_FEATURE } from "../domain/bot-capabilities";
 import { readRegisteredRuntimeForCleanup, readRuntimeSecret, type RuntimeAccessConfig } from "@openedbot/runtimes/application/runtime-access";
 import type { Db } from "@openedbot/platform-db";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export type BotRouteClient = Pick<
   HermesClient,
@@ -176,7 +176,7 @@ export async function ensureHostProfileForRestore(
       "Enregistrez Hermes avant de restaurer ce bot : son profil doit exister sur l’hôte.",
     );
   }
-  if (!runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+  if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
     throw new HttpError(
       409,
       "PROFILE_MANAGEMENT_UNAVAILABLE",

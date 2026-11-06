@@ -2,9 +2,9 @@ import type { BotModelResetDto, BotProfileModelSyncDto } from "@openedbot/contra
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { applyHostProfileModel } from "@openedbot/portability/application/model";
-import { PROFILE_CAPABILITIES_FEATURE, PROFILE_MODEL_BATCH_FEATURE } from "../domain/bot-capabilities";
 import { botsFollowingRuntimeModel, clearBotModelOverrides } from "../sql/bots";
 import { resolvedHostProfileModel, type BotDeps, type BotRouteClient } from "./bot-host";
+import { RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MODEL_BATCH } from "@openedbot/contracts-connector/features";
 
 /** Hôte sans `profile_model_batch` : un profil par appel, borné pour ne pas saturer le relais du lien. */
 const ALIGN_CONCURRENCY = 4;
@@ -107,11 +107,11 @@ export async function resetBotModelOverrides(db: Db, deps: BotDeps, organization
   const unchanged = { cleared: cleared.length, sync: current?.status === "running" ? current : null };
   if (candidates.length === 0) return unchanged;
   const runtime = await deps.readRuntime(db, organizationId);
-  if (!runtime?.linkFeatures?.includes(PROFILE_CAPABILITIES_FEATURE)) return unchanged;
+  if (!runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) return unchanged;
   const sync = startProfileModelSync(organizationId, candidates, {
     client: deps.clientFactory(runtime.client),
     runtime,
-    batch: runtime.linkFeatures.includes(PROFILE_MODEL_BATCH_FEATURE),
+    batch: runtime.linkFeatures.includes(RELAY_FEATURE_PROFILE_MODEL_BATCH),
     stillFollowing: followingInDb(db, organizationId),
   });
   return { cleared: cleared.length, sync };

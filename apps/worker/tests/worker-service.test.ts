@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import type { ClaimedRun } from "@openedbot/execution/application/queue";
 import type { TransactionalEmailSender } from "@openedbot/notifications/application/email";
@@ -7,6 +7,9 @@ import type { BackgroundJob } from "../src/application/background-jobs";
 import { maintenanceJobs } from "../src/application/maintenance-jobs";
 import { createWorkerService, type WorkerServiceDependencies } from "../src/application/worker-service";
 import { createRunQueueNotifications } from "../src/infrastructure/run-queue-notifications";
+import { logger } from "@openedbot/platform-observability";
+import { captureLogEvents, createTestLogger, runWithLogger } from "@openedbot/platform-observability/log/test-logger";
+import { traceIdOfRun } from "@openedbot/platform-observability/trace-context";
 
 const db = (() => { throw new Error("the worker loop must not query the database itself"); }) as unknown as SQL;
 const config = {
@@ -69,13 +72,14 @@ function fakeDependencies(jobs: BackgroundJob[], order: string[] = []) {
 }
 
 describe("worker claim loop", () => {
+  // The loop logs through the common logger; keep the test output quiet.
+  let level = logger.level;
   beforeEach(() => {
-    spyOn(console, "info").mockImplementation(() => undefined);
-    spyOn(console, "error").mockImplementation(() => undefined);
+    level = logger.level;
+    logger.level = "silent";
   });
   afterEach(() => {
-    (console.info as unknown as { mockRestore(): void }).mockRestore();
-    (console.error as unknown as { mockRestore(): void }).mockRestore();
+    logger.level = level;
   });
 
   for (const jobName of ["email-outbox", "push-notifications"]) test(`a held ${jobName} never delays the next claim, and shutdown still waits for it`, async () => {
@@ -248,32 +252,63 @@ describe("worker claim loop", () => {
       run: async () => { throw new Error("push provider down"); },
     };
     const { queue, dependencies } = fakeDependencies([failing]);
-    const worker = createWorkerService(db, config, dependencies);
-    const running = worker.run();
-
-    queue.insert("run-1");
-    await until(() => queue.claimed.length === 1);
-    worker.stop("SIGTERM");
-    await running;
+    const { records } = await captureLogEvents(async () => {
+      const worker = createWorkerService(db, config, dependencies);
+      const running = worker.run();
+      queue.insert("run-1");
+      await until(() => queue.claimed.length === 1);
+      worker.stop("SIGTERM");
+      await running;
+    });
 
     expect(queue.claimed[0]!.queuedMs!).toBeLessThan(250);
-    const failures = (console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls
-      .map(([line]) => JSON.parse(String(line)) as { event: string; job?: string });
-    expect(failures).toContainEqual(expect.objectContaining({ event: "worker.job_failed", job: "push-notifications" }));
+    expect(records).toContainEqual(expect.objectContaining({ level: 50, event: "worker.job_failed", job: "push-notifications" }));
   });
 
   test("a rejected tracked execution does not create an unhandled cleanup promise", async () => {
     const { queue, dependencies } = fakeDependencies([]);
     dependencies.executeRun = async () => { throw new Error("runner failed"); };
     // A failed output sink can also reject the runner's error handler.
-    (console.error as unknown as { mockImplementationOnce(callback: () => never): void })
-      .mockImplementationOnce(() => { throw new Error("output sink closed"); });
+    const { logger: sink } = createTestLogger();
+    const write = sink.error.bind(sink);
+    let broken = true;
+    sink.error = ((...args: Parameters<typeof write>) => {
+      if (broken) { broken = false; throw new Error("output sink closed"); }
+      return write(...args);
+    }) as typeof sink.error;
     queue.insert("run-1"); queue.insert("run-2");
-    const worker = createWorkerService(db, config, dependencies);
-    const running = worker.run();
-    try { await until(() => queue.claimed.length === 2); }
-    finally { worker.stop("SIGTERM"); await running; }
+    await runWithLogger(sink, async () => {
+      const worker = createWorkerService(db, config, dependencies);
+      const running = worker.run();
+      try { await until(() => queue.claimed.length === 2); }
+      finally { worker.stop("SIGTERM"); await running; }
+    });
+    expect(broken).toBe(false);
     expect(queue.claimed.map((run) => run.id)).toEqual(["run-1", "run-2"]);
+  });
+
+  test("every line of a claimed run carries the run's trace; the loop's own lines do not", async () => {
+    const { queue, dependencies } = fakeDependencies([]);
+    dependencies.executeRun = async (_db, _config, run) => {
+      const { logEvent } = await import("@openedbot/platform-observability");
+      logEvent("run.step", { runId: run.id });
+      await Bun.sleep(1);
+      logEvent("run.later_step", { runId: run.id });
+    };
+    queue.insert("run-1"); queue.insert("run-2");
+    const { records } = await captureLogEvents(async () => {
+      const worker = createWorkerService(db, config, dependencies);
+      const running = worker.run();
+      try { await until(() => queue.claimed.length === 2); await Bun.sleep(20); }
+      finally { worker.stop("SIGTERM"); await running; }
+    });
+    for (const runId of ["run-1", "run-2"]) {
+      const lines = records.filter((record) => record.runId === runId);
+      expect(lines.map((record) => record.event)).toEqual(["worker.run_claimed", "run.step", "run.later_step", "run.latency"]);
+      expect(new Set(lines.map((record) => record.traceId))).toEqual(new Set([traceIdOfRun(runId)]));
+      expect(new Set(lines.map((record) => record.spanId)).size).toBe(1);
+    }
+    expect(records.filter((record) => record.runId === undefined).every((record) => record.traceId === undefined)).toBe(true);
   });
 
   test("shutdown waits for the reviews a pass started without awaiting, even one started while draining", async () => {

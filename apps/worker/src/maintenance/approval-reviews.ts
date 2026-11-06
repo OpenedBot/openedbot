@@ -3,6 +3,7 @@ import { claimReviewGates, reviewGate, type ReviewDeps } from "@openedbot/execut
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
 import { REVIEW_PROFILE } from "@openedbot/runtimes/domain/runtime-contract";
 import type { WorkerConfig } from "../config";
+import { logEvent } from "@openedbot/platform-observability";
 
 /** Reviews in flight in this worker; each one is bounded by the 15 s budget. */
 const MAX_IN_FLIGHT = 8;
@@ -36,7 +37,7 @@ export async function processApprovalReviews(
   };
   for (const job of jobs) {
     const review: Promise<void> = reviewGate(db, job, deps)
-      .catch(() => console.error(JSON.stringify({ event: "approval.review_failed", runId: job.runId })))
+      .catch(() => logEvent("approval.review_failed", { runId: job.runId }, "error"))
       .finally(() => { inFlight.delete(review); });
     inFlight.add(review);
     track?.(review);

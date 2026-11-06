@@ -11,6 +11,7 @@ import { resolveImportedModel } from "./model";
 import { profileCreationFailureState } from "./provision";
 import { lockProfileImports } from "../sql/reservations";
 import { createImportedGroups, importHermesProfile, importObjectKey, type ImportBlobStore } from "../sql/roster";
+import { RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export type ImportExecutorClient = Pick<HermesClient,
   "hostCreateProfile" | "hostDeleteProfile" | "hostSetProfileModel" | "hostProfileInventory" |
@@ -148,7 +149,7 @@ export async function executeProfileImport(db: SQL, claimed: ImportJobRow, deps:
     if (items.some((item) => item.operation !== null)) throw new AmbiguousImportMutation();
     if (job.phase !== "prevalidation") return;
     const runtime = await guarded((tx) => runtimeIn(tx));
-    if (!runtime.link_features.includes("profile_management")) throw new ProfileImportError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
+    if (!runtime.link_features.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) throw new ProfileImportError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
     for (const item of items) {
       if (!item.entry) throw new Error("Missing import projection");
       const resolved = await resolveImportedModel(item.entry, { selectedModel: runtime.selected_model, selectedProvider: runtime.selected_provider }, loadCatalog);
@@ -262,7 +263,7 @@ export async function executeProfileImport(db: SQL, claimed: ImportJobRow, deps:
       let before: HermesHostProfile | undefined;
       try { before = (await root.hostProfileInventory()).profiles.find((profile) => profile.name === item.slug); }
       catch { await note(item, `capabilities-reread-failed:${item.slug}`); }
-      if (!runtime.link_features.includes("profile_capabilities")) await note(item, `per-bot-capabilities-not-applied:${item.slug}`);
+      if (!runtime.link_features.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) await note(item, `per-bot-capabilities-not-applied:${item.slug}`);
       else {
         for (const flag of entry.toolsets) {
           if (ALWAYS_FORBIDDEN_TOOLSETS.has(flag.name)) { await note(item, `toolset-forbidden:${item.slug}:${flag.name}`); continue; }

@@ -1239,6 +1239,10 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 		c.sendErr(send, f.ID, "HERMES_LINK_PATH_FORBIDDEN", "route not in the connector allowlist", StageBeforeDispatch)
 		return
 	}
+	trace, traced := traceOf(f.Headers)
+	if traced {
+		c.logRelayTrace(f, trace)
+	}
 	c.mu.Lock()
 	if len(c.inflight) >= MaxInFlight {
 		c.mu.Unlock()
@@ -1298,9 +1302,12 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 		return
 	}
 	for k, v := range f.Headers {
-		if ForwardedRequestHeaders[strings.ToLower(k)] {
+		if name := strings.ToLower(k); ForwardedRequestHeaders[name] && name != TraceparentHeader {
 			req.Header.Set(k, v)
 		}
+	}
+	if traced {
+		req.Header.Set(TraceparentHeader, trace.Header)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Bearer)
 	req.Header.Del("Cookie")

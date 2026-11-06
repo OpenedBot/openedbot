@@ -31,8 +31,8 @@ public release; in case of doubt, the test vectors are authoritative.
 # Connecteur : contrat de fil entre `edge-setup` et openedbot
 
 Ce document est **le** contrat partagé par les deux dépôts. Côté openedbot
-il est incarné (dépôt `OpenedBot/openedbot`) par `contracts/connector/src/relay-frames.ts` et
-`relay-allowlist.ts` ; côté `edge-setup` par `internal/connector/frames.go`
+il est incarné (dépôt `OpenedBot/openedbot`) par `protocol/connector/src/relay-frames.ts`,
+`relay-allowlist.ts` et `relay-features.ts` (réexportés par `contracts/connector`) ; côté `edge-setup` par `internal/connector/frames.go`
 et `allowlist.go`. Les vecteurs de test (`test/golden/relay-frames/`) sont
 identiques dans les deux dépôts : une divergence casse un test des deux côtés.
 
@@ -143,7 +143,9 @@ Trames **binaires** : `[u32 BE id][bytes]`, un fragment de corps pour le flux
 
 ### En-têtes
 
-Vers l'hôte : `Accept`, `Cache-Control`, `Content-Type`, `Idempotency-Key`, `Last-Event-ID`. `Cache-Control: no-cache` sur `GET /hermes-setup/usage` demande une sonde neuve à l'opérateur au lieu de sa lecture en cache (une minute).
+Vers l'hôte : `Accept`, `Cache-Control`, `Content-Type`, `Idempotency-Key`, `Last-Event-ID`, `traceparent`. `Cache-Control: no-cache` sur `GET /hermes-setup/usage` demande une sonde neuve à l'opérateur au lieu de sa lecture en cache (une minute).
+
+`traceparent` ([W3C Trace Context](https://www.w3.org/TR/trace-context/), version `00`) est facultatif dans les deux sens. openedbot le pose sur chaque requête d'un run : le trace-id est l'identifiant du run sans ses tirets, le span-id change à chaque requête. Un hôte qui le connaît inscrit une ligne `relay <MÉTHODE> <chemin sans query> trace=<trace-id> span=<span-id>` dans son journal, une fois la route admise par l'allowlist, et transmet la valeur telle quelle au gateway (pas à l'opérateur). Une valeur mal formée, ou deux en-têtes `traceparent` dans la même trame, sont écartés sans erreur : ni relayés, ni journalisés. Un hôte plus ancien l'écarte comme tout en-tête hors de cette liste, et un openedbot plus ancien ne l'envoie pas : dans les deux cas la requête est servie à l'identique.
 Jamais `Authorization`, `Cookie`, `Host` : l'hôte les retire s'ils arrivent et
 ajoute lui-même `Authorization: Bearer <API_SERVER_KEY>` (lu depuis
 `$CREDENTIALS_DIRECTORY/runtime.env`). Cible fixe `http://127.0.0.1:8642`.

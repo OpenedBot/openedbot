@@ -15,11 +15,6 @@ import { withBotProfileLock } from "@openedbot/portability/application/profile-i
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import {
-  PROFILE_CAPABILITIES_FEATURE,
-  PROFILE_CREDENTIALS_FEATURE,
-  PROFILE_MANAGEMENT_FEATURE,
-  PROFILE_MEMORY_FEATURE,
-  TOOLSET_MANAGEMENT_FEATURE,
   botCapabilities,
   profileCapabilityError,
   profileMcpServers,
@@ -47,6 +42,7 @@ import {
   resolvedHostProfileModel,
   type BotDeps,
 } from "./bot-host";
+import { RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_CREDENTIALS, RELAY_FEATURE_PROFILE_MANAGEMENT, RELAY_FEATURE_PROFILE_MEMORY, RELAY_FEATURE_TOOLSET_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /**
  * Ce que ce bot peut appeler, et ce qu'il a appelé.
@@ -79,7 +75,7 @@ export async function readBotCapabilitiesView(
   let mcpServers: BotMcpServerDto[] | null = null;
   let profileSkills: HermesProfileNamedFlag[] | null = null;
   let hostToolsets: HermesHostToolsets | null = null;
-  const profileCapabilities = Boolean(found.profile && runtime?.linkFeatures?.includes(PROFILE_CAPABILITIES_FEATURE));
+  const profileCapabilities = Boolean(found.profile && runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_CAPABILITIES));
   if (runtime) {
     // Every read leaves at once. On a cold host each operator read starts its
     // own interpreter (1 to 3 s, measured 2026-10-31 on the lab runtime);
@@ -87,7 +83,7 @@ export async function readBotCapabilitiesView(
     // the slowest. Each one still fails on its own.
     // The toolset availability is best effort: an extra proof whose absence
     // only leaves every toolset `available: null` (not measured).
-    const hostToolsetsRead = runtime.linkFeatures?.includes(TOOLSET_MANAGEMENT_FEATURE)
+    const hostToolsetsRead = runtime.linkFeatures?.includes(RELAY_FEATURE_TOOLSET_MANAGEMENT)
       ? clientFactory(runtime.client).hostToolsets().catch(() => null)
       : Promise.resolve(null);
     const profileReads = profileCapabilities
@@ -120,7 +116,7 @@ export async function readBotCapabilitiesView(
     scope: profileCapabilities ? "profile" : "runtime",
     writable: profileCapabilities && input.canWrite,
     profileSkills,
-    profileManagement: Boolean(runtime?.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)),
+    profileManagement: Boolean(runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)),
     runtimeName: runtime?.name ?? null,
     inventory,
     hostToolsets,
@@ -144,7 +140,7 @@ export async function createBotProfile(
     await assertBotProfileReady(db, organizationId, botId);
     const runtime = await readRuntime(db, organizationId);
     if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de créer un profil.");
-    if (!runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+    if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la création de profils.");
     }
     const target = await withTenant(db, organizationId, (tx) => lockBotForProfile(tx, organizationId, botId));
@@ -211,7 +207,7 @@ export async function readBotProfileStatus(
   if (!target) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
   const runtime = target.profile ? await readRuntime(db, organizationId) : null;
   const state = !target.profile ? "none" : runtime ? await hostProfileState(clientFactory(runtime.client), target.profile) : "unknown";
-  const canRepair = state === "missing" && Boolean(runtime?.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE));
+  const canRepair = state === "missing" && Boolean(runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT));
   // Only worth a catalog round trip when a repair is on offer. An unreadable
   // catalog asks for nothing: the repair itself then says what is missing.
   let runtimeHasModel = true;
@@ -279,7 +275,7 @@ export async function repairBotProfile(
     if (!target.profile) throw new HttpError(409, "HERMES_PROFILE_REQUIRED", "Ce bot ne possède pas encore de profil Hermes.");
     const runtime = await readRuntime(db, organizationId);
     if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de recréer un profil.");
-    if (!runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+    if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la création de profils.");
     }
     const state = await hostProfileState(clientFactory(runtime.client), target.profile);
@@ -370,7 +366,7 @@ export async function setBotCapability(
       deps,
       organizationId,
       botId,
-      PROFILE_CAPABILITIES_FEATURE,
+      RELAY_FEATURE_PROFILE_CAPABILITIES,
       CAPABILITIES_UNAVAILABLE,
     );
     const client = deps.clientFactory(runtime.client);
@@ -402,7 +398,7 @@ export async function setBotCredential(
       deps,
       organizationId,
       botId,
-      PROFILE_CREDENTIALS_FEATURE,
+      RELAY_FEATURE_PROFILE_CREDENTIALS,
       CREDENTIALS_UNAVAILABLE,
     );
     try {
@@ -439,7 +435,7 @@ export async function readBotRuntimeMemory(
   if (!target.profile) return { available: false, reason: "no_profile" } satisfies BotRuntimeMemoryDto;
   const runtime = await deps.readRuntime(db, organizationId);
   if (!runtime) return { available: false, reason: "runtime_missing" } satisfies BotRuntimeMemoryDto;
-  if (!runtime.linkFeatures?.includes(PROFILE_MEMORY_FEATURE)) {
+  if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MEMORY)) {
     return { available: false, reason: "feature_missing" } satisfies BotRuntimeMemoryDto;
   }
   try {
@@ -462,7 +458,7 @@ export async function writeBotRuntimeMemory(
   if (!target) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
   if (!target.profile) throw new HttpError(409, "HERMES_PROFILE_REQUIRED", "Ce bot ne possède pas encore de profil Hermes.");
   const runtime = await deps.readRuntime(db, organizationId);
-  if (!runtime || !runtime.linkFeatures?.includes(PROFILE_MEMORY_FEATURE)) {
+  if (!runtime || !runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MEMORY)) {
     throw new HttpError(409, "PROFILE_MEMORY_UNAVAILABLE", "L’hôte Hermes ne sert pas la mémoire des profils.");
   }
   try {

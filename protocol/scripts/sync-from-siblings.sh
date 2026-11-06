@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
-# Refresh this repository from the two implementations of the wire contract,
-# in the same monorepo: the root .. (TypeScript) and ../edge-setup (Go).
+# Refresh the copied parts of this directory from the monorepo: the tests of
+# the root .. (platform/hermes/tests/transport) and the golden files and spec
+# of ../edge-setup (Go). The codec itself (connector/src) is NOT copied: it is
+# the source of truth, and the root's contracts/connector re-exports it.
 # Run it after either side changes the contract, then `bun run check`, then
 # review the diff and bump SPEC.md / CHANGELOG.md.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 main="${OPENEDBOT_MAIN_DIR:-$root/..}"
 edge="${EDGE_SETUP_DIR:-$root/../edge-setup}"
-[ -d "$main/contracts/connector/src" ] || { echo "missing $main" >&2; exit 2; }
+[ -d "$main/platform/hermes/tests/transport" ] || { echo "missing $main" >&2; exit 2; }
 [ -d "$edge/test/golden" ] || { echo "missing $edge" >&2; exit 2; }
-
-for f in relay-frames.ts relay-allowlist.ts a2a.ts index.ts; do
-  cp "$main/contracts/connector/src/$f" "$root/connector/src/$f"
-done
-# The only workspace import of the contract: vendored as ./uuid.
-sed -i.bak 's#from "@openedbot/contracts-primitives"#from "./uuid"#' "$root/connector/src/relay-frames.ts"
-rm -f "$root/connector/src/relay-frames.ts.bak"
 
 for f in relay-frames.test.ts relay-allowlist.test.ts relay-frames-audit.test.ts; do
   sed 's#from "@openedbot/contracts-connector"#from "../src/index"#' \

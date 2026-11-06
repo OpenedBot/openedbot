@@ -17,6 +17,7 @@
     "@openedbot/browser-i18n": "workspace:*",
     "@openedbot/browser-ui-kit": "workspace:*",
     "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
     "@openedbot/contracts-events": "workspace:*",
     "@openedbot/contracts-locale": "workspace:*",
     "@openedbot/contracts-native-bridge": "workspace:*",

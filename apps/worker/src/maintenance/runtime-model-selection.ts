@@ -9,8 +9,8 @@ import { withProfileNamesLock } from "@openedbot/portability/application/profile
 import { PROFILE_SERVE_WAIT } from "@openedbot/roster/application/profile-provisions";
 import { alignProfileModels, followingInDb } from "@openedbot/roster/application/bot-model-reset";
 import type { WorkerConfig } from "../config";
-
-const PROFILE_MODEL_BATCH_FEATURE = "profile_model_batch";
+import { RELAY_FEATURE_PROFILE_MODEL_BATCH } from "@openedbot/contracts-connector/features";
+import { logEvent } from "@openedbot/platform-observability";
 
 export async function processRuntimeModelSelection(db: SQL, config: WorkerConfig, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return;
@@ -102,16 +102,15 @@ export async function alignFollowers(db: Db, job: ModelProofJob, runtimeClient: 
   await alignProfileModels(sync, candidates, {
     client: runtimeClient,
     runtime: { selectedProvider: job.provider, selectedModel: job.model },
-    batch: job.link_features.includes(PROFILE_MODEL_BATCH_FEATURE),
+    batch: job.link_features.includes(RELAY_FEATURE_PROFILE_MODEL_BATCH),
     stillFollowing: followingInDb(db, job.organization_id),
   });
-  console.info(JSON.stringify({
-    event: "runtime_model_selection.followers",
+  logEvent("runtime_model_selection.followers", {
     runtimeId: job.runtime_id,
     organizationId: job.organization_id,
     total: sync.total,
     aligned: sync.aligned,
     failed: sync.failed,
     durationMs: Math.round(performance.now() - started),
-  }));
+  });
 }

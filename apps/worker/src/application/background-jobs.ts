@@ -1,3 +1,4 @@
+import { logEvent } from "@openedbot/platform-observability";
 export type BackgroundJob = {
   /** Stable name, logged as `job` when the pass throws. */
   name: string;
@@ -40,7 +41,7 @@ export function createBackgroundJobs(
       const execution = Promise.resolve()
         .then(() => job.run(signal, track))
         .catch((error) => {
-          console.error(JSON.stringify({ event: "worker.job_failed", job: job.name, error: String(error) }));
+          logEvent("worker.job_failed", { job: job.name, error: String(error) }, "error");
         })
         .finally(() => {
           running.delete(job.name);
@@ -54,7 +55,7 @@ export function createBackgroundJobs(
 }
 
 /**
- * Runs one maintenance pass and turns a throw into a single `console.error`
+ * Runs one maintenance pass and turns a throw into a single error log
  * line named `event`, so the job's next tick still runs. The error text joins
  * the line only with `withError`: leave it off when the message could carry a
  * customer value.
@@ -67,6 +68,6 @@ export async function guardedPass(
   try {
     await pass();
   } catch (error) {
-    console.error(JSON.stringify(options.withError ? { event, error: String(error) } : { event }));
+    logEvent(event, options.withError ? { error: String(error) } : {}, "error");
   }
 }

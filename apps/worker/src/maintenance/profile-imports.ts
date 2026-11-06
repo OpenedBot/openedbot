@@ -6,6 +6,7 @@ import { createRuntimeClient } from "@openedbot/execution/application/runtime-cl
 import { deleteBlob } from "../infrastructure/blob-store";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
+import { logEvent } from "@openedbot/platform-observability";
 
 function importBlobs(config: WorkerConfig): ImportBlobStore {
   return {
@@ -32,7 +33,7 @@ export async function processProfileImport(db: SQL, config: WorkerConfig, signal
   if (signal.aborted) return;
   const job = await claimProfileImport(db, config.workerId);
   if (!job) return;
-  console.info(JSON.stringify({ event: "profile_import.started", jobId: job.id, organizationId: job.organization_id, generation: job.lease_generation }));
+  logEvent("profile_import.started", { jobId: job.id, organizationId: job.organization_id, generation: job.lease_generation });
   await executeProfileImport(db, job, {
     signal, blobs: importBlobs(config),
     client: (runtimeId, profile) => createRuntimeClient({
@@ -40,7 +41,7 @@ export async function processProfileImport(db: SQL, config: WorkerConfig, signal
       tokenCiphertext: null, tokenNonce: null, tokenTag: null, tokenKeyId: null, hermesProfile: profile ?? null,
     }, config),
   });
-  console.info(JSON.stringify({ event: "profile_import.execution_stopped", jobId: job.id }));
+  logEvent("profile_import.execution_stopped", { jobId: job.id });
 }
 
 export { purgeOldProfileImports };

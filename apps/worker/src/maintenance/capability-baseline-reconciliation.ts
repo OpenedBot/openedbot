@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { HermesClientError, PROFILE_TOOLSETS_BATCH_FEATURE, type HermesProfileInventory } from "@openedbot/hermes";
+import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
 import {
   BASELINE_REQUIRED_FEATURES,
@@ -13,6 +13,8 @@ import { withBotProfileLock } from "@openedbot/portability/application/profile-i
 import type { Db } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import type { WorkerConfig } from "../config";
+import { RELAY_FEATURE_APPROVAL_POLICY, RELAY_FEATURE_PROFILE_TOOLSETS_BATCH } from "@openedbot/contracts-connector/features";
+import { logEvent } from "@openedbot/platform-observability";
 
 const BATCH_SIZE = 50;
 const BASELINE_RETRY_BASE_MS = 30_000;
@@ -87,8 +89,8 @@ export async function reconcileCapabilityBaselines(
     toolsets_batch: boolean;
   }>>`
     select b.id as bot_id, b.organization_id, rt.id as runtime_id, b.hermes_profile as profile,
-           rt.link_features @> array['approval_policy']::text[] as host_holds_policy,
-           rt.link_features @> array[${PROFILE_TOOLSETS_BATCH_FEATURE}]::text[] as toolsets_batch
+           rt.link_features @> array[${RELAY_FEATURE_APPROVAL_POLICY}]::text[] as host_holds_policy,
+           rt.link_features @> array[${RELAY_FEATURE_PROFILE_TOOLSETS_BATCH}]::text[] as toolsets_batch
       from bots b
       join runtimes rt on rt.organization_id = b.organization_id and rt.is_active and rt.revoked_at is null
      where b.hermes_profile_managed
@@ -144,12 +146,11 @@ export async function reconcileCapabilityBaselines(
       const row = inventory.profiles.find((profile) => profile.name === bot.profile);
       if (!row) {
         recordFailure(key, now());
-        console.info(JSON.stringify({
-          event: "worker.capability_baseline_profile_missing",
+        logEvent("worker.capability_baseline_profile_missing", {
           botId: bot.bot_id,
           organizationId: bot.organization_id,
           profile: bot.profile,
-        }));
+        });
         continue;
       }
       // Même verrou que `updateBot` et la provision : la version est relue sous
@@ -165,17 +166,15 @@ export async function reconcileCapabilityBaselines(
         // Not a failure: the approval policy reconciliation proves the gate,
         // this pass comes back on the usual backoff.
         recordFailure(key, now());
-        console.info(JSON.stringify({
-          event: "worker.capability_baseline_waiting_policy",
+        logEvent("worker.capability_baseline_waiting_policy", {
           botId: bot.bot_id,
           organizationId: bot.organization_id,
-        }));
+        });
         continue;
       }
       failuresByBot.delete(key);
       if (!applied) continue;
-      console.info(JSON.stringify({
-        event: "worker.capability_baseline_applied",
+      logEvent("worker.capability_baseline_applied", {
         botId: bot.bot_id,
         organizationId: bot.organization_id,
         profile: bot.profile,
@@ -186,20 +185,19 @@ export async function reconcileCapabilityBaselines(
         additive: applied.additive,
         bundled: applied.bundled,
         version: CAPABILITY_BASELINE_VERSION,
-      }));
+      });
     } catch (error) {
       const cause = error instanceof HermesClientError
         ? { code: error.code, status: error.status }
         : { code: null, status: null };
       const outcome = recordFailure(key, now(), cause.code === "PROFILE_UNVERIFIED");
-      console.info(JSON.stringify({
-        event: outcome.reported ? "worker.capability_baseline_stuck" : "worker.capability_baseline_failed",
+      logEvent(outcome.reported ? "worker.capability_baseline_stuck" : "worker.capability_baseline_failed", {
         botId: bot.bot_id,
         organizationId: bot.organization_id,
         ...cause,
         attempt: outcome.failures,
         stuck: outcome.stuck,
-      }));
+      });
     }
   }
 }
@@ -347,8 +345,8 @@ export async function provisionCapabilityBaseline(
 ): Promise<"applied" | "current" | "pending" | "unsupported"> {
   const rows = await db<Array<{ profile: string; host_holds_policy: boolean; toolsets_batch: boolean }>>`
     select b.hermes_profile as profile,
-           rt.link_features @> array['approval_policy']::text[] as host_holds_policy,
-           rt.link_features @> array[${PROFILE_TOOLSETS_BATCH_FEATURE}]::text[] as toolsets_batch
+           rt.link_features @> array[${RELAY_FEATURE_APPROVAL_POLICY}]::text[] as host_holds_policy,
+           rt.link_features @> array[${RELAY_FEATURE_PROFILE_TOOLSETS_BATCH}]::text[] as toolsets_batch
       from bots b
       join runtimes rt on rt.organization_id = b.organization_id and rt.id = ${job.runtime_id}
                       and rt.is_active and rt.revoked_at is null
@@ -383,8 +381,7 @@ export async function provisionCapabilityBaseline(
   }, settable, now));
   if (!applied) return "current";
   if (applied.pending) return "pending";
-  console.info(JSON.stringify({
-    event: "worker.capability_baseline_applied",
+  logEvent("worker.capability_baseline_applied", {
     botId: job.bot_id,
     organizationId: job.organization_id,
     profile: bot.profile,
@@ -396,6 +393,6 @@ export async function provisionCapabilityBaseline(
     bundled: applied.bundled,
     version: CAPABILITY_BASELINE_VERSION,
     during: "provision",
-  }));
+  });
   return "applied";
 }

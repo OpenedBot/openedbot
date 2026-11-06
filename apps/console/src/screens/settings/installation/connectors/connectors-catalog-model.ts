@@ -1,13 +1,12 @@
 import type { BotDto, BotFaceSpec, RuntimeHostProfileDto, RuntimeIntegrationMcpServerDto } from "@openedbot/contracts-api";
 import {
-  MCP_OAUTH_PROFILE_FEATURE,
-  MCP_PROFILE_DISCONNECT_FEATURE,
   mcpCatalogRootMatch,
   mcpConnectorEntry,
   type McpConnectorCategory,
   type McpConnectorEntry,
 } from "@openedbot/runtimes/domain/mcp-connector-catalog";
 import type { MessageKey } from "../../../../lib/i18n";
+import { RELAY_FEATURE_MCP_OAUTH_PROFILE, RELAY_FEATURE_MCP_PROFILE_DISCONNECT } from "@openedbot/contracts-connector/features";
 
 /**
  * Les règles de la page Réglages › Connecteurs, sans React : ce qui s'affiche
@@ -88,7 +87,7 @@ export function mcpConnectBlocker(input: {
 }): McpConnectBlocker {
   if (input.hasProfile === false) return "profile";
   if (!input.writable) return "role";
-  if (input.featuresPending || input.features.includes(MCP_OAUTH_PROFILE_FEATURE)) return null;
+  if (input.featuresPending || input.features.includes(RELAY_FEATURE_MCP_OAUTH_PROFILE)) return null;
   return "host";
 }
 
@@ -180,6 +179,6 @@ export function mcpDisconnectBlocker(input: {
   features: readonly string[];
 }): McpDisconnectBlocker {
   if (!input.writable) return "role";
-  if (input.featuresPending || input.features.includes(MCP_PROFILE_DISCONNECT_FEATURE)) return null;
+  if (input.featuresPending || input.features.includes(RELAY_FEATURE_MCP_PROFILE_DISCONNECT)) return null;
   return "host";
 }

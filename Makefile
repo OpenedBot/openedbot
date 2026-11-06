@@ -367,10 +367,10 @@ link-gateway-install: ## [HERMES] Installe le service utilisateur systemd sans l
 	@bun scripts/runtime-link-service.ts --install
 
 # ─── Qualité ─────────────────────────────────────────────────────────────────
-.PHONY: typecheck deps-check license-check test-unit test-dual solo-check bundle-budget test-integration test check
+.PHONY: typecheck deps-check license-check test-unit test-dual solo-check bundle-budget test-integration test-trace-legacy test check
 
 typecheck: ## Typechecke tous les workspaces actifs, puis tests/, scripts/ et apps/console/scripts (tsconfig.json racine).
-	bun run --filter api --filter worker --filter link-gateway --filter console --filter desktop-tauri --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter '@openedbot/browser-*' --filter './modules/*' typecheck
+	bun run --filter api --filter worker --filter link-gateway --filter console --filter desktop-tauri --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter @openedbot/protocol-connector --filter '@openedbot/browser-*' --filter './modules/*' typecheck
 	bunx tsc --noEmit -p tsconfig.json
 
 # Seules les couches présentes sont passées : dependency-cruiser refuse un
@@ -382,7 +382,7 @@ deps-check: ## Frontières entre applications, paquets et couches (.dependency-c
 	bun tests/scripts/permission-port-contract.ts
 	bun tests/scripts/subscription-port-contract.ts
 	bun tests/scripts/payment-provider-contract.ts
-	bunx depcruise --config .dependency-cruiser.cjs --output-type err $(wildcard apps platform contracts browser modules tests scripts)
+	bunx depcruise --config .dependency-cruiser.cjs --output-type err $(wildcard apps platform contracts protocol/connector browser modules tests scripts)
 	bunx depcruise --config .dependency-cruiser.cjs --output-type err --ts-config $(CURDIR)/apps/console/tsconfig.json apps/console
 	$(MAKE) --no-print-directory license-check
 
@@ -392,7 +392,7 @@ license-check: ## Licences des paquets tiers de bun.lock (transitifs compris) : 
 UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et scripts, sans réseau ni PostgreSQL.
-	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
+	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
 	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts tests/scripts/run-events-contract.test.ts apps/desktop-tauri/scripts
 	python3 -B tests/scripts/provider-fault-cleanup.test.py
 	# Découverte automatique : tout *.test.ts(x) sous apps/console/tests joue,
@@ -547,9 +547,18 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/text-array-binds.ts
 	bun tests/integration/provider-fallback-stream.ts
 	bun tests/integration/run-stop-cause.ts
+	# S7 : un run suivi de bout en bout par un seul trace-id (API, worker, passerelle, connecteur Go réel, Hermes) ; exige go.
+	bun tests/integration/run-trace-correlation.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.
 	bun tests/integration/worker-queue-notifications.ts
 	bun tests/integration/realtime-listen.ts
+
+# Le connecteur PUBLIÉ (tag edge-setup/vX.Y.Z, présent localement) contre ce
+# serveur : le run aboutit, le worker et la passerelle journalisent la trace,
+# le vieux connecteur écarte `traceparent` sans rien casser.
+TRACE_LEGACY_REF ?= edge-setup/v1.5.0
+test-trace-legacy: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Preuve S7 avec un connecteur déjà publié (TRACE_LEGACY_REF, défaut edge-setup/v1.5.0) ; exige go et le tag.
+	OPENEDBOT_TRACE_E2E_LEGACY_REF=$(TRACE_LEGACY_REF) bun tests/integration/run-trace-correlation.ts
 
 test: test-unit test-integration ## Unitaires et intégration.
 

@@ -20,10 +20,9 @@ import type {
 import { HttpError } from "../../interfaces/http/http-error";
 import {
   DEFAULT_INVENTORY_TIMEOUT_MS,
-  FEATURE_MCP,
-  FEATURE_TOOLSETS,
   MAX_MCP_TOKEN,
 } from "./runtime-integration-constants";
+import { RELAY_FEATURE_MCP_MANAGEMENT, RELAY_FEATURE_TOOLSET_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export function publicMcpOauth(session: HermesMcpOauthSession): RuntimeMcpOauthDto {
   return {
@@ -48,8 +47,8 @@ export function runtimeIntegrationInventory(input: {
   hostFeatures: string[] | null;
   hostToolsets: HermesHostToolsets | null;
 }): RuntimeIntegrationInventoryDto {
-  const canWriteToolsets = input.hostFeatures?.includes(FEATURE_TOOLSETS) === true;
-  const canWriteMcp = input.hostFeatures?.includes(FEATURE_MCP) === true;
+  const canWriteToolsets = input.hostFeatures?.includes(RELAY_FEATURE_TOOLSET_MANAGEMENT) === true;
+  const canWriteMcp = input.hostFeatures?.includes(RELAY_FEATURE_MCP_MANAGEMENT) === true;
   // `settable` n'est vrai que si l'hôte a NOMMÉ le toolset. Sans la liste, on
   // n'affiche aucun interrupteur : offrir la bascule d'un toolset que
   // l'écriture amont laisserait tomber en silence donnerait un faux succès.

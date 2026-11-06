@@ -1,4 +1,5 @@
 import { stat, writeFile } from "node:fs/promises";
+import { logEvent } from "@openedbot/platform-observability";
 
 /** Past this gap without a claim-loop turn, the worker stops vouching for itself. */
 export const LOOP_STALL_MS = 30_000;
@@ -29,18 +30,18 @@ export function createLoopHealth(file: string | null, now: () => number = Date.n
     async report() {
       const sinceMs = now() - lastProgressAt;
       if (sinceMs > LOOP_STALL_MS) {
-        if (!stalled) console.error(JSON.stringify({ event: "worker.loop_stalled", sinceMs }));
+        if (!stalled) logEvent("worker.loop_stalled", { sinceMs }, "error");
         stalled = true;
         return;
       }
-      if (stalled) console.info(JSON.stringify({ event: "worker.loop_recovered" }));
+      if (stalled) logEvent("worker.loop_recovered", {});
       stalled = false;
       if (!file) return;
       try {
         await writeFile(file, `${new Date(now()).toISOString()}\n`);
         writeFailed = false;
       } catch (error) {
-        if (!writeFailed) console.error(JSON.stringify({ event: "worker.health_file_failed", error: String(error) }));
+        if (!writeFailed) logEvent("worker.health_file_failed", { error: String(error) }, "error");
         writeFailed = true;
       }
     },

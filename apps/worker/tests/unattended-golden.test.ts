@@ -28,6 +28,7 @@ import { readGateIdentity, type GateIdentity } from "@openedbot/execution/domain
 import { edgeSetupPath } from "../../../tests/edge-setup-dir";
 import { permissionRuleSelector } from "../src/application/pro-plugins";
 import { differingCases, readGoldenFile, writeGoldenFile } from "./golden-store";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
 
 const GOLDEN_PATH = join(import.meta.dir, "fixtures/unattended-golden.json");
 const ORG = "org-client";
@@ -136,13 +137,8 @@ async function runCase(state: OrgState, gate: GateIdentity, command: string | nu
     sequence: 3, type: "approval.requested", occurredAt: new Date("2026-10-28T10:00:00.000Z"),
     payload: { approvalRequestId: APPROVAL_ID, command, description: "the gate", choices, gate },
   } as RunEvent;
-  const info = console.info;
-  console.info = (line: unknown) => { logs.push(typeof line === "string" ? JSON.parse(line) : line); };
-  try {
-    await persistEvents(db, CONFIG, context as never, 3, [event]);
-  } finally {
-    console.info = info;
-  }
+  const { events } = await captureLogEvents(() => persistEvents(db, CONFIG, context as never, 3, [event]));
+  logs.push(...events);
   return [JSON.stringify(writes), JSON.stringify(logs)];
 }
 

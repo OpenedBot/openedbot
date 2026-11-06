@@ -3,17 +3,17 @@ import { claimProfileProvision, executeProfileProvision } from "@openedbot/roste
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
 import type { WorkerConfig } from "../config";
 import { provisionCapabilityBaseline } from "./capability-baseline-reconciliation";
+import { logEvent } from "@openedbot/platform-observability";
 
 export async function processProfileProvision(db: SQL, config: WorkerConfig, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return;
   const job = await claimProfileProvision(db, config.workerId);
   if (!job) return;
-  console.info(JSON.stringify({
-    event: "profile_provision.started",
+  logEvent("profile_provision.started", {
     botId: job.bot_id,
     organizationId: job.organization_id,
     generation: job.lease_generation,
-  }));
+  });
   const client = (runtimeId: string) => createRuntimeClient({
     runtimeId,
     reachability: "connector",

@@ -59,6 +59,7 @@
         "@openedbot/browser-i18n": "workspace:*",
         "@openedbot/browser-ui-kit": "workspace:*",
         "@openedbot/contracts-api": "workspace:*",
+        "@openedbot/contracts-connector": "workspace:*",
         "@openedbot/contracts-events": "workspace:*",
         "@openedbot/contracts-locale": "workspace:*",
         "@openedbot/contracts-native-bridge": "workspace:*",
@@ -145,6 +146,7 @@
       "version": "1.0.2",
       "dependencies": {
         "@openedbot/contracts-api": "workspace:*",
+        "@openedbot/contracts-connector": "workspace:*",
         "@openedbot/conversation": "workspace:*",
         "@openedbot/execution": "workspace:*",
         "@openedbot/hermes": "workspace:*",
@@ -253,7 +255,7 @@
       "name": "@openedbot/contracts-connector",
       "version": "1.0.0",
       "dependencies": {
-        "@openedbot/contracts-primitives": "workspace:*",
+        "@openedbot/protocol-connector": "workspace:*",
       },
       "devDependencies": {
         "typescript": "^5.9.3",
@@ -395,6 +397,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@openedbot/contracts-api": "workspace:*",
+        "@openedbot/contracts-connector": "workspace:*",
         "@openedbot/contracts-errors": "workspace:*",
         "@openedbot/contracts-primitives": "workspace:*",
         "@openedbot/conversation": "workspace:*",
@@ -415,6 +418,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@openedbot/contracts-api": "workspace:*",
+        "@openedbot/contracts-connector": "workspace:*",
         "@openedbot/contracts-errors": "workspace:*",
         "@openedbot/contracts-primitives": "workspace:*",
         "@openedbot/conversation": "workspace:*",
@@ -456,6 +460,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@openedbot/contracts-api": "workspace:*",
+        "@openedbot/contracts-connector": "workspace:*",
         "@openedbot/contracts-errors": "workspace:*",
         "@openedbot/contracts-primitives": "workspace:*",
         "@openedbot/hermes": "workspace:*",
@@ -545,6 +550,10 @@
         "@types/bun": "1.4.0",
         "typescript": "^5.9.3",
       },
+    },
+    "protocol/connector": {
+      "name": "@openedbot/protocol-connector",
+      "version": "1.0.0",
     },
   },
   "overrides": {
@@ -712,6 +721,8 @@
     "@openedbot/platform-plugins": ["@openedbot/platform-plugins@workspace:platform/plugins"],
 
     "@openedbot/portability": ["@openedbot/portability@workspace:modules/portability"],
+
+    "@openedbot/protocol-connector": ["@openedbot/protocol-connector@workspace:protocol/connector"],
 
     "@openedbot/roster": ["@openedbot/roster@workspace:modules/roster"],
 

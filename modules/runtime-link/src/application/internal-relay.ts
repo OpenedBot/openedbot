@@ -5,7 +5,10 @@ import {
   RELAY_FORWARDED_REQUEST_HEADERS,
   RELAY_FORWARDED_RESPONSE_HEADERS,
   RELAY_MAX_REQUEST_BODY,
+  RELAY_TRACEPARENT_HEADER,
 } from "@openedbot/contracts-connector";
+import { logEvent } from "@openedbot/platform-observability";
+import { parseTraceparent, type TraceContext } from "@openedbot/platform-observability/trace-context";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import { jsonBody } from "@openedbot/platform-config/http-body";
@@ -78,29 +81,34 @@ export function runtimeLinkInternalRelay(
     }
     const path = `${url.pathname.slice(prefix.length)}${url.search}`;
     const method = context.req.method.toUpperCase();
+    // A malformed traceparent is ignored (W3C): neither journaled nor relayed.
+    const trace = parseTraceparent(context.req.header(RELAY_TRACEPARENT_HEADER));
+    const journal = relayJournal(runtimeId, method, path, trace);
     if (!matchRelayRoute(method, path)) {
-      return relayFailure(403, "HERMES_LINK_PATH_FORBIDDEN", "Le lien connecteur ne relaie pas cette route.", "before_dispatch");
+      return journal(relayFailure(403, "HERMES_LINK_PATH_FORBIDDEN", "Le lien connecteur ne relaie pas cette route.", "before_dispatch"));
     }
     // Existing run reconciliation and control remain usable during bounded drain.
     if (options.isDraining?.() && method !== "GET" && method !== "HEAD"
       && !(method === "POST" && /^(?:\/p\/[a-z0-9][a-z0-9_-]{0,62})?\/v1\/runs\/[A-Za-z0-9._~-]{1,128}\/(stop|approval)$/.test(path.split("?")[0]!))) {
-      return relayFailure(503, "LINK_DRAINING", "La passerelle termine les travaux en cours.", "before_dispatch");
+      return journal(relayFailure(503, "LINK_DRAINING", "La passerelle termine les travaux en cours.", "before_dispatch"));
     }
     const hopped = relayHopped((name) => context.req.header(name));
     if (!broker?.connected(runtimeId)) {
-      if (hopped) return loopResponse();
+      if (hopped) return journal(loopResponse());
       const location = await locator.locate(runtimeId);
-      if (location.kind === "remote") return locator.forwardProxy(runtimeId, context.req.raw);
-      return unavailableResponse(location.kind === "unavailable" ? location.detail : "no_link");
+      if (location.kind === "remote") return journal(await locator.forwardProxy(runtimeId, context.req.raw), "forwarded");
+      return journal(unavailableResponse(location.kind === "unavailable" ? location.detail : "no_link"));
     }
     const declaredLength = Number(context.req.header("content-length") ?? "");
     if (Number.isSafeInteger(declaredLength) && declaredLength > RELAY_MAX_REQUEST_BODY) {
-      return relayFailure(413, "HERMES_PROTOCOL_LIMIT", "Le corps de la requête dépasse la borne du lien.", "before_dispatch");
+      return journal(relayFailure(413, "HERMES_PROTOCOL_LIMIT", "Le corps de la requête dépasse la borne du lien.", "before_dispatch"));
     }
     const headers: Record<string, string> = {};
     context.req.raw.headers.forEach((value, name) => {
-      if (RELAY_FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) headers[name.toLowerCase()] = value;
+      const lower = name.toLowerCase();
+      if (RELAY_FORWARDED_REQUEST_HEADERS.has(lower) && lower !== RELAY_TRACEPARENT_HEADER) headers[lower] = value;
     });
+    if (trace) headers[RELAY_TRACEPARENT_HEADER] = context.req.header(RELAY_TRACEPARENT_HEADER)!.trim();
     const body = method === "GET" || method === "HEAD" ? null : context.req.raw.body;
 
     let response: Response;
@@ -108,7 +116,7 @@ export function runtimeLinkInternalRelay(
       response = await broker.dialer(runtimeId)({ method, path, headers, body }, context.req.raw.signal);
     } catch (error) {
       if (error instanceof RelayDialError) {
-        return relayFailure(relayFailureStatus(error.stage), error.code ?? "LINK_FAILED", error.message, error.stage);
+        return journal(relayFailure(relayFailureStatus(error.stage), error.code ?? "LINK_FAILED", error.message, error.stage));
       }
       throw error;
     }
@@ -120,7 +128,7 @@ export function runtimeLinkInternalRelay(
     const streaming = response.body && contentType.toLowerCase().startsWith("text/event-stream");
     const relayed = !response.body ? null
       : streaming ? withSseKeepalive(response.body, SSE_HEARTBEAT_INTERVAL_MS) : withSafeCancel(response.body);
-    return new Response(relayed, { status: response.status, headers: responseHeaders });
+    return journal(new Response(relayed, { status: response.status, headers: responseHeaders }));
   };
 
   /**
@@ -195,6 +203,32 @@ export function runtimeLinkInternalRelay(
     return context.json({ outcome: location.kind === "unavailable" && location.detail === "instance_dead" ? "owner_unavailable" : "no_link" });
   };
   return { proxy, control, probe };
+}
+
+/**
+ * La ligne du relais sur la piste d'un run (`runtime_link.relay_request`),
+ * seulement pour une requête qui porte un `traceparent` valide : route sans
+ * sa query, statut rendu au worker, étape d'une panne du lien, et le couple
+ * trace/span que le worker et le connecteur journalisent aussi.
+ */
+function relayJournal(runtimeId: string, method: string, path: string, trace: TraceContext | null) {
+  const startedAt = performance.now();
+  return (response: Response, hop?: "forwarded"): Response => {
+    if (!trace) return response;
+    const stage = response.headers.get(RUNTIME_LINK_RELAY_STAGE_HEADER);
+    logEvent("runtime_link.relay_request", {
+      runtimeId,
+      method,
+      path: path.split("?")[0],
+      status: response.status,
+      ...(stage ? { stage } : {}),
+      ...(hop ? { hop } : {}),
+      durationMs: Math.round(performance.now() - startedAt),
+      traceId: trace.traceId,
+      spanId: trace.spanId,
+    }, stage ? "warn" : undefined);
+    return response;
+  };
 }
 
 function relayFailure(status: number, code: string, message: string, stage: "before_dispatch" | "after_dispatch"): Response {

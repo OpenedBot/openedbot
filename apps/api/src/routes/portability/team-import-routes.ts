@@ -21,11 +21,11 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { hermesBundleImportRoutes } from "./hermes-bundle-import-routes";
 import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { RELAY_FEATURE_PROFILE_INVENTORY } from "@openedbot/contracts-connector/features";
 
 type RuntimeReader = typeof readRuntimeSecret;
 type ProfileClient = Pick<HermesClient, "hostCapabilities" | "hostProfileInventory" | "hostProfileAvatar" | "probeProfileIsolation" | "modelOptions">;
 const PROFILE_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
-const FEATURE_PROFILES = "profile_inventory";
 
 /**
  * Imports d'agents dans le roster : profils lus sur l'hôte du runtime
@@ -86,7 +86,7 @@ export function teamImportRoutes(
     } catch (error) {
       throw profileHostError(error);
     }
-    if (!features?.includes(FEATURE_PROFILES)) {
+    if (!features?.includes(RELAY_FEATURE_PROFILE_INVENTORY)) {
       throw new HttpError(404, "PROFILE_INVENTORY_UNAVAILABLE", "L’hôte de ce runtime n’annonce pas l’inventaire des profils.");
     }
     let catalog: Promise<HermesModelOptions> | undefined;

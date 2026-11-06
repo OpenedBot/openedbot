@@ -11,6 +11,7 @@ import { readBlockedToolsTx } from "../sql/tool-policies";
 import type { ProfileProvisionRow } from "../sql/profile-provisions";
 import { BASELINE_REQUIRED_FEATURES } from "../domain/capability-baseline";
 import type { BotProfileProvisionProgress } from "@openedbot/contracts-api";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
 
 /**
  * Plus long que tout ce qu'un passage fait sous un même bail : la création
@@ -333,7 +334,7 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
       if (!bot) throw new Error("profile owner is unavailable");
       const { features, error: featuresError } = await hostFeatures;
       if (featuresError) throw featuresError;
-      if (features?.includes("approval_policy")) {
+      if (features?.includes(RELAY_FEATURE_APPROVAL_POLICY)) {
         const blocked = await withTenant(db as unknown as Db, job.organization_id, (tx) => readBlockedToolsTx(tx, job.organization_id, job.bot_id));
         const policy = await applyHostApprovalPolicyWithClient(client, job.slug, bot.permission_mode, permissionPipelineOf(bot.permission_pipeline), blocked);
         await withTenant(db as unknown as Db, job.organization_id, (tx) => writeBotApprovalPolicyProof(tx, job.organization_id, job.bot_id, policy.mode, policy.effective));

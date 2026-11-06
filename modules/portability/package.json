@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
     "@openedbot/contracts-errors": "workspace:*",
     "@openedbot/contracts-primitives": "workspace:*",
     "@openedbot/conversation": "workspace:*",

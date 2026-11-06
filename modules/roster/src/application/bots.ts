@@ -11,8 +11,6 @@ import { readOperatorProfile } from "@openedbot/identity/sql/operator-profile";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import { botRuntimeSessionIds, namedHostProfileSlug } from "../domain/bot-deletion";
-import { PROFILE_CAPABILITIES_FEATURE, PROFILE_MANAGEMENT_FEATURE } from "../domain/bot-capabilities";
-import { APPROVAL_POLICY_FEATURE } from "@openedbot/runtimes/domain/runtime-contract";
 import { readModelAssignmentMode } from "@openedbot/runtimes/application/runtime-mode";
 import { applyHostApprovalPolicy, applyTighteningPolicyBeforeMutation, approvalPolicyWriteMustPrecedeCommit } from "./approval-policy";
 import { publicBot, type BotRow } from "../domain/bot-dto";
@@ -55,6 +53,7 @@ import {
   resolvedHostProfileModel,
   type BotDeps,
 } from "./bot-host";
+import { RELAY_FEATURE_APPROVAL_POLICY, RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export { resolveBotDeps } from "./bot-host";
 export type { BotDeps, BotRouteDeps, BotRouteClient } from "./bot-host";
@@ -169,7 +168,7 @@ export async function createBot(
   await assertPermissionModeUnderCeiling(db, organizationId, input.editor.permissionMode ?? "manual", null);
   const runtime = await readRuntime(db, organizationId);
   if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de créer un bot.");
-  const managedProfile = profile === null && runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE) === true;
+  const managedProfile = profile === null && runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT) === true;
   const provisionLater = managedProfile && (options.profileProvisioning ?? "async") === "async";
   return withProfileNamesLock(db, organizationId, profile ? [profile] : [], async (db) => {
   // The org-wide names lock: a racing replay sees its row here, before any host call.
@@ -354,7 +353,7 @@ export async function updateBot(
     permissionModeChanged
     && priorRows[0]?.hermesProfileManaged === true
     && priorRows[0].hermesProfile
-    && runtime?.linkFeatures?.includes(APPROVAL_POLICY_FEATURE)
+    && runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)
   );
   const nextPermissionMode = input.editor.permissionMode;
   const tightening = nextPermissionMode !== undefined && approvalPolicyWriteMustPrecedeCommit(nextPermissionMode);
@@ -377,7 +376,7 @@ export async function updateBot(
       try {
         restoreApprovalPolicy = await ensureHostProfileForRestore(runtime, slug, current.name, clientFactory, restoreTarget?.permissionMode ?? "manual", pipeline, blockedTools);
       } catch (error) {
-        if (runtime?.linkFeatures?.includes(APPROVAL_POLICY_FEATURE)) {
+        if (runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)) {
           await withTenant(db, organizationId, (tx) => writeBotApprovalPolicyProof(tx, organizationId, botId, null, false));
         }
         throw error;
@@ -453,7 +452,7 @@ export async function updateBot(
   ) {
     return bot;
   }
-  if (!runtime?.linkFeatures?.includes(PROFILE_CAPABILITIES_FEATURE)) {
+  if (!runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) {
     return bot;
   }
   // En mode global (choix global posé), le run envoie le modèle global et le
@@ -600,7 +599,7 @@ export async function deleteBot(
             "Enregistrez Hermes avant de supprimer un bot : son profil doit partir de l’hôte.",
           );
         }
-        if (!runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+        if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
           throw new HttpError(
             409,
             "PROFILE_MANAGEMENT_UNAVAILABLE",
@@ -650,7 +649,7 @@ export async function deleteBot(
     if ((sessions.length > 0 || cleanupProfile) && !runtime) {
       throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de supprimer un bot : son nettoyage doit être enregistré sur le runtime.");
     }
-    if (cleanupProfile && !runtime?.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+    if (cleanupProfile && !runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la suppression de profils.");
     }
     const result = await withTenant(db, organizationId, async (tx) => {

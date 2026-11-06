@@ -24,7 +24,7 @@ import { HermesClientError } from "@openedbot/hermes";
 import { withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { APPROVAL_POLICY_FEATURE, permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
+import { permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
 import { writeBotApprovalPolicyProof } from "../sql/bots";
 import {
   countBotToolPolicies,
@@ -35,6 +35,7 @@ import {
 } from "../sql/tool-policies";
 import { applyHostApprovalPolicy } from "./approval-policy";
 import type { BotDeps } from "./bot-host";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
 
 type ToolPolicyTarget = {
   profile: string | null;
@@ -114,7 +115,7 @@ export async function setBotToolPolicies(
 
     if (outcome.hostWrite && outcome.target.profile) {
       const runtime = await deps.readRuntime(db, organizationId);
-      if (runtime?.linkFeatures?.includes(APPROVAL_POLICY_FEATURE)) {
+      if (runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)) {
         try {
           const state = await applyHostApprovalPolicy(
             runtime,

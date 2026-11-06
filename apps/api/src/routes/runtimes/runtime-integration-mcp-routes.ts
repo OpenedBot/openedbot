@@ -2,8 +2,6 @@ import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
 import { HermesClientError, type HermesClientConfig, type HermesMcpOauthSession, type HermesMcpServer } from "@openedbot/hermes";
 import {
-  MCP_OAUTH_PROFILE_FEATURE,
-  MCP_PROFILE_DISCONNECT_FEATURE,
   mcpCatalogRootMatch,
   mcpConnectorEntry,
 } from "@openedbot/runtimes/domain/mcp-connector-catalog";
@@ -29,9 +27,6 @@ import {
   withDeadline,
 } from "./runtime-integration-public";
 import {
-  FEATURE_GATEWAY_RESTART,
-  FEATURE_MCP,
-  FEATURE_MCP_OAUTH,
   type InventoryClient,
   MAX_MCP_TOKEN,
   MAX_MCP_URL,
@@ -39,6 +34,7 @@ import {
   MCP_NAME_PATTERN,
 } from "./runtime-integration-constants";
 import { readThrough, wantsFreshRead, watchedReadPolicy } from "@openedbot/runtimes/application/runtime-read-snapshots";
+import { RELAY_FEATURE_GATEWAY_RESTART, RELAY_FEATURE_MCP_MANAGEMENT, RELAY_FEATURE_MCP_OAUTH, RELAY_FEATURE_MCP_OAUTH_PROFILE, RELAY_FEATURE_MCP_PROFILE_DISCONNECT } from "@openedbot/contracts-connector/features";
 
 /**
  * Les serveurs MCP de l’hôte : inventaire, ajout, catalogue approuvé, retrait,
@@ -112,7 +108,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     if (!target.profile) {
       throw new HttpError(409, "BOT_PROFILE_REQUIRED", "Ce bot n’a pas de profil Hermes : créez-le avant de connecter un serveur MCP.");
     }
-    const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, MCP_OAUTH_PROFILE_FEATURE);
+    const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, RELAY_FEATURE_MCP_OAUTH_PROFILE);
     const origin = connectorOpenedbotOrigin(config, requestOrigin(context) ?? undefined);
     const redirectUri = `${origin}/api/mcp-oauth/callback/${encodeURIComponent(auth.organizationId)}/${encodeURIComponent(runtimeId)}/${encodeURIComponent(entry.id)}`;
     const rootServer = async () => {
@@ -167,7 +163,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     if (!target.profile) {
       throw new HttpError(409, "BOT_PROFILE_REQUIRED", "Ce bot n’a pas de profil Hermes : aucun serveur MCP ne lui est connecté.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, MCP_PROFILE_DISCONNECT_FEATURE);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_PROFILE_DISCONNECT);
     let removal: Awaited<ReturnType<InventoryClient["hostRemoveProfileMcpServer"]>>;
     try {
       removal = await client.hostRemoveProfileMcpServer(target.profile, entry.id);
@@ -204,7 +200,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     if (authMode === "header" && (!token || token.length > MAX_MCP_TOKEN)) {
       throw new HttpError(400, "TOKEN_INVALID", "Un jeton porteur est requis pour l’authentification par en-tête.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_MCP);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_MANAGEMENT);
     let server: HermesMcpServer;
     try {
       server = await client.mcpServerAdd({
@@ -231,7 +227,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     }
     const body = await jsonBody(context.req.raw);
     const env = catalogEnv(body.env);
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_MCP);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_MANAGEMENT);
     let server: HermesMcpServer;
     try {
       server = await client.mcpCatalogInstall(name, env);
@@ -250,7 +246,7 @@ export function runtimeMcpRoutes(ctx: IntegrationRouteContext): Hono<{ Variables
     if (!MCP_NAME_PATTERN.test(name)) {
       throw new HttpError(400, "NAME_INVALID", "Ce nom de serveur n’est pas valide.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_MCP);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_MANAGEMENT);
     try {
       await client.mcpServerRemove(name);
     } catch (error) {
@@ -289,10 +285,10 @@ export function liveMcpRead(
     const client = clientFactory(runtime.client);
     let hostFeatures: string[] | null = null;
     try { hostFeatures = await withDeadline(announcedFeatures(runtime, client), timeoutMs); } catch { hostFeatures = null; }
-    if (!hostFeatures?.includes(FEATURE_MCP)) return MCP_UNAVAILABLE;
+    if (!hostFeatures?.includes(RELAY_FEATURE_MCP_MANAGEMENT)) return MCP_UNAVAILABLE;
     const result = await Promise.allSettled([withDeadline(client.mcpInventory(), MCP_INVENTORY_TIMEOUT_MS)]).then(([entry]) => entry!);
     return publicMcp(
-      { oauth: hostFeatures.includes(FEATURE_MCP_OAUTH), gatewayRestart: hostFeatures.includes(FEATURE_GATEWAY_RESTART) },
+      { oauth: hostFeatures.includes(RELAY_FEATURE_MCP_OAUTH), gatewayRestart: hostFeatures.includes(RELAY_FEATURE_GATEWAY_RESTART) },
       result.status === "fulfilled" ? result.value : null,
       result.status === "rejected" ? result.reason : null,
     );

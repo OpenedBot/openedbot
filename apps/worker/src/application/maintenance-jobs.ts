@@ -41,6 +41,7 @@ import { evaluateRuntimeLinkAlerts } from "@openedbot/runtime-link/application/l
 import { DIRECT_PROBE_TICK_MS, probeDirectRuntimes, failRunsOnUnhealthyDirectRuntimes } from "@openedbot/execution/application/runtime-direct";
 import { failRunsOnDisconnectedRuntimes } from "@openedbot/execution/application/disconnected-runtime-runs";
 import { MANAGED_EXPOSURE_TICK_MS, cleanupRevokedManagedExposures, reconcileManagedExposures } from "@openedbot/runtimes/application/managed-exposure-reconciliation";
+import { logEvent } from "@openedbot/platform-observability";
 
 /** Poison leases only exist once a 30 s lease has expired: a second is ample. */
 const POISON_REAP_TICK_MS = 1_000;
@@ -81,7 +82,7 @@ export function maintenanceJobs(
       run: (signal) => guardedPass("worker.runtime_direct_probe_failed", async () => {
         await probeDirectRuntimes(db, config, undefined, signal);
         const failed = await failRunsOnUnhealthyDirectRuntimes(db, config.linkQueueTimeoutMs);
-        if (failed > 0) console.info(JSON.stringify({ event: "worker.runs_failed_runtime_direct", count: failed }));
+        if (failed > 0) logEvent("worker.runs_failed_runtime_direct", { count: failed });
       }),
     },
     {
@@ -148,7 +149,7 @@ export function maintenanceJobs(
             environment: config.deployEnvironment,
           });
           if (alerts.opened > 0 || alerts.resolved > 0) {
-            console.info(JSON.stringify({ event: "worker.runtime_link_alerts", ...alerts }));
+            logEvent("worker.runtime_link_alerts", { ...alerts });
           }
         }, { withError: true });
         // Rotation du jeton de lien : l'ancien hash meurt à la fin de sa grâce.
@@ -156,7 +157,7 @@ export function maintenanceJobs(
         await purgeOldRuntimeLinkEvents(db, config.linkEventsRetentionDays);
         const disconnectedRuns = await failRunsOnDisconnectedRuntimes(db, config.linkQueueTimeoutMs);
         if (disconnectedRuns > 0) {
-          console.info(JSON.stringify({ event: "worker.runs_failed_runtime_disconnected", count: disconnectedRuns }));
+          logEvent("worker.runs_failed_runtime_disconnected", { count: disconnectedRuns });
         }
       },
     },
@@ -180,10 +181,9 @@ export function maintenanceJobs(
           deleteObject: (key) => deleteBlob(config, key, null),
         });
         if (ingressMaintenance.failed > 0) {
-          console.error(JSON.stringify({
-            event: "worker.message_ingress_maintenance_failed",
+          logEvent("worker.message_ingress_maintenance_failed", {
             ...ingressMaintenance,
-          }));
+          }, "error");
         }
       },
     },
@@ -193,7 +193,7 @@ export function maintenanceJobs(
       run: () => guardedPass("worker.push_notifications_failed", async () => {
         const push = await processPushNotifications(db, config);
         if (push.processed > 0) {
-          console.info(JSON.stringify({ event: "worker.push_notifications", ...push }));
+          logEvent("worker.push_notifications", { ...push });
         }
       }, { withError: true }),
     },
@@ -205,7 +205,7 @@ export function maintenanceJobs(
       run: () => guardedPass("worker.apns_deliveries_failed", async () => {
         const apns = await processApnsDeliveries(db, config);
         if (apns.sent + apns.retried + apns.failed + apns.revoked > 0) {
-          console.info(JSON.stringify({ event: "worker.apns_deliveries", ...apns }));
+          logEvent("worker.apns_deliveries", { ...apns });
         }
       }, { withError: true }),
     },
@@ -217,7 +217,7 @@ export function maintenanceJobs(
       run: () => guardedPass("worker.alert_deliveries_failed", async () => {
         const alerts = await processAlertDeliveries(db, config);
         if (alerts.sent + alerts.retried + alerts.failed + alerts.cancelled > 0) {
-          console.info(JSON.stringify({ event: "worker.alert_deliveries", ...alerts }));
+          logEvent("worker.alert_deliveries", { ...alerts });
         }
       }, { withError: true }),
     },
@@ -228,9 +228,9 @@ export function maintenanceJobs(
       everyMs: LINK_SECURITY_TICK_MS,
       run: () => guardedPass("worker.link_security_failed", async () => {
         const rotated = await rotateStaleLinkTokens(db, config.linkTokenMaxAgeHours, config);
-        if (rotated > 0) console.info(JSON.stringify({ event: "worker.link_tokens_rotated", rotated }));
+        if (rotated > 0) logEvent("worker.link_tokens_rotated", { rotated });
         const reconciled = await reconcileRuntimeSessions(db, config);
-        if (reconciled.unattributed > 0) console.error(JSON.stringify({ event: "worker.unattributed_sessions", ...reconciled }));
+        if (reconciled.unattributed > 0) logEvent("worker.unattributed_sessions", { ...reconciled }, "error");
       }, { withError: true }),
     },
     {
@@ -239,9 +239,9 @@ export function maintenanceJobs(
       everyMs: MANAGED_EXPOSURE_TICK_MS,
       run: (signal) => guardedPass("worker.managed_exposures_failed", async () => {
         const reconciled = await reconcileManagedExposures(db, config.managedTunnel, undefined, signal);
-        if (reconciled > 0) console.info(JSON.stringify({ event: "worker.managed_exposures_reconciled", count: reconciled }));
+        if (reconciled > 0) logEvent("worker.managed_exposures_reconciled", { count: reconciled });
         const cleaned = await cleanupRevokedManagedExposures(db, config.managedTunnel, undefined, signal);
-        if (cleaned > 0) console.info(JSON.stringify({ event: "worker.managed_exposures_cleanup", count: cleaned }));
+        if (cleaned > 0) logEvent("worker.managed_exposures_cleanup", { count: cleaned });
       }),
     },
     {

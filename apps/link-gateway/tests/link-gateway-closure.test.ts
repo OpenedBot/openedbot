@@ -68,6 +68,8 @@ const ALLOWED_PLATFORM = [
   "platform/observability/src/log/redact.ts",
   "platform/observability/src/log/test-logger.ts",
   "platform/observability/src/logger.ts",
+  // S7: the run's traceparent, read and journaled by the internal relay. No dependency.
+  "platform/observability/src/trace-context.ts",
 ];
 
 /** Le dossier d'un paquet suivi : `@openedbot/platform-<nom>` ou un module métier `@openedbot/<contexte>`. */

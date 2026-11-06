@@ -25,6 +25,7 @@
  * (`scope: "runtime"`), qui est encore le jeu que `FORBIDDEN_TOOLSETS`
  * expose aux appelants non migrés.
  */
+import { RELAY_FEATURE_APPROVAL_POLICY, RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /**
  * Seconds ordonnanceurs : interdits partout, profil nommé ou racine.
@@ -113,7 +114,6 @@ export const FORBIDDEN_RUNTIME_TOOLS: ReadonlySet<string> = new Set([
 export const APPROVAL_POLICY_WRITE_TOOLS: ReadonlySet<string> = new Set([
   "write_file", "patch", "skill_manage", "execute_code", "send_message", "cronjob",
 ]);
-export const APPROVAL_POLICY_FEATURE = "approval_policy";
 export function isApprovalPolicyWriteTool(name: string): boolean {
   return APPROVAL_POLICY_WRITE_TOOLS.has(name) || name.startsWith("mcp_");
 }
@@ -125,7 +125,7 @@ export const REVIEW_PROFILE = "openedbot-reviewer";
  */
 export const OPENEDBOT_SERVICE_PROFILES: ReadonlySet<string> = new Set(["openedbot-model-check", REVIEW_PROFILE]);
 /** The link features the review profile needs: create it, cut its tools, set its plugin. */
-export const REVIEW_PROFILE_FEATURES = ["profile_management", "profile_capabilities", APPROVAL_POLICY_FEATURE] as const;
+export const REVIEW_PROFILE_FEATURES = [RELAY_FEATURE_PROFILE_MANAGEMENT, RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_APPROVAL_POLICY] as const;
 /** Who answers an organization's gates (PERM2-1, `organizations.permission_pipeline`). */
 export type PermissionPipelineId = "legacy" | "v2";
 

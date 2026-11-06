@@ -8,6 +8,10 @@ uses [semantic versioning](https://semver.org/) as described in
 ## [Unreleased]
 
 ### Changed
+- The reference package is named `@openedbot/protocol-connector` and is the
+  source of truth: the monorepo's `@openedbot/contracts-connector` re-exports
+  it instead of carrying a copy, and `scripts/sync-from-siblings.sh` no
+  longer copies the codec (only tests, golden files and the spec body).
 - **Breaking.** A `hello` whose `devicePublicKey` differs from the key
   registered for the runtime is closed `4401` `LINK_POP_FAILED` before any
   `link.challenge`, under the current token as under a previous one, and
@@ -27,6 +31,21 @@ uses [semantic versioning](https://semver.org/) as described in
   report them.
 
 ### Added
+- Request header `traceparent` (W3C Trace Context, version `00`), optional
+  both ways: openedbot sets it on every request of a run (trace id = the run
+  id without dashes, a new span id per request); a host that knows it
+  journals `relay <METHOD> <path> trace=<id> span=<id>` once the route passed
+  the allowlist and relays the value unchanged to the gateway; a malformed or
+  duplicated one is dropped, neither relayed nor journaled. An older host
+  drops it like any header outside the list, an older openedbot never sends
+  it: the request is served the same either way. `RELAY_TRACEPARENT_HEADER`
+  joins `RELAY_FORWARDED_REQUEST_HEADERS`.
+- `connector/src/relay-features.ts`: every feature name a host may announce,
+  as constants, plus `RELAY_HOST_FEATURES` (the host's priority order, the
+  same as edge-setup's `HostFeatures`) and `RELAY_LINK_FEATURES`
+  (`LinkFeatures`). A monorepo test reads the Go list and fails when the two
+  differ by a name or by their order. 21 names that only lived in openedbot's
+  application code are now listed here; no name changed.
 - `inventory.changed` (host → openedbot, no field): the host's inventory files
   moved, or a session starts. Sent only when `link.context.accepts` names it.
 - `link.context.accepts`: the optional host frames this openedbot understands

@@ -113,6 +113,11 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      # run-trace-correlation.ts builds and runs the real edge-setup connector.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
       - name: PostgreSQL client and server versions
         # postgres-rls.sh drives psql (the runner's preinstalled client).
         run: |

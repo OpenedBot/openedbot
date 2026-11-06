@@ -12,9 +12,7 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { publicWriteError } from "../runtimes/runtime-integration-routes";
 import { botSettingsToolSecretHash } from "./bot-settings-tool-routes";
-
-const FEATURE_MCP = "mcp_management";
-const FEATURE_PROFILE_CAPABILITIES = "profile_capabilities";
+import { RELAY_FEATURE_MCP_MANAGEMENT, RELAY_FEATURE_PROFILE_CAPABILITIES } from "@openedbot/contracts-connector/features";
 
 type InstallClient = Pick<
   HermesClient,
@@ -63,8 +61,8 @@ export function botSettingsToolRoutes(
     } catch (error) {
       throw publicWriteError(error);
     }
-    if (!features?.includes(FEATURE_MCP)) return { runtime, client, reason: "host_unsupported" as const };
-    if (bot.profile && !features.includes(FEATURE_PROFILE_CAPABILITIES)) {
+    if (!features?.includes(RELAY_FEATURE_MCP_MANAGEMENT)) return { runtime, client, reason: "host_unsupported" as const };
+    if (bot.profile && !features.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) {
       return { runtime, client, reason: "profile_unsupported" as const };
     }
     return { runtime, client, reason: null };

@@ -27,6 +27,7 @@ import { organizationEventEnvelope } from "@openedbot/contracts-events";
 import { messageDto, publicRunStatus } from "@openedbot/conversation/domain/message-dto";
 import { createTestLogger, runWithLogger } from "@openedbot/platform-observability";
 import { threadHistoryRoutes } from "../src/routes/conversation/thread-history-routes";
+import { traceIdOfRun } from "@openedbot/platform-observability/trace-context";
 
 const members = [
   { id: "bot-neo", slug: "neo", position: 0 },
@@ -171,6 +172,8 @@ describe("cible de steering d'un follow-up", () => {
     const admission = records.find((record) => record.event === "run.admission");
     expect(admission).toMatchObject({
       runId: accepted.runId,
+      // The run's trace id is born with it: the worker, the relay and the connector journal the same.
+      traceId: traceIdOfRun(String(admission?.runId)),
       attributes: { disposition: "steer", workflow_kind: "dm", workflow: false },
       verdicts: { admission: { budgetMs: 250, pass: true } },
     });

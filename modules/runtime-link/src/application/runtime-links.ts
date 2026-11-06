@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { holdUnconfirmedLinkTokenRotation, rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/sql/runtime-link-rows";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { controlPushOf, LINK_CONTROL_FORWARD_TIMEOUT_MS, type ControlPush } from "./instances";
+import { RELAY_FEATURE_SESSIONS_INVENTORY } from "@openedbot/contracts-connector/features";
 
 /**
  * Entretien du lien connecteur côté worker.
@@ -262,7 +263,7 @@ export async function reconcileRuntimeSessions(db: SQL, options: LinkControlOpti
        and revoked_at is null
        and link_connected_at is not null
        and last_health_status <> 'disconnected'
-       and 'sessions_inventory' = any(link_features)
+       and ${RELAY_FEATURE_SESSIONS_INVENTORY} = any(link_features)
      order by link_sessions_reconciled_at asc nulls first, id
      limit ${SESSION_RECONCILIATION_BATCH}
   `;

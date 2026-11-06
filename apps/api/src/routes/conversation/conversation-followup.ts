@@ -8,6 +8,7 @@ import { SERVICE_STEP_KINDS } from "@openedbot/execution/domain/run-step";
 import type { MessageContent } from "@openedbot/contracts-api";
 import { logEvent } from "@openedbot/platform-observability";
 import { RunTrace, runLatencyVerdicts } from "@openedbot/platform-observability/run-trace";
+import { traceIdOfRun } from "@openedbot/platform-observability/trace-context";
 import {
   type CancellationRun,
 } from "@openedbot/execution/application/run-cancellation";
@@ -72,13 +73,16 @@ export async function activeRunSteerTargetTx(
 /**
  * Moitié API du traceur De la réception du POST au commit, en
  * noms et durées seulement. Le worker reprend à la réclamation, relié par
- * `runId` et par `queuedMs` (horloge PostgreSQL).
+ * `runId` et par `queuedMs` (horloge PostgreSQL). `traceId` est celui que
+ * le worker, le relais et le connecteur journalisent pour ce run : il naît ici,
+ * avec le run (S7).
  */
 export function logRunAdmission(runId: string, organizationId: string, trace: RunTrace): void {
   const summary = trace.summary();
   logEvent("run.admission", {
     runId,
     organizationId,
+    traceId: traceIdOfRun(runId),
     ...summary,
     verdicts: runLatencyVerdicts({ admission: summary.marks["api.committed"] ?? null }),
   });
