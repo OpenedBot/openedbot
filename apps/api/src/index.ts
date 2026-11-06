@@ -71,6 +71,8 @@ import { memberRoutes } from "./routes/identity/member-routes";
 import { permissionPolicyRoutes } from "./routes/identity/permission-policy-routes";
 import { ApiRuntimeMetrics, internalMetricsRoutes, normalizeOperationalMetrics, recordApiHeartbeat } from "./routes/platform/metrics-routes";
 import { HttpError } from "./interfaces/http/http-error";
+import { corsMiddleware } from "./interfaces/http/cors";
+import { clientVersionGate } from "./interfaces/http/client-version";
 import { createUnhandledErrorJournal, respondToUnhandledError, unhandledErrorJournalWriter } from "./interfaces/http/unhandled-error-journal";
 import { HermesEndpointError } from "@openedbot/hermes";
 import { accessLogMiddleware, logger, recordErrorCode } from "@openedbot/platform-observability";
@@ -293,21 +295,12 @@ if (!Number.isSafeInteger(idleTimeout) || idleTimeout < 1 || idleTimeout > 255) 
 // Le middleware vit dans `@openedbot/platform-observability` pour être testable sans base.
 app.use("*", accessLogMiddleware());
 
-app.use("*", async (context, next) => {
+app.use("*", async (_context, next) => {
   runtimeMetrics.recordRequest();
-  const origin = context.req.header("Origin");
-  if (origin && config.browserOrigins.includes(origin)) {
-    context.header("Access-Control-Allow-Origin", origin);
-    context.header("Access-Control-Allow-Credentials", "true");
-    context.header("Vary", "Origin");
-  }
-  if (context.req.method === "OPTIONS") {
-    context.header("Access-Control-Allow-Headers", ["Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OpenedBot-Organization", "X-OpenedBot-Fleet", ...compatHeaderNames(), "X-OpenedBot-Support-Token", "Last-Event-ID"].join(", "));
-    context.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    return context.body(null, 204);
-  }
   await next();
 });
+app.use("*", corsMiddleware({ browserOrigins: config.browserOrigins, nativeOrigins: config.nativeClients.origins }, compatHeaderNames));
+app.use("/api/*", clientVersionGate(config.nativeClients.minDesktopVersion));
 
 // Le plus à l'extérieur des middlewares `/api/*` : il voit la réponse finale,
 // compressée ou refusée par le rate limiter comprise. Avant `/api/health` :

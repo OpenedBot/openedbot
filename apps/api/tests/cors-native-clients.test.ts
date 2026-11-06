@@ -1,0 +1,95 @@
+import { describe, expect, test } from "bun:test";
+import { Hono } from "hono";
+import { HttpError } from "../src/interfaces/http/http-error";
+import { CLIENT_HEADER, corsMiddleware } from "../src/interfaces/http/cors";
+import { CLIENT_UPDATE_REQUIRED, clientVersionGate, desktopClientVersion } from "../src/interfaces/http/client-version";
+import { parseSemVer } from "@openedbot/platform-config/native-clients";
+
+const WEB = "https://openedbot.app";
+const NATIVE = "tauri://localhost";
+
+function app(minDesktopVersion = parseSemVer("1.2.0"), extra: () => string[] = () => ["X-Legacy-Org"]): Hono {
+  const routes = new Hono();
+  routes.use("*", corsMiddleware({ browserOrigins: [WEB], nativeOrigins: [NATIVE, "http://tauri.localhost"] }, extra));
+  routes.use("/api/*", clientVersionGate(minDesktopVersion));
+  routes.get("/api/health", (context) => context.json({ ok: true }));
+  routes.get("/api/threads", (context) => context.json({ ok: true }));
+  routes.onError((error, context) => {
+    if (!(error instanceof HttpError)) throw error;
+    return context.json({ error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } }, error.status as 400);
+  });
+  return routes;
+}
+
+const get = (routes: Hono, headers: Record<string, string>, path = "/api/threads", method = "GET") =>
+  routes.request(path, { method, headers });
+
+describe("CORS de l'API", () => {
+  test("une origine web garde ses cookies", async () => {
+    const response = await get(app(), { Origin: WEB });
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(WEB);
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    expect(response.headers.get("Access-Control-Expose-Headers")).toBe("X-Request-Id");
+  });
+
+  test("une origine de l'app de bureau passe, mais jamais avec les cookies", async () => {
+    for (const origin of [NATIVE, "http://tauri.localhost"]) {
+      const response = await get(app(), { Origin: origin });
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+      expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+      expect(response.headers.get("Access-Control-Expose-Headers")).toBe("X-Request-Id");
+      expect(response.headers.get("Vary")).toBe("Origin");
+    }
+  });
+
+  test("une origine inconnue ou null ne reçoit aucun en-tête CORS", async () => {
+    for (const origin of ["null", "https://evil.example", "tauri://evil"]) {
+      const response = await get(app(), { Origin: origin });
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+      expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    }
+  });
+
+  test("le préflight autorise l'en-tête client, les alias lus à la volée, et se met en cache", async () => {
+    let aliases = ["X-Legacy-Org"];
+    const routes = app(parseSemVer("1.2.0"), () => aliases);
+    const first = await get(routes, { Origin: NATIVE }, "/api/threads", "OPTIONS");
+    expect(first.status).toBe(204);
+    expect(first.headers.get("Access-Control-Allow-Headers")).toContain(CLIENT_HEADER);
+    expect(first.headers.get("Access-Control-Allow-Headers")).toContain("X-Legacy-Org");
+    expect(first.headers.get("Access-Control-Max-Age")).toBe("600");
+    aliases = ["X-Late-Alias"];
+    const second = await get(routes, { Origin: NATIVE }, "/api/threads", "OPTIONS");
+    expect(second.headers.get("Access-Control-Allow-Headers")).toContain("X-Late-Alias");
+    const stranger = await get(routes, { Origin: "https://evil.example" }, "/api/threads", "OPTIONS");
+    expect(stranger.headers.get("Access-Control-Max-Age")).toBeNull();
+  });
+});
+
+describe("garde de version de l'app de bureau", () => {
+  test("une app plus vieille que le minimum reçoit 426, avec le CORS pour qu'elle puisse le lire", async () => {
+    const response = await get(app(), { Origin: NATIVE, [CLIENT_HEADER]: "desktop/1.1.9" });
+    expect(response.status).toBe(426);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(NATIVE);
+    expect(await response.json()).toMatchObject({ error: { code: CLIENT_UPDATE_REQUIRED, details: { minVersion: "1.2.0", version: "1.1.9" } } });
+  });
+
+  test("le minimum lui-même, une version plus récente, un navigateur ou un en-tête illisible passent", async () => {
+    for (const client of ["desktop/1.2.0", "desktop/1.10.0", "desktop/2.0.0", "web/0.0.1", "desktop/1.1", "desktop/1.1.9-beta", ""]) {
+      const headers: Record<string, string> = client ? { [CLIENT_HEADER]: client } : {};
+      expect((await get(app(), headers)).status).toBe(200);
+    }
+  });
+
+  test("le bilan de santé reste ouvert, et sans minimum rien n'est refusé", async () => {
+    expect((await get(app(), { [CLIENT_HEADER]: "desktop/0.0.1" }, "/api/health")).status).toBe(200);
+    expect((await get(app(null), { [CLIENT_HEADER]: "desktop/0.0.1" })).status).toBe(200);
+  });
+
+  test("desktopClientVersion ne lit que desktop/X.Y.Z", () => {
+    expect(desktopClientVersion(" desktop/3.4.5 ")).toEqual([3, 4, 5]);
+    expect(desktopClientVersion("desktop/3.4")).toBeNull();
+    expect(desktopClientVersion("Desktop/3.4.5")).toBeNull();
+    expect(desktopClientVersion(undefined)).toBeNull();
+  });
+});

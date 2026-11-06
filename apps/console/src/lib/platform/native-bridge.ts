@@ -91,15 +91,3 @@ export function nativeAuthStore(): AuthStore | null {
     refresh: () => bridge.refresh(),
   };
 }
-
-/**
- * Ouvre une page de la console hors de la fenêtre compacte : navigateur
- * système dans la coque, nouvel onglet sinon. La fenêtre compacte ne montre
- * que le fil (DEV-139) : réglages, flotte et accueil s'ouvrent ailleurs.
- */
-export function openInBrowser(path: string): void {
-  const url = new URL(path, window.location.origin).toString();
-  const bridge = nativeBridge();
-  if (bridge) void bridge.openExternal(url);
-  else window.open(url, "_blank", "noopener");
-}

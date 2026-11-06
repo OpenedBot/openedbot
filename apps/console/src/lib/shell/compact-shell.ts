@@ -1,6 +1,6 @@
 import { api } from "../api";
 import { readCloudSession, saveCloudSession } from "../session/cloud-session";
-import { NATIVE_SESSION_MARK } from "../platform/native-bridge";
+import { NATIVE_SESSION_MARK } from "../platform";
 
 /**
  * La route compacte (DEV-139) : le fil et le composer d'UN bot, sans barre

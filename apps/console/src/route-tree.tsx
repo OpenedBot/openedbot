@@ -73,7 +73,7 @@ import { SupportLauncher } from "./components/support/support-launcher";
 import { WebWorkflowNotificationBridge } from "./components/web-workflow-notification-bridge";
 import { BrowserTabMetadata } from "./components/browser-tab-metadata";
 import { CompactEmpty } from "./components/compact/compact-frame";
-import { nativeAuth, nativeBridge } from "./lib/platform/native-bridge";
+import { appUrl, nativeAuth, nativeBridge } from "./lib/platform";
 import { COMPACT_PATH, primeNativeSession, readCompactLastBot } from "./lib/shell/compact-shell";
 import {
   CloudSessionGate,
@@ -890,7 +890,7 @@ async function requireFleetFrame(location: { href: string; pathname: string; pub
   await requireAuth({ location });
   await requireAppAccess();
   if (typeof window === "undefined") return;
-  const publicPath = new URL(location.publicHref, window.location.origin).pathname;
+  const publicPath = appUrl(location.publicHref).pathname;
   // `/o/<agency>/clients/<client>/fleet` mixes two frames: the fleet belongs to
   // the agency alone. Open that agency's fleet, never the hybrid address.
   const clientFleet = fleetInPath(publicPath);

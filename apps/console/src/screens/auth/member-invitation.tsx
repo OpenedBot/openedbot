@@ -5,7 +5,7 @@ import { ObInput } from "@openedbot/browser-ui-kit/components/onboarding";
 import { ApiError, api, errorMessage } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { readCloudSession, saveCloudSession } from "../../lib/session/cloud-session";
-import { nativeBridge } from "../../lib/platform/native-bridge";
+import { nativeBridge, publicConsoleUrl } from "../../lib/platform";
 import { workspaceHref } from "../../lib/workspace/workspace-location";
 import { BUTTON } from "../../components/settings/primitives";
 import { StepHeading } from "../onboarding/components/step-shell";
@@ -73,7 +73,7 @@ export function MemberInvitationScreen() {
             {!session.isPending && native ? <button
               type="button"
               className={BUTTON.primary}
-              onClick={() => void native.openExternal(new URL(`/invite/member/${token}`, window.location.origin).href)}
+              onClick={() => void native.openExternal(publicConsoleUrl(`/invite/member/${token}`))}
             >{t("memberInvitation.browser")}</button>
               : !session.isPending && !signedIn && !session.error && <>
                 {invitation.hasAccount ? <a className={BUTTON.primary} href={loginHref}>{t("memberInvitation.login")}</a> : <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); if (!busy) register.mutate(); }}>

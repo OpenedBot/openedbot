@@ -44,7 +44,7 @@ import { ComposerReplyTab } from "./composer-reply-tab";
 import { nextComposerExpanded } from "../lib/composer/composer-pill";
 import { animateComposerExpand } from "../lib/thread/thread-motion";
 import { focusComposerField } from "../lib/composer/composer-desktop-focus";
-import { isNativeShell } from "../lib/platform/native-bridge";
+import { isNativeShell } from "../lib/platform";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_LIMITS,

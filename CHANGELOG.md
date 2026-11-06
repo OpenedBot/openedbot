@@ -10,6 +10,15 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Ajouté
 
+- L'app de bureau indique sa version à l'API. Quand une version devient
+  trop ancienne pour être servie, l'app affiche « Mettez openedbot à jour »
+  avec un lien vers la page de téléchargement, au lieu d'erreurs en cascade.
+  Le seuil se règle côté serveur (`DESKTOP_MIN_VERSION`, vide par défaut :
+  aucune version n'est refusée).
+- L'API accepte les requêtes de la future app de bureau, dont la console
+  sera embarquée : ses origines locales passent le CORS sans jamais pouvoir
+  utiliser un cookie de session, et le numéro de référence d'une erreur reste
+  lisible.
 - Réglages › Archives : chaque section (corbeille, bots archivés,
   conversations masquées) s'affiche par pages de 15. Une case par ligne,
   une case pour cocher la page entière et « Tout sélectionner » pour toute

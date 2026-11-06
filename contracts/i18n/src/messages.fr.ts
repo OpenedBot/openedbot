@@ -18,7 +18,7 @@ import { onboarding, tailscaleGuide } from "./messages/fr/onboarding";
 import { cloudRuntimeSettings, connectorUpgrade, providerIncidents, providerLimits, runtimeAlerts, runtimeDirect, runtimeHealth, runtimeOffline, runtimeRail, railQuotas } from "./messages/fr/runtime";
 import { botHostCleanup, botProfileProvision, botProfileRepair, profileImport } from "./messages/fr/runtime-profiles";
 import { mobileSettingsHints, mobileSettingsRuntimes, pushNotifications, settings, settingsAccount, settingsArchives, settingsDeveloper, settingsNotifications, settingsProfile, settingsSecurity, settingsSidebar } from "./messages/fr/settings";
-import { appSidebar, boardui, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/fr/shell";
+import { appSidebar, boardui, clientUpdate, commandPalette, compactShell, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/fr/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/fr/thread";
 import { chartArea, chartTokens, dashboardMetrics, fleet, fleetClients, sectionCards, support } from "./messages/fr/workspace";
 
@@ -115,4 +115,5 @@ export const fr = {
   boardui,
   planCard,
   compactShell,
+  clientUpdate,
 } as const;

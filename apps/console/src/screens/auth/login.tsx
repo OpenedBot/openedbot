@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@opene
 import { isEmailSyntaxValid, normalizeEmail } from "@openedbot/identity/domain/email-address";
 import { hasMessage } from "@openedbot/browser-i18n";
 import { api, isAlphaClosed, queryKeys } from "../../lib/api";
-import { nativeAuth } from "../../lib/platform/native-bridge";
+import { nativeAuth } from "../../lib/platform";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { GoogleMark, useGoogleSignIn } from "./login-google";
 import { MatrixSpinner, SigninBrand, SigninFooter, SigninNote, SigninReassurance } from "./login-parts";

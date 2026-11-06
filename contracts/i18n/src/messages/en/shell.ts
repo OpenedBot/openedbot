@@ -298,3 +298,11 @@ export const compactShell = {
   signedOut: "The session is closed. Sign in again to resume the conversation.",
   signIn: "Sign in again",
 } as const;
+
+export const clientUpdate = {
+  title: "Update openedbot",
+  body: "This version of the app is no longer supported: install the latest one to continue.",
+  bodyVersions: "Installed version: {version}. Minimum version: {minVersion}.",
+  download: "Download the latest version",
+  linkHint: "If the browser does not open, go to {url}.",
+} as const;

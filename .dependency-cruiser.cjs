@@ -55,6 +55,16 @@ module.exports = {
       to: { path: PRO_CONSOLE_SCREENS, dependencyTypesNot: ["type-only"] },
     },
     {
+      name: "console-plateforme-par-la-facade",
+      comment:
+        "Hors de `src/lib/platform/`, la console passe par la façade `lib/platform` (`index.ts`), jamais par le pont de " +
+        "l'app de bureau (`native-bridge.ts`) : une seule porte, qui sait aussi l'URL publique de la console et l'en-tête " +
+        "client (ADR 0001, étape D1a). Les tests peuvent le simuler directement.",
+      severity: "error",
+      from: { path: "^apps/console/", pathNot: "^apps/console/src/lib/platform/|^apps/console/tests/" },
+      to: { path: "^apps/console/src/lib/platform/native-bridge\\.ts$" },
+    },
+    {
       name: "console-testing-hors-ecrans",
       comment:
         "`@openedbot/console/testing` (`src/pro-console/testing.ts`) sert aux tests des modules console d'un paquet pro : " +

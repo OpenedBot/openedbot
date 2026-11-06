@@ -51,6 +51,7 @@ const ALLOWED_PLATFORM = [
   "platform/config/src/deploy-environment.ts",
   "platform/config/src/hermes-timeouts.ts",
   "platform/config/src/http-body.ts",
+  "platform/config/src/native-clients.ts",
   "platform/config/src/rate-limit.ts",
   "platform/config/src/runtime-mode.ts",
   "platform/config/src/sse-heartbeat.ts",

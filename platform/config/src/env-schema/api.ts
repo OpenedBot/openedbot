@@ -110,6 +110,18 @@ export const API_ENV: readonly EnvVar[] = [
     productionExample: "",
   },
   {
+    name: "NATIVE_APP_ORIGINS",
+    scope: "api",
+    tier: "default_only",
+    doc: "Origins of the console bundled in the desktop app, comma-separated (default tauri://localhost,http://tauri.localhost). Allowed by CORS without credentials, never trusted for returnTo.",
+  },
+  {
+    name: "DESKTOP_MIN_VERSION",
+    scope: "api",
+    tier: "default_only",
+    doc: "Oldest desktop app (X.Y.Z) the API serves; an older one announcing X-OpenedBot-Client gets 426 and is asked to update. Empty: no minimum.",
+  },
+  {
     name: "ADMIN_PUBLIC_URL",
     scope: "admin",
     tier: "local",

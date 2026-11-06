@@ -43,6 +43,7 @@ import { needsPasswordChange, PASSWORD_CHANGE_PATH } from "./password-change-gat
 import { ensureAuthStatus, isAppAuthenticated } from "./auth-status";
 import { subscribeCloudSession } from "./cloud-session";
 import { isCompactPath } from "../shell/compact-shell";
+import { appUrl } from "../platform";
 
 /**
  * Tenant URLs carry the organization slug while requests still send its UUID.
@@ -65,7 +66,7 @@ function rememberNavigationWorkspaces(account: AccountWorkspacesDto) {
 
 export async function resolveWorkspaceLocation({ location }: { location: { publicHref: string } }) {
   if (typeof window === "undefined") return;
-  const publicUrl = new URL(location.publicHref, window.location.origin);
+  const publicUrl = appUrl(location.publicHref);
   const legacy = proLegacyHref(publicUrl);
   if (legacy) throw redirect({ href: legacy, replace: true });
   const publicPath = publicUrl.pathname;

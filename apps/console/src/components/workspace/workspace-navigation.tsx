@@ -11,6 +11,7 @@ import { fleetHomeHref, fleetInPath, internalWorkspacePath, operatingFleetId, wo
 import { isOverlaySettingsPath, useSettingsOverlay } from "../../lib/shell/settings-overlay";
 import { rememberSettingsReturn } from "../../lib/shell/settings-return";
 import { useT } from "../../lib/i18n";
+import { appUrl } from "../../lib/platform";
 import { BUTTON } from "../settings/primitives";
 
 /**
@@ -118,7 +119,7 @@ export function useWorkspaceNavigate(): (href: string) => void {
   const router = useRouter();
   const overlay = useSettingsOverlay();
   return useCallback((href: string) => {
-    const url = new URL(href, window.location.origin);
+    const url = appUrl(href);
     const internal = internalWorkspacePath(url.pathname);
     if (internal.startsWith("/settings")) {
       const sameFrame = workspaceFrameInPath(url.pathname) === workspaceFrameInPath(window.location.pathname);

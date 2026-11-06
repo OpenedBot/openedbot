@@ -19,7 +19,8 @@ import {
 } from "@/lib/stream/thread-stream-live";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { ApiClient, ApiClientError, type OrganizationEvent, type StreamGap } from "@openedbot/browser-api-client";
-import { nativeAuthStore } from "../platform/native-bridge";
+import { nativeAuthStore, nativeRequestInit } from "../platform";
+import { CLIENT_UPDATE_REQUIRED, isClientUpdateRequired, reportClientUpdateRequired, reportingClientUpdate } from "../platform/client-update";
 import { activeFleetId, activeOrganizationId, reportWorkspaceRevoked, cloudSessionRevision, readCloudSession, subscribeCloudSession } from "../session/cloud-session";
 import { api, API_ORIGIN, queryKeys, type ThreadView } from "../api";
 import { scheduleInvalidate } from "../query-client";
@@ -75,7 +76,9 @@ subscribeCloudSession(() => {
 function ensureOrganizationStream(): void {
   const organizationId = activeOrganizationId();
   const fleetId = activeFleetId();
-  if (!organizationId || listeners.size === 0) return;
+  // App de bureau trop vieille (426) : chaque nouvel écran rouvrirait un flux
+  // aussitôt refusé ; l'écran de mise à jour couvre déjà la console.
+  if (!organizationId || listeners.size === 0 || isClientUpdateRequired()) return;
   if (streamOrganization !== null && (streamOrganization !== organizationId || streamFleet !== fleetId)) {
     stopOrganizationStream();
   }
@@ -133,7 +136,7 @@ async function runOrganizationStream(organizationId: string, fleetId: string | n
       csrfToken: () => readCloudSession()?.csrfToken ?? null,
       // Coque native : le flux porte le bearer du pont et le renouvelle sur 401.
       auth: nativeAuthStore() ?? undefined,
-      fetch: (input, init) => globalThis.fetch(input, init),
+      fetch: reportingClientUpdate((input, init) => globalThis.fetch(input, nativeRequestInit(init))),
     });
     // Un seul flux pour l'organisation. Pas de `threadIds` : le roster patche
     // l'aperçu, le non-lu et la pastille de TOUS les fils depuis ce singleton.
@@ -168,6 +171,14 @@ async function runOrganizationStream(organizationId: string, fleetId: string | n
         if (error instanceof ApiClientError && error.code === "WORKSPACE_ACCESS_REVOKED") {
           controller.abort("workspace_revoked");
           reportWorkspaceRevoked(organizationId);
+          return;
+        }
+        // Sans cet abandon, la fin du générateur relancerait le flux aussitôt
+        // (`finally` ci-dessous), en boucle et sans délai.
+        if (error instanceof ApiClientError && error.code === CLIENT_UPDATE_REQUIRED) {
+          controller.abort("client_update_required");
+          // Déjà signalé, versions comprises, par `reportingClientUpdate` ; le premier signalement fait foi.
+          reportClientUpdateRequired(null);
           return;
         }
         console.error("Le flux d’événements de l’organisation est indisponible.", error);

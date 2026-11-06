@@ -5,6 +5,7 @@ import { cn, SidebarProvider, Toaster, TooltipProvider, useIsMobile } from "@ope
 import { isMobileShellPath } from "../lib/shell/mobile-navigation";
 import { isIosDevice, isStandaloneDisplay } from "../lib/platform/pwa-display";
 import { useVisualViewportInset } from "../lib/platform/use-visual-viewport-height";
+import { ClientUpdateGate } from "./client-update-required";
 
 /**
  * Les providers de la coque, et rien d'autre.
@@ -101,10 +102,12 @@ export function Shell({ children }: { children: ReactNode }) {
           } as CSSProperties
         }
       >
-        {children}
-        {/* Partout en bas à droite, réglages compris : ce sont désormais une
-            page du cadre, plus une modale centrée sous laquelle se poser. */}
-        <Toaster position="bottom-right" />
+        <ClientUpdateGate>
+          {children}
+          {/* Partout en bas à droite, réglages compris : ce sont désormais une
+              page du cadre, plus une modale centrée sous laquelle se poser. */}
+          <Toaster position="bottom-right" />
+        </ClientUpdateGate>
       </SidebarProvider>
     </TooltipProvider>
   );

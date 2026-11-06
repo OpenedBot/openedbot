@@ -131,6 +131,24 @@ describe("nextStreamAttempt", () => {
 });
 
 describe("ApiClient.events", () => {
+  test("an app too old for the API (426 CLIENT_UPDATE_REQUIRED) stops the stream without reconnecting", async () => {
+    const errors: unknown[] = [];
+    let calls = 0;
+    const client = new ApiClient({
+      baseUrl: "http://api.test", organizationId: () => "org-1",
+      fetch: async () => {
+        calls += 1;
+        return new Response(JSON.stringify({ error: { code: "CLIENT_UPDATE_REQUIRED", message: "old" } }), { status: 426 });
+      },
+    });
+    for await (const _event of client.events({ cursor: 0, signal: new AbortController().signal, onError: (error) => errors.push(error) })) {
+      // never reached: no event before the refusal
+    }
+    expect(calls).toBe(1);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ status: 426, code: "CLIENT_UPDATE_REQUIRED" });
+  });
+
   test("the selected mandate travels on SSE and a revocation stops it without reconnecting", async () => {
     const errors: unknown[] = [];
     const calls: Headers[] = [];

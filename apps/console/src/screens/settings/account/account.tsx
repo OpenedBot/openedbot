@@ -25,7 +25,7 @@ import { ApiError, api, errorMessage, queryKeys } from "../../../lib/api";
 import { activeOrganizationId } from "../../../lib/session/cloud-session";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
-import { isNativeShell } from "../../../lib/platform/native-bridge";
+import { isNativeShell } from "../../../lib/platform";
 import {
   ACTIONS,
   BUTTON,

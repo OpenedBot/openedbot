@@ -18,6 +18,7 @@ import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrati
 import { readApnsConfig } from "@openedbot/platform-integrations/apns";
 import { LEGAL_SLUGS, type LegalSlug, type RuntimeMode } from "@openedbot/contracts-api";
 import { fileBlobRoot, resolveBlobDriver } from "./blob-driver";
+import { readNativeClients, type NativeClients } from "./native-clients";
 
 /** Non-secret placeholder used outside production; rejected by assertProductionConfig. */
 const DEV_WORKER_INTERNAL_TOKEN = "openedbot-worker-dev-token";
@@ -217,6 +218,8 @@ export type ApiConfig = {
    * l'origine de `ADMIN_PUBLIC_URL`. Un seul var suffit pour le backoffice.
    */
   browserOrigins: string[];
+  /** L'app de bureau : origines CORS sans cookie, version minimale (`native-clients.ts`). */
+  nativeClients: NativeClients;
   nativeRedirectUris: string[];
   runtimeMode: RuntimeMode;
   /**
@@ -429,6 +432,7 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     adminUrl,
     transactionalEmailMailboxUrl,
     browserOrigins,
+    nativeClients: readNativeClients(env, browserOrigins),
     // Fixed allowlist: the Expo client was removed and NATIVE_REDIRECT_URIS is
     // deprecated. An OAuth redirect_uri allowlist must not be widenable by the
     // environment.
@@ -794,14 +798,7 @@ function splitList(value: string): string[] {
 }
 
 function uniqueOrigins(values: string[]): string[] {
-  const seen = new Set<string>();
-  const origins: string[] = [];
-  for (const value of values) {
-    if (seen.has(value)) continue;
-    seen.add(value);
-    origins.push(value);
-  }
-  return origins;
+  return [...new Set(values)];
 }
 
 function originOf(value: string): string | null {

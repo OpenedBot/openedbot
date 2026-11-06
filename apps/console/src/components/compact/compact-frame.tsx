@@ -7,7 +7,7 @@ import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
 import { BotFace } from "../bot-face";
 import { SettingsOverlayContext, type SettingsOverlay } from "../../lib/shell/settings-overlay";
-import { nativeBridge, openInBrowser } from "../../lib/platform/native-bridge";
+import { nativeBridge, openInBrowser } from "../../lib/platform";
 import { readCloudSession, subscribeCloudSession } from "../../lib/session/cloud-session";
 import { rememberCompactLastBot } from "../../lib/shell/compact-shell";
 import { APP_HOME_HREF } from "../../lib/workspace/workspace-location";

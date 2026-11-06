@@ -1,7 +1,7 @@
 import type { SupportHistoryDto, SupportOpenedDto, SupportSnapshotDto } from "@openedbot/contracts-api";
 import type { MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
-import { nativeBridge } from "../platform/native-bridge";
-import { API_ORIGIN, ApiError, authHeadersFor, request, sharedRead, supportTokenHeader } from "./http";
+import { clientHeaders, nativeBridge } from "../platform";
+import { API_ORIGIN, ApiError, rawApiFetch, authHeadersFor, request, sharedRead, supportTokenHeader } from "./http";
 
 export const supportApi = {
   /**
@@ -93,9 +93,9 @@ export const supportApi = {
     attachment: async (attachmentId: string, token: string | null): Promise<Blob> => {
       const bridge = nativeBridge();
       const bearer = bridge ? (await bridge.readAccessToken()) ?? "" : "";
-      const response = await fetch(`${API_ORIGIN}/api/support/attachments/${attachmentId}`, {
+      const response = await rawApiFetch(`${API_ORIGIN}/api/support/attachments/${attachmentId}`, {
         credentials: bridge ? "omit" : "include",
-        headers: { ...supportTokenHeader(token), ...authHeadersFor(bearer) },
+        headers: { ...supportTokenHeader(token), ...authHeadersFor(bearer), ...clientHeaders() },
       });
       if (!response.ok) throw new ApiError(response.status, "Capture illisible.", "ATTACHMENT_UNREADABLE");
       return response.blob();

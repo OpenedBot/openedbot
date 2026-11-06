@@ -40,6 +40,6 @@
   "modules/roster/src/sql/bots.ts": 640,
   "modules/runtime-link/src/application/gateway.ts": 703,
   "modules/runtime-link/src/application/link-connection.ts": 777,
-  "platform/config/src/api-config.ts": 883,
+  "platform/config/src/api-config.ts": 880,
   "platform/hermes/src/contracts.ts": 768
 }

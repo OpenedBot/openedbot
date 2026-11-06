@@ -418,6 +418,7 @@ test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et
 	bash tests/scripts/db-reset-contract.sh
 	bash tests/scripts/fake-hermes-contract.sh
 	bun tests/scripts/edge-setup-release-url-contract.ts
+	bun tests/scripts/console-platform-contract.ts
 	bash tests/scripts/db-ownership-contract.sh
 	bun tests/scripts/code-structure-contract.ts
 	bash tests/scripts/migration-record-contract.sh

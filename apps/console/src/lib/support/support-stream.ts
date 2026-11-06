@@ -5,7 +5,8 @@ import {
 } from "@openedbot/browser-api-client/support-stream";
 import type { SupportEventDto } from "@openedbot/contracts-api";
 import { API_ORIGIN } from "../api";
-import { nativeBridge, type OpenedbotNativeBridge } from "../platform/native-bridge";
+import { nativeBridge, withClientHeaders, type OpenedbotNativeBridge } from "../platform";
+import { reportingClientUpdate } from "../platform/client-update";
 
 /**
  * Le flux du guichet, côté visiteur.
@@ -53,9 +54,10 @@ export function openSupportStream(input: {
     // Un 401 ou un 404 veut dire que ce jeton n'ouvre plus rien : insister ne
     // le fera pas revenir, et le panneau doit repartir de son instantané plutôt
     // que de boucler sur une porte fermée.
-    stopStatuses: [401, 404],
+    // Un 426 : l'app de bureau est trop vieille, l'écran de mise à jour prend le relais.
+    stopStatuses: [401, 404, 426],
     accept: (event) => event.conversationId === input.conversationId,
-    fetchImpl: withNativeBearer(input.fetchImpl ?? fetch, nativeBridge()),
+    fetchImpl: reportingClientUpdate(withNativeBearer(input.fetchImpl ?? fetch, nativeBridge())),
     wait: input.wait,
   });
 }
@@ -69,7 +71,7 @@ function withNativeBearer(fetchImpl: typeof fetch, bridge: OpenedbotNativeBridge
   if (!bridge) return fetchImpl;
   const authorized = async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const token = await bridge.readAccessToken();
-    const headers = new Headers(init?.headers);
+    const headers = new Headers(withClientHeaders(init)?.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
     return fetchImpl(url, { ...init, headers, credentials: "omit" });
   };

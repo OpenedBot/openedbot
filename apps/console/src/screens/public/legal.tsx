@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { LegalSlug } from "@openedbot/contracts-api";
 import { ApiError, api, queryKeys } from "../../lib/api";
+import { appUrl } from "../../lib/platform";
 import { useT } from "../../lib/i18n";
 
 const LEGAL_LABELS: Record<LegalSlug, "legal.mentions" | "legal.privacy" | "legal.terms"> = {
@@ -119,7 +120,7 @@ function safeMarkdownUrl(value: string): string {
   const url = value.trim();
   if (!url || url.startsWith("#")) return url;
   try {
-    const parsed = new URL(url, globalThis.window?.location.origin ?? "http://localhost");
+    const parsed = appUrl(url);
     return ["http:", "https:", "mailto:"].includes(parsed.protocol) ? url : "";
   } catch {
     return "";

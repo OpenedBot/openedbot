@@ -79,6 +79,12 @@ export const SCRIPTS_ENV: readonly EnvVar[] = [
     productionExample: "https://api.example.invalid",
   },
   {
+    name: "VITE_PUBLIC_CONSOLE_URL",
+    scope: "web",
+    tier: "default_only",
+    doc: "Public origin of the web console, baked into a console bundled in the desktop app so its invitation links and browser pages never point at the app's local origin. Unused by the web build, which takes its own origin.",
+  },
+  {
     name: "DEV_HERMES_PROFILE",
     scope: "scripts",
     tier: "default_only",
