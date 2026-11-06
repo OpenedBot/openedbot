@@ -24,6 +24,7 @@ export const OVERLAY_SETTINGS_PATHS = [
   "/settings/models",
   "/settings/appearance",
   "/settings/updates",
+  "/settings/notch",
   "/settings/archives",
   "/settings/connectors",
   "/settings/notifications",

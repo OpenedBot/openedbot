@@ -35,6 +35,23 @@ impl bridge::WindowControl for NoWindow {
     fn toggle_maximize(&self) {}
 }
 
+/// The notch as on a system without it.
+struct NoNotch;
+impl bridge::NotchControl for NoNotch {
+    fn state(&self) -> notch::NotchState {
+        notch::NotchState { supported: false, available: false, mode: prefs::DisplayMode::Window, choice_pending: false, demo_supported: false, onboarding: false, camera_housing: false }
+    }
+    fn set_mode(&self, mode: prefs::DisplayMode) -> Result<notch::NotchState, notch::NotchRefusal> {
+        if mode != prefs::DisplayMode::Window {
+            return Err(notch::NotchRefusal::Unavailable);
+        }
+        Ok(self.state())
+    }
+    fn play_demo(&self) -> Result<notch::NotchState, notch::NotchRefusal> {
+        Err(notch::NotchRefusal::Unavailable)
+    }
+}
+
 struct NoBrowser;
 impl auth::GoogleSteps for NoBrowser {
     fn start_loopback(&self, _: u64) -> Result<(), auth::StepFailed> {
@@ -55,7 +72,7 @@ fn app() -> tauri::App<MockRuntime> {
     let config = test_config();
     let auth = AuthService::new(HttpAuthApi::new(&config.api_origin, "0.0.0"), Box::new(DisabledVault) as Box<dyn Vault>, Arc::new(NoEvents), callback::LOOPBACK_REDIRECT_URI, PREVIEW_CLIENT_ID);
     auth.restore();
-    app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())), google: Arc::new(NoBrowser), client_id: PREVIEW_CLIENT_ID.into(), window: Box::new(NoWindow) });
+    app.manage(Shell { auth: Arc::new(auth), config, version: "0.0.0".into(), opener: Box::new(|_| Ok(())), google: Arc::new(NoBrowser), client_id: PREVIEW_CLIENT_ID.into(), window: Box::new(NoWindow), notch: Box::new(NoNotch) });
     let status = Arc::new(crate::update_state::UpdateStatus::new(true, Box::new(|_, _| {})));
     app.manage(status.clone());
     app.manage(bridge::Updates(Arc::new(crate::update_engine::NoUpdates(status))));
@@ -240,4 +257,21 @@ fn the_runs_and_the_idle_setting_reach_the_shell() {
     assert_eq!(invoke(&main, "set_update_auto_install", LOCAL, json!({ "enabled": false })), Ok(Value::Null));
     assert_eq!(invoke(&main, "update_state", LOCAL, json!({})).unwrap()["autoInstall"], json!(false));
     assert!(!app.state::<WindowState>().prefs.get().auto_install_updates, "kept in the preferences");
+}
+
+#[test]
+fn the_notch_commands_reach_the_shell_and_name_their_refusals() {
+    let app = app();
+    let main = window(&app, window::MAIN_WINDOW);
+    let state = invoke(&main, "notch_state", LOCAL, json!({})).unwrap();
+    assert_eq!(
+        state,
+        json!({ "supported": false, "available": false, "mode": "window", "choicePending": false, "demoSupported": false, "onboarding": false, "cameraHousing": false })
+    );
+    assert_eq!(invoke(&main, "set_notch_mode", LOCAL, json!({ "mode": "window" })).unwrap()["mode"], json!("window"));
+    let refused = invoke(&main, "set_notch_mode", LOCAL, json!({ "mode": "both" })).expect_err("no notch here");
+    assert!(refused.to_string().contains("NOTCH_UNAVAILABLE"), "{refused}");
+    assert!(invoke(&main, "set_notch_mode", LOCAL, json!({ "mode": "everywhere" })).is_err());
+    let refused = invoke(&main, "play_notch_demo", LOCAL, json!({})).expect_err("no notch here");
+    assert!(refused.to_string().contains("NOTCH_UNAVAILABLE"), "{refused}");
 }

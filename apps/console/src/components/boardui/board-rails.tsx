@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +20,7 @@ import { useFleetFrameContext } from "../../pro-console/slots";
 import packageJson from "../../../package.json";
 import { RailLlmQuotas } from "./rail-llm-quotas";
 import { RailRuntimeHealth } from "./rail-runtime-health";
+import { DesktopUpdateRailButton } from "../desktop-update/entry";
 
 /**
  * Variante C (`lib/shell/account-layout.ts`, choisie dans Réglages > Apparence), bureau seulement : la coque
@@ -114,6 +115,8 @@ export function BoardIconRail() {
           </RailTip>
         ) : null}
         <div aria-hidden className={RAIL_DIVIDER} />
+        {/* App de bureau : la mise à jour prête, juste au-dessus de Réglages (rien sur le web). */}
+        {DesktopUpdateRailButton ? <Suspense fallback={null}><DesktopUpdateRailButton /></Suspense> : null}
         <RailTip label={t("navUser.settings")}>
           <button type="button" aria-label={t("navUser.settings")} className={RAIL_BUTTON} onClick={() => openSettings(fleetHome ? "/settings/profile" : "/settings")}>
             <RiSettings3Line aria-hidden />

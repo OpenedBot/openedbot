@@ -32,7 +32,7 @@ pub struct DockState {
     pub signed_in: bool,
 }
 
-const MODES: [(DisplayMode, &str, isize); 3] = [(DisplayMode::Window, "Fenêtre", 1), (DisplayMode::Popup, "Popup", 2), (DisplayMode::Both, "Fenêtre et popup", 3)];
+const MODES: [(DisplayMode, &str, isize); 3] = [(DisplayMode::Window, "Fenêtre", 1), (DisplayMode::Popup, "Encoche seule", 2), (DisplayMode::Both, "Fenêtre et encoche", 3)];
 const TAG_ALWAYS_ON_TOP: isize = 10;
 const TAG_SIGN_OUT: isize = 20;
 
@@ -124,7 +124,7 @@ pub fn refresh<R: Runtime>(app: &AppHandle<R>, state: DockState) {
         menu.addItem(&header);
         for (mode, label, tag) in MODES {
             let usable = mode == DisplayMode::Window || state.popup_available;
-            let title = if usable { label.to_string() } else { format!("{label} (popup introuvable)") };
+            let title = if usable { label.to_string() } else { format!("{label} (encoche indisponible)") };
             item(&title, tag, state.display_mode == mode, usable);
         }
         menu.addItem(&NSMenuItem::separatorItem(mtm));
@@ -142,6 +142,7 @@ mod tests {
     fn tags_map_to_their_actions_only() {
         assert_eq!(action_for(1), Some(DockAction::DisplayMode(DisplayMode::Window)));
         assert_eq!(action_for(3), Some(DockAction::DisplayMode(DisplayMode::Both)));
+        assert_eq!(MODES.map(|(_, label, _)| label), ["Fenêtre", "Encoche seule", "Fenêtre et encoche"]);
         assert_eq!(action_for(TAG_ALWAYS_ON_TOP), Some(DockAction::ToggleAlwaysOnTop));
         assert_eq!(action_for(TAG_SIGN_OUT), Some(DockAction::SignOut));
         assert_eq!(action_for(0), None);

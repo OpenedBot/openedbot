@@ -7,6 +7,7 @@ import {
   IconLayoutGrid,
   IconPlugConnected,
   IconPalette,
+  IconDeviceLaptop,
   IconRefresh,
   IconServerBolt,
   IconTerminal2,
@@ -82,6 +83,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { titleKey: "settingsSidebar.appearance", url: "/settings/appearance", icon: IconPalette },
       // App Tauri seulement : la mise à jour de l'app de bureau (constant au build).
       ...(import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" ? [{ titleKey: "settingsSidebar.updates" as const, url: "/settings/updates", icon: IconRefresh }] : []),
+      // App Tauri sur Mac seulement : l'encoche (la coque dit son système avant le premier script).
+      ...(import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" && globalThis.window?.__OPENEDBOT_SHELL__?.platform === "macos"
+        ? [{ titleKey: "settingsSidebar.notch" as const, url: "/settings/notch", icon: IconDeviceLaptop }]
+        : []),
     ],
   },
   {

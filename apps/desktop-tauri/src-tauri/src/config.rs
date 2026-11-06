@@ -59,7 +59,10 @@ pub struct ShellConfig {
     pub public_console_url: String,
     /// The update manifest; `None` turns the updater off.
     pub update_url: Option<String>,
-    /// Run the notch popup (Contents/Helpers/OpenedbotPopup.app) next to the window.
+    /// The notch popup (Contents/Helpers/OpenedbotPopup.app) may run: on by
+    /// default, the user then chooses (`notch.rs`). `false` (`OPENEDBOT_POPUP=0`,
+    /// `"popup": false` in `config.json`) is a kill switch: the window only,
+    /// whatever was chosen, and no first-run choice.
     pub popup: bool,
 }
 
@@ -181,7 +184,7 @@ pub fn load(config_dir: Option<&Path>, env: &dyn Fn(&str) -> Option<String>, hos
     let popup = match env("OPENEDBOT_POPUP").as_deref() {
         Some("1") | Some("true") => true,
         Some("0") | Some("false") => false,
-        _ => file.popup.unwrap_or(false),
+        _ => file.popup.unwrap_or(true),
     };
     Ok(ShellConfig { api_origin, public_console_url, update_url, popup })
 }
@@ -251,14 +254,19 @@ mod tests {
         assert_eq!(defaults.api_origin, PRODUCTION_API_ORIGIN);
         assert_eq!(defaults.public_console_url, PRODUCTION_CONSOLE_URL);
         assert_eq!(defaults.update_url, None);
-        assert!(!defaults.popup);
+        // The notch is on unless turned off: the user chooses at the first sign-in.
+        assert!(defaults.popup);
 
         let dir = std::env::temp_dir().join(format!("openedbot-config-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("config.json"), r#"{"apiOrigin":"http://127.0.0.1:8790","popup":true}"#).unwrap();
+        std::fs::write(dir.join("config.json"), r#"{"apiOrigin":"http://127.0.0.1:8790","popup":false}"#).unwrap();
         let from_file = load(Some(&dir), &no_env, false).unwrap();
         assert_eq!(from_file.api_origin, "http://127.0.0.1:8790");
-        assert!(from_file.popup);
+        assert!(!from_file.popup, "the kill switch in config.json");
+        let on = |name: &str| (name == "OPENEDBOT_POPUP").then(|| "1".to_string());
+        assert!(load(Some(&dir), &on, false).unwrap().popup, "the environment wins over the file");
+        let off = |name: &str| (name == "OPENEDBOT_POPUP").then(|| "0".to_string());
+        assert!(!load(None, &off, false).unwrap().popup, "the kill switch in the environment");
         let env = |name: &str| (name == "OPENEDBOT_API_ORIGIN").then(|| "http://localhost:9000".to_string());
         assert_eq!(load(Some(&dir), &env, false).unwrap().api_origin, "http://localhost:9000");
         std::fs::write(dir.join("config.json"), r#"{"apiOrigin":"http://example.com"}"#).unwrap();

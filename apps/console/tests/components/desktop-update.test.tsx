@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,6 +14,7 @@ import { I18nProvider } from "../../src/lib/i18n";
 import { queryKeys } from "../../src/lib/api";
 import { useRunInProgress } from "../../src/lib/run/run-in-progress";
 import { UpdateMenuRow, UpdatePill } from "../../src/components/desktop-update/update-pill";
+import { UpdateRailButton } from "../../src/components/desktop-update/update-rail-button";
 import { UpdateDialog } from "../../src/components/desktop-update/update-dialog";
 import { DesktopUpdateRequired } from "../../src/components/desktop-update/update-required";
 import { RUNS_UNKNOWN_AFTER_MS, useRunsInProgress, useUpdateDialog } from "../../src/components/desktop-update/update-hooks";
@@ -201,12 +204,41 @@ describe("pastille rendue", () => {
     expect(screen.getByRole("status").getAttribute("aria-label")).toBe("Téléchargement de la mise à jour… 42 %");
     shell.emit(ready());
     const pill = screen.getByRole("button", { name: /Mettre à jour/ });
-    expect(pill.className).toContain("bg-info-soft");
-    expect(pill.className).toContain("text-info-700");
+    // Le bleu de mise à jour (systemBlue), plein sous du blanc, et non l'accent.
+    expect(pill.className).toContain("bg-update-accent");
+    expect(pill.className).toContain("text-update-accent-contrast");
     expect(pill.className).not.toMatch(/\bprimary\b/);
     fireEvent.click(pill);
     expect(useUpdateDialog.getState().version).toBe("0.0.17");
     expect(shell.calls.install).toEqual([]);
+    view.unmount();
+  });
+
+  test("le bouton du rail : rien au repos ni en erreur, l'anneau, puis le carré bleu qui ouvre le dialogue", () => {
+    const shell = fakeUpdates(state({ status: "idle" }));
+    install(shell.updates);
+    const view = wrap(<UpdateRailButton />);
+    // Absent, il ne réserve aucune place dans le rail.
+    expect(view.container.innerHTML).toBe("");
+    shell.emit(state({ status: "downloading", version: "0.0.17", downloaded: 42, total: 100 }));
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe("Téléchargement de la mise à jour… 42 %");
+    expect(view.container.querySelector("[data-rail-update-slot]")).toBeTruthy();
+    shell.emit(ready());
+    const button = screen.getByRole("button", { name: "Mettre à jour — openedbot 0.0.17 est prête" });
+    // La taille et la cible des autres boutons du rail, en bleu de mise à jour plein.
+    expect(button.className).toContain("size-9");
+    expect(button.className).toContain("bg-update-accent");
+    expect(button.className).toContain("text-update-accent-contrast");
+    expect(button.className).toContain("hover:bg-update-accent-hover");
+    expect(button.className).toContain("focus-visible:ring-2");
+    expect(button.className).not.toMatch(/\bprimary\b/);
+    expect(button.querySelector("svg")).toBeTruthy();
+    fireEvent.click(button);
+    expect(useUpdateDialog.getState().version).toBe("0.0.17");
+    expect(shell.calls.install).toEqual([]);
+    act(() => useUpdateDialog.getState().close());
+    shell.emit(state({ status: "error", code: "FEED_UNREACHABLE" }, { lastError: "FEED_UNREACHABLE" }));
+    expect(view.container.innerHTML).toBe("");
     view.unmount();
   });
 
@@ -403,6 +435,7 @@ describe("le build web ne rend rien de tout cela", () => {
   test("hors build desktop, les points de montage valent null", () => {
     expect(entry.DesktopUpdatePill).toBeNull();
     expect(entry.DesktopUpdateMenuRow).toBeNull();
+    expect(entry.DesktopUpdateRailButton).toBeNull();
     expect(entry.DesktopUpdateLayer).toBeNull();
     expect(entry.DesktopUpdateRequired).toBeNull();
   });
@@ -420,5 +453,23 @@ describe("le build web ne rend rien de tout cela", () => {
     const view = wrap(<><UpdatePill /><UpdateMenuRow mobileDrawer={false} onSelect={() => undefined} /></>);
     expect(view.container.innerHTML).toBe("");
     view.unmount();
+  });
+});
+
+describe("le bleu de mise à jour", () => {
+  test("systemBlue en clair et en sombre, défini une fois, sans toucher au bleu « info »", () => {
+    const css = readFileSync(resolve(import.meta.dir, "../../../../browser/ui-kit/src/styles/app.css"), "utf8");
+    const values = (name: string) => [...css.matchAll(new RegExp(`\\s--${name}: (#[0-9a-f]{6});`, "g"))].map((match) => match[1] ?? "");
+    expect(values("update-accent")).toEqual(["#007aff", "#0a84ff"]);
+    expect(values("update-accent-contrast")).toEqual(["#ffffff", "#ffffff"]);
+    expect(values("state-info-fg")).toEqual(["#1447e6", "#8ec5ff"]);
+    // Blanc sur le bleu : au moins 3:1, le seuil d'une icône (WCAG 1.4.11).
+    const luminance = (hex: string) => {
+      const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    for (const fill of [...values("update-accent"), ...values("update-accent-hover")]) {
+      expect(1.05 / (luminance(fill) + 0.05)).toBeGreaterThanOrEqual(3);
+    }
   });
 });

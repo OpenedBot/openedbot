@@ -15,6 +15,7 @@ use crate::update_state::{UpdateState, UpdateStatus};
 use crate::callback::Loopback;
 use crate::popup::{GiveUp, HostToPopup, PopupEvents, PopupHost};
 use crate::prefs::DisplayMode;
+use crate::notch;
 use crate::window::{self, WindowState};
 
 pub struct PopupHandle(pub Arc<PopupHost<Auth>>);
@@ -22,19 +23,14 @@ pub struct PopupHandle(pub Arc<PopupHost<Auth>>);
 /// The popup is the native openedbot Notch, macOS only: elsewhere the mode is always the window.
 pub const POPUP_SUPPORTED: bool = cfg!(target_os = "macos");
 
-/// The display mode in force: the user's choice, else the configuration's default.
+/// The display mode in force (`notch::display_mode`): the window until the
+/// user has chosen, and whenever the popup cannot run.
 pub fn display_mode<R: Runtime>(app: &AppHandle<R>) -> DisplayMode {
-    if !POPUP_SUPPORTED {
-        return DisplayMode::Window;
-    }
-    let configured = app.try_state::<Shell>().is_some_and(|shell| shell.config.popup);
-    let fallback = if configured { DisplayMode::Both } else { DisplayMode::Window };
-    // No window state: the configuration was refused and nothing started.
-    app.try_state::<WindowState>().and_then(|state| state.prefs.get().display_mode).unwrap_or(fallback)
+    notch::display_mode(app)
 }
 
 fn signed_in<R: Runtime>(app: &AppHandle<R>) -> bool {
-    app.try_state::<Shell>().is_some_and(|shell| shell.auth.is_signed_in())
+    notch::signed_in(app)
 }
 
 /// Popup-only mode: no Dock icon while the window is hidden, back as soon as it shows.
@@ -56,7 +52,7 @@ pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
     {
         let state = crate::macos::dock::DockState {
             display_mode: display_mode(app),
-            popup_available: app.try_state::<PopupHandle>().is_some_and(|popup| popup.0.available()),
+            popup_available: notch::available(app),
             always_on_top: app.state::<WindowState>().prefs.get().always_on_top,
             signed_in: signed_in(app),
         };
@@ -66,23 +62,17 @@ pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
     let _ = app;
 }
 
+/// The user's choice (first-run choice, Réglages › Encoche, Dock menu), saved.
 pub fn set_display_mode<R: Runtime>(app: &AppHandle<R>, mode: DisplayMode) {
-    let mode = if POPUP_SUPPORTED { mode } else { DisplayMode::Window };
-    app.state::<WindowState>().prefs.update(|prefs| prefs.display_mode = Some(mode));
-    if let Some(popup) = app.try_state::<PopupHandle>() {
-        if mode == DisplayMode::Window {
-            popup.0.stop();
-        } else {
-            popup.0.start();
-        }
-    }
-    // Popup only hides the window, unless there is no session to show in the popup.
+    let mode = notch::choose(app, mode);
+    // The notch alone hides the window, unless there is no session to show in it.
     if mode == DisplayMode::Popup && signed_in(app) {
         window::hide(app);
     } else {
         window::show(app);
     }
     visibility_changed(app);
+    notch::changed(app);
 }
 
 pub fn set_always_on_top<R: Runtime>(app: &AppHandle<R>, value: bool) {
@@ -233,6 +223,8 @@ impl<R: Runtime> AuthEvents for ShellEvents<R> {
         }
         window::bring_to_front(&self.app);
         self.popup(HostToPopup::SignedIn);
+        // The popup starts now (it never runs signed out), or the first-run choice is asked.
+        notch::session_started(&self.app);
         visibility_changed(&self.app);
     }
 
@@ -241,6 +233,7 @@ impl<R: Runtime> AuthEvents for ShellEvents<R> {
     fn signed_out(&self, reason: SignedOutReason) {
         log::info!("signed out ({reason:?})");
         self.popup(HostToPopup::SignedOut);
+        notch::session_ended(&self.app);
         let app = self.app.clone();
         tauri::async_runtime::spawn(async move {
             let chooser = app.clone();
@@ -271,14 +264,23 @@ pub struct ShellPopupEvents<R: Runtime> {
     pub app: AppHandle<R>,
 }
 
+fn give_up_title(reason: &GiveUp) -> &'static str {
+    match reason {
+        GiveUp::Crashing(_) => "Encoche arrêtée",
+        _ => "Encoche désactivée",
+    }
+}
+
 fn give_up_message(reason: &GiveUp) -> String {
     match reason {
-        GiveUp::Missing => "openedbot notch n’est pas embarquée dans cette version d’openedbot. openedbot repasse en mode Fenêtre.".into(),
-        GiveUp::Crashing(failures) => format!("La popup s’est arrêtée {failures} fois de suite. openedbot repasse en mode Fenêtre."),
-        GiveUp::Protocol(0) => "Cette version d’openedbot notch est antérieure au mode popup d’openedbot : reconstruisez-la (make bundle dans openedbot-notch). openedbot repasse en mode Fenêtre.".into(),
-        GiveUp::Protocol(version) => format!("Cette popup parle une autre version du protocole ({version}). openedbot repasse en mode Fenêtre."),
-        GiveUp::Fatal(code) if code == "STANDALONE_RUNNING" => "openedbot notch tourne déjà seule. Quittez-la, puis choisissez à nouveau Popup dans le menu du Dock.".into(),
-        GiveUp::Fatal(code) => format!("La popup a refusé de démarrer ({code}). openedbot repasse en mode Fenêtre."),
+        GiveUp::Missing => "L’encoche n’est pas embarquée dans cette version d’openedbot. openedbot repasse en mode Fenêtre.".into(),
+        GiveUp::Crashing(failures) => format!(
+            "L’encoche s’est arrêtée {failures} fois de suite. Elle reste fermée jusqu’au prochain lancement d’openedbot, qui la relancera ; votre choix est gardé. Vous pouvez aussi la relancer depuis le menu du Dock."
+        ),
+        GiveUp::Protocol(0) => "Cette version de l’encoche est antérieure au mode hébergé d’openedbot : reconstruisez-la (make bundle dans openedbot-notch). openedbot repasse en mode Fenêtre.".into(),
+        GiveUp::Protocol(version) => format!("Cette encoche parle une autre version du protocole ({version}). openedbot repasse en mode Fenêtre."),
+        GiveUp::Fatal(code) if code == "STANDALONE_RUNNING" => "openedbot notch tourne déjà seule. Quittez-la, puis rallumez l’encoche dans Réglages › Encoche ou dans le menu du Dock.".into(),
+        GiveUp::Fatal(code) => format!("L’encoche a refusé de démarrer ({code}). openedbot repasse en mode Fenêtre."),
     }
 }
 
@@ -293,13 +295,31 @@ impl<R: Runtime> PopupEvents for ShellPopupEvents<R> {
     }
 
     fn gave_up(&self, reason: &GiveUp) {
-        log::warn!("popup unavailable ({reason:?}), back to the window");
-        set_display_mode(&self.app, DisplayMode::Window);
-        warn(&self.app, "Popup désactivée", &give_up_message(reason));
+        match notch::gave_up(&self.app, reason) {
+            notch::GiveUpOutcome::DemoUnavailable => log::warn!("popup unavailable during the first-run choice ({reason:?}): still preview"),
+            outcome => {
+                log::warn!("popup unavailable ({reason:?}): {outcome:?}");
+                // The notch alone hid the window: it comes back, saved or not.
+                window::show(&self.app);
+                visibility_changed(&self.app);
+                warn(&self.app, give_up_title(reason), &give_up_message(reason));
+            }
+        }
     }
 
     fn user_closed(&self) {
-        set_display_mode(&self.app, DisplayMode::Window);
+        if notch::user_closed(&self.app) {
+            set_display_mode(&self.app, DisplayMode::Window);
+        }
+    }
+
+    fn demo_support_changed(&self, supported: bool) {
+        log::info!("the popup {} the demo", if supported { "plays" } else { "does not play" });
+        notch::demo_support_changed(&self.app);
+    }
+
+    fn demo_ended(&self) {
+        notch::demo_ended(&self.app);
     }
 
     fn greeting(&self) -> Vec<HostToPopup> {
@@ -447,6 +467,10 @@ mod tests {
     fn every_give_up_reason_is_explained() {
         assert!(give_up_message(&GiveUp::Missing).contains("pas embarquée"));
         assert!(give_up_message(&GiveUp::Crashing(5)).contains("5 fois"));
+        // A crash loop keeps the choice: the message must not say the window mode is back for good.
+        assert!(give_up_message(&GiveUp::Crashing(5)).contains("prochain lancement"));
+        assert!(!give_up_message(&GiveUp::Crashing(5)).contains("repasse en mode Fenêtre"));
+        assert_eq!(give_up_title(&GiveUp::Crashing(5)), "Encoche arrêtée");
         assert!(give_up_message(&GiveUp::Protocol(0)).contains("antérieure"));
         assert!(give_up_message(&GiveUp::Protocol(2)).contains("(2)"));
         assert!(give_up_message(&GiveUp::Fatal("STANDALONE_RUNNING".into())).contains("tourne déjà seule"));

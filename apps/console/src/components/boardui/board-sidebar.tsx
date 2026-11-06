@@ -544,7 +544,7 @@ export function BoardSidebar({ className }: { className?: string }) {
           <div className={dense ? undefined : "mt-2"}>
             <AccountMenu />
           </div>
-        ) : <AccountUpdatePill />}
+        ) : <div className={railShell ? "md:hidden" : undefined}><AccountUpdatePill /></div>}
       </footer>
       </div>
 

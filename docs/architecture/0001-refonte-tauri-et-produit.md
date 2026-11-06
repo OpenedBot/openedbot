@@ -899,7 +899,8 @@ Le clic sur la pastille, la ligne du menu du compte, Réglages ou le menu de l'a
 « Mise à jour prête » (« Redémarrer » / « Plus tard »). S'il reste des runs en cours, le
 dialogue attend (« En attente de la fin de N run(s)… ») et propose « Redémarrer quand même ».
 Le clic sur le notch ouvre Réglages › Mises à jour ; le notch ne redémarre jamais rien. Couleur
-d'information fixe (`--state-info-*`), pas l'accent de l'app.
+fixe, pas l'accent de l'app : depuis D3b, le bleu des mises à jour d'Apple (`--update-accent`,
+section 4.3.7) au lieu de `--state-info-*`.
 
 **Inactivité.** Réglage « Installer quand le Mac est inactif », actif par défaut (préférences de
 la coque). Conditions : écran verrouillé, économiseur d'écran ou 10 minutes sans entrée
@@ -1345,6 +1346,125 @@ concorder, ce que vérifient la version du dmg, celle des debs et celle des sign
 8. Déploiement de la console web : c'est lui qui fait passer les apps 1.0.x à l'état décrit plus
    haut ; le faire après l'étape 6, pour que le téléchargement existe.
 
+### 4.3.7 Encoche à la première connexion, rail et focus (D3b, 2026-11-06)
+
+Branches `feat/d3b-notch-onboarding` (app) et `feat/notch-onboarding` (openedbot-notch, sur
+`feat/update-badge`). Décisions de l'utilisateur : l'encoche se présente par une démonstration et
+un choix à la première connexion, comme OpenBot ; elle n'existe qu'avec une session ; « Garder
+l'encoche » vaut fenêtre et encoche ; l'écran de la caméra seulement ; un volet Réglages › Encoche
+dans l'app Tauri sur Mac (rien dans le bundle web) ; un plantage en boucle ne retire plus le
+choix. Ajouts demandés pendant l'étape : la mise à jour dans le rail d'icônes, le bleu des mises
+à jour d'Apple partout, et aucun contour de focus dans l'app de bureau.
+
+**Qui décide (coque, `notch.rs`).** La préférence `displayMode` reste la seule chose gardée ;
+`None` veut dire « pas encore choisi ». Le reste vit le temps d'un lancement (`NotchSession`).
+
+```
+ session ouverte (connexion, ou session restaurée au lancement)
+        |
+        v
+ choix déjà fait ? --- oui ---> popup_plan : Window -> arrêté, Popup/Both -> encoche des bots
+        |
+       non (et encoche disponible : macOS, bundle présent, `popup` actif dans config.json)
+        |
+        v
+ onboarding : le popup joue `demo{cycles:0}` (bots fictifs, aucun réseau)
+              la console ouvre la feuille « openedbot vit aussi dans l'encoche »
+        |
+        +-- « Garder l'encoche » ------------> displayMode = both, `endDemo`, bots de la session
+        +-- « Pas maintenant » / Échap ------> displayMode = window, popup arrêté
+        +-- fermer ou quitter sans répondre -> rien d'écrit : la question revient au lancement suivant
+```
+
+| Situation | Encoche | Feuille | Préférence écrite |
+|---|---|---|---|
+| Pas de session (page de connexion) | arrêtée | non | non |
+| Première session, rien de choisi, Mac avec bundle | démonstration | oui | non |
+| Idem, popup sans `demo` (ancien bundle, `ready` sans la capacité) | arrêtée | oui, avec un aperçu dessiné | non |
+| Hors macOS, bundle absent, `popup: false` | arrêtée | non | non (effectif : fenêtre) |
+| « Garder l'encoche » | bots de la session | fermée | `both` |
+| « Pas maintenant », Échap | arrêtée | fermée | `window` |
+| Mise à jour d'une version où le choix est fait | selon le choix | jamais | inchangée |
+| Plantage en boucle (`Crashing`) | en pause jusqu'au lancement suivant, dialogue « Encoche arrêtée » | non | inchangée |
+| Bundle absent ou protocole incompatible | arrêtée | non | `window` (comme avant) |
+| Fermée par l'utilisateur (menu du popup) | arrêtée | — | inchangée (comme avant) |
+| Pendant la démonstration, popup en échec | arrêtée, la feuille reste | oui, aperçu | non |
+
+**Protocole.** Dans la v1, additions compatibles : `ready.features` (`["demo"]`), le bundle les
+déclare aussi (`OpenedbotHostedFeatures` dans l'`Info.plist`) ; hôte → popup `demo{cycles}` et
+`endDemo`, popup → hôte `demoEnded`. La démonstration n'est envoyée qu'à un popup qui l'annonce ;
+la coque n'envoie une ligne qu'au run qui a dit `ready` (un run remplacé ne parle plus pour le
+nouveau, revue Codex).
+
+**Démonstration (openedbot-notch, `DemoFeed.swift`).** Deux bots fictifs, Recherche et Rédaction ;
+un cycle d'environ 12 s : île compacte « en cours », Rédaction demande un accord et l'île se déplie
+sur « Autoriser » / « Refuser » (réponse locale, accord automatique au bout de 4 s), puis
+« terminé ». Elle boucle et s'arrête à la fin du cycle pendant lequel l'utilisateur l'a touchée
+(survol, clic, réponse) ; un refus garde le billet en brouillon. « Revoir la démonstration » joue
+deux cycles puis rend l'encoche au choix gardé. Pendant la démonstration : île centrée sur la
+caméra quel que soit le bord choisi (sans l'écrire), aucune notification ni bannière, la boîte de
+la session mise de côté puis rendue au premier roster du flux qui reprend, ses demandes d'accord
+recalées sur leur identité openedbot, la bannière d'accord interrompue remise en tête si la demande
+attend toujours. Les messages déjà vus sont gardés avec la boîte : le flux qui reprend relit les fils
+que la session avait chargés (jusqu'à ce que chacun ait été lu, même après un échec ou une
+démonstration rejouée), et une réponse arrivée pendant la démonstration s'annonce une fois, l'ancien
+jamais. Le flux de la session arrêté n'écrit plus le modèle (génération : relectures en vol, flux
+d'événements, réponses d'accord, envois, réactions, catalogue et choix du modèle). L'île se place sur l'écran qui a la caméra
+(sinon l'écran principal) et se replace au réveil (`didWake`, `screensDidWake`) et quand les écrans
+changent.
+
+**Console.** `components/desktop-notch/` (feuille, aperçu) et `screens/settings/general/notch.tsx`
+(Réglages › Encoche : afficher dans l'encoche, masquer la fenêtre, revoir la démonstration, ligne
+« L'encoche n'est pas disponible dans cette version. » sinon), chargés à part et absents du build
+web ; pont `notch_state`, `set_notch_mode`, `play_notch_demo`, événement `notch-state-changed`.
+Note de bas de feuille : « Réglages › Encoche » (le volet est dans le groupe « Moi », il n'y a pas
+de groupe « Général »). Pendant la pause d'un plantage en boucle, l'interrupteur montre l'effectif
+(fenêtre) ; le choix gardé revient au lancement suivant. Menu du Dock : « Fenêtre », « Encoche
+seule », « Fenêtre et encoche ».
+
+**Mise à jour dans le rail.** La disposition « c » (rail d'icônes) n'avait aucune indication de
+mise à jour. Un carré de 36 px se pose juste au-dessus de Réglages (`update-rail-button.tsx`, même
+état que la pastille de 4.3.4) : anneau pendant le téléchargement, icône de téléchargement une
+fois prête (infobulle « Mettre à jour — openedbot X.Y.Z est prête », clic → « Mise à jour prête »),
+rien au repos ni en erreur, aucune place réservée, entrée animée par le script (rien dans le CSS
+web). La pastille du pied de liste s'efface là où le rail s'affiche ; les autres dispositions la
+gardent.
+
+**Bleu des mises à jour.** Le bleu « info » sombre (#8ec5ff sur #16245699) se lisait mal. Un
+jeton dédié, `--update-accent` : systemBlue d'Apple, #007AFF en clair, #0A84FF en sombre, en
+aplat sous du blanc (`--update-accent-contrast`) ; survol #0069D9 en clair, #2A8FFF en sombre.
+Blanc sur #007AFF 4,02:1, sur #0A84FF 3,65:1, sur les survols 5,22:1 et 3,25:1 : au-dessus du
+3:1 d'une icône (WCAG 1.4.11), pas du 4,5:1 d'un petit texte, d'où le libellé en gras de la
+pastille. Le point de l'encoche prend `NSColor.systemBlue`. `--state-info-*` ne change pas.
+
+**Focus.** L'app de bureau n'affiche plus aucun anneau ni contour de focus, clavier compris : le
+build desktop n'installe pas `trackKeyboardFocus` (`<html>` ne porte jamais `data-keyboard-focus`,
+dont dépendent les variantes `focus-visible:` / `focus-within:` et les règles de focus) et pose une
+feuille (`lib/platform/desktop-focus.ts`) pour le contour natif et la bordure du composer. Le focus
+lui-même ne change pas. Le build web garde le suivi et ne contient pas la feuille (vérifié sur les
+deux builds). Le bouton du rail n'a donc pas d'anneau dans l'app, contrairement à la demande
+initiale.
+
+**Éprouvé à l'écran** sur des builds de production signés, notarisés et agrafés (1.1.4-test à
+1.1.12-test) : pas d'encoche avant la connexion ; démonstration et feuille à la première connexion
+(clair et sombre), les phases du cycle, l'arrêt après un survol ; « Garder l'encoche » → `both`,
+encoche des bots ; « Pas maintenant » → `window`, popup arrêté ; quitter sans répondre → la
+question revient ; Réglages › Encoche (clair et sombre), revoir la démonstration ; menu du Dock ;
+boucle de plantage (5 redémarrages puis pause, choix gardé, relancée au lancement suivant) ; mises
+à jour 1.1.4 → 1.1.5 → 1.1.6 → 1.1.8 → 1.1.10 par le flux local, choix gardé et aucune feuille ;
+bouton du rail, infobulle et dialogue (clair et sombre), pastille et point de l'encoche en
+systemBlue ; aucun contour après un clic, après Tab, dans un champ, dans le composer et dans
+« Mise à jour prête » (clair et sombre). **Par les tests seulement** : Échap sur la feuille (le
+harnais de test pose un event tap clavier qui consomme Échap avant toute app : une instrumentation
+du 1.1.12-test montre Tab reçu par la page, Échap jamais) ; le réveil (pas de mise en veille du Mac
+de l'utilisateur ; `PlacementTriggers` testé) ; l'absence de notification pendant la démonstration
+(test du `NoticeCenter`).
+
+**Écarts connus.** À l'ouverture au lancement, Tab sort de la feuille vers la page derrière (le
+piège de focus du `Dialog` ne se déclenche pas quand la fenêtre n'était pas active au montage) ;
+la barre des menus (élément d'état du popup) montre aussi les bots fictifs pendant la
+démonstration.
+
 ### 4.4 Console : origine, plateforme, performance
 
 **Découpler la console de son origine** (bloquant pour l'embarquement, O) :
@@ -1720,7 +1840,7 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
 | Coffre indisponible (Linux sans Secret Service, Keychain verrouillé) | Session en mémoire seulement, message clair, jamais de jeton en clair sur le disque | Test Rust |
 | Révocation distante ratée à la déconnexion | Session locale effacée quand même, échec journalisé | Test Rust |
 | Deep link non enregistré | Repli sur la boucle locale | Test Rust |
-| Popup notch absent, incompatible, ou qui plante en boucle | Arrêt immédiat si absent ou incompatible ; sinon 5 redémarrages avec délai, puis repli sur la fenêtre et dialogue | Test du protocole |
+| Popup notch absent, incompatible, ou qui plante en boucle | Arrêt immédiat si absent ou incompatible, repli durable sur la fenêtre ; sinon 5 redémarrages avec délai, puis encoche en pause jusqu’au lancement suivant (choix gardé) et dialogue ; pendant la démonstration de la première connexion, ni dialogue ni choix enregistré (section 4.3.7) | Tests du protocole et de `notch.rs` ; boucle de plantage vue sur le 1.1.4-test |
 | Écran débranché entre deux lancements | Fenêtre ramenée sur un écran visible | Test Rust |
 | Worker qui plante pendant la création, avant d'enregistrer l'identifiant Hermes | Run en `unknown` (`HERMES_CREATE_OUTCOME_UNKNOWN`, `queue.ts:270`), **jamais** relancé automatiquement : revue par l'utilisateur | Test d'intégration |
 | Worker qui plante après l'enregistrement de l'identifiant, rejeu annoncé par l'hôte | Reprise par rejeu depuis `last_hermes_sequence`, sans doublon d'événement | Test d'intégration |
@@ -1992,3 +2112,12 @@ D4. Une seule release macOS et Linux (`release.ts`, signatures vérifiées contr
 pipeline GitHub qui vérifie puis publie depuis R2. Rien de publié. `make solo-check` au vert hors
 des trois « silhouettes du cadre » connues en mode pro ; une passe de `codex review`, sans
 finding.
+
+**Encoche à la première connexion D3b (2026-11-06)** : section 4.3.7. Démonstration de deux bots
+fictifs et choix « Garder l'encoche » / « Pas maintenant » à la première connexion sur Mac, l'encoche
+seulement avec une session, Réglages › Encoche, pause au lieu d'un retrait après un plantage en
+boucle, écran de la caméra et replacement au réveil ; mise à jour dans le rail d'icônes, bleu
+systemBlue pour toutes les indications de mise à jour, aucun contour de focus dans l'app de bureau.
+Éprouvé sur des builds signés 1.1.4-test à 1.1.12-test, sauf Échap et le réveil (tests). Revues
+`codex review` jusqu'à une passe sans finding : 5 passes pour l'app, 17 pour openedbot-notch.
+Rien de publié.

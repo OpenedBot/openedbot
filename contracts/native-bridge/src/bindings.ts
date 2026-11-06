@@ -79,10 +79,26 @@ export const commands = {
 	reportRunsInProgress: (count: number | null) => typedError<null, BridgeError>(__TAURI_INVOKE("report_runs_in_progress", { count })),
 	/**  Installs a ready update when the Mac is idle (Settings › Mises à jour); kept in the preferences. */
 	setUpdateAutoInstall: (enabled: boolean) => __TAURI_INVOKE<void>("set_update_auto_install", { enabled }),
+	/**
+	 *  How the notch stands: Réglages › Encoche and the first-run choice read it,
+	 *  then follow `NotchStateChanged`.
+	 */
+	notchState: () => __TAURI_INVOKE<NotchState>("notch_state"),
+	/**
+	 *  The user's choice, saved: window (`window`), window and notch (`both`),
+	 *  notch alone (`popup`). Ends a demo playing. Refused while the notch cannot run.
+	 */
+	setNotchMode: (mode: DisplayMode) => typedError<NotchState, BridgeError>(__TAURI_INVOKE("set_notch_mode", { mode })),
+	/**
+	 *  « Revoir la démonstration »: the popup plays its demo, then goes back to
+	 *  the saved choice, which this does not change.
+	 */
+	playNotchDemo: () => typedError<NotchState, BridgeError>(__TAURI_INVOKE("play_notch_demo")),
 };
 
 /** Events */
 export const events = {
+	notchStateChanged: makeEvent<NotchStateChanged, NotchStateChanged>("notch-state-changed"),
 	notificationClicked: makeEvent<NotificationClicked, NotificationClicked>("notification-clicked"),
 	signinStateChanged: makeEvent<SigninStateChanged_Serialize, SigninStateChanged_Deserialize>("signin-state-changed"),
 	updateMenuChosen: makeEvent<UpdateMenuChosen, UpdateMenuChosen>("update-menu-chosen"),
@@ -96,7 +112,42 @@ export type BridgeError = {
 	message: string,
 };
 
+export type DisplayMode = 
+/**  The console window only. */
+"window" | 
+/**  The notch popup only (macOS): the window hides while signed in. */
+"popup" | 
+/**  Both. */
+"both";
+
 export type Level = "info" | "warn" | "error";
+
+/**  How the notch stands, for Réglages › Encoche and the first-run choice. */
+export type NotchState = {
+	/**  The notch exists on this system (macOS). */
+	supported: boolean,
+	/**  The popup ships in the app and the configuration leaves it on. */
+	available: boolean,
+	/**  The display mode in force. */
+	mode: DisplayMode,
+	/**  Nothing chosen yet: the first-run choice asks, once a session exists. */
+	choicePending: boolean,
+	/**  The popup plays the scripted demo; otherwise the console shows a still preview. */
+	demoSupported: boolean,
+	/**  The first-run choice is to be shown now. */
+	onboarding: boolean,
+	/**
+	 *  A screen has a camera housing (the copy says « autour de la caméra »);
+	 *  otherwise the notch sits under the menu bar.
+	 */
+	cameraHousing: boolean,
+};
+
+/**
+ *  Pushed on every change of `NotchState`: the console opens or closes the
+ *  first-run choice and refreshes Réglages › Encoche from it.
+ */
+export type NotchStateChanged = NotchState;
 
 /**
  *  A click on a notification the page showed, by the id the page gave it:

@@ -1,6 +1,7 @@
 import type { AuthStore } from "@openedbot/browser-api-client";
 import { createTauriBridge } from "./tauri-bridge";
 import type { NativeUpdatesBridge } from "./native-updates";
+import type { NativeNotchBridge } from "./native-notch";
 
 /**
  * Le pont de l'app de bureau (`apps/desktop-tauri`), construit sur ses
@@ -33,6 +34,8 @@ export type OpenedbotNativeBridge = {
   auth?: NativeAuthBridge;
   /** La mise à jour de l'app (coque Tauri seulement, `native-updates.ts`). */
   updates?: NativeUpdatesBridge;
+  /** L'encoche (coque Tauri seulement, `native-notch.ts` ; elle n'existe que sur Mac). */
+  notch?: NativeNotchBridge;
 };
 
 /** L'état de connexion poussé par la coque (`SigninState` du pont, `@openedbot/contracts-native-bridge`). */

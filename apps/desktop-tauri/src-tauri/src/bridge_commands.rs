@@ -24,4 +24,7 @@ pub const COMMANDS: &[&str] = &[
     "report_update_required",
     "report_runs_in_progress",
     "set_update_auto_install",
+    "notch_state",
+    "set_notch_mode",
+    "play_notch_demo",
 ];

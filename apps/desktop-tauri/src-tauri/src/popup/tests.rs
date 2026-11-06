@@ -8,8 +8,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 fn parses_the_popup_messages_and_rejects_the_rest() {
     assert_eq!(
         parse_popup_message(r#"{"type":"ready","protocol":1,"version":"1.2.0","extra":true}"#),
-        Ok(PopupToHost::Ready { protocol: 1, version: "1.2.0".into() })
+        Ok(PopupToHost::Ready { protocol: 1, version: "1.2.0".into(), features: vec![] })
     );
+    assert_eq!(
+        parse_popup_message(r#"{"type":"ready","protocol":1,"version":"1.3.0","features":["demo","later"]}"#),
+        Ok(PopupToHost::Ready { protocol: 1, version: "1.3.0".into(), features: vec!["demo".into(), "later".into()] })
+    );
+    assert_eq!(parse_popup_message(r#"{"type":"ready","protocol":1,"version":"1","features":["Demo!"]}"#), Err(ParseFailure::InvalidFields));
+    assert_eq!(parse_popup_message(r#"{"type":"ready","protocol":1,"version":"1","features":"demo"}"#), Err(ParseFailure::InvalidFields));
+    assert_eq!(parse_popup_message(r#"{"type":"demoEnded"}"#), Ok(PopupToHost::DemoEnded));
     assert_eq!(parse_popup_message(r#"{"type":"token","id":"t-1"}"#), Ok(PopupToHost::Token { id: "t-1".into(), force: false }));
     assert_eq!(parse_popup_message(r#"{"type":"token","id":"bad id"}"#), Err(ParseFailure::InvalidFields));
     assert_eq!(parse_popup_message(r#"{"type":"fatal","code":"lower"}"#), Err(ParseFailure::InvalidFields));
@@ -27,6 +34,8 @@ fn encodes_host_messages_on_one_line() {
     assert_eq!(encode_host_message(&HostToPopup::SignedIn), "{\"type\":\"signedIn\"}\n");
     let update = encode_host_message(&HostToPopup::UpdateState { status: "ready", version: Some("1.1.0".into()) });
     assert_eq!(update, "{\"type\":\"updateState\",\"status\":\"ready\",\"version\":\"1.1.0\"}\n");
+    assert_eq!(encode_host_message(&HostToPopup::Demo { cycles: 0 }), "{\"type\":\"demo\",\"cycles\":0}\n");
+    assert_eq!(encode_host_message(&HostToPopup::EndDemo), "{\"type\":\"endDemo\"}\n");
 }
 
 #[test]
@@ -69,11 +78,21 @@ impl PopupEvents for Events {
 
 /// A fake popup bundle: a shell script speaking the protocol.
 fn fake_bundle(name: &str, protocol: u32, script: &str) -> PathBuf {
+    fake_bundle_with(name, protocol, &[], script)
+}
+
+/// The same, declaring `features` in its Info.plist as `make bundle` writes them.
+fn fake_bundle_with(name: &str, protocol: u32, features: &[&str], script: &str) -> PathBuf {
     let bundle = std::env::temp_dir().join(format!("openedbot-popup-test-{}-{name}", std::process::id())).join(BUNDLE_NAME);
     std::fs::create_dir_all(bundle.join("Contents/MacOS")).unwrap();
+    let declared = if features.is_empty() {
+        String::new()
+    } else {
+        format!("\n  <key>OpenedbotHostedFeatures</key>\n  <array>\n{}  </array>", features.iter().map(|feature| format!("    <string>{feature}</string>\n")).collect::<String>())
+    };
     std::fs::write(
         bundle.join("Contents/Info.plist"),
-        format!("<plist><dict><key>OpenedbotHostedProtocol</key>\n  <integer>{protocol}</integer></dict></plist>"),
+        format!("<plist><dict><key>OpenedbotHostedProtocol</key>\n  <integer>{protocol}</integer>{declared}</dict></plist>"),
     )
     .unwrap();
     let executable = bundle.join(EXECUTABLE);
@@ -202,7 +221,9 @@ async fn stop_and_wait_returns_once_the_process_is_gone() {
     let tokens = Arc::new(Tokens { served: AtomicUsize::new(0) });
     let host = PopupHost::with_policy(Some(bundle), "a", "b", tokens, events.clone(), fast_policy());
     host.start();
-    for _ in 0..100 {
+    // A fresh script's first exec can wait on macOS's scan of new executables
+    // while the other tests spawn theirs: 5 s, not 2.
+    for _ in 0..250 {
         if *host.running.borrow() > 0 && pid_file.exists() {
             break;
         }
@@ -262,7 +283,8 @@ async fn a_held_popup_does_not_start_until_released() {
     assert_eq!(*host.running.borrow(), 0);
     host.release();
     host.start();
-    for _ in 0..100 {
+    // As above: the first exec of a fresh script can be slow under a parallel run.
+    for _ in 0..250 {
         if launches.exists() {
             break;
         }
@@ -333,4 +355,194 @@ exit 0"#,
     assert_eq!(written, "{\"type\":\"signedIn\"}\n{\"type\":\"updateState\",\"status\":\"ready\",\"version\":\"0.0.17\"}\n");
     host.stop();
     let _ = std::fs::remove_file(out);
+}
+
+#[test]
+fn reads_the_declared_features() {
+    let bundle = fake_bundle_with("features", 1, &["demo", "later"], "exit 0");
+    assert_eq!(read_hosted_features(&bundle), vec!["demo".to_string(), "later".to_string()]);
+    assert_eq!(read_hosted_protocol(&bundle), Some(1));
+    assert!(read_hosted_features(&fake_bundle("no-features", 1, "exit 0")).is_empty());
+    assert!(read_hosted_features(Path::new("/nonexistent")).is_empty());
+}
+
+#[derive(Default)]
+struct DemoEvents {
+    support: Mutex<Vec<bool>>,
+    ended: AtomicUsize,
+}
+
+impl PopupEvents for DemoEvents {
+    fn open_console(&self, _: &str) {}
+    fn gave_up(&self, _: &GiveUp) {}
+    fn demo_support_changed(&self, supported: bool) {
+        self.support.lock().unwrap().push(supported);
+    }
+    fn demo_ended(&self) {
+        self.ended.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+async fn wait_for_lines(out: &Path, count: usize) -> Vec<String> {
+    for _ in 0..100 {
+        if out.exists() && std::fs::read_to_string(out).unwrap().lines().count() >= count {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    std::fs::read_to_string(out).expect("the fake popup wrote what it received").lines().map(String::from).collect()
+}
+
+#[tokio::test]
+async fn the_demo_is_sent_before_the_session_and_ended_on_demand() {
+    // A popup that plays the demo: it gets the demo before the session state,
+    // says the demo ended, then hears `endDemo`.
+    let out = std::env::temp_dir().join(format!("openedbot-popup-test-{}-demo-out", std::process::id()));
+    let _ = std::fs::remove_file(&out);
+    let script = format!(
+        r#"echo '{{"type":"ready","protocol":1,"version":"t","features":["demo"]}}'
+read hello; read demo; read state
+printf '%s\n%s\n%s\n' "$hello" "$demo" "$state" > '{out}'
+echo '{{"type":"demoEnded"}}'
+read end
+printf '%s\n' "$end" >> '{out}'
+read eof
+exit 0"#,
+        out = out.display()
+    );
+    let bundle = fake_bundle_with("demo", 1, &["demo"], &script);
+    let events = Arc::new(DemoEvents::default());
+    let host = PopupHost::with_policy(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), events.clone(), fast_policy());
+    assert!(host.demo_supported(), "declared by the bundle");
+    assert!(host.play_demo(0));
+    assert!(host.demo_active());
+    let lines = wait_for_lines(&out, 3).await;
+    assert!(lines[0].starts_with(r#"{"type":"hello""#), "{lines:?}");
+    assert_eq!(lines[1], r#"{"type":"demo","cycles":0}"#);
+    assert_eq!(lines[2], r#"{"type":"signedIn"}"#);
+    for _ in 0..100 {
+        if events.ended.load(Ordering::SeqCst) > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(events.ended.load(Ordering::SeqCst), 1);
+    assert!(host.demo_active(), "the host decides when the demo gives way");
+    host.end_demo();
+    assert!(!host.demo_active());
+    let lines = wait_for_lines(&out, 4).await;
+    assert_eq!(lines[3], r#"{"type":"endDemo"}"#);
+    assert!(events.support.lock().unwrap().is_empty(), "the ready confirmed the declaration");
+    host.stop();
+    let _ = std::fs::remove_file(out);
+}
+
+#[tokio::test]
+async fn a_popup_that_does_not_announce_the_demo_never_gets_it() {
+    // The bundle declares it, the popup's ready does not: the ready wins,
+    // the demo is dropped and the shell hears it.
+    let out = std::env::temp_dir().join(format!("openedbot-popup-test-{}-nodemo-out", std::process::id()));
+    let _ = std::fs::remove_file(&out);
+    let script = format!(
+        r#"echo '{{"type":"ready","protocol":1,"version":"t"}}'
+read hello; read state
+printf '%s\n%s\n' "$hello" "$state" > '{}'
+read eof
+exit 0"#,
+        out.display()
+    );
+    let bundle = fake_bundle_with("nodemo", 1, &["demo"], &script);
+    let events = Arc::new(DemoEvents::default());
+    let host = PopupHost::with_policy(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), events.clone(), fast_policy());
+    assert!(host.play_demo(0));
+    let lines = wait_for_lines(&out, 2).await;
+    assert_eq!(lines[1], r#"{"type":"signedIn"}"#, "no demo line: {lines:?}");
+    for _ in 0..100 {
+        if !events.support.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(*events.support.lock().unwrap(), vec![false]);
+    assert!(!host.demo_supported());
+    assert!(!host.demo_active());
+    assert!(!host.play_demo(0), "refused once the popup said no");
+    host.stop();
+    let _ = std::fs::remove_file(out);
+}
+
+#[test]
+fn a_bundle_without_the_feature_plays_no_demo() {
+    let bundle = fake_bundle("old-popup", 1, "exit 0");
+    let host = PopupHost::new(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), Arc::new(DemoEvents::default()));
+    assert!(!host.demo_supported());
+    assert!(!host.play_demo(0));
+    assert!(!host.demo_active());
+}
+
+#[test]
+fn readiness_belongs_to_the_run_that_said_ready() {
+    // A replaced run still answering `ready` must not mark the new run ready
+    // (its lines would reach a process that has not said hello), nor rewrite
+    // what the bundle supports; a stop forgets the handshake.
+    let bundle = fake_bundle_with("ready-run", 1, &["demo"], "exit 0");
+    let host = PopupHost::new(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), Arc::new(DemoEvents::default()));
+    let served = Arc::new(Mutex::new(None));
+    let ready = |features: Vec<String>| PopupToHost::Ready { protocol: 1, version: "t".into(), features };
+
+    let current = {
+        let mut state = host.lock();
+        state.run += 1;
+        state.run
+    };
+    let (sender, mut lines) = tokio::sync::mpsc::unbounded_channel();
+    assert!(host.handle(ready(vec!["demo".into()]), current, &sender, &mut None, &served).is_none());
+    assert!(host.lock().is_ready());
+    host.stop();
+    assert!(!host.lock().is_ready(), "a stop forgets the handshake");
+
+    let stale = current;
+    host.lock().run += 1;
+    host.lock().demo = Some(0);
+    while lines.try_recv().is_ok() {}
+    assert!(host.handle(ready(Vec::new()), stale, &sender, &mut None, &served).is_none());
+    let state = host.lock();
+    assert!(!state.is_ready(), "the old run's ready is not the new run's");
+    assert!(state.demo_supported, "the old run does not speak for the new one");
+    assert_eq!(state.demo, Some(0), "nor drop the demo asked of it");
+    drop(state);
+    let sent: Vec<HostToPopup> = std::iter::from_fn(|| lines.try_recv().ok()).collect();
+    assert!(!sent.iter().any(|line| matches!(line, HostToPopup::Demo { .. })), "{sent:?}");
+}
+
+#[test]
+fn a_replaced_run_does_not_end_the_current_demo() {
+    // A `demoEnded` still buffered from a run that was replaced (or stopped)
+    // must not stop the new popup nor end its demo.
+    let bundle = fake_bundle_with("demo-ended-run", 1, &["demo"], "exit 0");
+    let events = Arc::new(DemoEvents::default());
+    let host = PopupHost::new(Some(bundle), "a", "b", Arc::new(Tokens { served: AtomicUsize::new(0) }), events.clone());
+    let served = Arc::new(Mutex::new(None));
+    let (sender, _lines) = tokio::sync::mpsc::unbounded_channel();
+    let ready_at = || Some(Instant::now());
+
+    let old = {
+        let mut state = host.lock();
+        state.wanted = true;
+        state.run += 1;
+        state.run
+    };
+    host.handle(PopupToHost::Ready { protocol: 1, version: "t".into(), features: vec!["demo".into()] }, old, &sender, &mut ready_at(), &served);
+    host.lock().run += 1; // the replacement, not ready yet
+    host.handle(PopupToHost::DemoEnded, old, &sender, &mut ready_at(), &served);
+    assert_eq!(events.ended.load(Ordering::SeqCst), 0, "the old run's line is ignored");
+
+    let current = host.lock().run;
+    host.handle(PopupToHost::Ready { protocol: 1, version: "t".into(), features: vec!["demo".into()] }, current, &sender, &mut ready_at(), &served);
+    host.handle(PopupToHost::DemoEnded, current, &sender, &mut ready_at(), &served);
+    assert_eq!(events.ended.load(Ordering::SeqCst), 1, "the current run's is heard");
+
+    host.stop();
+    host.handle(PopupToHost::DemoEnded, current, &sender, &mut ready_at(), &served);
+    assert_eq!(events.ended.load(Ordering::SeqCst), 1, "nothing after a stop");
 }

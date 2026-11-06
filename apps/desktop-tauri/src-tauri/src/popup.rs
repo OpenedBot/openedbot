@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 use crate::auth::{AccessGrant, ApiError};
 
 mod protocol;
-pub use protocol::{encode_host_message, parse_popup_message, resolve_console_path, HostToPopup, ParseFailure, PopupToHost};
+pub use protocol::{encode_host_message, parse_popup_message, resolve_console_path, HostToPopup, ParseFailure, PopupToHost, DEMO_FEATURE};
 
 pub const PROTOCOL_VERSION: u32 = 1;
 /// Longest line either side accepts. Real messages are a few hundred bytes.
@@ -62,6 +62,16 @@ pub fn read_hosted_protocol(bundle: &Path) -> Option<u32> {
     value.split("</integer>").next()?.trim().parse().ok()
 }
 
+/// The features a bundle declares (`OpenedbotHostedFeatures`, an array of
+/// strings in its Info.plist): what the host may count on before the popup
+/// runs. Its `ready` has the last word.
+pub fn read_hosted_features(bundle: &Path) -> Vec<String> {
+    let Ok(plist) = std::fs::read_to_string(bundle.join("Contents/Info.plist")) else { return Vec::new() };
+    let Some(after) = plist.split("<key>OpenedbotHostedFeatures</key>").nth(1) else { return Vec::new() };
+    let Some(array) = after.trim_start().strip_prefix("<array>").and_then(|rest| rest.split("</array>").next()) else { return Vec::new() };
+    array.split("<string>").skip(1).filter_map(|item| item.split("</string>").next()).map(|item| item.trim().to_string()).collect()
+}
+
 /// The popup bundle: `Contents/Helpers` of the running app when packaged,
 /// otherwise `OPENEDBOT_POPUP_APP` (development).
 pub fn locate_bundle(executable: &Path, env_override: Option<PathBuf>) -> Option<PathBuf> {
@@ -89,6 +99,12 @@ pub trait PopupEvents: Send + Sync + 'static {
     fn greeting(&self) -> Vec<HostToPopup> {
         Vec::new()
     }
+    /// The popup's `ready` said whether it plays the demo, and that differs
+    /// from what was known (the bundle's declaration, or an earlier run). A
+    /// demo asked of a popup that cannot play it is dropped first.
+    fn demo_support_changed(&self, _supported: bool) {}
+    /// The demo stopped by itself (`demoEnded`); the popup holds its last frame.
+    fn demo_ended(&self) {}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,6 +117,15 @@ pub enum GiveUp {
 
 struct State {
     wanted: bool,
+    /// The demo to play, its cycles (0: until the user touches it); sent
+    /// after `hello`, before the session state, on every (re)start.
+    demo: Option<u32>,
+    /// Whether the popup plays the demo: the bundle's declaration, then each `ready`.
+    demo_supported: bool,
+    /// The run that has said `ready` (and got `hello`). A line may go to the
+    /// popup only when it is the current run: a replacement launched before
+    /// the old process exited is not ready until its own `ready`.
+    ready_run: Option<u64>,
     /// An update replaces the bundle: no start until released.
     held: bool,
     /// The run that owns `sender` and `stop`: a run that ends late (stopped,
@@ -108,6 +133,12 @@ struct State {
     run: u64,
     sender: Option<mpsc::UnboundedSender<HostToPopup>>,
     stop: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl State {
+    fn is_ready(&self) -> bool {
+        self.ready_run == Some(self.run)
+    }
 }
 
 pub struct PopupHost<T: TokenSource> {
@@ -138,6 +169,7 @@ impl<T: TokenSource> PopupHost<T> {
     }
 
     pub fn with_policy(bundle: Option<PathBuf>, api_origin: &str, console_url: &str, tokens: Arc<T>, events: Arc<dyn PopupEvents>, policy: Policy) -> Arc<Self> {
+        let demo_supported = bundle.as_deref().is_some_and(|bundle| read_hosted_features(bundle).iter().any(|feature| feature == DEMO_FEATURE));
         Arc::new(Self {
             bundle,
             api_origin: api_origin.into(),
@@ -145,7 +177,7 @@ impl<T: TokenSource> PopupHost<T> {
             tokens,
             events,
             policy,
-            state: Mutex::new(State { wanted: false, held: false, run: 0, sender: None, stop: None }),
+            state: Mutex::new(State { wanted: false, demo: None, demo_supported, ready_run: None, held: false, run: 0, sender: None, stop: None }),
             running: tokio::sync::watch::channel(0).0,
         })
     }
@@ -204,10 +236,51 @@ impl<T: TokenSource> PopupHost<T> {
         tauri::async_runtime::spawn(async move { host.supervise().await });
     }
 
-    /// Stops it and keeps it stopped (idempotent).
+    /// Whether the popup plays the scripted demo (bundle declaration, then its `ready`).
+    pub fn demo_supported(&self) -> bool {
+        self.lock().demo_supported
+    }
+
+    /// A demo is asked of the popup (playing, or waiting for its `ready`).
+    pub fn demo_active(&self) -> bool {
+        self.lock().demo.is_some()
+    }
+
+    /// Plays the scripted demo from its start, the popup started if it was
+    /// not. `false` (nothing done) when the popup cannot play it.
+    pub fn play_demo(self: &Arc<Self>, cycles: u32) -> bool {
+        {
+            let mut state = self.lock();
+            if !state.demo_supported {
+                return false;
+            }
+            state.demo = Some(cycles);
+            if state.is_ready() {
+                if let Some(sender) = &state.sender {
+                    let _ = sender.send(HostToPopup::Demo { cycles });
+                }
+            }
+        }
+        self.start();
+        true
+    }
+
+    /// Back to the session's bots; the popup keeps running.
+    pub fn end_demo(&self) {
+        let mut state = self.lock();
+        if state.demo.take().is_some() && state.is_ready() {
+            if let Some(sender) = &state.sender {
+                let _ = sender.send(HostToPopup::EndDemo);
+            }
+        }
+    }
+
+    /// Stops it and keeps it stopped (idempotent); a demo asked is dropped.
     pub fn stop(&self) {
         let mut state = self.lock();
         state.wanted = false;
+        state.demo = None;
+        state.ready_run = None;
         state.sender = None;
         if let Some(stop) = state.stop.take() {
             let _ = stop.send(());
@@ -303,6 +376,7 @@ impl<T: TokenSource> PopupHost<T> {
             let mut state = self.lock();
             if state.wanted {
                 state.run += 1;
+                state.ready_run = None;
                 state.sender = Some(sender.clone());
                 state.stop = Some(stop_tx);
                 Some(state.run)
@@ -378,7 +452,7 @@ impl<T: TokenSource> PopupHost<T> {
                         match parse_popup_message(text) {
                             Err(reason) => log::warn!("popup line ignored ({reason:?})"),
                             Ok(message) => {
-                                if let Some(end) = self.handle(message, &sender, &mut ready_at, &served) {
+                                if let Some(end) = self.handle(message, run, &sender, &mut ready_at, &served) {
                                     refusal = Some(end);
                                     // Not waiting for EOF: a process the popup
                                     // spawned may still hold its stdout open.
@@ -397,6 +471,7 @@ impl<T: TokenSource> PopupHost<T> {
             if state.run == run {
                 state.sender = None;
                 state.stop = None;
+                state.ready_run = None;
             }
         }
         drop(sender);
@@ -419,6 +494,7 @@ impl<T: TokenSource> PopupHost<T> {
     fn handle(
         self: &Arc<Self>,
         message: PopupToHost,
+        run: u64,
         sender: &mpsc::UnboundedSender<HostToPopup>,
         ready_at: &mut Option<Instant>,
         served: &Arc<Mutex<Option<String>>>,
@@ -428,21 +504,63 @@ impl<T: TokenSource> PopupHost<T> {
             return None;
         }
         match message {
-            PopupToHost::Ready { protocol, version } => {
+            PopupToHost::Ready { protocol, version, features } => {
                 if protocol != PROTOCOL_VERSION {
                     log::error!("popup speaks protocol {protocol}, expected {PROTOCOL_VERSION}: stopping it");
                     return Some(GiveUp::Protocol(protocol));
                 }
                 *ready_at = Some(Instant::now());
-                log::info!("popup ready (version {version})");
-                let _ = sender.send(HostToPopup::Hello {
-                    protocol: PROTOCOL_VERSION,
-                    api_origin: self.api_origin.clone(),
-                    console_url: self.console_url.clone(),
-                });
-                let _ = sender.send(if self.tokens.is_signed_in() { HostToPopup::SignedIn } else { HostToPopup::SignedOut });
-                for line in self.events.greeting() {
-                    let _ = sender.send(line);
+                let supports_demo = features.iter().any(|feature| feature == DEMO_FEATURE);
+                log::info!("popup ready (version {version}, demo {})", if supports_demo { "supported" } else { "unsupported" });
+                let greeting = self.events.greeting();
+                let signed_in = self.tokens.is_signed_in();
+                // Under the lock: a `play_demo` racing this greeting cannot
+                // slip its line before `hello`, nor be sent twice.
+                let changed = {
+                    let mut state = self.lock();
+                    // Only the current run owns the handshake: a run replaced
+                    // meanwhile is on its way out and must not mark the new
+                    // one ready, nor rewrite what it supports.
+                    let current = state.run == run;
+                    let changed = current && state.demo_supported != supports_demo;
+                    if current {
+                        state.demo_supported = supports_demo;
+                        state.ready_run = Some(run);
+                        if !supports_demo && state.demo.take().is_some() {
+                            log::warn!("this popup does not play the demo: demo dropped");
+                        }
+                    }
+                    let _ = sender.send(HostToPopup::Hello {
+                        protocol: PROTOCOL_VERSION,
+                        api_origin: self.api_origin.clone(),
+                        console_url: self.console_url.clone(),
+                    });
+                    // Before the session state: the real bots never show first.
+                    if let Some(cycles) = state.demo.filter(|_| current) {
+                        let _ = sender.send(HostToPopup::Demo { cycles });
+                    }
+                    let _ = sender.send(if signed_in { HostToPopup::SignedIn } else { HostToPopup::SignedOut });
+                    for line in greeting {
+                        let _ = sender.send(line);
+                    }
+                    changed
+                };
+                if changed {
+                    self.events.demo_support_changed(supports_demo);
+                }
+                None
+            }
+            PopupToHost::DemoEnded => {
+                // A replaced or stopped run's late line says nothing about the current one.
+                let current = {
+                    let state = self.lock();
+                    state.wanted && state.is_ready() && state.run == run
+                };
+                if current {
+                    log::info!("popup demo ended");
+                    self.events.demo_ended();
+                } else {
+                    log::info!("demo end from a replaced popup run ignored");
                 }
                 None
             }

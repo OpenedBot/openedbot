@@ -20,7 +20,6 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use url::Url;
 
-use crate::prefs::DisplayMode;
 use crate::shell::PopupHandle;
 use crate::update_engine::{BoxFuture, DownloadFailure, Feed, FeedFailure, InstallHooks, ManifestFloor, Offer, Progress, UpdateControl};
 use crate::update_state::{UpdateErrorCode, UpdateStatus};
@@ -156,9 +155,8 @@ pub fn install_hooks<R: Runtime>(app: &AppHandle<R>) -> InstallHooks {
         resume: Box::new(move || {
             let Some(popup) = resuming.try_state::<PopupHandle>() else { return };
             popup.0.release();
-            if crate::shell::display_mode(&resuming) != DisplayMode::Window {
-                popup.0.start();
-            }
+            // Whatever the session and the choice call for (demo, live or off).
+            crate::notch::reconcile(&resuming);
         }),
         restart: Box::new(move || restarting.restart()),
     }

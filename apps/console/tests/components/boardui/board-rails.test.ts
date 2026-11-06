@@ -18,6 +18,15 @@ describe("le rail d'icônes", () => {
     expect(rails.indexOf("<RailLlmQuotas")).toBeLessThan(rails.indexOf("<RailRuntimeHealth"));
   });
 
+  test("la mise à jour de l'app de bureau se pose juste au-dessus de Réglages, sous le séparateur", () => {
+    const rails = read("src/components/boardui/board-rails.tsx");
+    const button = rails.indexOf("<DesktopUpdateRailButton");
+    expect(button).toBeGreaterThan(rails.indexOf("<div aria-hidden className={RAIL_DIVIDER} />"));
+    expect(button).toBeLessThan(rails.indexOf('<RailTip label={t("navUser.settings")}>'));
+    // Une seule surface à la fois : la pastille du pied de liste se retire dès que le rail s'affiche.
+    expect(read("src/components/boardui/board-sidebar.tsx")).toContain('<div className={railShell ? "md:hidden" : undefined}><AccountUpdatePill /></div>');
+  });
+
   test("le thème et la langue se règlent dans Réglages > Apparence, plus dans le rail", () => {
     const rails = read("src/components/boardui/board-rails.tsx");
     expect(rails).not.toContain("useTheme");

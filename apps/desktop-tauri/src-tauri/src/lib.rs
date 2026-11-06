@@ -21,6 +21,7 @@ pub mod config;
 pub mod csp;
 pub mod diagnostics;
 pub mod identity;
+pub mod notch;
 #[cfg(target_os = "linux")]
 mod linux;
 mod logger;
@@ -154,6 +155,7 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
 
     let prefs = Arc::new(PreferenceStore::open(data_dir.as_deref()));
     app.manage(WindowState::new(prefs.clone()));
+    app.manage(notch::NotchSession::default());
     app.manage(shell::Purging::default());
     let update_status = Arc::new(update_state::UpdateStatus::new(prefs.get().auto_install_updates, {
         let app = app.handle().clone();
@@ -203,6 +205,7 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
         google,
         client_id: identity.client_id.clone(),
         window: Box::new(window::MainWindowControl(handle.clone())),
+        notch: Box::new(window::AppNotchControl(handle.clone())),
     });
 
     // The popup host exists whenever the popup is supported: the Dock menu
@@ -237,10 +240,10 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
             }
         });
     }
-    if mode != DisplayMode::Window {
-        if let Some(popup) = app.try_state::<PopupHandle>() {
-            popup.0.start();
-        }
+    // The popup only runs with a session (and asks the first-run choice if
+    // nothing was chosen); otherwise it starts at sign-in.
+    if restored {
+        notch::session_started(&handle);
     }
 
     #[cfg(target_os = "macos")]

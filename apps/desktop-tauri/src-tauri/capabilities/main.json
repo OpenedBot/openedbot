@@ -31,6 +31,9 @@
     "allow-install-update",
     "allow-report-update-required",
     "allow-report-runs-in-progress",
-    "allow-set-update-auto-install"
+    "allow-set-update-auto-install",
+    "allow-notch-state",
+    "allow-set-notch-mode",
+    "allow-play-notch-demo"
   ]
 }

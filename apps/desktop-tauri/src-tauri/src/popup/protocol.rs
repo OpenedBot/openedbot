@@ -1,5 +1,10 @@
 //! The popup protocol v1: one JSON object per line, both ways (the notch's
 //! `OpenedbotHostedProtocol` 1).
+//!
+//! Added within v1, each side tolerating a peer that predates it: `features`
+//! in `ready` (what the popup can do beyond v1, `demo` for now), `demo` and
+//! `endDemo` from the host, `demoEnded` from the popup. The host sends `demo`
+//! only to a popup that announced it.
 
 use serde::{Deserialize, Serialize};
 
@@ -11,12 +16,26 @@ const MAX_PATH_LENGTH: usize = 1024;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PopupToHost {
-    Ready { protocol: u32, version: String },
+    Ready {
+        protocol: u32,
+        version: String,
+        /// Absent from a popup that predates it: no feature.
+        #[serde(default)]
+        features: Vec<String>,
+    },
     Token { id: String, #[serde(default)] force: bool },
     OpenConsole { path: String },
     SignOut,
     Fatal { code: String },
+    /// The scripted demo stopped by itself (its cycles played, or the user
+    /// touched it and its cycle ended); the popup keeps its last frame.
+    DemoEnded,
 }
+
+/// The feature a popup announces when it can play the scripted demo.
+pub const DEMO_FEATURE: &str = "demo";
+/// At most this many features of at most 32 characters each.
+const MAX_FEATURES: usize = 16;
 
 /// Host -> popup. Serialized field by field: nothing else can leak.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -42,6 +61,14 @@ pub enum HostToPopup {
     /// `hello`. Added within v1: a popup that does not know it drops the line
     /// (logged, nothing else), and one that does ignores an unknown status.
     UpdateState { status: &'static str, version: Option<String> },
+    /// Plays the scripted demo (fictional bots, no network) instead of the
+    /// session's bots, until `endDemo`. `cycles`: how many loops before it
+    /// stops by itself (`demoEnded`); 0 loops until the user touches it.
+    /// Sent before the session state on a fresh start, so that the popup
+    /// never shows the real bots first.
+    Demo { cycles: u32 },
+    /// Back to the session's bots (or to nothing, signed out).
+    EndDemo,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +90,11 @@ fn valid_code(code: &str) -> bool {
         && bytes.iter().all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || *byte == b'_')
 }
 
+/// A feature name: 1 to 32 lowercase ASCII letters.
+fn valid_feature(feature: &str) -> bool {
+    (1..=32).contains(&feature.len()) && feature.bytes().all(|byte| byte.is_ascii_lowercase())
+}
+
 /// Parses one line read from the popup. Unknown fields are ignored (forward compatible).
 pub fn parse_popup_message(line: &str) -> Result<PopupToHost, ParseFailure> {
     if line.len() > MAX_LINE_LENGTH {
@@ -70,16 +102,19 @@ pub fn parse_popup_message(line: &str) -> Result<PopupToHost, ParseFailure> {
     }
     let value: serde_json::Value = serde_json::from_str(line).map_err(|_| ParseFailure::InvalidJson)?;
     let kind = value.get("type").and_then(|kind| kind.as_str()).ok_or(ParseFailure::InvalidJson)?;
-    if !matches!(kind, "ready" | "token" | "openConsole" | "signOut" | "fatal") {
+    if !matches!(kind, "ready" | "token" | "openConsole" | "signOut" | "fatal" | "demoEnded") {
         return Err(ParseFailure::UnknownType);
     }
     let message: PopupToHost = serde_json::from_value(value).map_err(|_| ParseFailure::InvalidFields)?;
     let valid = match &message {
-        PopupToHost::Ready { version, .. } => (1..=64).contains(&version.len()),
+        PopupToHost::Ready { version, features, .. } => {
+            (1..=64).contains(&version.len()) && features.len() <= MAX_FEATURES && features.iter().all(|feature| valid_feature(feature))
+        }
         PopupToHost::Token { id, .. } => valid_id(id),
         PopupToHost::OpenConsole { path } => (1..=MAX_PATH_LENGTH).contains(&path.len()),
         PopupToHost::SignOut => true,
         PopupToHost::Fatal { code } => valid_code(code),
+        PopupToHost::DemoEnded => true,
     };
     if valid {
         Ok(message)

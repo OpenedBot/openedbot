@@ -71,6 +71,7 @@ export const settingsSidebar = {
   overview: "Activité",
   appearance: "Apparence et langue",
   updates: "Mises à jour",
+  notch: "Encoche",
   archives: "Archives",
   notifications: "Notifications",
   runtime: "Runtime",

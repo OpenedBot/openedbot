@@ -16,6 +16,8 @@ use url::Url;
 use crate::auth::{AuthService, AuthorizeTargets, GoogleSteps, GoogleTiming, HttpAuthApi, Persistence, SigninState};
 use crate::config::ShellConfig;
 use crate::diagnostics::{Level, Source};
+use crate::notch::{NotchRefusal, NotchState, NotchStateChanged};
+use crate::prefs::DisplayMode;
 use crate::update_engine::{InstallRefusal, InstallTrigger, UpdateControl};
 use crate::update_state::{UpdateState, UpdateStatus};
 use crate::vault::Vault;
@@ -56,6 +58,15 @@ pub struct Shell {
     pub client_id: String,
     /// The main window, for the commands that move or paint it.
     pub window: Box<dyn WindowControl>,
+    /// The notch's choice and demo (`notch.rs` in the app, a recorder in tests).
+    pub notch: Box<dyn NotchControl>,
+}
+
+/// What the page may ask of the notch (Réglages › Encoche, the first-run choice).
+pub trait NotchControl: Send + Sync {
+    fn state(&self) -> NotchState;
+    fn set_mode(&self, mode: DisplayMode) -> Result<NotchState, NotchRefusal>;
+    fn play_demo(&self) -> Result<NotchState, NotchRefusal>;
 }
 
 /// What the page may ask of its window (`window.rs` in the app, a recorder in tests).
@@ -394,6 +405,38 @@ pub fn set_update_auto_install(status: State<'_, Arc<UpdateStatus>>, window: Sta
     status.set_auto_install(enabled);
 }
 
+fn notch_refused(refusal: NotchRefusal) -> BridgeError {
+    match refusal {
+        NotchRefusal::Unavailable => BridgeError::new("NOTCH_UNAVAILABLE", "The notch cannot run here."),
+        NotchRefusal::DemoUnavailable => BridgeError::new("NOTCH_DEMO_UNAVAILABLE", "The notch cannot play the demo."),
+        NotchRefusal::SignedOut => BridgeError::new("NOTCH_SIGNED_OUT", "The notch only runs signed in."),
+    }
+}
+
+/// How the notch stands: Réglages › Encoche and the first-run choice read it,
+/// then follow `NotchStateChanged`.
+#[tauri::command]
+#[specta::specta]
+pub fn notch_state(shell: State<'_, Shell>) -> NotchState {
+    shell.notch.state()
+}
+
+/// The user's choice, saved: window (`window`), window and notch (`both`),
+/// notch alone (`popup`). Ends a demo playing. Refused while the notch cannot run.
+#[tauri::command]
+#[specta::specta]
+pub fn set_notch_mode(shell: State<'_, Shell>, mode: DisplayMode) -> Result<NotchState, BridgeError> {
+    shell.notch.set_mode(mode).map_err(notch_refused)
+}
+
+/// « Revoir la démonstration »: the popup plays its demo, then goes back to
+/// the saved choice, which this does not change.
+#[tauri::command]
+#[specta::specta]
+pub fn play_notch_demo(shell: State<'_, Shell>) -> Result<NotchState, BridgeError> {
+    shell.notch.play_demo().map_err(notch_refused)
+}
+
 /// The longest text the page may hand to the journal (redacted and cut further there).
 const MAX_DIAGNOSTIC: usize = 4096;
 
@@ -434,8 +477,11 @@ pub fn specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             report_update_required,
             report_runs_in_progress,
             set_update_auto_install,
+            notch_state,
+            set_notch_mode,
+            play_notch_demo,
         ])
-        .events(tauri_specta::collect_events![SigninStateChanged, NotificationClicked, UpdateStateChanged, UpdateMenuChosen])
+        .events(tauri_specta::collect_events![SigninStateChanged, NotificationClicked, UpdateStateChanged, UpdateMenuChosen, NotchStateChanged])
 }
 
 /// The TypeScript bindings, with the repository's header.

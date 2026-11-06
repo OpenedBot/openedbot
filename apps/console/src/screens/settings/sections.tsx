@@ -18,6 +18,8 @@ const DeveloperSettings = lazyRouteComponent(() => import("./dev/developer"), "D
 const AppearanceSettings = lazyRouteComponent(() => import("./general/appearance"), "AppearanceSettings");
 // The desktop app's updates, Tauri only: the web build has no nav entry, no chunk, an empty body.
 const UpdatesSettings = import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" ? lazyRouteComponent(() => import("./general/updates"), "UpdatesSettings") : () => null;
+// The notch of the Mac app, Tauri only, like the updates.
+const NotchSettings = import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" ? lazyRouteComponent(() => import("./general/notch"), "NotchSettings") : () => null;
 const ArchivesSettings = lazyRouteComponent(() => import("./general/archives"), "ArchivesSettings");
 const NotificationsSettings = lazyRouteComponent(() => import("./general/notifications"), "NotificationsSettings");
 const AgentsSettings = lazyRouteComponent(() => import("./installation/agents"), "AgentsSettings");
@@ -99,6 +101,7 @@ export const SETTINGS_SECTIONS: Record<OverlaySettingsPath, SettingsSection> = {
   "/settings/models": section("settingsSidebar.models", ModelsSettings, ModelsBodySkeleton),
   "/settings/appearance": section("settingsSidebar.appearance", AppearanceSettings),
   "/settings/updates": section("settingsSidebar.updates", UpdatesSettings),
+  "/settings/notch": section("settingsSidebar.notch", NotchSettings),
   "/settings/archives": section("settingsSidebar.archives", ArchivesSettings),
   "/settings/connectors": section("settingsSidebar.connectors", ConnectorsSettings),
   "/settings/notifications": section("settingsSidebar.notifications", NotificationsSettings),

@@ -7,8 +7,9 @@ import { menuRowVersion, pillView } from "./update-model";
 
 /**
  * La pastille de mise à jour, en pied de barre à côté du compte (Grok Bot,
- * `sand-update-pill`). Bleu informatif FIXE (`--state-info-*`, classes
- * `info-*`), jamais `--primary` qui suit l'accent du bot ou de l'espace.
+ * `sand-update-pill`). Bleu de mise à jour FIXE, plein sous du blanc
+ * (`--update-accent`, le systemBlue d'Apple), jamais `--primary` qui suit
+ * l'accent du bot ou de l'espace.
  * Sans animation une fois prête ; pendant le téléchargement, un anneau qui
  * tourne et le pourcentage en infobulle. Le clic ouvre le dialogue, jamais
  * un redémarrage direct.
@@ -22,7 +23,7 @@ export function UpdatePill() {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span role="status" aria-label={label} data-desktop-update-pill="downloading" className="inline-flex size-[30px] shrink-0 items-center justify-center text-info-700">
+          <span role="status" aria-label={label} data-desktop-update-pill="downloading" className="inline-flex size-[30px] shrink-0 items-center justify-center text-update-accent">
             <RiLoader4Line aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
           </span>
         </TooltipTrigger>
@@ -40,7 +41,7 @@ export function UpdatePill() {
           onClick={() => openUpdateDialog(view.version)}
           className={cn(
             "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 text-[12px] leading-4 font-semibold whitespace-nowrap outline-none",
-            "bg-info-soft text-info-700 transition-colors hover:bg-info-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+            "bg-update-accent text-update-accent-contrast transition-colors hover:bg-update-accent-hover focus-visible:ring-2 focus-visible:ring-update-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background-full",
           )}
         >
           <RiDownloadCloud2Line aria-hidden className="size-3.5" />
@@ -60,7 +61,7 @@ export function UpdateMenuRow({ onSelect, mobileDrawer }: { onSelect: () => void
   return (
     <div data-desktop-update-row="" className={cn("flex w-full items-center justify-between gap-2.5 rounded-2lg px-2 py-1", mobileDrawer && "min-h-11")}>
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <RiDownloadCloud2Line aria-hidden className="size-5 shrink-0 text-info-700" />
+        <RiDownloadCloud2Line aria-hidden className="size-5 shrink-0 text-update-accent" />
         <span className="truncate text-body-medium text-text-primary">{t("desktopUpdate.menuRow")}</span>
       </span>
       <button
@@ -70,7 +71,7 @@ export function UpdateMenuRow({ onSelect, mobileDrawer }: { onSelect: () => void
           onSelect();
           openUpdateDialog(version);
         }}
-        className="inline-flex h-6 shrink-0 cursor-pointer items-center rounded-full bg-info-soft px-2 text-xs font-semibold text-info-700 outline-none transition-colors hover:bg-info-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+        className="inline-flex h-6 shrink-0 cursor-pointer items-center rounded-full bg-update-accent px-2 text-xs font-semibold text-update-accent-contrast outline-none transition-colors hover:bg-update-accent-hover focus-visible:ring-2 focus-visible:ring-update-accent focus-visible:ring-offset-2"
       >
         {t("desktopUpdate.menuInstall")}
       </button>

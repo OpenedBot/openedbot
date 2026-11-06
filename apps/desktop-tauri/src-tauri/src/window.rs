@@ -577,6 +577,25 @@ async fn clear_store<R: Runtime>(window: &WebviewWindow<R>) -> bool {
     cleared
 }
 
+/// The bridge's notch commands, on the app.
+pub struct AppNotchControl<R: Runtime>(pub AppHandle<R>);
+
+impl<R: Runtime> crate::bridge::NotchControl for AppNotchControl<R> {
+    fn state(&self) -> crate::notch::NotchState {
+        crate::notch::state(&self.0)
+    }
+    fn set_mode(&self, mode: crate::prefs::DisplayMode) -> Result<crate::notch::NotchState, crate::notch::NotchRefusal> {
+        if mode != crate::prefs::DisplayMode::Window && !crate::notch::available(&self.0) {
+            return Err(crate::notch::NotchRefusal::Unavailable);
+        }
+        crate::shell::set_display_mode(&self.0, mode);
+        Ok(crate::notch::state(&self.0))
+    }
+    fn play_demo(&self) -> Result<crate::notch::NotchState, crate::notch::NotchRefusal> {
+        crate::notch::replay(&self.0)
+    }
+}
+
 /// The bridge's window commands, on the main window.
 pub struct MainWindowControl<R: Runtime>(pub AppHandle<R>);
 

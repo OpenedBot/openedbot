@@ -3,6 +3,7 @@ import { emit, emitTo, listen, once } from "@tauri-apps/api/event";
 import { commands, events, installTauriRuntime, type BridgeError, type Platform } from "@openedbot/contracts-native-bridge";
 import type { NativeAuthBridge, NativeSigninState, OpenedbotNativeBridge } from "./native-bridge";
 import type { NativeUpdateState, NativeUpdatesBridge } from "./native-updates";
+import type { NativeNotchBridge, NativeNotchState } from "./native-notch";
 import { installTauriShell } from "./tauri-shell";
 
 /**
@@ -112,6 +113,7 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
 
   return {
     updates: createUpdatesBridge(),
+    notch: createNotchBridge(),
     readAccessToken: async () => unwrap(await commands.readAccessToken()),
     refresh: async () => unwrap(await commands.refresh()),
     openExternal: async (url) => {
@@ -175,5 +177,42 @@ function createUpdatesBridge(): NativeUpdatesBridge {
         void unlisten.then((stop) => stop());
       };
     },
+  };
+}
+
+/**
+ * L'encoche : même forme que les mises à jour, un seul abonnement, le dernier
+ * état rejoué aussitôt, le premier lu par `notch_state` une fois l'écoute posée.
+ */
+function createNotchBridge(): NativeNotchBridge {
+  let last: NativeNotchState | null = null;
+  const listeners = new Set<(state: NativeNotchState) => void>();
+  const deliver = (state: NativeNotchState) => {
+    last = state;
+    for (const listener of listeners) listener(state);
+  };
+  let started = false;
+  const start = () => {
+    if (started) return;
+    started = true;
+    void events.notchStateChanged
+      .listen((event) => deliver(event.payload))
+      .then(async () => {
+        const current = await commands.notchState();
+        if (last === null) deliver(current);
+      })
+      .catch((error: unknown) => console.warn("[openedbot] notch state unavailable", error));
+  };
+  return {
+    onState: (listener) => {
+      listeners.add(listener);
+      start();
+      if (last) listener(last);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setMode: async (mode) => unwrap(await commands.setNotchMode(mode)),
+    playDemo: async () => unwrap(await commands.playNotchDemo()),
   };
 }

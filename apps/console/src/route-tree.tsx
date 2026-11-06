@@ -1022,7 +1022,7 @@ const routeTree = rootRoute.addChildren([
     agentsSettingsRoute,
     modelsSettingsRoute,
     appearanceSettingsRoute,
-    createRoute({ getParentRoute: () => settingsFrameRoute, path: "/updates", component: SETTINGS_SECTIONS["/settings/updates"] }), // app Tauri
+    ...(["/updates", "/notch"] as const).map((path) => createRoute({ getParentRoute: () => settingsFrameRoute, path, component: SETTINGS_SECTIONS[`/settings${path}`] })), // app Tauri (l'encoche : sur Mac)
     archivesSettingsRoute,
     supportSettingsRoute,
     connectorsSettingsRoute,

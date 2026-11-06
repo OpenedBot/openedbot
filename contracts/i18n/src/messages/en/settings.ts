@@ -70,6 +70,7 @@ export const settingsSidebar = {
   overview: "Activity",
   appearance: "Appearance and language",
   updates: "Updates",
+  notch: "Notch",
   archives: "Archives",
   notifications: "Notifications",
   runtime: "Runtime",

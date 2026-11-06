@@ -34,6 +34,28 @@ connecteur hôte et le protocole tiennent le leur :
   reconnecter, et les brouillons non envoyés de l'ancienne app ne sont pas
   repris (envoyez-les ou copiez-les avant de la remplacer).
 
+- **Sur Mac, l'encoche se présente à la première connexion.** Juste après
+  vous être connecté dans l'app de bureau, une courte démonstration joue en
+  haut de l'écran avec deux bots fictifs (Recherche et Rédaction : travail en
+  cours, demande d'accord avec « Autoriser » / « Refuser », puis terminé),
+  sans rien envoyer ni notifier, et une fenêtre propose « Garder l'encoche »
+  (l'encoche et la fenêtre) ou « Pas maintenant » (la fenêtre seule). Fermer
+  l'app sans choisir reposera la question au lancement suivant ; une mise à
+  jour ne la repose jamais. Après la démonstration, vos notifications et vos
+  demandes d'accord en attente reviennent, et la réponse d'un bot reçue
+  pendant qu'elle jouait s'annonce une fois. Le choix se change dans le nouveau volet
+  Réglages › Encoche, qui permet aussi de revoir la démonstration, ou depuis
+  le menu du Dock (« Fenêtre », « Encoche seule », « Fenêtre et encoche »).
+  L'encoche n'apparaît plus avant la connexion, se place sur l'écran qui a
+  la caméra et se replace au réveil. Quand elle s'arrête plusieurs fois de
+  suite, elle reste fermée jusqu'au prochain lancement, qui la relance, au
+  lieu de vous remettre définitivement sur la fenêtre seule.
+- **La mise à jour de l'app de bureau se voit dans le rail d'icônes** : un
+  bouton juste au-dessus de Réglages, qui ouvre « Mise à jour prête ». Toutes
+  les indications de mise à jour (ce bouton, la pastille « Mettre à jour »,
+  le point de l'encoche) prennent le bleu des mises à jour d'Apple, plein,
+  sous une icône blanche, lisible en thème sombre.
+
 - L'app de bureau indique sa version à l'API. Quand une version devient
   trop ancienne pour être servie, l'app affiche « Mettez openedbot à jour »
   avec un lien vers la page de téléchargement, au lieu d'erreurs en cascade.
@@ -52,6 +74,9 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- **L'app de bureau n'affiche plus de contour de focus** sur les boutons,
+  champs, onglets et menus, même au clavier ; la navigation au clavier
+  fonctionne comme avant. La console dans le navigateur ne change pas.
 - Un message se suit d'un bout à l'autre dans les journaux d'exploitation.
   Son run porte un identifiant de trace (l'identifiant du run sans ses
   tirets), présent sur la ligne `run.admission` de l'API, sur chaque ligne
