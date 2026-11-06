@@ -1,6 +1,6 @@
 import type { AuthStatus } from "../session/auth-status";
 import { clearCloudSession, readWebCsrfToken, syncCloudSession } from "../session/cloud-session";
-import { NATIVE_SESSION_MARK, nativeBridge } from "../platform/native-bridge";
+import { NATIVE_SESSION_MARK, nativeBridge } from "../platform";
 import { clearOnboardingDraft } from "../session/onboarding-draft";
 import { workspaceInPath } from "../workspace/workspace-location";
 import type { AccountSecurityDto, AuthMeDto, AuthStartDto, ChangePasswordDto, ChangePasswordInput, GoogleLinkClaimDto, GoogleUnlinkDto, MemberRoleChangedDto, OrganizationMemberDto, OrganizationPermissionPolicyInput, OrganizationPermissionPolicyView, RevokeSessionsDto } from "@openedbot/contracts-api";

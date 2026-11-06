@@ -6,8 +6,7 @@
   "type": "module",
   "exports": {
     "./application/*": "./src/application/*.ts",
-    "./domain/*": "./src/domain/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/*": "./src/domain/*.ts"
   },
   "scripts": {
     "test": "bun test tests",
@@ -18,12 +17,10 @@
     "@openedbot/contracts-errors": "workspace:*",
     "@openedbot/contracts-locale": "workspace:*",
     "@openedbot/contracts-primitives": "workspace:*",
-    "@openedbot/execution": "workspace:*",
     "@openedbot/hermes": "workspace:*",
     "@openedbot/notifications": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
-    "@openedbot/platform-observability": "workspace:*",
-    "@openedbot/portability": "workspace:*"
+    "@openedbot/platform-observability": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

@@ -6,7 +6,7 @@ import {
   runtimeToolsetNameIsContractForbidden,
 } from "@openedbot/runtimes/domain/runtime-contract";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
-import { PROFILE_CAPABILITIES_FEATURE } from "./bot-capabilities";
+import { RELAY_FEATURE_PROFILE_BUNDLED_SKILLS, RELAY_FEATURE_PROFILE_CAPABILITIES } from "@openedbot/contracts-connector/features";
 
 /**
  * Socle « bot léger » : version courante. Un bot dont
@@ -66,13 +66,10 @@ export function baselineEnabledToolsets(options: { gated: boolean; isolated: boo
   return DEFAULT_BOT_TOOLSETS.filter((name) => options.isolated || !PROFILE_RESTRICTED_TOOLSETS.has(name));
 }
 
-/** `POST /hermes-setup/profiles/{slug}/bundled-skills` : les skills livrées avec Hermes, en bloc. */
-export const PROFILE_BUNDLED_SKILLS_FEATURE = "profile_bundled_skills";
-
 /** Les verbes hôte dont le socle a besoin, tous deux annoncés par le runtime. */
 export const BASELINE_REQUIRED_FEATURES: readonly string[] = [
-  PROFILE_CAPABILITIES_FEATURE,
-  PROFILE_BUNDLED_SKILLS_FEATURE,
+  RELAY_FEATURE_PROFILE_CAPABILITIES,
+  RELAY_FEATURE_PROFILE_BUNDLED_SKILLS,
 ];
 
 export type BaselineToolsetWrite = { name: string; enabled: boolean };

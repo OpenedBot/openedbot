@@ -14,6 +14,7 @@ import {
   validatedRoutineInput,
 } from "../src/routes/execution/routine-routes";
 import { tableSubscriptionPort } from "./fixtures/table-subscription-port";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 import { installSubscriptionPort } from "@openedbot/platform-db/subscription-port";
 
 // The subscription reads go through the port, as the API installs it.
@@ -197,15 +198,14 @@ describe("lancement manuel durable d'une routine", () => {
     expect(ingressInsert?.values).toContain(RUN_KEY);
     expect(ingressInsert?.values).toContain(canonicalRoutineRunHash(ROUTINE_ID));
 
-    const workflowInsert = calls.find((call) => call.sql.includes("insert into workflows"));
-    expect(workflowInsert?.sql).toContain("kind, status");
-    expect(workflowInsert?.values).toContain("routine");
-    expect(workflowInsert?.values).toContain(owner.userId);
-    expect(workflowInsert?.values).toContainEqual({ routineId: ROUTINE_ID, trigger: "manual" });
+    const workflowInsert = calls.find((call) => call.sql.includes("insert into workflows"))!;
+    expect(insertedRow(workflowInsert.sql, workflowInsert.values)).toMatchObject({
+      kind: "routine", status: "queued", initiator_user_id: owner.userId,
+      recovery_state: { routineId: ROUTINE_ID, trigger: "manual" },
+    });
 
-    const runInsert = calls.find((call) => call.sql.includes("insert into runs"));
-    expect(runInsert?.sql).toContain("'not_started'");
-    expect(runInsert?.values).toContain("root");
+    const runInsert = calls.find((call) => call.sql.includes("insert into runs"))!;
+    expect(insertedRow(runInsert.sql, runInsert.values)).toMatchObject({ external_state: "not_started", step_kind: "root" });
     expect(calls.some((call) => call.sql.includes("insert into routine_executions"))).toBe(true);
     const messageInsert = calls.find((call) => call.sql.includes("insert into messages"));
     expect(messageInsert?.values).toContainEqual([{

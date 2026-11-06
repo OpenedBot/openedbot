@@ -32,8 +32,18 @@ const ALLOWED_APP = [
 ];
 
 const ALLOWED_RUNTIMES = [
+  // The enrollment probe's read-only client (S4), no execution verb.
+  "modules/runtimes/src/application/runtime-admin-client.ts",
   "modules/runtimes/src/application/runtime-enrollment.ts",
+  // The link registry, locator types and probe result the link module
+  // implements, defined in runtimes since S4 (no runtimes -> runtime-link edge).
+  "modules/runtimes/src/application/runtime-link-port.ts",
+  // The application façades (S4) over the three SQL files below.
+  "modules/runtimes/src/application/runtime-link-rows.ts",
   "modules/runtimes/src/application/runtime-probe.ts",
+  "modules/runtimes/src/application/runtime-replacement.ts",
+  "modules/runtimes/src/application/runtime-rows.ts",
+  "modules/runtimes/src/domain/link-probe.ts",
   "modules/runtimes/src/domain/runtime-contract.ts",
   "modules/runtimes/src/sql/runtime-enrollments.ts",
   "modules/runtimes/src/sql/runtime-link-rows.ts",
@@ -51,6 +61,7 @@ const ALLOWED_PLATFORM = [
   "platform/config/src/deploy-environment.ts",
   "platform/config/src/hermes-timeouts.ts",
   "platform/config/src/http-body.ts",
+  "platform/config/src/native-clients.ts",
   "platform/config/src/rate-limit.ts",
   "platform/config/src/runtime-mode.ts",
   "platform/config/src/sse-heartbeat.ts",
@@ -67,6 +78,8 @@ const ALLOWED_PLATFORM = [
   "platform/observability/src/log/redact.ts",
   "platform/observability/src/log/test-logger.ts",
   "platform/observability/src/logger.ts",
+  // S7: the run's traceparent, read and journaled by the internal relay. No dependency.
+  "platform/observability/src/trace-context.ts",
 ];
 
 /** Le dossier d'un paquet suivi : `@openedbot/platform-<nom>` ou un module métier `@openedbot/<contexte>`. */

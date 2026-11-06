@@ -1,8 +1,9 @@
-import { insertBotDefaultThread } from "@openedbot/conversation/sql/threads";
+import { insertBotDefaultThread } from "@openedbot/conversation/application/threads";
+import { readOrganizationPermissionPipeline } from "@openedbot/identity/application/permission-policy";
 import type { TransactionDb } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
 import { permissionPipelineOf, type PermissionPipelineId } from "@openedbot/runtimes/domain/runtime-contract";
-import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
+import { readReviewProven } from "@openedbot/runtimes/application/review-profile";
 import type { BotRow } from "../domain/bot-dto";
 import { queueBotBlobDeletionsTx } from "./bot-purge";
 import { nextSectionRowPosition } from "./sections";
@@ -329,10 +330,7 @@ export async function updateBotRow(
  * bot needs depends on it (`approvalPolicyMode`).
  */
 export async function readPermissionPipeline(tx: TransactionDb, organizationId: string): Promise<PermissionPipelineId> {
-  const rows = await tx<Array<{ pipeline: string }>>`
-    select permission_pipeline as pipeline from organizations where id = ${organizationId}
-  `;
-  return permissionPipelineOf(rows[0]?.pipeline);
+  return permissionPipelineOf(await readOrganizationPermissionPipeline(tx, organizationId));
 }
 
 /**

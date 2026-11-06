@@ -42,13 +42,41 @@ function origins(values: Iterable<string>): string[] {
 }
 
 /**
+ * L'origine de l'API dans la politique de l'app de bureau Tauri
+ * (`VITE_OPENEDBOT_SHELL=tauri`) : un réglage d'exécution là-bas, pas de build.
+ * La coque remplace ce marqueur en servant `index.html` (`src-tauri/src/csp.rs`,
+ * même nom) ; les deux bougent ensemble.
+ */
+export const DESKTOP_API_ORIGIN_PLACEHOLDER = "__OPENEDBOT_DESKTOP_API_ORIGIN__";
+
+/**
+ * L'IPC de Tauri : `ipc://localhost` sur macOS et Linux, `http://ipc.localhost`
+ * sur Windows. Sans eux, Tauri retombe sur `postMessage`, plus lent.
+ */
+const TAURI_IPC = ["ipc:", "http://ipc.localhost"];
+
+/** Le script de mesure d'audience : sorti du build desktop (ADR 0001, 4.4). */
+const ANALYTICS_SCRIPT = /\s*<!-- Mesure d'audience[^>]*-->\s*<script\b[^>]*\bsrc="https:\/\/umami\.[^"]+"[^>]*><\/script>/;
+
+export function withoutAnalytics(html: string): string {
+  const stripped = html.replace(ANALYTICS_SCRIPT, "");
+  if (new RegExp(EXTERNAL_SCRIPT.source, "i").test(stripped)) {
+    throw new Error("index.html du build desktop : un script externe reste après le retrait de la mesure d'audience");
+  }
+  return stripped;
+}
+
+/**
  * La politique pour ce HTML. `apiOrigin` : `VITE_API_ORIGIN` quand la console
  * appelle une API sur un autre nom ; vide, l'API est sur le nom de la page.
+ * `desktop` : la console embarquée dans l'app Tauri, servie depuis l'origine
+ * locale, qui parle à l'API choisie à l'exécution et à la coque par l'IPC.
  */
-export function consolePolicy(html: string, apiOrigin = ""): string {
+export function consolePolicy(html: string, apiOrigin = "", options: { desktop?: boolean } = {}): string {
   const hashes = [...html.matchAll(INLINE_SCRIPT)].map((match) => sha256(match[1] ?? "")).sort();
   const scriptOrigins = origins([...html.matchAll(EXTERNAL_SCRIPT)].map((match) => match[1] ?? ""));
-  const api = origins(apiOrigin ? [apiOrigin] : []);
+  const api = options.desktop ? [DESKTOP_API_ORIGIN_PLACEHOLDER] : origins(apiOrigin ? [apiOrigin] : []);
+  const ipc = options.desktop ? TAURI_IPC : [];
   const directives: Array<[string, string[]]> = [
     ["default-src", ["'self'"]],
     ["script-src", ["'self'", ...hashes, ...scriptOrigins]],
@@ -60,7 +88,7 @@ export function consolePolicy(html: string, apiOrigin = ""): string {
     ["img-src", ["'self'", "data:", "blob:", ...api]],
     ["font-src", ["'self'", "data:"]],
     // La mesure d'audience envoie ses mesures au nom qui sert son script.
-    ["connect-src", ["'self'", ...api, ...scriptOrigins]],
+    ["connect-src", ["'self'", ...ipc, ...api, ...scriptOrigins]],
     ["media-src", ["'self'", "data:", "blob:", ...api]],
     // L'aperçu d'un document HTML de bot est un srcdoc sandboxé : il hérite
     // de cette politique, ses scripts n'y tournent donc pas (voulu, voir
@@ -85,16 +113,22 @@ export function injectPolicy(html: string, policy: string): string {
 
 export function contentSecurityPolicy(): Plugin {
   let apiOrigin = "";
+  let desktop = false;
   return {
     name: "openedbot-console-csp",
     apply: "build",
     configResolved(config) {
       apiOrigin = String(config.env.VITE_API_ORIGIN ?? "").trim();
+      desktop = config.env.VITE_OPENEDBOT_SHELL === "tauri";
+      if (desktop && apiOrigin) throw new Error("VITE_API_ORIGIN n'a pas de sens dans le build desktop : l'origine de l'API y est choisie à l'exécution");
     },
     transformIndexHtml: {
       // Après les autres plugins : les empreintes portent sur le HTML final.
       order: "post",
-      handler: (html) => injectPolicy(html, consolePolicy(html, apiOrigin)),
+      handler: (html) => {
+        const page = desktop ? withoutAnalytics(html) : html;
+        return injectPolicy(page, consolePolicy(page, apiOrigin, { desktop }));
+      },
     },
   };
 }

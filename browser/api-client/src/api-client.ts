@@ -18,6 +18,9 @@ export type AuthStore = {
  * L'erreur HTTP de tout client openedbot (`status`, `code`, `requestId`). La console
  * (`ApiError`) et le backoffice (`StaffApiError`) l'étendent sans changer de nom.
  */
+/** Codes après lesquels le flux d'événements ne se reconnecte pas. */
+const TERMINAL_STREAM_CODES = new Set(["WORKSPACE_ACCESS_REVOKED", "CLIENT_UPDATE_REQUIRED"]);
+
 export class ApiClientError extends Error {
   constructor(
     readonly status: number,
@@ -161,7 +164,9 @@ export class ApiClient {
           continue;
         }
         input.onError?.(error);
-        if (input.signal.aborted || (error instanceof ApiClientError && error.code === "WORKSPACE_ACCESS_REVOKED")) return;
+        // Accès retiré, ou app de bureau trop vieille pour l'API (426) : réessayer
+        // ne changera rien, la console prend le relais (écran dédié).
+        if (input.signal.aborted || (error instanceof ApiClientError && TERMINAL_STREAM_CODES.has(error.code ?? ""))) return;
         attempt = nextStreamAttempt(attempt, openedAt);
         await wait(eventStreamRetryDelay(attempt), input.signal);
       }

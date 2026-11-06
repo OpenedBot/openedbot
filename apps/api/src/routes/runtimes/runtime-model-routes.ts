@@ -1,20 +1,21 @@
 import { recordRuntimeHealthObservation } from "@openedbot/runtimes/application/runtime-health";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import {
   resolvedHostProfileModel as resolveProfileModel,
   type HostProfileModelSelection,
-} from "@openedbot/portability/application/model";
+} from "@openedbot/roster/application/host-profile-model";
 import { Hono } from "hono";
-import { setModelAssignmentMode } from "@openedbot/identity/sql/organizations";
+import { setModelAssignmentMode } from "@openedbot/identity/application/organizations";
 import {
-  HermesClient,
   HermesClientError,
   hermesProviderAcceptsApiKey,
+  type HermesClient,
   hermesProviderAcceptsOauth,
   type HermesModelOptions,
   type HermesProviderSdk,
   type HermesClientConfig,
 } from "@openedbot/hermes";
+import { runtimeAdminClient, type RuntimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import {
   OPENAI_FREE_TIER_PROVIDER,
   openAiFreeTokensPerDay,
@@ -39,15 +40,14 @@ import {
   publicRuntimeWithBots,
   type RuntimeRow,
 } from "./runtime-routes";
-import { readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { cancelModelSelectionProof, enqueueModelSelectionProof } from "@openedbot/runtimes/application/model-selection-proof";
-import { readProvenRuntimeModel } from "@openedbot/runtimes/sql/model-selection-proofs";
+import { readProvenRuntimeModel } from "@openedbot/runtimes/application/model-selection-proof";
 import { followingInDb, startProfileModelSync } from "@openedbot/roster/application/bot-model-reset";
-import { PROFILE_MODEL_BATCH_FEATURE } from "@openedbot/roster/domain/bot-capabilities";
+import { RELAY_FEATURE_PROFILE_MODEL_BATCH, RELAY_FEATURE_PROVIDER_SDKS } from "@openedbot/contracts-connector/features";
 
 const ALWAYS_AUTHENTICATED_PROVIDERS = new Set(["moa"]);
-const PROVIDER_SDKS_FEATURE = "provider_sdks";
 export async function resolvedHostProfileModel(
   bot: { model?: string | null; provider?: string | null },
   runtime: { selectedProvider?: string | null; selectedModel?: string | null },
@@ -92,7 +92,7 @@ export async function readProviderSdks(
   row: Pick<RuntimeRow, "linkFeatures">,
   client: Pick<HermesClient, "hostProviderSdks">,
 ): Promise<HermesProviderSdk[] | null> {
-  if (!row.linkFeatures?.includes(PROVIDER_SDKS_FEATURE)) return null;
+  if (!row.linkFeatures?.includes(RELAY_FEATURE_PROVIDER_SDKS)) return null;
   return client.hostProviderSdks().catch(() => null);
 }
 
@@ -356,7 +356,7 @@ export function runtimeModelRoutes(db: Db, config: ApiConfig, dependencies: { sn
         const profileModelSync = candidates.length === 0 || !current ? null : startProfileModelSync(auth.organizationId, candidates, {
           client: resolved.client,
           runtime: { selectedProvider: current?.selectedProvider ?? null, selectedModel: current?.selectedModel ?? null },
-          batch: resolved.row.linkFeatures?.includes(PROFILE_MODEL_BATCH_FEATURE) ?? false,
+          batch: resolved.row.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MODEL_BATCH) ?? false,
           stillFollowing: followingInDb(db, auth.organizationId),
         }, "global_selection");
         await invalidateSnapshots(snapshots, auth.organizationId, "models");
@@ -415,7 +415,7 @@ export async function resolveRuntime(
   config: ApiConfig,
   organizationId: string,
   runtimeId: string,
-): Promise<{ row: RuntimeRow; client: HermesClient; clientConfig: HermesClientConfig }> {
+): Promise<{ row: RuntimeRow; client: RuntimeAdminClient; clientConfig: HermesClientConfig }> {
   const row = await withTenant(db, organizationId, async (tx) => {
     const rows = await readRuntimeRows(tx, organizationId);
     return rows.find((entry) => entry.id === runtimeId) ?? null;
@@ -423,7 +423,7 @@ export async function resolveRuntime(
   if (!row) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
   const secret = await readRuntimeSecret(db, config, organizationId);
   if (!secret || secret.id !== runtimeId) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
-  return { row, client: new HermesClient(secret.client), clientConfig: secret.client };
+  return { row, client: runtimeAdminClient(secret.client), clientConfig: secret.client };
 }
 
 function normalizedOptional(value: unknown, max: number, label: string): string | null {

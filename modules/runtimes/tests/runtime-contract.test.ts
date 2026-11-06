@@ -5,7 +5,6 @@ import {
   ALWAYS_FORBIDDEN_TOOLSETS,
   FORBIDDEN_TOOLSETS,
   APPROVAL_POLICY_WRITE_TOOLS,
-  APPROVAL_POLICY_FEATURE,
   approvalPolicyMode,
   permissionPipelineOf,
   isApprovalPolicyWriteTool,
@@ -14,6 +13,7 @@ import {
   runtimeToolsetIsForbidden,
   runtimeToolsetNameIsContractForbidden,
 } from "../src/domain/runtime-contract";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
 
 const memory = { name: "memory", enabled: true, tools: ["memory"] };
 const sessionSearch = { name: "session_search", enabled: true, tools: [] };
@@ -33,7 +33,7 @@ describe("runtime toolset contract", () => {
     const hostList = hostSource.match(/approvalPolicyWriteTools = \[\.\.\.\]string\{([^}]+)\}/)?.[1];
     expect(hostList).toBeDefined();
     expect([...APPROVAL_POLICY_WRITE_TOOLS].sort()).toEqual([...((hostList ?? "").matchAll(/"([^"]+)"/g))].map((match) => match[1]!).sort());
-    expect(APPROVAL_POLICY_FEATURE).toBe("approval_policy");
+    expect(RELAY_FEATURE_APPROVAL_POLICY).toBe("approval_policy");
     expect(["write_file", "patch", "skill_manage", "execute_code", "send_message", "cronjob", "mcp_search"]
       .map(isApprovalPolicyWriteTool)).toEqual([true, true, true, true, true, true, true]);
     expect(["read_file", "terminal", "mcp ", "mcp", "mcpfoo"]

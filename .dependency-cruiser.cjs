@@ -33,8 +33,37 @@ const PRO_CONSOLE_SCREENS =
   "^apps/console/src/(components/agency/|screens/agency/|screens/settings/agency/|" +
   "screens/auth/agency-invitation\\.tsx$|screens/settings/dev/billing\\.tsx$|components/settings/permission-rules\\.tsx$)";
 
+/**
+ * Les modules métier et les modules qu'ils déclarent (`dependencies` de leur
+ * package.json) : un module n'importe que ceux-là (ADR 0001 S4). Le graphe
+ * déclaré est sans cycle (`tests/scripts/workspace-deps-contract.ts`) ; cette
+ * règle le tient fichier par fichier, tests des modules compris.
+ */
+const fs = require("node:fs");
+const path = require("node:path");
+const MODULES_DIR = path.join(__dirname, "modules");
+const MODULE_DEPENDENCIES = fs
+  .readdirSync(MODULES_DIR, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(MODULES_DIR, entry.name, "package.json")))
+  .map((entry) => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(MODULES_DIR, entry.name, "package.json"), "utf8"));
+    const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+      .filter((name) => name.startsWith("@openedbot/"))
+      .map((name) => name.slice("@openedbot/".length));
+    return { module: entry.name, declared };
+  });
+
 module.exports = {
   forbidden: [
+    ...MODULE_DEPENDENCIES.map(({ module, declared }) => ({
+      name: "module-par-ses-dependances",
+      comment:
+        `Le module ${module} n'importe que les modules que déclare son package.json (${declared.filter((name) => fs.existsSync(path.join(MODULES_DIR, name))).join(", ") || "aucun"}) : ` +
+        "le graphe des modules reste sans cycle (ADR 0001 S4). Une nouvelle dépendance se déclare, et ne doit pas en fermer un.",
+      severity: "error",
+      from: { path: `^modules/${module}/` },
+      to: { path: "^modules/[^/]+/", pathNot: `^modules/(${[module, ...declared].join("|")})/` },
+    })),
     {
       name: "pas-de-pro-statique",
       comment:
@@ -53,6 +82,16 @@ module.exports = {
       severity: "error",
       from: { path: "^apps/console/", pathNot: `${PRO_CONSOLE_SCREENS}|^apps/console/tests/` },
       to: { path: PRO_CONSOLE_SCREENS, dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "console-plateforme-par-la-facade",
+      comment:
+        "Hors de `src/lib/platform/`, la console passe par la façade `lib/platform` (`index.ts`), jamais par le pont de " +
+        "l'app de bureau (`native-bridge.ts`) : une seule porte, qui sait aussi l'URL publique de la console et l'en-tête " +
+        "client (ADR 0001, étape D1a). Les tests peuvent le simuler directement.",
+      severity: "error",
+      from: { path: "^apps/console/", pathNot: "^apps/console/src/lib/platform/|^apps/console/tests/" },
+      to: { path: "^apps/console/src/lib/platform/native-bridge\\.ts$" },
     },
     {
       name: "console-testing-hors-ecrans",
@@ -78,7 +117,7 @@ module.exports = {
       name: "porte-permissions-par-le-port",
       comment:
         "Rien dans le module d'exécution ni dans le worker (la porte `permission-gate.ts`, le pipeline pur `domain/`, " +
-        "le relecteur `approval-review.ts`, l'enregistrement `persist.ts`, le relais `runner.ts`) ne lit lui-même " +
+        "le relecteur `approval-review.ts`, l'enregistrement `persist.ts`, le relais `runner/approval-forwarding.ts`) ne lit lui-même " +
         "les autorisations, les politiques d'outil, les règles en langage naturel ni l'interrupteur terminal : ces " +
         "règles passent par le port `PermissionRuleSource` (contrat de plug-in), dont la source du cœur est " +
         "`modules/execution/src/application/runner/core-permission-rules.ts` et que le plug-in `permissions` " +
@@ -95,13 +134,46 @@ module.exports = {
           "^apps/worker/src/maintenance/approval-policy-reconciliation\\.ts$",
       },
       to: {
+        // Since S4 these reads are public through the application façades of
+        // the roster and of runtimes (their SQL files are private): both are named.
         path:
-          "^modules/roster/src/sql/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
-          "(^|/)node_modules/@openedbot/roster/src/sql/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
-          "^@openedbot/roster/sql/(permission-grants|tool-policies|permission-rules)$|" +
-          "^modules/runtimes/src/sql/permission-settings\\.ts$|" +
-          "(^|/)node_modules/@openedbot/runtimes/src/sql/permission-settings\\.ts$|" +
-          "^@openedbot/runtimes/sql/permission-settings$",
+          "^modules/roster/src/(sql|application)/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
+          "(^|/)node_modules/@openedbot/roster/src/(sql|application)/(permission-grants|tool-policies|permission-rules)\\.ts$|" +
+          "^@openedbot/roster/(sql|application)/(permission-grants|tool-policies|permission-rules)$|" +
+          "^modules/runtimes/src/(sql|application)/permission-settings\\.ts$|" +
+          "(^|/)node_modules/@openedbot/runtimes/src/(sql|application)/permission-settings\\.ts$|" +
+          "^@openedbot/runtimes/(sql|application)/permission-settings$",
+      },
+    },
+    {
+      name: "sql-prive-au-module",
+      comment:
+        "Le SQL d'un module (`modules/<module>/src/sql/`) ne s'importe que depuis ce module (ADR 0001 S4) : les " +
+        "autres paquets, les applications et les plug-ins passent par sa couche `application` publique, qui " +
+        "réexporte ce qu'elle ouvre. Les exports des paquets ne publient plus `./sql/*`. Les harnais de la racine " +
+        "(`tests/`, `scripts/`) lisent encore le code qu'ils éprouvent.",
+      severity: "error",
+      from: { path: "^(apps|platform|contracts|browser|modules)/([^/]+)/" },
+      to: { path: "^modules/[^/]+/src/sql/", pathNot: "^modules/$2/" },
+    },
+    {
+      name: "primitives-de-creation-privees",
+      comment:
+        "Les primitives qui créent les runs et les workflows (`modules/execution/src/sql/run-writes.ts`, ADR 0001 " +
+        "S2b) ne s'importent que depuis les commandes de création (`application/run-creation.ts`, " +
+        "`application/runner/workflow-steps.ts`) et leurs tests. Le SQL écrit en ligne est vu par " +
+        "`tests/scripts/run-writes-contract.ts`.",
+      severity: "error",
+      from: {
+        pathNot:
+          "^modules/execution/src/application/(run-creation|runner/workflow-steps)\\.ts$|" +
+          "^modules/execution/tests/",
+      },
+      to: {
+        path:
+          "^modules/execution/src/sql/run-writes\\.ts$|" +
+          "(^|/)node_modules/@openedbot/execution/src/sql/run-writes\\.ts$|" +
+          "^@openedbot/execution/sql/run-writes$",
       },
     },
     {
@@ -168,7 +240,8 @@ module.exports = {
       severity: "error",
       from: {
         path: "^((?:apps|platform|contracts|browser|modules)/[^/]+)/",
-        pathNot: "^apps/(console|admin)/vite\\.config\\.ts$",
+        // The Vite config and its helpers (`vite-*.ts`): its esbuild bundle leaves package names external.
+        pathNot: "^apps/(console|admin)/vite(\\.config|-[a-z-]+)\\.ts$",
       },
       to: {
         path: "^(platform|contracts|browser|modules)/",
@@ -198,6 +271,15 @@ module.exports = {
       severity: "error",
       from: { path: "^contracts/" },
       to: { path: "^(apps|platform|browser|modules|tests|scripts)/" },
+    },
+    {
+      name: "protocole-autonome",
+      comment:
+        "La référence du protocole (`protocol/connector`) fait foi et se publie seule : elle n'importe rien du dépôt " +
+        "(c'est `contracts/connector` qui la réexporte, jamais l'inverse).",
+      severity: "error",
+      from: { path: "^protocol/" },
+      to: { path: "^(apps|platform|contracts|browser|modules|tests|scripts)/" },
     },
     {
       name: "contrat-sans-bun",
@@ -263,9 +345,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
-    // apps/desktop is a standalone client with its own dependencies (not a
-    // Bun workspace of the core): its boundaries are not the core's.
-    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop/" },
+    // apps/desktop-tauri is a workspace: only its build outputs are skipped
+    // (the embedded console build, the Rust target, the signed releases).
+    exclude: { path: "(^|/)(node_modules|dist|dev-dist|\\.output|\\.tanstack)/|^apps/desktop-tauri/(console-dist|src-tauri|release)/" },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {

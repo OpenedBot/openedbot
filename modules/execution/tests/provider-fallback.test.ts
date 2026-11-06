@@ -5,7 +5,6 @@ import {
   fallbackFailureMessage,
   fallbackIdempotencyKey,
   planProviderRetry,
-  PROFILE_MANAGEMENT_FEATURE,
   providerAuthRequiredPayload,
   providerFallbackPayload,
   quotaEmailDedupeKey,
@@ -24,6 +23,7 @@ import {
 } from "../src/application/runner/provider-recovery";
 import { NamedRunError } from "../src/application/runner/failure";
 import type { RunContext } from "../src/application/runner/types";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 const catalog: HermesModelOptions = {
   provider: "openai-codex",
@@ -443,7 +443,7 @@ describe("a model selection the profile does not carry", () => {
     hermesProfile: "atlas",
     runtimeSelectedProvider: null,
     runtimeSelectedModel: null,
-    linkFeatures: [PROFILE_MANAGEMENT_FEATURE],
+    linkFeatures: [RELAY_FEATURE_PROFILE_MANAGEMENT],
   } as unknown as RunContext;
   const host = (applied: boolean) => ({
     hostSetProfileModel: async (profile: string, input: { provider: string; model: string }) =>
@@ -486,7 +486,7 @@ describe("a model selection the profile does not carry", () => {
 
 describe("applyFallbackProfileModel", () => {
   const selection = { provider: "opencode-free", model: "nemotron" };
-  const able = { linkFeatures: [PROFILE_MANAGEMENT_FEATURE] };
+  const able = { linkFeatures: [RELAY_FEATURE_PROFILE_MANAGEMENT] };
 
   function recordingClient(): {
     client: { hostSetProfileModel: (profile: string, input: { provider: string; model: string }) => Promise<{ profile: string; provider: string; model: string; applied: boolean }> };

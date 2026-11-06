@@ -5,8 +5,8 @@ import type { AppVariables } from "../identity/auth";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "../../interfaces/http/http-error";
-import { readOrganizationCursor } from "@openedbot/conversation/sql/organization-cursor";
-import { selectThreadHistoryTx } from "@openedbot/conversation/sql/thread-history";
+import { readOrganizationCursor } from "@openedbot/conversation/application/organization-cursor";
+import { selectThreadHistoryTx } from "@openedbot/conversation/application/thread-history";
 import { encodeThreadHistoryCursor, parseThreadHistoryCursor, parseThreadHistoryLimit } from "@openedbot/conversation/domain/thread-history-cursor";
 import { messageDto, publicRunStatus, type MessageRow } from "@openedbot/conversation/domain/message-dto";
 import { organizationEventEnvelope, type RunEventRecord } from "@openedbot/contracts-events";
@@ -50,7 +50,7 @@ export function threadHistoryRoutes(db: Db): Hono<{ Variables: AppVariables }> {
       // transaction (READ COMMITTED : chaque SELECT voit ce qui est commité à
       // SON instant). Le worker prend `pg_advisory_xact_lock` par organisation
       // avant son premier insert et le tient jusqu'au commit
-      // (`runner/events.ts` `lockRunEventCursorTx`) : l'ordre des curseurs est
+      // (`modules/execution/src/sql/run-events.ts` `lockRunEventsTx`) : l'ordre des curseurs est
       // l'ordre des commits. Tout curseur ≤ un max lu à T1 est donc visible
       // par un SELECT à T2 > T1 : ce max est une borne BASSE sûre pour
       // attacher le flux : ce qui est commité après est rejoué par le serveur

@@ -6,6 +6,8 @@ import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
 import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
+import { createLiveRunText, type ThreadLiveText } from "../../src/lib/stream/live-run-text";
+import { LIVE_NARRATION_MAX } from "../../src/lib/stream/live-answer";
 
 const speechAdapter: SpeechSynthesisAdapter = {
   supported: false,
@@ -34,6 +36,7 @@ function renderTimeline({
   approvals = [],
   onOpenBotErrors,
   outgoing = null,
+  liveText = null,
 }: {
   events?: StoredProductEvent[];
   userInputs?: Array<{
@@ -50,6 +53,7 @@ function renderTimeline({
   approvals?: ApprovalRequestDto[];
   onOpenBotErrors?: () => void;
   outgoing?: { id: string; text: string; failed?: boolean } | null;
+  liveText?: ThreadLiveText | null;
 }) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -65,6 +69,7 @@ function renderTimeline({
           scrollToBottomOnThreadKey={scrollToBottomOnThreadKey}
           onOpenBotErrors={onOpenBotErrors}
           outgoing={outgoing}
+          liveText={liveText}
         />
       </I18nProvider>
     </QueryClientProvider>,
@@ -145,55 +150,11 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("ThreadTimeline", () => {
-  test("reveals local turns before fetching history and preserves the anchor when older turns arrive", async () => {
-    const inputs = Array.from({ length: 50 }, (_, index) => ({ id: `history-${index}`, runId: null,
-      text: `Question historique ${index}`, createdAt: new Date(Date.UTC(2026, 9, 5, 0, 0, index)).toISOString() }));
-    let requests = 0;
-    let captureHeight: (() => void) | undefined;
-    let resolvePage!: (loaded: boolean) => void;
-    const onLoadOlder = (capture?: () => void) => {
-      requests += 1;
-      captureHeight = capture;
-      return new Promise<boolean>((resolve) => { resolvePage = resolve; });
-    };
-    const view = (userInputs: typeof inputs, loadingOlder = false, hasOlderHistory = true) => (
-      <I18nProvider><ThreadTimeline events={[]} userInputs={userInputs} approvals={[]} running={false}
-        speechAdapter={speechAdapter} speechScope="history" hasOlderHistory={hasOlderHistory}
-        loadingOlder={loadingOlder} onLoadOlder={onLoadOlder} /></I18nProvider>
-    );
-    const rendered = render(view(inputs));
-    const node = rendered.container.querySelector<HTMLElement>('[role="log"]')!;
-    Object.defineProperty(node, "scrollHeight", { configurable: true,
-      get: () => rendered.container.querySelectorAll('[data-thread-find-target^="message:history-"]').length * 20 });
-    Object.defineProperty(node, "clientHeight", { configurable: true, value: 100 });
-    expect(screen.queryByText("Question historique 0")).toBeNull();
-    // The first paint mounts a few turns; the live window follows when idle.
-    fireEvent.click(await screen.findByRole("button", { name: "Charger 10 tours plus anciens" }));
-    expect(screen.getByText("Question historique 0")).toBeTruthy();
-    expect(requests).toBe(0);
-    fireEvent.click(screen.getByRole("button", { name: "Charger 30 tours plus anciens" }));
-    expect(requests).toBe(1);
-    rendered.rerender(view(inputs, true));
-    expect(screen.getByRole("button", { name: "Chargement des tours plus anciens…" }).hasAttribute("disabled")).toBe(true);
-    node.scrollTop = 120;
-    const older = Array.from({ length: 4 }, (_, index) => ({ id: `history-old-${index}`, runId: null,
-      text: `Ancienne question ${index}`, createdAt: new Date(Date.UTC(2026, 9, 4, 0, 0, index)).toISOString() }));
-    await act(async () => {
-      captureHeight?.();
-      rendered.rerender(view([...older, ...inputs], false, false));
-      resolvePage(true);
-    });
-    await waitFor(() => expect(screen.getByText("Ancienne question 0")).toBeTruthy());
-    expect(screen.getByText("Question historique 0")).toBeTruthy();
-    expect(node.scrollTop).toBe(200);
-    expect(screen.queryByRole("button", { name: /Charger .* tours plus anciens/ })).toBeNull();
-  });
-
   test("a history error remains visible with a retry control", () => {
     render(<I18nProvider><ThreadTimeline events={[]} userInputs={[]} approvals={[]} running={false}
       speechAdapter={speechAdapter} hasOlderHistory olderError onLoadOlder={async () => false} /></I18nProvider>);
     expect(screen.getByRole("alert").textContent).toContain("Impossible de charger les tours plus anciens");
-    expect(screen.getByRole("button", { name: "Charger 30 tours plus anciens" }).hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "Charger 40 tours plus anciens" }).hasAttribute("disabled")).toBe(false);
   });
 
   test("épingle le fil au montage avant la première frame", () => {
@@ -243,16 +204,19 @@ describe("ThreadTimeline", () => {
     const originalResizeObserver = globalThis.ResizeObserver;
     const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
     const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    let callback: ResizeObserverCallback | null = null;
-    const observed: Element[] = [];
+    // Two observers: the pin's (the messages column) and the virtual rows' (each turn, the viewport).
+    const observers: Array<{ callback: ResizeObserverCallback; observed: Element[] }> = [];
     const frames: FrameRequestCallback[] = [];
     class FakeResizeObserver {
+      private readonly record: { callback: ResizeObserverCallback; observed: Element[] };
       constructor(next: ResizeObserverCallback) {
-        callback = next;
+        this.record = { callback: next, observed: [] };
+        observers.push(this.record);
       }
       observe(target: Element) {
-        observed.push(target);
+        this.record.observed.push(target);
       }
+      unobserve() {}
       disconnect() {}
     }
     globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
@@ -269,9 +233,12 @@ describe("ThreadTimeline", () => {
       expect(scroller).not.toBeNull();
       expect(content).not.toBeNull();
       if (!scroller || !content) throw new Error("ThreadTimeline test nodes are missing");
-      expect(observed).toEqual([content]);
+      const pin = observers.find((observer) => observer.observed.includes(content));
+      // Compared by identity: a failed `toEqual` on DOM nodes would print the whole tree.
+      expect(pin?.observed.length).toBe(1);
+      const callback = pin?.callback;
       frames.splice(0).forEach((frame) => frame(0));
-      expect(callback).not.toBeNull();
+      expect(callback).toBeDefined();
 
       act(() => {
         callback?.([{ target: scroller } as unknown as ResizeObserverEntry], {} as ResizeObserver);
@@ -299,58 +266,6 @@ describe("ThreadTimeline", () => {
       globalThis.ResizeObserver = originalResizeObserver;
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-    }
-  });
-
-  test("reste au bas quand la fenêtre idle passe de 8 à 40 tours", () => {
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    const originalRequestIdleCallback = window.requestIdleCallback;
-    const originalCancelIdleCallback = window.cancelIdleCallback;
-    const frames: FrameRequestCallback[] = [];
-    let idleCallback: IdleRequestCallback | null = null;
-    const restoreScrollMetrics = mockThreadScrollMetrics(
-      () => document.querySelectorAll('[data-thread-find-target^="message:long-"]').length * 100,
-      200,
-      true,
-    );
-    globalThis.requestAnimationFrame = ((next: FrameRequestCallback) => {
-      frames.push(next);
-      return frames.length;
-    }) as typeof requestAnimationFrame;
-    globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
-    window.requestIdleCallback = ((callback: IdleRequestCallback) => {
-      idleCallback = callback;
-      return 1;
-    }) as typeof window.requestIdleCallback;
-    window.cancelIdleCallback = (() => {}) as typeof window.cancelIdleCallback;
-
-    try {
-      const userInputs = Array.from({ length: 50 }, (_, index) => ({
-        id: `long-${index}`,
-        runId: null,
-        text: `Question ${index}`,
-        createdAt: new Date(Date.UTC(2026, 9, 5, 0, 0, index)).toISOString(),
-      }));
-      const rendered = renderTimeline({ userInputs, scrollToBottomOnThreadKey: "thread-long" });
-      const scroller = rendered.container.querySelector<HTMLElement>('[role="log"]');
-      if (!scroller) throw new Error("ThreadTimeline test scroller is missing");
-      expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight);
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
-
-      expect(idleCallback).not.toBeNull();
-      act(() => idleCallback?.({ didTimeout: false, timeRemaining: () => 50 }));
-      act(() => frames.splice(0).forEach((frame) => frame(0)));
-
-      expect(rendered.container.querySelectorAll('[data-thread-find-target^="message:long-"]')).toHaveLength(40);
-      expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight);
-    } finally {
-      cleanup();
-      restoreScrollMetrics();
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-      window.requestIdleCallback = originalRequestIdleCallback;
-      window.cancelIdleCallback = originalCancelIdleCallback;
     }
   });
 
@@ -581,6 +496,61 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(container.querySelector("[data-turn-activity]")).toBeNull();
     // Its text then smooths in from empty (`useSmoothText`): its PLACE is what counts here.
     expect(container.querySelector("[data-assistant-response]")).not.toBeNull();
+  });
+
+  test("la réponse en direct lit le texte retenu hors du snapshot, et lui seul, sans doublon une fois patché", () => {
+    const matchMedia = window.matchMedia;
+    // Mouvement réduit : le texte s'affiche tel quel, sans lissage à attendre.
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      const at = new Date("2026-10-24T10:00:00.000Z");
+      const fragment = (sequence: number, text: string, runId = "run-live") =>
+        ({ sequence, runId, type: "agent.message", payload: { text }, occurredAt: at }) as unknown as StoredProductEvent;
+      const old = [fragment(1, "Ancienne réponse.", "run-old")];
+      const committed = [...old, fragment(1, "a".repeat(LIVE_NARRATION_MAX + 1))];
+      const store = createLiveRunText();
+      for (const event of committed) store.record(event);
+      store.record(fragment(2, " SUITE"));
+      const runs = [run("run-old", "completed"), run("run-live", "running")];
+      const view = renderTimeline({ events: committed, runs, running: true, liveText: { store, events: committed } });
+      const answers = () => [...view.container.querySelectorAll("[data-assistant-response]")].map((node) => node.textContent ?? "");
+      expect(answers().at(-1)).toContain(" SUITE");
+      // Un fragment publié ne passe que par la bulle en direct.
+      store.record(fragment(3, " ENCORE"));
+      act(() => store.publish());
+      expect(answers().at(-1)).toContain(" SUITE ENCORE");
+      expect(answers()[0]).toContain("Ancienne réponse.");
+      // Le snapshot reçoit les fragments : le suffixe les lâche dans le même rendu.
+      const patched = [...committed, fragment(2, " SUITE"), fragment(3, " ENCORE")];
+      view.rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <I18nProvider>
+            <ThreadTimeline events={patched} userInputs={[]} runs={runs} approvals={[]} running speechAdapter={speechAdapter} liveText={{ store, events: patched }} />
+          </I18nProvider>
+        </QueryClientProvider>,
+      );
+      expect(answers().at(-1)!.split("SUITE")).toHaveLength(2);
+      expect(answers().at(-1)).toContain(" SUITE ENCORE");
+      view.unmount();
+      // Une balise MEDIA: à cheval sur le snapshot et le suffixe n'est jamais affichée brute.
+      const tagged = [fragment(1, `${"b".repeat(LIVE_NARRATION_MAX + 1)}\nMED`, "run-media")];
+      // Fil ouvert en cours de réponse : le store n'a pas vu le début de la balise.
+      const mediaStore = createLiveRunText();
+      mediaStore.record(fragment(2, "IA:/workspace/x.png", "run-media"));
+      const media = renderTimeline({ events: tagged, runs: [run("run-media", "running")], running: true, liveText: { store: mediaStore, events: tagged } });
+      expect(media.container.querySelector("[data-assistant-response]")?.textContent).not.toContain("workspace");
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 
   test("place une question interactive historique au-dessus de sa réponse opérateur", () => {

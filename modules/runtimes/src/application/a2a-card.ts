@@ -2,6 +2,7 @@ import type { A2aAgentCard, A2aCardReadDto } from "@openedbot/contracts-api";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { assertClientMandate } from "./fleet";
+import { RELAY_FEATURE_A2A_CARD } from "@openedbot/contracts-connector/features";
 
 export type A2aCardRuntime = {
   id: string;
@@ -23,7 +24,7 @@ export async function readAgencyA2aCard(db: Db, scope: { userId: string; agencyI
     else {
       runtimeId = runtime.id;
       const capabilities = await runtime.client.hostCapabilities();
-      if (!capabilities?.includes("a2a_card")) state = "unsupported";
+      if (!capabilities?.includes(RELAY_FEATURE_A2A_CARD)) state = "unsupported";
       else { card = await runtime.client.a2aAgentCard(); state = "available"; }
     }
   } catch {

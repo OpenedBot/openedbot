@@ -8,6 +8,8 @@ import {
   type RuntimeClientConfig,
   type RuntimeClientContext,
 } from "../src/application/runtime-client";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
+import { parseTraceparent, runTraceContext, runWithTrace } from "@openedbot/platform-observability/trace-context";
 const config: RuntimeClientConfig = {
   apiInternalUrl: "http://127.0.0.1:8790",
   apiInternalToken: "worker-internal-token",
@@ -125,4 +127,50 @@ test("only a proven connection failure is classified as not sent by the worker",
       expect(result).toBe(uncertain);
     }
   }
+});
+
+describe("createWorkerRelayDialer: the run's trace", () => {
+  const RUN_ID = "4bf92f35-77b3-4da6-a3ce-929d0e0e4736";
+  const capture = () => {
+    const seen: Headers[] = [];
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(new Headers(init?.headers));
+      return Response.json({ ok: true });
+    }) as unknown as typeof fetch;
+    return { seen, dial: createWorkerRelayDialer("rt-1", config, fetchImpl) };
+  };
+
+  test("inside a run, every request carries a fresh child span of the run's trace and leaves one journal line", async () => {
+    const { seen, dial } = capture();
+    const run = runTraceContext(RUN_ID);
+    const { records } = await captureLogEvents(() => runWithTrace(run, async () => {
+      await dial({ method: "POST", path: "/v1/runs?x=1", headers: {}, body: null });
+      await dial({ method: "GET", path: "/v1/runs/h-1/events", headers: {}, body: null });
+    }));
+    const sent = seen.map((headers) => parseTraceparent(headers.get("traceparent")));
+    expect(sent.every((trace) => trace?.traceId === "4bf92f3577b34da6a3ce929d0e0e4736")).toBe(true);
+    expect(new Set(sent.map((trace) => trace?.spanId)).size).toBe(2);
+    expect(sent.map((trace) => trace?.spanId)).not.toContain(run.spanId);
+    expect(records.map((record) => [record.event, record.path, record.status, record.traceId, record.spanId, record.parentSpanId])).toEqual([
+      ["worker.relay_request", "/v1/runs", 200, run.traceId, sent[0]!.spanId, run.spanId],
+      ["worker.relay_request", "/v1/runs/h-1/events", 200, run.traceId, sent[1]!.spanId, run.spanId],
+    ]);
+  });
+
+  test("a link failure is journaled with its code and stage before it is thrown", async () => {
+    const dial = createWorkerRelayDialer("rt-1", config, (async () => Response.json(
+      { error: { code: "RUNTIME_LINK_UNAVAILABLE", message: "lien fermé", stage: "before_dispatch" } },
+      { status: 503, headers: { [RELAY_STAGE_HEADER]: "before_dispatch" } },
+    )) as unknown as typeof fetch);
+    const { records } = await captureLogEvents(() => runWithTrace(runTraceContext(RUN_ID), () =>
+      dial({ method: "GET", path: "/health", headers: {}, body: null }).catch((error: unknown) => error)));
+    expect(records).toEqual([expect.objectContaining({ event: "worker.relay_request", error: "RUNTIME_LINK_UNAVAILABLE", stage: "before_dispatch", level: 40 })]);
+  });
+
+  test("outside a run, nothing is added and nothing is journaled", async () => {
+    const { seen, dial } = capture();
+    const { records } = await captureLogEvents(() => dial({ method: "GET", path: "/health", headers: {}, body: null }));
+    expect(seen[0]!.has("traceparent")).toBe(false);
+    expect(records).toEqual([]);
+  });
 });

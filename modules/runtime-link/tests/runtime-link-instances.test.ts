@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  failRunsOnDisconnectedRuntimes,
-  sweepDisconnectedRuntimeLinks,
-} from "../src/application/runtime-links";
+import { sweepDisconnectedRuntimeLinks } from "../src/application/runtime-links";
 
 type Captured = { sql: string; values: unknown[] };
 
@@ -30,15 +27,4 @@ describe("balayage disconnected instance-aware", () => {
     expect(sql).toContain("'Aucun signe de vie du lien depuis 45 s.'");
   });
 
-  test("failRunsOnDisconnectedRuntimes n'échoue pas un runtime dont l'instance est vivante et last_seen frais", async () => {
-    const captured: Captured[] = [];
-    await failRunsOnDisconnectedRuntimes(fakeDb(captured), 900_000);
-    expect(captured).toHaveLength(1);
-    const sql = captured[0]!.sql;
-    expect(sql).toContain("left join api_instances inst");
-    expect(sql).toContain("interval '60 seconds'");
-    expect(sql).toContain("inst.instance_id is not null");
-    expect(sql).toContain("and not (");
-    expect(sql).toContain("rt.link_last_seen_at > now() - interval '45 seconds'");
-  });
 });

@@ -13,13 +13,14 @@ import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { decryptSecretFromKeyring, encryptSecret } from "../../infrastructure/crypto";
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
+import type { HermesClientConfig } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import {
   publicExposure,
   readExposureById,
   readPendingExposures,
   type RuntimeExposureRow,
-} from "@openedbot/runtimes/sql/runtime-exposures";
+} from "@openedbot/runtimes/application/runtime-exposures";
 import {
   defaultCloudflareClientFactory,
   defaultTailscaleClientFactory,
@@ -82,7 +83,7 @@ export const EXPOSURE_CHECK_CACHE_MS = 10_000;
  */
 export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeExposureRouteDeps = {}): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
-  const createClient = deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig));
+  const createClient = deps.clientFactory ?? runtimeAdminClient;
   const cloudflare = deps.cloudflareFactory ?? defaultCloudflareClientFactory;
   const tailscale = deps.tailscaleFactory ?? defaultTailscaleClientFactory;
   const now = deps.now ?? (() => new Date());

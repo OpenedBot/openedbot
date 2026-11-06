@@ -81,8 +81,8 @@
 /*
   Une colonne centrée, comme une app d'agent qui s'ouvre sur une conversation
   vide : la fenêtre est déjà le produit, le salon n'est pas une page
-  d'accueil (ni cartes explicatives ni filigrane, repris du skin de la coque
-  openedbot-desktop le 2026-10-13).
+  d'accueil (ni cartes explicatives ni filigrane, repris du skin de l'app
+  de bureau le 2026-10-13).
 */
 .openedbot-salon-guide {
   position: relative;

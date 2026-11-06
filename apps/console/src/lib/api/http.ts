@@ -1,6 +1,7 @@
 import { activeFleetId, activeOrganizationId, clearCloudSession, readCloudSession, readWebCsrfToken, reportWorkspaceRevoked } from "../session/cloud-session";
 import { LOCALE_STORAGE_KEY } from "../i18n";
-import { nativeBridge } from "../platform/native-bridge";
+import { clientHeaders, nativeBridge } from "../platform";
+import { CLIENT_UPDATE_REQUIRED, reportClientUpdateRequired, reportingClientUpdate } from "../platform/client-update";
 import { clearOnboardingDraft } from "../session/onboarding-draft";
 import { rememberAccountWorkspaces } from "../workspace/workspace-directory";
 import { ApiClientError } from "@openedbot/browser-api-client";
@@ -19,6 +20,12 @@ declare global {
  * web.
  */
 export const API_ORIGIN = (globalThis.window?.__OPENEDBOT_API_ORIGIN__ ?? import.meta.env.VITE_API_ORIGIN ?? "").replace(/\/+$/, "");
+
+/**
+ * Le `fetch` des appels qui ne passent pas par `request` (octets d'une pièce
+ * jointe) : un `426` y montre l'écran de mise à jour au lieu d'une image cassée.
+ */
+export const rawApiFetch = reportingClientUpdate((input, init) => globalThis.fetch(input, init));
 
 /**
  * Ce module n'a pas de contexte React : la langue s'y relit directement dans
@@ -160,6 +167,8 @@ export function cloudHeaders(method: string, includeOrganization = true, native 
   // Un bearer natif n'a pas de CSRF à prouver : l'API ne l'exige que sur un cookie.
   const csrfToken = native ? null : (readWebCsrfToken() ?? session?.csrfToken);
   return {
+    // L'app de bureau dit sa version : sous le minimum, l'API répond 426.
+    ...(native ? clientHeaders() : {}),
     ...(includeOrganization && organizationId ? { "X-OpenedBot-Organization": organizationId } : {}),
     ...(fleetId ? { "X-OpenedBot-Fleet": fleetId } : {}),
     ...(csrfToken && !["GET", "HEAD", "OPTIONS"].includes(method)
@@ -414,6 +423,7 @@ export async function attempt<T>(
   }
   if (!response.ok) {
     const error = errorFrom(response, body);
+    if (response.status === 426 && error.code === CLIENT_UPDATE_REQUIRED) reportClientUpdateRequired(error.details);
     // Bearer natif périmé : une rotation, puis le même appel. Un refus de la
     // rotation retombe sur le 401 ordinaire, qui efface la session.
     if (bridge && nativeRetry && !token && isUnauthorized(error)) {

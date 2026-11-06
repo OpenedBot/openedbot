@@ -6,7 +6,7 @@ import { HermesClientError, RelayDialError } from "@openedbot/hermes";
 import { installRuntimeLinks, NO_RUNTIME_LINKS, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
-import { applyHostProfileModel } from "@openedbot/portability/application/model";
+import { applyHostProfileModel } from "@openedbot/roster/application/host-profile-model";
 import {
   catalogValidatedSelection,
   hermesProfileFromBaseUrl,

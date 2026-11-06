@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
+import type { HermesClient, HermesClientConfig } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { BotRoutineToolDto } from "@openedbot/contracts-api";
 import { ROUTINE_TOOL_NAME, ROUTINE_TOOL_SERVER } from "@openedbot/execution/domain/routine-tool";
 import type { Db } from "@openedbot/platform-db";
@@ -12,23 +13,7 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { publicWriteError } from "../runtimes/runtime-integration-routes";
 import { routineToolSecretHash } from "./routine-tool-routes";
-
-/**
- * Activer `routine_manage` pour un bot (DEV-209), depuis son panneau Routines.
- *
- * Tout passe par les verbes nommés que l'hôte annonce déjà, jamais par un
- * shell : `mcp_management` ajoute à la racine le serveur `openedbot_routines` (https
- * vers CETTE API, bearer propre au runtime), `profile_capabilities` l'active
- * sur le profil du bot. L'écriture est prouvée par relecture de l'inventaire
- * MCP de l'hôte, jamais par un code de sortie (règle 2 de la frontière).
- *
- * Le secret du bearer n'existe qu'en transit vers l'hôte : la base n'en garde
- * que l'empreinte, et le réactiver après une perte de l'entrée sur l'hôte en
- * pose un nouveau. Le gateway ne lit ses serveurs MCP qu'au démarrage : la
- * réponse dit `restartPending`, et la console offre le redémarrage nommé.
- */
-const FEATURE_MCP = "mcp_management";
-const FEATURE_PROFILE_CAPABILITIES = "profile_capabilities";
+import { RELAY_FEATURE_MCP_MANAGEMENT, RELAY_FEATURE_PROFILE_CAPABILITIES } from "@openedbot/contracts-connector/features";
 
 type InstallClient = Pick<
   HermesClient,
@@ -50,7 +35,7 @@ export function botRoutineToolRoutes(
 ): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
   const readRuntime = deps.readRuntime ?? readRuntimeSecret;
-  const clientFactory = deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig));
+  const clientFactory = deps.clientFactory ?? runtimeAdminClient;
 
   const readBot = async (organizationId: string, botId: string): Promise<BotTarget> => {
     const rows = await withTenant(db, organizationId, (tx) => tx<BotTarget[]>`
@@ -82,8 +67,8 @@ export function botRoutineToolRoutes(
     } catch (error) {
       throw publicWriteError(error);
     }
-    if (!features?.includes(FEATURE_MCP)) return { runtime, client, reason: "host_unsupported" as const };
-    if (bot.profile && !features.includes(FEATURE_PROFILE_CAPABILITIES)) {
+    if (!features?.includes(RELAY_FEATURE_MCP_MANAGEMENT)) return { runtime, client, reason: "host_unsupported" as const };
+    if (bot.profile && !features.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) {
       return { runtime, client, reason: "profile_unsupported" as const };
     }
     return { runtime, client, reason: null };

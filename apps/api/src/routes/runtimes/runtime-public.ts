@@ -7,8 +7,8 @@ import type { RuntimeAdminMode, RuntimeProviderIncidentDto, RuntimePublicDto } f
 import { runtimeConnector, runtimeHermesUpdate, type ConnectorVersions } from "@openedbot/platform-config/connector-version";
 import { acceptedLinkOrigins, isRetiredLinkOrigin } from "@openedbot/runtime-link/application/link-pop";
 import { connectorLinkCommand, connectorLinkPublicOrigin } from "./runtime-enrollment-routes";
-import { type RuntimeExposureSummary } from "@openedbot/runtimes/sql/runtime-exposures";
-import { type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+import { type RuntimeExposureSummary } from "@openedbot/runtimes/application/runtime-exposures";
+import { type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 
 /** Le littéral `text[]` à écrire, ou `null` pour « ne pas toucher » (`coalesce` côté SQL). */
 export function hostFeatureLiteral(features: string[] | null): string | null {

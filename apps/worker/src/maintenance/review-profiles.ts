@@ -1,12 +1,13 @@
 import type { SQL } from "bun";
 import type { Db } from "@openedbot/platform-db";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
-import { withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
+import { withProfileNamesLock } from "@openedbot/roster/application/profile-import-guard";
 import { PROFILE_SERVE_WAIT } from "@openedbot/roster/application/profile-provisions";
 import { prepareReviewProfile } from "@openedbot/runtimes/application/review-profile";
 import { REVIEW_PROFILE } from "@openedbot/runtimes/domain/runtime-contract";
-import { claimReviewProfile, enqueueReviewProfiles, finishReviewProfile, type ReviewProfileJob } from "@openedbot/runtimes/sql/review-profiles";
+import { claimReviewProfile, enqueueReviewProfiles, finishReviewProfile, type ReviewProfileJob } from "@openedbot/runtimes/application/review-profile";
 import type { WorkerConfig } from "../config";
+import { logEvent } from "@openedbot/platform-observability";
 
 /**
  * PERM2-7a: one runtime per pass. The review profile of every active
@@ -47,8 +48,7 @@ export async function processReviewProfiles(
 function logOutcome(job: ReviewProfileJob, outcome: Awaited<ReturnType<typeof prepareReviewProfile>>, recorded: boolean, durationMs: number): void {
   // A proof that holds is not news; a change of state or a failure is.
   if (recorded && outcome.status === "proven" && job.status === "proven") return;
-  console.info(JSON.stringify({
-    event: recorded ? `review_profile.${outcome.status}` : "review_profile.stale",
+  logEvent(recorded ? `review_profile.${outcome.status}` : "review_profile.stale", {
     runtimeId: job.runtime_id,
     organizationId: job.organization_id,
     previous: job.status,
@@ -57,5 +57,5 @@ function logOutcome(job: ReviewProfileJob, outcome: Awaited<ReturnType<typeof pr
     ...(outcome.status === "failed" && outcome.transient && job.status === "proven" ? { proofKept: true } : {}),
     attempt: job.attempts,
     durationMs,
-  }));
+  });
 }

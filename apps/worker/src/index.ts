@@ -8,6 +8,7 @@ import { readQueuedRunsSignature } from "@openedbot/execution/application/queue"
 import { installSubscriptionPort } from "@openedbot/identity/application/subscription-port";
 import { installTenantDeletingListener } from "@openedbot/identity/application/tenant-deleting";
 import { installPermissionRuleSelector } from "@openedbot/execution/application/runner/permission-rule-sources";
+import { logEvent } from "@openedbot/platform-observability";
 
 const baseConfig = readWorkerConfig();
 const db = new SQL({
@@ -17,9 +18,9 @@ const db = new SQL({
   connectionTimeout: 10,
 });
 const pro = await loadWorkerPro(process.env, db, baseConfig, {
-  skipped: (skip) => console.warn(JSON.stringify({ event: "worker.pro_plugin_skipped", specifier: skip.specifier, reason: skip.reason })),
-  refused: (reason) => console.error(JSON.stringify({ event: "worker.pro_plugins_refused", reason })),
-  jobDisabled: (job) => console.info(JSON.stringify({ event: "worker.pro_job_disabled", job: job.name, reason: job.reason })),
+  skipped: (skip) => logEvent("worker.pro_plugin_skipped", { specifier: skip.specifier, reason: skip.reason }, "warn"),
+  refused: (reason) => logEvent("worker.pro_plugins_refused", { reason }, "error"),
+  jobDisabled: (job) => logEvent("worker.pro_job_disabled", { job: job.name, reason: job.reason }),
 });
 installTenantDeletingListener(pro.tenantDeleting);
 // Subscriptions are read through the port of the plug-in billing (step 8d);
@@ -28,7 +29,7 @@ installSubscriptionPort(pro.subscriptions);
 // PERM2 v2: without the plug-in `permissions` (or for an organization without
 // `permissions.v2`) the gates read the core rules, as in solo.
 installPermissionRuleSelector(pro.permissionRules, (error) =>
-  console.warn(JSON.stringify({ event: "worker.permission_rules_selector_failed", error: error instanceof Error ? error.message : String(error) })));
+  logEvent("worker.permission_rules_selector_failed", { error: error instanceof Error ? error.message : String(error) }, "warn"));
 // `billing.enforced` comes from the EntitlementSource, like the API's.
 const config = { ...baseConfig, billingEnforced: pro.billingEnforced };
 const worker = createWorkerService(db, config, {
@@ -41,19 +42,19 @@ const worker = createWorkerService(db, config, {
 });
 
 function stop(signal: string): void {
-  console.info(JSON.stringify({ event: "worker.stopping", signal }));
+  logEvent("worker.stopping", { signal });
   worker.stop(signal);
 }
 
 process.once("SIGINT", () => stop("SIGINT"));
 process.once("SIGTERM", () => stop("SIGTERM"));
 
-console.info(JSON.stringify({
-  event: "worker.started", workerId: config.workerId, environment: config.environment, bunVersion: Bun.version,
+logEvent("worker.started", {
+  workerId: config.workerId, environment: config.environment, bunVersion: Bun.version,
   mode: pro.plugins.length ? "pro" : "solo", plugins: pro.plugins.map((plugin) => plugin.manifest.id),
-}));
+});
 if (config.blob.driver === "file" && config.blob.fallbackReason) {
-  console.warn(JSON.stringify({ event: "worker.blob_fallback_file", root: config.blob.root, reason: config.blob.fallbackReason }));
+  logEvent("worker.blob_fallback_file", { root: config.blob.root, reason: config.blob.fallbackReason }, "warn");
 }
 await worker.run();
 // All tracked runs/jobs and database connections have finished. Explicit exit

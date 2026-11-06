@@ -24,7 +24,8 @@ export const botsTable = {
   decisionRequired: "Decision required",
   atRest: "Idle",
   colActivity: "Activity",
-  empty: "No bot : create one from the sidebar.",
+  empty: "No bot yet.",
+  create: "Create a bot",
 } as const;
 
 export const botContextMenu = {

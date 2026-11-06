@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { RELAY_CLOSE_UNAUTHORIZED } from "@openedbot/contracts-connector";
 import { withTenant } from "@openedbot/platform-db";
-import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/sql/model-selection-proofs";
+import { invalidateProvenRuntimeModels } from "@openedbot/runtimes/application/model-selection-proof";
 import { hashCredential, randomCredential } from "../../infrastructure/crypto";
 import { insertRuntimeLinkEvent, type LinkEventKind } from "@openedbot/runtime-link/application/broker";
 import type { AppVariables } from "../identity/auth";
@@ -11,7 +11,7 @@ import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-er
 import { logger } from "@openedbot/platform-observability";
 import { recordRuntimeHealthObservation } from "@openedbot/runtimes/application/runtime-health";
 import { mapHermesError, probeRuntimeWith } from "@openedbot/runtimes/application/runtime-probe";
-import { readRuntimeRowById } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById } from "@openedbot/runtimes/application/runtime-rows";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import type { RuntimeRouteContext } from "./runtime-routes";
 import { toIso } from "./runtime-public";

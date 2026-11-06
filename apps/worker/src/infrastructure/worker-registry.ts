@@ -1,5 +1,6 @@
 import type { SQL } from "bun";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
+import { releaseWorkerRunsOnShutdown } from "@openedbot/execution/application/worker-shutdown";
 
 export type WorkerRegistry = {
   recordHeartbeat(activeWork: number): Promise<void>;
@@ -34,25 +35,7 @@ export function createWorkerRegistry(db: SQL, workerId: string): WorkerRegistry 
   }
 
   async function releaseLeasesAndClose(): Promise<void> {
-    await db`
-      update runs set status = 'queued', lease_owner = null, lease_expires_at = null, updated_at = now()
-       where lease_owner = ${workerId} and status in ('starting','running','awaiting_approval')
-         and (external_state = 'not_started' or hermes_run_id is not null)
-    `;
-    await db`
-      with ambiguous as (
-        update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-          error_code = 'WORKER_SHUTDOWN_DURING_CREATE',
-          error_message = 'Arrêt du worker pendant une création Hermes; vérification manuelle requise.',
-          lease_owner = null, lease_expires_at = null, updated_at = now()
-         where lease_owner = ${workerId} and status in ('starting','running','awaiting_approval')
-           and hermes_run_id is null and external_state = 'creating'
-         returning organization_id, workflow_id
-      )
-      update workflows w set status = 'unknown', error_code = 'WORKER_SHUTDOWN_DURING_CREATE',
-        error_message = 'L’effet de la création Hermes est incertain.', updated_at = now()
-       from ambiguous a where w.organization_id = a.organization_id and w.id = a.workflow_id
-    `;
+    await releaseWorkerRunsOnShutdown(db, workerId);
     await db`delete from service_instances where id = ${workerId}`.catch(() => undefined);
     await db.close({ timeout: 5 });
   }

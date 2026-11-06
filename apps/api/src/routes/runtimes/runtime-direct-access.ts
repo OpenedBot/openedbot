@@ -4,6 +4,7 @@ import {
   normalizeHermesEndpoint,
   type HermesClientConfig,
 } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { ApiConfig } from "../../infrastructure/config";
 import {
   encryptSecret,
@@ -20,7 +21,7 @@ import {
   runtimeCapacity,
   type RuntimeProbeClient,
 } from "@openedbot/runtimes/application/runtime-probe";
-import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/sql/runtime-rows";
+import { readRuntimeRowById, type RuntimeRow } from "@openedbot/runtimes/application/runtime-rows";
 import {
   decryptEdgeAuth,
   decryptRuntimeToken,
@@ -78,7 +79,7 @@ export function insertRuntime(
 }
 
 export function defaultProbeClient(clientConfig: HermesClientConfig): RuntimeProbeClient {
-  return new HermesClient(clientConfig);
+  return runtimeAdminClient(clientConfig);
 }
 
 export type DirectRuntimeProbe = {

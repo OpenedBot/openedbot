@@ -3,7 +3,7 @@ import { request } from "./http";
 
 export const notificationsApi = {
   // TODO(notifications): plus utilisés par la console depuis le retrait du SW PWA ;
-  // à reprendre par openedbot-desktop (Electron) / APNs.
+  // à reprendre par les notifications de l'app de bureau / APNs.
   pushVapidPublicKey: () => request<PushVapidPublicKeyDto>("/api/push-subscriptions/vapid-public-key"),
   pushSubscriptions: () => request<PushSubscriptionListDto>("/api/push-subscriptions"),
   createPushSubscription: (input: CreatePushSubscriptionInput) =>

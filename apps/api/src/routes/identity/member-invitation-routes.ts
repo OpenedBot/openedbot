@@ -5,7 +5,7 @@ import {
   registerMemberInvitee,
   respondToMemberInvitation,
 } from "@openedbot/identity/application/member-invitation-consent";
-import { attachSessionOrganization, createWebSession } from "@openedbot/identity/sql/sessions";
+import { attachSessionOrganization, createWebSession } from "@openedbot/identity/application/sessions";
 import type { ApiConfig } from "../../infrastructure/config";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { rateLimiter } from "../../interfaces/http/rate-limit";

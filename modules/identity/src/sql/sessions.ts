@@ -69,8 +69,8 @@ async function insertNativeSession(
   const accessToken = randomCredential();
   const refreshToken = randomCredential();
   const accessTokenExpiresAt = new Date(Date.now() + ACCESS_TTL_MS);
-  // `family_id` regroupe les rotations d'une même connexion (coque
-  // openedbot-desktop) : une première ouverture en pose une, chaque rotation la reprend.
+  // `family_id` regroupe les rotations d'une même connexion (app de bureau) :
+  // une première ouverture en pose une, chaque rotation la reprend.
   const familyId = lineage?.familyId ?? crypto.randomUUID();
   const createdAt = lineage?.createdAt ?? new Date();
   // Même règle que `createWebSession` : sans organisation, la policy

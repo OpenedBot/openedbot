@@ -1,9 +1,10 @@
 import type { SQL, TransactionSQL } from "bun";
 import type { HermesBundleImportDto, HermesBundleImportInput, HermesBundleImportJobDto, HermesBundleImportJobListDto, HermesProfileImportEntry } from "@openedbot/contracts-api";
-import { ProfileImportError } from "../domain/errors";
-import { assertProfileNamesAvailable, lockProfileImports } from "./reservations";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 import { assertNoActiveProfileDelete } from "./delete-jobs";
-import type { HostProfileModelSelection } from "../application/model";
+import type { HostProfileModelSelection } from "@openedbot/roster/application/host-profile-model";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export const IMPORT_LEASE_SECONDS = 180;
 export type ImportJobRow = {
@@ -76,7 +77,7 @@ export async function enqueueProfileImport(
     await assertImportTenantAvailable(tx, org);
     const runtime = await tx<ImportRuntime[]>`select id, selected_provider, selected_model, link_features from runtimes where organization_id = ${org} and id = ${runtimeId} and is_active = true`;
     if (!runtime[0]) throw new ProfileImportError(409, "RUNTIME_REQUIRED", "Le runtime de cet import n’est plus actif.");
-    if (!runtime[0].link_features.includes("profile_management")) throw new ProfileImportError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
+    if (!runtime[0].link_features.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) throw new ProfileImportError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
     const sections = input.sectionId
       ? await tx<Array<{ id: string }>>`select id from sections where organization_id = ${org} and id = ${input.sectionId} limit 1`
       : await tx<Array<{ id: string }>>`select id from sections where organization_id = ${org} order by position asc limit 1`;

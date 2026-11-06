@@ -17,6 +17,7 @@ import { readSectionName, readSectionOrder, readSectionPatch, readSectionsOrder 
 import { readSectionId } from "@openedbot/roster/domain/section-id";
 import { readToolErrorCursor, readToolErrorLimit } from "@openedbot/roster/domain/tool-errors";
 import { createBot, deleteBot, listRoster, resolveBotDeps, updateBot, type BotRouteDeps } from "@openedbot/roster/application/bots";
+import { botRuns } from "@openedbot/execution/application/bot-runs";
 import {
   createBotProfile,
   readBotCapabilitiesView,
@@ -58,7 +59,7 @@ function canWriteCapabilities(role: string): boolean {
 
 export function botRoutes(db: Db, config: ApiConfig, routeDeps: BotRouteDeps = {}): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
-  const deps = resolveBotDeps(config, routeDeps);
+  const deps = resolveBotDeps(config, botRuns, routeDeps);
 
   routes.get("/", async (context) => {
     const auth = context.get("auth");
@@ -224,7 +225,7 @@ export function botRoutes(db: Db, config: ApiConfig, routeDeps: BotRouteDeps = {
   routes.post("/:botId/persona-drafts", async (context) => {
     const auth = context.get("auth");
     requireOperator(auth);
-    return context.json(await queuePersonaDraft(db, auth.organizationId, context.req.param("botId")), 202);
+    return context.json(await queuePersonaDraft(db, botRuns, auth.organizationId, context.req.param("botId")), 202);
   });
 
   routes.get("/:botId/persona-drafts/latest", async (context) => {

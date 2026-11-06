@@ -1,4 +1,4 @@
-import { memo, useState, type ComponentType, type ReactNode } from "react";
+import { memo, Suspense, useState, type ComponentType, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   RiCustomerService2Line,
@@ -26,8 +26,20 @@ import { OperatorBlob } from "../operator-blob";
 import { percentTone, useProviderLimits } from "../dashboard/provider-limits-panel";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import packageJson from "../../../package.json";
+import { DesktopUpdateMenuRow, DesktopUpdatePill } from "../desktop-update/entry";
 
 type IconType = ComponentType<{ className?: string }>;
+
+/** La pastille du pied de barre : la mise à jour de l'app de bureau. */
+const FooterPill = DesktopUpdatePill;
+
+/**
+ * La pastille de mise à jour de l'app Tauri, seule au pied de la barre quand
+ * le compte est ailleurs (dispositions « b » et « c ») ; rien sur le web.
+ */
+export function AccountUpdatePill() {
+  return FooterPill ? <div className="flex justify-end"><Suspense fallback={null}><FooterPill /></Suspense></div> : null;
+}
 
 /**
  * Une ligne du menu. Au niveau du module, pas dans `AccountMenu` : un
@@ -203,6 +215,7 @@ export const AccountMenu = memo(function AccountMenu({
             </div>
           </div>
           <div className="flex w-full flex-col gap-1">
+            {DesktopUpdateMenuRow ? <Suspense fallback={null}><DesktopUpdateMenuRow mobileDrawer={mobileDrawer !== null} onSelect={() => setOpen(false)} /></Suspense> : null}
             <UsageMenuItem mobileDrawer={mobileDrawer !== null} onSelect={() => run(() => openSettingsAt("/settings/models"))} />
             <MenuItem mobileDrawer={mobileDrawer !== null} icon={RiSettings3Line} label={t("navUser.settings")} onSelect={() => run(() => openSettings())} />
             {deskAvailable ? (
@@ -404,6 +417,8 @@ export const AccountMenu = memo(function AccountMenu({
           {panel}
         </BuiPopoverContent>
       </BuiPopover>
+      {/* App Tauri : la pastille « Mettre à jour », à côté du compte (Grok Bot). */}
+      {FooterPill ? <Suspense fallback={null}><FooterPill /></Suspense> : null}
       <button
         type="button"
         aria-label={t("navUser.settings")}

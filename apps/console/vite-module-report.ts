@@ -12,7 +12,7 @@ import type { Plugin } from "vite";
 const CORE_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 export type ModuleReport = {
-  chunks: { fileName: string; name: string; bytes: number; modules: string[] }[];
+  chunks: { fileName: string; name: string; bytes: number; modules: string[]; moduleBytes: Record<string, number> }[];
   assets: { fileName: string; bytes: number }[];
 };
 
@@ -35,6 +35,8 @@ export function moduleReport(path: string | undefined): Plugin {
             name: output.name,
             bytes: Buffer.byteLength(output.code),
             modules: Object.keys(output.modules).map(shortId).sort(),
+            // Rendered (minified, pre-gzip) bytes per module: what the bundle budget names when it fails.
+            moduleBytes: Object.fromEntries(Object.entries(output.modules).map(([id, info]) => [shortId(id), info.renderedLength])),
           });
         } else {
           report.assets.push({ fileName: output.fileName, bytes: typeof output.source === "string" ? Buffer.byteLength(output.source) : output.source.byteLength });

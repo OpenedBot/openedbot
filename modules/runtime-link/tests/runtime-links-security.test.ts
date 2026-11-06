@@ -168,7 +168,8 @@ describe("réconciliation des sessions Hermes", () => {
     const result = await reconcileRuntimeSessions(fakeDb(captured, { due, known: ["session-known"] }), { ...control, fetchImpl });
     expect(result).toEqual({ runtimes: 1, unattributed: 1 });
     expect(urls[0]).toBe("http://127.0.0.1:8790/internal/runtime-links/8f3b2c1d-1111-4222-8333-444455556666/proxy/hermes-setup/sessions-inventory");
-    expect(captured[0]!.sql).toContain("'sessions_inventory' = any(link_features)");
+    expect(captured[0]!.sql).toContain("? = any(link_features)");
+    expect(captured[0]!.values).toContain("sessions_inventory");
     const inserted = captured.filter((entry) => entry.sql.includes("insert into runtime_link_events"));
     expect(inserted).toHaveLength(1);
     expect(inserted[0]!.sql).toContain("'unattributed_session'");
@@ -192,7 +193,7 @@ describe("réconciliation des sessions Hermes", () => {
     const next = { id: "9a4c3d2e-2222-4333-8444-555566667777", organizationId: "org-1" };
     await reconcileRuntimeSessions(fakeDb(captured, { due: [...due, next] }), { ...control, fetchImpl: async () => new Response("", { status: 503 }) });
     expect(captured[0]!.sql).toContain("order by link_sessions_reconciled_at asc nulls first, id");
-    expect(captured[0]!.values).toEqual([SESSION_RECONCILIATION_BATCH]);
+    expect(captured[0]!.values).toEqual(["sessions_inventory", SESSION_RECONCILIATION_BATCH]);
     const stamps = captured.filter((entry) => entry.sql.includes("set link_sessions_reconciled_at = now()"));
     expect(stamps.map((entry) => entry.values[0])).toEqual([due[0]!.id, next.id]);
   });

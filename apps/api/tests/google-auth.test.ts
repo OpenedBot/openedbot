@@ -10,7 +10,7 @@ import type {
   NativeGoogleCompletion,
   NativeOptions,
   OAuthAttemptStore,
-} from "@openedbot/identity/sql/oauth-attempt-store";
+} from "@openedbot/identity/application/oauth-attempt-store";
 
 type Record = {
   attemptId: string;

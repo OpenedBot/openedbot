@@ -24,7 +24,7 @@ describe("persistResolvedRunModel", () => {
     );
 
     expect(wrote).toBe(true);
-    expect(statements[0]).toContain("set model =");
+    expect(statements[0]).toContain("model =");
     expect(statements[0]).toContain("external_state = 'creating'");
     expect(bindings[0]).toContain("gpt-5.6-luna");
     expect(bindings[0]).toContain("run-1");

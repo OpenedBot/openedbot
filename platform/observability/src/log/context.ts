@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Logger } from "pino";
 import { channelOf } from "./channels";
+import { currentTrace } from "../trace-context";
 
 /**
  * Pile de requête, équivalent du RequestStack Symfony. La WeakMap sur
@@ -49,8 +50,13 @@ export function runWithLogger<T>(log: Logger, fn: () => T): T {
  * sans les écrire dans l'objet passé à `logger.info`. Les spies des tests
  * voient donc toujours exactement les champs du call site.
  *
- * N'écrase jamais un `requestId` / `channel` déjà posé par l'appelant
- * (`onError` passe `requestId` à la main).
+ * Dans un contexte de trace (`runWithTrace`, ouvert par le worker autour d'un
+ * run), il colle aussi `traceId` et `spanId` : chaque étape du run se retrouve
+ * par son trace-id. Hors d'un tel contexte (toutes les lignes de l'API),
+ * rien ne change.
+ *
+ * N'écrase jamais un `requestId` / `channel` / `traceId` / `spanId` déjà posé
+ * par l'appelant (`onError` passe `requestId` à la main).
  */
 export function logMixin(mergeObject: object, _level: number, _logger: Logger): object {
   const requestId = requestAls.getStore()?.requestId;
@@ -59,5 +65,10 @@ export function logMixin(mergeObject: object, _level: number, _logger: Logger): 
   const extra: Record<string, unknown> = {};
   if (requestId && !("requestId" in mergeObject)) extra.requestId = requestId;
   if (event && !("channel" in mergeObject)) extra.channel = channelOf(event);
+  const trace = currentTrace();
+  if (trace) {
+    if (!("traceId" in mergeObject)) extra.traceId = trace.traceId;
+    if (!("spanId" in mergeObject)) extra.spanId = trace.spanId;
+  }
   return extra;
 }

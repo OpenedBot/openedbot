@@ -10,10 +10,12 @@ describe("worker registry shutdown", () => {
       return [];
     }) as unknown as SQL;
     (query as unknown as { close(options: { timeout: number }): Promise<void> }).close = async () => undefined;
+    (query as unknown as { begin(work: (tx: SQL) => Promise<unknown>): Promise<unknown> }).begin = (work) => work(query);
 
     await createWorkerRegistry(query, "worker-test").releaseLeasesAndClose();
 
+    expect(statements[0]).toContain("lease_owner = ?");
     expect(statements[0]).toContain("status in ('starting','running','awaiting_approval')");
-    expect(statements[1]).toContain("status in ('starting','running','awaiting_approval')");
+    expect(statements[0]).toContain("for update");
   });
 });

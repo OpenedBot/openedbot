@@ -1,6 +1,7 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig, type HermesMcpOauthSession } from "@openedbot/hermes";
+import type { HermesClientConfig, HermesMcpOauthSession } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import type { RuntimeMcpOauthDto } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import { requestOrigin, requireOperator } from "../identity/auth";
@@ -10,7 +11,6 @@ import { HttpError } from "../../interfaces/http/http-error";
 import { connectorOpenedbotOrigin } from "./runtime-enrollment-routes";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import {
-  FEATURE_MCP_OAUTH,
   type InventoryClient,
   MAX_OAUTH_CALLBACK,
   MCP_NAME_PATTERN,
@@ -24,6 +24,7 @@ import {
   postgresSnapshotStore,
   type SnapshotStore,
 } from "@openedbot/runtimes/application/runtime-read-snapshots";
+import { RELAY_FEATURE_MCP_OAUTH } from "@openedbot/contracts-connector/features";
 
 /** L’autorisation OAuth d’un serveur MCP : démarrage, suivi et annulation. */
 export function runtimeMcpOauthRoutes(ctx: IntegrationRouteContext): Hono<{ Variables: AppVariables }> {
@@ -48,7 +49,7 @@ export function runtimeMcpOauthRoutes(ctx: IntegrationRouteContext): Hono<{ Vari
     if (!MCP_NAME_PATTERN.test(name)) {
       throw new HttpError(400, "NAME_INVALID", "Ce nom de serveur n’est pas valide.");
     }
-    const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, FEATURE_MCP_OAUTH);
+    const { client, runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, RELAY_FEATURE_MCP_OAUTH);
     const origin = connectorOpenedbotOrigin(config, requestOrigin(context) ?? undefined);
     const redirectUri = `${origin}/api/mcp-oauth/callback/${encodeURIComponent(auth.organizationId)}/${encodeURIComponent(runtimeId)}/${encodeURIComponent(name)}`;
     let session: HermesMcpOauthSession;
@@ -70,7 +71,7 @@ export function runtimeMcpOauthRoutes(ctx: IntegrationRouteContext): Hono<{ Vari
     if (!MCP_NAME_PATTERN.test(name) || !SESSION_ID_PATTERN.test(sessionId)) {
       throw new HttpError(404, "OAUTH_SESSION_NOT_FOUND", "Cette autorisation n’existe plus.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_MCP_OAUTH);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_OAUTH);
     try {
       return context.json<RuntimeMcpOauthDto>(publicMcpOauth(await client.mcpOauthPoll(name, sessionId)));
     } catch (error) {
@@ -88,7 +89,7 @@ export function runtimeMcpOauthRoutes(ctx: IntegrationRouteContext): Hono<{ Vari
     if (!MCP_NAME_PATTERN.test(name) || !SESSION_ID_PATTERN.test(sessionId)) {
       throw new HttpError(404, "OAUTH_SESSION_NOT_FOUND", "Cette autorisation n’existe plus.");
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_MCP_OAUTH);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_MCP_OAUTH);
     try {
       await client.mcpOauthCancel(name, sessionId);
     } catch (error) {
@@ -126,7 +127,7 @@ export function mcpOauthCallbackRoutes(
 ): Hono {
   const routes = new Hono();
   const readRuntime = dependencies.readRuntime ?? readRuntimeSecret;
-  const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
+  const clientFactory = dependencies.clientFactory ?? runtimeAdminClient;
   const snapshots = dependencies.snapshotStore ?? postgresSnapshotStore(db);
 
   routes.get("/callback/:organizationId/:runtimeId/:name", async (context) => {

@@ -328,7 +328,7 @@ describe("plug-in context", () => {
 describe("onOrganizationCreated, wired like apps/api/src/index.ts", () => {
   test("a plug-in hook that throws is logged; the organization is still created and the other hooks still run", async () => {
     const { installOrganizationCreatedListener } = await import("@openedbot/identity/application/organization-created");
-    const { createOrganization } = await import("@openedbot/identity/sql/accounts");
+    const { createOrganization } = await import("@openedbot/identity/application/accounts");
     const order: string[] = [];
     const warnings: unknown[] = [];
     const throwing: ProPlugin = { ...fixturePlugin(), hooks: { onOrganizationCreated: async () => { order.push("throwing"); throw new Error("pro down"); } } };
@@ -374,7 +374,7 @@ describe("onOrganizationCreating (step 8d), wired like apps/api/src/index.ts", (
 
   test("a throwing hook rolls the creation back through identity (nothing is swallowed here)", async () => {
     const { installOrganizationCreatingListener, OrganizationCreatingError } = await import("@openedbot/identity/application/organization-creating");
-    const { createOrganization } = await import("@openedbot/identity/sql/accounts");
+    const { createOrganization } = await import("@openedbot/identity/application/accounts");
     const order: string[] = [];
     installOrganizationCreatingListener(organizationCreatingHookOf([billing(async () => { throw new Error("stripe down"); })]));
     try {

@@ -89,8 +89,9 @@ func (s *darwinService) Restart(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Unlike systemctl stop, bootout unregisters the LaunchAgent. Rekey stops
-	// before writing the key, so that path must bootstrap the job again.
+	// Unlike systemctl stop, bootout unregisters the LaunchAgent. A command
+	// that stops the connector before rewriting its state must therefore
+	// bootstrap the job again.
 	if !status.Registered {
 		return s.client.Start(ctx)
 	}

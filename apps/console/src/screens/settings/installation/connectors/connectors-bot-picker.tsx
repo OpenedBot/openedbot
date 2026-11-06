@@ -19,6 +19,7 @@ import {
   type McpConnectBlocker,
   type McpDisconnectBlocker,
 } from "./connectors-catalog-model";
+import { RELAY_FEATURE_GATEWAY_RESTART } from "@openedbot/contracts-connector/features";
 
 type Target = { entry: McpConnectorEntry; bot: BotDto };
 
@@ -79,7 +80,7 @@ export function useConnectorAdd() {
     },
     disconnectBlocker,
     connected,
-    gatewayRestart: features.includes("gateway_restart"),
+    gatewayRestart: features.includes(RELAY_FEATURE_GATEWAY_RESTART),
     /** L'hôte recharge MCP tout seul : aucun redémarrage à demander après un geste MCP. */
     liveReload: hasMcpLiveReload(features),
     elements: (

@@ -2,7 +2,7 @@ import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { permissionModeRaiseRefused, type BotPermissionMode, type PermissionCeiling } from "@openedbot/contracts-api";
-import { readOrganizationPermissionPolicy } from "@openedbot/identity/sql/permission-policy";
+import { readOrganizationPermissionPolicy } from "@openedbot/identity/application/permission-policy";
 
 /** The organization's ceiling (PERM2-8), `null` when none is set. */
 export async function readPermissionCeiling(db: Db, organizationId: string): Promise<PermissionCeiling | null> {

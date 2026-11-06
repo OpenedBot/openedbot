@@ -7,7 +7,7 @@ import type { TailscaleApiClient } from "@openedbot/platform-integrations/tailsc
 import type { ApiConfig } from "../src/infrastructure/config";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
-import type { RuntimeExposureRow } from "@openedbot/runtimes/sql/runtime-exposures";
+import type { RuntimeExposureRow } from "@openedbot/runtimes/application/runtime-exposures";
 import type { RuntimeRow } from "../src/routes/runtimes/runtime-routes";
 import { EXPOSURE_CHECK_CACHE_MS, reachabilityVerdict, runtimeExposureRoutes } from "../src/routes/runtimes/runtime-exposure-routes";
 

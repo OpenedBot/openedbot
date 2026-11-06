@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import type { Db } from "@openedbot/platform-db";
 import type { CreatedOrganizationDto, OrganizationKind } from "@openedbot/contracts-api";
 import { listAccountWorkspaces } from "@openedbot/identity/application/workspaces";
-import { createOrganization, type ApiEnvironment } from "@openedbot/identity/sql/accounts";
-import { attachSessionOrganization } from "@openedbot/identity/sql/sessions";
+import { createOrganization, type ApiEnvironment } from "@openedbot/identity/application/accounts";
+import { attachSessionOrganization } from "@openedbot/identity/application/sessions";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import {
   fleetWorkspacesEnabled,

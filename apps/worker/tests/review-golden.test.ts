@@ -27,6 +27,7 @@ import { reviewGate, type ReviewDeps, type ReviewJob } from "@openedbot/executio
 import { installPermissionRuleSelector } from "@openedbot/execution/application/runner/permission-rule-sources";
 import { permissionRuleSelector } from "../src/application/pro-plugins";
 import { differingCases, readGoldenFile, writeGoldenFile } from "./golden-store";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
 
 const GOLDEN_PATH = join(import.meta.dir, "fixtures/review-golden.json");
 const ORG = "org-client";
@@ -208,15 +209,9 @@ async function runCase(preflight: Preflight, rules: Pick<DbState, "rulesMode" | 
   const now = { at: CREATED_AT + (preflight.ageMs ?? 1_000) };
   const writes: unknown[] = [];
   const calls: unknown[] = [];
-  const logs: unknown[] = [];
   const inputs: string[] = [];
-  const info = console.info;
-  console.info = (line: unknown) => { logs.push(typeof line === "string" ? JSON.parse(line) : line); };
-  try {
-    await reviewGate(fakeDb(state, writes), job as ReviewJob, fakeDeps(script, now, calls, inputs));
-  } finally {
-    console.info = info;
-  }
+  const { events: logs } = await captureLogEvents(() =>
+    reviewGate(fakeDb(state, writes), job as ReviewJob, fakeDeps(script, now, calls, inputs)));
   return [inputs.length > 0 ? inputs.join("\n") : "(no model call)", JSON.stringify(calls), JSON.stringify(writes), JSON.stringify(logs)];
 }
 

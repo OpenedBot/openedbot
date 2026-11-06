@@ -6,8 +6,9 @@ import type {
 } from "@openedbot/contracts-api";
 import { isUniqueViolation } from "@openedbot/platform-db";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
-import { ProfileDeleteError, ProfileImportError } from "../domain/errors";
-import { lockProfileImports } from "./reservations";
+import { ProfileDeleteError, ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { lockProfileImports } from "@openedbot/roster/application/profile-reservations";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export const DELETE_LEASE_SECONDS = 180;
 
@@ -85,7 +86,7 @@ export async function enqueueProfileDelete(
       select id, link_features from runtimes where organization_id = ${org} and id = ${runtimeId} and is_active = true
     `;
     if (!runtime[0]) throw new ProfileDeleteError(409, "RUNTIME_REQUIRED", "Le runtime de cette suppression n’est plus actif.");
-    if (!runtime[0].link_features.includes("profile_management")) {
+    if (!runtime[0].link_features.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       throw new ProfileDeleteError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
     }
     const id = crypto.randomUUID();

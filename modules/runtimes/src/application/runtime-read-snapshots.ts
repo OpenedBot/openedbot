@@ -1,5 +1,5 @@
 import { logger } from "@openedbot/platform-observability";
-import { postgresSnapshotStore } from "@openedbot/runtimes/sql/runtime-read-snapshots";
+import { postgresSnapshotStore } from "../sql/runtime-read-snapshots";
 
 export type RuntimeReadKind = "mcp" | "models" | "profiles" | "integrations";
 /** Under this age a snapshot answers without any host read. */

@@ -28,7 +28,14 @@
 @keyframes grok-menu-in { 0% { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes shimmer-text-sweep { 0% { background-position: 200% 50%, 0 0; } to { background-position: -200% 50%, 0 0; } }
 
-.grok-w { animation: grok-blur-in 0.2s var(--grok-ease) both; }
+/*
+ * `backwards`, not the template's `both`: the last keyframe IS the word's own
+ * style (opaque, no blur), so holding it changes no pixel, but a held
+ * animation stays in effect for good. One per streamed word, they piled up
+ * (1 200 at the end of a 9 000-character answer, D1c) and every frame
+ * restyled all of them.
+ */
+.grok-w { animation: grok-blur-in 0.2s var(--grok-ease) backwards; }
 .grok-feed-in { animation: grok-feed-in 0.45s var(--grok-ease) both; transform-origin: center top; }
 .grok-feed-out { animation: grok-feed-out 0.4s var(--grok-ease) both; transform-origin: center top; }
 .grok-enter { animation: grok-enter 0.2s var(--grok-ease) both; }

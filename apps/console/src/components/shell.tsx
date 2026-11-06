@@ -1,10 +1,13 @@
-import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Suspense, useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "@tanstack/react-router";
 import { cn, SidebarProvider, Toaster, TooltipProvider, useIsMobile } from "@openedbot/browser-ui-kit";
 import { isMobileShellPath } from "../lib/shell/mobile-navigation";
 import { isIosDevice, isStandaloneDisplay } from "../lib/platform/pwa-display";
 import { useVisualViewportInset } from "../lib/platform/use-visual-viewport-height";
+import { ClientUpdateGate } from "./client-update-required";
+import { DesktopUpdateLayer } from "./desktop-update/entry";
+import { DesktopNotchOnboarding } from "./desktop-notch/entry";
 
 /**
  * Les providers de la coque, et rien d'autre.
@@ -101,10 +104,17 @@ export function Shell({ children }: { children: ReactNode }) {
           } as CSSProperties
         }
       >
-        {children}
-        {/* Partout en bas à droite, réglages compris : ce sont désormais une
-            page du cadre, plus une modale centrée sous laquelle se poser. */}
-        <Toaster position="bottom-right" />
+        {/* App Tauri seulement (`null` sur le web) : les runs en cours pour la
+            coque, le menu de l'app et le dialogue de redémarrage. */}
+        {DesktopUpdateLayer ? <Suspense fallback={null}><DesktopUpdateLayer /></Suspense> : null}
+        {/* App Tauri sur Mac seulement (`null` sur le web) : le choix de l'encoche à la première connexion. */}
+        {DesktopNotchOnboarding ? <Suspense fallback={null}><DesktopNotchOnboarding /></Suspense> : null}
+        <ClientUpdateGate>
+          {children}
+          {/* Partout en bas à droite, réglages compris : ce sont désormais une
+              page du cadre, plus une modale centrée sous laquelle se poser. */}
+          <Toaster position="bottom-right" />
+        </ClientUpdateGate>
       </SidebarProvider>
     </TooltipProvider>
   );

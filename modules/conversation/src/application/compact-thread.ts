@@ -13,7 +13,7 @@ import {
   type HistoryMessage,
   type ThreadCompaction,
 } from "../domain/thread-compaction";
-import { withTenant } from "@openedbot/platform-db";
+import { withTenant, type TransactionDb } from "@openedbot/platform-db";
 
 const COMPACT_POLL_MS = 400;
 const COMPACT_DEADLINE_MS = 60_000;
@@ -46,13 +46,28 @@ export async function readThreadCompaction(
   };
 }
 
+/**
+ * The watermark only moves forward: a summarizer that finishes late (a run's
+ * own compaction racing the on-demand one) never replaces a summary that
+ * already covers more of the thread.
+ */
 export async function persistThreadCompaction(
   db: SQL,
   organizationId: string,
   threadId: string,
   compaction: ThreadCompaction,
 ): Promise<void> {
-  await withTenant(db, organizationId, (tx) => tx`
+  await withTenant(db, organizationId, (tx) => persistThreadCompactionTx(tx, organizationId, threadId, compaction));
+}
+
+/** The same write inside the caller's transaction (under its tenant), e.g. behind a lease fence. */
+export async function persistThreadCompactionTx(
+  tx: TransactionDb,
+  organizationId: string,
+  threadId: string,
+  compaction: ThreadCompaction,
+): Promise<void> {
+  await tx`
     insert into thread_compactions (
       organization_id, thread_id, summary, compacted_through_sequence, source_message_count
     ) values (
@@ -64,8 +79,15 @@ export async function persistThreadCompaction(
       compacted_through_sequence = excluded.compacted_through_sequence,
       source_message_count = excluded.source_message_count,
       updated_at = now()
-  `);
+    where thread_compactions.compacted_through_sequence <= excluded.compacted_through_sequence
+  `;
 }
+
+/**
+ * Writes a summary for the caller; false when it refused (its fence was lost)
+ * and nothing was written. Defaults to `persistThreadCompaction`.
+ */
+export type PersistCompaction = (compaction: ThreadCompaction) => Promise<boolean>;
 
 /**
  * Messages OLD à plier : après le watermark, avant KEEP. Le plus vieux
@@ -117,6 +139,9 @@ export async function runThreadCompaction(
     messages: readonly HistoryMessage[];
     /** Consignes du résumeur ; DM par défaut, `buildRoomCompactionInstructions` pour un salon. */
     instructions?: string;
+    persist?: PersistCompaction;
+    /** Told the Hermes run of the summary once created (a command stops it on cancellation). */
+    onRun?: (hermesRunId: string) => void | Promise<void>;
   },
   signal: AbortSignal,
 ): Promise<ThreadCompaction | null> {
@@ -141,6 +166,7 @@ export async function runThreadCompaction(
       idempotencyKey: `compact:${context.id}:${last.sequence}`,
       signal,
     });
+    await input.onRun?.(hermesRunId);
     const output = await waitForCompactOutput(client, hermesRunId, signal);
     const summary = output ? normalizeCompactionSummary(output) : null;
     if (!summary) return null;
@@ -149,7 +175,11 @@ export async function runThreadCompaction(
       compactedThroughSequence: last.sequence,
       sourceMessageCount: input.messages.length,
     };
-    await persistThreadCompaction(db, context.organizationId, context.threadId, compaction);
+    if (input.persist) {
+      if (!(await input.persist(compaction))) return null;
+    } else {
+      await persistThreadCompaction(db, context.organizationId, context.threadId, compaction);
+    }
     return compaction;
   } catch {
     return null;
@@ -175,7 +205,17 @@ export function roomSpeakerLabel(
     : `member ${line.authorName}`;
 }
 
-type RoomCompactContext = { organizationId: string; threadId: string; runId: string | null };
+type RoomCompactContext = {
+  organizationId: string;
+  threadId: string;
+  runId: string | null;
+  /**
+   * Keys the summarizer run on Hermes (`compact:<id>:<last sequence>`) when
+   * there is no run: a durable command passes its own id, so its retry after
+   * a crash reuses the Hermes run it already created for the same messages.
+   */
+  idempotencyId?: string;
+};
 
 /**
  * Messages attribués du salon, du plus ancien au plus récent, strictement
@@ -242,7 +282,13 @@ export async function compactRoomThread(
     reasoningEffort: string | null;
     operatorName: string | null;
   },
-  input: { previousSummary: string; watermark: number; keepFirstSequence: number | null },
+  input: {
+    previousSummary: string;
+    watermark: number;
+    keepFirstSequence: number | null;
+    persist?: PersistCompaction;
+    onRun?: (hermesRunId: string) => void | Promise<void>;
+  },
   signal: AbortSignal,
 ): Promise<ThreadCompaction | null> {
   const loaded = await loadRoomMessages(db, context, context.operatorName, {
@@ -256,12 +302,18 @@ export async function compactRoomThread(
     {
       organizationId: context.organizationId,
       threadId: context.threadId,
-      id: context.runId ?? crypto.randomUUID(),
+      id: context.runId ?? context.idempotencyId ?? crypto.randomUUID(),
       model: context.model,
       provider: context.provider,
       reasoningEffort: context.reasoningEffort,
     },
-    { previousSummary: input.previousSummary, messages, instructions: buildRoomCompactionInstructions() },
+    {
+      previousSummary: input.previousSummary,
+      messages,
+      instructions: buildRoomCompactionInstructions(),
+      ...(input.persist ? { persist: input.persist } : {}),
+      ...(input.onRun ? { onRun: input.onRun } : {}),
+    },
     signal,
   );
 }
@@ -278,7 +330,8 @@ export type CompactNowResult = {
 };
 
 /**
- * Compacte un salon à la demande (DEV-332, `POST /api/threads/:threadId/compact`),
+ * Compacte un salon à la demande (DEV-332, `POST /api/threads/:threadId/compact`,
+ * exécuté par le worker comme commande durable depuis S3),
  * sans attendre le dépassement de budget : tout sauf la queue récente (KEEP,
  * même ratio que l'automatique) rejoint le résumé commun, prolongé s'il existe.
  *
@@ -298,6 +351,12 @@ export async function compactThreadNow(
     provider: string | null;
     reasoningEffort: string | null;
     operatorName?: string | null;
+    /** See `RoomCompactContext.idempotencyId`. */
+    idempotencyId?: string;
+    /** Writes each pass's summary (a durable command fences it with its lease). */
+    persist?: PersistCompaction;
+    /** See `runThreadCompaction`. */
+    onRun?: (hermesRunId: string) => void | Promise<void>;
   },
   signal: AbortSignal,
 ): Promise<CompactNowResult> {
@@ -312,7 +371,12 @@ export async function compactThreadNow(
      where organization_id = ${input.organizationId} and id = ${input.threadId}
   `);
   if (!groups[0]?.groupId) return unchanged;
-  const context = { organizationId: input.organizationId, threadId: input.threadId, runId: null };
+  const context: RoomCompactContext = {
+    organizationId: input.organizationId,
+    threadId: input.threadId,
+    runId: null,
+    ...(input.idempotencyId ? { idempotencyId: input.idempotencyId } : {}),
+  };
   const operatorName = input.operatorName ?? null;
   let watermark = compaction?.compactedThroughSequence ?? -1;
   let summary = compaction?.summary ?? "";
@@ -331,7 +395,13 @@ export async function compactThreadNow(
       db,
       client,
       { ...context, model: input.model, provider: input.provider, reasoningEffort: input.reasoningEffort, operatorName },
-      { previousSummary: summary, watermark, keepFirstSequence: keepFirst },
+      {
+        previousSummary: summary,
+        watermark,
+        keepFirstSequence: keepFirst,
+        ...(input.persist ? { persist: input.persist } : {}),
+        ...(input.onRun ? { onRun: input.onRun } : {}),
+      },
       signal,
     );
     if (!written) break;

@@ -1,17 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_BOT_TOOLSETS, FORBIDDEN_TOOLSETS } from "@openedbot/runtimes/domain/runtime-contract";
-import { PROFILE_CAPABILITIES_FEATURE } from "../src/domain/bot-capabilities";
 import {
   BASELINE_ENABLED_TOOLSETS,
   BASELINE_GATE_PROOF_MAX_AGE_MS,
   BASELINE_REQUIRED_FEATURES,
   CAPABILITY_BASELINE_VERSION,
-  PROFILE_BUNDLED_SKILLS_FEATURE,
   baselineEnabledToolsets,
   baselineGate,
   baselineToolsetPlan,
   baselineToolsetWrites,
 } from "../src/domain/capability-baseline";
+import { RELAY_FEATURE_PROFILE_BUNDLED_SKILLS, RELAY_FEATURE_PROFILE_CAPABILITIES } from "@openedbot/contracts-connector/features";
 
 /** Every name the tests use, plus the forbidden ones: what a full host accepts to write. */
 const SETTABLE = new Set([
@@ -25,8 +24,8 @@ describe("socle de capacités d'un bot léger", () => {
     // Version 2 (operator, 2026-10-25): bots stamped at 1 get the default tools.
     expect(CAPABILITY_BASELINE_VERSION).toBe(2);
     expect([...BASELINE_ENABLED_TOOLSETS]).toEqual(["web", "terminal", "skills"]);
-    expect(BASELINE_REQUIRED_FEATURES).toEqual([PROFILE_CAPABILITIES_FEATURE, PROFILE_BUNDLED_SKILLS_FEATURE]);
-    expect(PROFILE_BUNDLED_SKILLS_FEATURE).toBe("profile_bundled_skills");
+    expect(BASELINE_REQUIRED_FEATURES).toEqual([RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_BUNDLED_SKILLS]);
+    expect(RELAY_FEATURE_PROFILE_BUNDLED_SKILLS).toBe("profile_bundled_skills");
   });
 
   test("un profil déjà au socle ne reçoit aucune écriture", () => {

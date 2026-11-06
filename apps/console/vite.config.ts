@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import { configureSseProxy } from "./vite-api-proxy";
 import { buildId } from "./vite-build-id";
 import { contentSecurityPolicy } from "./vite-csp";
+import { localePreload } from "./vite-locale-preload";
 import { CONSOLE_HOST_DIR, CONSOLE_HOST_PREFIX, proConsole, proConsoleEntries } from "./vite-pro-console";
 import { moduleReport } from "./vite-module-report";
 import react from "@vitejs/plugin-react";
@@ -44,6 +45,9 @@ export default defineConfig(({ command, mode, isPreview }) => {
   plugins: [
     react(),
     tailwindcss(),
+    // Au build : le dictionnaire de la langue active part avec l'entrée
+    // (`vite-locale-preload.ts`). Avant la CSP, dont l'empreinte couvre son script.
+    localePreload(),
     // Au build : la CSP en tête de index.html (`vite-csp.ts`).
     contentSecurityPolicy(),
     // The pro screens (agency, billing, permission rules): only what
@@ -90,14 +94,13 @@ export default defineConfig(({ command, mode, isPreview }) => {
     emptyOutDir: true,
     rolldownOptions: {
       output: {
-        // KaTeX has no app-state dependency. Its static import and precache
-        // remain intact while the renderer no longer swells the entry chunk.
-        // Rolldown has no `onlyExplicitManualChunks`: a `codeSplitting` group
-        // only captures the listed modules and leaves the rest untouched.
-        // Same for the BoardUI tree view of tool activity (7cd29326): motion
-        // and react-aria took the entry chunk from 3.07 to 3.37 MB, past the
-        // per-file precache ceiling below. Their own chunk keeps the static
-        // import, so the thread renders exactly as before.
+        // KaTeX has no app-state dependency: its own chunk, loaded with the
+        // thread's markdown (`thread-markdown.tsx` imports the renderer and its
+        // stylesheet), never with the first load. Rolldown has no
+        // `onlyExplicitManualChunks`: a `codeSplitting` group only captures the
+        // listed modules and leaves the rest untouched. Same for the BoardUI
+        // tree view of tool activity (7cd29326): motion and react-aria get
+        // their own chunk, and the thread renders exactly as before.
         codeSplitting: {
           groups: [
             { name: "math-renderer", test: /[\\/]node_modules[\\/]katex[\\/]/ },
@@ -105,6 +108,15 @@ export default defineConfig(({ command, mode, isPreview }) => {
               name: "tree-view",
               test: /[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion|react-aria-components|react-aria|@react-aria|@react-stately|@react-types|@internationalized)[\\/]/,
             },
+            // Everything the first load imports from node_modules and from the
+            // UI kit, in one chunk each. Split per module (the UI kit is free of
+            // side effects), the first load was ~80 files: on HTTP/1.1 its
+            // six connections turned that into a waterfall (ADR 0001, D1b).
+            // The groups only take `$initial` modules, so nothing lazy joins
+            // the first load. Declared after the KaTeX and tree-view groups:
+            // a module goes to the first group that matches.
+            { name: "boot-vendor", test: /[\\/]node_modules[\\/]/, tags: ["$initial"] },
+            { name: "boot-ui-kit", test: /[\\/]browser[\\/]ui-kit[\\/]/, tags: ["$initial"] },
           ],
         },
       },

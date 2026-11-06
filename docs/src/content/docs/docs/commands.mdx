@@ -53,7 +53,7 @@ never require root.
 | `--ticket-file F` | `0600` file holding the ticket; by default stdin, or a prompt without echo. |
 | `--insecure-openedbot` | Also accepts an `http://` origin **on the loopback** (development, behind a reverse SSH tunnel); any other `http://` origin is still refused. |
 | `--name <name>` | Named instance (`^[a-z][a-z0-9-]{0,31}$`): its own link, its own device key and its `hermes-connector@<name>.service` unit, next to the default link. This is what lets one host serve a prod and a dev at the same time. See [Named instances](#named-instances). |
-| `--rekey` | Regenerates the device key of an already linked runtime, without a ticket; the new public key is presented on a session. |
+| `--rekey` | Retired: openedbot no longer replaces a registered device key. It refuses and changes nothing; to give a host a new key, enroll it again (see [Operations](/docs/operations)). |
 
 ## `up` options
 
@@ -136,5 +136,4 @@ and the operator socket.
 was: it does not refuse another origin. Before reading the ticket, it reports
 the origin it is leaving and the runtime that openedbot keeps although the
 host will no longer call it back. To keep both links, create the second one
-with `--name dev`. `status` lists every instance; `link --rekey` and `unlink`
-take the same `--name`.
+with `--name dev`. `status` lists every instance; `unlink` takes the same `--name`.

@@ -252,8 +252,6 @@ export async function hostSetProfileToolset(ctx: HermesClientContext, profile: s
   return parseProfileToolsetStateResponse(await ctx.providerJson(response));
 }
 
-/** `POST /hermes-setup/profiles/{slug}/toolsets`, annoncée par l'hôte sous ce nom. */
-export const PROFILE_TOOLSETS_BATCH_FEATURE = "profile_toolsets_batch";
 /** Twin of `maxProfileToolsetsBatch` (edge-setup/internal/operator/profile_toolsets_batch.go). */
 export const PROFILE_TOOLSETS_BATCH_MAX = 32;
 

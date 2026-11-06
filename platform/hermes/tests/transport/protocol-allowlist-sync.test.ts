@@ -1,36 +1,35 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { RELAY_ALLOWLIST, type RelayRoute } from "@openedbot/contracts-connector";
-import { RELAY_ALLOWLIST as PROTOCOL_ALLOWLIST } from "../../../../protocol/connector/src/relay-allowlist";
+import { readdirSync, readFileSync } from "node:fs";
+import * as contracts from "@openedbot/contracts-connector";
+import * as protocol from "../../../../protocol/connector/src/index";
 
 /**
- * La référence publiée (`protocol/connector`) est une copie de
- * `contracts/connector` et du manifeste d'edge-setup, rafraîchie par
- * `protocol/scripts/sync-from-siblings.sh`. Une route ajoutée d'un côté
- * seulement fait refuser par un connecteur tiers ce que le SDK courant
- * demande : ce test échoue tant que les copies divergent.
+ * La référence publiée (`protocol/connector`) fait foi ; `contracts/connector`
+ * la réexporte sans copie. Ce test échoue si une copie réapparaît (un fichier
+ * de code dans `contracts/connector/src` autre qu'un réexport) ou si le
+ * manifeste d'allowlist d'edge-setup diverge de celui de la référence.
  */
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-function routeKey(route: RelayRoute): string {
-  return [
-    route.method,
-    route.path.source,
-    `events=${route.events}`,
-    `host=${route.host}`,
-    `rootOnly=${route.rootOnly === true}`,
-    `noQuery=${route.noQuery === true}`,
-    `query=${route.query?.source ?? ""}`,
-  ].join(" ");
-}
-
-describe("protocol reference allowlist stays in sync with contracts/connector", () => {
-  test("same routes, same flags", () => {
-    expect(PROTOCOL_ALLOWLIST.map(routeKey).sort()).toEqual(RELAY_ALLOWLIST.map(routeKey).sort());
+describe("contracts/connector re-exports protocol/connector", () => {
+  test("every export is the very same binding", () => {
+    expect(Object.keys(contracts).sort()).toEqual(Object.keys(protocol).sort());
+    for (const name of Object.keys(protocol)) {
+      expect((contracts as Record<string, unknown>)[name]).toBe((protocol as Record<string, unknown>)[name]);
+    }
   });
 
-  test("same source file, byte for byte", () => {
-    expect(read("../../../../protocol/connector/src/relay-allowlist.ts")).toBe(read("../../../../contracts/connector/src/relay-allowlist.ts"));
+  test("contracts/connector/src holds re-exports only, no copy of the codec", () => {
+    const dir = new URL("../../../../contracts/connector/src/", import.meta.url);
+    for (const file of readdirSync(dir)) {
+      const code = read(`../../../../contracts/connector/src/${file}`)
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "")
+        .trim();
+      for (const statement of code.split("\n").filter((line) => line.trim() !== "")) {
+        expect(statement).toMatch(/^export (\*|type \{[^}]+\}) from "@openedbot\/protocol-connector(\/[a-z0-9-]+)?";$/);
+      }
+    }
   });
 
   test("same allowlist manifest as the one the hermes client checks", () => {

@@ -6,6 +6,7 @@ import { createRuntimeClient } from "@openedbot/execution/application/runtime-cl
 import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
 import type { HermesApprovalPolicyMode } from "@openedbot/hermes";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
+import { createTestLogger, eventFields, runWithLogger } from "@openedbot/platform-observability/log/test-logger";
 
 type ReconciliationCandidate = {
   bot_id: string;
@@ -80,15 +81,8 @@ function fakeClientFactory(options: {
 
 async function captureInfo(run: (lines: Array<Record<string, unknown>>) => Promise<void>): Promise<Array<Record<string, unknown>>> {
   const lines: Array<Record<string, unknown>> = [];
-  const originalInfo = console.info;
-  console.info = (...args: Parameters<typeof console.info>) => {
-    if (typeof args[0] === "string") lines.push(JSON.parse(args[0]) as Record<string, unknown>);
-  };
-  try {
-    await run(lines);
-  } finally {
-    console.info = originalInfo;
-  }
+  const { logger } = createTestLogger({ onRecord: (record) => { lines.push(eventFields(record)); } });
+  await runWithLogger(logger, () => run(lines));
   return lines;
 }
 

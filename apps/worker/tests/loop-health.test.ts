@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import {
   isLoopHealthy,
   LOOP_STALL_MS,
 } from "../src/infrastructure/loop-health";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
 
 describe("worker loop health file", () => {
   let directory: string;
@@ -15,13 +16,9 @@ describe("worker loop health file", () => {
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), "openedbot-worker-health-"));
     file = join(directory, "alive");
-    spyOn(console, "error").mockImplementation(() => undefined);
-    spyOn(console, "info").mockImplementation(() => undefined);
   });
   afterEach(() => {
     rmSync(directory, { recursive: true, force: true });
-    (console.error as unknown as { mockRestore(): void }).mockRestore();
-    (console.info as unknown as { mockRestore(): void }).mockRestore();
   });
 
   test("is refreshed while the loop turns and goes stale once it stops", async () => {
@@ -35,12 +32,14 @@ describe("worker loop health file", () => {
 
     rmSync(file);
     now += LOOP_STALL_MS + 1;
-    await health.report();
-    await health.report();
+    const { records } = await captureLogEvents(async () => {
+      await health.report();
+      await health.report();
+    });
     expect(existsSync(file)).toBe(false);
-    const stalls = (console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls
-      .filter(([line]) => String(line).includes("worker.loop_stalled"));
+    const stalls = records.filter((record) => record.event === "worker.loop_stalled");
     expect(stalls).toHaveLength(1);
+    expect(stalls[0]!.level).toBe(50);
 
     health.progressed();
     await health.report();
@@ -49,7 +48,7 @@ describe("worker loop health file", () => {
 
   test("without a configured file only the stall is reported", async () => {
     const health = createLoopHealth(null);
-    await health.report();
-    expect(console.error).not.toHaveBeenCalled();
+    const { records } = await captureLogEvents(() => health.report());
+    expect(records).toEqual([]);
   });
 });

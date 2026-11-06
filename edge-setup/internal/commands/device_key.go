@@ -95,9 +95,10 @@ func newDeviceKey(ctx context.Context, r exec.Runner, inst layout.ConnectorInsta
 
 // ensureDeviceKeys creates the sealed credential of every linked instance
 // that lacks one (a host linked before proof of possession existed, upgraded
-// in place). An instance that already has a key keeps it: a new key would
-// be refused by openedbot until `link --rekey`. The public half of a new
-// key reaches openedbot in the next hello.
+// in place). An instance that already has a key keeps it: openedbot refuses
+// a key that differs from the registered one, and only a new enrollment can
+// bring another. The public half of a new key reaches openedbot in the next
+// hello, where it is registered only if the runtime has no key yet.
 func ensureDeviceKeys(ctx context.Context, r exec.Runner, log func(string, ...any)) error {
 	if runtime.GOOS == "darwin" {
 		store, err := devicekeys.New()
@@ -126,7 +127,7 @@ func ensureDeviceKeys(ctx context.Context, r exec.Runner, log func(string, ...an
 func loadDeviceKey(credDir string) (ed25519.PrivateKey, error) {
 	data, err := os.ReadFile(filepath.Join(credDir, deviceKeyCredentialName))
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, errors.New("device.key credential is missing: the unit was rendered before proof of possession existed, or the key was never sealed; run `edge-setup up --yes` (re-renders the unit) then `edge-setup link --rekey --yes`")
+		return nil, errors.New("device.key credential is missing: the unit was rendered before proof of possession existed, or the key was never sealed; run `edge-setup up --yes` (re-renders the unit and seals a key); if openedbot already holds a key for this runtime, re-link this host with a new ticket (`edge-setup link --openedbot https://… --yes`)")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("device.key credential: %w", err)
@@ -138,8 +139,8 @@ func loadDeviceKey(credDir string) (ed25519.PrivateKey, error) {
 	return priv, nil
 }
 
-// preflightDeviceKey checks access before enrollment spends a ticket or
-// rekey stops a running connector. Only a confirmed absent item is allowed.
+// preflightDeviceKey checks access before enrollment spends a ticket.
+// Only a confirmed absent item is allowed.
 func preflightDeviceKey(ctx context.Context, inst layout.ConnectorInstance) error {
 	if runtime.GOOS != "darwin" {
 		return nil
@@ -178,7 +179,7 @@ func readKeychainDeviceKey(ctx context.Context, store devicekeys.Store, inst lay
 	return ed25519.NewKeyFromSeed(seed), nil
 }
 
-// persistKeychainDeviceKey belongs only to explicit enrollment and rekey.
+// persistKeychainDeviceKey belongs only to explicit enrollment.
 // A read error cannot be treated as absence, even for these writes.
 func persistKeychainDeviceKey(ctx context.Context, store devicekeys.Store, inst layout.ConnectorInstance, priv ed25519.PrivateKey) error {
 	if len(priv) != ed25519.PrivateKeySize {

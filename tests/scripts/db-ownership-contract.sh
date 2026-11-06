@@ -9,9 +9,12 @@ set -euo pipefail
 # adds a table nobody owns, and the "SQL lives with its owner" rule has no
 # anchor.
 #
-# Pass 2: a module writes (insert into / update / delete from) only the tables
-# it owns, or tables whose entry names it in `writers`. A `select` is not a
-# write. The scan covers modules/*/src/sql/** and modules/*/src/application/**.
+# Pass 2: a context writes (insert into / update / delete from) only the
+# tables it owns, or tables whose entry names it in `writers`. A `select` is
+# not a write (reads are frozen by tests/scripts/foreign-reads-contract.ts).
+# The contexts are the modules (`roster`, scanned in modules/*/src/sql/** and
+# modules/*/src/application/**) and, since ADR 0001 S4, the applications
+# (`apps/api`, `apps/worker`..., scanned in apps/*/src/**, tests excluded).
 #
 # An entry of db/ownership.json is either the owner's name:
 #
@@ -36,11 +39,14 @@ set -euo pipefail
 #
 #   "$migrations": { "0139_permission_review.sql": { "owner": "permissions", "debt": { "until": "...", "reason": "..." } } }
 #
-# Owners are module names (modules/<name>), plus three technical owners:
-# `db` (schema_migrations), `webhooks` (a context served by apps/api that
-# has no module yet) and `api` (api_errors, the journal of the API's own
-# unhandled errors, written by apps/api and purged by apps/worker). Writers
-# are module names.
+# Owners are module names (modules/<name>), applications (`apps/api` owns
+# api_errors, the journal of its own unhandled errors, which apps/worker
+# purges, and the outgoing webhooks, a context it serves with no module
+# yet), the plug-ins leaving the core (dated debt), and one technical owner:
+# `db` (schema_migrations).
+# Writers are module names or applications (`apps/<name>`): an application
+# that writes a module's table inline is a declared cross-context write, to
+# move into the owning module's application layer.
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 
@@ -64,6 +70,8 @@ for path in sorted(migrations.glob("*.sql")):
 entries = json.loads(ownership.read_text(encoding="utf-8"))
 migration_entries = entries.pop("$migrations", {})
 modules = sorted(p.name for p in (root / "modules").iterdir() if (p / "src").is_dir())
+apps = sorted(f"apps/{p.name}" for p in (root / "apps").iterdir() if (p / "src").is_dir())
+contexts = set(modules) | set(apps)
 errors: list[str] = []
 debts: dict[str, dict] = {}
 today = datetime.date.today()
@@ -94,8 +102,8 @@ for table, entry in entries.items():
         if "debt" in entry:
             debts[table] = entry["debt"]
         for writer in sorted(writers[table]):
-            if writer not in modules:
-                errors.append(f"db-ownership-contract: {table} : writer inconnu (pas de modules/{writer}) : {writer}")
+            if writer not in contexts:
+                errors.append(f"db-ownership-contract: {table} : writer inconnu (ni modules/{writer} ni une application apps/<nom>) : {writer}")
             if writer == owners[table]:
                 errors.append(f"db-ownership-contract: {table} : {writer} est déjà propriétaire, pas writer")
     else:
@@ -134,26 +142,37 @@ write = re.compile(
 blank = lambda m: re.sub(r"[^\n]", " ", m.group(0))
 writes = 0
 used: set[tuple[str, str]] = set()
-if owners:
+
+def scanned() -> list[tuple[str, pathlib.Path]]:
+    files: list[tuple[str, pathlib.Path]] = []
     for module in modules:
         for layer in ("sql", "application"):
-            for path in sorted((root / "modules" / module / "src" / layer).rglob("*.ts")):
-                text = path.read_text(encoding="utf-8")
-                text = re.sub(r"/\*.*?\*/", blank, text, flags=re.S)
-                text = re.sub(r"(?m)^[ \t]*//.*$", blank, text)
-                for match in write.finditer(text):
-                    table = match.group(1).lower()
-                    writes += 1
-                    if module in writers[table]:
-                        used.add((table, module))
-                    if module == owners[table] or module in writers[table]:
-                        continue
-                    line = text.count("\n", 0, match.start()) + 1
-                    errors.append(
-                        f"db-ownership-contract: {path.relative_to(root)}:{line} : "
-                        f"{module} écrit {table} (propriétaire : {owners[table]}), "
-                        f"à déclarer dans writers de db/ownership.json"
-                    )
+            files += [(module, path) for path in sorted((root / "modules" / module / "src" / layer).rglob("*.ts"))]
+    for app in apps:
+        for path in sorted((root / app / "src").rglob("*.ts*")):
+            if path.suffix not in (".ts", ".tsx") or "node_modules" in path.parts or re.search(r"\.test\.tsx?$", path.name):
+                continue
+            files.append((app, path))
+    return files
+
+if owners:
+    for context, path in scanned():
+        text = path.read_text(encoding="utf-8")
+        text = re.sub(r"/\*.*?\*/", blank, text, flags=re.S)
+        text = re.sub(r"(?m)^[ \t]*//.*$", blank, text)
+        for match in write.finditer(text):
+            table = match.group(1).lower()
+            writes += 1
+            if context in writers[table]:
+                used.add((table, context))
+            if context == owners[table] or context in writers[table]:
+                continue
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"db-ownership-contract: {path.relative_to(root)}:{line} : "
+                f"{context} écrit {table} (propriétaire : {owners[table]}), "
+                f"à déclarer dans writers de db/ownership.json"
+            )
 
 # A debt past its date is due: reported, never fatal.
 for table in sorted(debts):
@@ -191,7 +210,7 @@ if errors:
     sys.exit(1)
 print(
     f"db-ownership-contract: {len(alive)} tables vivantes, toutes possédées ; "
-    f"{writes} écritures de modules, toutes chez leur propriétaire ou un writer déclaré ; "
+    f"{writes} écritures de modules et d'applications, toutes chez leur propriétaire ou un writer déclaré ; "
     f"{len(debts)} tables et {len(migration_debts)} migrations en dette datée."
 )
 PY

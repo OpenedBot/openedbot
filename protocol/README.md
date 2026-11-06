@@ -33,7 +33,9 @@ agent or gateway can link to openedbot by implementing this specification.
   enrollment, relay frames, limits, close codes, route allowlist, operator verbs, proof of
   possession, announced origin change
 - **Reference codec**: strict relay frame decoder/encoder (`relay-frames.ts`), gateway route
-  allowlist (`relay-allowlist.ts`) and A2A agent card types (`a2a.ts`)
+  allowlist (`relay-allowlist.ts`), feature names (`relay-features.ts`) and A2A agent card
+  types (`a2a.ts`). This package is the source of truth: the monorepo's `contracts/connector`
+  re-exports it, nothing is copied
 - **Normative test vectors**: byte-identical to the host implementation's golden files
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
@@ -52,7 +54,7 @@ bun run check        # typecheck + tests
 Use the codec from another Bun or TypeScript project:
 
 ```ts
-import { decodeTextFrame, matchRelayRoute, RELAY_PROTOCOL } from "@openedbot/contracts-connector";
+import { decodeTextFrame, matchRelayRoute, RELAY_PROTOCOL } from "@openedbot/protocol-connector";
 
 const frame = decodeTextFrame(raw);          // throws RelayFrameError on any invalid frame
 const route = matchRelayRoute("GET", "/health");
@@ -91,9 +93,10 @@ scripts/              sync from the reference implementations
 
 ## Status
 
-The two reference implementations are still where the contract is developed; this directory is
-refreshed from them with `bun run sync` and versioned on its own. Making it the single source both
-sides import is planned.
+The TypeScript codec in `connector/src` is the single source: the monorepo's
+`contracts/connector` re-exports it, and a monorepo test compares its feature names with the Go
+host's list. The tests, golden vectors and spec body are still refreshed from the two reference
+implementations with `bun run sync`, and the directory is versioned on its own.
 
 ## Documentation
 

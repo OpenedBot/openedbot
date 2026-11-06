@@ -14,7 +14,7 @@ import {
   LINK_PROBE_TIMEOUT_MS,
   LINK_RECONNECT_REASON,
   type LinkProbeResult,
-} from "../domain/link-probe";
+} from "@openedbot/runtimes/domain/link-probe";
 import {
   describeLinkClosure,
   LinkLeaseLostError,

@@ -1,5 +1,5 @@
 import { ApiError, api, isApiUnavailable } from "../../lib/api";
-import type { NativeAuthBridge, NativeSigninState } from "../../lib/platform/native-bridge";
+import type { NativeAuthBridge, NativeSigninState } from "../../lib/platform";
 
 /**
  * Où part la connexion de l'écran `/login`. Un seul écran, deux transports :

@@ -14,11 +14,11 @@ import { assertPassword, assertString, boundedTextBody, HttpError, jsonBody } fr
 import { requestClientIp } from "../../interfaces/http/rate-limit";
 import { authFailureCode } from "@openedbot/identity/domain/signup";
 import { createGoogleAuth } from "@openedbot/identity/application/google-auth";
-import { createPostgresOAuthAttemptStore, OAuthAttemptTransitionError } from "@openedbot/identity/sql/oauth-attempt-store";
-import { firstLivingOrganization, recordUserLogin, verifyCredentials } from "@openedbot/identity/sql/accounts";
+import { createPostgresOAuthAttemptStore, OAuthAttemptTransitionError } from "@openedbot/identity/application/oauth-attempt-store";
+import { firstLivingOrganization, recordUserLogin, verifyCredentials } from "@openedbot/identity/application/accounts";
 import { resolveGoogleIdentity } from "@openedbot/identity/application/google-identity";
 import { linkGoogleIdentity } from "@openedbot/identity/application/google-link";
-import { agencyAccessAllowed, readWorkspaceAccess } from "@openedbot/identity/sql/workspace-access";
+import { agencyAccessAllowed, readWorkspaceAccess } from "@openedbot/identity/application/workspace-access";
 import {
   createWebSession,
   findLiveSession,
@@ -26,7 +26,7 @@ import {
   touchSession,
   WEB_SESSION_TTL_MS,
   type SessionDevice,
-} from "@openedbot/identity/sql/sessions";
+} from "@openedbot/identity/application/sessions";
 import { exchangeNativeAuthCode, issueNativeAuthCode, refreshNativeSession } from "@openedbot/identity/application/native-auth";
 import { readAccountIdentityView, resolveSessionIdentity } from "@openedbot/identity/application/session-identity";
 import type { ImpersonationSource } from "@openedbot/platform-plugins";

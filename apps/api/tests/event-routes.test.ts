@@ -108,6 +108,32 @@ describe("SSE cursor policy", () => {
     expect(woken).toEqual(["org-1"]);
   });
 
+  test("LISTEN établi : le hint post-commit n'est plus suivi, les trames pré-commit passent toujours", async () => {
+    const tx = () => [{ botId: "bot-1", turnId: "run-1", sessionKey: "session-1" }];
+    const db = { begin: async (fn: (inner: typeof tx) => Promise<unknown>) => fn(tx) } as unknown as Db;
+    const hub = new EventHub();
+    const received: number[] = [];
+    hub.subscribe("org-1", (entry) => { received.push(entry.sequence); });
+    const woken: string[] = [];
+    let listening = true;
+    const routes = internalEventRoutes(db, { workerInternalToken: "worker-secret" } as ApiConfig, hub,
+      (organizationId) => { woken.push(organizationId); }, () => !listening);
+    const live = { organizationId: "org-1", threadId: "thread-1", runId: "run-1", sequence: 8, leaseGeneration: 4,
+      type: "agent.message", payload: { delta: "x" }, occurredAt: "2026-10-25T00:00:00.000Z" };
+    const post = () => routes.request("http://localhost/publish", {
+      method: "POST",
+      headers: { Authorization: "Bearer worker-secret", "Content-Type": "application/json" },
+      body: JSON.stringify({ events: [event(7), live] }),
+    });
+
+    expect((await post()).status).toBe(204);
+    expect(received).toEqual([8]);
+    expect(woken).toEqual([]);
+    listening = false;
+    expect((await post()).status).toBe(204);
+    expect(woken).toEqual(["org-1"]);
+  });
+
   test("un lot pré-commit ne contrôle le bail qu'une fois par run, et publie dans l'ordre", async () => {
     const queries: string[] = [];
     const tx = (strings: TemplateStringsArray) => {

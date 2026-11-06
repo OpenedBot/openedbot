@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { SupportEventDto } from "@openedbot/contracts-api";
 import { openSupportStream, supportBackoffMs } from "../../../src/lib/support/support-stream";
+import { asDesktopBuild } from "../../support/desktop-build";
+
+// These tests drive the desktop app's bridge, which only the desktop build reads.
+asDesktopBuild();
 
 /**
  * Un flux qui rend ses trames puis RESTE OUVERT, comme un vrai SSE.

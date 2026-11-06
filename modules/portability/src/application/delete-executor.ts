@@ -2,8 +2,8 @@ import type { SQL, TransactionSQL } from "bun";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { RuntimeProfileDeleteJobItemDto } from "@openedbot/contracts-api";
 import { HermesClientError, type HermesClient } from "@openedbot/hermes";
-import { ProfileDeleteError, ProfileImportError } from "../domain/errors";
-import { lockProfileImports } from "../sql/reservations";
+import { ProfileDeleteError, ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { lockProfileImports } from "@openedbot/roster/application/profile-reservations";
 import { DELETE_LEASE_SECONDS, type DeleteJobRow } from "../sql/delete-jobs";
 import { deleteHostProfile, type HostProfileDeleteClient, type HostProfileDeleteOwnership } from "./host-profile-delete";
 

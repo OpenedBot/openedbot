@@ -68,7 +68,7 @@ export function GroupConversationScreen() {
   // dans le composer. Lecture réservée aux `owner`/`admin` (voir le hook).
   const mcpPlugins = useConnectedMcpPlugins(me.data?.session.role);
   const group = roster.data?.groups?.find((candidate) => candidate.id === groupId);
-  const { thread, streaming, loading, loadOlder, loadingOlder, olderError } = useThreadStream(group?.threadId);
+  const { thread, streaming, loading, loadOlder, loadingOlder, olderError, liveText } = useThreadStream(group?.threadId);
   useMarkThreadRead(
     group?.threadId,
     thread.data?.id === group?.threadId ? thread.data : null,
@@ -396,7 +396,7 @@ export function GroupConversationScreen() {
               className="relative flex min-h-0 flex-1 flex-col"
               data-turn-rail={turnRailShown ? "" : undefined}
             >
-            <DevRenderProfiler id="thread-timeline"><ThreadTimeline
+            <DevRenderProfiler id="thread-timeline"><ThreadTimeline liveText={liveText}
               events={timelineEvents}
               runs={timelineRuns}
               messages={timelineMessages}

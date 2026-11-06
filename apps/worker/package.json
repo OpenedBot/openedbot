@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
     "@openedbot/conversation": "workspace:*",
     "@openedbot/execution": "workspace:*",
     "@openedbot/hermes": "workspace:*",
@@ -19,11 +20,11 @@
     "@openedbot/notifications": "workspace:*",
     "@openedbot/platform-config": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
-    "@openedbot/roster": "workspace:*",
     "@openedbot/platform-integrations": "workspace:*",
     "@openedbot/platform-observability": "workspace:*",
     "@openedbot/platform-plugins": "workspace:*",
     "@openedbot/portability": "workspace:*",
+    "@openedbot/roster": "workspace:*",
     "@openedbot/runtime-link": "workspace:*",
     "@openedbot/runtimes": "workspace:*",
     "@openedbot/support": "workspace:*"

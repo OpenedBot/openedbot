@@ -1,0 +1,55 @@
+{
+  "until": "2026-12-31",
+  "step": "workflows",
+  "reason": "ADR 0001 S2d : les écritures de runs sont strictes (sql/run-transitions.ts, sql/run-columns.ts). Restent, comptées, les écritures de workflows.status et des colonnes qui l'accompagnent (error_code, recovery_state, used_tokens…), en SQL en ligne à côté de la transition de run qui les entraîne ; une fonction de transition des workflows, sur le modèle de sql/run-transitions.ts, les videra (inventaire 0002, section 9.3). queue-sweeps.ts et worker-shutdown.ts reprennent celles de queue.ts et de worker-registry.ts, déplacées sans ajout.",
+  "files": {
+    "apps/api/src/routes/execution/workflow-routes.ts": {
+      "workflows": 6
+    },
+    "modules/execution/src/application/approval-review.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/disconnected-runtime-runs.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/queue-sweeps.ts": {
+      "workflows": 4
+    },
+    "modules/execution/src/application/queue.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/run-cancellation.ts": {
+      "workflows": 3
+    },
+    "modules/execution/src/application/run-steering.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/admission.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/runner/approval-forwarding.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/cancel.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/runner/failure.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/persist.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/rooms.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/workflows.ts": {
+      "workflows": 6
+    },
+    "modules/execution/src/application/runtime-direct.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/worker-shutdown.ts": {
+      "workflows": 1
+    }
+  }
+}

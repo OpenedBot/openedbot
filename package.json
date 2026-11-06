@@ -8,9 +8,11 @@
   "workspaces": [
     "apps/api",
     "apps/console",
+    "apps/desktop-tauri",
     "apps/link-gateway",
     "apps/worker",
     "contracts/*",
+    "protocol/connector",
     "browser/*",
     "platform/*",
     "modules/*"

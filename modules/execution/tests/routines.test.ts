@@ -8,8 +8,15 @@ import {
   routineFireText,
 } from "../src/domain/routines";
 import { fireDueRoutine } from "../src/application/routines";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 
 type Query = { sql: string; values: unknown[] };
+
+function inserted(queries: Query[], table: "runs" | "workflows"): Record<string, unknown> {
+  const query = queries.find(({ sql }) => sql.includes(`insert into ${table}`));
+  if (!query) throw new Error(`no insert into ${table}`);
+  return insertedRow(query.sql, query.values);
+}
 
 type DueRow = {
   id: string;
@@ -121,13 +128,12 @@ describe("fireDueRoutine", () => {
 
     expect(await fireDueRoutine(db, false, NOW)).toBe(true);
 
-    const workflow = queries.find((query) => query.sql.includes("insert into workflows"));
-    expect(workflow?.sql).toContain("'routine', 'queued'");
-    expect(workflow?.values).toContainEqual({ routineId: due.id, trigger: "scheduled" });
-
-    const run = queries.find((query) => query.sql.includes("insert into runs"));
-    expect(run?.sql).toContain("'queued'");
-    expect(run?.values).toContain(routineFireText(due.name, due.message));
+    expect(inserted(queries, "workflows")).toMatchObject({
+      kind: "routine", status: "queued", recovery_state: { routineId: due.id, trigger: "scheduled" },
+    });
+    expect(inserted(queries, "runs")).toMatchObject({
+      status: "queued", step_kind: "root", input: routineFireText(due.name, due.message),
+    });
 
     const message = queries.find((query) => query.sql.includes("insert into messages"));
     expect(message?.values).toContainEqual([{ type: "text", text: routineFireText(due.name, due.message) }]);
@@ -145,9 +151,7 @@ describe("fireDueRoutine", () => {
     for (const neverWait of [true, false]) {
       const { db, queries } = fakeDb({ due: dueRow({ neverWait }), subscriptionStatus: "active" });
       expect(await fireDueRoutine(db, false, NOW)).toBe(true);
-      const workflow = queries.find((query) => query.sql.includes("insert into workflows"));
-      expect(workflow?.sql).toContain("never_wait");
-      expect(workflow?.values.at(-1)).toBe(neverWait);
+      expect(inserted(queries, "workflows").never_wait).toBe(neverWait);
     }
   });
 
@@ -301,12 +305,11 @@ describe("fireDueRoutine", () => {
 
     expect(await fireDueRoutine(db, false, NOW)).toBe(true);
 
-    const workflow = queries.find((query) => query.sql.includes("insert into workflows"));
-    expect(workflow?.sql).toContain("'group', 'queued'");
-    expect(workflow?.values).toContain(ROOM_LIMITS.maxMemberTurns);
-    expect(workflow?.values).toContainEqual({ routineId: due.id, trigger: "scheduled" });
-    const run = queries.find((query) => query.sql.includes("insert into runs"));
-    expect(run?.sql).toContain("'group'");
+    expect(inserted(queries, "workflows")).toMatchObject({
+      kind: "group", status: "queued", max_steps: ROOM_LIMITS.maxMemberTurns,
+      recovery_state: { routineId: due.id, trigger: "scheduled" },
+    });
+    expect(inserted(queries, "runs").step_kind).toBe("group");
     const execution = queries.find((query) => query.sql.includes("insert into routine_executions"));
     expect(execution?.values).toContain("fired");
   });

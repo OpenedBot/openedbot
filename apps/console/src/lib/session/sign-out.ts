@@ -17,7 +17,7 @@ import { toast } from "@openedbot/browser-ui-kit";
 import { useT } from "../i18n";
 import { api, isUnauthorized } from "../api";
 import { clearCloudSession } from "./cloud-session";
-import { nativeBridge } from "../platform/native-bridge";
+import { nativeBridge } from "../platform";
 import { clearOnboardingDraft } from "./onboarding-draft";
 import { clearPersistedQueries } from "../query-persister";
 import { clearWorkspaceDrafts } from "../workspace/workspace-draft";

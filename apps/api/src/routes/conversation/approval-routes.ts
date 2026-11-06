@@ -7,8 +7,8 @@ import { logEvent } from "@openedbot/platform-observability";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { appendDecisionTx, type DecisionChoice } from "@openedbot/execution/application/decision-journal";
 import { isAlwaysChoice } from "@openedbot/execution/domain/permission-always";
-import { createBotPermissionGrantTx } from "@openedbot/roster/sql/permission-grants";
-import { activeRuntimeIdTx, setTerminalDangerAlwaysTx } from "@openedbot/runtimes/sql/permission-settings";
+import { createBotPermissionGrantTx } from "@openedbot/roster/application/permission-grants";
+import { activeRuntimeIdTx, setTerminalDangerAlwaysTx } from "@openedbot/runtimes/application/permission-settings";
 import type { ApprovalAlwaysChoice, ApprovalRespondDto } from "@openedbot/contracts-api";
 import {
   alwaysErrorCode,

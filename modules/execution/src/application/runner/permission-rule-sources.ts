@@ -45,7 +45,7 @@ export async function permissionRuleSourceFor(organizationId: string): Promise<R
 
 /**
  * Locks a run's workflow `for update` (the caller already holds the run: the
- * forwarder's order, runner.ts) and, given a source, reads its "Never wait"
+ * forwarder's order, runner/approval-forwarding.ts) and, given a source, reads its "Never wait"
  * through it (PERM2-9). No workflow, or a workflow gone: someone may answer.
  * The source is resolved by the caller before its transaction: a slow
  * entitlement hook never holds these locks.

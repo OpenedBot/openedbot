@@ -1,5 +1,5 @@
 import type { TransactionDb } from "@openedbot/platform-db";
-import { moveTeamImportsToDefaultSection } from "@openedbot/portability/sql/team-imports";
+import { moveTeamImportsToDefaultSection } from "./team-import-sections";
 
 /**
  * Une section qui n'a plus ni bot ni salon disparaît d'elle-même : elle

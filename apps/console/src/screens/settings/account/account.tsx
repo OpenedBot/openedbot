@@ -25,7 +25,7 @@ import { ApiError, api, errorMessage, queryKeys } from "../../../lib/api";
 import { activeOrganizationId } from "../../../lib/session/cloud-session";
 import { useT, type Locale, type MessageKey } from "../../../lib/i18n";
 import { hasMessage } from "@openedbot/browser-i18n";
-import { isNativeShell } from "../../../lib/platform/native-bridge";
+import { isNativeShell } from "../../../lib/platform";
 import {
   ACTIONS,
   BUTTON,
@@ -373,7 +373,7 @@ function useGoogleLink(email: string) {
       // Sur le web, l'onglet s'ouvre DANS le clic, avant la réponse de l'API :
       // ouvert après un `await`, le navigateur le bloque comme fenêtre
       // surgissante. Dans la coque, `window.open` part au navigateur système
-      // (`setWindowOpenHandler` d'openedbot-desktop) et rend toujours `null` : on
+      // et rend toujours `null` : on
       // ouvre donc l'URL Google elle-même, une fois connue.
       const native = isNativeShell();
       const tab = native ? null : globalThis.window?.open("", "_blank") ?? null;

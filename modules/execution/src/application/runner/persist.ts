@@ -1,11 +1,11 @@
 import { isUuid } from "@openedbot/contracts-primitives";
-import { insertMessageAttachment } from "@openedbot/conversation/sql/attachments";
-import { insertAssistantMessage } from "@openedbot/conversation/sql/messages";
-import { raiseGroupNeedsYou } from "@openedbot/roster/sql/groups";
+import { insertMessageAttachment } from "@openedbot/conversation/application/attachments";
+import { insertAssistantMessage } from "@openedbot/conversation/application/messages";
+import { raiseGroupNeedsYou } from "@openedbot/roster/application/groups";
 import type { SQL } from "bun";
 import type { HermesClient } from "@openedbot/hermes";
 import type { RunEvent } from "../../domain/hermes-events";
-import type { GateIdentity } from "../../domain/gate-identity";
+import { approvalGateIdentity, legacyPolicyOf, type GateIdentity } from "../../domain/gate-identity";
 import { resolveGateTx } from "./permission-gate";
 import { lockWorkflowTx, permissionRuleSourceFor } from "./permission-rule-sources";
 import { clearProviderIncident } from "../provider-fallback";
@@ -25,7 +25,8 @@ import { organizationEventEnvelope, runTurnId, type OrganizationEvent } from "@o
 import type { RunTrace } from "@openedbot/platform-observability/run-trace";
 import type { WorkerConfig } from "../worker-config";
 import { expireUnacknowledgedRunSteers } from "../run-steering";
-import { appendNoticeTx, deferWake, lockRunEventCursorTx, publishBatch, takeDeferredWake } from "./events";
+import { appendNumberedRunEventsTx, appendRunEventsTx, lockRunEventsTx } from "../../sql/run-events";
+import { appendNoticeTx, deferWake, publishBatch, takeDeferredWake } from "./events";
 import {
   createHandoffTx,
   delegatedHandoffNotice,
@@ -40,12 +41,18 @@ import { advanceGroupTx, assistantMessageForCompletion, groupSendState } from ".
 import { assistantContent, storeRuntimeArtifacts } from "./transcript";
 import { extractOutputMedia, workspaceMediaNames } from "../../domain/output-media";
 import { fetchWorkspaceMedia } from "./output-media-fetch";
-import type { GroupRunContext, RunContext, RunEventIdentityRow } from "./types";
+import type { GroupRunContext, RunContext } from "./types";
 import { log } from "./util";
+import { ACTIVE_RUN_STATUSES } from "../../domain/run-transitions";
+import { advanceHermesWatermark } from "../../sql/run-columns";
+import { lockLeasedRunTx, NOW, RELEASE_LEASE, transitionRuns } from "../../sql/run-transitions";
+import { heldLease, runKey } from "./lease-transitions";
+import { chainLegacyRoomTurnTx } from "./workflow-steps";
 import {
   advanceWorkflowCompletionTx,
   advanceWorkflowFailureTx,
   measureWorkflowTokens,
+  settleReviewWorkflowTx,
   settleSimpleDmCompletionTx,
   usageTotal,
 } from "./workflows";
@@ -58,28 +65,7 @@ function validApprovalRequestId(value: unknown): string {
     : crypto.randomUUID();
 }
 
-/**
- * The normalizer's gate identity, or `unknown` when the vehicle is missing
- * (an event built elsewhere): never a partly trusted identity.
- */
-function approvalGateIdentity(value: unknown): GateIdentity {
-  const gate = value && typeof value === "object" ? value as Partial<GateIdentity> : {};
-  const hermesRequestId = typeof gate.hermesRequestId === "string" ? gate.hermesRequestId : null;
-  if (gate.gateKind === "plugin_tool" && typeof gate.toolKey === "string" && gate.gateArgs && typeof gate.descriptorVersion === "number") {
-    return { hermesRequestId, gateKind: "plugin_tool", toolKey: gate.toolKey, gateArgs: gate.gateArgs, descriptorVersion: gate.descriptorVersion };
-  }
-  if (gate.gateKind === "terminal_danger" && gate.gateArgs) {
-    return { hermesRequestId, gateKind: "terminal_danger", toolKey: null, gateArgs: gate.gateArgs, descriptorVersion: null };
-  }
-  return { hermesRequestId, gateKind: "unknown", toolKey: null, gateArgs: null, descriptorVersion: null };
-}
-
-/** `resolved_by_policy` of a `legacy` refusal: the bot's stored mode, in the closed set of 0138. */
-function legacyPolicyOf(mode: string | null): "manual" | "plan" | "auto" | "bypass" {
-  return mode === "plan" || mode === "auto" || mode === "bypass" ? mode : "manual";
-}
-
-function stampApprovalRequestIds(events: RunEvent[]): void {
+function stampApprovalRequestIds(events: readonly BatchEvent[]): void {
   for (const event of events) {
     if (event.type === "approval.requested") {
       event.payload.approvalRequestId = validApprovalRequestId(event.payload.approvalRequestId);
@@ -152,21 +138,41 @@ async function hiddenGroupOutput(
   return mentionedMembers(output, members, { excludeBotId: context.botId ?? undefined }).length > 0;
 }
 
+/** An event the worker writes outside its stream (failure, fallback, reconciled failure): numbered under the run's locks. */
+export type UnnumberedRunEvent = Omit<RunEvent, "sequence">;
+type BatchEvent = UnnumberedRunEvent & { sequence?: number };
+type PreparedEvent = {
+  event: BatchEvent;
+  payload: Record<string, unknown>;
+  gate: GateIdentity | null;
+  resolution: Awaited<ReturnType<typeof resolveGateTx>> | null;
+};
+
+/** A batch the stream's normalizer numbered (its deltas left before the commit, under these numbers). */
 export async function persistEvents(
-  db: SQL,
-  config: WorkerConfig,
-  context: RunContext,
-  rawSequence: number,
-  events: RunEvent[],
-  client?: HermesClient,
-  trace?: RunTrace,
+  db: SQL, config: WorkerConfig, context: RunContext, rawSequence: number, events: RunEvent[], client?: HermesClient, trace?: RunTrace,
 ): Promise<void> {
+  await persistBatch(db, config, context, rawSequence, events, true, client, trace);
+}
+
+/** Events nobody numbered yet: numbered under the run's locks, published after the commit only. Returns the committed envelopes. */
+export async function persistUnnumberedEvents(
+  db: SQL, config: WorkerConfig, context: RunContext, rawSequence: number, events: UnnumberedRunEvent[], client?: HermesClient, trace?: RunTrace,
+): Promise<OrganizationEvent[]> {
+  return persistBatch(db, config, context, rawSequence, events, false, client, trace);
+}
+
+/** Returns the committed envelopes (none when the lease was lost). */
+async function persistBatch(
+  db: SQL, config: WorkerConfig, context: RunContext, rawSequence: number, events: BatchEvent[], numbered: boolean,
+  client?: HermesClient, trace?: RunTrace,
+): Promise<OrganizationEvent[]> {
   // Deltas leave before accounting and commit. Receipts and terminal events
   // wait for their durable, canonically enriched API representation.
   stampApprovalRequestIds(events);
   const quietGroupPhase = groupSendState(context)?.phase;
   const quietTurn = quietGroupPhase === "route" || quietGroupPhase === "contribution";
-  const earlyEvents = events.filter((event) => EARLY_EVENT_TYPES.has(event.type)
+  const earlyEvents = !numbered ? [] : (events as RunEvent[]).filter((event) => EARLY_EVENT_TYPES.has(event.type)
     && !(quietTurn && (event.type === "agent.message" || event.type === "agent.reasoning")));
   await publishUncommittedEvents(config, context, earlyEvents);
   if (trace && earlyEvents.length > 0) {
@@ -205,19 +211,17 @@ export async function persistEvents(
   let envelopes: OrganizationEvent[];
   try {
   envelopes = await db.begin(async (tx) => {
-    const fence = await tx<Array<{ id: string }>>`
-      select id from runs
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-         and status in ('starting','running','awaiting_approval')
-         and remote_stop_state is distinct from 'requested'
-       for update
-    `;
-    if (!fence[0]) return [] as OrganizationEvent[];
+    const lease = heldLease(config, context);
+    if (!await lockLeasedRunTx(tx as unknown as SQL, runKey(context), lease)) return [] as OrganizationEvent[];
     // PERM2-9: the workflow's snapshot of "Never wait", read under its lock.
     const neverWait = await lockWorkflowTx(tx as unknown as SQL, context.organizationId, context.workflowId, unattendedFrom);
-    await lockRunEventCursorTx(tx, context.organizationId);
-    const result: OrganizationEvent[] = [];
+    // The run is held since the fence: its cursor next, in the order of the
+    // allocation primitive, before the gates below take their `for share`.
+    await lockRunEventsTx(tx, [{ organizationId: context.organizationId, runId: context.id }]);
+    // 1. The whole batch is written first, in order. A notice a completion
+    // appends below then comes after it, instead of taking the sequence of an
+    // event the normalizer numbered after `run.completed` (D3).
+    const prepared: PreparedEvent[] = [];
     for (const event of events) {
       if (quietTurn && (event.type === "agent.message" || event.type === "agent.reasoning" || event.type === "tool.call" || event.type === "tool.result")) {
         continue;
@@ -242,16 +246,22 @@ export async function persistEvents(
         payload.approvalRequestId = validApprovalRequestId(payload.approvalRequestId);
         if (resolution?.pipeline === "v2" && resolution.decision.outcome === "review") payload.reviewing = true;
       }
-      // `lease_generation` explicite : le trigger 0092 refuse la ligne si le
-      // run a été repris entre-temps, même hors de ce verrou `for update`.
-      const rows = await tx<RunEventIdentityRow[]>`
-        insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at, lease_generation)
-        values (${context.organizationId}, ${context.threadId}, ${context.id}, ${event.sequence},
-                ${event.type}, ${payload}, ${event.occurredAt}, ${context.leaseGeneration})
-        on conflict (organization_id, run_id, sequence) do nothing
-        returning cursor, bot_id as "botId", turn_id as "turnId", session_key as "sessionKey",
-                  lease_generation as "leaseGeneration"
-      `;
+      prepared.push({ event, payload, gate, resolution });
+    }
+    // `lease_generation` explicite : le trigger 0092 refuse la ligne si le
+    // run a été repris entre-temps, même hors de ce verrou `for update`. Un
+    // lot numéroté par le flux dont une séquence est déjà prise est refusé
+    // (RunEventSequenceConflictError), jamais sauté.
+    const target = { organizationId: context.organizationId, threadId: context.threadId, runId: context.id, leaseGeneration: context.leaseGeneration };
+    const result: OrganizationEvent[] = numbered
+      ? await appendNumberedRunEventsTx(tx, target, prepared.map(({ event, payload }) => ({
+          sequence: event.sequence!, type: event.type, payload, occurredAt: event.occurredAt,
+        })))
+      : await appendRunEventsTx(tx, prepared.map(({ event, payload }) => ({
+          ...target, type: event.type, payload, occurredAt: event.occurredAt,
+        })));
+    // 2. Then what each event does, in the same order.
+    for (const { event, payload, gate, resolution } of prepared) {
       if (
         event.type === "tool.result.attached" &&
         typeof event.payload.toolCallId === "string" &&
@@ -259,12 +269,6 @@ export async function persistEvents(
       ) {
         await backfillToolErrorMessageTx(tx, context, event.payload.toolCallId, event.payload.errorMessage);
       }
-      const row = rows[0];
-      if (!row) continue;
-      result.push(organizationEventEnvelope({
-        ...row, organizationId: context.organizationId, threadId: context.threadId,
-        runId: context.id, sequence: event.sequence, type: event.type, payload, occurredAt: event.occurredAt,
-      }));
       // Un outil en échec laisse une ligne dans `tool_errors` (0037), dans la
       // transaction de son `tool.result` : le panneau Capacités du bot la lit
       // après la purge des événements, et la purge du bot l'emporte.
@@ -336,11 +340,9 @@ export async function persistEvents(
           where organization_id = ${context.organizationId} and run_id = ${context.id}
         `;
 
-        await tx`
-          update runs set status = 'awaiting_approval', updated_at = now()
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease, transition: { from: ACTIVE_RUN_STATUSES, to: { status: "awaiting_approval" } },
+        });
         // The workflow status is what notifies (0039 push): only a gate that
         // waits for a person moves it. A policy answer or a gate under review
         // (the reviewer moves it if it escalates) notifies nobody.
@@ -356,15 +358,15 @@ export async function persistEvents(
         const state = service ? null : groupSendState(context);
         const hide = await hiddenGroupOutput(tx, context, state, output);
         const message = service || hide ? null : assistantMessageForCompletion(output, state);
-        await tx`
-          update runs set status = 'completed', output = ${output || null}, usage = ${payload.usage ?? null},
-            external_state = 'settled', events_complete = ${payload.reconciled !== true},
-            completion_kind = ${payload.reconciled === true ? "reconciled" : "normal"},
-            error_code = null, error_message = null,
-            ended_at = now(), updated_at = now(), lease_owner = null, lease_expires_at = null
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease,
+          transition: { from: ACTIVE_RUN_STATUSES, to: { status: "completed", externalState: "settled" } },
+          set: {
+            output: output || null, usage: payload.usage ?? null, eventsComplete: payload.reconciled !== true,
+            completionKind: payload.reconciled === true ? "reconciled" : "normal", errorCode: null, errorMessage: null,
+            endedAt: NOW, ...RELEASE_LEASE,
+          },
+        });
         if (context.workflowId) {
           const totalTokens = event === completion && accounting
             ? accounting.effectiveTokens
@@ -403,6 +405,8 @@ export async function persistEvents(
         }
         if (service) {
           // Run de service : pas de bulle, pas d'avance salon, pas de `@slug`.
+          // Il n'a de workflow que sa revue (0175), close avec lui.
+          if (context.workflowId) await settleReviewWorkflowTx(tx, context, { status: "completed" });
         } else if (state) {
           // Tour de salon : un pass (explicite ou implicite) ne laisse qu'un
           // avis ; une vraie sortie qui mentionne l'opérateur lève « needs you ».
@@ -423,6 +427,8 @@ export async function persistEvents(
         } else if (context.groupTurnPosition !== null) {
           // Ancien enchaînement (runs de salon posés avant `group_state`) :
           // chaque membre parle une fois, dans l'ordre, sur la même entrée.
+          // Sa seule revue possible (0175) se clôt avec lui.
+          if (context.workflowId) await settleReviewWorkflowTx(tx, context, { status: "completed" });
           const next = await tx<Array<{ botId: string; position: number }>>`
             select gm.bot_id as "botId", gm.position
               from threads t
@@ -432,11 +438,14 @@ export async function persistEvents(
              order by gm.position asc limit 1
           `;
           if (next[0]) {
-            await tx`
-              insert into runs (id, organization_id, thread_id, bot_id, group_turn_position, input, status)
-              values (${crypto.randomUUID()}, ${context.organizationId}, ${context.threadId}, ${next[0].botId},
-                      ${next[0].position}, ${context.input}, 'queued')
-            `;
+            await chainLegacyRoomTurnTx(tx, {
+              organizationId: context.organizationId,
+              threadId: context.threadId,
+              botId: next[0].botId,
+              groupTurnPosition: next[0].position,
+              input: context.input,
+              groupState: null,
+            });
           }
         } else if (context.workflowId) {
           result.push(...await advanceWorkflowCompletionTx(tx, context, output));
@@ -494,14 +503,14 @@ export async function persistEvents(
       if (event.type === "run.error") {
         const message = typeof payload.message === "string" ? payload.message : "Erreur Hermes.";
         const errorCode = typeof payload.errorCode === "string" ? payload.errorCode : "HERMES_RUN_FAILED";
-        await tx`
-          update runs set status = 'failed', error_code = ${errorCode}, error_message = ${message},
-            external_state = 'settled', events_complete = ${payload.reconciled !== true},
-            completion_kind = ${payload.reconciled === true ? "reconciled_failure" : "failed"},
-            ended_at = now(), updated_at = now(), lease_owner = null, lease_expires_at = null
-           where id = ${context.id} and organization_id = ${context.organizationId}
-             and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-        `;
+        await transitionRuns(tx as unknown as SQL, {
+          target: runKey(context), fence: lease,
+          transition: { from: ACTIVE_RUN_STATUSES, to: { status: "failed", externalState: "settled" } },
+          set: {
+            errorCode, errorMessage: message, eventsComplete: payload.reconciled !== true,
+            completionKind: payload.reconciled === true ? "reconciled_failure" : "failed", endedAt: NOW, ...RELEASE_LEASE,
+          },
+        });
         // Un tour de salon échoué vaut un pass : l'erreur reste visible sur le
         // run, et l'envoi continue avec le membre suivant.
         const state = isServiceStepKind(context.stepKind) ? null : groupSendState(context);
@@ -513,16 +522,15 @@ export async function persistEvents(
         if (!isServiceStepKind(context.stepKind) && context.originRunId) {
           result.push(...await deliverHandoffReplyTx(tx, context, { status: "failed", output: null, error: message }));
         }
-        if (context.workflowId && !state) {
+        if (context.workflowId && !state && context.groupTurnPosition !== null) {
+          // Tour de salon hérité en revue (0175) : aucune étape ne le règle.
+          await settleReviewWorkflowTx(tx, context, { status: "failed", errorCode, message });
+        } else if (context.workflowId && !state) {
           result.push(...await advanceWorkflowFailureTx(tx, context, message, errorCode));
         }
       }
     }
-    await tx`
-      update runs set last_hermes_sequence = ${rawSequence}, heartbeat_at = now(), updated_at = now()
-       where id = ${context.id} and organization_id = ${context.organizationId}
-         and lease_generation = ${context.leaseGeneration}
-    `;
+    await advanceHermesWatermark(tx as unknown as SQL, runKey(context), { generation: context.leaseGeneration }, rawSequence);
     return result;
   }) as OrganizationEvent[];
   } catch (error) {
@@ -532,7 +540,7 @@ export async function persistEvents(
       organizationId: context.organizationId,
       leaseGeneration: context.leaseGeneration,
     });
-    return;
+    return [];
   }
   const hasText = envelopes.some((envelope) => envelope.type === "agent.message");
   const hasTerminal = envelopes.some((envelope) => envelope.type === "run.completed" || envelope.type === "run.error");
@@ -564,4 +572,5 @@ export async function persistEvents(
   if (events.some((event) => event.type === "run.completed") && context.provider) {
     await clearProviderIncident(db, context.organizationId, context.runtimeId, context.provider);
   }
+  return envelopes;
 }

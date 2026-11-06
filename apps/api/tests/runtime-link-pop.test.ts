@@ -96,21 +96,21 @@ describe("preuve de possession du lien connecteur", () => {
     expect(session.shared.liveness.some((entry) => entry.write === "connected")).toBe(false);
   });
 
-  test("rekey sous le jeton courant : preuve avec la NOUVELLE clé, clé enregistrée mise à jour, rotated au journal", async () => {
+  test("clé différente sous le jeton courant : refus 4401 sans défi, clé enregistrée inchangée, rekey_refused au journal", async () => {
+    // Un jeton de lien volé ne doit pas suffire à imposer la clé de l'attaquant.
     const old = deviceKey();
     const fresh = deviceKey();
     const session = await openLinkSession({ registeredDeviceKey: old.publicKey, offeredDeviceKey: fresh.publicKey });
-    const challenge = await session.waitFrame((frame) => frame.t === "link.challenge");
-    if (challenge.t !== "link.challenge") throw new Error("unreachable");
-    session.send({ t: "link.proof", signature: proveLink(fresh, challenge.nonce, session.wsUrl) });
-    await session.waitLiveness((entry) => entry.write === "connected");
-    const update = session.shared.statements.find((entry) => entry.sql.includes("update runtimes set link_device_pubkey ="));
-    expect(update).toBeDefined();
-    expect(update!.values).toContain(fresh.publicKey);
-    expect(session.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "rotated")).toMatchObject({ meta: { reason: "device_key" } });
+    expect(await session.waitClose()).toBe(RELAY_CLOSE_UNAUTHORIZED);
+    expect(session.frames.some((frame) => frame.t === "link.challenge")).toBe(false);
+    expect(session.shared.statements.some((entry) => entry.sql.includes("update runtimes set link_device_pubkey ="))).toBe(false);
+    expect(session.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "pop_failed")).toMatchObject({ meta: { reason: "rekey_refused" } });
+    expect(session.shared.liveness.some((entry) => entry.write === "event" && entry.kind === "rotated")).toBe(false);
+    expect(session.shared.logs.find((entry) => entry.event === "runtime_link.rekey_refused")).toBeDefined();
+    expect(session.shared.broker.connected(LINK_RUNTIME_ID)).toBe(false);
   });
 
-  test("première clé sous le jeton courant : inscription de A après preuve, puis rekey vers B sous le même jeton", async () => {
+  test("première clé sous le jeton courant : inscription de A après preuve, puis B refusée sous le même jeton", async () => {
     const a = deviceKey();
     const b = deviceKey();
     const first = await openLinkSession({ registeredDeviceKey: null, offeredDeviceKey: a.publicKey, forwardedFor: "203.0.113.10" });
@@ -124,20 +124,17 @@ describe("preuve de possession du lien connecteur", () => {
     expect(updateA).toBeDefined();
     expect(updateA!.values[0]).toBe(a.publicKey);
     expect(updateA!.sql).toContain("and link_token_hash =");
+    expect(updateA!.sql).toContain("and (link_device_pubkey is null or link_device_pubkey =");
     expect(first.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "device_key_registered")).toMatchObject({ meta: { ip: "203.0.113.10", agent: "edge-setup/test" } });
     expect(first.shared.liveness.some((entry) => entry.write === "event" && entry.kind === "rotated")).toBe(false);
 
     // La base factice rend à la seconde montée la clé écrite par la première.
     const second = await openLinkSession({ registeredDeviceKey: updateA!.values[0] as string, offeredDeviceKey: b.publicKey });
-    const challengeB = await second.waitFrame((frame) => frame.t === "link.challenge");
-    if (challengeB.t !== "link.challenge") throw new Error("unreachable");
+    expect(await second.waitClose()).toBe(RELAY_CLOSE_UNAUTHORIZED);
+    expect(second.frames.some((frame) => frame.t === "link.challenge")).toBe(false);
+    expect(second.shared.statements.some((entry) => entry.sql.includes("update runtimes set link_device_pubkey ="))).toBe(false);
+    expect(second.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "pop_failed")).toMatchObject({ meta: { reason: "rekey_refused" } });
     expect(second.shared.broker.connected(LINK_RUNTIME_ID)).toBe(false);
-    second.send({ t: "link.proof", signature: proveLink(b, challengeB.nonce, second.wsUrl) });
-    await second.waitLiveness((entry) => entry.write === "connected");
-    const updateB = second.shared.statements.find((entry) => entry.sql.includes("update runtimes set link_device_pubkey ="));
-    expect(updateB!.values[0]).toBe(b.publicKey);
-    expect(second.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "rotated")).toMatchObject({ meta: { reason: "device_key" } });
-    expect(second.shared.liveness.some((entry) => entry.write === "event" && entry.kind === "device_key_registered")).toBe(false);
   });
 
   test("première clé sous l'ANCIEN jeton en grâce : refusée sans défi ni inscription", async () => {
@@ -151,13 +148,13 @@ describe("preuve de possession du lien connecteur", () => {
     expect(session.shared.broker.connected(LINK_RUNTIME_ID)).toBe(false);
   });
 
-  test("rekey sous l'ANCIEN jeton en grâce : refusé avant tout défi", async () => {
+  test("clé différente sous l'ANCIEN jeton en grâce : refusée avant tout défi", async () => {
     const old = deviceKey();
     const fresh = deviceKey();
     const session = await openLinkSession({ registeredDeviceKey: old.publicKey, offeredDeviceKey: fresh.publicKey, previousToken: true });
     expect(await session.waitClose()).toBe(RELAY_CLOSE_UNAUTHORIZED);
     expect(session.frames.some((frame) => frame.t === "link.challenge")).toBe(false);
-    expect(session.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "pop_failed")).toMatchObject({ meta: { reason: "rekey_with_previous_token" } });
+    expect(session.shared.liveness.find((entry) => entry.write === "event" && entry.kind === "pop_failed")).toMatchObject({ meta: { reason: "rekey_refused" } });
   });
 
   test("deux sockets valides d'adresses différentes en dix minutes : rotation d'urgence et fermeture 4401", async () => {

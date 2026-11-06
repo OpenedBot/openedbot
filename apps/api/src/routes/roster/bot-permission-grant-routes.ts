@@ -1,7 +1,7 @@
 import { isUuid, isoInstant } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
 import type { BotPermissionGrantDto } from "@openedbot/contracts-api";
-import { listActiveBotPermissionGrants, revokeBotPermissionGrantTx, type PermissionActor } from "@openedbot/roster/sql/permission-grants";
+import { listActiveBotPermissionGrants, revokeBotPermissionGrantTx, type PermissionActor } from "@openedbot/roster/application/permission-grants";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import type { AppVariables, AuthContext } from "../identity/auth";

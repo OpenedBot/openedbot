@@ -172,3 +172,24 @@ export function gateDescriptionText(description: unknown): unknown {
   if (typeof description !== "string") return description;
   return description.split("\n").filter((line) => !line.startsWith(DESCRIPTOR_PREFIX)).join("\n").trim();
 }
+
+/**
+ * The normalizer's gate identity, or `unknown` when the vehicle is missing
+ * (an event built elsewhere): never a partly trusted identity.
+ */
+export function approvalGateIdentity(value: unknown): GateIdentity {
+  const gate = value && typeof value === "object" ? value as Partial<GateIdentity> : {};
+  const hermesRequestId = typeof gate.hermesRequestId === "string" ? gate.hermesRequestId : null;
+  if (gate.gateKind === "plugin_tool" && typeof gate.toolKey === "string" && gate.gateArgs && typeof gate.descriptorVersion === "number") {
+    return { hermesRequestId, gateKind: "plugin_tool", toolKey: gate.toolKey, gateArgs: gate.gateArgs, descriptorVersion: gate.descriptorVersion };
+  }
+  if (gate.gateKind === "terminal_danger" && gate.gateArgs) {
+    return { hermesRequestId, gateKind: "terminal_danger", toolKey: null, gateArgs: gate.gateArgs, descriptorVersion: null };
+  }
+  return { hermesRequestId, gateKind: "unknown", toolKey: null, gateArgs: null, descriptorVersion: null };
+}
+
+/** `resolved_by_policy` of a `legacy` refusal: the bot's stored mode, in the closed set of 0138. */
+export function legacyPolicyOf(mode: string | null): "manual" | "plan" | "auto" | "bypass" {
+  return mode === "plan" || mode === "auto" || mode === "bypass" ? mode : "manual";
+}

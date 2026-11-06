@@ -30,22 +30,6 @@
 
 export const MCP_CONNECTOR_CATALOG_VERSION = "2026-10-31";
 
-/**
- * La feature de lien qui permet d'autoriser un serveur MCP pour UN profil
- * nommé. Les jetons MCP vivent dans le home de chaque profil : sans elle, une
- * autorisation ne pourrait être faite qu'à la racine, que les runs d'un bot
- * ne lisent pas. Le catalogue d'un bot n'est donc proposé qu'avec elle.
- */
-export const MCP_OAUTH_PROFILE_FEATURE = "mcp_oauth_profile";
-
-/**
- * La feature de lien qui permet de DÉCONNECTER un serveur MCP d'un profil
- * nommé : retrait du serveur de la configuration du profil et suppression de
- * ses jetons sur le disque de l'hôte. Sans elle, un bot connecté ne peut être
- * que désactivé, son jeton reste sur l'hôte.
- */
-export const MCP_PROFILE_DISCONNECT_FEATURE = "mcp_profile_disconnect";
-
 export type McpConnectorCategory = "docs" | "dev";
 
 export type McpConnectorEntry = {

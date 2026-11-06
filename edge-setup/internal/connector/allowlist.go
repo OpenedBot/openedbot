@@ -220,8 +220,9 @@ var a2aAuditQuery = regexp.MustCompile(`^limit=([1-9]|[1-9][0-9]|100)$`)
 // ForwardedRequestHeaders are the only request headers relayed to the
 // gateway; the bearer is added locally.
 // `cache-control` lets openedbot's « Actualiser » ask the operator for a fresh
-// account-usage probe instead of its one-minute cache.
-var ForwardedRequestHeaders = map[string]bool{"accept": true, "cache-control": true, "content-type": true, "idempotency-key": true, "last-event-id": true}
+// account-usage probe instead of its one-minute cache. `traceparent` is
+// relayed only when it is well formed (trace.go), and journaled.
+var ForwardedRequestHeaders = map[string]bool{"accept": true, "cache-control": true, "content-type": true, "idempotency-key": true, "last-event-id": true, TraceparentHeader: true}
 
 // ForwardedResponseHeaders are the only response headers relayed back.
 var ForwardedResponseHeaders = map[string]bool{"content-type": true, "retry-after": true}

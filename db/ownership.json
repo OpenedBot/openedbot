@@ -30,7 +30,12 @@
       "reason": "Flotte (plug-in agency externe, qui déclare fleet.workspaces et fleet.billing) : depuis l'étape 11.2 ses routes HTTP et ses écrans sont dans le plug-in ; la table, ses migrations, sa RLS et le code d'accès (modules/identity agency-*) restent au cœur, en dette datée ; les valeurs stockées 'agency' (kind, role, clés product_features) ne sont pas migrées."
     }
   },
-  "api_errors": "api",
+  "api_errors": {
+    "owner": "apps/api",
+    "writers": [
+      "apps/worker"
+    ]
+  },
   "api_instances": "runtime-link",
   "audit_chain": "runtime-link",
   "audit_worm_orphans": "runtime-link",
@@ -38,15 +43,35 @@
   "alert_deliveries": "notifications",
   "apns_deliveries": "notifications",
   "apns_devices": "notifications",
-  "approval_requests": "execution",
-  "attachments": "conversation",
-  "bot_groups": "roster",
+  "approval_requests": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "attachments": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "bot_groups": {
+    "owner": "roster",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "bot_host_cleanups": "roster",
   "bot_permission_grants": "roster",
   "bot_permission_rules": "roster",
   "bot_permission_tool_policies": "roster",
   "bot_playbooks": "roster",
-  "bots": "roster",
+  "bots": {
+    "owner": "roster",
+    "writers": [
+      "apps/worker"
+    ]
+  },
   "bot_profile_provisions": "roster",
   "bot_setting_proposals": "roster",
   "decisions": "execution",
@@ -58,6 +83,7 @@
     ]
   },
   "email_outbox_events": "notifications",
+  "execution_commands": "execution",
   "group_member_read_positions": {
     "owner": "conversation",
     "writers": [
@@ -68,11 +94,36 @@
   "marketplace_entries": "marketplace",
   "membership_events": "identity",
   "memberships": "identity",
-  "message_ingress": "conversation",
-  "message_reactions": "conversation",
-  "message_versions": "conversation",
-  "messages": "conversation",
-  "mobile_connect_tickets": "identity",
+  "message_ingress": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "message_reactions": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "message_versions": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "messages": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "mobile_connect_tickets": {
+    "owner": "identity",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "native_auth_codes": "identity",
   "oauth_attempts": "identity",
   "operator_profiles": "identity",
@@ -82,6 +133,7 @@
   "organizations": {
     "owner": "identity",
     "writers": [
+      "apps/api",
       "runtime-link"
     ]
   },
@@ -101,26 +153,41 @@
   "profile_import_jobs": "portability",
   "push_deliveries": "notifications",
   "push_outbox": "notifications",
-  "push_subscriptions": "notifications",
-  "routine_executions": "execution",
-  "routines": "execution",
-  "run_events": {
-    "owner": "execution",
+  "push_subscriptions": {
+    "owner": "notifications",
     "writers": [
-      "runtime-link"
+      "apps/api"
     ]
   },
-  "run_steering_attempts": "execution",
-  "runs": {
+  "routine_executions": {
     "owner": "execution",
     "writers": [
-      "runtime-link"
+      "apps/api"
     ]
   },
+  "routines": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "run_events": "execution",
+  "run_steering_attempts": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runs": "execution",
   "runtime_a2a_audit": "runtimes",
   "runtime_audit_anchors": "runtime-link",
   "runtime_audit_keys": "runtime-link",
-  "runtime_audit_verifications": "runtime-link",
+  "runtime_audit_verifications": {
+    "owner": "runtime-link",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "runtime_connector_notices": {
     "owner": "runtime-link",
     "writers": [
@@ -128,34 +195,68 @@
     ]
   },
   "runtime_connector_release_seen": "runtime-link",
-  "runtime_direct_exposures": "runtimes",
-  "runtime_enrollments": "runtimes",
+  "runtime_direct_exposures": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtime_enrollments": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "runtime_link_alerts": "runtime-link",
-  "runtime_model_selection_proofs": "runtimes",
+  "runtime_model_selection_proofs": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api",
+      "apps/worker"
+    ]
+  },
   "runtime_permission_settings": "runtimes",
   "runtime_model_proven": "runtimes",
   "runtime_review_profiles": "runtimes",
   "runtime_link_diagnostics": "runtime-link",
   "runtime_link_dispatches": "runtime-link",
   "runtime_link_events": "runtime-link",
-  "runtime_bot_settings_tools": "execution",
+  "runtime_bot_settings_tools": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "runtime_read_snapshots": "runtimes",
   "runtime_provider_incidents": {
     "owner": "execution",
     "writers": [
+      "apps/api",
       "runtimes"
     ]
   },
-  "runtime_routine_tools": "execution",
+  "runtime_routine_tools": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "runtimes": {
     "owner": "runtimes",
     "writers": [
+      "apps/api",
       "runtime-link"
     ]
   },
   "schema_migrations": "db",
   "sections": "roster",
-  "service_instances": "runtime-link",
+  "service_instances": {
+    "owner": "runtime-link",
+    "writers": [
+      "apps/api",
+      "apps/worker"
+    ]
+  },
   "sessions": "identity",
   "staff_impersonation_claims": {
     "owner": "staff",
@@ -203,7 +304,12 @@
   "support_conversations": "support",
   "support_events": "support",
   "support_messages": "support",
-  "team_imports": "portability",
+  "team_imports": {
+    "owner": "portability",
+    "writers": [
+      "roster"
+    ]
+  },
   "tenant_blob_deletions": {
     "owner": "identity",
     "writers": [
@@ -215,26 +321,49 @@
   },
   "tenant_deletions": "identity",
   "thread_compactions": "conversation",
-  "thread_hides": "conversation",
+  "thread_hides": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "thread_message_counters": "conversation",
-  "thread_reads": "conversation",
-  "threads": "conversation",
+  "thread_reads": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "threads": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "tool_errors": "execution",
-  "users": "identity",
+  "users": {
+    "owner": "identity",
+    "writers": [
+      "apps/api"
+    ]
+  },
   "waitlist_signups": {
     "owner": "staff",
+    "writers": [
+      "apps/api"
+    ],
     "debt": {
       "until": "2026-12-31",
       "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
     }
   },
-  "webhook_deliveries": "webhooks",
-  "webhook_endpoints": "webhooks",
-  "webhook_management_operations": "webhooks",
+  "webhook_deliveries": "apps/api",
+  "webhook_endpoints": "apps/api",
+  "webhook_management_operations": "apps/api",
   "workflows": {
     "owner": "execution",
     "writers": [
-      "runtime-link"
+      "apps/api"
     ]
   }
 }

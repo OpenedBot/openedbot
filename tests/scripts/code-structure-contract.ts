@@ -21,7 +21,7 @@ import { join, relative, resolve } from "node:path";
 const root = resolve(import.meta.dir, "../..");
 const MAX_LINES = 600;
 const DEBT_FILE = join(root, "tests/scripts/code-size-debt.json");
-const LAYERS = ["apps", "modules", "platform", "contracts", "browser"];
+const LAYERS = ["apps", "modules", "platform", "contracts", "protocol", "browser"];
 const SKIPPED = /(\.test\.tsx?|\.d\.ts|\.bench\.tsx?)$/;
 
 function walk(dir: string, out: string[]): void {

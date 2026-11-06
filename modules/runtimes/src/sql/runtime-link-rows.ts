@@ -47,7 +47,12 @@ export async function writeLinkOrigin(tx: Db, scope: LinkRuntimeScope, origin: s
   return rows.length > 0;
 }
 
-/** Enregistre la clé device du lien ; `false` si le jeton a tourné ou le runtime a été révoqué. */
+/**
+ * Inscrit la première clé device du lien. `false` si le jeton a tourné, si le
+ * runtime a été révoqué, ou si une autre clé a été inscrite entre-temps : une
+ * clé enregistrée ne se remplace jamais par cette voie (la même clé reste
+ * acceptée, pour une montée concurrente du même hôte).
+ */
 export async function registerLinkDevicePublicKey(
   tx: Db,
   scope: LinkRuntimeScope,
@@ -57,6 +62,7 @@ export async function registerLinkDevicePublicKey(
     update runtimes set link_device_pubkey = ${devicePublicKey}, updated_at = now()
      where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}
        and link_token_hash = ${scope.tokenHash} and revoked_at is null
+       and (link_device_pubkey is null or link_device_pubkey = ${devicePublicKey})
      returning id
   `;
   return rows.length > 0;

@@ -17,6 +17,7 @@ import { HermesProfileField } from "../hermes-profile-field";
 import { DEFAULT_CREATION_OPTIONS, RuntimePromiseLine, type CreationOptionsValue } from "./creation-options";
 import type { BotCreationRequest } from "./creation-request";
 import { useBotCreationLaunch } from "./use-bot-launch";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /** The `bots.label` bound (0099): the role is the label shown under the name. */
 export const BOT_ROLE_MAX_CHARS = 60;
@@ -147,7 +148,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   const isMobile = useIsMobile();
   const runtimeQuery = useQuery({ ...runtimesQueryOptions(), enabled: open });
   const runtime = runtimeQuery.data?.runtimes[0] ?? null;
-  const profileManagement = runtime?.linkFeatures?.includes("profile_management") === true;
+  const profileManagement = runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT) === true;
   // Same cache entry as the model picker: the organization's assignment mode.
   // While the runtime's new model is still being proven, read it again so the
   // warning below leaves as soon as the proof settles.

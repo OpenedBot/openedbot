@@ -10,13 +10,15 @@ import type { RuntimeEdgeAuthInput } from "@openedbot/contracts-api";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { runtimeLinkClientConfig, runtimeLinks, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";
 import {
+  runtimeLinkClientConfig,
   runtimeLinkLocator,
+  runtimeLinks,
   unavailableMessage,
   type LinkUnavailableDetail,
   type RuntimeLinkLocator,
-} from "@openedbot/runtime-link/application/instances";
+  type RuntimeLinks,
+} from "./runtime-link-port";
 import { readRuntimeRowById, readRuntimeRows, type RuntimeRow } from "../sql/runtime-rows";
 
 /** Persisted active runtime identity and last announced link features, with no connector reachability check. */

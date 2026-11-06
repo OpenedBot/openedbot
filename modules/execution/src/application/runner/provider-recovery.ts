@@ -16,7 +16,6 @@ import {
   fallbackFailureMessage,
   loadActiveIncidents,
   planProviderRetry,
-  PROFILE_MANAGEMENT_FEATURE,
   providerAuthRequiredPayload,
   providerFallbackPayload,
   PROVIDER_FALLBACK_EVENT,
@@ -26,9 +25,11 @@ import {
 import { rememberWarmModelSelection } from "../warm-model-selection";
 import type { WorkerConfig } from "../worker-config";
 import { NamedRunError } from "./failure";
-import { persistEvents } from "./persist";
+import { persistUnnumberedEvents } from "./persist";
 import type { RunContext } from "./types";
 import { describe, log } from "./util";
+import { markCreateIntent } from "./lease-transitions";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /**
  * Le couple que ce run demandera, selon le mode d'attribution de l'organisation.
@@ -221,14 +222,7 @@ export async function persistResolvedRunModel(
   context: Pick<RunContext, "id" | "organizationId" | "leaseGeneration">,
   model: string | null,
 ): Promise<boolean> {
-  const rows = await db<Array<{ id: string }>>`
-    update runs set model = ${model}, external_state = 'creating', events_complete = false, updated_at = now()
-     where id = ${context.id} and organization_id = ${context.organizationId}
-       and lease_owner = ${config.workerId} and lease_generation = ${context.leaseGeneration}
-       and status = 'starting' and external_state = 'not_started'
-     returning id
-  `;
-  return Boolean(rows[0]);
+  return markCreateIntent(db, config, context, model);
 }
 
 export function fallbackAwareError(error: unknown, retryState: ProviderRetryState): unknown {
@@ -251,14 +245,15 @@ export function fallbackAwareError(error: unknown, retryState: ProviderRetryStat
  * What the runner does after a provider failure.
  *
  * `retry` carries the sequence of the `run.provider_fallback` event it just
- * wrote: a run whose normaliser is already open must skip it, or its next
- * event takes the same sequence and is dropped by `on conflict do nothing`
- * (measured 2026-10-24: the first characters of every answer after a
- * fallback, "ello" for "hello"). `auth_required` names the provider whose
+ * wrote (null if the lease was lost before): a run whose normaliser is
+ * already open must skip it, or its next event proposes the same sequence,
+ * refused since S2c (`RUN_EVENT_SEQUENCE_CONFLICT`); it used to be dropped by
+ * `on conflict do nothing` (measured 2026-10-24: the first characters of every
+ * answer after a fallback, "ello" for "hello"). `auth_required` names the provider whose
  * login was refused: the run fails with `PROVIDER_AUTH_REQUIRED`.
  */
 export type ProviderRecovery =
-  | { action: "retry"; selection: ResolvedRunSelection; state: ProviderRetryState; fallbackSequence: number }
+  | { action: "retry"; selection: ResolvedRunSelection; state: ProviderRetryState; fallbackSequence: number | null }
   | { action: "auth_required"; provider: string }
   | { action: "give_up" };
 
@@ -337,19 +332,13 @@ export async function recoverProviderFailure(
       profile: context.hermesProfile,
       provider: fallback.provider,
       model: fallback.model,
-      capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
+      capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
     });
     // Le repli repartirait chez le fournisseur du profil, celui qui vient
     // d'échouer : pas de nouvelle tentative sous une étiquette fausse.
     if (profileServesOtherProvider(catalog, fallback.provider)) return { action: "give_up" };
   }
-  const sequenceRows = await db<Array<{ next: number }>>`
-    select coalesce(max(sequence), -1) + 1 as next from run_events
-     where organization_id = ${context.organizationId} and run_id = ${context.id}
-  `;
-  const fallbackSequence = Number(sequenceRows[0]?.next ?? 0);
-  await persistEvents(db, config, context, context.lastHermesSequence, [{
-    sequence: fallbackSequence,
+  const committed = await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
     type: PROVIDER_FALLBACK_EVENT,
     occurredAt: new Date(),
     payload: providerFallbackPayload(plan.state.fromProvider, fallback),
@@ -363,6 +352,8 @@ export async function recoverProviderFailure(
     reason: fallback.reason,
     profileApplied: applied,
   });
+  // Null when the lease was lost meanwhile: the next write of this run is refused anyway.
+  const fallbackSequence = committed.find((event) => event.type === PROVIDER_FALLBACK_EVENT)?.sequence ?? null;
   return { action: "retry", selection: plan.selection, state: plan.state, fallbackSequence };
 }
 
@@ -466,7 +457,7 @@ export async function resolveSelectionForNewRun(
         model: selection.model,
         profileProvider: catalog.provider,
         profileModel: catalog.model,
-        capability: context.linkFeatures.includes(PROFILE_MANAGEMENT_FEATURE),
+        capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
       });
       // Le gateway route sur le fournisseur du profil, pas sur celui du corps
       // du run : lancer quand même afficherait le modèle demandé pendant qu'un
@@ -537,16 +528,11 @@ export function profileCatalogMissingCurrent(
 
 /**
  * Échec avant même l’appel à Hermes : aucun fournisseur utilisable. On passe
- * par persistEvents pour que le message remonte dans le fil exactement comme
+ * par persistUnnumberedEvents pour que le message remonte dans le fil exactement comme
  * un run.error Hermes, sans jamais repasser par la file de retry.
  */
 export async function failWithoutUsableProvider(db: SQL, config: WorkerConfig, context: RunContext): Promise<void> {
-  const sequenceRows = await db<Array<{ next: number }>>`
-    select coalesce(max(sequence), -1) + 1 as next from run_events
-     where organization_id = ${context.organizationId} and run_id = ${context.id}
-  `;
-  await persistEvents(db, config, context, context.lastHermesSequence, [{
-    sequence: Number(sequenceRows[0]?.next ?? 0),
+  await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
     type: "run.error",
     occurredAt: new Date(),
     payload: { message: NO_USABLE_PROVIDER_MESSAGE, errorCode: NO_USABLE_PROVIDER_CODE },

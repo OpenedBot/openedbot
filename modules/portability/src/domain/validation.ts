@@ -1,7 +1,7 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { parseHostProfile, parseHostProfileAvatar } from "@openedbot/hermes";
 import type { HermesBundleImportInput, HermesProfileImportEntry } from "@openedbot/contracts-api";
-import { ProfileImportError } from "./errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 
 const PROFILE_FIELDS = ["name", "displayName", "title", "description", "soul", "model", "uiMeta", "hasAvatar", "routines", "skills", "toolsets", "mcpServers", "avatar"];
 const FLAG_PATTERNS = {

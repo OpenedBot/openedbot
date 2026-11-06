@@ -1,43 +1,40 @@
-# Builds the desktop app (apps/desktop): the macOS .dmg (arm64, notch popup
-# embedded) and the Linux AppImage and .deb (x64). A pull request that touches
-# the app builds them as run artifacts. A desktop/vX.Y.Z tag also publishes
-# them as a GitHub release, under stable names, so
-# https://github.com/OpenedBot/openedbot/releases/latest/download/<file> always
-# serves the newest build. No auto-update feed (apps/desktop/README.md).
+# Publishes the desktop app's GitHub release on a desktop/vX.Y.Z tag, from the
+# files already published on R2 (https://releases.openedbot.app/desktop/vX.Y.Z/).
+# Nothing is built here: the macOS app is signed with the Developer ID and
+# notarised on a Mac, and every update artifact is signed with the update key,
+# which never leaves that Mac (apps/desktop-tauri: build-mac.ts and
+# build-linux.ts --identity production, then release.ts; ADR 0001, D3 and D6).
 #
-# macOS signature: a pull request builds ad hoc (no secret reaches its code). A
-# tag, or a manual run, signs with the Developer ID and notarises the app and
-# the dmg; a tag without the secrets fails rather than publish a build
-# Gatekeeper refuses. Secrets: MACOS_CSC_LINK (base64 .p12, imported into a
-# keychain of the run, see Signing keychain), MACOS_CSC_KEY_PASSWORD,
-# APPLE_API_KEY_P8 (App Store Connect key, .p8 content), APPLE_API_KEY_ID,
-# APPLE_API_ISSUER.
+# The workflow downloads the files R2 lists in SHA256SUMS, checks them (sums,
+# update signatures against apps/desktop-tauri/updater.pub, Gatekeeper and the
+# team for the dmg, package metadata and a start under Xvfb for Linux), then
+# copies the installers into the GitHub release under stable names, so
+# https://github.com/OpenedBot/openedbot/releases/latest/download/<file>
+# always serves the newest build:
+#
+#   openedbot-mac-arm64.dmg           macOS, Apple Silicon
+#   openedbot-linux-amd64.deb         Debian, Ubuntu (x86_64)
+#   openedbot-linux-x86_64.AppImage   other Linux (x86_64)
+#   openedbot-linux-arm64.deb         Debian, Ubuntu (arm64)
+#   openedbot-linux-aarch64.AppImage  other Linux (arm64)
+#
+# Nothing on R2 for this version, or one file that does not check: the
+# workflow fails and nothing is published.
 # Actions pinned by SHA; Bun pinned by packageManager (package.json).
 name: desktop-release
 
 on:
-  pull_request:
-    paths:
-      - apps/desktop/**
-      - .github/workflows/desktop-release.yml
   push:
     tags: ["desktop/v*"]
+  # A re-run on a tag (a release that failed half-way); a branch is refused.
   workflow_dispatch:
-    inputs:
-      notch_ref:
-        description: "OpenedBot/openedbot-notch ref to embed"
-        required: false
-        default: main
 
 permissions:
   contents: read
 
 concurrency:
   group: desktop-release-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-env:
-  NOTCH_REF: ${{ github.event.inputs.notch_ref || 'main' }}
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -46,9 +43,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.v.outputs.version }}
-      release: ${{ steps.v.outputs.release }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: v
         # The ref goes through the environment, never the script body: `${{ }}`
         # is substituted before the shell reads the line.
@@ -56,159 +51,100 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          version="$(jq -r .version apps/desktop/package.json)"
-          case "$version" in
-            [0-9]*.[0-9]*.[0-9]*) ;;
-            *) echo "apps/desktop/package.json has no X.Y.Z version: $version" >&2; exit 2 ;;
-          esac
-          release=false
-          if [ "$REF_TYPE" = "tag" ]; then
-            # A tag that disagrees with package.json would publish files whose
-            # names and About box carry another version.
-            if [ "$REF_NAME" != "desktop/v$version" ]; then
-              echo "tag $REF_NAME does not match apps/desktop/package.json ($version): want desktop/v$version" >&2
-              exit 2
-            fi
-            release=true
+          if [ "$REF_TYPE" != tag ]; then
+            echo "run this workflow on a desktop/vX.Y.Z tag, not on $REF_TYPE $REF_NAME" >&2
+            exit 2
+          fi
+          version="${REF_NAME#desktop/v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$'; then
+            echo "tag $REF_NAME is not desktop/vX.Y.Z" >&2
+            exit 2
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "release=$release" >> "$GITHUB_OUTPUT"
 
-  mac:
-    name: macOS dmg (arm64)
+  fetch:
+    # Every file SHA256SUMS lists, then release.ts verify: the list is exactly
+    # the release's files, each sum matches, and every update artifact
+    # (.app.tar.gz, AppImage) is signed by the update key for this version.
+    name: Fetch and verify the files on R2
     needs: version
-    runs-on: macos-26
-    # Notarisation (app, then dmg) waits on Apple, usually a few minutes.
-    timeout-minutes: 75
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: OpenedBot/openedbot-notch
-          ref: ${{ env.NOTCH_REF }}
-          path: openedbot-notch
-      - name: Toolchain (newest Xcode on the image)
-        # Same choice as the notch's own CI: older Swift times out on its views.
-        run: |
-          xcode="$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)"
-          sudo xcode-select -s "$xcode"
-          echo "$xcode"
-          swift --version
-      - name: Build the notch popup (signed ad hoc)
-        env:
-          OPENEDBOT_NOTCH_ADHOC: "1"
-        run: |
-          # An older notch ref signs with a keychain identity whose trust
-          # prompt hangs a runner until the timeout: stop at once instead.
-          grep -q OPENEDBOT_NOTCH_ADHOC openedbot-notch/scripts/dev-sign.sh || {
-            echo "OpenedBot/openedbot-notch@$NOTCH_REF predates ad hoc signing (OPENEDBOT_NOTCH_ADHOC): pick a newer notch_ref" >&2
-            exit 1
-          }
-          make -C openedbot-notch bundle
-          echo "NOTCH_SHA=$(git -C openedbot-notch rev-parse HEAD)" >> "$GITHUB_ENV"
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
-      - name: Install
-        working-directory: apps/desktop
-        run: |
-          bun install --frozen-lockfile
-          bun x install-electron
-      - name: Typecheck and tests
-        working-directory: apps/desktop
-        run: make typecheck test
-      - name: Signing mode
-        id: sign
-        env:
-          EVENT: ${{ github.event_name }}
-          RELEASE: ${{ needs.version.outputs.release }}
-          HAS_SECRETS: ${{ secrets.MACOS_CSC_LINK != '' && secrets.MACOS_CSC_KEY_PASSWORD != '' && secrets.APPLE_API_KEY_P8 != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
-        run: |
-          if [ "$EVENT" = pull_request ]; then
-            mode=adhoc
-          elif [ "$HAS_SECRETS" = true ]; then
-            mode=developer-id
-          elif [ "$RELEASE" = true ]; then
-            echo "a release needs the Developer ID and notarisation secrets (MACOS_CSC_LINK, MACOS_CSC_KEY_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER)" >&2
-            exit 1
-          else
-            echo "::warning::signing secrets missing: building ad hoc"
-            mode=adhoc
-          fi
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "macOS signature: $mode" >> "$GITHUB_STEP_SUMMARY"
-      - name: Package (ad hoc)
-        if: steps.sign.outputs.mode == 'adhoc'
-        working-directory: apps/desktop
-        env:
-          # electron-builder skips signing on a pull request, which leaves the
-          # app with a broken seal. The identity is ad hoc (no certificate, no
-          # secret), so a PR build is signed like a local one.
-          CSC_FOR_PULL_REQUEST: "true"
-        run: make package-mac MAC_SIGN=adhoc NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
-      - name: Notarisation key
-        if: steps.sign.outputs.mode == 'developer-id'
-        env:
-          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-        run: |
-          # notarytool reads the key from a file: APPLE_API_KEY is its path.
-          key="$RUNNER_TEMP/AuthKey.p8"
-          (umask 077; printf '%s\n' "$APPLE_API_KEY_P8" > "$key")
-          echo "APPLE_API_KEY=$key" >> "$GITHUB_ENV"
-      - name: Signing keychain
-        # Not CSC_LINK: electron-builder 26 then unlocks its own temporary
-        # keychain with the .p12 password instead of the keychain's, and
-        # `security set-key-partition-list` fails. This step builds the same
-        # keychain correctly and hands it over through CSC_KEYCHAIN.
-        if: steps.sign.outputs.mode == 'developer-id'
-        env:
-          MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-        run: |
-          keychain="$RUNNER_TEMP/openedbot-signing.keychain-db"
-          p12="$RUNNER_TEMP/developer-id.p12"
-          pass="$(openssl rand -base64 32)"
-          echo "::add-mask::$pass"
-          (umask 077; printf '%s' "$MACOS_CSC_LINK" | base64 --decode > "$p12")
-          security create-keychain -p "$pass" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$pass" "$keychain"
-          security import "$p12" -k "$keychain" -P "$MACOS_CSC_KEY_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productbuild
-          rm -f "$p12"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$pass" "$keychain" >/dev/null
-          # codesign and notarytool look the identity up in the search list.
-          # shellcheck disable=SC2046
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          security find-identity -v -p codesigning "$keychain" | grep -q 'Developer ID Application' || {
-            echo "no Developer ID Application identity in MACOS_CSC_LINK" >&2; exit 1; }
-          echo "CSC_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
-      - name: Package (Developer ID, notarised)
-        if: steps.sign.outputs.mode == 'developer-id'
-        working-directory: apps/desktop
-        env:
-          # The identity comes from CSC_KEYCHAIN (step above), never CSC_LINK.
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: make package-mac MAC_SIGN=developer-id NOTCH_DIR="$GITHUB_WORKSPACE/openedbot-notch"
-      - name: Remove the notarisation key and the signing keychain
-        if: always() && steps.sign.outputs.mode == 'developer-id'
-        run: |
-          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/developer-id.p12"
-          if [ -n "${CSC_KEYCHAIN:-}" ]; then security delete-keychain "$CSC_KEYCHAIN" || true; fi
-      - name: Check the app
-        # developer-id: Gatekeeper (spctl) must accept the app and the dmg, and
-        # both tickets must be stapled (scripts/check-mac-app.sh).
-        working-directory: apps/desktop
-        env:
-          MAC_SIGN: ${{ steps.sign.outputs.mode }}
-        run: make check-mac MAC_SIGN="$MAC_SIGN"
-      - name: Stage under the release name
+      - name: Download
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
+          base="https://releases.openedbot.app/desktop/v$VERSION"
+          mkdir -p r2
+          curl -fsS --proto '=https' --retry 3 -o r2/SHA256SUMS "$base/SHA256SUMS"
+          # Names come from the network: only the release's own shapes, never a path.
+          while read -r _sum name; do
+            case "$name" in
+              openedbot_"$VERSION"_*) ;;
+              *) echo "unexpected name in SHA256SUMS: $name" >&2; exit 1 ;;
+            esac
+            if ! printf '%s' "$name" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+              echo "unexpected name in SHA256SUMS: $name" >&2
+              exit 1
+            fi
+            curl -fsS --proto '=https' --retry 3 -o "r2/$name" "$base/$name"
+          done < r2/SHA256SUMS
+          ls -l r2
+      - name: Verify sums and update signatures
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: bun apps/desktop-tauri/scripts/release.ts verify --version "$VERSION" --dir r2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: r2-files
+          path: r2/
+          if-no-files-found: error
+          retention-days: 7
+
+  mac:
+    # The dmg R2 serves, checked as a downloaded copy: Gatekeeper, the stapled
+    # ticket, the team that signed it, the bundle id and the version.
+    name: macOS dmg
+    needs: [version, fetch]
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: r2-files
+          path: r2
+      - name: Check the dmg
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          dmg="r2/openedbot_${VERSION}_aarch64.dmg"
+          spctl -a -t open --context context:primary-signature -vv "$dmg"
+          xcrun stapler validate "$dmg"
+          mount="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
+          app="$mount/openedbot.app"
+          id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+          short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          spctl -a -vv "$app"
+          xcrun stapler validate "$app"
+          # Gatekeeper accepts any notarised developer: the app must be OpenedBot's.
+          team="$(codesign -dv "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+          hdiutil detach "$mount"
+          if [ "$team" != QDC76LMF29 ]; then
+            echo "$dmg is signed by team '$team', want QDC76LMF29" >&2
+            exit 1
+          fi
+          if [ "$id" != app.openedbot.desktop ] || [ "$short" != "$VERSION" ]; then
+            echo "$dmg holds $id $short, want app.openedbot.desktop $VERSION" >&2
+            exit 1
+          fi
           mkdir -p out
-          cp "apps/desktop/release/openedbot-$VERSION-mac-arm64.dmg" out/openedbot-mac-arm64.dmg
-          echo "$NOTCH_SHA" > out/notch-sha.txt
+          cp "$dmg" out/openedbot-mac-arm64.dmg
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-mac
@@ -217,64 +153,82 @@ jobs:
           retention-days: 14
 
   linux:
-    name: Linux AppImage and deb (x64)
-    needs: version
-    runs-on: ubuntu-24.04
+    # The deb and the AppImage R2 serves for one architecture, on a runner of
+    # that architecture: the deb's metadata (package, version, the 1.0.x
+    # package it replaces, the openedbot:// handler), then each one started
+    # under Xvfb, which must still run after 20 s (timeout exits 124).
+    name: Linux deb and AppImage (${{ matrix.arch }})
+    needs: [version, fetch]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: x86_64
+            deb-arch: amd64
+            elf: x86-64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            deb-arch: arm64
+            elf: ARM aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          bun-version-file: package.json
-      - name: Install
-        working-directory: apps/desktop
-        run: |
-          bun install --frozen-lockfile
-          bun x install-electron
-      - name: Typecheck and tests
-        working-directory: apps/desktop
-        run: make typecheck test
-      - name: Package
-        working-directory: apps/desktop
-        run: make package-linux
+          name: r2-files
+          path: r2
+      - run: sudo apps/desktop-tauri/linux/install-deps.sh test
       - name: Check the packages
-        working-directory: apps/desktop
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          DEB_ARCH: ${{ matrix.deb-arch }}
+          ELF: ${{ matrix.elf }}
         run: |
-          # electron-builder spells the architecture per target (amd64 for the
-          # .deb, x86_64 for the AppImage): find each file by its extension.
-          one() { set -- $1; [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "want exactly one file, got: $*" >&2; exit 1; }; echo "$1"; }
-          deb="$(one 'release/*.deb')"
-          appimage="$(one 'release/*.AppImage')"
-          echo "DEB=apps/desktop/$deb" >> "$GITHUB_ENV"
-          echo "APPIMAGE=apps/desktop/$appimage" >> "$GITHUB_ENV"
+          deb="r2/openedbot_${VERSION}_${ARCH}.deb"
+          appimage="r2/openedbot_${VERSION}_${ARCH}.AppImage"
           dpkg-deb --info "$deb"
+          [ "$(dpkg-deb --field "$deb" Package)" = openedbot ]
           [ "$(dpkg-deb --field "$deb" Version)" = "$VERSION" ]
+          [ "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH" ]
+          # Installed over the 1.0.x package, it takes its place instead of failing on shared files.
+          dpkg-deb --field "$deb" Replaces | grep -qw openedbot-desktop
+          dpkg-deb --field "$deb" Conflicts | grep -qw openedbot-desktop
           # The Google return (openedbot://auth/callback) needs the scheme handler.
-          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
-          [ -x "$appimage" ]
-      - name: Smoke launch
-        # The packaged app must stay up for 20 s on a virtual display (timeout
-        # exits 124); a crash at startup exits sooner with another status.
-        # --no-sandbox: the runner forbids the unprivileged user namespaces the
-        # Chromium sandbox needs, which an installed .deb gets through its
-        # setuid chrome-sandbox.
-        working-directory: apps/desktop
+          # Tauri's deb lists `usr/…` without the `./` of electron-builder's: match either.
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards '*usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
+          file "$appimage" | tee /dev/stderr | grep -q "ELF 64-bit.*$ELF"
+          chmod +x "$appimage"
+      - name: Start the installed deb, then the AppImage
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
         run: |
-          set +e
-          xvfb-run --auto-servernum timeout 20 release/linux-unpacked/openedbot --no-sandbox
-          status=$?
-          set -e
-          [ "$status" -eq 124 ] || { echo "the app exited with $status before 20 s" >&2; exit 1; }
+          sudo apt-get install -y -qq "./r2/openedbot_${VERSION}_${ARCH}.deb"
+          for app in /usr/bin/openedbot "./r2/openedbot_${VERSION}_${ARCH}.AppImage"; do
+            set +e
+            apps/desktop-tauri/linux/session.sh --keyring timeout 20 "$app"
+            status=$?
+            set -e
+            [ "$status" -eq 124 ] || { echo "$app exited with $status before 20 s" >&2; exit 1; }
+          done
       - name: Stage under the release names
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          DEB_ARCH: ${{ matrix.deb-arch }}
         run: |
           mkdir -p out
-          cp "$APPIMAGE" out/openedbot-linux-x86_64.AppImage
-          cp "$DEB" out/openedbot-linux-amd64.deb
+          cp "r2/openedbot_${VERSION}_${ARCH}.deb" "out/openedbot-linux-${DEB_ARCH}.deb"
+          cp "r2/openedbot_${VERSION}_${ARCH}.AppImage" "out/openedbot-linux-${ARCH}.AppImage"
+          ls -l out
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: desktop-linux
+          name: desktop-linux-${{ matrix.arch }}
           path: out/
           if-no-files-found: error
           retention-days: 14
@@ -282,7 +236,6 @@ jobs:
   release:
     name: Publish the GitHub release
     needs: [version, mac, linux]
-    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -298,9 +251,7 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          notch="$(cat notch-sha.txt)"
-          rm notch-sha.txt
-          sha256sum openedbot-mac-arm64.dmg openedbot-linux-x86_64.AppImage openedbot-linux-amd64.deb > SHA256SUMS
+          sha256sum openedbot-mac-arm64.dmg openedbot-linux-amd64.deb openedbot-linux-x86_64.AppImage openedbot-linux-arm64.deb openedbot-linux-aarch64.AppImage > SHA256SUMS
           cat SHA256SUMS
           {
             echo "openedbot desktop $VERSION."
@@ -308,12 +259,15 @@ jobs:
             echo "| System | File |"
             echo "|---|---|"
             echo "| macOS, Apple Silicon | \`openedbot-mac-arm64.dmg\` |"
-            echo "| Debian, Ubuntu (x64) | \`openedbot-linux-amd64.deb\` |"
-            echo "| Other Linux (x64) | \`openedbot-linux-x86_64.AppImage\` |"
+            echo "| Debian, Ubuntu (x86_64) | \`openedbot-linux-amd64.deb\` |"
+            echo "| Other Linux (x86_64) | \`openedbot-linux-x86_64.AppImage\` |"
+            echo "| Debian, Ubuntu (arm64) | \`openedbot-linux-arm64.deb\` |"
+            echo "| Other Linux (arm64) | \`openedbot-linux-aarch64.AppImage\` |"
             echo
-            echo "macOS: signed with a Developer ID and notarised by Apple, it opens without a warning. Windows and Linux builds are unsigned. Install steps: apps/desktop/README.md."
+            echo "macOS: signed with a Developer ID and notarised by Apple; it opens without a warning and updates itself."
+            echo "Linux: the AppImage updates itself (make it executable, then run it). The deb installs with \`sudo apt install ./openedbot-linux-amd64.deb\` (or arm64), takes the place of an earlier openedbot package, and is updated by installing the next one. The packages are not signed; their update artifacts are."
             echo
-            echo "Notch popup: OpenedBot/openedbot-notch@$notch."
+            echo "The same files and the update artifacts are served by https://releases.openedbot.app/desktop/v$VERSION/ (SHA256SUMS there)."
           } > ../notes.md
       - name: Create or update the release
         # A re-run of the same tag replaces the files instead of failing.
@@ -323,7 +277,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          files="out/openedbot-mac-arm64.dmg out/openedbot-linux-x86_64.AppImage out/openedbot-linux-amd64.deb out/SHA256SUMS"
+          files="out/openedbot-mac-arm64.dmg out/openedbot-linux-amd64.deb out/openedbot-linux-x86_64.AppImage out/openedbot-linux-arm64.deb out/openedbot-linux-aarch64.AppImage out/SHA256SUMS"
           if gh release view "$TAG" >/dev/null 2>&1; then
             # shellcheck disable=SC2086
             gh release upload "$TAG" $files --clobber

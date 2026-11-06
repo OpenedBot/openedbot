@@ -1,27 +1,27 @@
 /*
-  La coque native (`openedbot-desktop`) n'a pas de barre de titre, ni sous macOS ni
-  sous Windows : la console monte jusqu'au bord haut de la fenêtre et la
+  L'app de bureau n'a pas de barre de titre sous macOS (ni sous Windows, D4) :
+  la console monte jusqu'au bord haut de la fenêtre et la
   barre du haut du cadre (`board-chrome.tsx`, 46 px) devient celle de la
   fenêtre, à la manière de Codex, de ChatGPT ou de T3 Code. La rangée du haut
   de l'app (haut de la barre latérale, barre du haut, en-tête de l'éditeur
   d'agent) devient la poignée de la fenêtre.
 
   - macOS : les feux tricolores flottent dans le coin haut gauche.
-  - Windows : la coque dessine réduire, agrandir et fermer par-dessus le coin
-    haut droit (`titleBarOverlay`, 46 px de haut, aux couleurs du cadre).
+  - Windows (D4) : réduire, agrandir et fermer par-dessus le coin haut droit
+    (46 px de haut, aux couleurs du cadre).
 
   Tout vit sous `:root[data-native-titlebar]` (`"mac"` ou `"windows"`), posé
   avant le premier rendu par `lib/platform/native-titlebar.ts` : navigateur et PWA ne
   voient aucune de ces règles. Les règles communes aux deux coques prennent
   l'attribut seul, les autres sa valeur.
 
-  Géométrie liée à `openedbot-desktop/src/main/window.ts` :
-  - macOS, `trafficLightPosition: { x: 16, y: 16 }` (boutons de 14 pt espacés
-    de 23 : x 16 à 76, y 16 à 30, centre y 23). Ce centre est celui de la
-    barre du haut du cadre (46 / 2), barre latérale ouverte ou repliée.
-  - Windows, `titleBarOverlay.height: 46` : les boutons font la hauteur de la
-    barre. Leur largeur vient des variables de la Window Controls Overlay
-    (`env(titlebar-area-*)`), qu'Electron expose avec `titleBarOverlay`.
+  Géométrie liée à `apps/desktop-tauri/src-tauri/src/macos/traffic_lights.rs` :
+  - macOS, le bouton de fermeture à x 16, les trois boutons centrés sur la
+    barre du haut du cadre (46 / 2 × zoom), barre latérale ouverte ou
+    repliée ; la place réservée finit à 76.
+  - Windows, 46 px de haut : les boutons font la hauteur de la barre. Leur
+    largeur vient des variables de la Window Controls Overlay
+    (`env(titlebar-area-*)`).
   Changer l'un sans l'autre décale les boutons.
 
   Régions de déplacement : Chromium les applique dans l'ordre, une région

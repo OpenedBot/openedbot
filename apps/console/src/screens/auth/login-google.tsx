@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import type { AuthClaimDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { leaveTo } from "../../lib/platform/open-external";
-import type { NativeAuthBridge } from "../../lib/platform/native-bridge";
+import type { NativeAuthBridge } from "../../lib/platform";
 import { APP_HOME_HREF } from "../../lib/session/public-landing-gate";
 import { loginFailureCode, runNativeStep } from "./login-transport";
 

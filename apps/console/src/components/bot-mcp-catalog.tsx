@@ -2,7 +2,6 @@ import { useCallback, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BotDto, BotMcpServerDto } from "@openedbot/contracts-api";
 import {
-  MCP_PROFILE_DISCONNECT_FEATURE,
   mcpCatalogOffer,
   mcpConnectorEntry,
   type McpConnectorEntry,
@@ -20,6 +19,7 @@ import {
 } from "../screens/settings/installation/connectors/connectors-catalog-model";
 import { CONNECTOR_PILL, McpConnectorLogo, McpConnectorRow } from "./mcp-connector-row";
 import { Note } from "./settings/primitives";
+import { RELAY_FEATURE_GATEWAY_RESTART, RELAY_FEATURE_MCP_PROFILE_DISCONNECT } from "@openedbot/contracts-connector/features";
 
 export type { McpConnectBlocker } from "../screens/settings/installation/connectors/connectors-catalog-model";
 
@@ -76,11 +76,11 @@ export function useBotMcpConnect(bot: BotDto, writable: boolean, open: boolean) 
     /** Le serveur d'un bot vient-il du catalogue ? Seuls ceux-là se reconnectent d'ici. */
     catalogEntry: (name: string) => mcpConnectorEntry(name),
     connected,
-    gatewayRestart: features.includes("gateway_restart"),
+    gatewayRestart: features.includes(RELAY_FEATURE_GATEWAY_RESTART),
     /** L'hôte recharge MCP tout seul : aucun redémarrage à demander après un geste MCP. */
     liveReload: hasMcpLiveReload(features),
     /** L'hôte sait retirer un serveur du catalogue de ce profil, jeton compris. */
-    canDisconnect: writable && Boolean(bot.hermesProfile) && features.includes(MCP_PROFILE_DISCONNECT_FEATURE),
+    canDisconnect: writable && Boolean(bot.hermesProfile) && features.includes(RELAY_FEATURE_MCP_PROFILE_DISCONNECT),
     dialog,
   };
 }

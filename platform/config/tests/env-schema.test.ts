@@ -90,9 +90,7 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   { path: "platform/config/src/client-env.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "apps/console/vite.config.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/setup.sh", pattern: SETUP_WRITE, strip: stripShellComments },
-  // LOCAL_CONSOLE_URL is a make variable handed to the apps/desktop sub-make
-  // (`make desktop`), not an environment variable of any app.
-  { path: "Makefile", pattern: MAKEFILE_EXPORT, strip: stripShellComments, skip: new Set(["LOCAL_CONSOLE_URL"]) },
+  { path: "Makefile", pattern: MAKEFILE_EXPORT, strip: stripShellComments },
   // Élargissement de l'audit A3 : ces lecteurs manquaient à l'appel, ce qui a
   // laissé HERMES_SESSION_MESSAGES_TIMEOUT_MS, LINK_DEV_*, OPENEDBOT_POSTGRES_PORT
   // et les confirmations de reset hors du schéma pendant que MIGRATOR_DATABASE_URL

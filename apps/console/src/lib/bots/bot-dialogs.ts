@@ -30,6 +30,17 @@ export const BOT_MANAGE_PAGES = [
 ] as const;
 export type BotManagePage = (typeof BOT_MANAGE_PAGES)[number];
 
+/**
+ * Parked pages: shown, never opened (the webhooks keep their panel and API;
+ * reactivating one is removing it from here). Lives with the page list, not
+ * in the bot page itself: the group menu reads it without loading that page.
+ */
+const PARKED_BOT_MANAGE_PAGES: ReadonlySet<BotManagePage> = new Set<BotManagePage>(["webhooks"]);
+
+export function isBotManagePageParked(page: BotManagePage): boolean {
+  return PARKED_BOT_MANAGE_PAGES.has(page);
+}
+
 type BotDialogsState = {
   createOpen: boolean;
   createSource: BotDto | null;

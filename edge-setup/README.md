@@ -155,7 +155,7 @@ edge-setup audit --strict
 | `plan` | yes | Prints exactly what `up` would do. |
 | `up` | | Installs the runtime, loopback gateway and connector; host policies are opt-in flags. `--auto-upgrade` also enables the upgrade timer. |
 | `verify-access` | | From a fresh SSH session: proves admin access and commits a guarded policy. |
-| `link` | | Pairs the runtime with openedbot (`--openedbot`, default `https://link.openedbot.app`; `--name`, `--ticket-file`, `--rekey`, `--insecure-openedbot` for a loopback development origin only). |
+| `link` | | Pairs the runtime with openedbot (`--openedbot`, default `https://link.openedbot.app`; `--name`, `--ticket-file`, `--insecure-openedbot` for a loopback development origin only). |
 | `unlink` | | Stops and removes one local link, keeping its device key and Hermes data. |
 | `credentials list\|add\|login\|remove` | | Model-provider credentials, from stdin or a `0600` file, or OAuth device code (`login`). |
 | `mcp`, `toolsets` | | List, add/enable or remove/disable MCP servers and toolsets on this host. |

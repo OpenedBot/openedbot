@@ -1,13 +1,14 @@
 import type { SQL } from "bun";
 import { type HermesClient, HermesClientError, type HermesRunDetails } from "@openedbot/hermes";
 import { HERMES_RUN_INTERRUPTED_CODE } from "@openedbot/contracts-errors";
-import type { RunEvent } from "../../domain/hermes-events";
 import type { RunTrace } from "@openedbot/platform-observability/run-trace";
 import type { WorkerConfig } from "../worker-config";
 import { reconciledFailureMessage } from "../provider-fallback";
 import { replayUndeliveredRunSteers } from "../run-steering";
 import { markRunUnknown } from "./failure";
-import { persistEvents } from "./persist";
+import type { RunEvent } from "../../domain/hermes-events";
+import { readNextRunEventSequence } from "../../sql/run-events";
+import { persistEvents, persistUnnumberedEvents } from "./persist";
 import type { EventContext, RunContext } from "./types";
 import { describe, log, pollWait } from "./util";
 
@@ -16,10 +17,9 @@ async function readReconciliationJournal(
   config: Pick<WorkerConfig, "workerId">,
   context: Pick<RunContext, "id" | "organizationId" | "leaseGeneration">,
   hermesRunId: string,
-): Promise<{ next: number; hasText: boolean; watermark: number } | null> {
-  const rows = await db<Array<{ next: number; hasText: boolean; watermark: number }>>`
-    select coalesce(max(event.sequence), -1) + 1 as next,
-           coalesce(bool_or(event.type = 'agent.message'), false) as "hasText",
+): Promise<{ hasText: boolean; watermark: number } | null> {
+  const rows = await db<Array<{ hasText: boolean; watermark: number }>>`
+    select coalesce(bool_or(event.type = 'agent.message'), false) as "hasText",
            run.last_hermes_sequence as watermark
       from runs run left join run_events event
         on event.organization_id = run.organization_id and event.run_id = run.id
@@ -96,7 +96,9 @@ export async function reconcileHermesRun(
       }
       const journal = await readReconciliationJournal(db, config, context, hermesRunId);
       if (!journal) return;
-      const sequence = Number(journal.next);
+      // Numbered like the stream, from a proposal checked again under the
+      // run's locks: the recovered text leaves before the commit, as a delta does.
+      const sequence = await readNextRunEventSequence(db, context.organizationId, context.id);
       const events: RunEvent[] = [];
       const occurredAt = new Date();
       // Status recovery has an authoritative answer even when no delta survived.
@@ -131,8 +133,7 @@ export async function reconcileHermesRun(
              order by sequence desc limit 1
           `
         : [];
-      await persistEvents(db, config, context, Number(journal.watermark), [{
-        sequence: Number(journal.next),
+      await persistUnnumberedEvents(db, config, context, Number(journal.watermark), [{
         type: "run.error",
         occurredAt: new Date(),
         payload: {

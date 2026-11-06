@@ -133,6 +133,48 @@ describe("entrée des messages dans le fil", () => {
   });
 });
 
+// The thread's turns live in rows (`data-thread-turn`, virtual rows of D1d).
+const turn = (key: string, children: ReactNode[]) => <div key={key} data-row={`turn-${key}`} data-thread-turn={key}>{children}</div>;
+const spacer = <div key="spacer" data-row="spacer" data-thread-spacer="bottom" />;
+const date = <div key="d" data-row="date" data-thread-date="">Aujourd'hui</div>;
+
+describe("entrée des messages, rangées de tours", () => {
+  test("un tour neuf au bout fait monter ses messages, pas sa puce de date", async () => {
+    const view = render(<Thread>{[turn("u1", [user("u1", "bonjour"), answer("a1")])]}</Thread>);
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour"), answer("a1")]), turn("u2", [date, user("u2", "et toi ?")])]}</Thread>);
+    await Promise.resolve();
+    expect(animated.map((entry) => entry.split("|")[0])).toEqual(["u2"]);
+  });
+
+  test("une réponse ajoutée à la rangée du dernier tour monte ; dans un tour plus haut, non", async () => {
+    const view = render(<Thread>{[turn("u1", [user("u1", "bonjour")]), turn("u2", [user("u2", "et toi ?")])]}</Thread>);
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour"), answer("a1")]), turn("u2", [user("u2", "et toi ?")])]}</Thread>);
+    await Promise.resolve();
+    expect(animated).toEqual([]);
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour"), answer("a1")]), turn("u2", [user("u2", "et toi ?"), answer("a2")])]}</Thread>);
+    await Promise.resolve();
+    expect(animated.map((entry) => entry.split("|")[0])).toEqual(["a2"]);
+  });
+
+  test("un tour remonté par le défilement ne rejoue pas son entrée", async () => {
+    const last = turn("u2", [user("u2", "et toi ?"), answer("a2")]);
+    const view = render(<Thread>{[turn("u1", [user("u1", "bonjour")]), last]}</Thread>);
+    // Scrolled up: the last turn is a spacer, then it comes back at the bottom.
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour")]), spacer]}</Thread>);
+    await Promise.resolve();
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour")]), last]}</Thread>);
+    await Promise.resolve();
+    expect(animated).toEqual([]);
+  });
+
+  test("un tour monté au-dessus d'un espaceur n'est pas un ajout au bout", async () => {
+    const view = render(<Thread>{[turn("u1", [user("u1", "bonjour")]), spacer]}</Thread>);
+    view.rerender(<Thread>{[turn("u1", [user("u1", "bonjour")]), turn("u2", [user("u2", "plus bas")]), spacer]}</Thread>);
+    await Promise.resolve();
+    expect(animated).toEqual([]);
+  });
+});
+
 /** `animate` qui garde ses appels et laisse le test finir l'animation. */
 function recordAnimations() {
   const calls: Array<{ element: HTMLElement; keyframes: Keyframe[]; options: KeyframeAnimationOptions; finish: () => void }> = [];

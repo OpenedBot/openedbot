@@ -7,8 +7,7 @@
   "exports": {
     "./application/*": "./src/application/*.ts",
     "./domain/*": "./src/domain/*.ts",
-    "./domain/runtime/*": "./src/domain/runtime/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/runtime/*": "./src/domain/runtime/*.ts"
   },
   "scripts": {
     "test": "bun test tests",
@@ -16,14 +15,14 @@
   },
   "dependencies": {
     "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
     "@openedbot/contracts-errors": "workspace:*",
     "@openedbot/contracts-primitives": "workspace:*",
     "@openedbot/hermes": "workspace:*",
     "@openedbot/platform-config": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
     "@openedbot/platform-integrations": "workspace:*",
-    "@openedbot/platform-observability": "workspace:*",
-    "@openedbot/runtime-link": "workspace:*"
+    "@openedbot/platform-observability": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

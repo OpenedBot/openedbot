@@ -14,6 +14,16 @@ deux releases différentes.
 
 ## Non publié
 
+## v1.5.1 - 2026-11-06
+
+### Ajouté
+
+- Chaque échange d'une conversation porte désormais l'identifiant de suivi qu'openedbot lui donne, et le connecteur l'inscrit dans son journal avant de le transmettre à l'agent. Un incident se retrouve ainsi d'un bout à l'autre, de la conversation jusqu'à la machine. Rien à faire après la mise à jour ; une version plus ancienne d'edge-setup continue de fonctionner sans ce suivi.
+
+### Changé
+
+- `link --rekey` est retiré : openedbot ne remplace plus la clé d'appareil d'une machine déjà liée, pour qu'un jeton de lien volé ne suffise jamais à en imposer une autre. Pour donner une nouvelle clé à une machine, la réenrôler avec un nouveau ticket depuis Réglages › Runtime › Remplacer le runtime. La commande refuse désormais sans rien modifier, au lieu de remplacer la clé de la machine avant de la présenter. Ne pas lancer l'ancienne commande avant cette mise à jour ; une machine où elle a déjà été lancée se réenrôle de la même façon.
+
 ## v1.5.0 - 2026-11-06
 
 Même edge-setup que v1.1.0, sous un numéro que l'ancien dépôt n'a jamais utilisé. Une machine en v1.1.0 passe en v1.5.0 avec une mise à jour ordinaire.

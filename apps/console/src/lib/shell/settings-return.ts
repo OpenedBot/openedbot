@@ -1,4 +1,5 @@
 import { workspaceFrameInPath } from "../workspace/workspace-location";
+import { appUrl } from "../platform";
 
 /*
  * Where the cross of the settings modal leads when settings were opened as a
@@ -46,7 +47,7 @@ export function rememberAppPath(): void {
  * settings frame, so another client's settings never reuse it.
  */
 export function rememberSettingsReturn(settingsHref: string): void {
-  const target = new URL(settingsHref, window.location.origin).pathname;
+  const target = appUrl(settingsHref).pathname;
   store(SETTINGS_RETURN, { frame: workspaceFrameInPath(target), href: publicHref() });
 }
 

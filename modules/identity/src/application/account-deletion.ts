@@ -1,7 +1,6 @@
 import { isLiveSubscriptionStatus, subscriptionPort } from "./subscription-port";
 import { isoInstant } from "@openedbot/contracts-primitives";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { requestOrganizationCancellationTx } from "@openedbot/execution/application/run-cancellation";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import {
   cancelUnclaimedAccountDeletion,
@@ -21,6 +20,17 @@ import {
 } from "../sql/members";
 
 export type AccountDeletionScope = { organizationId: string; userId: string };
+
+/**
+ * Stops the organization's runs when its deletion is scheduled. Runs belong
+ * to the execution module, which sits above identity (ADR 0001 S4): the API
+ * passes `requestOrganizationCancellationTx`.
+ */
+export type CancelOrganizationRuns = (
+  tx: TransactionDb,
+  organizationId: string,
+  reason: { code: string; message: string },
+) => Promise<unknown>;
 
 export type DeletionBlocker =
   | "owner_required"
@@ -63,6 +73,7 @@ export async function scheduleAccountDeletion(
   db: Db,
   scope: AccountDeletionScope,
   graceDays: number,
+  cancelOrganizationRuns: CancelOrganizationRuns,
 ): Promise<AccountDeletionState["deletion"]> {
   const deletion = await withAccountTenant(db, scope, async (tx) => {
     // The worker and the payment webhook both lock this row before touching a
@@ -83,7 +94,7 @@ export async function scheduleAccountDeletion(
     // The grace period protects stored data, not active work. Runs that never
     // crossed Hermes stop locally; known remote runs enter the durable stop
     // state and ambiguous effects remain reviewable instead of being hidden.
-    await requestOrganizationCancellationTx(tx, scope.organizationId, {
+    await cancelOrganizationRuns(tx, scope.organizationId, {
       code: "ACCOUNT_DELETED",
       message: "Le compte a demandé sa suppression.",
     });

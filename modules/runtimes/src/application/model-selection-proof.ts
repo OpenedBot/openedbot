@@ -4,6 +4,14 @@ import { HttpError } from "@openedbot/contracts-errors/http-error";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { deleteModelSelectionProof, readModelSelectionProof, upsertModelSelectionProof, upsertProvenRuntimeModel, type RuntimeModelSelectionProof } from "../sql/model-selection-proofs";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
+
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export {
+  invalidateProvenRuntimeModels,
+  readModelSelectionProof,
+  readProvenRuntimeModel,
+} from "../sql/model-selection-proofs";
 
 export type ModelSelection = { provider: string | null; model: string | null; reasoningEffort: string | null };
 export type ModelProofClient = Pick<HermesClient, "createRun" | "getRunStatus" | "stopRun" | "deleteSession">;
@@ -169,7 +177,7 @@ export async function executeRuntimeModelSelectionProof(
   try {
     const base = deps.client(job);
     const selection = { provider: job.provider, model: job.model, reasoningEffort: job.reasoning_effort };
-    if (job.provider && job.model && job.link_features.includes("profile_management")) {
+    if (job.provider && job.model && job.link_features.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       await proveManagedRuntimeModelSelection(job.organization_id, (profile) => deps.client(job, profile), selection, deps.withProfileNamesLock, deps.profileServeWait, spans);
     } else await proveRuntimeModelSelection(base, selection, spans);
   } catch (error) { failure = error; }

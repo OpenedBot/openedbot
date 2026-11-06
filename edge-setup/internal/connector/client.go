@@ -146,9 +146,6 @@ type Client struct {
 	early    map[uint32]*earlyBody
 	tails    map[string]context.CancelFunc
 	operator *http.Client
-	// stopAfterHandshake ends the session once the broker acknowledged
-	// hello, for Rekey.
-	stopAfterHandshake bool
 	// retiring makes the session ask openedbot to revoke this runtime
 	// (link.retire) and end once it confirms (link.retired), for Retire.
 	retiring bool
@@ -792,17 +789,6 @@ func (c *Client) Session(ctx context.Context) error {
 	return c.session(ctx, nil)
 }
 
-// Rekey opens one session whose hello carries a fresh device public key and
-// returns once the broker has seen it: after link.proof when the broker
-// challenges, after its first frame otherwise (an older broker ignores the
-// key). This is the only moment a public key reaches openedbot without a
-// prior proof: `edge-setup link --rekey` is a console gesture by root.
-func (c *Client) Rekey(ctx context.Context) error {
-	c.stopAfterHandshake = true
-	defer func() { c.stopAfterHandshake = false }()
-	return c.session(ctx, nil)
-}
-
 // Retire opens one session, proves possession like any reconnection, then
 // asks openedbot to revoke this runtime (link.retire, repeated every two
 // seconds until answered: the broker ignores it until the link is admitted)
@@ -867,7 +853,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 	// push an operator capability out for an API that announced no bound.
 	// openedbot learns that this host watches from the first inventory.changed
 	// of the session. Enrollment and retirement never watch.
-	watchInventory := c.Auth.EnrollmentTicket == "" && !c.retiring && !c.stopAfterHandshake && c.operatorAvailable()
+	watchInventory := c.Auth.EnrollmentTicket == "" && !c.retiring && c.operatorAvailable()
 	c.logDroppedFeatures("hello", bound, dropped)
 	c.noteHelloFeatures(0)
 	// One endpoint per session: the dial and the proof must name the same.
@@ -1039,7 +1025,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			c.Logf("creation audit armed under key %s", f.KeyID)
 		case TLinkChallenge:
 			if c.DeviceKey == nil {
-				c.Logf("link.challenge received but this host has no device key; run `edge-setup link --rekey --yes`")
+				c.Logf("link.challenge received but this host has no device key; run `edge-setup up --yes` to seal one, or re-link this host with a new ticket if openedbot already holds a key for this runtime")
 				continue
 			}
 			nonce, err := enroll.ParsePoPNonce(f.Nonce)
@@ -1056,9 +1042,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			proved = true
 			startUnsolicited()
 			c.Logf("proof of possession sent")
-			if c.stopAfterHandshake {
-				return nil
-			}
 			continue
 		case TLinkRotate:
 			if c.Auth.EnrollmentTicket != "" || c.Auth.RuntimeID == "" {
@@ -1151,11 +1134,6 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 			c.cancel(f.ID)
 		case TErr:
 			c.cancel(f.ID)
-		}
-		if c.stopAfterHandshake {
-			// An older broker never challenges: its first frame is enough to
-			// know hello (and the key) reached it.
-			return nil
 		}
 	}
 }
@@ -1261,6 +1239,10 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 		c.sendErr(send, f.ID, "HERMES_LINK_PATH_FORBIDDEN", "route not in the connector allowlist", StageBeforeDispatch)
 		return
 	}
+	trace, traced := traceOf(f.Headers)
+	if traced {
+		c.logRelayTrace(f, trace)
+	}
 	c.mu.Lock()
 	if len(c.inflight) >= MaxInFlight {
 		c.mu.Unlock()
@@ -1320,9 +1302,12 @@ func (c *Client) serve(parent context.Context, f Text, send sender) {
 		return
 	}
 	for k, v := range f.Headers {
-		if ForwardedRequestHeaders[strings.ToLower(k)] {
+		if name := strings.ToLower(k); ForwardedRequestHeaders[name] && name != TraceparentHeader {
 			req.Header.Set(k, v)
 		}
+	}
+	if traced {
+		req.Header.Set(TraceparentHeader, trace.Header)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.Bearer)
 	req.Header.Del("Cookie")

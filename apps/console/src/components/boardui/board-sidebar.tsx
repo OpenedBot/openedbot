@@ -29,7 +29,7 @@ import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { ConnectorUpgradeSidebarLink } from "../dashboard/connector-upgrade-badge";
 import { useOperatorIdentity } from "../../lib/session/operator-identity";
 import { useWorkspaceSwitch } from "../workspace/workspace-navigation";
-import { AccountMenu } from "./account-menu";
+import { AccountMenu, AccountUpdatePill } from "./account-menu";
 import { BUI_PANEL_ITEM, BuiCloseGlyph, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import { COLLAPSE_MOTION, CreateMenu, useBoardChrome } from "./board-chrome";
 import { useRosterSections } from "../dashboard/use-roster-sections";
@@ -544,7 +544,7 @@ export function BoardSidebar({ className }: { className?: string }) {
           <div className={dense ? undefined : "mt-2"}>
             <AccountMenu />
           </div>
-        ) : null}
+        ) : <div className={railShell ? "md:hidden" : undefined}><AccountUpdatePill /></div>}
       </footer>
       </div>
 

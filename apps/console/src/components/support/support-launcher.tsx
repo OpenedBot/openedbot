@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useRouterState } from "@tanstack/react-router";
+import { Suspense, useEffect } from "react";
+import { lazyRouteComponent, useRouterState } from "@tanstack/react-router";
 import { IconMessageCircle2 } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
@@ -11,8 +11,11 @@ import {
 } from "../../lib/support/support-panel-session";
 import { useSupportDeskAvailable } from "../../lib/support/support-desk-availability";
 import { useSupportUnread, useSupportWatch } from "../../lib/support/support-watch";
-import { SupportPanel } from "./support-panel";
 import { SupportUnreadDot } from "./support-unread-dot";
+
+// Its own chunk: the card, its stream and its markdown load on the first
+// opening, never with the page that carries the bubble (ADR 0001, D1b).
+const SupportPanel = lazyRouteComponent(() => import("./support-panel"), "SupportPanel");
 
 const LAUNCHER_CLASS =
   "openedbot-support-launcher fixed right-[max(1.5rem,var(--openedbot-safe-right))] bottom-[max(1.5rem,var(--openedbot-safe-bottom))] z-40 flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-[var(--shadow-elevated)] transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none active:scale-95";
@@ -66,7 +69,7 @@ export function SupportLauncher() {
   // Ouverte, la bulle disparaît : la carte couvre le coin où elle se tient,
   // donc la laisser montée n'offrirait qu'une cible invisible au clavier et au
   // lecteur d'écran. La carte porte son propre bouton de fermeture.
-  if (open) return <SupportPanel onClose={closeSupportPanel} variant="card" />;
+  if (open) return <Suspense fallback={null}><SupportPanel onClose={closeSupportPanel} variant="card" /></Suspense>;
 
   const label = unread > 0
     ? plural(unread, {

@@ -32,9 +32,9 @@ describe(`route tree (${pro ? "pro" : "solo"})`, () => {
     expect(paths.filter((path) => PRO_ROUTES.includes(path)).sort()).toEqual(pro ? PRO_ROUTES : []);
   });
 
-  test("keeps the core routes in both modes (40)", () => {
-    expect(paths.length).toBe(40 + (pro ? PRO_ROUTES.length : 0));
-    for (const route of ["/settings/decisions", "/settings/policies", "/settings/security", "/settings/connectors"]) {
+  test("keeps the core routes in both modes (42)", () => {
+    expect(paths.length).toBe(42 + (pro ? PRO_ROUTES.length : 0));
+    for (const route of ["/settings/decisions", "/settings/policies", "/settings/security", "/settings/connectors", "/settings/notch"]) {
       expect(paths).toContain(route);
     }
     // The public landing left the console for its own site.

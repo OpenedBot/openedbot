@@ -1,14 +1,22 @@
 import { Hono } from "hono";
-import { HermesClient, type HermesClientConfig } from "@openedbot/hermes";
 import type { ThreadCompactResult } from "@openedbot/contracts-api";
 import { isUuid } from "@openedbot/contracts-primitives";
 import { logger } from "@openedbot/platform-observability";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { assertEntitled } from "@openedbot/identity/domain/entitlement";
-import { compactThreadNow, type CompactHermes } from "@openedbot/conversation/application/compact-thread";
 import { readRoomCompactionTarget } from "@openedbot/conversation/application/compact-room-request";
-import { applyRuntimeModelSelection } from "@openedbot/execution/application/runner/provider-recovery";
+import { readIdempotencyKey } from "@openedbot/conversation/application/message-ingress";
+import {
+  awaitExecutionCommand,
+  cancelThreadCompaction,
+  commandSettled,
+  ExecutionCommandError,
+  readThreadCompactionReplay,
+  submitThreadCompaction,
+  type ExecutionCommandRow,
+  type ThreadCompactionCommandResult,
+} from "@openedbot/execution/application/execution-commands";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { runtimeLinks, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";
 import { runtimeLinkLocator, type RuntimeLinkLocator } from "@openedbot/runtime-link/application/instances";
@@ -18,24 +26,35 @@ import { requireOperator, type AppVariables } from "../identity/auth";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 
 /**
- * Jusqu'à quatre passes de résumé d'une minute chacune (`COMPACT_NOW_MAX_PASSES`
- * et `COMPACT_DEADLINE_MS` du module) : au-delà, la requête est abandonnée.
+ * How long the request waits for the worker: the command's own deadline (four
+ * one-minute passes) plus its claim. The console gives up at 270 s.
  */
-const COMPACT_REQUEST_DEADLINE_MS = 250_000;
+const COMPACT_WAIT_MS = 255_000;
+
+/** The command seams; production uses `@openedbot/execution/application/execution-commands`. */
+export type ThreadCompactCommands = {
+  replay: typeof readThreadCompactionReplay;
+  submit: typeof submitThreadCompaction;
+  wait: typeof awaitExecutionCommand;
+  cancel: typeof cancelThreadCompaction;
+};
 
 export type ThreadCompactRouteDeps = {
-  clientFactory?: (config: HermesClientConfig) => CompactHermes;
   links?: RuntimeLinks;
   locator?: RuntimeLinkLocator;
-  now?: () => Date;
+  commands?: Partial<ThreadCompactCommands>;
+  waitMs?: number;
 };
 
 /**
  * Compacte l'historique d'un salon à la demande (DEV-332).
  *
- * La route ne fait que garder (droits, abonnement, salon, runs, seuil), choisir
- * le client et le modèle, puis déléguer à `compactThreadNow` : le mécanisme est
- * celui de la compaction automatique (DEV-331), seul le déclencheur change.
+ * La route garde (droits, abonnement, salon, runs, seuil, runtime), puis
+ * enregistre une commande durable que le worker exécute (ADR 0001 S3) : l'API
+ * n'ouvre aucune session sur le runtime. Elle attend le résultat pour rendre
+ * la même réponse qu'avant ; si le client s'en va, le résumé continue. Avec
+ * `Idempotency-Key`, une requête rejouée retrouve la commande déjà
+ * enregistrée et son résultat au lieu d'en ouvrir une autre.
  */
 export function threadCompactRoutes(
   db: Db,
@@ -43,13 +62,16 @@ export function threadCompactRoutes(
   deps: ThreadCompactRouteDeps = {},
 ): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
-  const createClient = deps.clientFactory ?? ((clientConfig: HermesClientConfig) => new HermesClient(clientConfig));
   const links = deps.links ?? runtimeLinks();
   const locator = deps.locator ?? runtimeLinkLocator();
-  const now = deps.now ?? (() => new Date());
-  // Un seul résumé à la fois par fil dans CE processus : deux clics (ou deux
-  // onglets) ne doivent pas ouvrir deux sessions de résumé concurrentes.
-  const inFlight = new Set<string>();
+  const commands: ThreadCompactCommands = {
+    replay: readThreadCompactionReplay,
+    submit: submitThreadCompaction,
+    wait: awaitExecutionCommand,
+    cancel: cancelThreadCompaction,
+    ...deps.commands,
+  };
+  const waitMs = deps.waitMs ?? COMPACT_WAIT_MS;
 
   routes.post("/:threadId/compact", async (context) => {
     const auth = context.get("auth");
@@ -57,6 +79,7 @@ export function threadCompactRoutes(
     requireOperator(auth);
     const threadId = context.req.param("threadId");
     if (!isUuid(threadId)) throw new HttpError(404, "THREAD_NOT_FOUND", "Conversation introuvable.");
+    const idempotencyKey = readIdempotencyKey(context.req.header("Idempotency-Key"));
 
     // Un résumé coûte des jetons sur le runtime du client, comme un run.
     const subscription = await withTenant(db, auth.organizationId, async (tx) => {
@@ -69,74 +92,128 @@ export function threadCompactRoutes(
       "Le résumé est bloqué tant que l’abonnement n’est pas actif.",
     );
 
-    const key = `${auth.organizationId}:${threadId}`;
-    if (inFlight.has(key)) {
-      throw new HttpError(409, "COMPACTION_IN_PROGRESS", "Un résumé de ce salon est déjà en cours.");
-    }
-    inFlight.add(key);
+    let submitted: { command: ExecutionCommandRow; replayed: boolean } | undefined;
     try {
-      const target = await readRoomCompactionTarget(db, auth.organizationId, threadId);
-      if (target.kind === "not_found") throw new HttpError(404, "THREAD_NOT_FOUND", "Conversation introuvable.");
-      if (target.kind === "not_room") {
-        throw new HttpError(404, "THREAD_NOT_ROOM", "Seul l’historique d’un salon se résume à la demande.");
+      // A replay comes before the guards: once its summary is written the
+      // thread is below the threshold, and only the recorded command answers.
+      const replay = idempotencyKey
+        ? await commands.replay(db, { organizationId: auth.organizationId, threadId, userId: auth.userId, idempotencyKey })
+        : null;
+      if (replay) {
+        submitted = { command: replay, replayed: true };
+      } else {
+        const target = await readRoomCompactionTarget(db, auth.organizationId, threadId);
+        if (target.kind !== "ready") {
+          // A concurrent request under the same key may have recorded (and
+          // finished) the compaction since the replay read: it answers.
+          const late = idempotencyKey
+            ? await commands.replay(db, { organizationId: auth.organizationId, threadId, userId: auth.userId, idempotencyKey })
+            : null;
+          if (!late) throw refusal(target.kind);
+          submitted = { command: late, replayed: true };
+        }
       }
-      if (target.kind === "run_active") {
-        throw new HttpError(409, "RUN_IN_PROGRESS", "Un membre répond encore : attendez la fin du tour pour résumer.");
-      }
-      if (target.kind === "below_threshold") {
-        throw new HttpError(422, "COMPACTION_BELOW_THRESHOLD", "L’historique est encore trop court pour être résumé.");
-      }
-
-      const runtime = await readRuntimeSecret(db, config, auth.organizationId, links, locator);
-      if (!runtime) {
-        throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de résumer l’historique.");
-      }
-      // Un lien connecteur sert le profil du membre (`/p/<slug>`), comme son
-      // run ; un runtime direct n'a pas de profil (même règle que le worker).
-      const clientConfig: HermesClientConfig = "transport" in runtime.client
-        ? { ...runtime.client, profile: target.speaker.profile }
-        : runtime.client;
-      const selection = applyRuntimeModelSelection(
-        { model: target.speaker.model, reasoningEffort: target.speaker.reasoningEffort },
-        { provider: runtime.selectedProvider, model: runtime.selectedModel, reasoningEffort: runtime.reasoningEffort },
-        target.assignmentMode,
-      );
-      const signal = AbortSignal.any([context.req.raw.signal, AbortSignal.timeout(COMPACT_REQUEST_DEADLINE_MS)]);
-      const result = await compactThreadNow(
-        db,
-        createClient(clientConfig),
-        {
+      if (!submitted) {
+        const runtime = await readRuntimeSecret(db, config, auth.organizationId, links, locator);
+        if (!runtime) {
+          throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de résumer l’historique.");
+        }
+        submitted = await commands.submit(db, {
           organizationId: auth.organizationId,
           threadId,
-          model: selection.model,
-          provider: selection.provider,
-          reasoningEffort: selection.reasoningEffort,
-          operatorName: target.operatorName,
-        },
-        signal,
-      );
-      if (!result.compacted || result.compactedThroughSequence === null) {
-        logger.warn(
-          { event: "api.thread_compact_failed", threadId, runtimeId: runtime.id },
-          "on-demand room compaction produced no summary",
-        );
-        throw new HttpError(
-          502,
-          "COMPACTION_FAILED",
-          "Le résumé n’a pas pu être produit par le runtime. Réessayez dans un instant.",
-        );
+          runtimeId: runtime.id,
+          userId: auth.userId,
+          idempotencyKey,
+        });
       }
+    } catch (error) {
+      throw submitError(error);
+    }
+    if (submitted.replayed) context.header("Idempotency-Replayed", "true");
+
+    const command = commandSettled(submitted.command)
+      ? submitted.command
+      : await commands.wait(db, auth.organizationId, submitted.command.id, {
+        deadlineMs: waitMs,
+        signal: context.req.raw.signal,
+      });
+    if (!command) throw refusal("not_found");
+    if (command.status === "succeeded" && command.result) {
+      const result = command.result as ThreadCompactionCommandResult;
       const body: ThreadCompactResult = {
         compacted: true,
-        summarizedCount: result.summarizedCount,
-        compactedThroughSequence: result.compactedThroughSequence,
-        compactedAt: now().toISOString(),
+        summarizedCount: Number(result.summarizedCount),
+        compactedThroughSequence: Number(result.compactedThroughSequence),
+        compactedAt: String(result.compactedAt),
       };
       return context.json(body);
-    } finally {
-      inFlight.delete(key);
     }
+    throw commandFailure(command, threadId);
+  });
+
+  /** Arrête le résumé en cours du salon ; le POST qui l'attend répond `COMPACTION_CANCELLED`. */
+  routes.delete("/:threadId/compact", async (context) => {
+    const auth = context.get("auth");
+    requireOperator(auth);
+    const threadId = context.req.param("threadId");
+    if (!isUuid(threadId)) throw refusal("not_found");
+    const cancelled = await commands.cancel(db, auth.organizationId, threadId);
+    if (!cancelled) throw new HttpError(404, "COMPACTION_NOT_FOUND", "Aucun résumé de ce salon n’est en cours.");
+    return context.body(null, 204);
   });
 
   return routes;
+}
+
+function submitError(error: unknown): unknown {
+  if (!(error instanceof ExecutionCommandError)) return error;
+  if (error.code === "IDEMPOTENCY_KEY_REUSED") {
+    return new HttpError(409, "IDEMPOTENCY_KEY_REUSED", "Cette clé a déjà servi à résumer un autre salon.");
+  }
+  return new HttpError(409, "COMPACTION_IN_PROGRESS", "Un résumé de ce salon est déjà en cours.");
+}
+
+function refusal(kind: "not_found" | "not_room" | "run_active" | "below_threshold"): HttpError {
+  switch (kind) {
+    case "not_found": return new HttpError(404, "THREAD_NOT_FOUND", "Conversation introuvable.");
+    case "not_room": return new HttpError(404, "THREAD_NOT_ROOM", "Seul l’historique d’un salon se résume à la demande.");
+    case "run_active": return new HttpError(409, "RUN_IN_PROGRESS", "Un membre répond encore : attendez la fin du tour pour résumer.");
+    case "below_threshold": return new HttpError(422, "COMPACTION_BELOW_THRESHOLD", "L’historique est encore trop court pour être résumé.");
+  }
+}
+
+/** The answer of a command that did not succeed: its stable code, mapped as the route answered before S3. */
+function commandFailure(command: ExecutionCommandRow, threadId: string): HttpError {
+  switch (command.errorCode) {
+    case "THREAD_NOT_FOUND": return refusal("not_found");
+    case "THREAD_NOT_ROOM": return refusal("not_room");
+    case "RUN_IN_PROGRESS": return refusal("run_active");
+    case "COMPACTION_BELOW_THRESHOLD": return refusal("below_threshold");
+    case "RUNTIME_REQUIRED":
+      return new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de résumer l’historique.");
+    case "COMMAND_CANCELLED":
+      return new HttpError(409, "COMPACTION_CANCELLED", "Le résumé de ce salon a été arrêté.");
+    case "COMMAND_NOT_STARTED":
+      return new HttpError(
+        503,
+        "COMPACTION_NOT_STARTED",
+        "Le résumé n’a pas pu démarrer : le service d’exécution ne répond pas. Réessayez dans un instant.",
+      );
+  }
+  if (!commandSettled(command)) {
+    return new HttpError(
+      504,
+      "COMPACTION_STILL_RUNNING",
+      "Le résumé continue en arrière-plan ; l’historique se mettra à jour une fois terminé.",
+    );
+  }
+  logger.warn(
+    { event: "api.thread_compact_failed", threadId, commandId: command.id, code: command.errorCode, attempts: command.attempts },
+    "on-demand room compaction produced no summary",
+  );
+  return new HttpError(
+    502,
+    "COMPACTION_FAILED",
+    "Le résumé n’a pas pu être produit par le runtime. Réessayez dans un instant.",
+  );
 }

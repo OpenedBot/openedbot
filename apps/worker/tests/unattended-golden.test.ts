@@ -28,6 +28,7 @@ import { readGateIdentity, type GateIdentity } from "@openedbot/execution/domain
 import { edgeSetupPath } from "../../../tests/edge-setup-dir";
 import { permissionRuleSelector } from "../src/application/pro-plugins";
 import { differingCases, readGoldenFile, writeGoldenFile } from "./golden-store";
+import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
 
 const GOLDEN_PATH = join(import.meta.dir, "fixtures/unattended-golden.json");
 const ORG = "org-client";
@@ -88,6 +89,7 @@ const clean = (value: unknown): unknown => JSON.parse(JSON.stringify(value, func
 function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes: unknown[]): SQL {
   const tenant: string[] = [];
   return ((strings: TemplateStringsArray, ...parameters: unknown[]) => {
+    if (!("raw" in strings)) return strings;
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     if (text.startsWith("insert") || text.startsWith("update")) {
       writes.push({ sql: text, parameters: clean(parameters) });
@@ -100,7 +102,8 @@ function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes
     if (text.includes("set_config('app.organization_id'")) { tenant.push(String(parameters[0])); return Promise.resolve([{ set_config: parameters[0] }]); }
     if (text.includes("pg_advisory_xact_lock")) return Promise.resolve([]);
     const visible = () => tenant.at(-1) === parameters[0];
-    if (text.includes("from runs") && text.includes("for update")) return Promise.resolve([{ id: "run-1" }]);
+    if (text.includes("from runs") && (text.includes("for update") || text.includes("for no key update"))) return Promise.resolve([{ id: "run-1" }]);
+    if (text.includes("max(sequence)")) return Promise.resolve([]);
     if (text.includes("from workflows")) return Promise.resolve(workflow && parameters[1] === WORKFLOW ? [{ id: WORKFLOW, neverWait: workflow.neverWait }] : []);
     if (text.includes("from bot_permission_tool_policies")) {
       const policy = state.toolPolicies?.[String(parameters[2])];
@@ -134,13 +137,8 @@ async function runCase(state: OrgState, gate: GateIdentity, command: string | nu
     sequence: 3, type: "approval.requested", occurredAt: new Date("2026-10-28T10:00:00.000Z"),
     payload: { approvalRequestId: APPROVAL_ID, command, description: "the gate", choices, gate },
   } as RunEvent;
-  const info = console.info;
-  console.info = (line: unknown) => { logs.push(typeof line === "string" ? JSON.parse(line) : line); };
-  try {
-    await persistEvents(db, CONFIG, context as never, 3, [event]);
-  } finally {
-    console.info = info;
-  }
+  const { events } = await captureLogEvents(() => persistEvents(db, CONFIG, context as never, 3, [event]));
+  logs.push(...events);
   return [JSON.stringify(writes), JSON.stringify(logs)];
 }
 

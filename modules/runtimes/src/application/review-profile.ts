@@ -2,6 +2,15 @@ import { HermesClientError, RelayDialError, type HermesClient } from "@openedbot
 import { REVIEW_PROFILE } from "../domain/runtime-contract";
 import type { ReviewProfileOutcome } from "../sql/review-profiles";
 
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export {
+  claimReviewProfile,
+  enqueueReviewProfiles,
+  finishReviewProfile,
+  readReviewProven,
+  type ReviewProfileJob,
+} from "../sql/review-profiles";
+
 /**
  * PERM2-7a: prepares the `openedbot-reviewer` profile of one runtime and proves it
  * has no tool. The reviewer only reads a gate and answers in JSON; any tool

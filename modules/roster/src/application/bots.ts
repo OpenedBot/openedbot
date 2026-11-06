@@ -1,23 +1,19 @@
 import { createHash } from "node:crypto";
 import { HermesClientError } from "@openedbot/hermes";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { withBotProfileLock, withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
-import { applyHostProfileModel } from "@openedbot/portability/application/model";
-import { readOrganizationCursor } from "@openedbot/conversation/sql/organization-cursor";
-import { cancelMaintenanceRunsTx, isMaintenanceStepKind } from "@openedbot/execution/application/run-cancellation";
-import { botGreetingInput } from "@openedbot/execution/domain/bot-greeting";
-import { insertBotGreetingRun } from "@openedbot/execution/sql/runs";
-import { readOperatorProfile } from "@openedbot/identity/sql/operator-profile";
+import { withBotProfileLock, withProfileNamesLock } from "./profile-import-guard";
+import { applyHostProfileModel } from "./host-profile-model";
+import { readOrganizationCursor } from "@openedbot/conversation/application/organization-cursor";
+import { readOperatorProfile } from "@openedbot/identity/application/operator-profile";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import { botRuntimeSessionIds, namedHostProfileSlug } from "../domain/bot-deletion";
-import { PROFILE_CAPABILITIES_FEATURE, PROFILE_MANAGEMENT_FEATURE } from "../domain/bot-capabilities";
-import { APPROVAL_POLICY_FEATURE } from "@openedbot/runtimes/domain/runtime-contract";
 import { readModelAssignmentMode } from "@openedbot/runtimes/application/runtime-mode";
 import { applyHostApprovalPolicy, applyTighteningPolicyBeforeMutation, approvalPolicyWriteMustPrecedeCommit } from "./approval-policy";
 import { publicBot, type BotRow } from "../domain/bot-dto";
 import { assertPermissionModeUnderCeiling } from "./permission-ceiling";
 import type { CreateBotInput, UpdateBotInput } from "../domain/bot-input";
+import type { BotRuns } from "./bot-runs";
 import { chooseBotSlug } from "./bot-slug";
 import {
   deleteBotRow,
@@ -55,6 +51,7 @@ import {
   resolvedHostProfileModel,
   type BotDeps,
 } from "./bot-host";
+import { RELAY_FEATURE_APPROVAL_POLICY, RELAY_FEATURE_PROFILE_CAPABILITIES, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 export { resolveBotDeps } from "./bot-host";
 export type { BotDeps, BotRouteDeps, BotRouteClient } from "./bot-host";
@@ -169,7 +166,7 @@ export async function createBot(
   await assertPermissionModeUnderCeiling(db, organizationId, input.editor.permissionMode ?? "manual", null);
   const runtime = await readRuntime(db, organizationId);
   if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de créer un bot.");
-  const managedProfile = profile === null && runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE) === true;
+  const managedProfile = profile === null && runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT) === true;
   const provisionLater = managedProfile && (options.profileProvisioning ?? "async") === "async";
   return withProfileNamesLock(db, organizationId, profile ? [profile] : [], async (db) => {
   // The org-wide names lock: a racing replay sees its row here, before any host call.
@@ -258,18 +255,18 @@ export async function createBot(
       });
     }
     if (options.greeting && input.greet) {
-      await insertBotGreetingRun(tx, {
+      await deps.runs.greetNewBot(tx, {
         organizationId,
         threadId,
         botId: id,
         initiatorUserId: options.greeting.initiatorUserId,
-        input: botGreetingInput({
+        bot: {
           name,
           role: input.description,
           mission: input.mission,
           replyLanguage: input.editor.replyLanguage ?? "auto",
           operatorLocale: input.operatorLocale,
-        }),
+        },
       });
     }
     if (options.afterInsert) await options.afterInsert(tx, { id, threadId });
@@ -344,6 +341,7 @@ export async function updateBot(
   if (input.archived === true) {
     await withTenant(db, organizationId, (tx) => assertBotQuiescent(
       tx,
+      deps.runs,
       organizationId,
       botId,
       { code: "CANCELLED_BY_ARCHIVE", message: "Passe de maintenance annulée : le bot est archivé." },
@@ -354,7 +352,7 @@ export async function updateBot(
     permissionModeChanged
     && priorRows[0]?.hermesProfileManaged === true
     && priorRows[0].hermesProfile
-    && runtime?.linkFeatures?.includes(APPROVAL_POLICY_FEATURE)
+    && runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)
   );
   const nextPermissionMode = input.editor.permissionMode;
   const tightening = nextPermissionMode !== undefined && approvalPolicyWriteMustPrecedeCommit(nextPermissionMode);
@@ -377,7 +375,7 @@ export async function updateBot(
       try {
         restoreApprovalPolicy = await ensureHostProfileForRestore(runtime, slug, current.name, clientFactory, restoreTarget?.permissionMode ?? "manual", pipeline, blockedTools);
       } catch (error) {
-        if (runtime?.linkFeatures?.includes(APPROVAL_POLICY_FEATURE)) {
+        if (runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)) {
           await withTenant(db, organizationId, (tx) => writeBotApprovalPolicyProof(tx, organizationId, botId, null, false));
         }
         throw error;
@@ -392,6 +390,7 @@ export async function updateBot(
     if (input.archived === true) {
       const found = await assertBotQuiescent(
         tx,
+        deps.runs,
         organizationId,
         botId,
         {
@@ -453,7 +452,7 @@ export async function updateBot(
   ) {
     return bot;
   }
-  if (!runtime?.linkFeatures?.includes(PROFILE_CAPABILITIES_FEATURE)) {
+  if (!runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_CAPABILITIES)) {
     return bot;
   }
   // En mode global (choix global posé), le run envoie le modèle global et le
@@ -483,12 +482,13 @@ export async function updateBot(
  */
 export async function assertBotDeletable(
   tx: TransactionDb,
+  runs: BotRuns,
   organizationId: string,
   botId: string,
   options: { detachGroups?: boolean } = {},
 ): Promise<void> {
   await assertBotProfileSettled(tx, organizationId, botId);
-  await assertBotQuiescent(tx, organizationId, botId, {
+  await assertBotQuiescent(tx, runs, organizationId, botId, {
     code: "CANCELLED_BY_DELETE",
     message: "Passe de maintenance annulée : le bot est supprimé.",
   }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.", options.detachGroups === true);
@@ -522,6 +522,7 @@ async function assertBotNotInGroup(
  */
 async function assertBotQuiescent(
   tx: TransactionDb,
+  runs: BotRuns,
   organizationId: string,
   botId: string,
   maintenanceReason: { code: string; message: string },
@@ -530,14 +531,8 @@ async function assertBotQuiescent(
 ): Promise<boolean> {
   const active = await lockActiveBotRuns(tx, organizationId, botId);
   if (!(await lockBotRow(tx, organizationId, botId))) return false;
-  await cancelMaintenanceRunsTx(
-    tx,
-    organizationId,
-    active.filter((run) => isMaintenanceStepKind(run.stepKind)),
-    maintenanceReason,
-  );
-  const blocking = active.find((run) => !isMaintenanceStepKind(run.stepKind))
-    ?? (await readActiveBotRuns(tx, organizationId, botId))[0];
+  const remaining = await runs.stopMaintenanceRuns(tx, organizationId, active, maintenanceReason);
+  const blocking = remaining[0] ?? (await readActiveBotRuns(tx, organizationId, botId))[0];
   if (blocking) {
     throw new HttpError(
       409,
@@ -577,7 +572,7 @@ export async function deleteBot(
   return withBotProfileLock(db, organizationId, botId, async (db) => {
     if (!purge) {
       const scope = await withTenant(db, organizationId, async (tx) => {
-        await assertBotDeletable(tx, organizationId, botId);
+        await assertBotDeletable(tx, deps.runs, organizationId, botId);
         return readBotDeletionScope(tx, organizationId, botId);
       });
       if (!scope) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
@@ -600,7 +595,7 @@ export async function deleteBot(
             "Enregistrez Hermes avant de supprimer un bot : son profil doit partir de l’hôte.",
           );
         }
-        if (!runtime.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+        if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
           throw new HttpError(
             409,
             "PROFILE_MANAGEMENT_UNAVAILABLE",
@@ -609,7 +604,7 @@ export async function deleteBot(
         }
       }
       const rows = await withTenant(db, organizationId, async (tx) => {
-        await assertBotDeletable(tx, organizationId, botId);
+        await assertBotDeletable(tx, deps.runs, organizationId, botId);
         const deletedAt = await softDeleteBot(tx, organizationId, botId);
         if (!deletedAt) return [] as BotRow[];
         if (runtime && (sessions.length > 0 || slug)) {
@@ -638,7 +633,7 @@ export async function deleteBot(
     // lecture ne pourrait naître que d'un run, et un run actif a déjà fait
     // échouer `assertBotDeletable`.
     const scope = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
+      await assertBotDeletable(tx, deps.runs, organizationId, botId, { detachGroups: force });
       return readBotDeletionScope(tx, organizationId, botId);
     });
     if (!scope) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
@@ -650,11 +645,11 @@ export async function deleteBot(
     if ((sessions.length > 0 || cleanupProfile) && !runtime) {
       throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de supprimer un bot : son nettoyage doit être enregistré sur le runtime.");
     }
-    if (cleanupProfile && !runtime?.linkFeatures?.includes(PROFILE_MANAGEMENT_FEATURE)) {
+    if (cleanupProfile && !runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) {
       throw new HttpError(409, "PROFILE_MANAGEMENT_UNAVAILABLE", "L’hôte Hermes ne gère pas la suppression de profils.");
     }
     const result = await withTenant(db, organizationId, async (tx) => {
-      await assertBotDeletable(tx, organizationId, botId, { detachGroups: force });
+      await assertBotDeletable(tx, deps.runs, organizationId, botId, { detachGroups: force });
       const groupsDetached = force ? await detachBotFromGroups(tx, organizationId, botId) : null;
       const existing = await tx<Array<{ status: string }>>`select status from bot_host_cleanups
         where organization_id = ${organizationId} and bot_id = ${botId}

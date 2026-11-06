@@ -1,13 +1,17 @@
-import { useEffect, useRef } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Suspense, useEffect, useRef } from "react";
+import { lazyRouteComponent, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { BotDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../../lib/api";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useOpenedOnce } from "../../lib/hooks/use-opened-once";
-import { CreateBotSheet } from "../bot-create/create-bot-sheet";
-import { BotRoutinesDialog } from "../bot-routines-dialog";
-import { BotManageDialog } from "./bot-manage-dialog";
+
+// Each dialog is its own chunk, fetched on its first opening: the bot page
+// alone carries the persona editor, the capabilities, the model picker and
+// their markdown, none of which the frame needs to draw (ADR 0001, D1b).
+const CreateBotSheet = lazyRouteComponent(() => import("../bot-create/create-bot-sheet"), "CreateBotSheet");
+const BotRoutinesDialog = lazyRouteComponent(() => import("../bot-routines-dialog"), "BotRoutinesDialog");
+const BotManageDialog = lazyRouteComponent(() => import("./bot-manage-dialog"), "BotManageDialog");
 
 /**
  * The one mount of the creation sheet and of the bot page (`lib/bots/bot-dialogs.ts`),
@@ -42,25 +46,30 @@ export function BotDialogsHost() {
 
   return (
     <>
-      {createMounted ? <CreateBotSheet open={createOpen} source={createSource} onClose={closeCreate} /> : null}
+      {/* One boundary each: a dialog loading its chunk never hides another one already open. */}
+      {createMounted ? <Suspense fallback={null}><CreateBotSheet open={createOpen} source={createSource} onClose={closeCreate} /></Suspense> : null}
       {routineBot ? (
-        <BotRoutinesDialog
-          bot={routineBot}
-          open
-          onClose={() => {
-            closeRoutines();
-            void navigate({ to: "/bot/$botId", params: { botId: routineBot.id } });
-          }}
-        />
+        <Suspense fallback={null}>
+          <BotRoutinesDialog
+            bot={routineBot}
+            open
+            onClose={() => {
+              closeRoutines();
+              void navigate({ to: "/bot/$botId", params: { botId: routineBot.id } });
+            }}
+          />
+        </Suspense>
       ) : null}
       {shownBot ? (
-        <BotManageDialog
-          bot={shownBot}
-          open={bot !== null}
-          initialPage={managePage}
-          threadId={manageThreadId}
-          onClose={closeManage}
-        />
+        <Suspense fallback={null}>
+          <BotManageDialog
+            bot={shownBot}
+            open={bot !== null}
+            initialPage={managePage}
+            threadId={manageThreadId}
+            onClose={closeManage}
+          />
+        </Suspense>
       ) : null}
     </>
   );

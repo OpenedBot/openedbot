@@ -7,8 +7,7 @@
   "exports": {
     "./application/*": "./src/application/*.ts",
     "./domain/*": "./src/domain/*.ts",
-    "./domain/archive/*": "./src/domain/archive/*.ts",
-    "./sql/*": "./src/sql/*.ts"
+    "./domain/archive/*": "./src/domain/archive/*.ts"
   },
   "scripts": {
     "test": "bun test tests",
@@ -16,11 +15,13 @@
   },
   "dependencies": {
     "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
     "@openedbot/contracts-errors": "workspace:*",
     "@openedbot/contracts-primitives": "workspace:*",
     "@openedbot/conversation": "workspace:*",
     "@openedbot/execution": "workspace:*",
     "@openedbot/hermes": "workspace:*",
+    "@openedbot/identity": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
     "@openedbot/roster": "workspace:*",
     "@openedbot/runtimes": "workspace:*",

@@ -405,6 +405,9 @@
   --color-info-100: var(--state-info);
   --color-info-700: var(--state-info-fg);
   --color-info-soft: var(--state-info-soft);
+  --color-update-accent: var(--update-accent);
+  --color-update-accent-hover: var(--update-accent-hover);
+  --color-update-accent-contrast: var(--update-accent-contrast);
 
   /*
     Contribution heatmap (Tailwind violet). The whole ramp is themed, not just
@@ -623,6 +626,13 @@
   --state-info-fg: #1447e6;
   --state-info-soft: #eff6ff;
 
+  /* The desktop app's update (rail button, pill, download ring, the notch's
+     dot): Apple's informative blue, systemBlue, as a solid fill under white.
+     White on it 4,02:1, on the hover 5,22:1 (3:1 needed for an icon). */
+  --update-accent: #007aff;
+  --update-accent-hover: #0069d9;
+  --update-accent-contrast: #ffffff;
+
   --primary: var(--accent-600);
   --primary-foreground: var(--accent-contrast);
   --secondary: #f7f7f7; /* neutral-100 */
@@ -834,6 +844,12 @@
   --state-info: #16245699;
   --state-info-fg: #8ec5ff; /* blue-300 */
   --state-info-soft: #16245666;
+
+  /* systemBlue, dark: white on it 3,65:1. The hover lightens without
+     going under 3:1 for the white icon (#409cff would be 2,83:1). */
+  --update-accent: #0a84ff;
+  --update-accent-hover: #2a8fff;
+  --update-accent-contrast: #ffffff;
 
   --primary: var(--accent-500);
   --primary-foreground: var(--accent-contrast);

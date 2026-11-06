@@ -22,17 +22,8 @@ import { assertString } from "@openedbot/platform-config/http-body";
 import { runtimeToolsetNameIsContractForbidden } from "@openedbot/runtimes/domain/runtime-contract";
 import { HOST_SOFTWARE_TOOLSETS } from "@openedbot/runtimes/domain/bot-capabilities";
 
-export const PROFILE_MANAGEMENT_FEATURE = "profile_management";
-/** `GET /hermes-setup/toolsets` : réglable et disponibilité réelle (`availability`, absente d'un edge-setup plus ancien). */
-export const TOOLSET_MANAGEMENT_FEATURE = "toolset_management";
-export const PROFILE_CAPABILITIES_FEATURE = "profile_capabilities";
-/** `POST /hermes-setup/profiles/models` : un même modèle écrit dans plusieurs profils en un aller-retour. */
-export const PROFILE_MODEL_BATCH_FEATURE = "profile_model_batch";
-/** L'hôte sert la mémoire du profil (`MEMORY.md` / `USER.md`) par le magasin amont. */
-export const PROFILE_MEMORY_FEATURE = "profile_memory";
 /** Borne d'une entrée ou d'un fragment sur le fil ; les plafonds du magasin (2 200 / 1 375) sont ceux du runtime. */
 const RUNTIME_MEMORY_ENTRY_MAX_CHARS = 2_000;
-export const PROFILE_CREDENTIALS_FEATURE = "profile_credentials";
 const CAPABILITY_NAME_PATTERN = /^[a-z0-9][a-z0-9_]{0,63}$/;
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const MCP_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;

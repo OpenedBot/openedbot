@@ -236,7 +236,8 @@ describe("processTenantDeletion runs onTenantDeleting in the purge transaction",
     if (sql.includes("current_setting('statement_timeout')")) return [{ value: "0" }];
     return [];
   };
-  const options = { workerId: "worker-1", webAppUrl: "http://localhost" } as Parameters<typeof processTenantDeletion>[1];
+  const noProfileJobs = { cancelQueuedImports: async () => {}, cancelQueuedDeletes: async () => {}, lockImports: async () => {} };
+  const options = { workerId: "worker-1", webAppUrl: "http://localhost", deleteBlob: async () => {}, profileJobs: noProfileJobs } as Parameters<typeof processTenantDeletion>[1];
 
   test("solo: the organization is deleted, no listener query", async () => {
     const statements: string[] = [];

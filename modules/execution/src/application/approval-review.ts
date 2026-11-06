@@ -24,7 +24,7 @@
 import type { SQL } from "bun";
 import { HermesClientError, type HermesClient } from "@openedbot/hermes";
 import { REVIEW_PROFILE } from "@openedbot/runtimes/domain/runtime-contract";
-import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
+import { readReviewProven } from "@openedbot/runtimes/application/review-profile";
 import type { GateDescriptor, GateKind } from "../domain/gate-identity";
 import type { ResolvedPermissionRuleSource } from "../domain/permission-rules";
 import {
@@ -278,7 +278,7 @@ async function preflight(db: SQL, job: ReviewJob, deps: ReviewDeps): Promise<Rev
 
 /**
  * Writes the outcome under the claim token. The run, then its workflow, then
- * the gate: the forwarder's order (runner.ts), so the two cannot deadlock.
+ * the gate: the forwarder's order (runner/approval-forwarding.ts), so the two cannot deadlock.
  * "Never wait" (PERM2-9) is read through the port under the workflow lock;
  * the snapshot never changes once the workflow exists (0144).
  */

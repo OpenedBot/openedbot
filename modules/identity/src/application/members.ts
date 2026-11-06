@@ -1,8 +1,7 @@
-import type { Db } from "@openedbot/platform-db";
+import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isoInstant } from "@openedbot/contracts-primitives";
 import { withTenant } from "@openedbot/platform-db";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { pauseMemberRoutines } from "@openedbot/execution/sql/routines";
 import { assertMutableMemberRole } from "../domain/member-policy";
 import {
   listActiveMembers,
@@ -44,12 +43,19 @@ export async function changeMemberRole(db: Db, input: {
   });
 }
 
+/**
+ * Met en pause les routines qu'un membre a créées. Les routines sont au module
+ * d'exécution, au-dessus d'identity (ADR 0001 S4) : l'API passe
+ * `pauseMemberRoutines`.
+ */
+export type PauseMemberRoutines = (tx: TransactionDb, organizationId: string, userId: string) => Promise<void>;
+
 /** Révoque un membre : son accès, ses notifications et ses routines s'arrêtent dans la même transaction. */
 export async function removeMember(db: Db, input: {
   organizationId: string;
   actorUserId: string;
   userId: string;
-}): Promise<void> {
+}, pauseMemberRoutines: PauseMemberRoutines): Promise<void> {
   await withTenant(db, input.organizationId, async (tx) => {
     await lockOrganizationForMembership(tx, input.organizationId);
     const current = await readActiveMembershipRole(tx, input.organizationId, input.userId, { lock: true });

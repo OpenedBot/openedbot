@@ -382,6 +382,7 @@ describe("relay allowlist: identical to internal/connector/allowlist.go", () => 
       "content-type",
       "idempotency-key",
       "last-event-id",
+      "traceparent",
     ]);
     expect([...RELAY_FORWARDED_RESPONSE_HEADERS].sort()).toEqual(["content-type", "retry-after"]);
   });

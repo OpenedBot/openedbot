@@ -124,7 +124,6 @@ export const AssistantMessage = memo(function AssistantMessage({
   findTargetId,
   findActive = false,
   hover,
-  settled = false,
 }: {
   text: string;
   attachments?: readonly MessageAttachmentChip[];
@@ -142,8 +141,6 @@ export const AssistantMessage = memo(function AssistantMessage({
   findTargetId: string;
   findActive?: boolean;
   hover?: MessageCardHover;
-  /** Hors des derniers tours et du direct : `content-visibility: auto`. */
-  settled?: boolean;
 }) {
   const text = useSmoothText(targetText, streaming);
   const markdown = streaming || text !== targetText
@@ -195,7 +192,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       tabIndex={-1}
       data-turn-of={author?.id}
       data-thread-find-target={author || hover ? findTargetId : undefined}
-      className={`group/reply flex w-full max-w-full flex-col items-start self-start text-body-regular ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-[var(--radius-2-5xl)] ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
+      className={`group/reply flex w-full max-w-full flex-col items-start self-start text-body-regular ${findActive ? "rounded-[var(--radius-2-5xl)] ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
       <div data-assistant-response="" className="flex w-full min-w-0 flex-col items-start">
         {body}
@@ -276,7 +273,6 @@ export const UserMessage = memo(function UserMessage({
   mentionSlugs,
   findTargetId,
   findActive = false,
-  settled = false,
   onEdit,
 }: {
   text: string;
@@ -293,8 +289,6 @@ export const UserMessage = memo(function UserMessage({
   mentionSlugs: ReadonlySet<string>;
   findTargetId: string;
   findActive?: boolean;
-  /** Hors des derniers tours et du direct : `content-visibility: auto`. Jamais posé sur la bulle sortante. */
-  settled?: boolean;
   /** Rewrite this message (grok.com's « Modifier » under the bubble). */
   onEdit?: () => void;
 }) {
@@ -307,7 +301,7 @@ export const UserMessage = memo(function UserMessage({
     <div
       data-thread-find-target={findTargetId}
       tabIndex={-1}
-      className={`flex max-w-full flex-col items-end gap-1.5 self-end ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`flex max-w-full flex-col items-end gap-1.5 self-end ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
     >
       {attachments?.length ? (
         <ul className="flex flex-wrap justify-end gap-1.5">
@@ -396,21 +390,18 @@ export const BotInboundMessage = memo(function BotInboundMessage({
   authorBot,
   findTargetId,
   findActive = false,
-  settled = false,
 }: {
   text: string;
   authorBot: MessageAuthorBot;
   findTargetId: string;
   findActive?: boolean;
-  /** Hors des derniers tours et du direct : `content-visibility: auto`. */
-  settled?: boolean;
 }) {
   const { t } = useT();
   const label = authorBot.name ?? authorBot.slug ?? t("threadTimeline.unknownBot");
   return (
     <div
       tabIndex={-1}
-      className={`flex max-w-full items-start gap-2 self-start ${settled ? "openedbot-turn-contain" : ""} ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
+      className={`flex max-w-full items-start gap-2 self-start ${findActive ? "rounded-2xl ring-2 ring-primary ring-offset-2" : ""}`}
       aria-label={t("threadTimeline.inboundFrom", { name: label })}
       data-inbound-from={authorBot.id}
       data-thread-find-target={findTargetId}

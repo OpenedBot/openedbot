@@ -1,5 +1,5 @@
 import { ageSince, type Locale, type MessageKey } from "@openedbot/browser-i18n";
-import type { GlobalSearchHitDto } from "@openedbot/conversation/domain/global-search";
+import type { GlobalSearchHitDto } from "@openedbot/roster/domain/global-search";
 
 type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
 

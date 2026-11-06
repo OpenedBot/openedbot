@@ -2,10 +2,7 @@ import { isLiveSubscriptionStatus, subscriptionPort } from "./subscription-port"
 import { runTenantDeleting } from "./tenant-deleting";
 import { DEFAULT_LOCALE } from "@openedbot/contracts-locale";
 import { enqueueTransactionalEmail } from "@openedbot/notifications/application/transactional-email";
-import type { Db } from "@openedbot/platform-db";
-import { cancelQueuedDeletesForDeletion } from "@openedbot/portability/application/delete-executor";
-import { cancelQueuedImportsForDeletion } from "@openedbot/portability/application/executor";
-import { lockProfileImports } from "@openedbot/portability/sql/reservations";
+import type { Db, TransactionDb } from "@openedbot/platform-db";
 import {
   claimBlobDeletions,
   completeBlobDeletion,
@@ -42,6 +39,21 @@ export type TenantDeletionOptions = {
    * every reachable store). Idempotent; an unreachable store throws.
    */
   deleteBlob: (key: string, driver: "file" | "r2" | null) => Promise<void>;
+  /** The Hermes profile jobs the purge races with (`TenantPurgeProfileJobs`). */
+  profileJobs: TenantPurgeProfileJobs;
+};
+
+/**
+ * The Hermes profile imports and deletes, owned by portability, which sits
+ * above identity (ADR 0001 S4): the purge cancels the queued ones of tenants
+ * being deleted, and holds their import lock while it claims and purges one.
+ * Implemented by `@openedbot/portability/application/tenant-purge`; the worker
+ * passes it.
+ */
+export type TenantPurgeProfileJobs = {
+  cancelQueuedImports(db: Db): Promise<void>;
+  cancelQueuedDeletes(db: Db): Promise<void>;
+  lockImports(tx: TransactionDb, organizationId: string): Promise<void>;
 };
 
 class TenantDeletionLeaseLostError extends Error {
@@ -57,8 +69,8 @@ class TenantDeletionLeaseLostError extends Error {
  * at most one tenant. True when something was done.
  */
 export async function processTenantDeletion(db: Db, options: TenantDeletionOptions): Promise<boolean> {
-  await cancelQueuedImportsForDeletion(db);
-  await cancelQueuedDeletesForDeletion(db);
+  await options.profileJobs.cancelQueuedImports(db);
+  await options.profileJobs.cancelQueuedDeletes(db);
   const cleaned = await processTenantBlobDeletions(db, options);
   const task = await db.begin(async (tx) => {
     // Payment webhooks lock the subscription before cancelling a pending
@@ -68,7 +80,7 @@ export async function processTenantDeletion(db: Db, options: TenantDeletionOptio
     // (the webhook takes this lock first) and finally claim the deletion row.
     const candidate = await findDeletionCandidate(tx, DELETION_MAX_ATTEMPTS);
     if (!candidate) return null;
-    await lockProfileImports(tx, candidate.organizationId);
+    await options.profileJobs.lockImports(tx, candidate.organizationId);
     const subscriptionStatus = await subscriptionPort().status(tx, candidate.organizationId, { lock: true });
     const claimed = await lockDeletionCandidate(tx, candidate.organizationId, DELETION_MAX_ATTEMPTS);
     if (!claimed) return null;
@@ -87,7 +99,7 @@ export async function processTenantDeletion(db: Db, options: TenantDeletionOptio
       throw new Error("Tenant deletion lease was lost before the final purge.");
     }
     outcome = await db.begin(async (tx) => {
-      await lockProfileImports(tx, task.organizationId);
+      await options.profileJobs.lockImports(tx, task.organizationId);
       if (await hasActiveProfileImport(tx, task.organizationId)) throw new TenantDeletionLeaseLostError();
       if (await hasActiveProfileDelete(tx, task.organizationId)) throw new TenantDeletionLeaseLostError();
       // Existing subscriptions serialize with the billing writes first. The organization

@@ -5,7 +5,7 @@ import {
   readRuntimePermissionSettingsTx,
   setTerminalDangerAlwaysTx,
   type RuntimePermissionSettingsRow,
-} from "@openedbot/runtimes/sql/permission-settings";
+} from "@openedbot/runtimes/application/permission-settings";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { logEvent } from "@openedbot/platform-observability";

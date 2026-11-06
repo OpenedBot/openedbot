@@ -24,7 +24,8 @@ import {
   runtimeIntegrationInventory,
   withDeadline,
 } from "./runtime-integration-public";
-import { FEATURE_SKILLS_INVENTORY, FEATURE_TOOLSETS, TOOLSET_NAME_PATTERN } from "./runtime-integration-constants";
+import { TOOLSET_NAME_PATTERN } from "./runtime-integration-constants";
+import { RELAY_FEATURE_SKILLS_INVENTORY, RELAY_FEATURE_TOOLSET_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /** L’inventaire global du runtime et la bascule de ses toolsets. */
 export function runtimeInventoryRoutes(ctx: IntegrationRouteContext): Hono<{ Variables: AppVariables }> {
@@ -100,7 +101,7 @@ export function runtimeInventoryRoutes(ctx: IntegrationRouteContext): Hono<{ Var
         + "Il reste désactivé sur les runtimes openedbot.",
       );
     }
-    const client = await requireWritableRuntime(auth.organizationId, FEATURE_TOOLSETS);
+    const client = await requireWritableRuntime(auth.organizationId, RELAY_FEATURE_TOOLSET_MANAGEMENT);
     let state: HermesToolsetState;
     try {
       state = await client.toolsetSet(name, body.enabled);
@@ -153,7 +154,7 @@ export function liveIntegrationsRead(
     // `/v1/skills` répond 500 sur Hermes 0.21.3 à 0.22.6 (amont #142575) :
     // l'opérateur de l'hôte lit la même liste sans l'argument fautif. Son
     // échec laisse l'erreur d'origine affichée, jamais une liste vide.
-    if (inventory?.skillsFailed && hostFeatures?.includes(FEATURE_SKILLS_INVENTORY)) {
+    if (inventory?.skillsFailed && hostFeatures?.includes(RELAY_FEATURE_SKILLS_INVENTORY)) {
       const [skillsResult] = await Promise.allSettled([withDeadline(client.hostSkills(), timeoutMs)]);
       if (skillsResult.status === "fulfilled" && skillsResult.value !== null) {
         inventory = { ...inventory, skills: skillsResult.value, skillsFailed: false };
@@ -166,7 +167,7 @@ export function liveIntegrationsRead(
     // son journal d'un refus qui n'apprend rien. L'inventaire MCP, lui, n'est
     // pas ici du tout : il a sa route, lue quand son panneau s'ouvre.
     let hostToolsets: HermesHostToolsets | null = null;
-    if (hostFeatures?.includes(FEATURE_TOOLSETS)) {
+    if (hostFeatures?.includes(RELAY_FEATURE_TOOLSET_MANAGEMENT)) {
       const toolsetsResult = await Promise.allSettled([withDeadline(client.hostToolsets(), timeoutMs)]);
       if (toolsetsResult[0].status === "fulfilled") hostToolsets = toolsetsResult[0].value;
     }

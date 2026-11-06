@@ -17,16 +17,15 @@ import {
   readThrough,
   wantsFreshRead,
 } from "@openedbot/runtimes/application/runtime-read-snapshots";
-import { asProfileHttpError, withProfileNamesLock } from "@openedbot/portability/application/profile-import-guard";
+import { asProfileHttpError, withProfileNamesLock } from "@openedbot/roster/application/profile-import-guard";
 import { deleteHostProfile, parseDeleteJobSlugs } from "@openedbot/portability/application/host-profile-delete";
-import { enqueueProfileDelete, lastProfileJobChange, listDeleteJobs } from "@openedbot/portability/sql/delete-jobs";
+import { enqueueProfileDelete, lastProfileJobChange, listDeleteJobs } from "@openedbot/portability/application/delete-jobs";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import { publicWriteError, withDeadline } from "./runtime-integration-public";
 import {
-  FEATURE_PROFILE_MANAGEMENT,
-  FEATURE_PROFILES,
   PROFILE_INVENTORY_TIMEOUT_MS,
 } from "./runtime-integration-constants";
+import { RELAY_FEATURE_PROFILE_INVENTORY, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 /** Les profils Hermes de l’hôte : inventaire, et suppressions par lot ou à l’unité. */
 export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Variables: AppVariables }> {
@@ -59,7 +58,7 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
         } catch (error) {
           throw publicWriteError(error);
         }
-        if (!features?.includes(FEATURE_PROFILES)) {
+        if (!features?.includes(RELAY_FEATURE_PROFILE_INVENTORY)) {
           throw new HttpError(404, "PROFILE_INVENTORY_UNAVAILABLE", "L’hôte de ce runtime n’annonce pas l’inventaire des profils.");
         }
         let inventory: HermesProfileInventory;
@@ -99,7 +98,7 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
     }));
     return context.json<RuntimeProfileInventoryDto>({
       profiles,
-      canDelete: Boolean(features?.includes(FEATURE_PROFILE_MANAGEMENT)),
+      canDelete: Boolean(features?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)),
     });
   });
 
@@ -118,7 +117,7 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
       const mapped = asProfileHttpError(error);
       throw mapped instanceof HttpError ? mapped : error;
     }
-    const { runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, FEATURE_PROFILE_MANAGEMENT);
+    const { runtimeId } = await requireWritableRuntimeWithId(auth.organizationId, RELAY_FEATURE_PROFILE_MANAGEMENT);
     try {
       const job = await enqueueProfileDelete(db, auth.organizationId, auth.userId, runtimeId, slugs);
       await invalidateSnapshots(snapshots, auth.organizationId, "profiles");
@@ -144,7 +143,7 @@ export function runtimeProfileRoutes(ctx: IntegrationRouteContext): Hono<{ Varia
     const auth = context.get("auth");
     requireOperator(auth);
     const slug = context.req.param("slug");
-    const { client } = await requireWritableRuntimeWithId(auth.organizationId, FEATURE_PROFILE_MANAGEMENT);
+    const { client } = await requireWritableRuntimeWithId(auth.organizationId, RELAY_FEATURE_PROFILE_MANAGEMENT);
     const runtime = await readRuntime(db, config, auth.organizationId);
     if (!runtime) {
       throw new HttpError(404, "RUNTIME_REQUIRED", "Aucun runtime Hermes actif : il n’y a rien à configurer.");

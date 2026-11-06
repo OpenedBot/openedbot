@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
-import { resolveImportedModel } from "@openedbot/portability/application/model";
-import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/portability/sql/reservations";
-import { createImportedGroups, importHermesProfile } from "@openedbot/portability/sql/roster";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
+import { resolveImportedModel } from "@openedbot/roster/application/host-profile-model";
+import { assertProfileNamesAvailable, lockProfileImports } from "@openedbot/roster/application/profile-reservations";
+import { createImportedGroups, importHermesProfile } from "@openedbot/portability/application/roster";
 import type { RuntimeProfileImportDto } from "@openedbot/contracts-api";
 import type { AppVariables } from "../identity/auth";
 import { requireOperator } from "../identity/auth";
@@ -11,21 +11,22 @@ import type { BlobStore } from "../../infrastructure/blob-store";
 import type { Db } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
 import {
-  HermesClient,
   HermesClientError,
+  type HermesClient,
   type HermesClientConfig,
   type HermesModelOptions,
   type HermesProfileAvatar,
 } from "@openedbot/hermes";
+import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { hermesBundleImportRoutes } from "./hermes-bundle-import-routes";
 import { OPENEDBOT_SERVICE_PROFILES } from "@openedbot/runtimes/domain/runtime-contract";
+import { RELAY_FEATURE_PROFILE_INVENTORY } from "@openedbot/contracts-connector/features";
 
 type RuntimeReader = typeof readRuntimeSecret;
 type ProfileClient = Pick<HermesClient, "hostCapabilities" | "hostProfileInventory" | "hostProfileAvatar" | "probeProfileIsolation" | "modelOptions">;
 const PROFILE_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
-const FEATURE_PROFILES = "profile_inventory";
 
 /**
  * Imports d'agents dans le roster : profils lus sur l'hôte du runtime
@@ -49,7 +50,7 @@ export function teamImportRoutes(
     put: (key: string, bytes: Uint8Array, contentType: string) => blobs.put(key, bytes, contentType),
     delete: (key: string) => blobs.delete(key, blobs.driver),
   };
-  const clientFactory = dependencies.clientFactory ?? ((clientConfig) => new HermesClient(clientConfig));
+  const clientFactory = dependencies.clientFactory ?? runtimeAdminClient;
   routes.route("/hermes-bundle", hermesBundleImportRoutes(db, config, readRuntime));
 
   routes.post("/runtime", async (context) => {
@@ -86,7 +87,7 @@ export function teamImportRoutes(
     } catch (error) {
       throw profileHostError(error);
     }
-    if (!features?.includes(FEATURE_PROFILES)) {
+    if (!features?.includes(RELAY_FEATURE_PROFILE_INVENTORY)) {
       throw new HttpError(404, "PROFILE_INVENTORY_UNAVAILABLE", "L’hôte de ce runtime n’annonce pas l’inventaire des profils.");
     }
     let catalog: Promise<HermesModelOptions> | undefined;

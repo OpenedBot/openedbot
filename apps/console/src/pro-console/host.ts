@@ -37,7 +37,7 @@ export { FLEET_SECTIONS, fleetSection, selectFleetOrganization, useAccountWorksp
 export { fleetAuditRequestContext, fleetClientRequestContext, api, ApiError, assertFleetClientRequestContext, errorMessage, queryKeys, userFacingError, workspaceQueryKey } from "../lib/api";
 export { activeFleetId, activeOrganizationId, readCloudSession, saveCloudSession } from "../lib/session/cloud-session";
 export { formatDate } from "../lib/format";
-export { nativeBridge } from "../lib/platform/native-bridge";
+export { nativeBridge } from "../lib/platform";
 export { writeOnboardingDraft } from "../lib/session/onboarding-draft";
 export { useOperatorIdentity } from "../lib/session/operator-identity";
 export { isOwnFleet, ORGANIZATION_SETUP_PATH } from "../lib/session/organization-gate";

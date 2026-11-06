@@ -1,3 +1,7 @@
+import type { SQL } from "bun";
+import { appendRunEventsTx } from "../sql/run-events";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
+import type { RunStatus } from "../domain/run-transitions";
 import type { TransactionDb } from "@openedbot/platform-db";
 
 const ACTIVE_RUN_STATUSES = ["queued", "starting", "running", "awaiting_approval", "relaying"] as const;
@@ -148,6 +152,7 @@ async function applyCancellationTx(
   reason: CancellationReason,
 ): Promise<CancellationRun[]> {
   if (rows.length === 0) return [];
+  const sql = tx as unknown as SQL;
   const workflowIds = [...new Set(rows.map((row) => row.workflowId).filter((id): id is string => Boolean(id)))].sort();
   if (workflowIds.length > 0) await tx`
     select id from workflows where organization_id = ${organizationId} and id in ${tx(workflowIds)}
@@ -170,29 +175,33 @@ async function applyCancellationTx(
     const canStopById = !approvalInFlight && row.hermesRunId !== null && row.externalState !== "ambiguous";
     const status: CancellationRun["status"] = safelyLocal ? "cancelled" : canStopById ? "requested" : "unknown";
 
+    // The API acts on rows it holds locked, whoever leases them: the worker's
+    // own writes are fenced out by the new state.
+    const target = { organizationId, id: row.id };
+    const from = [row.status as RunStatus];
     if (status === "cancelled") {
-      await tx`
-        update runs set status = 'cancelled', external_state = 'settled', events_complete = true,
-          error_code = ${reason.code}, error_message = ${reason.message}, ended_at = now(),
-          lease_owner = null, lease_expires_at = null, next_attempt_at = null, updated_at = now()
-         where organization_id = ${organizationId} and id = ${row.id}
-      `;
+      await transitionRuns(sql, {
+        target, fence: "unleased", transition: { from, to: { status: "cancelled", externalState: "settled" } },
+        set: { eventsComplete: true, errorCode: reason.code, errorMessage: reason.message, endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null },
+      });
     } else if (status === "requested") {
-      await tx`
-        update runs set external_state = 'stopping', remote_stop_state = 'requested',
-          error_code = ${reason.code}, error_message = ${reason.message}, ended_at = null,
-          next_attempt_at = case when status = 'queued' then now() else next_attempt_at end, updated_at = now()
-         where organization_id = ${organizationId} and id = ${row.id}
-      `;
+      await transitionRuns(sql, {
+        target, fence: "unleased", transition: { from, to: { externalState: "stopping", remoteStopState: "requested" } },
+        set: {
+          errorCode: reason.code, errorMessage: reason.message, endedAt: null,
+          nextAttemptAt: sqlExpr`case when status = 'queued' then now() else next_attempt_at end`,
+        },
+      });
     } else {
-      await tx`
-        update runs set status = 'unknown', external_state = 'ambiguous', events_complete = false,
-          remote_stop_state = case when remote_stop_state is null then 'ambiguous' else remote_stop_state end,
-          error_code = 'CANCEL_OUTCOME_UNKNOWN',
-          error_message = 'L’annulation croise un effet Hermes dont l’issue ne peut pas être confirmée.',
-          ended_at = null, lease_owner = null, lease_expires_at = null, next_attempt_at = null, updated_at = now()
-         where organization_id = ${organizationId} and id = ${row.id}
-      `;
+      await transitionRuns(sql, {
+        target, fence: "unleased",
+        transition: { from, to: { status: "unknown", externalState: "ambiguous", remoteStopState: { map: { none: "ambiguous" } } } },
+        set: {
+          eventsComplete: false, errorCode: "CANCEL_OUTCOME_UNKNOWN",
+          errorMessage: "L’annulation croise un effet Hermes dont l’issue ne peut pas être confirmée.",
+          endedAt: null, ...RELEASE_LEASE, nextAttemptAt: null,
+        },
+      });
     }
     result.push({
       id: row.id,
@@ -244,6 +253,8 @@ async function applyCancellationTx(
 }
 
 export const MAINTENANCE_STEP_KINDS = ["memory", "compaction"] as const;
+/** What `lockActiveBotRuns` returns: every status a maintenance pass may still be in. */
+const MAINTENANCE_CANCELLABLE = ["queued", "starting", "running", "awaiting_approval", "relaying", "unknown"] as const satisfies readonly RunStatus[];
 
 export function isMaintenanceStepKind(stepKind: string | null | undefined): boolean {
   return stepKind === "memory" || stepKind === "compaction";
@@ -263,31 +274,19 @@ export async function cancelMaintenanceRunsTx(
   reason: CancellationReason,
 ): Promise<void> {
   if (runs.length === 0) return;
-  await tx`
-    select pg_advisory_xact_lock(
-      hashtext(${organizationId}),
-      hashtext('openedbot-run-events-cursor')
-    )
-  `;
+  // The callers lock these rows first (`lockActiveBotRuns`); a dead type has no lease worth keeping.
+  const cancelled: typeof runs[number][] = [];
   for (const run of runs) {
-    await tx`
-      update runs set status = 'cancelled', external_state = 'settled', events_complete = true,
-        error_code = ${reason.code}, error_message = ${reason.message}, ended_at = now(),
-        lease_owner = null, lease_expires_at = null, next_attempt_at = null, updated_at = now()
-       where organization_id = ${organizationId} and id = ${run.id}
-    `;
-    const sequenceRows = await tx<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${organizationId} and run_id = ${run.id}
-    `;
-    await tx`
-      insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-      values (
-        ${organizationId}, ${run.threadId}, ${run.id}, ${Number(sequenceRows[0]?.next ?? 0)},
-        'run.error',
-        ${{ message: reason.message, errorCode: reason.code }},
-        now()
-      )
-    `;
+    const moved = await transitionRuns(tx as unknown as SQL, {
+      target: { organizationId, id: run.id }, fence: "unleased",
+      transition: { from: MAINTENANCE_CANCELLABLE, to: { status: "cancelled", externalState: "settled" } },
+      set: { eventsComplete: true, errorCode: reason.code, errorMessage: reason.message, endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null },
+    });
+    if (moved.length > 0) cancelled.push(run);
   }
+  // The updates hold every row: the primitive then takes the cursor once.
+  await appendRunEventsTx(tx as unknown as SQL, cancelled.map((run) => ({
+    organizationId, threadId: run.threadId, runId: run.id,
+    type: "run.error", payload: { message: reason.message, errorCode: reason.code },
+  })));
 }

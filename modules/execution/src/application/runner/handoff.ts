@@ -7,11 +7,14 @@ import {
   type HandoffMention,
 } from "@openedbot/roster/domain/bot-mode";
 import { UNTRACKED_BACKGROUND_TOOLS } from "@openedbot/runtimes/domain/runtime-contract";
-import { organizationEventEnvelope, type OrganizationEvent } from "@openedbot/contracts-events";
-import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/sql/messages";
-import { touchThread } from "@openedbot/conversation/sql/threads";
-import { appendNoticeTx, lockRunEventCursorTx } from "./events";
-import type { HandoffChildContext, RunContext, RunEventIdentityRow } from "./types";
+import type { OrganizationEvent } from "@openedbot/contracts-events";
+import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/application/messages";
+import { touchThread } from "@openedbot/conversation/application/threads";
+import { appendRunEventsTx } from "../../sql/run-events";
+import { NOW, transitionRuns } from "../../sql/run-transitions";
+import { appendNoticeTx } from "./events";
+import { openHandoffTx } from "./workflow-steps";
+import type { HandoffChildContext, RunContext } from "./types";
 import { log } from "./util";
 
 // ── Bot mode (hand-off `@mention`) ───────────────────────────────────────────
@@ -145,21 +148,15 @@ export async function createHandoffTx(
   context: RunContext,
   mention: HandoffMention,
 ): Promise<{ created: boolean; notice: OrganizationEvent | null }> {
-  const courierId = crypto.randomUUID();
-  const inboundId = crypto.randomUUID();
-  await tx`
-    insert into runs (id, organization_id, thread_id, bot_id, input, status, origin_run_id)
-    values (${inboundId}, ${context.organizationId}, ${mention.threadId}, ${mention.botId},
-            ${attributedInput({ name: context.botName, slug: context.botSlug }, mention.message)},
-            'queued', ${courierId})
-  `;
   // Le courrier n'a pas de `bot_id` (voir RunDto) ni de ligne message : la
   // sortie du bot d'origine, avec sa mention, est déjà le dernier message.
-  await tx`
-    insert into runs (id, organization_id, thread_id, bot_id, input, status, handoff_target_bot_id)
-    values (${courierId}, ${context.organizationId}, ${context.threadId}, null,
-            ${mention.message}, 'relaying', ${mention.botId})
-  `;
+  const { inboundId, courierId } = await openHandoffTx(tx, {
+    organizationId: context.organizationId,
+    originThreadId: context.threadId,
+    target: { botId: mention.botId, threadId: mention.threadId },
+    inboundInput: attributedInput({ name: context.botName, slug: context.botSlug }, mention.message),
+    courierInput: mention.message,
+  });
   await insertHandoffInboundMessage(tx, {
     organizationId: context.organizationId,
     threadId: mention.threadId,
@@ -230,62 +227,34 @@ export async function deliverHandoffReplyTx(
   });
   // Le statut AVANT les événements : un client qui reçoit `run.completed`
   // et relit le fil doit y trouver un courrier déjà terminé.
-  await tx`
-    update runs set status = 'completed', ended_at = now(), updated_at = now()
-     where organization_id = ${context.organizationId} and id = ${origin.id} and status = 'relaying'
-  `;
-  await lockRunEventCursorTx(tx, context.organizationId);
-  const sequenceRows = await tx<Array<{ next: number }>>`
-    select coalesce(max(sequence), -1) + 1 as next from run_events
-     where organization_id = ${context.organizationId} and run_id = ${origin.id}
-  `;
-  const first = Number(sequenceRows[0]?.next ?? 0);
+  await transitionRuns(tx, {
+    target: { organizationId: context.organizationId, id: origin.id }, fence: "unleased",
+    transition: { from: ["relaying"], to: { status: "completed" } }, set: { endedAt: NOW },
+  });
   const occurredAt = new Date();
-  const events: Array<{ sequence: number; type: string; payload: Record<string, unknown> }> = [
-    {
-      sequence: first,
-      type: "bot.message",
-      payload: {
-        messageId,
-        fromBotId: context.botId,
-        fromSlug: context.botSlug,
-        fromName: context.botName,
-        text: reply.text,
-        ok: reply.ok,
-      },
-    },
+  const event = (type: string, payload: Record<string, unknown>) => ({
+    organizationId: context.organizationId, threadId: origin.threadId, runId: origin.id, type, payload, occurredAt,
+  });
+  const result = await appendRunEventsTx(tx, [
+    event("bot.message", {
+      messageId,
+      fromBotId: context.botId,
+      fromSlug: context.botSlug,
+      fromName: context.botName,
+      text: reply.text,
+      ok: reply.ok,
+    }),
     // Avertissement seulement, jamais un blocage : la délégation perdue est
     // signalée après la réponse, avant la clôture du courrier.
     ...(delegated
-      ? [{
-          sequence: first + 1,
-          type: "system.notice",
-          payload: {
-            message: delegatedHandoffNotice({ name: context.botName, slug: context.botSlug }),
-            kind: HANDOFF_NOTICE_KIND.delegated,
-            botId: context.botId,
-          } as Record<string, unknown>,
-        }]
+      ? [event("system.notice", {
+          message: delegatedHandoffNotice({ name: context.botName, slug: context.botSlug }),
+          kind: HANDOFF_NOTICE_KIND.delegated,
+          botId: context.botId,
+        })]
       : []),
-    { sequence: first + (delegated ? 2 : 1), type: "run.completed", payload: { output: null, usage: null } },
-  ];
-  const result: OrganizationEvent[] = [];
-  for (const event of events) {
-    const rows = await tx<RunEventIdentityRow[]>`
-      insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-      values (${context.organizationId}, ${origin.threadId}, ${origin.id}, ${event.sequence},
-              ${event.type}, ${event.payload}, ${occurredAt})
-      on conflict (organization_id, run_id, sequence) do nothing
-      returning cursor, bot_id as "botId", turn_id as "turnId", session_key as "sessionKey",
-                lease_generation as "leaseGeneration"
-    `;
-    const row = rows[0];
-    if (!row) continue;
-    result.push(organizationEventEnvelope({
-      ...row, organizationId: context.organizationId, threadId: origin.threadId,
-      runId: origin.id, sequence: event.sequence, type: event.type, payload: event.payload, occurredAt,
-    }));
-  }
+    event("run.completed", { output: null, usage: null }),
+  ]);
   await touchThread(tx, context.organizationId, origin.threadId);
   return result;
 }

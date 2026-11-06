@@ -20,9 +20,10 @@ bun install
 bun run check      # tsc type-check + codec, allowlist and fixture-schema tests
 ```
 
-The reference implementations live in sibling repositories. With
-`../openedbot-main` and `../edge-setup` checked out next to this one,
-`bun run sync` refreshes the codec, tests, vectors and spec body from them.
+The codec in `connector/src` is edited here: it is the source the monorepo
+re-exports. The reference implementations live in the same monorepo (the
+root and `../edge-setup`); `bun run sync` refreshes the tests, vectors and spec
+body from them, never the codec.
 
 ## Rules
 

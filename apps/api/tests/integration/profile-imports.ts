@@ -8,9 +8,9 @@ import { expect } from "bun:test";
 import { HermesClient, HermesClientError } from "@openedbot/hermes";
 import { parseHermesProfileFiles } from "@openedbot/portability/domain/hermes-profile-bundle";
 import { claimProfileImport, executeProfileImport, type ImportExecutorClient } from "@openedbot/portability/application/executor";
-import { importHermesProfile } from "@openedbot/portability/sql/roster";
-import { acknowledgeImportJob, enqueueProfileImport, findIdempotentImport, readImportJob, withImportTenant } from "@openedbot/portability/sql/jobs";
-import { withProfileNamesLock, withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
+import { importHermesProfile } from "@openedbot/portability/application/roster";
+import { acknowledgeImportJob, enqueueProfileImport, findIdempotentImport, readImportJob, withImportTenant } from "@openedbot/portability/application/jobs";
+import { withProfileNamesLock, withBotProfileLock } from "@openedbot/roster/application/profile-import-guard";
 import { startFakeHermes } from "../../../../tests/fake-hermes/server";
 
 const url = process.env.INTEGRATION_ADMIN_DATABASE_URL;

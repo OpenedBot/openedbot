@@ -11,6 +11,7 @@ import type {
 import { isAmbiguousWebhookManagementFailure } from "@/lib/bots/webhook-management";
 import { Button, Input, Label, Switch, toast } from "@openedbot/browser-ui-kit";
 import { API_ORIGIN, ApiError, api, queryKeys } from "../lib/api";
+import { publicConsoleOrigin } from "../lib/platform";
 import { randomId } from "../lib/random-id";
 import { useT } from "../lib/i18n";
 import { BUTTON } from "./settings/primitives";
@@ -279,13 +280,15 @@ function CredentialLine({ label, value }: { label: string; value: string }) {
 }
 
 export function absoluteIngressUrl(path: string): string {
-  for (const base of [API_ORIGIN, globalThis.window?.location.origin]) {
-    if (!base) continue;
+  // The API's own origin first; on the web the API shares the public console
+  // origin, which `publicConsoleOrigin` gives (never a desktop app's local one).
+  for (const base of [() => API_ORIGIN, publicConsoleOrigin]) {
     try {
-      return new URL(path, base).toString();
+      const origin = base();
+      if (origin) return new URL(path, origin).toString();
     } catch {
-      // Test DOMs and native shells may expose a non-URL origin (for example
-      // `null`). The relative path remains valid and never gains a credential.
+      // Test DOMs may expose a non-URL origin (for example `null`), and a
+      // desktop app may lack its public URL: the relative path stays valid.
     }
   }
   return path;

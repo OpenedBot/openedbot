@@ -1,0 +1,60 @@
+[package]
+name = "openedbot-desktop-preview"
+version = "0.0.0"
+description = "openedbot desktop, Tauri 2 prototype (ADR 0001, D2a)"
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.88"
+publish = false
+
+[lib]
+name = "openedbot_desktop"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+tauri-plugin-updater = "2.14"
+tauri-plugin-opener = "2.7"
+tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+specta = { version = "=2.0.0-rc.26", features = ["derive"] }
+specta-typescript = "0.0.13"
+keyring = { version = "3.6", features = ["apple-native"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time", "process", "io-util", "macros", "rt", "net"] }
+url = "2"
+sha2 = "0.10"
+base64 = "0.22"
+rand = "0.8"
+thiserror = "2"
+log = "0.4"
+time = { version = "0.3", features = ["parsing", "formatting"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+tauri-plugin-single-instance = { version = "2.5", features = ["deep-link"] }
+tauri-plugin-deep-link = "2.6"
+tauri-plugin-global-shortcut = "2.4"
+tauri-plugin-notification = "2.8"
+tauri-plugin-dialog = "2.8"
+rusqlite = { version = "0.40", features = ["bundled"] }
+semver = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSDate", "NSError", "NSSet", "NSString", "NSArray", "NSObject", "NSNotification", "NSDistributedNotificationCenter", "NSOperation", "NSGeometry", "block2"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSMenu", "NSMenuItem", "NSResponder", "NSRunningApplication", "NSScreen", "NSWorkspace"] }
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore", "WKWebsiteDataRecord", "block2", "objc2-app-kit"] }
+
+# Linux (ADR 0001, D5, `src/linux.rs`): the Secret Service for the session
+# (encrypted D-Bus session, no file fallback) and the tray. In this target
+# section so the macOS build is unchanged.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust"] }
+tauri = { version = "2.12", features = ["tray-icon"] }
+
+[dev-dependencies]
+tauri = { version = "2.12", features = ["test"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "test-util"] }

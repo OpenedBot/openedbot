@@ -7,6 +7,7 @@ import type { Db } from "@openedbot/platform-db";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import { HttpError } from "../../interfaces/http/http-error";
 import type { BlobStore } from "../../infrastructure/blob-store";
+import type { EventLinkStatus } from "../../infrastructure/event-notifications";
 
 export class ApiRuntimeMetrics {
   readonly startedAt = new Date();
@@ -30,6 +31,8 @@ export function internalMetricsRoutes(
   hub: EventHub,
   blobs: BlobStore,
   runtimeMetrics: ApiRuntimeMetrics,
+  /** Le lien LISTEN de CE processus (S6) ; absent : non rapporté. */
+  eventLink: () => EventLinkStatus | null = () => null,
 ): Hono {
   const routes = new Hono();
   routes.get("/", async (context) => {
@@ -102,6 +105,7 @@ export function internalMetricsRoutes(
       sseConnections: hub.subscriberCount(),
       activeRuns,
       api: runtimeMetrics.snapshot(),
+      eventLink: eventLink(),
       attachments: {
         activeBytes: Number(attachmentRows[0]?.activeBytes ?? 0),
         orphaned: Number(attachmentRows[0]?.orphaned ?? 0),
@@ -139,6 +143,7 @@ type MetricsReport = {
   sseConnections: number;
   activeRuns: number;
   api: { startedAt: string; requestsTotal: number; serverErrorsTotal: number };
+  eventLink: EventLinkStatus | null;
   attachments: {
     activeBytes: number;
     orphaned: number;
@@ -239,6 +244,7 @@ function prometheus(report: MetricsReport): string {
     `openedbot_api_requests_total ${report.api.requestsTotal}`,
     "# TYPE openedbot_api_server_errors_total counter",
     `openedbot_api_server_errors_total ${report.api.serverErrorsTotal}`,
+    ...eventLinkLines(report.eventLink),
     `openedbot_attachment_active_bytes ${report.attachments.activeBytes}`,
     `openedbot_attachment_orphaned ${report.attachments.orphaned}`,
     `openedbot_blob_writes_total ${report.attachments.writes}`,
@@ -293,6 +299,27 @@ function prometheus(report: MetricsReport): string {
     lines.push(`openedbot_instance_rss_bytes{service="${instance.service}"} ${instance.rssBytes}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/** Le lien LISTEN du processus qui répond : une réplique, pas la flotte. */
+function eventLinkLines(link: EventLinkStatus | null): string[] {
+  if (!link) return [];
+  return [
+    "# TYPE openedbot_api_events_listen_connected gauge",
+    `openedbot_api_events_listen_connected ${link.connected ? 1 : 0}`,
+    "# TYPE openedbot_api_events_listen_resubscriptions_total counter",
+    `openedbot_api_events_listen_resubscriptions_total ${link.resubscriptions}`,
+    "# TYPE openedbot_api_events_listen_failures_total counter",
+    `openedbot_api_events_listen_failures_total ${link.failures}`,
+    "# TYPE openedbot_api_events_listen_stalls_total counter",
+    `openedbot_api_events_listen_stalls_total ${link.stalls}`,
+    "# TYPE openedbot_api_events_listen_notifications_total counter",
+    `openedbot_api_events_listen_notifications_total ${link.notifications}`,
+    ...(link.lagMs === null ? [] : [
+      "# TYPE openedbot_api_events_listen_lag_ms gauge",
+      `openedbot_api_events_listen_lag_ms ${link.lagMs}`,
+    ]),
+  ];
 }
 
 function metricCount(value: string | number, name: string): number {

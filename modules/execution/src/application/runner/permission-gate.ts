@@ -9,7 +9,7 @@
 
 import type { SQL } from "bun";
 import type { GateDescriptor, GateIdentity } from "../../domain/gate-identity";
-import { readReviewProven } from "@openedbot/runtimes/sql/review-profiles";
+import { readReviewProven } from "@openedbot/runtimes/application/review-profile";
 import {
   decidePermission,
   humanChoiceStillAllowed,

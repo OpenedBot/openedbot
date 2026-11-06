@@ -172,7 +172,7 @@ export function ConversationScreen() {
     if (bot?.id && bot.threadId) rememberBotThread(bot.id, bot.threadId);
   }, [bot?.id, bot?.threadId]);
 
-  const { thread, streaming, loading, loadOlder, loadingOlder, olderError } = useThreadStream(activeThreadId);
+  const { thread, streaming, loading, loadOlder, loadingOlder, olderError, liveText } = useThreadStream(activeThreadId);
   // Opening another bot closes the editor instead of carrying its canvas over.
   const releaseEditor = useAgentEditor((state) => state.release);
   useLayoutEffect(() => {
@@ -1056,7 +1056,7 @@ export function ConversationScreen() {
             className="relative flex min-h-0 flex-1 flex-col"
             data-turn-rail={turnRailShown ? "" : undefined}
           >
-          <DevRenderProfiler id="thread-timeline"><ThreadTimeline
+          <DevRenderProfiler id="thread-timeline"><ThreadTimeline liveText={liveText}
             events={timelineEvents}
             messages={timelineMessages}
             userInputs={timelineUserInputs}

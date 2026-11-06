@@ -1,48 +1,34 @@
 import type { SQL } from "bun";
-import { organizationEventEnvelope, type OrganizationEvent } from "@openedbot/contracts-events";
+import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { WorkerConfig } from "../worker-config";
-import type { EventContext, RunEventIdentityRow } from "./types";
+import { appendRunEventsTx } from "../../sql/run-events";
+import type { EventContext } from "./types";
 import { describe, log } from "./util";
 
 /**
- * Ajoute un `system.notice` au run dans la transaction courante, à la suite
- * des événements déjà écrits (même mécanique que failWithoutUsableProvider :
- * séquence recalculée, enveloppe publiée par l'appelant).
+ * Ajoute un événement au run dans la transaction courante, à la suite des
+ * événements déjà écrits : la séquence est allouée par la primitive
+ * (`sql/run-events.ts`), sous le verrou du run puis celui du curseur ;
+ * l'enveloppe est publiée par l'appelant.
  */
 export async function appendEventTx(
   tx: SQL,
   context: EventContext,
   type: string,
   payload: Record<string, unknown>,
-): Promise<OrganizationEvent | null> {
-  await lockRunEventCursorTx(tx, context.organizationId);
-  const sequenceRows = await tx<Array<{ next: number }>>`
-    select coalesce(max(sequence), -1) + 1 as next from run_events
-     where organization_id = ${context.organizationId} and run_id = ${context.id}
-  `;
-  const sequence = Number(sequenceRows[0]?.next ?? 0);
-  const occurredAt = new Date();
-  const rows = await tx<RunEventIdentityRow[]>`
-    insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-    values (${context.organizationId}, ${context.threadId}, ${context.id}, ${sequence},
-            ${type}, ${payload}, ${occurredAt})
-    on conflict (organization_id, run_id, sequence) do nothing
-    returning cursor, bot_id as "botId", turn_id as "turnId", session_key as "sessionKey",
-              lease_generation as "leaseGeneration"
-  `;
-  const row = rows[0];
-  if (!row) return null;
-  return organizationEventEnvelope({
-    ...row, organizationId: context.organizationId, threadId: context.threadId,
-    runId: context.id, sequence, type, payload, occurredAt,
-  });
+): Promise<OrganizationEvent> {
+  const [envelope] = await appendRunEventsTx(tx, [{
+    organizationId: context.organizationId, threadId: context.threadId, runId: context.id,
+    type, payload, occurredAt: new Date(),
+  }]);
+  return envelope!;
 }
 
 export async function appendNoticeTx(
   tx: SQL,
   context: EventContext,
   payload: Record<string, unknown>,
-): Promise<OrganizationEvent | null> {
+): Promise<OrganizationEvent> {
   return appendEventTx(tx, context, "system.notice", payload);
 }
 
@@ -51,18 +37,8 @@ export async function appendRunErrorTx(
   context: EventContext,
   message: string,
   errorCode: string,
-): Promise<OrganizationEvent | null> {
+): Promise<OrganizationEvent> {
   return appendEventTx(tx, context, "run.error", { message, errorCode });
-}
-
-/**
- * Identity cursors must be allocated in commit order. All run-event writers
- * take this organization-scoped transaction lock before their first insert;
- * the SSE poller can then advance a cursor without skipping an uncommitted
- * lower identity from a concurrent run.
- */
-export async function lockRunEventCursorTx(tx: SQL, organizationId: string): Promise<void> {
-  await tx`select pg_advisory_xact_lock(hashtext(${organizationId}), hashtext('openedbot-run-events-cursor'))`;
 }
 
 export async function publish(

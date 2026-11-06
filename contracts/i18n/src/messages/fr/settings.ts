@@ -70,6 +70,8 @@ export const settingsSidebar = {
   groupControl: "Contrôle",
   overview: "Activité",
   appearance: "Apparence et langue",
+  updates: "Mises à jour",
+  notch: "Encoche",
   archives: "Archives",
   notifications: "Notifications",
   runtime: "Runtime",

@@ -53,7 +53,7 @@ ne demandent jamais root.
 | `--ticket-file F` | Fichier `0600` portant le ticket ; par défaut stdin, ou une invite sans écho. |
 | `--insecure-openedbot` | Accepte en plus une origine `http://` **de la loopback** (développement, derrière un tunnel SSH inverse) ; toute autre origine `http://` reste refusée. |
 | `--name <name>` | Instance nommée (`^[a-z][a-z0-9-]{0,31}$`) : son propre lien, sa propre clé device et son unité `hermes-connector@<name>.service`, à côté du lien par défaut. C'est ce qui permet à un hôte de servir une prod et un dev à la fois. Voir [Instances nommées](#instances-nommées). |
-| `--rekey` | Régénère la clé device d'un runtime déjà lié, sans ticket ; la nouvelle clé publique est présentée sur une session. |
+| `--rekey` | Retiré : openedbot ne remplace plus une clé device enregistrée. Il refuse sans rien changer ; pour donner une nouvelle clé à un hôte, le réenrôler (voir [Exploitation](/fr/docs/operations)). |
 
 ## Les options de `up`
 
@@ -137,5 +137,4 @@ et le socket de l'opérateur.
 refuse pas une autre origine. Avant de lire le ticket, il annonce l'origine
 quittée et le runtime que cet openedbot conserve alors que l'hôte ne le
 rappellera plus. Pour garder les deux liens, poser le second avec `--name dev`.
-`status` liste chaque instance ; `link --rekey` et `unlink` prennent le même
-`--name`.
+`status` liste chaque instance ; `unlink` prend le même `--name`.

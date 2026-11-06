@@ -1,11 +1,8 @@
-import { useEffect, useState, type UIEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { Suspense, useEffect, useState, type UIEvent } from "react";
+import { Link, lazyRouteComponent } from "@tanstack/react-router";
 import { IconPlus } from "@tabler/icons-react";
-import { ChartAreaInteractive } from "../../components/dashboard/chart-area-interactive";
-import { TokensChart } from "../../components/dashboard/tokens-chart";
 import { SectionCards } from "../../components/dashboard/section-cards";
 import { ChartCardSkeleton, SectionCardsSkeleton } from "../../components/dashboard/overview-skeleton";
-import { BotsTable } from "../../components/dashboard/bots-table";
 import { SiteHeader } from "../../components/dashboard/site-header";
 import { ChromeIconButton } from "../../components/mobile/mobile-header";
 import { useT } from "../../lib/i18n";
@@ -15,6 +12,14 @@ import { NewBotHome } from "./new-bot-home";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { useQuery } from "@tanstack/react-query";
 import { api, queryKeys } from "../../lib/api";
+
+// Recharts with its d3 scales, and the bots table with TanStack Table, are
+// their own chunks: the home `/` shares this module with the settings
+// overview but draws neither, and loading them held the whole frame, sidebar
+// included, behind the route (ADR 0001, D1b).
+const ChartAreaInteractive = lazyRouteComponent(() => import("../../components/dashboard/chart-area-interactive"), "ChartAreaInteractive");
+const TokensChart = lazyRouteComponent(() => import("../../components/dashboard/tokens-chart"), "TokensChart");
+const BotsTable = lazyRouteComponent(() => import("../../components/dashboard/bots-table"), "BotsTable");
 
 /**
  * Cartes, graphiques et table, l’ancien accueil, désormais sur la Vue
@@ -38,10 +43,10 @@ export function OverviewDashboard({ flush = false, stage = 4 }: { flush?: boolea
           !flush && "px-4 lg:px-6",
         )}
       >
-        {stage >= 2 ? <ChartAreaInteractive /> : <ChartCardSkeleton label={loading} />}
-        {stage >= 3 ? <TokensChart /> : <ChartCardSkeleton label={loading} totalLine />}
+        {stage >= 2 ? <Suspense fallback={<ChartCardSkeleton label={loading} />}><ChartAreaInteractive /></Suspense> : <ChartCardSkeleton label={loading} />}
+        {stage >= 3 ? <Suspense fallback={<ChartCardSkeleton label={loading} totalLine />}><TokensChart /></Suspense> : <ChartCardSkeleton label={loading} totalLine />}
       </div>
-      {stage >= 4 ? <BotsTable flush={flush} /> : null}
+      {stage >= 4 ? <Suspense fallback={null}><BotsTable flush={flush} /></Suspense> : null}
     </div>
   );
 }

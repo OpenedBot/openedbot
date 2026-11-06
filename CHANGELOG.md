@@ -8,8 +8,65 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 1.1.1 — 2026-11-06
+
 ### Ajouté
 
+- **openedbot 1.1.1 : l'app de bureau devient native, sur Mac et sous
+  Linux.** La console est embarquée au lieu d'être téléchargée à chaque
+  ouverture, et l'app se met à jour seule (pastille bleue « Mettre à jour »,
+  redémarrage avec votre accord ; sous Linux, l'AppImage se met à jour seule,
+  le paquet deb par l'installation du suivant). Sur Mac, elle occupe environ
+  un tiers de mémoire en moins (456 Mo contre 660 Mo, fil ouvert) et ses
+  boutons de fenêtre restent centrés sur la barre du haut, quelle que soit la
+  taille du texte. Le notch, la connexion par e-mail ou Google, les
+  notifications et le raccourci ⌘⇧O sont repris. Sous Linux : un deb et une
+  AppImage, pour x86_64 et désormais aussi pour ARM (arm64), avec l'icône
+  dans la zone de notification.
+  **L'app de bureau Windows n'est plus proposée pour l'instant**, le temps
+  de livrer sa version native ; la console web reste disponible dans le
+  navigateur.
+  **L'ancienne app de bureau (versions 1.0.x) ne se met pas à jour toute
+  seule : remplacez-la par le nouveau téléchargement.** Sur Mac, le dmg
+  s'installe à la même place dans Applications ; sous Linux, le nouveau deb
+  remplace l'ancien paquet (`sudo apt install ./openedbot-linux-amd64.deb`).
+  Une fois la console web mise à jour, l'ancienne app affiche « Cette
+  version d'openedbot n'est plus prise en charge », avec les liens de
+  téléchargement et « Continuer dans le navigateur ». **À l'installation, une seule fois** : il faut se
+  reconnecter, et les brouillons non envoyés de l'ancienne app ne sont pas
+  repris (envoyez-les ou copiez-les avant de la remplacer).
+
+- **Sur Mac, l'encoche se présente à la première connexion.** Juste après
+  vous être connecté dans l'app de bureau, une courte démonstration joue en
+  haut de l'écran avec deux bots fictifs (Recherche et Rédaction : travail en
+  cours, demande d'accord avec « Autoriser » / « Refuser », puis terminé),
+  sans rien envoyer ni notifier, et une fenêtre propose « Garder l'encoche »
+  (l'encoche et la fenêtre) ou « Pas maintenant » (la fenêtre seule). Fermer
+  l'app sans choisir reposera la question au lancement suivant ; une mise à
+  jour ne la repose jamais. Après la démonstration, vos notifications et vos
+  demandes d'accord en attente reviennent, et la réponse d'un bot reçue
+  pendant qu'elle jouait s'annonce une fois. Le choix se change dans le nouveau volet
+  Réglages › Encoche, qui permet aussi de revoir la démonstration, ou depuis
+  le menu du Dock (« Fenêtre », « Encoche seule », « Fenêtre et encoche »).
+  L'encoche n'apparaît plus avant la connexion, se place sur l'écran qui a
+  la caméra et se replace au réveil. Quand elle s'arrête plusieurs fois de
+  suite, elle reste fermée jusqu'au prochain lancement, qui la relance, au
+  lieu de vous remettre définitivement sur la fenêtre seule.
+- **La mise à jour de l'app de bureau se voit dans le rail d'icônes** : un
+  bouton juste au-dessus de Réglages, qui ouvre « Mise à jour prête ». Toutes
+  les indications de mise à jour (ce bouton, la pastille « Mettre à jour »,
+  le point de l'encoche) prennent le bleu des mises à jour d'Apple, plein,
+  sous une icône blanche, lisible en thème sombre.
+
+- L'app de bureau indique sa version à l'API. Quand une version devient
+  trop ancienne pour être servie, l'app affiche « Mettez openedbot à jour »
+  avec un lien vers la page de téléchargement, au lieu d'erreurs en cascade.
+  Le seuil se règle côté serveur (`DESKTOP_MIN_VERSION`, vide par défaut :
+  aucune version n'est refusée).
+- L'API accepte les requêtes de la future app de bureau, dont la console
+  sera embarquée : ses origines locales passent le CORS sans jamais pouvoir
+  utiliser un cookie de session, et le numéro de référence d'une erreur reste
+  lisible.
 - Réglages › Archives : chaque section (corbeille, bots archivés,
   conversations masquées) s'affiche par pages de 15. Une case par ligne,
   une case pour cocher la page entière et « Tout sélectionner » pour toute
@@ -19,6 +76,64 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- **L'app de bureau n'affiche plus de contour de focus** sur les boutons,
+  champs, onglets et menus, même au clavier ; la navigation au clavier
+  fonctionne comme avant. La console dans le navigateur ne change pas.
+- Un message se suit d'un bout à l'autre dans les journaux d'exploitation.
+  Son run porte un identifiant de trace (l'identifiant du run sans ses
+  tirets), présent sur la ligne `run.admission` de l'API, sur chaque ligne
+  du worker pendant le run (`worker.run_claimed`, les étapes, `run.latency`),
+  sur une nouvelle ligne par requête envoyée à l'hôte
+  (`worker.relay_request`, `runtime_link.relay_request` côté passerelle) et
+  dans le journal du connecteur à partir de la prochaine version
+  d'edge-setup ; l'en-tête `traceparent` (W3C) le porte jusqu'à Hermes. Le
+  worker écrit désormais ses journaux comme l'API (pino : JSON horodaté et
+  nivelé en production, lisible en développement, mêmes noms d'événements et
+  mêmes champs) au lieu de lignes `console` ; les lignes de l'API ne changent
+  pas, `run.admission` gagne seulement `traceId`. Un connecteur déjà installé
+  continue de fonctionner : il ignore l'en-tête.
+- Le direct ne dépend plus de la réplique d'API à laquelle on est connecté.
+  Chaque réplique écoute les nouveaux événements dans PostgreSQL (LISTEN) :
+  une réponse qui s'écrit, une annulation ou un message ajouté par l'API
+  arrivent à tous les clients quelques millisecondes après leur
+  enregistrement, au lieu d'attendre
+  jusqu'à 5 s le sondage de secours sur les répliques que le worker ne
+  prévient pas, ou pour les événements écrits par l'API elle-même. Après une
+  coupure de la connexion, la réplique se réabonne seule et relit ce qui
+  s'est passé entre-temps, sans perte ni doublon. Si l'écoute est
+  indisponible, l'API démarre quand même, le signale dans ses journaux et ses
+  métriques, et retombe sur l'ancien chemin (alerte du worker, sondage).
+- La console s'ouvre plus vite : avant d'afficher la liste des fils, elle
+  télécharge moitié moins de code (environ 390 ko compressés au lieu de
+  860) et en 27 fichiers au lieu de 54. L'écran de conversation, la page
+  d'un bot, la palette ⌘K, le guichet de support, les notes de version du
+  connecteur, les graphiques et la table de la Vue d'ensemble, et le rendu
+  des formules (KaTeX) se chargent quand on les ouvre. Le dictionnaire de la
+  langue active part en même temps que l'application. Avec une latence
+  réseau de 50 ms, le premier lancement passe d'environ 1,2 s à 0,9 s dans
+  le navigateur, et le premier lancement après une mise à jour d'environ
+  1 s à 0,65 s dans l'app de bureau.
+- Une réponse qui s'écrit ne fait plus travailler tout l'écran : seule sa
+  bulle suit le texte, et le reste de la conversation (en-tête, liste des
+  fils, fil) se met à jour une fois par seconde au plus pendant qu'elle
+  s'allonge. Les mots déjà apparus ne gardent plus leur animation, et le
+  rail des tours mesure le fil dix fois par seconde au plus. Sur un
+  processeur ralenti quatre fois, comme sur une machine modeste, une longue
+  réponse s'affiche à 85 images par seconde environ au lieu de 50 à 57.
+  Pendant l'écriture, la recherche dans le fil et l'aperçu de la liste des
+  fils suivent la réponse avec au plus une seconde de retard.
+- Un long fil reste fluide, même après avoir chargé tout son historique.
+  Seuls les tours visibles, avec un écran de marge, sont affichés ; les
+  autres gardent leur place, et la barre de défilement ne saute plus. Avec
+  750 tours chargés, le défilement reste à 120 images par seconde au lieu
+  de 92 (avec des creux à 30), et la page occupe 34 Mo de mémoire au lieu
+  de 115. La lecture ne change pas : le fil reste en bas pendant une
+  réponse, et charger les messages précédents ne déplace plus le message
+  qu'on lit. Un lien vers un message, la recherche (⌘K et ⌘F) et le rail
+  des tours atteignent aussi un tour lointain. Une sélection de texte ou le
+  focus clavier gardent leurs tours affichés : copier plusieurs messages
+  fonctionne toujours. « Charger les messages précédents » annonce
+  désormais 40 messages, la taille réelle d'une page.
 - Plus aucun nom technique hérité de l'ancien nom du produit : base et rôles
   PostgreSQL, fonctions SQL, en-têtes, cookies, schéma d'URL de l'app de
   bureau (`openedbot://`), popup natif (`OpenedbotPopup.app`), classes CSS,
@@ -44,9 +159,58 @@ connecteur hôte et le protocole tiennent le leur :
   Developer ID et notarisées par Apple. Le dmg téléchargé s'ouvre sans
   alerte, sans passer par « Ouvrir quand même » dans Réglages › Confidentialité
   et sécurité. Les builds des pull requests restent signés ad hoc.
+- « Compacter l'historique du salon » s'exécute désormais dans le worker,
+  comme une réponse, et plus dans la requête de la console. Fermer l'onglet
+  ou le dialogue n'arrête plus un résumé déjà lancé : il se termine et
+  l'historique se met à jour. Un seul résumé par salon à la fois, quelle que
+  soit la réplique d'API qui reçoit la demande ; un résumé interrompu par un
+  redémarrage du worker reprend sur un autre. La réponse ne change pas.
+  Nouveaux cas, chacun avec son message : `COMPACTION_NOT_STARTED` (aucun
+  worker n'a pris le résumé), `COMPACTION_STILL_RUNNING` (le résumé continue
+  au-delà de l'attente de la requête), `COMPACTION_CANCELLED` (arrêté par
+  `DELETE /api/threads/:threadId/compact`).
 
 ### Corrigé
 
+- Un travail dont l'issue est devenue incertaine (le worker s'est arrêté
+  pendant sa création chez Hermes, par exemple) ne bloque plus sa
+  conversation sans recours : un brouillon de persona, un message transmis
+  par un ancien `@bot`, un ancien tour de salon ou un message d'un opérateur
+  dont le compte a été supprimé apparaît désormais « à vérifier » dans la
+  boîte de réception, comme un message privé. L'abandonner libère la
+  conversation, le bot et la place qu'il occupait chez le runtime. Un
+  brouillon de persona ne se relance pas d'ici (on le relance depuis la
+  fiche du bot), ni un message transmis (on le renvoie).
+- Un travail « à vérifier » qu'un administrateur abandonne (ou remplace par
+  une relance) ne s'affiche plus « à vérifier » dans sa conversation : il
+  apparaît en échec, comme dans la boîte de réception.
+- Un message transmis à un autre bot par un ancien `@bot` ne reçoit plus sa
+  réponse en double quand on annule la conversation au moment même où le
+  bot répond : le fil d'origine reçoit une seule réponse.
+- Un message repris après l'arrêt d'un worker (mise à jour, redémarrage)
+  relit d'abord l'état du run chez Hermes quand le runtime n'annonce pas de
+  rejeu, comme après la perte de son bail, au lieu de se raccrocher au flux
+  en cours sans savoir ce qu'il a manqué.
+- Un worker dont le bail a expiré n'écrit plus rien sur le message qu'il
+  traitait, même si aucun autre worker ne l'a encore repris : sa réponse
+  tardive ne peut plus clore un message que la reprise va réconcilier.
+- Les mises à jour en direct (réponses en cours, fils, notifications) arrivent
+  aussi à la future app de bureau, dont la console est embarquée : le flux
+  temps réel portait l'en-tête CORS des autres requêtes de l'API sauf le sien,
+  et l'app se reconnectait sans fin. Le web et l'app actuelle, servis depuis
+  l'origine de la console, n'étaient pas touchés.
+- Un message en échec s'affiche toujours dans sa conversation. Quand le
+  runtime ne répondait plus et qu'un autre événement arrivait au même
+  instant sur le même message, son erreur pouvait disparaître du fil : le
+  message était marqué en échec, mais le fil ne le montrait qu'après
+  rechargement. De même, le résultat d'un outil rattaché à la fin d'une
+  réponse ne se perd plus quand la réponse ajoute un avertissement (une
+  délégation hors plateforme, par exemple). Si deux écritures se disputent
+  encore la même place dans le journal d'un message, le message échoue avec
+  une erreur nommée (`RUN_EVENT_SEQUENCE_CONFLICT`) au lieu de perdre un
+  événement en silence.
+- Réglages › Activité : sans aucun bot, le tableau propose « Créer un bot ».
+  L'ancien message renvoyait vers la barre latérale, absente de cet écran.
 - Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de
   nouveau en glissant depuis le bord : il ne saute plus d'un coup à 320 px
   en décalant le fil.
@@ -82,6 +246,17 @@ connecteur hôte et le protocole tiennent le leur :
   lien, l'app de bureau, le Makefile et les scripts ne refusent plus de
   démarrer quand l'un d'eux est posé, et `make env-prune` ne les réécrit
   plus sous leur nouveau nom. Un ancien nom est simplement ignoré.
+
+
+### Sécurité
+
+- Une machine liée ne peut plus changer de clé d'appareil par son lien :
+  openedbot refuse toute autre clé que celle enregistrée à l'enrôlement, même
+  présentée avec le jeton de lien courant. Un jeton de lien volé ne suffit
+  donc plus à imposer la clé d'un attaquant. Pour donner une nouvelle clé à
+  une machine, on la réenrôle (Réglages › Runtime › Remplacer le runtime).
+  Deux montées simultanées d'une machine sans clé ne peuvent plus non plus
+  s'écraser l'une l'autre.
 
 ## 1.0.2 — 2026-11-04
 

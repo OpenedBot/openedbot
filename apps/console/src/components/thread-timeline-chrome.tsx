@@ -1,4 +1,5 @@
 import { useT } from "../lib/i18n";
+import { useDismissedAskUserRuns } from "../lib/run/ask-user-dismissals";
 
 /**
  * La puce de date du template : « Aujourd'hui », « Hier », puis la date,
@@ -36,5 +37,17 @@ export function Divider({ children, findTargetId, findActive = false }: {
     >
       {children}
     </p>
+  );
+}
+
+/** « Ignorée » après une question repliée par le « x » de sa carte. */
+export function AskUserDismissedMark({ runId }: { runId: string }) {
+  const { t } = useT();
+  const dismissed = useDismissedAskUserRuns();
+  if (!dismissed.includes(runId)) return null;
+  return (
+    <span className="shrink-0 rounded-full bg-background-secondary-default px-1.5 not-italic text-text-tertiary">
+      {t("threadTimeline.askUserDismissed")}
+    </span>
   );
 }

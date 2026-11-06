@@ -14,6 +14,10 @@ import { I18nProvider } from "../../../src/lib/i18n";
 import { readCloudSession } from "../../../src/lib/session/cloud-session";
 import { LoginScreen } from "../../../src/screens/auth/login";
 import type { NativeAuthBridge, NativeSigninState } from "../../../src/lib/platform/native-bridge";
+import { asDesktopBuild } from "../../support/desktop-build";
+
+// These tests drive the desktop app's bridge, which only the desktop build reads.
+asDesktopBuild();
 
 const realFetch = globalThis.fetch;
 let reply: Response;
@@ -75,7 +79,7 @@ afterEach(() => {
 
 const CODE_PROVIDERS = { google: { enabled: false, reason: "not_configured" }, password: { enabled: false }, emailCode: { enabled: true } };
 
-/** Une coque desktop simulée : chaque action pousse ses états, comme le main d'Electron. */
+/** Une coque desktop simulée : chaque action pousse ses états, comme la coque Rust. */
 function fakeShell(verifyOutcome: NativeSigninState) {
   const listeners = new Set<(state: NativeSigninState) => void>();
   let last: NativeSigninState = { status: "idle" };

@@ -1,6 +1,8 @@
 import type { SQL } from "bun";
 import { HermesClientError } from "@openedbot/hermes";
-import { recordDirectProbeResult } from "@openedbot/runtimes/sql/runtime-rows";
+import { recordDirectProbeResult } from "@openedbot/runtimes/application/runtime-rows";
+import { appendRunEventsTx } from "../sql/run-events";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
 import { createRuntimeClient, type RuntimeClientContext, type RuntimeClientConfig } from "@openedbot/execution/application/runtime-client";
 
 export const DIRECT_PROBE_TICK_MS = 30_000;
@@ -55,58 +57,48 @@ export async function probeDirectRuntimes(
   return results.reduce((sum, count) => sum + count, 0);
 }
 
-/** Same run/workflow/event settlement as the disconnected connector, without replay. */
+const UNHEALTHY_DIRECT_MESSAGE = "Le runtime en accès direct n’a pas répondu à la sonde de santé à temps ; le run n’a pas démarré.";
+
+/**
+ * Same run/workflow/event settlement as the disconnected connector, without
+ * replay. The update holds every failed run's row; their `run.error` is then
+ * numbered by the primitive, in a statement after the cursor lock (D2).
+ */
 export async function failRunsOnUnhealthyDirectRuntimes(db: SQL, timeoutMs: number): Promise<number> {
-  const rows = await db<Array<{ count: string | number }>>`
-    with stale_runtimes as (
-      select rt.organization_id, rt.id
-        from runtimes rt
-       where rt.reachability = 'direct' and rt.revoked_at is null and rt.is_active
-         and (rt.last_health_status <> 'healthy' or rt.last_probed_at is null
-           or rt.last_probed_at <= now() - interval '90 seconds')
-    ), failed_runs as (
-      update runs run set status = 'failed', external_state = 'settled', events_complete = true,
-        error_code = 'RUNTIME_DISCONNECTED',
-        error_message = 'Le runtime en accès direct n’a pas répondu à la sonde de santé à temps ; le run n’a pas démarré.',
-        ended_at = now(), lease_owner = null, lease_expires_at = null,
-        next_attempt_at = null, updated_at = now()
-       from stale_runtimes stale
-       where run.organization_id = stale.organization_id
-         and run.status = 'queued' and run.hermes_run_id is null
-         and run.created_at < now() - (${timeoutMs} * interval '1 millisecond')
-       returning run.organization_id, run.thread_id, run.id as run_id, run.workflow_id
-    ), failed_workflows as (
-      update workflows workflow set status = 'failed',
-        error_code = 'RUNTIME_DISCONNECTED',
-        error_message = 'Le runtime en accès direct n’a pas répondu à la sonde de santé à temps.',
-        ended_at = now(), updated_at = now()
-       from failed_runs run
-       where workflow.organization_id = run.organization_id and workflow.id = run.workflow_id
-         and workflow.status in ('queued','running','awaiting_approval')
-       returning workflow.organization_id, workflow.id
-    ), cursor_locks as materialized (
-      select organization_id,
-             pg_advisory_xact_lock(hashtext(organization_id::text), hashtext('openedbot-run-events-cursor')) as locked
-        from (select distinct organization_id from failed_runs) organizations
-       order by organization_id
-    ), event_rows as (
-      select run.organization_id, run.thread_id, run.run_id,
-             coalesce((select max(event.sequence) + 1 from run_events event
-                        where event.organization_id = run.organization_id and event.run_id = run.run_id), 0) as sequence
-        from failed_runs run
-        join cursor_locks cursor on cursor.organization_id = run.organization_id
-    ), inserted as (
-      insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-      select organization_id, thread_id, run_id, sequence, 'run.error',
-             jsonb_build_object(
-               'message', 'Le runtime en accès direct n’a pas répondu à la sonde de santé à temps ; le run n’a pas démarré.',
-               'errorCode', 'RUNTIME_DISCONNECTED'
-             ), now()
-        from event_rows
-      on conflict (organization_id, run_id, sequence) do nothing
-      returning run_id
-    )
-    select count(*) as count from failed_runs
-  `;
-  return Number(rows[0]?.count ?? 0);
+  return db.begin(async (tx) => {
+    const sql = tx as unknown as SQL;
+    // Queued, never sent to Hermes: no lease to hold. Every run of an
+    // organization with a stale runtime, as the join on the organization did.
+    const failed = await transitionRuns(sql, {
+      target: { sweep: true }, fence: "unleased",
+      transition: { from: ["queued"], to: { status: "failed", externalState: "settled" } },
+      set: {
+        eventsComplete: true, errorCode: "RUNTIME_DISCONNECTED", errorMessage: UNHEALTHY_DIRECT_MESSAGE,
+        endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null,
+      },
+      where: sqlExpr`hermes_run_id is null and created_at < now() - (${timeoutMs} * interval '1 millisecond')
+        and organization_id in (
+          select rt.organization_id
+            from runtimes rt
+           where rt.reachability = 'direct' and rt.revoked_at is null and rt.is_active
+             and (rt.last_health_status <> 'healthy' or rt.last_probed_at is null
+               or rt.last_probed_at <= now() - interval '90 seconds')
+        )`,
+    });
+    for (const run of failed) {
+      if (!run.workflowId) continue;
+      await sql`
+        update workflows set status = 'failed',
+          error_code = 'RUNTIME_DISCONNECTED',
+          error_message = 'Le runtime en accès direct n’a pas répondu à la sonde de santé à temps.',
+          ended_at = now(), updated_at = now()
+         where organization_id = ${run.organizationId} and id = ${run.workflowId}
+           and status in ('queued','running','awaiting_approval')
+      `;
+    }
+    await appendRunEventsTx(sql, failed.map((run) => ({
+      organizationId: run.organizationId, threadId: run.threadId, runId: run.id, type: "run.error", payload: { message: UNHEALTHY_DIRECT_MESSAGE, errorCode: "RUNTIME_DISCONNECTED" },
+    })));
+    return failed.length;
+  }) as Promise<number>;
 }

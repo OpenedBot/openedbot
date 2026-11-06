@@ -1,10 +1,14 @@
+import type { SQL } from "bun";
 import {
   type BotIdentity,
 } from "@openedbot/roster/domain/bot-mode";
+import { appendRunEventsTx } from "@openedbot/execution/application/run-events";
+import { NOW, transitionRuns } from "@openedbot/execution/application/run-transitions";
 import { SERVICE_STEP_KINDS } from "@openedbot/execution/domain/run-step";
 import type { MessageContent } from "@openedbot/contracts-api";
 import { logEvent } from "@openedbot/platform-observability";
 import { RunTrace, runLatencyVerdicts } from "@openedbot/platform-observability/run-trace";
+import { traceIdOfRun } from "@openedbot/platform-observability/trace-context";
 import {
   type CancellationRun,
 } from "@openedbot/execution/application/run-cancellation";
@@ -69,13 +73,16 @@ export async function activeRunSteerTargetTx(
 /**
  * Moitié API du traceur De la réception du POST au commit, en
  * noms et durées seulement. Le worker reprend à la réclamation, relié par
- * `runId` et par `queuedMs` (horloge PostgreSQL).
+ * `runId` et par `queuedMs` (horloge PostgreSQL). `traceId` est celui que
+ * le worker, le relais et le connecteur journalisent pour ce run : il naît ici,
+ * avec le run (S7).
  */
 export function logRunAdmission(runId: string, organizationId: string, trace: RunTrace): void {
   const summary = trace.summary();
   logEvent("run.admission", {
     runId,
     organizationId,
+    traceId: traceIdOfRun(runId),
     ...summary,
     verdicts: runLatencyVerdicts({ admission: summary.marks["api.committed"] ?? null }),
   });
@@ -366,6 +373,15 @@ export async function settleCancelledHandoffsTx(
     `;
     const origin = origins[0];
     if (!origin || origin.status !== "relaying") continue;
+    // Closed first, under its guard: the update locks the courier and moves
+    // it only if it still relays (D6). A courier the worker delivered
+    // meanwhile receives nothing more. Its status is set before its events:
+    // a client that reads `run.completed` and reloads finds it closed.
+    const closed = await transitionRuns(tx as unknown as SQL, {
+      target: { organizationId, id: origin.id }, fence: "unleased",
+      transition: { from: ["relaying"], to: { status: "completed" } }, set: { endedAt: NOW },
+    });
+    if (closed.length === 0) continue;
     // La cible est relue même archivée : elle reste nommée dans la réponse.
     const targets = await tx<Array<{ name: string; slug: string }>>`
       select name, slug from bots where organization_id = ${organizationId} and id = ${run.botId}
@@ -379,27 +395,11 @@ export async function settleCancelledHandoffsTx(
               -- role 'user' : entrée du fil d'origine, rendue BotInboundMessage côté client.
               'user', ${[{ type: "text", text }]}, ${run.botId})
     `;
-    // Le statut AVANT les événements : un client qui reçoit `run.completed`
-    // et relit le fil doit y trouver un courrier déjà terminé.
-    await tx`
-      update runs set status = 'completed', ended_at = now(), updated_at = now()
-       where organization_id = ${organizationId} and id = ${origin.id}
-    `;
-    await tx`
-      select pg_advisory_xact_lock(
-        hashtext(${organizationId}),
-        hashtext('openedbot-run-events-cursor')
-      )
-    `;
-    const sequenceRows = await tx<Array<{ next: number }>>`
-      select coalesce(max(sequence), -1) + 1 as next from run_events
-       where organization_id = ${organizationId} and run_id = ${origin.id}
-    `;
-    const first = Number(sequenceRows[0]?.next ?? 0);
+    // The transition above holds the courier's row: the primitive takes the cursor after it.
     const occurredAt = new Date();
-    const events: Array<{ sequence: number; type: string; payload: Record<string, unknown> }> = [
+    await appendRunEventsTx(tx as unknown as SQL, [
       {
-        sequence: first,
+        organizationId, threadId: origin.threadId, runId: origin.id, occurredAt,
         type: "bot.message",
         payload: {
           messageId,
@@ -410,16 +410,11 @@ export async function settleCancelledHandoffsTx(
           ok: false,
         },
       },
-      { sequence: first + 1, type: "run.completed", payload: { output: null, usage: null } },
-    ];
-    for (const event of events) {
-      await tx`
-        insert into run_events (organization_id, thread_id, run_id, sequence, type, payload, occurred_at)
-        values (${organizationId}, ${origin.threadId}, ${origin.id}, ${event.sequence},
-                ${event.type}, ${event.payload}, ${occurredAt})
-        on conflict (organization_id, run_id, sequence) do nothing
-      `;
-    }
+      {
+        organizationId, threadId: origin.threadId, runId: origin.id, occurredAt,
+        type: "run.completed", payload: { output: null, usage: null },
+      },
+    ]);
     await tx`
       update threads set updated_at = now()
        where organization_id = ${organizationId} and id = ${origin.threadId}

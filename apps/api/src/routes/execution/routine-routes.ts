@@ -13,6 +13,7 @@ import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/do
 import { ROOM_LIMITS } from "@openedbot/roster/domain/bot-mode";
 import { coerceGroupDefaultResponder, planRoutineGroupSend, type GroupSendState } from "@openedbot/execution/domain/group-send";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
+import { fireRoutineTx } from "@openedbot/execution/application/run-creation";
 import type { AppVariables, AuthContext } from "../identity/auth";
 import { requireOperator } from "../identity/auth";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
@@ -481,33 +482,24 @@ export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variable
             opened?.autonomyTokenBudget ?? routine.autonomyTokenBudget ?? AUTONOMY_DEFAULTS.tokenBudget,
           ),
         });
-        const workflowKind = routine.groupId ? "group" : "routine";
-        const workflowMaxSteps = routine.groupId ? ROOM_LIMITS.maxMemberTurns : policy.maxSteps;
-        const runBotId = opened?.botId ?? routine.botId;
-        const runStepKind = routine.groupId ? "group" : "root";
-        await tx`
-          insert into workflows (
-            id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-            kind, status, protocol_version,
-            autonomy_enabled, max_depth, max_steps, max_handoffs, timeout_seconds, token_budget,
-            used_steps, used_handoffs, used_tokens, deadline_at, recovery_state, never_wait
-          ) values (
-            ${workflowId}, ${auth.organizationId}, ${routine.threadId}, ${runId}, ${runBotId},
-            ${auth.userId}, ${workflowKind}, 'queued', 1, ${policy.enabled}, ${policy.maxDepth},
-            ${workflowMaxSteps}, ${policy.maxHandoffs}, ${policy.timeoutSeconds}, ${policy.tokenBudget},
-            1, 0, 0, now() + (${policy.timeoutSeconds} * interval '1 second'),
-            ${{ routineId: routine.id, trigger: "manual" }}, ${routine.neverWait === true}
-          )
-        `;
-        await tx`
-          insert into runs (
-            id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, status,
-            workflow_id, step_index, step_kind, stack_depth, external_state, events_complete
-          ) values (
-            ${runId}, ${auth.organizationId}, ${routine.threadId}, ${runBotId}, ${opened?.position ?? null},
-            ${opened?.state ?? null}, ${text}, 'queued', ${workflowId}, 0, ${runStepKind}, 0, 'not_started', true
-          )
-        `;
+        // routines_bot_xor_group: a room routine has its opened speaker, a bot routine its bot.
+        const speaker = opened
+          ? { kind: "group" as const, botId: opened.botId, position: opened.position, state: opened.state }
+          : routine.botId ? { kind: "root" as const, botId: routine.botId } : null;
+        if (!speaker) throw new Error(`routine ${routine.id} has neither a bot nor a room`);
+        await fireRoutineTx(tx, {
+          trigger: "manual",
+          routineId: routine.id,
+          organizationId: auth.organizationId,
+          threadId: routine.threadId,
+          runId,
+          workflowId,
+          initiatorUserId: auth.userId,
+          input: text,
+          speaker,
+          budget: opened ? { ...policy, maxSteps: ROOM_LIMITS.maxMemberTurns } : policy,
+          neverWait: routine.neverWait === true,
+        });
         await tx`
           insert into messages (id, organization_id, thread_id, run_id, role, content)
           values (${messageId}, ${auth.organizationId}, ${routine.threadId}, ${runId},

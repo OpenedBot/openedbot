@@ -1,0 +1,18 @@
+{
+  "name": "desktop-tauri",
+  "version": "0.0.1",
+  "private": true,
+  "description": "openedbot desktop app for macOS and Linux (ADR 0001): the solo console embedded in a Tauri 2 shell, native bridge in Rust",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test scripts",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

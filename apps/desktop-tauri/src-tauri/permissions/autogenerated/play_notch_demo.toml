@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-play-notch-demo"
+description = "Enables the play_notch_demo command without any pre-configured scope."
+commands.allow = ["play_notch_demo"]
+
+[[permission]]
+identifier = "deny-play-notch-demo"
+description = "Denies the play_notch_demo command without any pre-configured scope."
+commands.deny = ["play_notch_demo"]

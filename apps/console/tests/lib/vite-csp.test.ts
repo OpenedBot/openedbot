@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { consolePolicy, injectPolicy } from "../../vite-csp";
+import { consolePolicy, DESKTOP_API_ORIGIN_PLACEHOLDER, injectPolicy, withoutAnalytics } from "../../vite-csp";
 
 const BOOT = "\n      document.documentElement.classList.add('x');\n    ";
 const HTML = `<!doctype html>
@@ -79,5 +79,27 @@ describe("injectPolicy", () => {
     const inline = [...source.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
     expect(inline.length).toBeGreaterThan(0);
     for (const match of inline) expect(scripts).toContain(hash(match[1] ?? ""));
+  });
+});
+
+describe("consolePolicy, desktop build (Tauri)", () => {
+  const desktopHtml = HTML.replace(/\s*<script defer src="https:\/\/umami[^>]*><\/script>/, "");
+
+  test("the runtime API origin is a placeholder the shell fills, next to the Tauri IPC", () => {
+    const policy = consolePolicy(desktopHtml, "", { desktop: true });
+    expect(directive(policy, "connect-src")).toEqual(["'self'", "ipc:", "http://ipc.localhost", DESKTOP_API_ORIGIN_PLACEHOLDER]);
+    expect(directive(policy, "img-src")).toContain(DESKTOP_API_ORIGIN_PLACEHOLDER);
+    expect(directive(policy, "media-src")).toContain(DESKTOP_API_ORIGIN_PLACEHOLDER);
+    expect(directive(policy, "script-src")).toContain(hash(BOOT));
+    expect(directive(policy, "script-src")).not.toContain("'unsafe-inline'");
+  });
+
+  test("the analytics script leaves the real index.html, and nothing external remains", () => {
+    const real = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+    expect(real).toContain("umami");
+    const stripped = withoutAnalytics(real);
+    expect(stripped).not.toContain("umami");
+    expect(directive(consolePolicy(stripped, "", { desktop: true }), "script-src").some((source) => source.startsWith("https:"))).toBe(false);
+    expect(() => withoutAnalytics(stripped.replace("</head>", '<script src="https://cdn.example.test/x.js"></script></head>'))).toThrow();
   });
 });

@@ -1,8 +1,8 @@
-import { nativeBridge } from "../platform/native-bridge";
+import { nativeBridge } from "../platform";
 import { normalizeWorkflowCounters } from "@/lib/run/workflow-display";
 import type { CreateMessageVersionInput, InboxDto, MessageVersionCreatedDto, MessageVersionFamilyListDto, ThreadCompactResult, WorkflowHistoryPageDto } from "@openedbot/contracts-api";
 import type { MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
-import { API_ORIGIN, ApiError, authHeadersFor, cloudHeaders, request } from "./http";
+import { API_ORIGIN, ApiError, rawApiFetch, authHeadersFor, cloudHeaders, request } from "./http";
 import type { SendMessageResult, ThreadView, WorkflowRecoveryResult } from "./types";
 
 export const threadsApi = {
@@ -106,7 +106,7 @@ export const threadsApi = {
   attachment: async (attachmentId: string): Promise<Blob> => {
     const bridge = nativeBridge();
     const bearer = bridge ? (await bridge.readAccessToken()) ?? "" : "";
-    const response = await fetch(`${API_ORIGIN}/api/attachments/${attachmentId}`, {
+    const response = await rawApiFetch(`${API_ORIGIN}/api/attachments/${attachmentId}`, {
       credentials: bridge ? "omit" : "include",
       headers: { ...cloudHeaders("GET", true, bridge !== null), ...authHeadersFor(bearer) },
     });

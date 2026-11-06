@@ -1,13 +1,15 @@
 import type { SQL } from "bun";
 import { HermesClientError, type HermesProfileInventory } from "@openedbot/hermes";
 import { applyHostApprovalPolicyWithClient, effectiveHostPolicy, hostBlockedToolsMatch } from "@openedbot/roster/application/approval-policy";
-import { readBlockedTools } from "@openedbot/roster/sql/tool-policies";
+import { readBlockedTools } from "@openedbot/roster/application/tool-policies";
 import type { BotPermissionMode } from "@openedbot/contracts-api";
 import { approvalPolicyMode, permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
 import { createRuntimeClient } from "@openedbot/execution/application/runtime-client";
-import { withBotProfileLock } from "@openedbot/portability/application/profile-import-guard";
+import { withBotProfileLock } from "@openedbot/roster/application/profile-import-guard";
 import type { Db } from "@openedbot/platform-db";
 import type { WorkerConfig } from "../config";
+import { RELAY_FEATURE_APPROVAL_POLICY } from "@openedbot/contracts-connector/features";
+import { logEvent } from "@openedbot/platform-observability";
 
 const BATCH_SIZE = 50;
 const APPROVAL_POLICY_RECHECK_MS = 10 * 60_000;
@@ -64,7 +66,7 @@ export async function reconcileHostApprovalPolicies(
        and b.hermes_profile is not null
        and b.deleted_at is null
        and rt.reachability = 'connector'
-       and rt.link_features @> array['approval_policy']::text[]
+       and rt.link_features @> array[${RELAY_FEATURE_APPROVAL_POLICY}]::text[]
        and (${cursor?.organizationId ?? ""} = '' or (b.organization_id::text, b.id::text) > (${cursor?.organizationId ?? ""}, ${cursor?.botId ?? ""}))
        and not exists (
          select 1 from bot_profile_provisions p
@@ -107,12 +109,11 @@ export async function reconcileHostApprovalPolicies(
       const inventory = await inventoryPromise;
       if (!inventory.profiles.some((profile) => profile.name === bot.profile)) {
         recordFailure(key, now());
-        console.info(JSON.stringify({
-          event: "worker.approval_policy_profile_missing",
+        logEvent("worker.approval_policy_profile_missing", {
           botId: bot.bot_id,
           organizationId: bot.organization_id,
           profile: bot.profile,
-        }));
+        });
         continue;
       }
       // Même verrou que `updateBot` : sans lui, une passe lancée avant un
@@ -167,13 +168,12 @@ export async function reconcileHostApprovalPolicies(
            where organization_id = ${bot.organization_id} and id = ${bot.bot_id}
         `;
       } finally {
-        console.info(JSON.stringify({
-          event: "worker.approval_policy_reconcile_failed",
+        logEvent("worker.approval_policy_reconcile_failed", {
           botId: bot.bot_id,
           organizationId: bot.organization_id,
           ...cause,
           attempt,
-        }));
+        });
       }
     }
   }

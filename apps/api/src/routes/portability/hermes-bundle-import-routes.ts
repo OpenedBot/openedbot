@@ -1,16 +1,17 @@
 import { isUuid } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { ProfileImportError } from "@openedbot/portability/domain/errors";
+import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import { parseHermesBundleInput } from "@openedbot/portability/domain/validation";
 import {
   acknowledgeImportJob, enqueueProfileImport, findIdempotentImport, listImportJobs,
   readImportJob,
-} from "@openedbot/portability/sql/jobs";
+} from "@openedbot/portability/application/jobs";
 import type { Db } from "@openedbot/platform-db";
 import type { ApiConfig } from "../../infrastructure/config";
 import { requireOperator, type AppVariables } from "../identity/auth";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 function id(value: string): string {
   if (!isUuid(value)) throw new HttpError(404, "PROFILE_IMPORT_NOT_FOUND", "Import introuvable.");
@@ -37,7 +38,7 @@ export function hermesBundleImportRoutes(db: Db, config: ApiConfig, readRuntime 
     if (previous) return context.json(previous, 202);
     const runtime = await readRuntime(db, config, auth.organizationId);
     if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant d’importer des agents.");
-    if (!runtime.linkFeatures?.includes("profile_management")) throw new HttpError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
+    if (!runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT)) throw new HttpError(404, "PROFILE_MANAGEMENT_UNAVAILABLE", "Ce runtime n’annonce pas la gestion des profils.");
     const job = await enqueueProfileImport(db, auth.organizationId, auth.userId, runtime.id, input, limitations);
     return context.json(job, 202);
   });

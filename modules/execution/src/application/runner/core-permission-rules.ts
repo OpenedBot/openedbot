@@ -6,10 +6,10 @@
  * reviewer (PERM2-6) and the unattended gates (PERM2-9) made before theirs.
  */
 import type { SQL } from "bun";
-import { readTerminalAlwaysTx } from "@openedbot/runtimes/sql/permission-settings";
-import { activeGrantIdTx } from "@openedbot/roster/sql/permission-grants";
-import { readReviewRulesTx } from "@openedbot/roster/sql/permission-rules";
-import { readToolPolicyTx } from "@openedbot/roster/sql/tool-policies";
+import { readTerminalAlwaysTx } from "@openedbot/runtimes/application/permission-settings";
+import { activeGrantIdTx } from "@openedbot/roster/application/permission-grants";
+import { readReviewRulesTx } from "@openedbot/roster/application/permission-rules";
+import { readToolPolicyTx } from "@openedbot/roster/application/tool-policies";
 import {
   NO_GRANTS,
   NO_ORGANIZATION_POLICY,

@@ -325,22 +325,31 @@ Since proof of possession (docs/CONNECTOR.md), every linked host holds
 an Ed25519 device key sealed by `systemd-creds` (TPM2 if present, otherwise the
 host key) in `/etc/hermes/connector/device.key.cred`. `link` creates it;
 `up` and `upgrade` create it afterwards on a host linked before it existed.
-To replace it without a new ticket (regenerated host key, cloned VPS,
-suspected leak):
+To replace it (regenerated host key, cloned VPS, suspected leak), enroll the
+host again: openedbot refuses any key that differs from the one it registered,
+so that a stolen link token is never enough to impose another key. In
+openedbot, *Settings › Runtime › Replace the runtime* opens a ticket; on the
+host:
 
 ```bash
-edge-setup link --rekey --yes
+edge-setup link --openedbot https://link.openedbot.app --yes
 edge-setup status
 ```
 
-`--rekey` stops the connector, seals a new key, presents it to
-openedbot over a session, then restarts the unit. Then check the
-runtime's link journal in openedbot: this is the only action that gets
-a public key accepted without a prior proof.
+Paste the ticket at the hidden prompt: the enrollment seals a new key and has
+it registered. If the new runtime shows as pending in openedbot, confirm the
+replacement; if the old connector was already disconnected, openedbot switches
+on its own. If `link` fails after spending the ticket, remove the pending
+runtime in openedbot, then start again with a new ticket.
+
+`link --rekey` is retired: it refuses and changes nothing. edge-setup v1.5.0
+and earlier still offer it, and replace the host's key before presenting it:
+do not run it, update edge-setup first. A host where it already ran is
+enrolled again as above.
 
 A host can carry several links, for example a production one and a
 development one. Each instance then has its own device key, unit and state,
-and `--rekey` takes the same `--name` as `link`; `status` lists them all.
+and the new enrollment takes the same `--name` as `link`; `status` lists them all.
 See [Named instances](/docs/commands#named-instances).
 
 ## Backup and destruction

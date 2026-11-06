@@ -172,7 +172,7 @@ type LegalSlug = (typeof LEGAL_SLUGS)[number];
  * l'application : une page publique (`/legal/<slug>`, celle vers laquelle
  * pointe aussi le pied de page du site) qu'on lit, garde ou partage hors de la
  * session. Dans l'app de bureau, un nouvel onglet part dans le navigateur du
- * système (`setWindowOpenHandler`, apps/desktop/src/main/window.ts).
+ * système.
  */
 function legalPageUrl(slug: LegalSlug): string {
   // Relatif à l'origine de la console : le navigateur le résout, et l'app de

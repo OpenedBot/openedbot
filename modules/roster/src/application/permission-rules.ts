@@ -23,7 +23,7 @@ import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { isoInstant } from "@openedbot/contracts-primitives";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
-import { readOrganizationPermissionPolicy } from "@openedbot/identity/sql/permission-policy";
+import { readOrganizationPermissionPolicy } from "@openedbot/identity/application/permission-policy";
 import { permissionPipelineOf } from "@openedbot/runtimes/domain/runtime-contract";
 import {
   countPermissionRules,
@@ -33,6 +33,9 @@ import {
   listPermissionRules,
 } from "../sql/permission-rules";
 import type { ToolPolicyActor } from "../sql/tool-policies";
+
+/** What other packages call here (ADR 0001 S4); the SQL file stays private to the module. */
+export { readReviewRulesTx } from "../sql/permission-rules";
 
 export type PermissionRuleActor = ToolPolicyActor & { userId: string };
 
