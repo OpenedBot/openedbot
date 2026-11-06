@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { Suspense, useState, type ReactNode } from "react";
+import { lazyRouteComponent, useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ContextMenu } from "radix-ui";
 import { Clock, Eye, EyeOff, FolderInput, Mail, Pin, PinOff, Trash2, Users, Webhook } from "lucide-react";
@@ -7,13 +7,16 @@ import { Button, cn, Dialog, toast } from "@openedbot/browser-ui-kit";
 import { BUI_MENU_ITEM, BUI_POPOVER } from "./boardui/menu";
 import type { GroupDto } from "@openedbot/contracts-api";
 import { ApiError, api, queryKeys } from "../lib/api";
-import { GroupDialog } from "./group-dialog";
-import { BotRoutinesDialog } from "./bot-routines-dialog";
-import { ThreadWebhooksPanel } from "./bot-webhooks-panel";
-import { isBotManagePageParked } from "./bot-manage/bot-manage-dialog";
-import { MoveToSectionDialog } from "./move-to-section-dialog";
+import { isBotManagePageParked } from "../lib/bots/bot-dialogs";
 import { useT } from "../lib/i18n";
 import { useOpenedOnce } from "../lib/hooks/use-opened-once";
+
+// Fetched on first opening: the sidebar draws every group row with this menu,
+// and none of its dialogs is needed to draw a row (ADR 0001, D1b).
+const GroupDialog = lazyRouteComponent(() => import("./group-dialog"), "GroupDialog");
+const MoveToSectionDialog = lazyRouteComponent(() => import("./move-to-section-dialog"), "MoveToSectionDialog");
+const BotRoutinesDialog = lazyRouteComponent(() => import("./bot-routines-dialog"), "BotRoutinesDialog");
+const ThreadWebhooksPanel = lazyRouteComponent(() => import("./bot-webhooks-panel"), "ThreadWebhooksPanel");
 
 /**
  * Menu contextuel d'un groupe, au clic droit, le pendant de `BotContextMenu`
@@ -135,9 +138,9 @@ export function GroupContextMenu({ group, children }: { group: GroupDto; childre
         </ContextMenu.Portal>
       </ContextMenu.Root>
 
-      {groupMounted ? <GroupDialog open={managing} onClose={() => setManaging(false)} group={group} /> : null}
-      {sectionMounted ? <MoveToSectionDialog row={{ kind: "group", group }} open={movingToSection} onClose={() => setMovingToSection(false)} /> : null}
-      {routinesMounted ? <BotRoutinesDialog group={group} open={managingRoutines} onClose={() => setManagingRoutines(false)} /> : null}
+      {groupMounted ? <Suspense fallback={null}><GroupDialog open={managing} onClose={() => setManaging(false)} group={group} /></Suspense> : null}
+      {sectionMounted ? <Suspense fallback={null}><MoveToSectionDialog row={{ kind: "group", group }} open={movingToSection} onClose={() => setMovingToSection(false)} /></Suspense> : null}
+      {routinesMounted ? <Suspense fallback={null}><BotRoutinesDialog group={group} open={managingRoutines} onClose={() => setManagingRoutines(false)} /></Suspense> : null}
 
       <Dialog
         open={managingWebhooks}
@@ -146,7 +149,7 @@ export function GroupContextMenu({ group, children }: { group: GroupDto; childre
         closeLabel={t("common.close")}
         className="max-w-2xl"
       >
-        <ThreadWebhooksPanel threadId={group.threadId} open={managingWebhooks} />
+        <Suspense fallback={null}><ThreadWebhooksPanel threadId={group.threadId} open={managingWebhooks} /></Suspense>
       </Dialog>
 
       <Dialog

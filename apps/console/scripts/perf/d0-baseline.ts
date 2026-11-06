@@ -24,7 +24,7 @@
 //     Wall clock from process spawn to the marker, so browser/Electron start
 //     is included; for the web, the in-page time from navigation start too.
 //   - The console is a production build served like production (gzip, ETag,
-//     no Cache-Control: lib/static-server.ts), solo variant (no
+//     no-cache on the document: lib/static-server.ts), solo variant (no
 //     pro console plugins).
 //   - Electron runs the compiled shell (`electron-vite build`) with a throwaway
 //     home (CFFIXED_USER_HOME) and Chromium's mock keychain, so it never

@@ -12,7 +12,6 @@ import { router } from "./route-tree";
 import { applyNativeTitlebar } from "./lib/platform/native-titlebar";
 import { trackKeyboardFocus } from "./lib/shell/keyboard-focus";
 import { applyStoredTextSize } from "./lib/shell/text-size";
-import "katex/dist/katex.min.css";
 import "./styles/globals.css";
 
 // Avant tout rendu : `<html>` porte déjà la bonne classe quand React monte,

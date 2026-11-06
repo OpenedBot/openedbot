@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { Suspense, useState, type ReactNode } from "react";
+import { lazyRouteComponent, useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   RiArchiveLine,
@@ -20,7 +20,6 @@ import {
 import { toast } from "@openedbot/browser-ui-kit";
 import type { BotDto } from "@openedbot/contracts-api";
 import { api, queryKeys } from "../lib/api";
-import { MoveToSectionDialog } from "./move-to-section-dialog";
 import { useT } from "../lib/i18n";
 import { useAgentEditor } from "../lib/bots/agent-editor";
 import { useBotDialogs } from "../lib/bots/bot-dialogs";
@@ -36,6 +35,9 @@ import {
   BuiContextSubContent,
   BuiContextSubTrigger,
 } from "./boardui/menu";
+
+// On first opening only: every bot row carries this menu (ADR 0001, D1b).
+const MoveToSectionDialog = lazyRouteComponent(() => import("./move-to-section-dialog"), "MoveToSectionDialog");
 
 /**
  * Menu contextuel d'un bot, au clic droit : l'idiome d'OpenMausBot et de
@@ -157,7 +159,7 @@ export function BotContextMenu({
       {deleteMounted ? (
         <BotDeleteDialog bot={bot} open={confirming} onClose={() => setConfirming(false)} remove={actions.remove} />
       ) : null}
-      {sectionMounted ? <MoveToSectionDialog row={{ kind: "bot", bot }} open={movingToSection} onClose={() => setMovingToSection(false)} /> : null}
+      {sectionMounted ? <Suspense fallback={null}><MoveToSectionDialog row={{ kind: "bot", bot }} open={movingToSection} onClose={() => setMovingToSection(false)} /></Suspense> : null}
     </>
   );
 }

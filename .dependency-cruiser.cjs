@@ -178,7 +178,8 @@ module.exports = {
       severity: "error",
       from: {
         path: "^((?:apps|platform|contracts|browser|modules)/[^/]+)/",
-        pathNot: "^apps/(console|admin)/vite\\.config\\.ts$",
+        // The Vite config and its helpers (`vite-*.ts`): its esbuild bundle leaves package names external.
+        pathNot: "^apps/(console|admin)/vite(\\.config|-[a-z-]+)\\.ts$",
       },
       to: {
         path: "^(platform|contracts|browser|modules)/",

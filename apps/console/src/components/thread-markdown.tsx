@@ -17,15 +17,9 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import {
-  AlertTriangle,
-  Check,
-  CircleAlert,
-  Copy,
-  Info,
-  Lightbulb,
-  ShieldAlert,
-} from "lucide-react";
+// With its renderer, not in `main.tsx`: there it pulled KaTeX into the first load (ADR 0001, D1b).
+import "katex/dist/katex.min.css";
+import { AlertTriangle, Check, CircleAlert, Copy, Info, Lightbulb, ShieldAlert } from "lucide-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import {
   parseGithubAlertMarker,

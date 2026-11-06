@@ -1,8 +1,4 @@
-import {
-  fleetSection,
-  selectFleetOrganization,
-  WorkspaceDialogScope,
-} from "./components/workspace/workspace-navigation";
+import { fleetSection, selectFleetOrganization, WorkspaceDialogScope } from "./components/workspace/workspace-navigation";
 import {
   fleetHomeHref,
   fleetInPath,
@@ -64,8 +60,7 @@ import { APP_HOME_HREF, resolveAppFrameEntry, rootRewriteInput, rootRewriteOutpu
 import { ensureAuthStatus, isAppAuthenticated } from "./lib/session/auth-status";
 import { subscribeCloudSession } from "./lib/session/cloud-session";
 import { useT } from "./lib/i18n";
-import { ConversationScreen } from "./screens/conversation/conversation";
-import { BotCreatingScreen } from "./components/bot-create/bot-creating-screen";
+import { ConversationBodySkeleton } from "./components/thread-skeleton";
 import { isPendingBotId } from "./lib/bots/pending-bot-creations";
 import { isRuntimeSection, type RuntimeSection } from "./screens/settings/installation/cloud/cloud-shared";
 import { SETTINGS_SECTIONS, SettingsBodySkeleton } from "./screens/settings/sections";
@@ -87,13 +82,15 @@ import { AppFrame } from "./components/frames/app-frame";
 import { CompactFrameEntry } from "./components/frames/compact-frame-entry";
 import { SettingsFrame } from "./components/frames/settings-frame";
 
-// Every screen but the frame and the conversation is its own chunk, loaded
-// when its route matches (TanStack `lazyRouteComponent`, preloaded by the
-// router before render). A refresh on a conversation no longer evaluates the
-// agency, settings, onboarding and public screens before its first request.
+// Every screen but the frame is its own chunk, loaded when its route matches
+// (TanStack `lazyRouteComponent`, preloaded by the router before render), the
+// conversation included (ADR 0001, D1b): a refresh evaluates no other screen,
+// and the thread list never waits for the composer, the timeline or markdown.
 // The agency screens come from its pro console module (`src/pro-console/`):
 // solo, there is none, and their routes are not registered (`routeTree`).
 const FLEET_SCREENS = proConsole().fleet?.screens;
+const ConversationScreen = lazyRouteComponent(() => import("./screens/conversation/conversation"), "ConversationScreen");
+const BotCreatingScreen = lazyRouteComponent(() => import("./components/bot-create/bot-creating-screen"), "BotCreatingScreen");
 const OrganizationSetupScreen = lazyRouteComponent(() => import("./screens/onboarding/organization"), "OrganizationSetupScreen");
 const MobileSettingsScreen = lazyRouteComponent(() => import("./components/mobile/mobile-settings-screen"), "MobileSettingsScreen");
 const InboxScreen = lazyRouteComponent(() => import("./screens/conversation/inbox"), "InboxScreen");
@@ -543,9 +540,10 @@ const botConversationRoute = createRoute({
   path: "/bot/$botId",
   validateSearch: conversationSearch,
   loaderDeps: ({ search }) => ({ task: search.task }),
-  // Not awaited: the roster and the thread start now, the screen renders
-  // without waiting and reads the same cache entries.
+  // Not awaited: the screen's chunk, the roster and the thread start now; the
+  // screen renders without waiting and reads the same cache entries.
   loader: ({ params, deps }) => {
+    void (isPendingBotId(params.botId) ? BotCreatingScreen : ConversationScreen).preload?.();
     if (!isPendingBotId(params.botId)) prefetchConversation(params.botId, deps.task);
   },
   component: BotConversationEntry,
@@ -554,7 +552,7 @@ const botConversationRoute = createRoute({
 /** Un bot en cours de création (`lib/bots/pending-bot-creations.ts`) n'a pas encore de fil. */
 function BotConversationEntry() {
   const { botId } = botConversationRoute.useParams();
-  return isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />;
+  return <Suspense fallback={<ConversationBodySkeleton />}>{isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />}</Suspense>;
 }
 
 /**

@@ -31,7 +31,7 @@ import { ApiError, api, queryKeys, runtimesQueryOptions } from "../../lib/api";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { haptics } from "../../lib/platform/haptics";
 import { useAgentEditor } from "../../lib/bots/agent-editor";
-import { useBotDialogs, type BotManagePage } from "../../lib/bots/bot-dialogs";
+import { isBotManagePageParked, useBotDialogs, type BotManagePage } from "../../lib/bots/bot-dialogs";
 import { BotFace } from "../bot-face";
 import { BotProfileRepair, useBotProfileStatus } from "../bot-profile-repair";
 import { BotCapabilitiesPanel, botCapabilitiesQueryOptions } from "../bot-capabilities-panel";
@@ -61,8 +61,8 @@ const PAGES: Record<BotManagePage, PageEntry> = {
   coordination: { id: "coordination", icon: IconHierarchy3, labelKey: "botManage.page.coordination" },
   activity: { id: "activity", icon: IconActivity, labelKey: "botManage.page.activity" },
   runtime: { id: "runtime", icon: IconServerBolt, labelKey: "botManage.page.runtime" },
-  // Parqué : le panneau et l'API restent, réactiver = retirer `disabled`.
-  webhooks: { id: "webhooks", icon: IconWebhook, labelKey: "botManage.page.webhooks", disabled: true },
+  // Parqué (`isBotManagePageParked`) : le panneau et l'API restent.
+  webhooks: { id: "webhooks", icon: IconWebhook, labelKey: "botManage.page.webhooks", disabled: isBotManagePageParked("webhooks") },
 };
 
 /** The rows of the bot page, grouped as OpenBot's `settings-rows` (each row says its current answer). */
@@ -73,10 +73,7 @@ export const BOT_MANAGE_GROUPS: ReadonlyArray<{ labelKey: MessageKey; pages: Bot
   { labelKey: "botManage.group.where", pages: ["runtime", "webhooks"] },
 ];
 
-/** Parked: visible, not actionable (webhooks keep their panel and API). Also read by the group menu. */
-export function isBotManagePageParked(page: BotManagePage): boolean {
-  return PAGES[page].disabled === true;
-}
+export { isBotManagePageParked };
 
 /** A parked page never opens: the index stays. */
 export function usableBotManagePage(page: BotManagePage | null | undefined): BotManagePage | null {

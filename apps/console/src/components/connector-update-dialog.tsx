@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { lazyRouteComponent } from "@tanstack/react-router";
 import { CircleCheck } from "lucide-react";
 import { Alert, Dialog, cn } from "@openedbot/browser-ui-kit";
-import { SupportMarkdown } from "@openedbot/browser-ui-kit/components/support-markdown";
 import { canOperateWorkspace, type ConnectorReleaseDto, type RuntimePublicDto } from "@openedbot/contracts-api";
 import { api, queryKeys, runtimeQueryOptions } from "../lib/api";
 import { connectorUpgradeLevel, type ConnectorUpgradeLevel } from "../lib/runtime/connector-upgrade";
@@ -15,6 +15,19 @@ const RELEASE_STALE_MS = 30 * 60_000;
 const UP_TO_DATE_MS = 8_000;
 
 /** A runtime may have no name yet: its short id stands in, as on the runtime screen. */
+// The release notes' markdown is its own chunk: every app frame mounts the
+// announcement, few ever open it (ADR 0001, D1b). Until it arrives, the
+// notes show as plain text rather than an empty box.
+const SupportMarkdown = lazyRouteComponent(() => import("@openedbot/browser-ui-kit/components/support-markdown"), "SupportMarkdown");
+
+function ReleaseNotes({ body }: { body: string }) {
+  return (
+    <Suspense fallback={<p className="whitespace-pre-wrap">{body}</p>}>
+      <SupportMarkdown body={body} />
+    </Suspense>
+  );
+}
+
 function runtimeLabel(runtime: RuntimePublicDto): string {
   return runtime.name ?? runtime.id?.slice(0, 8) ?? "runtime";
 }
@@ -191,7 +204,7 @@ function ConnectorUpdateDialog({
           <section className="space-y-2">
             <h3 className="font-medium text-foreground">{t("connectorUpgrade.dialogNotes")}</h3>
             <div className="scrollbar-subtle max-h-[min(40vh,320px)] overflow-y-auto rounded-lg bg-surface-sunken px-3 py-2 text-muted-foreground">
-              <SupportMarkdown body={release.notes} />
+              <ReleaseNotes body={release.notes} />
             </div>
             <a href={release.url} target="_blank" rel="noreferrer" className="inline-block text-sm underline underline-offset-2">
               {t("connectorUpgrade.dialogNotesMore")}
@@ -280,7 +293,7 @@ export function ConnectorReleaseNotesButton() {
         >
           <section data-connector-release-notes="" className="space-y-2 text-sm">
             <div className="scrollbar-subtle max-h-[min(60vh,480px)] overflow-y-auto rounded-lg bg-surface-sunken px-3 py-2 text-muted-foreground">
-              <SupportMarkdown body={latest.notes} />
+              <ReleaseNotes body={latest.notes} />
             </div>
             <a href={latest.url} target="_blank" rel="noreferrer" className="inline-block text-sm underline underline-offset-2">
               {t("connectorUpgrade.dialogNotesMore")}

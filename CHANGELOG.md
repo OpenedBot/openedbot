@@ -28,6 +28,16 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- La console s'ouvre plus vite : avant d'afficher la liste des fils, elle
+  télécharge moitié moins de code (environ 390 ko compressés au lieu de
+  860) et en 27 fichiers au lieu de 54. L'écran de conversation, la page
+  d'un bot, la palette ⌘K, le guichet de support, les notes de version du
+  connecteur, les graphiques et la table de la Vue d'ensemble, et le rendu
+  des formules (KaTeX) se chargent quand on les ouvre. Le dictionnaire de la
+  langue active part en même temps que l'application. Avec une latence
+  réseau de 50 ms, le premier lancement passe d'environ 1,2 s à 0,9 s dans
+  le navigateur, et le premier lancement après une mise à jour d'environ
+  1 s à 0,65 s dans l'app de bureau.
 - Plus aucun nom technique hérité de l'ancien nom du produit : base et rôles
   PostgreSQL, fonctions SQL, en-têtes, cookies, schéma d'URL de l'app de
   bureau (`openedbot://`), popup natif (`OpenedbotPopup.app`), classes CSS,

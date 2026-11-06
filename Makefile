@@ -367,7 +367,7 @@ link-gateway-install: ## [HERMES] Installe le service utilisateur systemd sans l
 	@bun scripts/runtime-link-service.ts --install
 
 # ─── Qualité ─────────────────────────────────────────────────────────────────
-.PHONY: typecheck deps-check license-check test-unit test-dual solo-check test-integration test check
+.PHONY: typecheck deps-check license-check test-unit test-dual solo-check bundle-budget test-integration test check
 
 typecheck: ## Typechecke tous les workspaces actifs, puis tests/, scripts/ et apps/console/scripts (tsconfig.json racine).
 	bun run --filter api --filter worker --filter link-gateway --filter console --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter '@openedbot/browser-*' --filter './modules/*' typecheck
@@ -456,6 +456,18 @@ test-dual: ## Tests unitaires deux fois : solo (sans plug-in), puis avec les plu
 	$(MAKE) -C plugins link-core OPENEDBOT_MAIN_DIR=$(CURDIR)
 	@echo "== test-dual : pro (OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST))"
 	OPENEDBOT_PLUGINS=$(PRO_PLUGINS_LIST) OPENEDBOT_CONSOLE_PLUGINS=$(PRO_CONSOLE_LIST) $(MAKE) test-unit
+
+# Ce qu'un lancement de la console solo télécharge, sous les budgets de l'ADR
+# 0001 (G2) : chunk d'entrée et premier chargement, en gzip
+# (`apps/console/scripts/bundle-budget.ts`). Build solo dans BUNDLE_BUDGET_DIR,
+# jamais dans apps/console/dist, sans .env.local ni plug-ins : la CI le joue.
+BUNDLE_BUDGET_DIR ?= $(or $(TMPDIR),/tmp/)openedbot-bundle-budget
+
+bundle-budget: ## Budget du bundle de la console solo (entrée, premier chargement), en gzip.
+	@rm -rf "$(BUNDLE_BUDGET_DIR)" && mkdir -p "$(BUNDLE_BUDGET_DIR)"
+	cd apps/console && OPENEDBOT_CONSOLE_PLUGINS= OPENEDBOT_CONSOLE_MODULE_REPORT="$(BUNDLE_BUDGET_DIR)/report.json" ./node_modules/.bin/vite build --logLevel warn --outDir "$(BUNDLE_BUDGET_DIR)/dist" --emptyOutDir
+	bun apps/console/scripts/bundle-budget.ts "$(BUNDLE_BUDGET_DIR)/dist" "$(BUNDLE_BUDGET_DIR)/report.json"
+	@rm -rf "$(BUNDLE_BUDGET_DIR)"
 
 # La console solo ne contient aucun écran pro (agence, facturation, règles de
 # permission) : un build Vite sans OPENEDBOT_CONSOLE_PLUGINS, dont le rapport de modules

@@ -161,6 +161,56 @@ la validité des chiffres ; G1 et G4 ont été remesurés après correction.
   l'échéance de l'essai.
 - Les contextes de navigateur des boucles mémoire et streaming sont fermés dans un `finally`.
 
+### 3.2 Chargement (D1b, 2026-11-06)
+
+Même machine, même script (`apps/console/scripts/perf/d0-baseline.ts`, 5 essais, médianes),
+même compte et même runtime que D0 ; console solo du commit de D1b. G3 et G4 n'étaient pas visés.
+
+| Indicateur | Web avant (D0) | Web après | Electron avant (D0) | Electron après |
+|---|---|---|---|---|
+| G1 premier lancement, local / réseau simulé | 538 / 1 174 ms | 489 / 863 ms | 564 / 1 399 ms | 537 / 1 141 ms |
+| G1 lancement suivant, local / réseau simulé | 445 / 589 ms | 409 / 549 ms | 452 / 573 ms | 426 / 553 ms |
+| G1 après mise à jour, local / réseau simulé | 455 / 1 083 ms | 430 / 844 ms | 482 / 987 ms | 438 / 663 ms |
+| G2 JS avant la liste des fils | 859 ko gzip, 54 fichiers | **389 ko gzip, 27 fichiers** | même build | même build |
+| G3 mémoire au repos | 1 135 Mo (indicatif) | 1 208 Mo (indicatif) | 660 Mo | 707 Mo |
+
+**Ce qui a changé.**
+- Chargés à l'ouverture et non plus au lancement : l'écran de conversation (préchargé par le
+  loader de sa route, en même temps que le fil), l'écran « bot en création », les trois
+  dialogues du bot, les dialogues des menus de la barre latérale, la palette ⌘K (les raccourcis
+  restent montés), la carte du guichet de support, le markdown des notes de version du
+  connecteur, les graphiques et la table de la Vue d'ensemble. La feuille de style de KaTeX
+  était importée par `main.tsx`, ce qui tirait tout le chunk de KaTeX (76 ko) dans le premier
+  chargement : elle part avec le rendu markdown du fil.
+- `@openedbot/browser-ui-kit` se déclare sans effet de bord (`sideEffects`) : son barrel ne
+  tire plus vaul, cmdk et les autres composants dans le premier chargement de qui n'en utilise
+  qu'un.
+- Les modules du premier chargement venant de `node_modules` et du kit d'interface sont
+  regroupés en deux chunks (`boot-vendor`, `boot-ui-kit`, groupes `$initial` de Rolldown). Sans
+  ce regroupement, le premier chargement comptait environ 80 fichiers, et le premier lancement
+  en réseau simulé passait à 1,5 s (plus lent qu'avant) : HTTP/1.1 ne sert que 6 fichiers à la
+  fois. La prod sert en HTTP/2 et la console embarquée n'aura plus de réseau, mais la cascade
+  reste à éviter.
+- `index.html` précharge le dictionnaire de la langue active (`vite-locale-preload.ts`) :
+  `main.tsx` l'attend avant le premier rendu, et il n'était découvert qu'après l'exécution de
+  l'entrée.
+
+**Lecture.**
+- G2 est atteint. La cible « entrée ≤ 200 ko gzip » ne dit plus grand-chose depuis le
+  regroupement : l'entrée fait 74 ko, mais `boot-vendor` (167 ko) est chargé avec elle. Le
+  budget suivi en CI (`make bundle-budget`, job « Console bundle budget ») porte donc sur le
+  **premier chargement** : tous les scripts de `index.html` et le plus gros dictionnaire,
+  369 ko gzip pour un plafond de 380 ko. Le plafond laisse ~20 ko au chunk de la route
+  d'arrivée sous les 400 ko de G2. L'entrée garde son plafond de 200 ko.
+- G1 « après mise à jour » en réseau simulé passe sous 700 ms dans Electron, sans atteindre les
+  600 ms visés ; le premier lancement en réseau simulé reste à 0,9–1,1 s. Ces deux cas
+  dépendent du réseau, ce que la console embarquée supprime (D2).
+- La mémoire n'a pas baissé (707 Mo contre 660 Mo). L'écart n'est pas expliqué : le fil de test
+  d'Atlas grandit à chaque série de G4 (section 3.1) et G3 se mesure fil ouvert. G3 reste
+  l'affaire du shell (D2), pas du chargement.
+- Non fait, faute de gain mesuré suffisant : une seule librairie d'icônes (Q4) ; `@remixicon/react`
+  pèse encore 38 ko (avant gzip) dans le premier chargement.
+
 ## 4. Architecture cible
 
 ### 4.1 Vue d'ensemble
