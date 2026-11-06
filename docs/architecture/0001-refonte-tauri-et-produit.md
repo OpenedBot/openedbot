@@ -706,6 +706,163 @@ TAURI_POPUP=…/OpenedbotPopup.app`, `make desktop-tauri-feed`, `make desktop-ta
 TAURI_VERSION=X.Y.Z`. L'app lit `OPENEDBOT_UPDATE_CHECK_SECONDS` pour une vérification
 rapprochée.
 
+### 4.3.3 Linux (D5, 2026-11-06)
+
+Le shell Tauri construit et tourne sous Linux (WebKitGTK 4.1), non distribué. L'instance unique,
+le plugin deep-link, le bouton de fermeture et le raccourci global viennent de D2b, communs aux
+plateformes ; le code propre à Linux (tray, schéma de l'aperçu, enregistrement du gestionnaire par
+l'AppImage, pas d'auto-mise à jour pour le deb) vit dans `src-tauri/src/linux.rs` et des
+dépendances ciblées (`[target.'cfg(target_os = "linux")']` : Secret Service, tray) ; `lib.rs` et
+`updater.rs` n'en gardent que trois points d'appel `#[cfg]`. Tout se
+construit et se teste dans l'image `apps/desktop-tauri/linux/Dockerfile` (Ubuntu 24.04, WebKitGTK
+2.52.6, Rust 1.98.0, Bun 1.4.4, tauri-driver 2.1.0), sur le Mac de dev par OrbStack : **x86_64
+émulé** (Rosetta), **aarch64 natif**. La VM 240 (x86_64, 2 vCPU, 3,9 Go, runtime Hermes) n'a pas
+servi : l'émulation suffisait, et rien n'y a été installé.
+
+**Artefacts** (`apps/desktop-tauri/dist-linux/<version>/<arch>/`, ignoré par git, rien de publié).
+L'AppImage porte sa signature de mise à jour (`.AppImage.sig`, clé minisign de D2a, montée en
+lecture seule dans le conteneur, jamais copiée).
+
+| Fichier | Taille | sha256 |
+|---|---|---|
+| `1.1.0/x86_64/openedbot-preview_1.1.0_x86_64.deb` | 18,5 Mo | `cf9f5d9ee5b0d71401e5fda2cfb9134047cf672e7fa2091b00e2d0d5ca8760ab` |
+| `1.1.0/x86_64/openedbot-preview_1.1.0_x86_64.AppImage` | 92,8 Mo | `4726b004c1421eb27316e6d978a2dbf452ca641f70c0b17c6f7957867950c961` |
+| `1.1.0/x86_64/openedbot-preview_1.1.0_x86_64.AppImage.sig` | 452 o | `3a72cfbcaa39edf09b815ce4335b15084f3299c45ef1892db06753027da9de66` |
+| `1.1.0/aarch64/openedbot-preview_1.1.0_aarch64.deb` | 18,6 Mo | `988be0f551cc3cbc6ea14da105d892e45a62d18ad7f71289b224589a5586015c` |
+| `1.1.0/aarch64/openedbot-preview_1.1.0_aarch64.AppImage` | 90,9 Mo | `713725d022c65b25ec7c62488e4ddd39816b5249f4681e9e32d5da7d24935f50` |
+| `1.1.0/aarch64/openedbot-preview_1.1.0_aarch64.AppImage.sig` | 452 o | `4410276704ee0f71aa2b01752022b047cea024c081598f6c8674cfbff78e180c` |
+| `1.1.1-test/x86_64/openedbot-preview_1.1.1-test_x86_64.deb` | 18,5 Mo | `5875730ada770f78c5da9c692e9b05e7b94973ed0af10efbc9183630b5f34747` |
+| `1.1.1-test/x86_64/openedbot-preview_1.1.1-test_x86_64.AppImage` | 92,8 Mo | `28325670a94d414e490633c3be4bc1d04bd3c5eee4f110fae4f08bc92b78c7e6` |
+| `1.1.1-test/x86_64/openedbot-preview_1.1.1-test_x86_64.AppImage.sig` | 464 o | `73f63ea2748d5ccff114cb8e64564eded00f4527c51371b691d9025ee6d3e00f` |
+
+Les 1.1.0 sont construits sur la branche rebasée sur develop 0445bec (S7) ; la 1.1.1-test, cible de
+la mise à jour, l'a été sur f3b9361 (D2b) : même shell, seule la console embarquée diffère (S2e, S7).
+
+Le deb dépend de `libwebkit2gtk-4.1-0`, `libgtk-3-0` et `libayatana-appindicator3-1` (ajoutés par
+le bundler), déclare `MimeType=x-scheme-handler/openedbot-preview` dans son `.desktop`, et installe
+`/usr/bin/openedbot-desktop-preview`. L'AppImage n'est pas « strippée » (`NO_STRIP` : le `strip` de
+linuxdeploy ne lit pas les sections `.relr.dyn` des chaînes récentes), d'où ~90 Mo.
+
+**Ce qui est prouvé** (`make desktop-tauri-linux-e2e`, WebDriver par tauri-driver + WebKitWebDriver,
+Xvfb, bus D-Bus de session, GNOME Keyring déverrouillé ; API locale du Mac, runtime de la VM 240 ;
+chaque point est une vérification qui fait échouer le parcours, pas une simple mesure ; rapport et
+captures X11 + WebView dans `dist-linux/e2e/`).
+
+| # | Point | Preuve |
+|---|---|---|
+| 1 | Démarrage, console embarquée | L'AppImage puis le deb installé (`dpkg -i`) démarrent et affichent la console servie par `tauri://localhost` ; `shell_info.platform = "linux"` |
+| 2 | Connexion par code e-mail | `dev@openedbot.local`, code lu dans Mailpit, saisi dans `/login` ; puis la console complète (`/`, depuis D2b) : barre latérale avec les fils des 5 bots (Atlas, Websearch, Essai image, Audit essai, Veille), fil de Websearch |
+| 3 | Streaming | Prompt long de D0 envoyé à Websearch (bot à outils, mode auto, runtime de la VM 240) : run `completed`, la réponse grandit au fil de l'eau (capture à mi-réponse), **sur la connexion `/api/events`** : aucun « Flux interrompu », aucun sondage de `/history` pendant le streaming |
+| 4 | Coffre | Jeton dans le Secret Service (`secret-tool` le retrouve, `shell_info.persistence = "keystore"`) ; ni le refresh ni l'access token en clair sous `$HOME` ni `/tmp` ; relance sans connexion ×5 ; le deb relit la même session (même identifiant) |
+| 5 | Sans Secret Service | Bus de session sans aucun service activable : `persistence = "memory-only"`, journal « session kept in memory only », aucun jeton sur disque, la relance redemande la connexion. Test Rust (`linux::tests`) : le vrai backend `keyring` sans bus refuse lecture et écriture, rien n'est écrit sous un `HOME` jetable ; aller-retour réel sous GNOME Keyring |
+| 6 | Instance unique, deep link | Seconde instance : rend la main en ~0,5 s (code 0), la première reçoit `openedbot-preview://open` ; l'AppImage enregistre son gestionnaire (`~/.local/share/applications/openedbot-desktop-preview-handler.desktop`, `xdg-mime`) et `gio open openedbot-preview://open` arrive à l'instance en cours |
+| 7 | Tray | Icône (mascotte) dans un tray XEmbed (`stalonetray`, repli de libayatana-appindicator sans hôte StatusNotifier) ; menu Afficher / Masquer, Se déconnecter, Quitter |
+| 8 | Bouton de fermeture | Un vrai `WM_DELETE_WINDOW` cache la fenêtre, l'app reste dans le tray, une seconde ouverture la réaffiche |
+| 9 | Mise à jour (AppImage) | 1.1.0 → **1.1.1-test** par `scripts/update-feed.ts` (Bun, boucle locale du Mac) : manifeste `linux-x86_64-appimage`, téléchargement, signature vérifiée, fichier remplacé (sha256 = l'AppImage 1.1.1-test), **redémarrage en 1.1.1-test** ; puis manifeste 1.1.2-test signé d'une autre clé : « The signature was created with a different key than the one provided », fichier intact |
+| 10 | Deb et mises à jour | Avec un flux configuré, le deb ne tente rien (« not an AppImage: updates come from the package manager ») : le manifeste ne publie que la clé `-appimage` ; un deb se met à jour par son dépôt (à définir) ou par réinstallation |
+
+Sur les artefacts finaux (branche rebasée sur S7), les dix points passent en aarch64 et en x86_64.
+Le streaming tourne dans le fil de Websearch : les bots de test d'origine (Designer, Recherche…)
+n'existent plus dans l'org de dev, et le fil d'Atlas, partagé avec les tests de D2b, dépasse
+100 000 caractères. Avant les premiers builds rebasés, le fil d'Atlas était resté bloqué par deux
+runs de ces tests pendant une coupure du lien runtime de `make dev` : le run `db0241ca` a échoué
+seul sur le délai du workflow (`WORKFLOW_DEADLINE_EXCEEDED`), et le workflow `unknown` du run
+`a9d2cf6e` a été soldé par le chemin de revue (réconciliation refusée faute d'identifiant Hermes,
+puis abandon : `EXTERNAL_OUTCOME_ABANDONED`). Un essai interrompu par l'arrêt de l'API (run
+`5f6655f9` dans Websearch) a été réconcilié par le même chemin et s'est terminé `completed`.
+
+**Origine mesurée** (sonde `origin-probe.ts` devant l'API, toutes les requêtes de la page) :
+**`tauri://localhost`**, comme sur macOS ; préflights compris ; le CORS répond
+`Access-Control-Allow-Origin: tauri://localhost`, sans `Allow-Credentials` ; aucun cookie. Les seules
+requêtes sans `Origin` viennent de Rust (connexion) et de la sonde. `DEFAULT_NATIVE_APP_ORIGINS`
+(`platform/config/src/native-clients.ts`) la couvrait déjà : **aucun changement de l'API**.
+
+**Performance WebKitGTK** (même esprit que D0 : marqueur = premier lien de la barre latérale vers le
+fil d'un bot (`a[href*="/bot/"]`) attaché et visible, le marqueur de G1 ; temps mur du `POST
+/session` WebDriver, qui lance le processus, au marqueur, sondé toutes les 25 ms ; mémoire = RSS de
+l'app et de tous ses processus après 20 s au repos ; streaming = intervalles de
+`requestAnimationFrame` pendant la croissance de la réponse, dans le fil de Websearch, console
+complète).
+
+| Indicateur | x86_64 (émulé) | aarch64 (natif) | Electron 44, macOS (D0) |
+|---|---|---|---|
+| Lancement suivant jusqu'à la liste des fils (session restaurée), médiane de 5 | 4,98 s (4,95 à 5,05 s) | **1,09 s** (1,06 à 1,13 s) | 452 ms |
+| dont côté page (`performance.now()` au marqueur) | 2,8 à 3,1 s | 0,29 à 0,51 s | non mesuré |
+| Connexion : envoi du code à la liste des fils (e-mail compris) | 7,3 s | 3,2 s | — |
+| Mémoire au repos (RSS, 3 processus), console complète | 1 072 Mo (web 711, app 275, réseau 86) | **746 Mo** (web 489, app 197, réseau 60) | 660 Mo, 4 processus |
+| Streaming : délai avant le premier texte, modèle compris | 6,3 s | 8,4 s | 9,2 et 9,6 s |
+| Streaming : durée de la croissance, caractères | 20,6 s, 9 318 | 22,7 s, 8 897 | — |
+| Streaming : fps moyen / p5 | 24,8 / 14,9 | 25 / 13,7 | 120 / 98 à 100 |
+| Streaming : frames > 50 ms, frame max, frames manquées | 119 sur 519, 134 ms, 18,7 % | 123 sur 575, 214 ms, 21,2 % | 0 |
+| fps au repos (fil ouvert, rien ne bouge) | 58,4 | 57 | 120 |
+
+**Limites de ces chiffres.** Xvfb sans GPU : WebKitGTK compose en logiciel (« DRI3 error ») et
+`requestAnimationFrame` plafonne vers 55–60 Hz au repos ; l'x86_64 passe par Rosetta, qui pénalise
+surtout le JIT JavaScript ; l'aarch64 natif tourne dans la VM Linux d'OrbStack sur un M5 Pro, donc
+plus vite qu'un portable Linux ordinaire. WebKit n'a ni `longtask` ni `long-animation-frame` : seuls
+les intervalles de frames sont comptés. Avant le rebase, la fenêtre compacte sur le fil d'Atlas donnait des chiffres voisins (22,6 % et
+24,7 % de frames manquées). Le temps
+WebDriver inclut la négociation de la session automation (quelques dizaines de ms). Aucune machine
+Linux physique ni Wayland n'a été mesurée.
+
+**Ce que ça dit.** En natif, le lancement suivant prend ~1,1 s jusqu'à la liste des fils, plus du
+double d'Electron sur macOS (dont ~0,3 à 0,5 s côté page : le reste est le démarrage du processus,
+de WebKitGTK et de la session WebDriver), et la mémoire au repos ~750 Mo, au-dessus d'Electron
+(660 Mo) : pas de gain mémoire sous Linux. Pendant le streaming, une frame sur cinq manque, en
+natif comme en émulation : le goulot est le rendu logiciel de WebKitGTK sous Xvfb (sans GPU), pas
+le CPU. Le risque « WebKitGTK lent » (section 7) n'est donc **pas** levé : il faut mesurer une vraie
+machine Linux avec GPU avant de remplacer Electron sous Linux. Rien ne bloque pour autant le build :
+la console tourne entière, SSE compris. Le délai avant le premier texte dépend surtout du modèle et
+de la file du runtime de la VM 240.
+
+**Constats.**
+- **Fermer la fenêtre** : avant D2b, un vrai `WM_DELETE_WINDOW` détruisait la fenêtre pendant que
+  le tray gardait le processus en vie, sans plus rien à afficher. Depuis D2b (`window.rs`), fermer
+  cache la fenêtre sur toutes les plateformes ; le parcours le vérifie sous Linux (point 8) et
+  « Quitter » du tray quitte vraiment.
+- **Purge des données de la WebView sans confirmation** (relevé par D2b) : sous Linux,
+  `clear_all_browsing_data` de wry ne signale pas la fin de `webkit_website_data_manager_clear` ;
+  la page suivante se charge après une pause de 500 ms. Écart connu : une confirmation demande
+  d'appeler WebKitGTK directement (`with_webview`, crate `webkit2gtk`), non fait en D5.
+- Le code macOS de D2b (`#[cfg(target_os = "macos")]`, `src/macos/`) compile sous Linux sans
+  retouche : `cargo test` (85 tests) et `clippy -D warnings` passent dans l'image.
+- `xdg-open` en mode générique (aucun bureau détecté) ne sait pas lire la ligne `Exec` entre
+  guillemets qu'écrit le plugin deep-link ; GNOME et KDE passent par `gio`/`kde-open`, qui la lisent :
+  le parcours utilise `gio open`.
+- Le processus web de WebKitGTK n'est **pas** sous bubblewrap : wry n'active pas le bac à sable de
+  WebKitGTK (aucun appel dans wry 0.57, aucun `bwrap` dans l'arbre des processus mesuré). À décider
+  avant une distribution.
+- Fermer la session WebDriver ne quitte pas l'app (fenêtre cachée, tray) : le parcours la termine
+  lui-même entre deux lancements.
+- Les outils du dépôt démarrent par `#!/usr/bin/env node` (vite) : l'image n'a pas Node, `node` y
+  est un lien vers Bun.
+
+**CI.** Job `desktop-linux` de `core-ci.yml` (ubuntu-24.04), requis par `core-ci ok` : mêmes
+paquets (`linux/install-deps.sh`), Rust 1.98.0, `cargo test`, aller-retour Secret Service sous GNOME
+Keyring, `clippy -D warnings`, deb + AppImage **non signés** (aucun secret en CI), puis démarrage de
+l'AppImage et du deb installé sous Xvfb jusqu'à la page de connexion (scénario `smoke`, captures
+en artefact). Non lancé sur GitHub (pas de push) : ses commandes ont tourné dans l'image
+(`bun apps/desktop-tauri/scripts/linux-docker.ts ci`, vert), et `actionlint` (avec shellcheck) passe.
+Écart possible avec le runner GitHub (noyau, AppArmor, polices) : à surveiller au premier passage.
+
+**Reproduire.** `make desktop-tauri-linux TAURI_VERSION=1.1.0 [TAURI_LINUX_ARCH=aarch64]`,
+`make desktop-tauri-linux-check`, `make desktop-tauri-linux-e2e TAURI_VERSION=1.1.0` (API de
+`make dev` et Mailpit), `make desktop-tauri-linux TAURI_VERSION=1.1.1-test` puis
+`make desktop-tauri-linux-update TAURI_FROM=1.1.0 TAURI_TO=1.1.1-test` (ces deux dernières sur le
+Mac : le conteneur joint l'API, Mailpit et le flux, liés à `127.0.0.1`, par `host.docker.internal`,
+que Docker Desktop et OrbStack renvoient vers la boucle locale de l'hôte, pas Docker natif sous
+Linux ; le script refuse alors avec un message). L'app lit
+`~/.config/app.openedbot.desktop.preview/config.json`.
+
+**Écarts restant pour Linux.**
+- Hébergement et canal du flux (Q2) ; dépôt APT ou équivalent pour le deb ; signature des paquets
+  (le deb n'est pas signé, l'AppImage n'a pas de signature embarquée, seule la mise à jour l'est).
+- Wayland natif, GNOME sans extension AppIndicator (pas d'icône : la fenêtre et le menu restent),
+  KWallet, Secret Service verrouillé (une invite peut bloquer le démarrage le temps de la saisie).
+- Mesure sur une vraie machine Linux avec GPU ; RPM et Flatpak non faits.
+- Le deep link ne fait que ramener l'app au premier plan : le retour de connexion Google viendra
+  avec D2b.
+
 ### 4.4 Console : origine, plateforme, performance
 
 **Découpler la console de son origine** (bloquant pour l'embarquement, O) :
@@ -1049,8 +1206,9 @@ Recommandations issues de la revue Codex ; celles marquées **(décision)** atte
 WKWebView, la signature, la notarisation et la mise à jour sont vérifiés par le prototype D2a
 (section 4.3.1), et la parité macOS par D2b (section 4.3.2). D2b n'a pas vérifié la vraie page
 Google, le menu contextuel sur un champ mot de passe, `navigator.clipboard`, ni le clic sur une
-notification à l'écran. Aucun test sur WebView2 ou WebKitGTK ni aucun test PostgreSQL concurrent n'a été
-fait. Les autres points marqués `I` restent à confirmer.
+notification à l'écran. WebKitGTK est vérifié sous Xvfb, en conteneur (section 4.3.3), pas sur une
+machine Linux physique ni sous Wayland. Aucun test sur WebView2 ni aucun test PostgreSQL concurrent
+n'a été fait. Les autres points marqués `I` restent à confirmer.
 
 ## 10. Historique de revue
 

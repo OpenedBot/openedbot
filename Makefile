@@ -593,6 +593,31 @@ desktop-tauri-publish: ## [DESKTOP] Publie localement une version construite dan
 	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
 	bun $(DESKTOP_TAURI_DIR)/scripts/update-feed.ts publish --version "$(TAURI_VERSION)" --port 8799
 
+# ─── Desktop Tauri Linux (D5, ADR 0001 §4.3.3) ───────────────────────────────
+# Tout passe par l'image `apps/desktop-tauri/linux/Dockerfile` (Ubuntu 24.04,
+# WebKitGTK 4.1) : x86_64 émulé sur un Mac arm64 (OrbStack), aarch64 natif.
+# Les paquets restent dans `apps/desktop-tauri/dist-linux/<version>/<arch>/`
+# (ignoré), les preuves du parcours dans `dist-linux/e2e/`. Rien n'est publié.
+.PHONY: desktop-tauri-linux desktop-tauri-linux-check desktop-tauri-linux-e2e desktop-tauri-linux-update
+TAURI_LINUX_ARCH ?= x86_64
+TAURI_FROM ?=
+TAURI_TO ?=
+
+desktop-tauri-linux: ## [DESKTOP] Paquets Linux deb + AppImage (+ artefact de mise à jour signé) construits dans Docker : TAURI_VERSION=X.Y.Z [TAURI_LINUX_ARCH=x86_64|aarch64].
+	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/build-linux.ts --docker --version "$(TAURI_VERSION)" --arch "$(TAURI_LINUX_ARCH)"
+
+desktop-tauri-linux-check: ## [DESKTOP] Dans Docker, comme la CI : cargo test, coffre Secret Service, cargo clippy -D warnings (Linux).
+	bun $(DESKTOP_TAURI_DIR)/scripts/linux-docker.ts check --arch "$(TAURI_LINUX_ARCH)"
+
+desktop-tauri-linux-e2e: ## [DESKTOP] Parcours réel sous Xvfb contre l'API locale (make dev) : connexion, fils, streaming, coffre, relances : TAURI_VERSION=X.Y.Z.
+	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/linux-docker.ts e2e --version "$(TAURI_VERSION)" --arch "$(TAURI_LINUX_ARCH)"
+
+desktop-tauri-linux-update: ## [DESKTOP] L'AppImage se met à jour par le flux local puis refuse une signature étrangère : TAURI_FROM=X.Y.Z TAURI_TO=X.Y.Z-test.
+	@[ -n "$(TAURI_FROM)" ] && [ -n "$(TAURI_TO)" ] || { echo "TAURI_FROM et TAURI_TO sont requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/linux-docker.ts update --from "$(TAURI_FROM)" --to "$(TAURI_TO)" --arch "$(TAURI_LINUX_ARCH)"
+
 # ─── Contrat connecteur ──────────────────────────────────────────────────────
 # Le fil entre edge-setup (Go, chez le client) et openedbot (TS, dans le cloud) a
 # deux implémentations et des fixtures en double : trames, journal de

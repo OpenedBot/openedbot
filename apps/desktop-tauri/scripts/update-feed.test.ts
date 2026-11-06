@@ -18,10 +18,24 @@ describe("update feed", () => {
     });
   });
 
+  test("a Linux manifest names the AppImage, so a deb install finds nothing to replace itself with", () => {
+    const manifest = buildManifest({
+      version: "1.1.1-test",
+      url: "http://127.0.0.1:8799/1.1.1-test/openedbot-preview_1.1.1-test_x86_64.AppImage",
+      signature: "c2ln",
+      notes: "",
+      pubDate: new Date("2026-11-06T12:00:00Z"),
+      platform: "linux-x86_64",
+    });
+    expect(Object.keys(manifest.platforms)).toEqual(["linux-x86_64-appimage"]);
+    expect(manifest.version).toBe("1.1.1-test");
+  });
+
   test("a version or signature that cannot be served is refused", () => {
     const base = { url: "u", notes: "", pubDate: new Date() };
     expect(() => buildManifest({ ...base, version: "v1", signature: "s" })).toThrow();
     expect(() => buildManifest({ ...base, version: "0.0.2", signature: " " })).toThrow();
+    expect(() => buildManifest({ ...base, version: "1.1.1-", signature: "s" })).toThrow();
   });
 
   test("the server only serves files inside the feed", () => {

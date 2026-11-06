@@ -55,6 +55,11 @@ pub fn check_period(raw: Option<&str>) -> Duration {
 }
 
 pub fn spawn_checks<R: Runtime>(app: AppHandle<R>, manifest: String, hooks: UpdateHooks) {
+    #[cfg(target_os = "linux")]
+    if !crate::linux::self_update_supported() {
+        log::info!("not an AppImage: updates come from the package manager, update check skipped");
+        return;
+    }
     let period = check_period(std::env::var("OPENEDBOT_UPDATE_CHECK_SECONDS").ok().as_deref());
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(FIRST_CHECK).await;

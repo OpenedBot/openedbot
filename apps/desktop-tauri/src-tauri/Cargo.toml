@@ -47,6 +47,13 @@ objc2-foundation = { version = "0.3", features = ["NSDate", "NSError", "NSSet", 
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSMenu", "NSMenuItem", "NSResponder", "NSRunningApplication"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore", "WKWebsiteDataRecord", "block2", "objc2-app-kit"] }
 
+# Linux (ADR 0001, D5, `src/linux.rs`): the Secret Service for the session
+# (encrypted D-Bus session, no file fallback) and the tray. In this target
+# section so the macOS build is unchanged.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust"] }
+tauri = { version = "2.12", features = ["tray-icon"] }
+
 [dev-dependencies]
 tauri = { version = "2.12", features = ["test"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "test-util"] }

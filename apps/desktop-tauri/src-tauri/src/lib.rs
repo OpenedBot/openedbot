@@ -17,6 +17,8 @@ pub mod callback;
 pub mod config;
 pub mod csp;
 pub mod diagnostics;
+#[cfg(target_os = "linux")]
+mod linux;
 mod logger;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -225,6 +227,8 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
             }),
         );
     }
+    #[cfg(target_os = "linux")]
+    linux::setup(app);
     shell::visibility_changed(&handle);
 
     {

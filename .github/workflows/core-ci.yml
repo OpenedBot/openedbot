@@ -1,7 +1,8 @@
 # Contrôles du cœur TypeScript (apps, platform, contracts, modules, browser,
 # tests, scripts) : typecheck, tests unitaires, frontières et licences, puis
 # tests d'intégration contre un PostgreSQL jetable ; et le shell Rust de l'app
-# de bureau (cargo test, clippy) sur macOS. Aucun plug-in pro
+# de bureau : cargo test et clippy sur macOS, et sous Linux les mêmes plus
+# les paquets deb / AppImage démarrés sous Xvfb. Aucun plug-in pro
 # (./plugins) en CI : le cœur tourne en solo, c'est attendu. Aucun secret,
 # aucun .env.local : les cibles make tournent sur leurs valeurs par défaut.
 # Actions épinglées par SHA ; Bun épinglé par packageManager (package.json).
@@ -153,12 +154,70 @@ jobs:
           restore-keys: desktop-tauri-${{ runner.os }}-
       - run: make desktop-tauri-check
 
+  desktop-linux:
+    # The Tauri shell on Linux (ADR 0001, D5): cargo test (IPC refusals, the
+    # vault refusing without a Secret Service, bindings), the Secret Service
+    # round trip under an unlocked GNOME Keyring, clippy -D warnings; then the
+    # deb and the AppImage, unsigned (no secret here), each started under Xvfb
+    # until the embedded console draws its sign-in page. Same packages and
+    # commands as the local image (apps/desktop-tauri/linux/Dockerfile,
+    # `make desktop-tauri-linux-check`).
+    name: Desktop shell (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_VERSION: 1.98.0
+      TAURI_DRIVER_VERSION: 2.1.0
+      CARGO_TERM_COLOR: never
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: sudo apps/desktop-tauri/linux/install-deps.sh build test
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy
+          rustup default "$RUST_VERSION"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/bin/tauri-driver
+            apps/desktop-tauri/src-tauri/target
+          key: desktop-linux-${{ runner.os }}-${{ hashFiles('apps/desktop-tauri/src-tauri/Cargo.lock') }}
+          restore-keys: desktop-linux-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - name: cargo test, Secret Service, clippy
+        working-directory: apps/desktop-tauri/src-tauri
+        run: |
+          cargo test --locked
+          ../linux/session.sh --keyring cargo test --locked -- --ignored --exact linux::tests::secret_service_round_trip
+          cargo clippy --all-targets --locked -- -D warnings
+      - name: deb and AppImage (unsigned)
+        run: bun apps/desktop-tauri/scripts/build-linux.ts --version 0.0.0-ci --unsigned --out "$RUNNER_TEMP/dist-linux"
+      - name: Start under Xvfb (AppImage, then the installed deb)
+        run: |
+          command -v tauri-driver >/dev/null || cargo install tauri-driver --version "$TAURI_DRIVER_VERSION" --locked
+          apps/desktop-tauri/linux/session.sh --keyring bun apps/desktop-tauri/scripts/linux-e2e.ts --scenario smoke \
+            --artifacts "$RUNNER_TEMP/dist-linux/0.0.0-ci/x86_64" --evidence "$RUNNER_TEMP/linux-smoke"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: desktop-linux-smoke
+          path: ${{ runner.temp }}/linux-smoke
+          if-no-files-found: ignore
+          retention-days: 7
+
   ci-ok:
     # The single required check. It always runs and passes only when every
     # job succeeded: a failed, cancelled or skipped job fails it.
     name: core-ci ok
     if: always()
-    needs: [typecheck, unit, bundle, deps, integration, desktop-tauri]
+    needs: [typecheck, unit, bundle, deps, integration, desktop-tauri, desktop-linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

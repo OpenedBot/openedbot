@@ -1,0 +1,30 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "targets": ["deb", "appimage"],
+    "shortDescription": "openedbot preview",
+    "longDescription": "openedbot desktop preview (Tauri 2): drive your AI agents from a native window.",
+    "icon": [
+      "../../desktop/build/icons/32x32.png",
+      "../../desktop/build/icons/64x64.png",
+      "../../desktop/build/icons/128x128.png",
+      "../../desktop/build/icons/256x256.png",
+      "../../desktop/build/icons/512x512.png"
+    ],
+    "linux": {
+      "deb": {
+        "section": "utils"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["openedbot-preview"]
+      }
+    }
+  }
+}
