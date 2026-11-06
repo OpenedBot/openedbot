@@ -493,20 +493,30 @@ nouveau monolithe. Cible : **plusieurs commandes explicites** dans `modules/exec
 transactionnelles privées ; un garde interdit toute écriture physique dans `runs` et `workflows`
 hors de ces primitives. Le trigger de revue des messages privés
 (`db/migrations/0091_run_admission_envelope.sql:43-60`) est conservé, ou remplacé dans la même
-migration.
+migration. L'inventaire S2a ([0002](0002-invariants-des-runs.md)) confirme les 16 écritures (plus
+7 `insert into workflows` et celui du trigger), détaille leurs invariants et propose les commandes
+de S2b ; il relève qu'un brouillon de persona (ou un run entrant de handoff hérité, ou un DM d'agence
+dont l'initiateur a été effacé) en `unknown` n'a aucun chemin de revue (défaut D1, prouvé par
+`tests/integration/orphan-unknown-runs.ts`).
 
 **Transitions explicites.** Les changements de `runs.status`, `external_state` et
-`remote_stop_state` passent par une fonction de transition qui refuse une transition illégale et
-garde le fencing par bail (`lease_owner`, `lease_generation`).
+`remote_stop_state` (51 instructions `update runs`, dont 38 posent `status`, inventaire 0002
+section 7) passent par une fonction de transition qui refuse une transition illégale et garde le
+fencing par bail (`lease_owner`, `lease_generation`).
 
 **Événements.** Deux choses distinctes à préserver : la `sequence` par run (calcul
-`max(sequence)+1` présent à 14 endroits, parfois **avant** la transaction, par exemple
-`provider-recovery.ts:346-351`) et l'ordre de commit du curseur global. Le code s'appuie
-aujourd'hui sur deux protections distinctes : le verrou de la ligne du run (`persist.ts:208`), qui
-sérialise le `max(sequence)+1` d'un même run, puis le verrou du curseur de l'organisation
-(`persist.ts:219`). Être « dans la transaction » ne suffit pas à sérialiser un `max+1`. Cible :
-une seule primitive d'allocation qui prend **les deux verrous dans cet ordre** avant de calculer,
-dans la transaction qui insère, et un test de producteurs concurrents sur un même run (section 5).
+`max(sequence)+1` présent à 14 endroits sur `run_events`) et l'ordre de commit du curseur global.
+L'inventaire (0002 section 5) les classe : 5 calculs dans une instruction qui suit la prise du
+verrou du curseur de l'organisation, sérialisés par ce verrou ; 3 calculs dans **la même
+instruction** que la prise du verrou (CTE de `queue.ts:88-108`, `runtime-direct.ts:87-106`,
+`runtime-links.ts:149-168`), qui lisent un instantané antérieur à l'attente et perdent leur
+événement en silence (`on conflict do nothing`, observé par une sonde) ; 6 calculs du worker
+**hors transaction** (par exemple `provider-recovery.ts:346-350`), suivis de `persistEvents`, qui
+verrouille le run (`persist.ts:208`) puis le curseur (`persist.ts:219`) sans recalculer et jette
+une collision. Être « dans la transaction » ne suffit pas à sérialiser un `max+1`. Cible : une
+seule primitive d'allocation qui prend **les deux verrous dans cet ordre**, puis calcule dans une
+instruction séparée, dans la transaction qui insère, et un test de producteurs concurrents sur un
+même run (section 5).
 
 **Découper `executeRun`** (fermeture de 1 250 lignes, `runner.ts:102-1357`) en étapes nommées :
 préflight, création, streaming, approbations, repli de fournisseur, réconciliation.
@@ -595,7 +605,7 @@ préflight, création, streaming, approbations, repli de fournisseur, réconcili
 | Worker qui plante après l'enregistrement de l'identifiant, rejeu annoncé par l'hôte | Reprise par rejeu depuis `last_hermes_sequence`, sans doublon d'événement | Test d'intégration |
 | Idem, rejeu **non** annoncé par l'hôte | Réconciliation par lecture du statut (`runner.ts:885`), puis `unknown` si l'issue reste incertaine | Test d'intégration |
 | Deux producteurs d'événements concurrents sur un même run | Séquences uniques et contiguës, curseur global ordonné | Test d'intégration concurrent |
-| Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible | Test d'intégration, à écrire en S2a |
+| Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible. État S2a : insertion directe **impossible** en production ; DM racine d'un membre : initiateur gardé, revue 0091 ; **possible sans chemin de revue** (défaut D1 de [0002](0002-invariants-des-runs.md)) : brouillon de persona, DM d'un opérateur d'agence dont le compte est supprimé (pro, rare), run entrant d'un handoff hérité ; à corriger en S2b | `tests/integration/orphan-unknown-runs.ts` (S2a) caractérise le défaut ; S2b le réécrit pour prouver le chemin de revue |
 | Ancien worker qui écrit après expiration de son bail | Écriture refusée par le fencing | Test d'intégration |
 | Coupure de la connexion LISTEN | Réabonnement, rattrapage depuis le curseur durable | Test d'intégration |
 | Deux répliques d'API | Les deltas arrivent à tous les clients en < 1 s | Test d'intégration à deux instances |
@@ -639,7 +649,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **D4** Windows | WebView2, signature (Q7) | Build CI, installation et mise à jour d'un artefact téléchargé |
 | **D5** Linux | WebKitGTK, deb et AppImage, lancement sous xvfb | Build CI + parcours de test ; perf WebKitGTK mesurée |
 | **S1** Sûreté | Refus du changement de clé implicite (après comptage en prod) ; secrets séparés ; worker aligné sur le refus de la valeur de dev | Tests de la section 5 |
-| **S2a** Inventaire | Inventaire des invariants des 16 écritures de `runs` | Document d'invariants relu |
+| **S2a** Inventaire | Inventaire des invariants des 16 écritures de `runs` ([0002](0002-invariants-des-runs.md)) | Document d'invariants relu |
 | **S2b** Primitives de création | Primitives transactionnelles + commandes explicites ; trigger 0091 conservé | Garde : aucune écriture de `runs`/`workflows` hors des primitives |
 | **S2c** Allocation d'événements | Une seule primitive : verrou du run puis verrou du curseur, puis calcul, dans la transaction qui insère | Garde sur `max(sequence)` hors primitive ; test de producteurs concurrents |
 | **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales |
@@ -730,3 +740,10 @@ Codex de l'outil, qui a corrigé le cas « après mise à jour » : 987 ms en r�
 l'indépendance au réseau. G2 borne aussi le JS chargé avant la liste des fils (859 ko gzip
 mesurés). G4 compte les frames longues (Long Animation Frames), l'API `longtask` ne rapportant
 rien pendant le streaming.
+
+**Inventaire S2a (2026-11-06)** : [0002](0002-invariants-des-runs.md). Chiffres confirmés (16
+`insert into runs`, 14 `max(sequence)+1` sur `run_events`) ; section 4.5 précisée sur
+l'allocation des séquences (le verrou du curseur sérialise les calculs faits après lui, pas ceux
+faits dans la même instruction ni hors transaction). Un brouillon de persona, un handoff hérité ou
+un DM d'agence sans initiateur en `unknown` n'a aucun chemin de revue (section 5, défaut D1), à
+corriger en S2b. Relu par Codex (branche et document), corrections intégrées dans 0002.
