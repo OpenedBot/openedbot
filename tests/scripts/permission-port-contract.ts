@@ -7,14 +7,16 @@
 // scan does: in the execution module and the worker, the rule tables, the
 // grants, the tool policies, the organization policy, the runtime terminal
 // switch and the workflows' "Never wait" are read by the core source
-// (`core-permission-rules.ts`) only. `routines.ts` copies a routine's
-// "Never wait" into the workflow it fires (the snapshot's writer, 0144).
+// (`core-permission-rules.ts`) only. `routines.ts` reads a routine's
+// "Never wait" to copy it into the workflow it fires (0144), and the creation
+// primitive `sql/run-writes.ts` writes that snapshot (S2b).
 import { Glob } from "bun";
 
 const ROOTS = ["modules/execution/src", "apps/worker/src"];
 const ALLOWED: Record<string, readonly string[]> = {
   "modules/execution/src/application/runner/core-permission-rules.ts": ["table", "never_wait"],
   "modules/execution/src/application/routines.ts": ["never_wait"],
+  "modules/execution/src/sql/run-writes.ts": ["never_wait"],
 };
 const TABLE = /\b(?:from|join)\s+(bot_permission_rules|organization_permission_policies|bot_permission_grants|bot_permission_tool_policies|runtime_permission_settings)\b/g;
 // A column, not the reason code `"never_wait"` the traces carry, nor a

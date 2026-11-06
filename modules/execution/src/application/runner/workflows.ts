@@ -12,13 +12,13 @@ import {
 import {
   canDelegate,
   delegationRefusalMessage,
-  workflowSessionKey,
   type WorkflowBudget,
 } from "@openedbot/roster/domain/autonomous-workflow";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { WorkerConfig } from "../worker-config";
 import { appendNoticeTx } from "./events";
 import { handoffRoster } from "./handoff";
+import { startWorkflowStepTx } from "./workflow-steps";
 import type { RunContext, WorkflowFailureContext } from "./types";
 import { describe, log } from "./util";
 
@@ -121,28 +121,22 @@ export async function advanceWorkflowCompletionTx(
       budget: workflowBudget(workflow),
     });
     if (decision.accepted) {
-      const childId = crypto.randomUUID();
-      await tx`
-        insert into runs (
-          id, organization_id, thread_id, bot_id, input, status, workflow_id, step_index, step_kind,
-          stack_depth, caller_bot_id, caller_run_id, execution_session_key, external_state, events_complete
-        ) values (
-          ${childId}, ${context.organizationId}, ${context.threadId}, ${mention.botId},
-          ${attributedInput({ name: context.botName, slug: context.botSlug }, mention.message)},
-          'queued', ${workflow.id}, ${workflow.usedSteps}, 'delegated',
-          ${context.stackDepth + 1}, ${context.botId}, ${context.id},
-          ${workflowSessionKey(context.organizationId, workflow.id, mention.botId)}, 'not_started', true
-        )
-      `;
       await tx`
         update runs set completion_kind = 'delegated', output = ${split.body.trim() || null}, updated_at = now()
          where organization_id = ${context.organizationId} and id = ${context.id}
       `;
-      await tx`
-        update workflows set status = 'running', used_steps = used_steps + 1,
-          used_handoffs = used_handoffs + 1, updated_at = now()
-         where organization_id = ${context.organizationId} and id = ${workflow.id}
-      `;
+      const childId = await startWorkflowStepTx(tx, {
+        kind: "delegated",
+        organizationId: context.organizationId,
+        threadId: context.threadId,
+        workflowId: workflow.id,
+        stepIndex: workflow.usedSteps,
+        botId: mention.botId,
+        input: attributedInput({ name: context.botName, slug: context.botSlug }, mention.message),
+        stackDepth: context.stackDepth + 1,
+        callerBotId: context.botId,
+        callerRunId: context.id,
+      });
       const notice = await appendNoticeTx(tx, context, {
         message: handoffSentNotice(mention),
         kind: HANDOFF_NOTICE_KIND.sent,
@@ -266,6 +260,26 @@ export async function settleSimpleDmCompletionTx(
   return result;
 }
 
+/**
+ * A run that belongs to a workflow only through its review (0175): a service
+ * run (persona draft) or a legacy room turn, which no workflow step settles.
+ * Reconciled, it closes that review as a root DM step closes its own, without
+ * reading its output as a reply or a directive.
+ */
+export async function settleReviewWorkflowTx(
+  tx: SQL,
+  context: Pick<RunContext, "organizationId" | "workflowId">,
+  outcome: { status: "completed" } | { status: "failed"; errorCode: string; message: string },
+): Promise<void> {
+  const failed = outcome.status === "failed" ? outcome : null;
+  await tx`
+    update workflows set status = ${outcome.status}, error_code = ${failed?.errorCode ?? null},
+      error_message = ${failed?.message ?? null}, ended_at = now(), updated_at = now()
+     where organization_id = ${context.organizationId} and id = ${context.workflowId}
+       and status in ('queued','running','awaiting_approval','reconciling')
+  `;
+}
+
 /** A known child failure returns once to its caller; an unknown effect never enters this path. */
 export async function advanceWorkflowFailureTx(
   tx: SQL,
@@ -330,25 +344,20 @@ async function createWorkflowContinuationTx(
           from runs where organization_id = ${context.organizationId} and id = ${context.callerRunId}
       `)[0]
     : null;
-  const id = crypto.randomUUID();
-  await tx`
-    insert into runs (
-      id, organization_id, thread_id, bot_id, input, status, workflow_id, step_index, step_kind,
-      stack_depth, caller_bot_id, caller_run_id, resumes_run_id, completion_kind,
-      execution_session_key, external_state, events_complete
-    ) values (
-      ${id}, ${context.organizationId}, ${context.threadId}, ${context.callerBotId}, ${completion.input}, 'queued',
-      ${workflow.id}, ${workflow.usedSteps}, 'continuation', ${Math.max(0, context.stackDepth - 1)},
-      ${parent?.callerBotId ?? null}, ${parent?.callerRunId ?? null}, ${context.callerRunId},
-      ${completion.completionKind},
-      ${workflowSessionKey(context.organizationId, workflow.id, context.callerBotId)}, 'not_started', true
-    )
-  `;
-  await tx`
-    update workflows set status = 'running', used_steps = used_steps + 1, updated_at = now()
-     where organization_id = ${context.organizationId} and id = ${workflow.id}
-  `;
-  return id;
+  return startWorkflowStepTx(tx, {
+    kind: "continuation",
+    organizationId: context.organizationId,
+    threadId: context.threadId,
+    workflowId: workflow.id,
+    stepIndex: workflow.usedSteps,
+    botId: context.callerBotId,
+    input: completion.input,
+    stackDepth: Math.max(0, context.stackDepth - 1),
+    callerBotId: parent?.callerBotId ?? null,
+    callerRunId: parent?.callerRunId ?? null,
+    resumesRunId: context.callerRunId,
+    completionKind: completion.completionKind,
+  });
 }
 
 async function workflowCallStack(tx: SQL, context: RunContext): Promise<string[]> {

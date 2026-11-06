@@ -506,63 +506,6 @@ export async function lockBotPolicy(
   return policyRows[0];
 }
 
-export async function insertQueuedWorkflow(
-  tx: TransactionDb,
-  workflow: {
-    id: string;
-    organizationId: string;
-    threadId: string;
-    rootRunId: string;
-    rootBotId: string;
-    initiatorUserId: string | null;
-    kind: "group" | "dm";
-    autonomyEnabled: boolean;
-    maxDepth: number;
-    maxSteps: number;
-    maxHandoffs: number;
-    timeoutSeconds: number;
-    tokenBudget: number;
-  },
-): Promise<void> {
-  await tx`
-    insert into workflows (
-      id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-      kind, status, protocol_version, autonomy_enabled, max_depth, max_steps, max_handoffs,
-      timeout_seconds, token_budget, used_steps, used_handoffs, used_tokens, deadline_at
-    ) values (
-      ${workflow.id}, ${workflow.organizationId}, ${workflow.threadId}, ${workflow.rootRunId}, ${workflow.rootBotId}, ${workflow.initiatorUserId},
-      ${workflow.kind}, 'queued', 1, ${workflow.autonomyEnabled}, ${workflow.maxDepth},
-      ${workflow.maxSteps}, ${workflow.maxHandoffs}, ${workflow.timeoutSeconds}, ${workflow.tokenBudget},
-      1, 0, 0, now() + (${workflow.timeoutSeconds} * interval '1 second')
-    )
-  `;
-}
-
-export async function insertQueuedRun(
-  tx: TransactionDb,
-  run: {
-    id: string;
-    organizationId: string;
-    threadId: string;
-    botId: string;
-    groupTurnPosition: number | null;
-    groupState: unknown;
-    input: string;
-    workflowId: string;
-    stepKind: "group" | "root";
-  },
-): Promise<void> {
-  await tx`
-    insert into runs (
-      id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, status,
-      workflow_id, step_index, step_kind, stack_depth, external_state, events_complete
-    ) values (
-      ${run.id}, ${run.organizationId}, ${run.threadId}, ${run.botId}, ${run.groupTurnPosition}, ${run.groupState}, ${run.input},
-      'queued', ${run.workflowId}, 0, ${run.stepKind}, 0, 'not_started', true
-    )
-  `;
-}
-
 export async function insertUserMessage(
   tx: TransactionDb,
   message: { id: string; organizationId: string; threadId: string; runId: string; content: unknown },

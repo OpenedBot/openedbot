@@ -13,11 +13,8 @@ import {
   handoffSentNotice,
   type BotIdentity,
 } from "@openedbot/roster/domain/bot-mode";
-import {
-  AUTONOMY_DEFAULTS,
-  normalizeAutonomyPolicy,
-  workflowSessionKey,
-} from "@openedbot/roster/domain/autonomous-workflow";
+import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
+import { branchTurnTx } from "@openedbot/execution/application/run-creation";
 import { runtimeToolsetContractMessage, runtimeToolsetContractViolation } from "@openedbot/runtimes/domain/runtime-contract";
 import { messageVersionPrecondition } from "@openedbot/conversation/domain/message-version";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
@@ -277,22 +274,12 @@ export function messageVersionRoutes(
         const mention = dmHandoffMention(input, rootBot.id, roster);
         let runBotId = rootBot.id;
         let runInput = composeRunInput(input, sourceAttachments);
-        let stepKind: "root" | "delegated" = "root";
-        let stackDepth = 0;
-        let callerBotId: string | null = null;
-        let executionSessionKey: string | null = null;
-        let usedHandoffs = 0;
         if (mention) {
           runBotId = mention.botId;
           runInput = attributedInput(
             { name: rootBot.name, slug: rootBot.slug },
             composeRunInput(mention.message, sourceAttachments),
           );
-          stepKind = "delegated";
-          stackDepth = 1;
-          callerBotId = rootBot.id;
-          executionSessionKey = workflowSessionKey(auth.organizationId, workflowId, mention.botId);
-          usedHandoffs = 1;
         }
         if (runBotId !== rootBot.id) {
           const target = await tx<Array<{ id: string }>>`
@@ -315,31 +302,21 @@ export function messageVersionRoutes(
         const workflowUpdatedAt = new Date().toISOString();
         // La variante garde les restrictions du tour source : un plan reste un
         // plan, une routine sans attente le reste.
-        await tx`
-          insert into workflows (
-            id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-            kind, status, protocol_version, autonomy_enabled, max_depth, max_steps, max_handoffs,
-            timeout_seconds, token_budget, used_steps, used_handoffs, used_tokens, deadline_at,
-            plan_only, never_wait
-          ) values (
-            ${workflowId}, ${auth.organizationId}, ${branchThreadId}, ${runId}, ${rootBot.id}, ${auth.userId},
-            'dm', 'queued', 1, ${policy.enabled}, ${policy.maxDepth}, ${maxSteps}, ${maxHandoffs},
-            ${policy.timeoutSeconds}, ${policy.tokenBudget}, 1, ${usedHandoffs}, 0,
-            now() + (${policy.timeoutSeconds} * interval '1 second'),
-            ${source.planOnly === true}, ${source.neverWait === true}
-          )
-        `;
-        await tx`
-          insert into runs (
-            id, organization_id, thread_id, bot_id, input, status, workflow_id,
-            step_index, step_kind, stack_depth, caller_bot_id, execution_session_key,
-            external_state, events_complete, plan_only
-          ) values (
-            ${runId}, ${auth.organizationId}, ${branchThreadId}, ${runBotId}, ${runInput}, 'queued',
-            ${workflowId}, 0, ${stepKind}, ${stackDepth}, ${callerBotId}, ${executionSessionKey},
-            'not_started', true, ${source.planOnly === true}
-          )
-        `;
+        await branchTurnTx(tx, {
+          organizationId: auth.organizationId,
+          threadId: branchThreadId,
+          runId,
+          workflowId,
+          initiatorUserId: auth.userId,
+          rootBotId: rootBot.id,
+          input: runInput,
+          speaker: mention
+            ? { kind: "delegated", botId: runBotId, callerBotId: rootBot.id }
+            : { kind: "root", botId: runBotId },
+          budget: { ...policy, maxSteps, maxHandoffs },
+          planOnly: source.planOnly === true,
+          neverWait: source.neverWait === true,
+        });
         await tx`
           insert into messages (id, organization_id, thread_id, run_id, role, content)
           values (

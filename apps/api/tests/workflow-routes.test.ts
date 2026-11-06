@@ -3,6 +3,7 @@ import type { SQL } from "bun";
 import { Hono } from "hono";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 import { readHistoryCursor, readHistoryFilter, readHistoryLimit, routinePublicFields, workflowRoutes } from "../src/routes/execution/workflow-routes";
 
 const owner: AuthContext = {
@@ -272,12 +273,10 @@ describe("workflow recovery routes", () => {
     expect(rootRead?.sql).toContain("(run.plan_only or source.plan_only)");
     expect(rootRead?.sql).toContain("source.never_wait");
     expect(rootRead?.sql).toContain("coalesce(run.source_message_id,");
-    const workflowInsert = calls.find(({ sql }) => sql.includes("insert into workflows"));
-    expect(workflowInsert?.sql).toContain("recovery_state, plan_only, never_wait");
-    expect(workflowInsert?.values.slice(-2)).toEqual([true, true]);
-    const runInsert = calls.find(({ sql }) => sql.includes("insert into runs"));
-    expect(runInsert?.sql).toContain("plan_only, source_message_id");
-    expect(runInsert?.values.slice(-2)).toEqual([true, "message-1"]);
+    const workflow = inserted(calls, "workflows");
+    expect([workflow.plan_only, workflow.never_wait]).toEqual([true, true]);
+    const run = inserted(calls, "runs");
+    expect([run.plan_only, run.source_message_id]).toEqual([true, "message-1"]);
   });
 
   test("une relance ordinaire n'invente aucune restriction", async () => {
@@ -289,10 +288,27 @@ describe("workflow recovery routes", () => {
     });
 
     expect(response.status).toBe(202);
-    const workflowInsert = calls.find(({ sql }) => sql.includes("insert into workflows"));
-    expect(workflowInsert?.values.slice(-2)).toEqual([false, false]);
-    const runInsert = calls.find(({ sql }) => sql.includes("insert into runs"));
-    expect(runInsert?.values.slice(-2)).toEqual([false, null]);
+    const workflow = inserted(calls, "workflows");
+    expect([workflow.plan_only, workflow.never_wait]).toEqual([false, false]);
+    const run = inserted(calls, "runs");
+    expect([run.plan_only, run.source_message_id]).toEqual([false, null]);
+  });
+
+  test("0175 : la revue d'un brouillon de persona ou d'un hand-off hérité s'abandonne, sans relance", async () => {
+    for (const [options, code] of [
+      [{ stepKind: "persona_draft" }, "WORKFLOW_SERVICE_RETRY_UNSUPPORTED"],
+      [{ stepKind: null, originRunId: "courier-1" }, "WORKFLOW_HANDOFF_RETRY_UNSUPPORTED"],
+    ] as const) {
+      const calls: SqlCall[] = [];
+      const response = await mount(idempotentRetryDb(calls, options)).request("/workflow-1/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmDuplicateRisk: true }),
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: { code } });
+      expect(calls.some(({ sql }) => sql.includes("insert into") || sql.includes("update runs"))).toBe(false);
+    }
   });
 
   test("refuse la relance si le run de repli ambigu a disparu", async () => {
@@ -336,9 +352,7 @@ describe("workflow recovery routes", () => {
     });
     expect(calls.filter(({ sql }) => sql.includes("insert into workflows"))).toHaveLength(1);
     expect(calls.filter(({ sql }) => sql.includes("insert into runs"))).toHaveLength(1);
-    const replacement = calls.find(({ sql }) => sql.includes("insert into workflows"));
-    expect(replacement?.sql).toContain("autonomy_enabled");
-    expect(replacement?.values[8]).toBe(false);
+    expect(inserted(calls, "workflows").autonomy_enabled).toBe(false);
   });
 
   test("fails safely when a historical retry marker has no replayable receipt", async () => {
@@ -359,6 +373,12 @@ describe("workflow recovery routes", () => {
 });
 
 type SqlCall = { sql: string; values: unknown[] };
+
+function inserted(calls: SqlCall[], table: "runs" | "workflows"): Record<string, unknown> {
+  const call = calls.find(({ sql }) => sql.includes(`insert into ${table}`));
+  if (!call) throw new Error(`no insert into ${table}`);
+  return insertedRow(call.sql, call.values);
+}
 
 function mount(
   db: SQL,
@@ -424,7 +444,10 @@ function recoveryDb(
 
 function idempotentRetryDb(
   calls: SqlCall[],
-  options: { planOnly?: boolean; neverWait?: boolean; sourceMessageId?: string | null } = {},
+  options: {
+    planOnly?: boolean; neverWait?: boolean; sourceMessageId?: string | null;
+    stepKind?: string | null; originRunId?: string | null;
+  } = {},
 ): SQL {
   let recoveryState: Record<string, unknown> = {};
   const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -445,7 +468,7 @@ function idempotentRetryDb(
         botId: "bot-1",
         input: "Retry this",
         model: null,
-        stepKind: "root",
+        stepKind: options.stepKind === undefined ? "root" : options.stepKind,
         stackDepth: 0,
         callerBotId: null,
         groupTurnPosition: null,
@@ -453,6 +476,7 @@ function idempotentRetryDb(
         planOnly: options.planOnly ?? false,
         neverWait: options.neverWait ?? false,
         sourceMessageId: options.sourceMessageId ?? null,
+        originRunId: options.originRunId ?? null,
       }]);
     }
     if (sql.includes("select id from bots")) return Promise.resolve([{ id: "bot-1" }]);

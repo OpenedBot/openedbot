@@ -1,11 +1,13 @@
 # 0002 — Invariants des écritures de `runs` (inventaire S2a)
 
 - **Statut :** inventaire S2a de l'ADR [0001](0001-refonte-tauri-et-produit.md) (section 4.5, étapes
-  S2a à S2e), en relecture
+  S2a à S2e) ; **S2b réalisé** (section 9.1) : les références `fichier:ligne` des sections 3 à 8
+  décrivent l'état d'avant S2b
 - **Date :** 2026-11-06
 - **Référence :** `develop` au commit `c1edc11`. Toutes les références `fichier:ligne` pointent ce
   commit ; `O` = observé dans le code ou par un test, `I` = déduit, à confirmer
-- **Preuve exécutable :** `tests/integration/orphan-unknown-runs.ts` (cible `make test-integration`)
+- **Preuve exécutable :** `tests/integration/orphan-unknown-runs.ts` (cible `make test-integration`),
+  qui caractérisait D1 en S2a et prouve sa correction depuis S2b
 - **Entrée de :** S2b (primitives de création), S2c (allocation d'événements), S2d (transitions)
 
 Ce document recense chaque écriture qui crée un run (et le workflow qui l'accompagne), la façon
@@ -293,7 +295,8 @@ décision de produit, et les autres relèvent de S2b à S2d.
 
 ### Élevé
 
-**D1 — Run `unknown` orphelin, sans chemin de revue (O, test).** Le trigger 0091 n'ouvre pas de
+**D1 — Run `unknown` orphelin, sans chemin de revue (O, test). Corrigé en S2b** par
+`0175_review_path_for_every_unknown_run.sql` (section 9.1). Le trigger 0091 n'ouvre pas de
 workflow à un run sans workflow qui n'est pas `root` ou n'a pas d'initiateur, et les sorties de
 `unknown` passent par un workflow (section 6). Trois formes, quand l'un des huit écrivains de la
 section 6 les passe en `unknown` :
@@ -415,6 +418,80 @@ Primitives partagées :
 - **`transitionRun`** (S2d) : table des transitions de la section 7, fencing par bail obligatoire
   pour le worker, et passage en `unknown` qui garantit un chemin de revue (D1).
 
+### 9.1 Réalisé en S2b (2026-11-06)
+
+Les 16 créations passent par des commandes de `modules/execution`, chacune dans la transaction de
+son appelant, qui garde ses verrous, leur ordre et ses événements (aucun n'est déplacé : D5 et D10
+restent ouverts). Les commandes ne verrouillent rien et ne lisent aucune politique : l'appelant
+leur passe le budget qu'il a figé.
+
+| # | Commande | Fichier |
+|---|---|---|
+| 1 | `admitUserTurnTx` (DM simple, repli de steer, salon, mention, remplacement) | `application/run-creation.ts` |
+| 2 | `branchTurnTx` | idem |
+| 3 | `admitWebhookDeliveryTx` | idem |
+| 4 | `openWorkflowRetryTx` (moitié création ; l'ancien workflow et ses runs `unknown` restent réglés par la route, S2d) | idem |
+| 5, 8, 9 | `fireRoutineTx` (`manual` / `scheduled`, bot / salon) | idem |
+| 6 | `queuePersonaDraftRunTx` | idem |
+| 7 | `greetNewBotTx` (le délai d'autonomie est lu avant l'insertion, dans la même transaction, au lieu d'une sous-requête) | idem |
+| 10, 14, 15 | `startWorkflowStepTx` (`group`, `delegated`, `continuation`) | `application/runner/workflow-steps.ts` |
+| 10 sans workflow, 11, 16 | `chainLegacyRoomTurnTx` | idem |
+| 12, 13 | `openHandoffTx` | idem |
+
+Primitives privées (`sql/run-writes.ts`), seules écritures physiques de création :
+`insertRunTx` (tout run), `openWorkflowTx` (workflow puis son run racine, `used_steps = 1`,
+`deadline_at = now() + timeout`), `claimWorkflowStepTx` (`used_steps + 1`, `used_handoffs + 1` pour
+une délégation, `status = 'running'`). Chaque instruction énumère toutes ses colonnes, valeurs par
+défaut de la table comprises ; une forme invalide est refusée avant d'écrire
+(`domain/run-creation.ts`, `newRunViolation`, `newWorkflowViolation`) : statut `queued` ou
+`relaying`, courrier sans bot ni workflow, étape de workflow avec index et genre de tour, pas de
+`deadline_at` sur une étape de workflow, `delegated` avec appelant, run de service hors workflow,
+salon à 18 étapes, racine déléguée ⇔ un handoff consommé. Ce sont des erreurs de programmation, pas
+des erreurs de domaine : aucune n'atteint un client.
+
+Seul changement d'ordre : la délégation (14) écrit le `completion_kind` du run courant avant
+d'insérer l'enfant, au lieu d'après ; aucune garde ni trigger ne lit cette colonne.
+
+**Garde.** `tests/scripts/run-writes-contract.ts` (`make test-unit`, testé par mutation dans
+`run-writes-contract.test.ts`), plus la règle dependency-cruiser `primitives-de-creation-privees`
+(`make deps-check`) :
+
+- strict : `insert into runs`, `insert into workflows`, `delete from runs|workflows` et le compte
+  d'étapes d'un workflow (`update workflows` qui pose `used_steps` ou `used_handoffs`) n'existent que
+  dans `sql/run-writes.ts` ; dans `db/migrations`, seul le trigger de revue (0091, 0175) insère un
+  workflow ; seules les deux commandes importent les primitives ;
+- cliquet daté (S2d, jusqu'au 2026-12-31, `tests/scripts/run-writes-debt.json`) : les autres
+  `update runs` (66) et `update workflows` (36) sont comptés par fichier ; un compte peut baisser
+  (`--record`), jamais monter, et un fichier absent du cliquet ne peut pas se mettre à écrire. Ces
+  instructions sont les transitions de la section 7 et les colonnes qui voyagent avec elles
+  (`completion_kind`, `output`, `last_hermes_sequence`, `used_tokens`…) : S2d doit trier ce qui
+  rejoint la fonction de transition et ce qui reste une écriture de colonne.
+
+**D1.** `0175_review_path_for_every_unknown_run.sql` remplace la fonction et le trigger de 0091 :
+tout run sans workflow qui **passe** en `unknown` reçoit son workflow de revue (`group` dans un fil
+de salon, `dm` sinon, initiateur du run, éventuellement nul), comme le DM racine auparavant.
+Brouillon de persona, run entrant d'un handoff, tour de salon hérité et DM sans initiateur
+s'abandonnent donc depuis la boîte de réception, ce qui libère le fil, la place de capacité et le
+bot (test d'intégration). Deux ajustements de la revue l'accompagnent : la relance est refusée pour un run de
+service (`409 WORKFLOW_SERVICE_RETRY_UNSUPPORTED`, le brouillon se relance depuis la fiche du bot)
+et pour le run entrant d'un handoff hérité (`409 WORKFLOW_HANDOFF_RETRY_UNSUPPORTED` : la copie
+n'aurait plus de courrier à qui livrer), celle d'un salon l'étant déjà ; et un run de service ou un
+tour de salon hérité réconcilié, qu'aucune étape de workflow ne règle, clôt sa revue
+(`settleReviewWorkflowTx`, `completed` ou `failed`, au lieu de la laisser `running`). Le cliquet de
+`runner/workflows.ts` passe de 5 à 6 `update workflows` pour cette transition.
+
+Reste ouvert :
+
+- **S2c** : allocation des séquences (sections 5, D2, D3) ; les notices à séquence en dur de 1 et 2
+  (famille D) restent dans leurs routes ;
+- **S2d** : fonction de transition et vidage du cliquet ; D4, D6, D9 ; l'ancien workflow d'une
+  relance réglé par la route ;
+- un abandon de la revue d'un run entrant ne livre pas son courrier : le fil d'origine reste
+  `relaying` jusqu'à son arrêt par l'opérateur (inchangé, données héritées seulement) ;
+- D5 (ordre des verrous abonnement / fil) et D10 (politique de routine lue sans verrou), qui
+  demandent de déplacer des verrous de route ; D7 ; D8 (runs sans enveloppe : 6, 11, 12, 16) ;
+- retrait de 11, 12, 13, 16 après comptage en production.
+
 ## 10. Ce qui reste incertain
 
 - D3, D4, D5, D9 et la forme « agence » de D1 sont déduits de la lecture ; D1 (persona, handoff
@@ -427,7 +504,6 @@ Primitives partagées :
   été cherché (`insert into runs` n'apparaît que dans ses tests).
 
 ## Historique de revue
-
 - 2026-11-06 : inventaire S2a, test `orphan-unknown-runs.ts`, sonde de la famille B.
 - 2026-11-06, relecture Codex n° 1 : handoff par courrier reclassé en données héritées ; DM racine
   sans initiateur possible sous mandat d'agence (D1) ; sortie de maintenance de `unknown` ;
@@ -440,3 +516,5 @@ Primitives partagées :
   étapes, mention à 2 étapes et 1 handoff) ; garde de `worker-registry.ts:38` ; route publique du
   webhook ; D8 étendu à 10 ; D9 conditionné à l'état externe ; graphe complété
   (`queued` → `unknown`, `unknown` → `cancelled`). Revue de branche : aucune régression.
+- 2026-11-06, S2b : commandes et primitives de création (section 9.1), garde
+  `run-writes-contract.ts`, D1 corrigé par 0175.

@@ -1,0 +1,79 @@
+{
+  "until": "2026-12-31",
+  "step": "S2d",
+  "reason": "ADR 0001 S2d : les transitions de runs.status, external_state et remote_stop_state (et les colonnes qui voyagent avec elles) passent par une fonction de transition avec fencing ; inventaire 0002, section 7.",
+  "files": {
+    "apps/api/src/routes/conversation/conversation-followup.ts": {
+      "runs": 1
+    },
+    "apps/api/src/routes/conversation/conversation-message-routes.ts": {
+      "runs": 1
+    },
+    "apps/api/src/routes/execution/workflow-routes.ts": {
+      "runs": 5,
+      "workflows": 6
+    },
+    "apps/worker/src/infrastructure/worker-registry.ts": {
+      "runs": 2,
+      "workflows": 1
+    },
+    "modules/execution/src/application/approval-review.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/queue.ts": {
+      "runs": 9,
+      "workflows": 5
+    },
+    "modules/execution/src/application/run-cancellation.ts": {
+      "runs": 4,
+      "workflows": 3
+    },
+    "modules/execution/src/application/run-steering.ts": {
+      "runs": 3,
+      "workflows": 2
+    },
+    "modules/execution/src/application/run-timings.ts": {
+      "runs": 1
+    },
+    "modules/execution/src/application/runner.ts": {
+      "runs": 15,
+      "workflows": 3
+    },
+    "modules/execution/src/application/runner/cancel.ts": {
+      "runs": 6,
+      "workflows": 1
+    },
+    "modules/execution/src/application/runner/failure.ts": {
+      "runs": 3,
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/handoff.ts": {
+      "runs": 1
+    },
+    "modules/execution/src/application/runner/persist.ts": {
+      "runs": 4,
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/provider-recovery.ts": {
+      "runs": 1
+    },
+    "modules/execution/src/application/runner/rooms.ts": {
+      "workflows": 2
+    },
+    "modules/execution/src/application/runner/thread-session.ts": {
+      "runs": 1
+    },
+    "modules/execution/src/application/runner/workflows.ts": {
+      "runs": 7,
+      "workflows": 6
+    },
+    "modules/execution/src/application/runtime-direct.ts": {
+      "runs": 1,
+      "workflows": 1
+    },
+    "modules/runtime-link/src/application/runtime-links.ts": {
+      "runs": 1,
+      "workflows": 1
+    }
+  }
+}

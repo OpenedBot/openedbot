@@ -75,6 +75,15 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Corrigé
 
+- Un travail dont l'issue est devenue incertaine (le worker s'est arrêté
+  pendant sa création chez Hermes, par exemple) ne bloque plus sa
+  conversation sans recours : un brouillon de persona, un message transmis
+  par un ancien `@bot`, un ancien tour de salon ou un message d'un opérateur
+  dont le compte a été supprimé apparaît désormais « à vérifier » dans la
+  boîte de réception, comme un message privé. L'abandonner libère la
+  conversation, le bot et la place qu'il occupait chez le runtime. Un
+  brouillon de persona ne se relance pas d'ici (on le relance depuis la
+  fiche du bot), ni un message transmis (on le renvoie).
 - Réglages › Activité : sans aucun bot, le tableau propose « Créer un bot ».
   L'ancien message renvoyait vers la barre latérale, absente de cet écran.
 - Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de

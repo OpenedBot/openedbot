@@ -5,7 +5,8 @@ export type RetrySource = {
   botId: string | null;
   input: string;
   model: string | null;
-  stepKind: "root" | "delegated" | "group" | null;
+  /** The stored kind; a service kind (0175 review of a persona draft) is not replayable. */
+  stepKind: string | null;
   stackDepth: number;
   callerBotId: string | null;
   groupTurnPosition: number | null;
@@ -18,6 +19,8 @@ export type RetrySource = {
    * d'origine, hérité le long d'une chaîne de relances (0173).
    */
   sourceMessageId: string | null;
+  /** The courier of a legacy inbound handoff (0175 review): a replay could not deliver to it. */
+  originRunId: string | null;
 };
 
 export async function readRetrySource(
@@ -35,7 +38,8 @@ export async function readRetrySource(
               where message.organization_id = run.organization_id and message.run_id = run.id
                 and message.role = 'user'
               order by message.sequence asc limit 1
-           )) as "sourceMessageId"
+           )) as "sourceMessageId",
+           run.origin_run_id as "originRunId"
       from runs run
       join workflows source on source.organization_id = run.organization_id and source.id = run.workflow_id
      where run.organization_id = ${organizationId} and run.id = ${rootRunId}

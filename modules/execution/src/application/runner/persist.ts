@@ -42,10 +42,12 @@ import { extractOutputMedia, workspaceMediaNames } from "../../domain/output-med
 import { fetchWorkspaceMedia } from "./output-media-fetch";
 import type { GroupRunContext, RunContext, RunEventIdentityRow } from "./types";
 import { log } from "./util";
+import { chainLegacyRoomTurnTx } from "./workflow-steps";
 import {
   advanceWorkflowCompletionTx,
   advanceWorkflowFailureTx,
   measureWorkflowTokens,
+  settleReviewWorkflowTx,
   settleSimpleDmCompletionTx,
   usageTotal,
 } from "./workflows";
@@ -403,6 +405,8 @@ export async function persistEvents(
         }
         if (service) {
           // Run de service : pas de bulle, pas d'avance salon, pas de `@slug`.
+          // Il n'a de workflow que sa revue (0175), close avec lui.
+          if (context.workflowId) await settleReviewWorkflowTx(tx, context, { status: "completed" });
         } else if (state) {
           // Tour de salon : un pass (explicite ou implicite) ne laisse qu'un
           // avis ; une vraie sortie qui mentionne l'opérateur lève « needs you ».
@@ -423,6 +427,8 @@ export async function persistEvents(
         } else if (context.groupTurnPosition !== null) {
           // Ancien enchaînement (runs de salon posés avant `group_state`) :
           // chaque membre parle une fois, dans l'ordre, sur la même entrée.
+          // Sa seule revue possible (0175) se clôt avec lui.
+          if (context.workflowId) await settleReviewWorkflowTx(tx, context, { status: "completed" });
           const next = await tx<Array<{ botId: string; position: number }>>`
             select gm.bot_id as "botId", gm.position
               from threads t
@@ -432,11 +438,14 @@ export async function persistEvents(
              order by gm.position asc limit 1
           `;
           if (next[0]) {
-            await tx`
-              insert into runs (id, organization_id, thread_id, bot_id, group_turn_position, input, status)
-              values (${crypto.randomUUID()}, ${context.organizationId}, ${context.threadId}, ${next[0].botId},
-                      ${next[0].position}, ${context.input}, 'queued')
-            `;
+            await chainLegacyRoomTurnTx(tx, {
+              organizationId: context.organizationId,
+              threadId: context.threadId,
+              botId: next[0].botId,
+              groupTurnPosition: next[0].position,
+              input: context.input,
+              groupState: null,
+            });
           }
         } else if (context.workflowId) {
           result.push(...await advanceWorkflowCompletionTx(tx, context, output));
@@ -513,7 +522,10 @@ export async function persistEvents(
         if (!isServiceStepKind(context.stepKind) && context.originRunId) {
           result.push(...await deliverHandoffReplyTx(tx, context, { status: "failed", output: null, error: message }));
         }
-        if (context.workflowId && !state) {
+        if (context.workflowId && !state && context.groupTurnPosition !== null) {
+          // Tour de salon hérité en revue (0175) : aucune étape ne le règle.
+          await settleReviewWorkflowTx(tx, context, { status: "failed", errorCode, message });
+        } else if (context.workflowId && !state) {
           result.push(...await advanceWorkflowFailureTx(tx, context, message, errorCode));
         }
       }

@@ -18,7 +18,8 @@ import {
 import { dmHandoffMention } from "@openedbot/conversation/domain/dm-handoff";
 import { type GroupFollowUp, type GroupSendState } from "@openedbot/execution/domain/group-send";
 import { recordRunReceiptsTx } from "@openedbot/execution/application/run-receipts";
-import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy, workflowSessionKey } from "@openedbot/roster/domain/autonomous-workflow";
+import { admitUserTurnTx } from "@openedbot/execution/application/run-creation";
+import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { workflowNotificationEligible } from "@openedbot/notifications/domain/workflow-notifications";
 import { FOLLOWUP_SUPERSEDE_CODE } from "@openedbot/contracts-errors";
 import { FOLLOWUP_SUPERSEDE_MESSAGE, mergeFollowupInputs } from "@openedbot/conversation/domain/followup";
@@ -195,7 +196,6 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
         let runStepKind: "root" | "delegated" | "group" = thread.groupId ? "group" : "root";
         let runStackDepth = 0;
         let runCallerBotId: string | null = null;
-        let runExecutionSession: string | null = null;
         let delegationNotice: HandoffMention | null = null;
         let steerTargetRunId: string | null = null;
         const receiptAttemptIds: string[] = [];
@@ -261,7 +261,6 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
             runCallerBotId = thread.botId;
             delegationNotice = mention;
             workflowUsedHandoffs = 1;
-            runExecutionSession = workflowSessionKey(auth.organizationId, reservedWorkflowId, mention.botId);
             runInput = attributedInput(
               { name: thread.botName ?? "bot", slug: thread.botSlug ?? "bot" },
               composeReplyRunInput(composeRunInput(mention.message, attachments), replyTarget),
@@ -414,30 +413,28 @@ export function conversationMessageRoutes(db: Db, blobs: BlobStore, config: ApiC
           ? null
           : (thread.groupId || delegationNotice || policy.enabled ? reservedWorkflowId : null);
         trace.set("workflow", workflowId !== null);
-        if (workflowId) await tx`
-          insert into workflows (
-            id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-            kind, status, protocol_version, autonomy_enabled, max_depth, max_steps, max_handoffs,
-            timeout_seconds, token_budget, used_steps, used_handoffs, used_tokens, deadline_at, plan_only
-          ) values (
-            ${workflowId}, ${auth.organizationId}, ${thread.id}, ${runId}, ${workflowRootBotId}, ${auth.userId},
-            ${workflowKind}, 'queued', 1, ${policy.enabled}, ${policy.maxDepth}, ${workflowMaxSteps}, ${workflowMaxHandoffs},
-            ${policy.timeoutSeconds}, ${policy.tokenBudget}, 1, ${workflowUsedHandoffs}, 0,
-            now() + (${policy.timeoutSeconds} * interval '1 second'), ${planOnly}
-          )
-        `;
-        await tx`
-          insert into runs (
-            id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, status,
-            workflow_id, step_index, step_kind, stack_depth, caller_bot_id, execution_session_key,
-            external_state, events_complete, initiator_user_id, deadline_at, plan_only
-          ) values (
-            ${runId}, ${auth.organizationId}, ${thread.id}, ${runBotId}, ${groupPosition}, ${groupState},
-            ${runInput}, 'queued', ${workflowId}, 0, ${runStepKind}, ${runStackDepth}, ${runCallerBotId},
-            ${runExecutionSession}, 'not_started', true, ${auth.userId},
-            now() + (${workflowId ? null : policy.timeoutSeconds}::integer * interval '1 second'), ${planOnly}
-          )
-        `;
+        await admitUserTurnTx(tx, {
+          organizationId: auth.organizationId,
+          threadId: thread.id,
+          runId,
+          initiatorUserId: auth.userId,
+          input: runInput,
+          planOnly,
+          speaker: runStepKind === "group"
+            ? { kind: "group", botId: runBotId, position: groupPosition, state: groupState }
+            : runStepKind === "delegated"
+              ? { kind: "delegated", botId: runBotId, callerBotId: runCallerBotId! }
+              : { kind: "root", botId: runBotId },
+          workflow: workflowId
+            ? {
+                id: workflowId,
+                kind: workflowKind,
+                rootBotId: workflowRootBotId,
+                budget: { ...policy, maxSteps: workflowMaxSteps, maxHandoffs: workflowMaxHandoffs },
+              }
+            : null,
+          admissionTimeoutSeconds: policy.timeoutSeconds,
+        });
         trace.mark("api.run_created");
         if (steerTargetRunId) {
           const attemptId = crypto.randomUUID();

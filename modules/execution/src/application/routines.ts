@@ -5,6 +5,7 @@ import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/do
 import { clearGroupNeedsYou } from "@openedbot/roster/sql/groups";
 import { ROOM_LIMITS } from "@openedbot/roster/domain/bot-mode";
 import { coerceGroupDefaultResponder, planRoutineGroupSend } from "../domain/group-send";
+import { fireRoutineTx } from "./run-creation";
 import type { RoutineExecutionOutcome } from "@openedbot/contracts-api";
 import { ROUTINE_ERROR_BUSY_RETRIES_EXHAUSTED, ROUTINE_ERROR_GROUP_EMPTY } from "@openedbot/contracts-errors";
 import {
@@ -289,36 +290,31 @@ async function fireDirectOccurrence(
   routine: DueRoutine,
   text: string,
 ): Promise<{ kind: "fired"; workflowId: string; runId: string }> {
+  // routines_bot_xor_group: a routine without a room has its bot.
+  if (!routine.botId) throw new Error(`routine ${routine.id} has neither a bot nor a room`);
   const runId = crypto.randomUUID();
   const workflowId = crypto.randomUUID();
-  const timeoutSeconds = routine.autonomyTimeoutSeconds ?? AUTONOMY_DEFAULTS.timeoutSeconds;
-  await tx`
-    insert into workflows (
-      id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-      kind, status, protocol_version,
-      autonomy_enabled, max_depth, max_steps, max_handoffs, timeout_seconds, token_budget,
-      used_steps, used_handoffs, used_tokens, deadline_at, recovery_state, never_wait
-    ) values (
-      ${workflowId}, ${routine.organizationId}, ${routine.threadId}, ${runId}, ${routine.botId},
-      ${routine.createdByUserId},
-      'routine', 'queued', 1, ${routine.autonomyEnabled ?? AUTONOMY_DEFAULTS.enabled},
-      ${routine.autonomyMaxDepth ?? AUTONOMY_DEFAULTS.maxDepth},
-      ${routine.autonomyMaxSteps ?? AUTONOMY_DEFAULTS.maxSteps},
-      ${routine.autonomyMaxHandoffs ?? AUTONOMY_DEFAULTS.maxHandoffs},
-      ${timeoutSeconds}, ${routine.autonomyTokenBudget ?? AUTONOMY_DEFAULTS.tokenBudget},
-      1, 0, 0, now() + (${timeoutSeconds} * interval '1 second'),
-      ${{ routineId: routine.id, trigger: "scheduled" }}, ${routine.neverWait === true}
-    )
-  `;
-  await tx`
-    insert into runs (
-      id, organization_id, thread_id, bot_id, input, status, workflow_id, step_index, step_kind,
-      stack_depth, external_state, events_complete
-    ) values (
-      ${runId}, ${routine.organizationId}, ${routine.threadId}, ${routine.botId}, ${text}, 'queued',
-      ${workflowId}, 0, 'root', 0, 'not_started', true
-    )
-  `;
+  // The bot's policy as the routine read it, defaults filled, not normalized.
+  await fireRoutineTx(tx, {
+    trigger: "scheduled",
+    routineId: routine.id,
+    organizationId: routine.organizationId,
+    threadId: routine.threadId,
+    runId,
+    workflowId,
+    initiatorUserId: routine.createdByUserId,
+    input: text,
+    speaker: { kind: "root", botId: routine.botId },
+    budget: {
+      enabled: routine.autonomyEnabled ?? AUTONOMY_DEFAULTS.enabled,
+      maxDepth: routine.autonomyMaxDepth ?? AUTONOMY_DEFAULTS.maxDepth,
+      maxSteps: routine.autonomyMaxSteps ?? AUTONOMY_DEFAULTS.maxSteps,
+      maxHandoffs: routine.autonomyMaxHandoffs ?? AUTONOMY_DEFAULTS.maxHandoffs,
+      timeoutSeconds: routine.autonomyTimeoutSeconds ?? AUTONOMY_DEFAULTS.timeoutSeconds,
+      tokenBudget: Number(routine.autonomyTokenBudget ?? AUTONOMY_DEFAULTS.tokenBudget),
+    },
+    neverWait: routine.neverWait === true,
+  });
   await insertRoutineInputMessage(tx, {
     organizationId: routine.organizationId,
     threadId: routine.threadId,
@@ -370,30 +366,19 @@ async function fireGroupOccurrence(
   });
   const runId = crypto.randomUUID();
   const workflowId = crypto.randomUUID();
-  await tx`
-    insert into workflows (
-      id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id,
-      kind, status, protocol_version,
-      autonomy_enabled, max_depth, max_steps, max_handoffs, timeout_seconds, token_budget,
-      used_steps, used_handoffs, used_tokens, deadline_at, recovery_state, never_wait
-    ) values (
-      ${workflowId}, ${routine.organizationId}, ${routine.threadId}, ${runId}, ${speaker.id},
-      ${routine.createdByUserId},
-      'group', 'queued', 1, ${policy.enabled}, ${policy.maxDepth}, ${ROOM_LIMITS.maxMemberTurns},
-      ${policy.maxHandoffs}, ${policy.timeoutSeconds}, ${policy.tokenBudget},
-      1, 0, 0, now() + (${policy.timeoutSeconds} * interval '1 second'),
-      ${{ routineId: routine.id, trigger: "scheduled" }}, ${routine.neverWait === true}
-    )
-  `;
-  await tx`
-    insert into runs (
-      id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, status,
-      workflow_id, step_index, step_kind, stack_depth, external_state, events_complete
-    ) values (
-      ${runId}, ${routine.organizationId}, ${routine.threadId}, ${speaker.id}, ${planned.position},
-      ${planned.state}, ${text}, 'queued', ${workflowId}, 0, 'group', 0, 'not_started', true
-    )
-  `;
+  await fireRoutineTx(tx, {
+    trigger: "scheduled",
+    routineId: routine.id,
+    organizationId: routine.organizationId,
+    threadId: routine.threadId,
+    runId,
+    workflowId,
+    initiatorUserId: routine.createdByUserId,
+    input: text,
+    speaker: { kind: "group", botId: speaker.id, position: planned.position, state: planned.state },
+    budget: { ...policy, maxSteps: ROOM_LIMITS.maxMemberTurns },
+    neverWait: routine.neverWait === true,
+  });
   await insertRoutineInputMessage(tx, {
     organizationId: routine.organizationId,
     threadId: routine.threadId,

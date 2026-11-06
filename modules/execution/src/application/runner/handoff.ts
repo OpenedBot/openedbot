@@ -11,6 +11,7 @@ import { organizationEventEnvelope, type OrganizationEvent } from "@openedbot/co
 import { insertHandoffInboundMessage, insertHandoffReplyMessage } from "@openedbot/conversation/sql/messages";
 import { touchThread } from "@openedbot/conversation/sql/threads";
 import { appendNoticeTx, lockRunEventCursorTx } from "./events";
+import { openHandoffTx } from "./workflow-steps";
 import type { HandoffChildContext, RunContext, RunEventIdentityRow } from "./types";
 import { log } from "./util";
 
@@ -145,21 +146,15 @@ export async function createHandoffTx(
   context: RunContext,
   mention: HandoffMention,
 ): Promise<{ created: boolean; notice: OrganizationEvent | null }> {
-  const courierId = crypto.randomUUID();
-  const inboundId = crypto.randomUUID();
-  await tx`
-    insert into runs (id, organization_id, thread_id, bot_id, input, status, origin_run_id)
-    values (${inboundId}, ${context.organizationId}, ${mention.threadId}, ${mention.botId},
-            ${attributedInput({ name: context.botName, slug: context.botSlug }, mention.message)},
-            'queued', ${courierId})
-  `;
   // Le courrier n'a pas de `bot_id` (voir RunDto) ni de ligne message : la
   // sortie du bot d'origine, avec sa mention, est déjà le dernier message.
-  await tx`
-    insert into runs (id, organization_id, thread_id, bot_id, input, status, handoff_target_bot_id)
-    values (${courierId}, ${context.organizationId}, ${context.threadId}, null,
-            ${mention.message}, 'relaying', ${mention.botId})
-  `;
+  const { inboundId, courierId } = await openHandoffTx(tx, {
+    organizationId: context.organizationId,
+    originThreadId: context.threadId,
+    target: { botId: mention.botId, threadId: mention.threadId },
+    inboundInput: attributedInput({ name: context.botName, slug: context.botSlug }, mention.message),
+    courierInput: mention.message,
+  });
   await insertHandoffInboundMessage(tx, {
     organizationId: context.organizationId,
     threadId: mention.threadId,

@@ -5,6 +5,7 @@ import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import type { ApiConfig } from "../src/infrastructure/config";
 import type { BlobStore } from "../src/infrastructure/blob-store";
 import { HttpError } from "../src/interfaces/http/http-error";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 import {
   activeRunSteerTargetTx,
   followupDispositionTx,
@@ -363,7 +364,7 @@ describe("admission d'un DM sans workflow", () => {
       body: await response.json() as Record<string, unknown>,
       statements,
       workflowInserted: statements.some((sql) => sql.includes("insert into workflows")),
-      runValues: runInsert >= 0 ? parameters[runInsert]! : null,
+      runValues: runInsert >= 0 ? insertedRow(statements[runInsert]!, parameters[runInsert]!) : null,
       runSql: runInsert >= 0 ? statements[runInsert]! : null,
     };
   };
@@ -378,10 +379,10 @@ describe("admission d'un DM sans workflow", () => {
     // workflow_id, initiateur et plafond de durée (secondes) : le run porte
     // seul ce que le workflow lui donnait.
     const values = admitted.runValues!;
-    expect(values[7]).toBeNull();
-    expect(values[8]).toBe("root");
-    expect(values[12]).toBe("user-1");
-    expect(values[13]).toBe(900);
+    expect(values.workflow_id).toBeNull();
+    expect(values.step_kind).toBe("root");
+    expect(values.initiator_user_id).toBe("user-1");
+    expect(values.deadline_at).toBe(900);
     expect(admitted.runSql).toContain("now() + (");
   });
 
@@ -392,8 +393,8 @@ describe("admission d'un DM sans workflow", () => {
     expect(admitted.workflowInserted).toBe(true);
     expect(admitted.body).toMatchObject({ workflowId: expect.any(String), notificationEligible: true });
     expect(admitted.body.workflow).toMatchObject({ id: workflowId, kind: "dm", autonomyEnabled: true });
-    expect(admitted.runValues![7]).toBe(workflowId);
-    expect(admitted.runValues![13]).toBeNull();
+    expect(admitted.runValues!.workflow_id).toBe(workflowId);
+    expect(admitted.runValues!.deadline_at).toBeNull();
   });
 
   test("une délégation explicite `@slug` garde son workflow même autonomie coupée", async () => {
@@ -404,8 +405,8 @@ describe("admission d'un DM sans workflow", () => {
     expect(admitted.status).toBe(202);
     expect(admitted.workflowInserted).toBe(true);
     expect(admitted.body.run).toMatchObject({ workflowId: admitted.body.workflowId, stepKind: "delegated" });
-    expect(admitted.runValues![7]).toBe(admitted.body.workflowId);
-    expect(String(admitted.runValues![11])).toContain(`:workflow:${admitted.body.workflowId as string}:bot:bot-trinity`);
+    expect(admitted.runValues!.workflow_id).toBe(admitted.body.workflowId);
+    expect(String(admitted.runValues!.execution_session_key)).toContain(`:workflow:${admitted.body.workflowId as string}:bot:bot-trinity`);
   });
 
   test("un salon garde son workflow même autonomie coupée", async () => {
@@ -419,7 +420,7 @@ describe("admission d'un DM sans workflow", () => {
     expect(admitted.status).toBe(202);
     expect(admitted.workflowInserted).toBe(true);
     expect(admitted.body).toMatchObject({ workflowId: expect.any(String), notificationEligible: true });
-    expect(admitted.runValues![7]).toBe(workflowId);
+    expect(admitted.runValues!.workflow_id).toBe(workflowId);
   });
 
   test("un follow-up se replie dans le run d'un DM simple, toujours sans workflow", async () => {
@@ -443,7 +444,7 @@ describe("admission d'un DM sans workflow", () => {
       workflowId: null, status: "queued", steerTargetRunId: "run-busy", notificationEligible: false,
     });
     expect(admitted.statements.some((sql) => sql.includes("insert into run_steering_attempts"))).toBe(true);
-    expect(admitted.runValues?.[7]).toBeNull();
+    expect(admitted.runValues?.workflow_id).toBeNull();
   });
 
   test("un workflow autonome déjà réclamé n'ouvre pas un second workflow", async () => {
@@ -458,7 +459,7 @@ describe("admission d'un DM sans workflow", () => {
       workflowId: null, steerTargetRunId: "run-busy", notificationEligible: false,
     });
     expect(admitted.body).not.toHaveProperty("workflow");
-    expect(admitted.runValues?.[7]).toBeNull();
+    expect(admitted.runValues?.workflow_id).toBeNull();
     const steer = admitted.statements.find((sql) => sql.includes("insert into run_steering_attempts"));
     expect(steer).toBeTruthy();
   });
@@ -1312,11 +1313,11 @@ describe("création du courrier de hand-off par l'opérateur", () => {
     expect(runIndex).toBeLessThan(noticeIndex);
     const workflowIndex = statements.findIndex((sql) => sql.includes("insert into workflows"));
     expect(workflowIndex).toBeGreaterThanOrEqual(0);
-    const workflowValues = parametersByStatement[workflowIndex]!;
-    expect(workflowValues[4]).toBe("bot-neo");
+    const row = insertedRow(statements[workflowIndex]!, parametersByStatement[workflowIndex]!);
+    expect(row.root_bot_id).toBe("bot-neo");
     // Le flag et les limites viennent du caller; la mention humaine ne réserve
     // que ses minima protocolaires, sans réactiver l'autonomie du workflow.
-    expect(workflowValues.slice(7, 14)).toEqual([false, 1, 2, 1, 60, 1_000, 1]);
+    expect([row.autonomy_enabled, row.max_depth, row.max_steps, row.max_handoffs, row.timeout_seconds, row.token_budget, row.used_handoffs]).toEqual([false, 1, 2, 1, 60, 1_000, 1]);
     // La séquence est allouée sous le verrou de curseur, comme partout ailleurs.
     const lock = statements.findIndex((sql) => sql.includes("pg_advisory_xact_lock"));
     expect(lock).toBeGreaterThanOrEqual(0);
@@ -1384,10 +1385,10 @@ describe("création du courrier de hand-off par l'opérateur", () => {
       });
       const workflowIndex = statements.findIndex((sql) => sql.includes("insert into workflows"));
       expect(workflowIndex).toBeGreaterThanOrEqual(0);
-      const workflowValues = parametersByStatement[workflowIndex]!;
-      expect(workflowValues[4]).toBe("bot-trinity");
-      expect(workflowValues[6]).toBe("group");
-      expect(workflowValues.slice(7, 14)).toEqual([
+      const row = insertedRow(statements[workflowIndex]!, parametersByStatement[workflowIndex]!);
+      expect(row.root_bot_id).toBe("bot-trinity");
+      expect(row.kind).toBe("group");
+      expect([row.autonomy_enabled, row.max_depth, row.max_steps, row.max_handoffs, row.timeout_seconds, row.token_budget, row.used_handoffs]).toEqual([
         policyEnabled, 2, 18, 3, 300, 12_000, 0,
       ]);
     }
@@ -1665,7 +1666,7 @@ describe("« Planifier d'abord » : un tour qui ne fait qu'un plan (0155)", () =
     expect(response.status).toBe(202);
     const run = statements.findIndex((sql) => sql.includes("insert into runs") && sql.includes("plan_only"));
     expect(run).toBeGreaterThanOrEqual(0);
-    expect(parameters[run]!.at(-1)).toBe(true);
+    expect(insertedRow(statements[run]!, parameters[run]!).plan_only).toBe(true);
     expect(statements.some((sql) => sql.includes("from runs queued") || sql.includes("from runs active"))).toBe(false);
     expect(statements.some((sql) => sql.includes("insert into run_steering_attempts"))).toBe(false);
   });

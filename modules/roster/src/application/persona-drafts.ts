@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PersonaDraftDto } from "@openedbot/contracts-api";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import { insertPersonaDraftRun } from "@openedbot/execution/sql/runs";
+import { queuePersonaDraftRunTx } from "@openedbot/execution/application/run-creation";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { PERSONA_MAX_CHARS } from "../domain/persona";
@@ -47,7 +47,7 @@ export async function queuePersonaDraft(db: Db, organizationId: string, botId: s
     );
     const sessionKey = personaDraftSessionKey(organizationId, bot.id);
     const draftThreadId = await ensurePersonaDraftThread(tx, organizationId, bot.id, bot.name, sessionKey);
-    const runId = await insertPersonaDraftRun(tx, {
+    const runId = await queuePersonaDraftRunTx(tx, {
       organizationId,
       threadId: draftThreadId,
       botId: bot.id,

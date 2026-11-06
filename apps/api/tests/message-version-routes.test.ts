@@ -8,6 +8,7 @@ import type { ApiConfig } from "../src/infrastructure/config";
 import { HttpError } from "../src/interfaces/http/http-error";
 import { messageVersionRoutes, versionRequestHash } from "../src/routes/conversation/message-version-routes";
 import { tableSubscriptionPort } from "./fixtures/table-subscription-port";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 import { installSubscriptionPort } from "@openedbot/platform-db/subscription-port";
 
 // The subscription reads go through the port, as the API installs it.
@@ -387,11 +388,10 @@ describe("message version persistence contract", () => {
     const sourceRead = fake.calls.find(({ sql }) => sql.includes("join messages message") && sql.includes("for update of thread"));
     expect(sourceRead?.sql).toContain("coalesce(message_run.plan_only, false) or coalesce(workflow.plan_only, false)");
     expect(sourceRead?.sql).toContain("coalesce(workflow.never_wait, false)");
-    const workflowInsert = fake.calls.find(({ sql }) => sql.includes("insert into workflows"));
-    expect(workflowInsert?.sql).toContain("plan_only, never_wait");
-    expect(workflowInsert?.values.slice(-2)).toEqual([true, true]);
-    const runInsert = fake.calls.find(({ sql }) => sql.includes("insert into runs"));
-    expect(runInsert?.sql).toContain("plan_only");
-    expect(runInsert?.values.at(-1)).toBe(true);
+    const workflowInsert = fake.calls.find(({ sql }) => sql.includes("insert into workflows"))!;
+    const workflow = insertedRow(workflowInsert.sql, workflowInsert.values);
+    expect([workflow.plan_only, workflow.never_wait]).toEqual([true, true]);
+    const runInsert = fake.calls.find(({ sql }) => sql.includes("insert into runs"))!;
+    expect(insertedRow(runInsert.sql, runInsert.values).plan_only).toBe(true);
   });
 });

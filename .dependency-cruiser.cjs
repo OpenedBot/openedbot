@@ -115,6 +115,26 @@ module.exports = {
       },
     },
     {
+      name: "primitives-de-creation-privees",
+      comment:
+        "Les primitives qui créent les runs et les workflows (`modules/execution/src/sql/run-writes.ts`, ADR 0001 " +
+        "S2b) ne s'importent que depuis les commandes de création (`application/run-creation.ts`, " +
+        "`application/runner/workflow-steps.ts`) et leurs tests. Le SQL écrit en ligne est vu par " +
+        "`tests/scripts/run-writes-contract.ts`.",
+      severity: "error",
+      from: {
+        pathNot:
+          "^modules/execution/src/application/(run-creation|runner/workflow-steps)\\.ts$|" +
+          "^modules/execution/tests/",
+      },
+      to: {
+        path:
+          "^modules/execution/src/sql/run-writes\\.ts$|" +
+          "(^|/)node_modules/@openedbot/execution/src/sql/run-writes\\.ts$|" +
+          "^@openedbot/execution/sql/run-writes$",
+      },
+    },
+    {
       name: "app-sans-autre-app",
       comment: "Une application n'importe jamais le code d'une autre : ce qui se partage vit dans une couche partagée.",
       severity: "error",

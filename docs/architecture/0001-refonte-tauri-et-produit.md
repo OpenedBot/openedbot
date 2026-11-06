@@ -497,7 +497,13 @@ migration. L'inventaire S2a ([0002](0002-invariants-des-runs.md)) confirme les 1
 7 `insert into workflows` et celui du trigger), détaille leurs invariants et propose les commandes
 de S2b ; il relève qu'un brouillon de persona (ou un run entrant de handoff hérité, ou un DM d'agence
 dont l'initiateur a été effacé) en `unknown` n'a aucun chemin de revue (défaut D1, prouvé par
-`tests/integration/orphan-unknown-runs.ts`).
+`tests/integration/orphan-unknown-runs.ts`). **Fait en S2b** ([0002](0002-invariants-des-runs.md),
+section 9.1) : dix commandes (`admitUserTurnTx`, `branchTurnTx`, `admitWebhookDeliveryTx`,
+`openWorkflowRetryTx`, `fireRoutineTx`, `queuePersonaDraftRunTx`, `greetNewBotTx`,
+`startWorkflowStepTx`, `chainLegacyRoomTurnTx`, `openHandoffTx`) sur trois primitives privées
+(`sql/run-writes.ts`) ; `tests/scripts/run-writes-contract.ts` interdit toute autre création et met
+les 102 autres écritures de `runs` / `workflows` sous un cliquet daté pour S2d ; le trigger 0091 est
+remplacé par 0175, qui ouvre la revue de tout run sans workflow passé en `unknown` (D1 corrigé).
 
 **Transitions explicites.** Les changements de `runs.status`, `external_state` et
 `remote_stop_state` (51 instructions `update runs`, dont 38 posent `status`, inventaire 0002
@@ -605,7 +611,7 @@ préflight, création, streaming, approbations, repli de fournisseur, réconcili
 | Worker qui plante après l'enregistrement de l'identifiant, rejeu annoncé par l'hôte | Reprise par rejeu depuis `last_hermes_sequence`, sans doublon d'événement | Test d'intégration |
 | Idem, rejeu **non** annoncé par l'hôte | Réconciliation par lecture du statut (`runner.ts:885`), puis `unknown` si l'issue reste incertaine | Test d'intégration |
 | Deux producteurs d'événements concurrents sur un même run | Séquences uniques et contiguës, curseur global ordonné | Test d'intégration concurrent |
-| Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible. État S2a : insertion directe **impossible** en production ; DM racine d'un membre : initiateur gardé, revue 0091 ; **possible sans chemin de revue** (défaut D1 de [0002](0002-invariants-des-runs.md)) : brouillon de persona, DM d'un opérateur d'agence dont le compte est supprimé (pro, rare), run entrant d'un handoff hérité ; à corriger en S2b | `tests/integration/orphan-unknown-runs.ts` (S2a) caractérise le défaut ; S2b le réécrit pour prouver le chemin de revue |
+| Run privé en `unknown` hors du trigger 0091 (sans initiateur, non racine, inséré directement en `unknown`) | Un chemin de revue existe, ou le cas est prouvé impossible. État S2b : insertion directe **impossible** en production (seule la primitive insère, statut `queued` ou `relaying`) ; tout run sans workflow qui passe en `unknown` reçoit son workflow de revue (0175) : DM racine, brouillon de persona, DM sans initiateur (agence), run entrant d'un handoff hérité, tour de salon hérité ; l'abandon libère fil, capacité et bot | `tests/integration/orphan-unknown-runs.ts` (S2a caractérisait D1, S2b prouve le chemin de revue) |
 | Ancien worker qui écrit après expiration de son bail | Écriture refusée par le fencing | Test d'intégration |
 | Coupure de la connexion LISTEN | Réabonnement, rattrapage depuis le curseur durable | Test d'intégration |
 | Deux répliques d'API | Les deltas arrivent à tous les clients en < 1 s | Test d'intégration à deux instances |
@@ -747,3 +753,13 @@ l'allocation des séquences (le verrou du curseur sérialise les calculs faits a
 faits dans la même instruction ni hors transaction). Un brouillon de persona, un handoff hérité ou
 un DM d'agence sans initiateur en `unknown` n'a aucun chemin de revue (section 5, défaut D1), à
 corriger en S2b. Relu par Codex (branche et document), corrections intégrées dans 0002.
+
+**Primitives de création S2b (2026-11-06)** : section 4.5 et [0002](0002-invariants-des-runs.md)
+section 9.1. Les 16 créations passent par des commandes de `modules/execution`, sans changer leurs
+colonnes, leurs verrous ni leurs événements ; garde `run-writes-contract.ts` (strict pour les
+créations, cliquet S2d daté au 2026-12-31 pour les transitions) et règle dependency-cruiser
+`primitives-de-creation-privees`. D1 corrigé (0175). Les routes touchées gardent leur contrat HTTP :
+aucune ne change de corps de requête, et la seule erreur nouvelle (`WORKFLOW_SERVICE_RETRY_UNSUPPORTED`)
+est rendue par l'API ; les commandes ne lèvent aucune erreur de domaine. Le dépôt n'a pas encore de
+zod : les contrats zod de section 4.6 restent à poser avec leur middleware, dans une étape qui touche
+le contrat d'une route.

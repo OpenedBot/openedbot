@@ -18,6 +18,7 @@ import {
   webhookSecretMatches,
 } from "../src/routes/webhooks/shared";
 import { tableSubscriptionPort } from "./fixtures/table-subscription-port";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 import { installSubscriptionPort } from "@openedbot/platform-db/subscription-port";
 
 // The subscription reads go through the port, as the API installs it.
@@ -162,8 +163,10 @@ describe("webhook ingress", () => {
     expect(body.runId).toBeString();
     expect(body.workflowId).toBeString();
     const statements = fake.calls.map((call) => call.sql);
-    expect(statements.some((sql) => sql.includes("insert into workflows") && sql.includes("'queued'"))).toBe(true);
-    expect(statements.some((sql) => sql.includes("insert into runs") && sql.includes("external_state"))).toBe(true);
+    const rows = (table: string) => fake.calls.filter((call) => call.sql.includes(`insert into ${table}`))
+      .map((call) => insertedRow(call.sql, call.values));
+    expect(rows("workflows")).toEqual([expect.objectContaining({ status: "queued", kind: "dm", used_steps: 1 })]);
+    expect(rows("runs")).toEqual([expect.objectContaining({ status: "queued", step_kind: "root", external_state: "not_started" })]);
     expect(statements.some((sql) => sql.includes("insert into messages"))).toBe(true);
     expect(statements.some((sql) => sql.includes("update webhook_deliveries set state = 'accepted'"))).toBe(true);
     const allValues = fake.calls.flatMap((call) => call.values);

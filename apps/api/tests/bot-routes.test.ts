@@ -9,6 +9,7 @@ import { botRoutes } from "../src/routes/roster/bot-routes";
 import type { BotRouteDeps } from "@openedbot/roster/application/bots";
 import type { BotRow } from "@openedbot/roster/domain/bot-dto";
 import { HttpError } from "../src/interfaces/http/http-error";
+import { insertedRow } from "../../../tests/sql-insert-columns";
 
 const owner: AuthContext = {
   sessionId: "session-1",
@@ -940,10 +941,11 @@ describe("profil Hermes géré par openedbot", () => {
     };
   }
 
-  function profileDb(row: BotRow, mode: "create" | "capabilities" | "repair" = "create", statements: string[] = [], assignmentMode: "per_bot" | "global" = "per_bot"): SQL {
+  function profileDb(row: BotRow, mode: "create" | "capabilities" | "repair" = "create", statements: string[] = [], assignmentMode: "per_bot" | "global" = "per_bot", parameters: unknown[][] = []): SQL {
     const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = [...strings].join(" ");
       statements.push(sql);
+      parameters.push(values);
       if (sql.includes("select model_assignment_mode")) return Promise.resolve([{ mode: assignmentMode }]);
       if (mode === "repair" && sql.includes('select name, hermes_profile as "profile", model')) return Promise.resolve([{ name: row.name, profile: row.hermesProfile, model: row.model }]);
       if (mode === "create" && sql.includes('select id, name, slug')) return Promise.resolve([{ id: row.id, name: row.name, slug: row.slug, profile: null, model: row.model }]);
@@ -976,12 +978,13 @@ describe("profil Hermes géré par openedbot", () => {
     expect(calls.some((call) => call.startsWith("create-profile"))).toBe(false);
     expect(statements.some((sql) => sql.includes("insert into bots"))).toBe(true);
     expect(statements.some((sql) => sql.includes("insert into bot_profile_provisions"))).toBe(true);
-    expect(statements.some((sql) => sql.includes("insert into runs") && sql.includes("bot_greeting"))).toBe(false);
+    expect(statements.some((sql) => sql.includes("insert into runs"))).toBe(false);
     expect(calls).not.toContain("delete-profile:atlas");
   });
 
   test("creates one queued root greeting in the bot transaction without a message", async () => {
     const statements: string[] = [];
+    const parameters: unknown[][] = [];
     const response = await mount(profileDb({
       ...storedBotRow,
       name: "Atlas",
@@ -989,7 +992,7 @@ describe("profil Hermes géré par openedbot", () => {
       description: "Research assistant",
       hermesProfile: "atlas",
       hermesProfileManaged: true,
-    }, "create", statements), owner, runtimeDeps([])).request("/", {
+    }, "create", statements, "per_bot", parameters), owner, runtimeDeps([])).request("/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1003,15 +1006,21 @@ describe("profil Hermes géré par openedbot", () => {
     expect(response.status).toBe(201);
     const botInsert = statements.findIndex((sql) => sql.includes("insert into bots"));
     const provisionInsert = statements.findIndex((sql) => sql.includes("insert into bot_profile_provisions"));
-    const greetingStatements = statements.filter((sql) => sql.includes("insert into runs") && sql.includes("bot_greeting"));
-    const greetingInsert = statements.indexOf(greetingStatements[0]!);
+    const runInserts = statements.flatMap((sql, index) => sql.includes("insert into runs") ? [index] : []);
+    expect(runInserts).toHaveLength(1);
+    const greetingInsert = runInserts[0]!;
     expect(botInsert).toBeGreaterThanOrEqual(0);
     expect(provisionInsert).toBeGreaterThan(botInsert);
-    expect(greetingStatements).toHaveLength(1);
     expect(greetingInsert).toBeGreaterThan(provisionInsert);
-    expect(statements[greetingInsert]).toContain("'queued'");
-    expect(statements[greetingInsert]).toContain("null, 0, 'root', 0, null, null, 'not_started', true");
-    expect(statements[greetingInsert]).toContain("initiator_user_id, deadline_at, origin");
+    expect(insertedRow(statements[greetingInsert]!, parameters[greetingInsert]!)).toMatchObject({
+      status: "queued", origin: "bot_greeting", initiator_user_id: owner.userId,
+      group_turn_position: null, group_state: null, workflow_id: null, step_index: 0, step_kind: "root",
+      stack_depth: 0, caller_bot_id: null, execution_session_key: null,
+      external_state: "not_started", events_complete: true,
+    });
+    // The envelope is the bot's autonomy timeout, read in the same transaction.
+    expect(statements[greetingInsert]).toContain("now() + (");
+    expect(statements[greetingInsert - 1]).toContain("select autonomy_timeout_seconds");
     expect(statements.some((sql) => sql.includes("insert into messages"))).toBe(false);
   });
 
@@ -1030,7 +1039,7 @@ describe("profil Hermes géré par openedbot", () => {
         body: JSON.stringify(body),
       });
       expect(response.status).toBe(201);
-      expect(statements.some((sql) => sql.includes("insert into runs") && sql.includes("bot_greeting"))).toBe(false);
+      expect(statements.some((sql) => sql.includes("insert into runs"))).toBe(false);
     }
   });
 
@@ -1537,7 +1546,8 @@ describe("brouillon de persona d'un bot", () => {
     expect(thread?.statement).toMatch(/, false\)/);
     expect(thread?.statement).toContain("on conflict (organization_id, hermes_session_id) do nothing");
     expect(thread?.values).toEqual(expect.arrayContaining(["org-1", "bot-1", "Scout", personaDraftSessionKey("org-1", "bot-1")]));
-    const run = calls.find(({ statement }) => statement.includes("insert into runs") && statement.includes("persona_draft"));
+    const run = calls.find(({ statement, values }) => statement.includes("insert into runs")
+      && insertedRow(statement, values).step_kind === "persona_draft");
     expect(run?.values).toContain("thread-draft-1");
     expect(run?.values).not.toContain("thread-1");
     expect(calls.some(({ statement }) => statement.includes("from runs") && statement.includes("thread_id =") && statement.includes("status in"))).toBe(false);

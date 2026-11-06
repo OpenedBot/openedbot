@@ -47,6 +47,7 @@ import type { WorkerConfig } from "../worker-config";
 import { appendNoticeTx } from "./events";
 import { HISTORY_MESSAGE_CAP, MAX_HISTORY_CHARS, runImage, trimHistoryToCharBudget } from "./history";
 import { assistantContent } from "./transcript";
+import { chainLegacyRoomTurnTx, startWorkflowStepTx } from "./workflow-steps";
 import type { GroupRunContext, LegacyGroupRunContext, RunContext } from "./types";
 
 type GroupWorkflowLimits = {
@@ -656,21 +657,17 @@ export async function advanceGroupTx(
     }
   }
   if (advance.kind === "next") {
-    const position = members.find((member) => member.id === advance.botId)?.position ?? null;
-    await tx`
-      insert into runs (
-        id, organization_id, thread_id, bot_id, group_turn_position, group_state, input, status,
-        workflow_id, step_index, step_kind, stack_depth, external_state, events_complete
-      )
-      values (${crypto.randomUUID()}, ${context.organizationId}, ${context.threadId}, ${advance.botId},
-              ${position}, ${advance.state}, '', 'queued', ${context.workflowId ?? null},
-              ${context.workflowId ? (context.stepIndex ?? 0) + 1 : null},
-              ${context.workflowId ? "group" : null}, 0, 'not_started', true)
-    `;
-    if (context.workflowId) await tx`
-      update workflows set status = 'running', used_steps = used_steps + 1, updated_at = now()
-       where organization_id = ${context.organizationId} and id = ${context.workflowId}
-    `;
+    const next = {
+      organizationId: context.organizationId, threadId: context.threadId, botId: advance.botId,
+      groupTurnPosition: members.find((member) => member.id === advance.botId)?.position ?? null,
+      groupState: advance.state,
+    };
+    if (context.workflowId) {
+      const stepIndex = (context.stepIndex ?? 0) + 1;
+      await startWorkflowStepTx(tx, { ...next, kind: "group", workflowId: context.workflowId, stepIndex });
+    } else {
+      await chainLegacyRoomTurnTx(tx, { ...next, input: "" });
+    }
     return null;
   }
   if (context.workflowId) await tx`
@@ -697,9 +694,8 @@ export async function advanceLegacyGroupTx(tx: SQL, context: LegacyGroupRunConte
      order by gm.position asc limit 1
   `;
   if (!next[0]) return;
-  await tx`
-    insert into runs (id, organization_id, thread_id, bot_id, group_turn_position, input, status)
-    values (${crypto.randomUUID()}, ${context.organizationId}, ${context.threadId}, ${next[0].botId},
-            ${next[0].position}, ${context.input}, 'queued')
-  `;
+  await chainLegacyRoomTurnTx(tx, {
+    organizationId: context.organizationId, threadId: context.threadId, botId: next[0].botId,
+    groupTurnPosition: next[0].position, input: context.input, groupState: null,
+  });
 }

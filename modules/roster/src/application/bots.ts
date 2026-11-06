@@ -6,7 +6,7 @@ import { applyHostProfileModel } from "@openedbot/portability/application/model"
 import { readOrganizationCursor } from "@openedbot/conversation/sql/organization-cursor";
 import { cancelMaintenanceRunsTx, isMaintenanceStepKind } from "@openedbot/execution/application/run-cancellation";
 import { botGreetingInput } from "@openedbot/execution/domain/bot-greeting";
-import { insertBotGreetingRun } from "@openedbot/execution/sql/runs";
+import { greetNewBotTx } from "@openedbot/execution/application/run-creation";
 import { readOperatorProfile } from "@openedbot/identity/sql/operator-profile";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation, withTenant } from "@openedbot/platform-db";
@@ -258,7 +258,7 @@ export async function createBot(
       });
     }
     if (options.greeting && input.greet) {
-      await insertBotGreetingRun(tx, {
+      await greetNewBotTx(tx, {
         organizationId,
         threadId,
         botId: id,

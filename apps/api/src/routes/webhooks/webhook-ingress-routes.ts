@@ -13,13 +13,12 @@ import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readBearer } from "../../interfaces/http/request-readers";
 import { openGroupSend } from "../conversation/conversation-routes";
 import { readGroupDefaultResponder } from "@openedbot/roster/domain/groups";
+import { admitWebhookDeliveryTx } from "@openedbot/execution/application/run-creation";
 import { UUID, webhookSecretMatches } from "./shared";
 import {
   clearGroupNeedsYou,
   countRecentAcceptedDeliveries,
   hasPendingAccountDeletion,
-  insertQueuedRun,
-  insertQueuedWorkflow,
   insertUserMessage,
   lockBotPolicy,
   lockSubscriptionStatus,
@@ -142,31 +141,17 @@ export function webhookIngressRoutes(
         const runInput = buildWebhookRunInput(endpoint.name, endpoint.instructions, payload, eventName, deliveryId);
         const visibleMessage = buildWebhookDisplayMessage(endpoint.name, payload, eventName);
 
-        await insertQueuedWorkflow(tx, {
-          id: workflowId,
+        await admitWebhookDeliveryTx(tx, {
           organizationId,
           threadId: thread.id,
-          rootRunId: runId,
-          rootBotId: runBotId,
-          initiatorUserId: endpoint.createdByUserId,
-          kind: thread.groupId ? "group" : "dm",
-          autonomyEnabled: policy.enabled,
-          maxDepth: policy.maxDepth,
-          maxSteps: workflowMaxSteps,
-          maxHandoffs: policy.maxHandoffs,
-          timeoutSeconds: policy.timeoutSeconds,
-          tokenBudget: policy.tokenBudget,
-        });
-        await insertQueuedRun(tx, {
-          id: runId,
-          organizationId,
-          threadId: thread.id,
-          botId: runBotId,
-          groupTurnPosition: groupPosition,
-          groupState,
-          input: runInput,
+          runId,
           workflowId,
-          stepKind: thread.groupId ? "group" : "root",
+          initiatorUserId: endpoint.createdByUserId,
+          input: runInput,
+          speaker: thread.groupId
+            ? { kind: "group", botId: runBotId, position: groupPosition, state: groupState }
+            : { kind: "root", botId: runBotId },
+          budget: { ...policy, maxSteps: workflowMaxSteps },
         });
         await insertUserMessage(tx, {
           id: messageId,
