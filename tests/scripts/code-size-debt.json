@@ -31,7 +31,6 @@
   "modules/conversation/src/domain/thread-snapshot-mutations.ts": 807,
   "modules/conversation/src/domain/thread-tools.ts": 605,
   "modules/execution/src/application/run-steering.ts": 910,
-  "modules/execution/src/application/runner.ts": 1331,
   "modules/execution/src/application/runner/rooms.ts": 701,
   "modules/portability/src/domain/team-markdown.ts": 618,
   "modules/roster/src/application/bots.ts": 686,

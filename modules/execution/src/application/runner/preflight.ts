@@ -1,10 +1,18 @@
-import type { HermesClient, HermesModelOptions } from "@openedbot/hermes";
+import {
+  type HermesClient,
+  type HermesModelOptions,
+  hermesToolsetFingerprint,
+  noteHermesPreflightLink,
+} from "@openedbot/hermes";
 import {
   runtimeToolsetContractMessage,
   runtimeToolsetContractViolation,
 } from "@openedbot/runtimes/domain/runtime-contract";
 import { BOT_PROFILE_MISSING_CODE, botProfileMissingMessage } from "@openedbot/roster/domain/bot-profile-transfer";
+import { withBotModeInstructions } from "@openedbot/roster/domain/bot-mode";
+import { buildRuntimeMemoryBlock } from "@openedbot/roster/domain/bot-memory";
 import type { RunTrace } from "@openedbot/platform-observability/run-trace";
+import { type WarmModelSelection, readWarmModelSelection, warmModelSelectionKey } from "../warm-model-selection";
 import { NamedRunError } from "./failure";
 import type { RunContext } from "./types";
 
@@ -127,4 +135,111 @@ export async function missingRunProfile(
   } catch {
     return null;
   }
+}
+
+export type RunPreflight = {
+  /** The key a new run's model selection is remembered under; null for a resumed run. */
+  warmModelKey: string | null;
+  warmSelection: WarmModelSelection | null;
+  toolsetInventory: Awaited<ReturnType<HermesClient["toolsets"]>>;
+  /** Unresolved: the selection awaits it, after the gate. */
+  modelCatalog: Promise<HermesModelOptions | null> | null;
+  /** Unresolved and never rejected: the event stream awaits it. */
+  replayProbe: Promise<boolean>;
+};
+
+/**
+ * Préflight, second half, for a run that will create or follow a Hermes
+ * run: the session's inventory and scope, its gate, the session itself, then
+ * what the inventory tells the bot. `resumedHermesRunId` is the id the run
+ * was claimed with (a resumed run never reads the catalogue again). Writes
+ * `context.memoryToolEnabled`, `context.webToolsEnabled` and
+ * `context.instructions`; a refused gate throws a `NamedRunError`.
+ */
+export async function gatherRunPreflight(
+  client: HermesClient,
+  context: RunContext,
+  trace: Pick<RunTrace, "span">,
+  signal: AbortSignal,
+  resumedHermesRunId: string | null,
+): Promise<RunPreflight> {
+  // Inventory and scope reads run in parallel. Session creation waits for
+  // their capability gate; model, history and createRun consume the result.
+  // The model catalogue read rides with the inventory and the replay probe
+  // starts at the gate: neither is serial before the event stream.
+  const warmModelKey = resumedHermesRunId ? null : warmModelSelectionKey({
+    organizationId: context.organizationId,
+    runtimeId: context.runtimeId,
+    profile: context.hermesProfile,
+    provider: context.provider,
+    model: context.model,
+    reasoningEffort: context.reasoningEffort,
+    linkConnectedAt: linkInstant(context.linkConnectedAt),
+  });
+  const warmSelection = readWarmModelSelection(warmModelKey, Date.now());
+  const {
+    toolsets: toolsetInventory,
+    modelCatalog,
+    replayProbe,
+  } = await gatherIndependentPreflight(trace, {
+    toolsets: () => preflightToolsets(client, context),
+    toolsetScope: () => resolveToolsetScope(client, context),
+    // Le titre d'une session de SALON est le nom du salon, pas celui du membre
+    // dont c'est le tour : le premier orateur baptisait la session à son nom.
+    ensureSession: () => client.ensureSession(
+      context.sessionId,
+      context.groupId ? context.threadTitle : context.botName,
+      signal,
+    ),
+    missingProfile: () => missingRunProfile(client, context),
+    // A resumed run, or a warm selection still inside its TTL, never reads
+    // the catalogue again.
+    ...(resumedHermesRunId || warmSelection ? {} : { modelCatalog: () => client.modelOptions() }),
+    // Rejeu : un runtime `connector` qui annonce `features.event_replay` tient
+    // un journal numéroté (docs/CONNECTOR.md). Keyed on the link instant, the
+    // inventory fingerprint and the stored model, so consecutive turns on the
+    // same link reuse the answer and skip the capabilities probe.
+    ...(context.reachability === "connector"
+      ? {
+          replayCached: (inventory: Awaited<ReturnType<HermesClient["toolsets"]>>) => {
+            const linkConnectedAt = linkInstant(context.linkConnectedAt);
+            return client.peekCachedEventReplay({
+              organizationId: context.organizationId,
+              runtimeId: context.runtimeId,
+              linkConnectedAt,
+              toolsetFingerprint: hermesToolsetFingerprint(inventory),
+              model: context.model,
+            });
+          },
+          replayProbe: (inventory: Awaited<ReturnType<HermesClient["toolsets"]>>) => {
+            const linkConnectedAt = linkInstant(context.linkConnectedAt);
+            noteHermesPreflightLink({
+              organizationId: context.organizationId,
+              runtimeId: context.runtimeId,
+              linkConnectedAt,
+            });
+            return client.eventReplaySupported({
+              organizationId: context.organizationId,
+              runtimeId: context.runtimeId,
+              linkConnectedAt,
+              toolsetFingerprint: hermesToolsetFingerprint(inventory),
+              model: context.model,
+            });
+          },
+        }
+      : {}),
+  });
+  const memoryToolEnabled = toolsetInventory?.some((toolset) => toolset.name === "memory" && toolset.enabled) === true;
+  context.memoryToolEnabled = memoryToolEnabled;
+  // The web rule names `web_search` then `web_extract`: only a session
+  // whose `web` toolset really announces both gets it.
+  context.webToolsEnabled = toolsetInventory?.some((toolset) => toolset.name === "web" && toolset.enabled
+    && toolset.tools?.includes("web_search") === true && toolset.tools.includes("web_extract")) === true;
+  // La mémoire est celle du runtime : le bloc dit seulement au bot si son
+  // outil `memory` existe dans cette session (toolset actif sur le profil).
+  context.instructions = withBotModeInstructions(
+    context.personaInstructions,
+    buildRuntimeMemoryBlock({ toolEnabled: memoryToolEnabled }),
+  );
+  return { warmModelKey, warmSelection, toolsetInventory, modelCatalog, replayProbe };
 }

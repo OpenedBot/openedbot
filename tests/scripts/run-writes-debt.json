@@ -24,8 +24,11 @@
     "modules/execution/src/application/run-steering.ts": {
       "workflows": 2
     },
-    "modules/execution/src/application/runner.ts": {
-      "workflows": 3
+    "modules/execution/src/application/runner/admission.ts": {
+      "workflows": 1
+    },
+    "modules/execution/src/application/runner/approval-forwarding.ts": {
+      "workflows": 2
     },
     "modules/execution/src/application/runner/cancel.ts": {
       "workflows": 1

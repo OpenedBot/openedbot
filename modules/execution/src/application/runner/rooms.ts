@@ -339,7 +339,7 @@ export function assistantMessageForCompletion(output: string, state: GroupSendSt
   return output;
 }
 
-type GroupTurn =
+export type GroupTurn =
   | {
     kind: "speak";
     input: string;

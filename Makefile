@@ -546,6 +546,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 	bun tests/integration/apns-push.ts
 	bun tests/integration/text-array-binds.ts
 	bun tests/integration/provider-fallback-stream.ts
+	bun tests/integration/run-stop-cause.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.
 	bun tests/integration/worker-queue-notifications.ts
 	bun tests/integration/realtime-listen.ts

@@ -805,7 +805,13 @@ séquences en dur y passent ; garde `tests/scripts/run-events-contract.ts` ; tes
 `tests/integration/run-event-sequences.ts`, qui reproduit D2 et D3 sur le code d'avant.
 
 **Découper `executeRun`** (fermeture de 1 250 lignes, `runner.ts:102-1357`) en étapes nommées :
-préflight, création, streaming, approbations, repli de fournisseur, réconciliation.
+préflight, création, streaming, approbations, repli de fournisseur, réconciliation. **Fait en S2e**
+([0002](0002-invariants-des-runs.md), section 9.4) : `runner.ts` (1 331 lignes) devient une suite
+d'appels de 91 lignes ; chaque étape est un module de `application/runner/` (`admission.ts`,
+`preflight.ts`, `creation.ts`, `event-stream.ts` et `frame-events.ts`, `stream-fallback.ts`,
+`approval-forwarding.ts`, `supervision.ts`, `settlement.ts`) qui reçoit ses entrées en arguments ;
+le seul état partagé avec les minuteries est `RunState` (`run-state.ts`), passé explicitement.
+Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du cliquet de taille.
 
 ### 4.6 Serveur : propriété de l'exécution, frontières, contrats, temps réel
 
@@ -975,7 +981,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **S2b** Primitives de création | Primitives transactionnelles + commandes explicites ; trigger 0091 conservé | Garde : aucune écriture de `runs`/`workflows` hors des primitives |
 | **S2c** Allocation d'événements | Une seule primitive : verrou du run puis verrou du curseur, puis calcul, dans la transaction qui insère | Garde sur `max(sequence)` hors primitive ; test de producteurs concurrents |
 | **S2d** Transitions | Fonction de transition avec fencing | Tests des transitions illégales. **Fait** (2026-11-06) ; reste : transitions de `workflows` (cliquet daté) |
-| **S2e** `executeRun` | Découpage en étapes nommées | Comportement identique (tests existants) + taille sous le cliquet |
+| **S2e** `executeRun` | Découpage en étapes nommées | Comportement identique (tests existants) + taille sous le cliquet. **Fait** (2026-11-06) |
 | **S3** Propriété de l'exécution | Lectures vers `modules/runtimes` ; mutations en commandes durables du worker | Garde : l'API ne crée plus de `HermesClient` d'exécution |
 | **S4** Frontières | Façades pour pro, exports restreints, cycles cassés, propriété des tables étendue à `apps/*`, cliquet sur les lectures étrangères | dependency-cruiser au vert ; `test-dual` et `solo-check` au vert |
 | **S6** Temps réel | LISTEN par processus, trigger gardé, rattrapage durable | Tests LISTEN de la section 5 |
@@ -1118,3 +1124,11 @@ findings P1/P2 ont été corrigés dans la branche :
 - processus de popup qui se chevauchent ;
 - masquage d'une URL entre parenthèses ;
 - refresh lancé avant la fenêtre.
+
+**Découpage S2e (2026-11-06)** : section 4.5 et [0002](0002-invariants-des-runs.md) section 9.4.
+`executeRun` passe de 1 331 à 91 lignes ; huit modules d'étape, aucun au-delà de 304 lignes, et un
+état partagé explicite (`RunState`) pour les minuteries. Même ordre des écritures, mêmes verrous,
+événements et journaux : les tests existants passent sans changement, le golden des portes est
+inchangé ; tests ajoutés pour la complétion d'une trame et l'échéance du workflow. Relevé sans
+correction : un double enveloppement du message de repli à la création, latent tant qu'un refus de
+création ne peut pas être classé `quota`. Aucune migration.

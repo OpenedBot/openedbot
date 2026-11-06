@@ -88,7 +88,7 @@ module.exports = {
       name: "porte-permissions-par-le-port",
       comment:
         "Rien dans le module d'exécution ni dans le worker (la porte `permission-gate.ts`, le pipeline pur `domain/`, " +
-        "le relecteur `approval-review.ts`, l'enregistrement `persist.ts`, le relais `runner.ts`) ne lit lui-même " +
+        "le relecteur `approval-review.ts`, l'enregistrement `persist.ts`, le relais `runner/approval-forwarding.ts`) ne lit lui-même " +
         "les autorisations, les politiques d'outil, les règles en langage naturel ni l'interrupteur terminal : ces " +
         "règles passent par le port `PermissionRuleSource` (contrat de plug-in), dont la source du cœur est " +
         "`modules/execution/src/application/runner/core-permission-rules.ts` et que le plug-in `permissions` " +

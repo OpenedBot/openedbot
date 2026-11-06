@@ -278,7 +278,7 @@ async function preflight(db: SQL, job: ReviewJob, deps: ReviewDeps): Promise<Rev
 
 /**
  * Writes the outcome under the claim token. The run, then its workflow, then
- * the gate: the forwarder's order (runner.ts), so the two cannot deadlock.
+ * the gate: the forwarder's order (runner/approval-forwarding.ts), so the two cannot deadlock.
  * "Never wait" (PERM2-9) is read through the port under the workflow lock;
  * the snapshot never changes once the workflow exists (0144).
  */

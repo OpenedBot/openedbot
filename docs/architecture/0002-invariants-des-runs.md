@@ -2,7 +2,8 @@
 
 - **Statut :** inventaire S2a de l'ADR [0001](0001-refonte-tauri-et-produit.md) (section 4.5, étapes
   S2a à S2e) ; **S2b réalisé** (section 9.1), **S2c réalisé** (section 9.2), **S2d réalisé**
-  (section 9.3) : les références `fichier:ligne` des sections 3 à 8 décrivent l'état d'avant S2b
+  (section 9.3), **S2e réalisé** (section 9.4) : les références `fichier:ligne` des sections 3 à 8
+  décrivent l'état d'avant S2b
 - **Date :** 2026-11-06
 - **Référence :** `develop` au commit `c1edc11`. Toutes les références `fichier:ligne` pointent ce
   commit ; `O` = observé dans le code ou par un test, `I` = déduit, à confirmer
@@ -11,7 +12,8 @@
   `tests/integration/run-event-sequences.ts`, qui reproduit D2 et D3 sur `develop` d'avant S2c et
   prouve leur correction ; `tests/integration/run-transitions.ts`, fencing à deux workers,
   transitions illégales, D4, D6 et D9 (S2d)
-- **Entrée de :** S2b (primitives de création), S2c (allocation d'événements), S2d (transitions)
+- **Entrée de :** S2b (primitives de création), S2c (allocation d'événements), S2d (transitions),
+  S2e (découpage d'`executeRun`)
 
 Ce document recense chaque écriture qui crée un run (et le workflow qui l'accompagne), la façon
 dont les événements reçoivent leur `sequence`, les transitions de `runs.status`, `external_state`
@@ -712,7 +714,66 @@ Reste ouvert :
   fonction de transition des workflows sur le même modèle ;
 - l'ancien workflow d'une relance reste réglé par la route ;
 - D5, D7, D8, D10, D11 (ci-dessus) ;
-- S2e : découpage d'`executeRun` (`runner.ts`, 1 331 lignes).
+- S2e : découpage d'`executeRun` (`runner.ts`, 1 331 lignes), fait en section 9.4.
+
+### 9.4 Réalisé en S2e (2026-11-06)
+
+**Découpage.** `executeRun` (`modules/execution/src/application/runner.ts`, 1 331 lignes, dont une
+fermeture de 1 170) n'est plus qu'une suite d'appels de 91 lignes. Chaque étape vit dans un module
+de `application/runner/` et reçoit ses entrées en arguments : `db`, `config`, le `RunContext`, le
+client Hermes, la trace, et `RunState` (`run-state.ts`), le seul état partagé. Ce dernier existe
+parce que les minuteries (battement, sondage, délai) et les étapes lisent et écrivent les mêmes
+champs pendant le run : l'identifiant Hermes suivi, la sélection et l'état de repli, la requête de
+création, `terminal`, l'arrêt demandé, la dernière activité et les trois causes d'abandon ; chaque
+étape dit dans sa documentation lesquels elle écrit. Aucune autre variable n'est capturée.
+
+| Étape | Fonction (module) | Entrées | Sortie, écritures |
+|---|---|---|---|
+| Préflight (admission) | `admitClaimedRun` (`admission.ts`) | run réclamé, trace | client Hermes, ou `null` une fois le run en échec nommé ; `workflow` → `running` |
+| Préflight (session) | `gatherRunPreflight` (`preflight.ts`) | client, signal, id Hermes réclamé | inventaire, catalogue et sonde de rejeu non résolus, clé et sélection tièdes ; écrit `instructions`, `memoryToolEnabled`, `webToolsEnabled` du contexte |
+| Création | `createRunOnHermes` (`creation.ts`), qui compose la requête (`composeRunRequest`) puis la poste (`postCreateRun`) | préflight | id Hermes confirmé, ou `null` (tour de salon muet, aucun fournisseur, bail perdu, création orpheline) ; écrit sélection, état de repli, requête et id dans `RunState` |
+| Streaming | `streamHermesEvents` (`event-stream.ts`), `enrichFrameEvents` (`frame-events.ts`) par trame | id Hermes, sonde de rejeu, transmetteur des portes | id du run sur lequel le flux s'est fini, ou `null` une fois réglé ; `terminal`, dernière activité |
+| Repli de fournisseur | `fallBackAfterRunFailure` (`stream-fallback.ts`) | trame d'échec, sélection et requête courantes | `none`, `auth_required` (fournisseur), `restarted`, `settled` |
+| Approbations | `forwardReadyApproval`, `expirePendingApprovalTx` (`approval-forwarding.ts`) | id Hermes courant | décision transmise et confirmée, ou run `unknown` et abandon |
+| Supervision | `superviseRun` (`supervision.ts`) | signal externe | transmetteur des portes, `stop()` ; arrêt demandé, délais, expiration, battement, steers |
+| Réconciliation | `settleRequestedCancellation`, `settleStreamEnd`, `settleRunError` (`settlement.ts`) | état du run, erreur | run annulé, réconcilié par le statut, ou en échec nommé |
+
+Les trois `update workflows` de `runner.ts` suivent leur code dans le cliquet de
+`run-writes-debt.json` : `admission.ts` (1) et `approval-forwarding.ts` (2), le compte reste à 36.
+`runner.ts` quitte `code-size-debt.json` ; aucun nouveau fichier ne dépasse 304 lignes.
+
+**Comportement.** Identique : même ordre des lectures et des écritures, mêmes transactions et
+verrous, mêmes événements, journaux, marques et durées de la trace. Le code est déplacé tel quel,
+sauf les noms (`activeContext` et `context` étaient le même objet). Deux lectures de l'id Hermes
+sont gardées à l'identique, au moment de l'envoi : la transmission d'une porte et celle d'un steer
+le relisent après leurs attentes, comme le faisait la fermeture ; un repli démarré entre-temps peut
+donc les adresser au nouveau run, ou à un id nul pendant sa création (une erreur, puis la porte en
+`ambiguous` et le run en `unknown`). Course étroite (une porte décidée pendant qu'une trame
+d'échec déclenche un repli), non reproduite, notée ici sans changement.
+
+**Preuves.** Les tests existants, sans modification : `make test-unit` (dont le golden
+`unattended-golden.json`, inchangé), `make test-integration` (dont `dm-without-workflow.ts`,
+`permission-policy-preflight.ts`, `named-coordination.ts`, `run-identity-replay.ts` et ses trois
+variantes, `run-crash-replay.ts` et sa variante, `provider-fallback-stream.ts`,
+`unattended-gates.ts`, qui appellent `executeRun` ou ses étapes), et les contrats
+(`run-writes`, `run-events`, `db-ownership`, `permission-port`, structure). Nouveaux tests par
+étape testable seule : `modules/execution/tests/runner/frame-events.test.ts` (complétion d'une
+trame : fournisseur refusé, transcript du tour, relecture unique, message d'erreur d'outil,
+relecture en panne) et `admission.test.ts` (échéance du workflow, borne du délai, état initial).
+Une erreur de recopie l'a montré : la première version de `settlement.ts` ne passait plus la cause
+d'arrêt à `reconcileHermesRun`, et tous les tests passaient (`unattended-gates.ts` appelle la
+réconciliation directement). Un run arrêté par openedbot (délai, inactivité, porte expirée) aurait
+dit « Run Hermes annulé » (`HERMES_RUN_CANCELLED`). Corrigé avant commit, et couvert par
+`tests/integration/run-stop-cause.ts` : un run réel dépasse son délai, il est arrêté puis réconcilié
+en `RUN_TIMEOUT` ; sans la cause, le test échoue sur `HERMES_RUN_CANCELLED`.
+
+**Défaut relevé, non corrigé.** Après un repli **pendant la création** (avant tout flux), un
+second refus est enveloppé deux fois par `fallbackAwareError` (dans `postCreateRun`, puis dans
+`settleRunError`) : le `run.error` dirait « … Repli tenté sur X / Y. Repli tenté sur X / Y. ».
+Latent : un refus HTTP du POST ne porte jamais le texte du fournisseur (`throwResponse` le range
+dans `diagnostic`), et 429, 401 et 403 y deviennent des codes de gateway classés `other` ; aucun
+refus de création n'ouvre donc de repli aujourd'hui. À corriger (un seul enveloppement) le jour où
+une création peut être classée `quota`.
 
 ## 10. Ce qui reste incertain
 
