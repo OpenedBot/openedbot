@@ -441,6 +441,75 @@ localStorage d'Electron ne sont pas repris. Les brouillons texte sont persistant
 perte des brouillons annoncée dans la note de version, et jamais Electron et Tauri connectés en
 même temps avec le même refresh token.
 
+### 4.3.1 Prototype D2a (2026-11-06)
+
+Prototype vertical, non distribué : `apps/desktop-tauri/` (workspace Bun `desktop-tauri`, Rust
+dans `src-tauri/`, Tauri 2.12.5), contrat `contracts/native-bridge/`, adaptateur
+`apps/console/src/lib/platform/tauri-bridge.ts`. Identifiant `app.openedbot.desktop.preview`, nom
+« openedbot preview », service Keychain distinct, aucun schéma `openedbot://` : il cohabite avec
+l'app Electron. Mesures sur le Mac de dev (macOS 26.6.2, arm64), API locale, runtime de la VM 240.
+
+**Ce qui est prouvé.**
+
+| # | Point | Preuve |
+|---|---|---|
+| 1 | Console embarquée | Build solo en mode desktop (`VITE_OPENEDBOT_SHELL=tauri`) servi par `tauri://localhost` ; repli `index.html` de Tauri pour les chemins profonds. Le build web n'embarque rien de Tauri (vérifié sur le bundle ; `make bundle-budget` 370,6 / 380 ko) |
+| 2 | Auth bearer côté Rust | Code e-mail (`/api/auth/login/code`, `/native/code/verify`, `/native/token`, PKCE) mené par Rust ; jeton dans le Keychain (`keyring`), remis à la page par `read_access_token` seulement ; refresh mono-vol (test : 8 appels concurrents, 1 rotation) ; coffre refusé : session en mémoire, rien sur disque (tests). Commandes déclarées dans `AppManifest::commands` (`build.rs`), accordées à la seule fenêtre `main` sur l'origine locale (`capabilities/main.json`) ; tests de refus : autre fenêtre, autre origine (`https://console.openedbot.app`, `http://localhost:1420`), commandes des plugins. Pont typé tauri-specta, contrat vérifié par `cargo test` |
+| 3 | Fils et SSE | Fenêtre compacte (`/compact`, comme Electron) : sélecteur des fils des 5 bots, fil d'Atlas, envoi d'un message, réponse du runtime de la VM 240 affichée au fil de l'eau sur **une** connexion `/api/events` |
+| 4 | Popup notch | L'hôte Rust lance `OpenedbotPopup --hosted` (openedbot-notch `origin/main`, `OpenedbotHostedProtocol` 1) : `ready` (1.0.0) → `hello` → `signedIn` → jeton servi ; le popup appelle l'API avec ce bearer ; il s'arrête sur EOF quand l'app quitte. Vérifié en dev puis dans l'app signée (`Contents/Helpers`) |
+| 5 | En-tête `Origin` | Mesuré par une sonde devant l'API (`scripts/origin-probe.ts`) : **`tauri://localhost`** sur chaque requête de la page (préflight compris), app de dev comme app notarisée. Le CORS de D1a répond `Access-Control-Allow-Origin: tauri://localhost`, sans `Allow-Credentials`, et aucun cookie ne part. Les requêtes de Rust (connexion) n'envoient pas d'`Origin` |
+| 6 | Signature, notarisation, quarantaine | Developer ID, hardened runtime, sans App Sandbox, **aucun entitlement** ; popup re-signé de l'intérieur (runtime + horodatage) avant l'app ; app et dmg notarisés et agrafés. dmg marqué `com.apple.quarantine` : `spctl -a -t open` → `accepted, source=Notarized Developer ID` ; app glissée dans `/Applications` par le Finder : `spctl -a -vv` accepté, dialogue de premier lancement « Apple a effectué une recherche de logiciels malveillants et n'en a détecté aucun » |
+| 7 | Vraie mise à jour | `tauri-plugin-updater`, `.app.tar.gz` signé par une clé minisign distincte (`~/.config/openedbot-tauri-updater/`, 0700/0600), manifeste servi par `scripts/update-feed.ts` (Bun, boucle locale). v0.0.1 installée depuis le dmg ; v0.0.2 publiée ; au lancement suivant : téléchargement (18 Mo), signature vérifiée, popup arrêté, bundle remplacé, **redémarrage en 0.0.2**, session Keychain relue sans invite (même Developer ID, même identifiant), app toujours notarisée. Manifeste 0.0.3 signé par une autre clé : « The signature was created with a different key than the one provided », 0.0.2 intacte, popup jamais arrêté |
+
+**Entitlements retenus : aucun.** `allow-jit` et `allow-unsigned-executable-memory` sont inutiles :
+WebKit compile dans ses propres processus, et l'app signée en hardened runtime affiche et fait
+tourner la console.
+
+**Durées de notarisation** (quatre passes, toutes `Accepted`) : build release + notarisation et
+agrafage de l'app 61 à 77 s au total ; dmg 28 à 34 s (`notarytool submit --wait`).
+
+**Constats.**
+- **Le flux SSE n'avait pas d'en-tête CORS** : `/api/events` rend une `Response` brute, qui ne
+  reçoit pas les en-têtes posés par `context.header` avant elle. Sans effet sur le web et Electron
+  (même origine), bloquant pour la console embarquée (« Flux interrompu : reconnexion en cours »,
+  reconnexion toutes les 5 s). Corrigé dans `apps/api/src/interfaces/http/cors.ts` (en-têtes reposés
+  sur la réponse finale) et testé ; la preuve 3 a tourné contre une réplique de l'API de cette
+  branche sur la base locale, l'API de `make dev` n'ayant pas encore le correctif.
+- **App Translocation** : une app en quarantaine que l'utilisateur n'a pas déplacée lui-même (copie
+  par script du Finder) tourne depuis un montage en lecture seule ; la mise à jour y échouait
+  (« Read-only file system »), proprement. Le prototype ne tente plus rien dans ce cas et le
+  journalise ; un vrai glisser-déposer du Finder (dmg → `/Applications`) n'est pas translocalisé.
+- La console complète (`/`) ne pose pas sa session cloud depuis le pont : seule la fenêtre
+  compacte le fait (`primeNativeSession`). Le prototype ouvre donc `/compact`, comme Electron.
+- tauri-specta importe `@tauri-apps/api` en dur ; un contrat n'importe que zod. L'export Rust
+  redirige ces imports vers `contracts/native-bridge/src/runtime.ts`, que l'adaptateur de la console
+  remplit avec `@tauri-apps/api` : la règle `contrat-zod-seul` reste entière.
+- La CSP de la console desktop porte un marqueur à la place de l'origine de l'API (réglage
+  d'exécution) ; la coque le remplace en servant `index.html` (`csp.rs`), IPC de Tauri autorisé,
+  script d'audience retiré du build.
+- Un build de dev non signé change de signature à chaque compilation : le Keychain redemande
+  l'accès. En dev, `OPENEDBOT_PREVIEW_VAULT=memory`.
+
+**Reproduire.** `make desktop-tauri-check` (cargo test, clippy), `make desktop-tauri-mac
+TAURI_VERSION=0.0.2 TAURI_POPUP=…/OpenedbotPopup.app`, `make desktop-tauri-feed`, `make
+desktop-tauri-publish TAURI_VERSION=0.0.2` ; l'app installée lit
+`~/Library/Application Support/app.openedbot.desktop.preview/config.json`
+(`apiOrigin`, `publicConsoleUrl`, `updateUrl`, `popup`).
+
+**Écarts restant pour D2b.**
+- Connexion Google (navigateur + boucle locale `127.0.0.1:47813`), déconnexion avec purge des
+  données de la WebView (sans elle, un cache de requêtes d'un compte reste visible au suivant :
+  observé), refresh anticipé par minuterie, instance unique, deep link.
+- Console complète depuis le pont, `shell.platform` (figé à `"windows"` par le contrat actuel),
+  silhouette de démarrage (le script inline de `index.html` ne voit pas encore le pont).
+- Mise à jour : vérification périodique et pas seulement au lancement, message « déplacez l'app
+  dans Applications » en cas de translocation, écran « mise à jour requise » (426), attente de la
+  sortie du popup avant le remplacement, manifeste par canal et variante, hébergement (Q2).
+- Popup : dialogue de repli et préférences fenêtre / popup / les deux ; diagnostics SQLite ; menus,
+  raccourci global, tray, position de fenêtre.
+- `cargo test` et `cargo clippy` en CI (aujourd'hui `make desktop-tauri-check` en local), crates
+  pour Windows et Linux (`keyring` n'active que le Keychain).
+
 ### 4.4 Console : origine, plateforme, performance
 
 **Découpler la console de son origine** (bloquant pour l'embarquement, O) :
@@ -697,9 +766,9 @@ Recommandations issues de la revue Codex ; celles marquées **(décision)** atte
 
 ## 9. Ce qui n'est pas vérifié
 
-Aucun build Tauri, aucun test sur WKWebView, WebView2 ou WebKitGTK, aucun test PostgreSQL
-concurrent, aucun essai de notarisation n'ont été faits. Les points marqués `I` et tout ce qui
-concerne Tauri sont à confirmer en D2a.
+WKWebView, la signature, la notarisation et la mise à jour sont vérifiés par le prototype D2a
+(section 4.3.1). Aucun test sur WebView2 ou WebKitGTK ni aucun test PostgreSQL concurrent n'a été
+fait. Les autres points marqués `I` restent à confirmer.
 
 ## 10. Historique de revue
 
@@ -763,3 +832,8 @@ aucune ne change de corps de requête, et la seule erreur nouvelle (`WORKFLOW_SE
 est rendue par l'API ; les commandes ne lèvent aucune erreur de domaine. Le dépôt n'a pas encore de
 zod : les contrats zod de section 4.6 restent à poser avec leur middleware, dans une étape qui touche
 le contrat d'une route.
+
+**Prototype D2a (2026-11-06)** : résultats en section 4.3.1. WKWebView envoie
+`Origin: tauri://localhost`, accepté par le CORS de D1a ; aucun entitlement ; mise à jour réelle
+0.0.1 → 0.0.2 depuis un dmg notarisé, signature étrangère refusée. Le flux SSE manquait d'en-têtes
+CORS (corrigé dans la même étape).

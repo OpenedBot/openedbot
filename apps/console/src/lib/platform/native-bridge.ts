@@ -1,4 +1,5 @@
 import type { AuthStore } from "@openedbot/browser-api-client";
+import { createTauriBridge } from "./tauri-bridge";
 
 /**
  * Le pont que la coque native (dépôt voisin `openedbot-desktop`, Electron) expose au
@@ -63,6 +64,17 @@ declare global {
  * `request()` compare cette identité avant et après chaque réponse.
  */
 export const NATIVE_SESSION_MARK = "native";
+
+/**
+ * L'app Tauri n'a pas de preload : son pont se construit ici, au chargement du
+ * module, sur les commandes Rust (`tauri-bridge.ts`). Seulement dans le build
+ * desktop (`VITE_OPENEDBOT_SHELL=tauri`, `apps/desktop-tauri`) : ailleurs la
+ * condition est fausse dès le build, et le module Tauri n'est pas embarqué.
+ */
+if (import.meta.env.VITE_OPENEDBOT_SHELL === "tauri" && globalThis.window && !globalThis.window.__OPENEDBOT_NATIVE__) {
+  const bridge = createTauriBridge();
+  if (bridge) Object.defineProperty(globalThis.window, "__OPENEDBOT_NATIVE__", { value: bridge, writable: false, configurable: false });
+}
 
 export function nativeBridge(): OpenedbotNativeBridge | null {
   const bridge = globalThis.window?.__OPENEDBOT_NATIVE__;

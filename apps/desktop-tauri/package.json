@@ -1,0 +1,18 @@
+{
+  "name": "desktop-tauri",
+  "version": "0.0.1",
+  "private": true,
+  "description": "openedbot desktop, Tauri 2 prototype (ADR 0001, D2a): the solo console embedded, native bridge in Rust",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test scripts",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -370,7 +370,7 @@ link-gateway-install: ## [HERMES] Installe le service utilisateur systemd sans l
 .PHONY: typecheck deps-check license-check test-unit test-dual solo-check bundle-budget test-integration test check
 
 typecheck: ## Typechecke tous les workspaces actifs, puis tests/, scripts/ et apps/console/scripts (tsconfig.json racine).
-	bun run --filter api --filter worker --filter link-gateway --filter console --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter '@openedbot/browser-*' --filter './modules/*' typecheck
+	bun run --filter api --filter worker --filter link-gateway --filter console --filter desktop-tauri --filter @openedbot/hermes --filter @openedbot/platform-config --filter @openedbot/platform-db --filter @openedbot/platform-integrations --filter @openedbot/platform-observability --filter @openedbot/platform-plugins --filter '@openedbot/contracts-*' --filter '@openedbot/browser-*' --filter './modules/*' typecheck
 	bunx tsc --noEmit -p tsconfig.json
 
 # Seules les couches présentes sont passées : dependency-cruiser refuse un
@@ -393,7 +393,7 @@ UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Tests unitaires API, Worker, Web, contrats, plateforme, modules et scripts, sans réseau ni PostgreSQL.
 	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
-	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts
+	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts apps/desktop-tauri/scripts
 	python3 -B tests/scripts/provider-fault-cleanup.test.py
 	# Découverte automatique : tout *.test.ts(x) sous apps/console/tests joue,
 	# sauf tests/e2e/ (parcours applicatifs complets, déjà couverts nommément
@@ -549,6 +549,35 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## PostgreSQL jetable
 test: test-unit test-integration ## Unitaires et intégration.
 
 check: env-audit typecheck deps-check test build-cloud ## Garde complète: environnement, code, tests et builds cloud.
+
+# ─── Desktop Tauri (prototype D2a, ADR 0001 §4.3.1) ──────────────────────────
+# Le shell Rust (`apps/desktop-tauri/src-tauri`) embarque la console solo en
+# mode desktop. Rien n'est publié : le build signé reste dans
+# `apps/desktop-tauri/release/<version>/`, le flux de mise à jour est servi en
+# boucle locale. Clés : Developer ID dans le trousseau, notarisation et clé de
+# mise à jour hors du dépôt (`scripts/build-mac.ts`).
+.PHONY: desktop-tauri-bindings desktop-tauri-check desktop-tauri-mac desktop-tauri-feed desktop-tauri-publish
+DESKTOP_TAURI_DIR := apps/desktop-tauri
+TAURI_VERSION ?=
+TAURI_SIGN ?= developer-id
+TAURI_POPUP ?=
+
+desktop-tauri-bindings: ## [DESKTOP] Régénère le contrat du pont natif (contracts/native-bridge) depuis les commandes Rust.
+	cd $(DESKTOP_TAURI_DIR)/src-tauri && cargo run --quiet --example export-bindings -- ../../../contracts/native-bridge/src/bindings.ts
+
+desktop-tauri-check: ## [DESKTOP] cargo test (refus IPC, refresh mono-vol, coffre, popup, bindings à jour) et cargo clippy -D warnings.
+	cd $(DESKTOP_TAURI_DIR)/src-tauri && cargo test --quiet && cargo clippy --all-targets --quiet -- -D warnings
+
+desktop-tauri-mac: ## [DESKTOP] Build macOS signé Developer ID, notarisé, agrafé + artefact de mise à jour signé : TAURI_VERSION=X.Y.Z [TAURI_SIGN=adhoc] [TAURI_POPUP=…/OpenedbotPopup.app].
+	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/build-mac.ts --version "$(TAURI_VERSION)" --sign "$(TAURI_SIGN)" $(if $(TAURI_POPUP),--popup "$(TAURI_POPUP)")
+
+desktop-tauri-feed: ## [DESKTOP] Sert le flux de mise à jour local sur http://127.0.0.1:8799/latest.json.
+	bun $(DESKTOP_TAURI_DIR)/scripts/update-feed.ts serve --port 8799
+
+desktop-tauri-publish: ## [DESKTOP] Publie localement une version construite dans le flux : TAURI_VERSION=X.Y.Z.
+	@[ -n "$(TAURI_VERSION)" ] || { echo "TAURI_VERSION=X.Y.Z est requis"; exit 1; }
+	bun $(DESKTOP_TAURI_DIR)/scripts/update-feed.ts publish --version "$(TAURI_VERSION)" --port 8799
 
 # ─── Contrat connecteur ──────────────────────────────────────────────────────
 # Le fil entre edge-setup (Go, chez le client) et openedbot (TS, dans le cloud) a

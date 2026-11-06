@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { HttpError } from "../src/interfaces/http/http-error";
 import { CLIENT_HEADER, corsMiddleware } from "../src/interfaces/http/cors";
+import { responseCompression } from "../src/interfaces/http/compression";
 import { CLIENT_UPDATE_REQUIRED, clientVersionGate, desktopClientVersion } from "../src/interfaces/http/client-version";
 import { parseSemVer } from "@openedbot/platform-config/native-clients";
 
@@ -14,6 +15,8 @@ function app(minDesktopVersion = parseSemVer("1.2.0"), extra: () => string[] = (
   routes.use("/api/*", clientVersionGate(minDesktopVersion));
   routes.get("/api/health", (context) => context.json({ ok: true }));
   routes.get("/api/threads", (context) => context.json({ ok: true }));
+  // Comme `/api/events` : une `Response` brute, hors du contexte Hono.
+  routes.get("/api/events", () => new Response("data: {}\n\n", { headers: { "Content-Type": "text/event-stream" } }));
   routes.onError((error, context) => {
     if (!(error instanceof HttpError)) throw error;
     return context.json({ error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } }, error.status as 400);
@@ -39,6 +42,39 @@ describe("CORS de l'API", () => {
       expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
       expect(response.headers.get("Access-Control-Expose-Headers")).toBe("X-Request-Id");
       expect(response.headers.get("Vary")).toBe("Origin");
+    }
+  });
+
+  test("un flux rendu en Response brute (SSE) porte aussi les en-têtes CORS", async () => {
+    const native = await get(app(), { Origin: NATIVE }, "/api/events");
+    expect(native.headers.get("Content-Type")).toBe("text/event-stream");
+    expect(native.headers.get("Access-Control-Allow-Origin")).toBe(NATIVE);
+    expect(native.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    expect(native.headers.get("Access-Control-Expose-Headers")).toBe("X-Request-Id");
+    const web = await get(app(), { Origin: WEB }, "/api/events");
+    expect(web.headers.get("Access-Control-Allow-Origin")).toBe(WEB);
+    expect(web.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    const unknown = await get(app(), { Origin: "https://evil.example" }, "/api/events");
+    expect(unknown.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
+  test("Vary garde Accept-Encoding posé par la compression", async () => {
+    const routes = new Hono();
+    routes.use("*", corsMiddleware({ browserOrigins: [WEB], nativeOrigins: [NATIVE] }));
+    routes.use("/api/*", responseCompression());
+    routes.get("/api/legal", (context) => context.json({ text: "x".repeat(8192) }));
+    for (const origin of [WEB, NATIVE]) {
+      // happy-dom retire `Accept-Encoding` d'un `Request` (en-tête interdit) : on le repose (`compression.test.ts`).
+      const request = new Request("http://api.test/api/legal", { headers: { Origin: origin } });
+      const headers = new Headers(request.headers);
+      headers.set("Accept-Encoding", "gzip");
+      Object.defineProperty(request, "headers", { value: headers, configurable: true });
+      const response = await routes.request(request);
+      expect(response.headers.get("Content-Encoding")).toBe("gzip");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+      const vary = (response.headers.get("Vary") ?? "").split(",").map((value) => value.trim().toLowerCase());
+      expect(vary).toContain("accept-encoding");
+      expect(vary.filter((value) => value === "origin")).toHaveLength(1);
     }
   });
 

@@ -1,0 +1,40 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "openedbot preview",
+  "version": "0.0.1",
+  "identifier": "app.openedbot.desktop.preview",
+  "build": {
+    "frontendDist": "../console-dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null,
+      "capabilities": ["main"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "category": "Productivity",
+    "copyright": "openedbot",
+    "icon": [
+      "../../desktop/build/icons/32x32.png",
+      "../../desktop/build/icons/128x128.png",
+      "../../desktop/build/icons/256x256.png",
+      "../../desktop/build/icon.icns"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "hardenedRuntime": true
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
+  }
+}

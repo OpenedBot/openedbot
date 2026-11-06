@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The embedded console, in the main window and on the local origin only (no `remote` block): the native bridge and the sign-in event, nothing else. No plugin command is granted: the opener and the updater are driven from Rust.",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-read-access-token",
+    "allow-refresh",
+    "allow-open-external",
+    "allow-sign-out",
+    "allow-request-email-code",
+    "allow-verify-email-code",
+    "allow-start-google",
+    "allow-cancel-sign-in",
+    "allow-signin-state",
+    "allow-shell-info"
+  ]
+}

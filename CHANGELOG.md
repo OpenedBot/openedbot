@@ -84,6 +84,11 @@ connecteur hôte et le protocole tiennent le leur :
   conversation, le bot et la place qu'il occupait chez le runtime. Un
   brouillon de persona ne se relance pas d'ici (on le relance depuis la
   fiche du bot), ni un message transmis (on le renvoie).
+- Les mises à jour en direct (réponses en cours, fils, notifications) arrivent
+  aussi à la future app de bureau, dont la console est embarquée : le flux
+  temps réel portait l'en-tête CORS des autres requêtes de l'API sauf le sien,
+  et l'app se reconnectait sans fin. Le web et l'app actuelle, servis depuis
+  l'origine de la console, n'étaient pas touchés.
 - Réglages › Activité : sans aucun bot, le tableau propose « Créer un bot ».
   L'ancien message renvoyait vers la barre latérale, absente de cet écran.
 - Le panneau latéral (Réflexions, pièce jointe, contexte) s'ouvre de

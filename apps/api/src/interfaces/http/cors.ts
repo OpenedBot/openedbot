@@ -29,12 +29,15 @@ export function corsMiddleware(
     const origin = context.req.header("Origin");
     const web = origin !== undefined && origins.browserOrigins.includes(origin);
     const native = !web && origin !== undefined && origins.nativeOrigins.includes(origin);
-    if (web || native) {
-      context.header("Access-Control-Allow-Origin", origin);
-      if (web) context.header("Access-Control-Allow-Credentials", "true");
-      context.header("Access-Control-Expose-Headers", REQUEST_ID_HEADER);
-      context.header("Vary", "Origin");
-    }
+    const allowed: Array<[string, string]> = web || native
+      ? [
+          ["Access-Control-Allow-Origin", origin],
+          ...(web ? [["Access-Control-Allow-Credentials", "true"] as [string, string]] : []),
+          ["Access-Control-Expose-Headers", REQUEST_ID_HEADER],
+        ]
+      : [];
+    for (const [name, value] of allowed) context.header(name, value);
+    if (web || native) context.header("Vary", "Origin", { append: true });
     if (context.req.method === "OPTIONS") {
       context.header("Access-Control-Allow-Headers", [
         "Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-Token", "X-OpenedBot-Organization", "X-OpenedBot-Fleet",
@@ -45,5 +48,22 @@ export function corsMiddleware(
       return context.body(null, 204);
     }
     await next();
+    // Une route qui rend une `Response` brute (le flux SSE `/api/events`) ne
+    // reçoit pas les en-têtes posés par `context.header` avant elle : on les
+    // repose sur la réponse finale. Sans eux, la console embarquée de l'app de
+    // bureau (origine `tauri://localhost`) voyait son flux refusé par la
+    // WebView et se reconnectait sans fin (ADR 0001, D2a).
+    for (const [name, value] of allowed) {
+      if (context.res.headers.get(name) !== value) context.res.headers.set(name, value);
+    }
+    // `Vary` se fusionne : la compression y a pu ajouter `Accept-Encoding`.
+    if (web || native) withVaryOrigin(context.res.headers);
   };
+}
+
+function withVaryOrigin(headers: Headers): void {
+  const current = headers.get("Vary");
+  const values = (current ?? "").split(",").map((value) => value.trim().toLowerCase());
+  if (values.includes("origin") || values.includes("*")) return;
+  headers.set("Vary", current ? `${current}, Origin` : "Origin");
 }
