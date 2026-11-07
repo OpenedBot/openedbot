@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { internalBearer } from "@openedbot/platform-config/internal-secrets";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import type { WorkerConfig } from "../worker-config";
 import { appendRunEventsTx } from "../../sql/run-events";
@@ -42,14 +43,14 @@ export async function appendRunErrorTx(
 }
 
 export async function publish(
-  config: Pick<WorkerConfig, "apiInternalUrl" | "apiInternalToken">,
+  config: Pick<WorkerConfig, "apiInternalUrl" | "internalSecrets">,
   event: OrganizationEvent,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   try {
     const response = await fetchImpl(`${config.apiInternalUrl}/internal/events/publish`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${config.apiInternalToken}`, "Content-Type": "application/json" },
+      headers: { Authorization: internalBearer(config.internalSecrets, "events"), "Content-Type": "application/json" },
       body: JSON.stringify(event),
       signal: AbortSignal.timeout(2_000),
     });
@@ -64,7 +65,7 @@ export async function publish(
  * event keeps the original one-event body. Best effort like `publish`.
  */
 export async function publishBatch(
-  config: Pick<WorkerConfig, "apiInternalUrl" | "apiInternalToken">,
+  config: Pick<WorkerConfig, "apiInternalUrl" | "internalSecrets">,
   events: OrganizationEvent[],
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
@@ -73,7 +74,7 @@ export async function publishBatch(
   try {
     const response = await fetchImpl(`${config.apiInternalUrl}/internal/events/publish`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${config.apiInternalToken}`, "Content-Type": "application/json" },
+      headers: { Authorization: internalBearer(config.internalSecrets, "events"), "Content-Type": "application/json" },
       body: JSON.stringify({ events }),
       signal: AbortSignal.timeout(2_000),
     });
@@ -101,7 +102,7 @@ const deferredWakes = new Map<string, DeferredWake>();
  * sondage de repli de l'API, comme un hint en échec.
  */
 export function deferWake(
-  config: Pick<WorkerConfig, "apiInternalUrl" | "apiInternalToken">,
+  config: Pick<WorkerConfig, "apiInternalUrl" | "internalSecrets">,
   runId: string,
   envelope: OrganizationEvent,
   fetchImpl: typeof fetch = fetch,
@@ -127,7 +128,7 @@ export function takeDeferredWake(runId: string): OrganizationEvent | null {
 
 /** Envoie tout de suite le réveil en attente d'un run (tests, arrêt propre). */
 export async function flushDeferredWake(
-  config: Pick<WorkerConfig, "apiInternalUrl" | "apiInternalToken">,
+  config: Pick<WorkerConfig, "apiInternalUrl" | "internalSecrets">,
   runId: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {

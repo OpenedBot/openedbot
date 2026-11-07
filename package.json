@@ -36,6 +36,7 @@
     "@openedbot/contracts-events": "workspace:*",
     "@openedbot/hermes": "workspace:*",
     "@openedbot/notifications": "workspace:*",
+    "@openedbot/platform-config": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
     "@openedbot/roster": "workspace:*",
     "@types/bun": "1.4.0",

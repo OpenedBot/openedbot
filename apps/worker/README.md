@@ -106,8 +106,10 @@ imports vers l’API :
 - `blob-store.ts` centralise la suppression idempotente des objets fichier/R2 ;
 - `@openedbot/hermes` porte le client, la politique d’endpoint, le flux SSE et le
   chiffrement des secrets Hermes partagés avec l’API ;
-- l’API interne est appelée en HTTP avec `API_INTERNAL_URL` et
-  `WORKER_INTERNAL_TOKEN`, notamment sur `/internal/events/publish` ;
+- l’API interne est appelée en HTTP avec `API_INTERNAL_URL` et un secret par
+  rôle (ADR 0001, 4.7) : `EVENTS_INTERNAL_TOKEN` sur `/internal/events/publish`,
+  `RELAY_INTERNAL_TOKEN` sur le relais du lien, `RUN_KEY_SECRET` pour signer
+  les clés de run ; chacun retombe sur `WORKER_INTERNAL_TOKEN` s’il est absent ;
 - les blobs utilisent le driver fichier en développement ou R2 en production ;
 - l’e-mail transactionnel passe par l’endpoint configuré, avec une clé de
   déduplication durable.

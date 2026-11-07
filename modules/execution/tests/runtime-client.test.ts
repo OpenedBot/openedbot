@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import { HermesClientError, RelayDialError } from "@openedbot/hermes";
 import {
@@ -12,7 +13,7 @@ import { captureLogEvents } from "@openedbot/platform-observability/log/test-log
 import { parseTraceparent, runTraceContext, runWithTrace } from "@openedbot/platform-observability/trace-context";
 const config: RuntimeClientConfig = {
   apiInternalUrl: "http://127.0.0.1:8790",
-  apiInternalToken: "worker-internal-token",
+  internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "worker-internal-token" }),
 };
 
 function connectorContext(): RuntimeClientContext {
@@ -173,4 +174,15 @@ describe("createWorkerRelayDialer: the run's trace", () => {
     expect(seen[0]!.has("traceparent")).toBe(false);
     expect(records).toEqual([]);
   });
+});
+
+test("the relay dialer sends the relay secret, never the events or run-key one (S1b)", async () => {
+  const internalSecrets = testInternalSecrets("worker", { EVENTS_INTERNAL_TOKEN: "events-secret", RELAY_INTERNAL_TOKEN: "relay-secret", RUN_KEY_SECRET: "run-key-secret" });
+  let authorization = null as string | null;
+  const dial = createWorkerRelayDialer("5f0f8a3a-1111-4222-8333-444455556666", { apiInternalUrl: "http://api:8790", internalSecrets }, (async (_url: RequestInfo | URL, init?: RequestInit) => {
+    authorization = new Headers(init?.headers).get("Authorization");
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch);
+  await dial({ method: "GET", path: "/health", headers: {} } as never);
+  expect(authorization).toBe("Bearer relay-secret");
 });

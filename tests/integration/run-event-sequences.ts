@@ -19,6 +19,7 @@
  *     warning) before the `tool.result.attached` the normalizer numbered after
  *     `run.completed` used to lose that event; every event is now kept.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -187,7 +188,7 @@ await withDisposablePostgres("openedbot3_s2c_sequences", async ({ owner, connect
   const config = {
     workerId: "s2c-worker",
     apiInternalUrl: "http://127.0.0.1:9",
-    apiInternalToken: "s2c",
+    internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "s2c" }),
     tokenEncryption: { current: key, previous: [] },
     hermesMtls: null,
     leaseSeconds: 30,

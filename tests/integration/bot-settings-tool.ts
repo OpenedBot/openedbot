@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import type { AppVariables } from "../../apps/api/src/routes/identity/auth";
 import { botSettingsToolMcpRoutes, botSettingsToolSecretHash } from "../../apps/api/src/routes/execution/bot-settings-tool-routes";
@@ -48,7 +49,7 @@ await withDisposablePostgres("openedbot131_bot_settings", async ({ owner, connec
   app.onError((error, context) => error instanceof HttpError
     ? context.json({ code: error.code }, error.status as 401)
     : context.json({ code: "INTERNAL" }, 500));
-  app.route("/api/mcp/bot-settings", botSettingsToolMcpRoutes(db, { workerInternalToken: WORKER_SECRET }));
+  app.route("/api/mcp/bot-settings", botSettingsToolMcpRoutes(db, testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: WORKER_SECRET })));
   let rpcId = 0;
   const post = (organizationId: string, bearer: string | null, body: unknown) => app.request(`/api/mcp/bot-settings/${organizationId}`, {
     method: "POST",
@@ -164,6 +165,31 @@ await withDisposablePostgres("openedbot131_bot_settings", async ({ owner, connec
     select id from bot_setting_proposals where organization_id = ${ORG_A} and id = ${bypassProposalId}
   `);
   assert(crossTenant.length === 0, "RLS must hide another tenant's proposal");
+  // S1b: the run-key cohort on the real route. The PLAN bot answers its plan-mode
+  // refusal only once the key is accepted; a refused key says "run_key is not valid".
+  const NEW_SECRET = "integration-bot-settings-run-key";
+  const proposeWith = async (env: Record<string, string>, runKey: string) => {
+    const scoped = new Hono<{ Variables: AppVariables }>();
+    scoped.route("/api/mcp/bot-settings", botSettingsToolMcpRoutes(db, testInternalSecrets("api", env)));
+    const response = await scoped.request(`/api/mcp/bot-settings/${ORG_A}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${BEARER}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method: "tools/call", params: { name: "bot_settings_propose", arguments: { run_key: runKey, reason: "cohort", label: "Cohort" } } }),
+    });
+    return (await response.json() as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
+  };
+  const ACCEPTED = "plan mode: proposing setting changes is disabled";
+  const planRun = runs.get(PLAN)!.runId;
+  const planCreated = (await owner<Array<{ at: Date }>>`select created_at as at from runs where id = ${planRun}`)[0]!.at;
+  const bound = (offsetMs: number) => new Date(planCreated.getTime() + offsetMs).toISOString();
+  const formerKey = signBotSettingsRunKey(WORKER_SECRET, planRun);
+  const previous = (offsetMs: number) => ({ RUN_KEY_SECRET: NEW_SECRET, RUN_KEY_PREVIOUS_SECRET: WORKER_SECRET, RUN_KEY_PREVIOUS_CREATED_BEFORE: bound(offsetMs) });
+  assert(await proposeWith({ RUN_KEY_SECRET: NEW_SECRET }, signBotSettingsRunKey(NEW_SECRET, planRun)) === ACCEPTED, "a key signed with RUN_KEY_SECRET must pass");
+  assert(await proposeWith(previous(60_000), formerKey) === ACCEPTED, "the previous secret must read the key of a run created before its bound");
+  assert((await proposeWith(previous(0), formerKey)).startsWith("run_key is not valid"), "a run created at the bound is outside the cohort");
+  assert((await proposeWith(previous(-60_000), formerKey)).startsWith("run_key is not valid"), "a former key for a run created after the bound must be refused");
+  assert((await proposeWith({ RUN_KEY_SECRET: NEW_SECRET }, formerKey)).startsWith("run_key is not valid"), "after P4 the former secret must read no key");
+
   await db.close();
-  console.log("bot-settings-tool: MCP, proposal lifecycle, operator decisions, stale checks and tenant RLS proven");
+  console.log("bot-settings-tool: MCP, proposal lifecycle, operator decisions, stale checks, tenant RLS and run-key cohort proven");
 });

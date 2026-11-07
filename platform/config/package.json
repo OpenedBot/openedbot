@@ -18,6 +18,7 @@
     "./env-schema": "./src/env-schema.ts",
     "./hermes-timeouts": "./src/hermes-timeouts.ts",
     "./http-body": "./src/http-body.ts",
+    "./internal-secrets": "./src/internal-secrets.ts",
     "./native-clients": "./src/native-clients.ts",
     "./rate-limit": "./src/rate-limit.ts",
     "./runtime-mode": "./src/runtime-mode.ts",

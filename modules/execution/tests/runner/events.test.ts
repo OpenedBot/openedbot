@@ -1,9 +1,10 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import type { OrganizationEvent } from "@openedbot/contracts-events";
 import { HermesEventNormalizer } from "../../src/domain/hermes-events";
 import { publish, publishBatch } from "../../src/application/runner/events";
 
-const config = { apiInternalUrl: "http://api:8790", apiInternalToken: "test-token" };
+const config = { apiInternalUrl: "http://api:8790", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "test-token"  })};
 const event: OrganizationEvent = {
   cursor: 42, organizationId: "org-1", threadId: "thread-1", runId: "run-1", sequence: 3,
   type: "message.delta", payload: { delta: "hello" }, occurredAt: "2026-09-05T12:00:00Z",
@@ -83,5 +84,23 @@ describe("publishBatch", () => {
     expect(requests).toHaveLength(2);
     expect(JSON.parse(requests[0]!)).toEqual(uncommitted);
     expect(JSON.parse(requests[1]!)).toEqual({ events: committed });
+  });
+});
+
+describe("one secret per internal role (S1b)", () => {
+  const split = { EVENTS_INTERNAL_TOKEN: "events-secret", RELAY_INTERNAL_TOKEN: "relay-secret", RUN_KEY_SECRET: "run-key-secret", WORKER_INTERNAL_TOKEN: "former-secret" };
+  const sent = async (emit: "legacy" | "split") => {
+    let authorization = null as string | null;
+    await publish({ apiInternalUrl: "http://api:8790", internalSecrets: testInternalSecrets("worker", { ...split, INTERNAL_TOKENS_EMIT: emit }) }, event,
+      (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        authorization = new Headers(init?.headers).get("Authorization");
+        return new Response(null, { status: 204 });
+      }) as typeof fetch);
+    return authorization;
+  };
+
+  test("events go out with the former secret in phase P1 and with the events secret from P2 on", async () => {
+    expect(await sent("legacy")).toBe("Bearer former-secret");
+    expect(await sent("split")).toBe("Bearer events-secret");
   });
 });

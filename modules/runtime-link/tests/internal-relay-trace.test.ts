@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import { captureLogEvents } from "@openedbot/platform-observability/log/test-logger";
@@ -13,7 +14,7 @@ function relayWith(seen: RelayRequest[]) {
     connected: () => true,
     dialer: () => async (request: RelayRequest) => { seen.push(request); return Response.json({ ok: true }); },
   } as unknown as RuntimeLinkBroker;
-  return runtimeLinkInternalRelay({ workerInternalToken: "test" } as ApiConfig, broker, NO_RUNTIME_LINK_LOCATOR);
+  return runtimeLinkInternalRelay(testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: "test" }), broker, NO_RUNTIME_LINK_LOCATOR);
 }
 
 function context(path: string, headers: Record<string, string>): InternalRelayContext {

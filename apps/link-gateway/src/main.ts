@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { describeInternalSecrets, internalBearer, readInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { createAuditWormStore } from "@openedbot/runtime-link/application/audit-worm";
 import { assertProductionConfig, readApiConfig } from "@openedbot/platform-config/api-config";
 import { createDatabase } from "@openedbot/platform-db";
@@ -17,12 +18,15 @@ const config = readApiConfig();
 const linkConfig = readRuntimeLinkConfig();
 if (linkConfig.mode !== "separate") throw new Error("The persistent gateway requires RUNTIME_LINK_MODE=separate");
 if (config.environment === "production") assertProductionConfig(config);
+// The gateway holds the relay and inventory secrets only (ADR 0001, S1b): it can
+// neither publish events nor sign run keys, the only process exposed to the hosts.
+const internalSecrets = readInternalSecrets("link-gateway", config.environment);
 // Pool propre à la passerelle, jamais celui de l'API : voir RUNTIME_LINK_DB_MAX_DEFAULT.
 const db = createDatabase(config.databaseUrl, linkConfig.dbMax);
 const instanceId = `link-${crypto.randomUUID()}`;
 const startedAt = new Date();
 const log = (event: string, fields: Record<string, unknown>) => logger.info({ event, instanceId, ...fields }, event);
-const instanceConfig = { instanceId, apiInternalUrl: linkConfig.internalUrl, workerInternalToken: config.workerInternalToken };
+const instanceConfig = { instanceId, apiInternalUrl: linkConfig.internalUrl, relay: internalSecrets };
 const registry = createApiInstanceRegistry(db, instanceConfig, startedAt);
 const lease = routingLease(registry);
 const locator = createRuntimeLinkLocator(db, instanceConfig);
@@ -30,13 +34,12 @@ const locator = createRuntimeLinkLocator(db, instanceConfig);
 // legacy). Aucun plug-in n'est chargé ici : un ancrage externe en échec n'y
 // est jamais bloquant, il se journalise (`worm_write_failed`).
 // `inventory.changed` : la composition de l'inventaire vit dans l'API ; la
-// passerelle lui transmet le runtime à relire (même bearer que les autres
-// appels internes). Un signal perdu n'est pas grave : la page relit l'hôte
+// passerelle lui transmet le runtime à relire (secret du signal d'inventaire). Un signal perdu n'est pas grave : la page relit l'hôte
 // quand l'instantané est périmé, et la prochaine connexion en renvoie un.
 const signalInventoryChanged = (link: { organizationId: string; runtimeId: string }) => {
   void fetch(`${config.apiInternalUrl}/internal/runtime-inventory/changed`, {
     method: "POST",
-    headers: { authorization: `Bearer ${config.workerInternalToken}`, "content-type": "application/json" },
+    headers: { authorization: internalBearer(internalSecrets, "inventory"), "content-type": "application/json" },
     body: JSON.stringify({ organizationId: link.organizationId, runtimeId: link.runtimeId }),
     signal: AbortSignal.timeout(5_000),
   }).then((response) => {
@@ -63,7 +66,7 @@ app.get("/health", async (context) => {
   }
   return context.json({ ok: true, role: "runtime-link-gateway", instanceId, draining: service.draining });
 });
-app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(config, broker, locator, {
+app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(internalSecrets, broker, locator, {
   isDraining: () => service.draining,
 }));
 app.onError((error, context) => {
@@ -91,7 +94,7 @@ const service = startRuntimeLinkServer({
     });
   },
 });
-log("runtime_link.gateway_started", { url: service.server.url.toString(), startedAt: startedAt.toISOString() });
+log("runtime_link.gateway_started", { url: service.server.url.toString(), startedAt: startedAt.toISOString(), internalSecrets: describeInternalSecrets(internalSecrets) });
 let shutdownWork: Promise<void> | undefined;
 function shutdown(signal: string): Promise<void> {
   return shutdownWork ??= (async () => {

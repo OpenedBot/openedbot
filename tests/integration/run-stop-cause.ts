@@ -11,6 +11,7 @@
  * `unattended-gates.ts` calls the reconciliation directly. The same path
  * carries `APPROVAL_EXPIRED` and `RUN_INACTIVITY_TIMEOUT`.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import { RUN_TIMEOUT_STOP_CODE } from "../../contracts/errors/src/index.ts";
 import { encryptSecret, secretEncryptionKey } from "../../platform/hermes/src/index.ts";
@@ -67,7 +68,7 @@ try {
     const workerConfig: WorkerConfig = {
       workerId: "openedbot147-worker",
       apiInternalUrl: "http://127.0.0.1:9",
-      apiInternalToken: "openedbot147",
+      internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "openedbot147" }),
       tokenEncryption: { current: key, previous: [] },
       hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],

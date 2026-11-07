@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -221,7 +222,7 @@ async function runChild(_mode: ChildMode): Promise<void> {
       workerId,
       apiInternalUrl,
       runtimeLinkInternalUrl: runtimeLinkUrl,
-      apiInternalToken: internalToken,
+      internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: internalToken }),
       tokenEncryption: {} as WorkerConfig["tokenEncryption"],
       hermesMtls: null,
       hermesEndpointPolicy: {
@@ -383,7 +384,7 @@ async function parentMain(): Promise<void> {
         });
         apiApp.route("/internal/events", internalEventRoutes(
           apiDb as unknown as Db,
-          { workerInternalToken: INTERNAL_WORKER_TOKEN } as ApiConfig,
+          testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: INTERNAL_WORKER_TOKEN }),
           hub,
         ) as unknown as HonoLikeApp);
         apiApp.route("/", eventRoutes(apiDb as unknown as Db, hub, {

@@ -21,7 +21,6 @@ import { fileBlobRoot, resolveBlobDriver } from "./blob-driver";
 import { readNativeClients, type NativeClients } from "./native-clients";
 
 /** Non-secret placeholder used outside production; rejected by assertProductionConfig. */
-const DEV_WORKER_INTERNAL_TOKEN = "openedbot-worker-dev-token";
 const DEV_METRICS_INTERNAL_TOKEN = "openedbot-metrics-dev-token";
 
 /** L'origine de la PWA en développement, quand `WEB_APP_URL` n'est pas posé. */
@@ -306,7 +305,8 @@ export type ApiConfig = {
    * inventer rouvrirait le garde SSRF.
    */
   hermesEndpointPolicy: EndpointPolicy;
-  workerInternalToken: string;
+  // The internal secrets (events, relay, inventory, run keys) are not here: each
+  // process reads its own with `readInternalSecrets` (internal-secrets.ts, S1b).
   metricsInternalToken: string;
   /** true seulement derrière un reverse-proxy de confiance (nginx en prod). */
   trustProxy: boolean;
@@ -466,9 +466,6 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     developmentHermesUrl,
     testHermesUrl,
     hermesEndpointPolicy,
-    workerInternalToken:
-      env.WORKER_INTERNAL_TOKEN?.trim() ||
-      (environment === "production" ? required(undefined, "WORKER_INTERNAL_TOKEN") : DEV_WORKER_INTERNAL_TOKEN),
     metricsInternalToken:
       env.METRICS_INTERNAL_TOKEN?.trim() ||
       (environment === "production" ? required(undefined, "METRICS_INTERNAL_TOKEN") : DEV_METRICS_INTERNAL_TOKEN),
@@ -555,10 +552,8 @@ export function assertProductionConfig(config: ApiConfig): void {
   if ((config.hermesEndpointPolicy.insecureOrigins?.size ?? 0) > 0) {
     throw new Error("HERMES_ALLOW_INSECURE_ORIGINS must be empty in production; Hermes requires HTTPS.");
   }
-  if (config.workerInternalToken === DEV_WORKER_INTERNAL_TOKEN) {
-    throw new Error("WORKER_INTERNAL_TOKEN must not be the development default in production.");
-  }
-  if (config.metricsInternalToken === DEV_METRICS_INTERNAL_TOKEN || config.metricsInternalToken === config.workerInternalToken) {
+  // Distinct from every internal secret too: `readInternalSecrets` checks it in production.
+  if (config.metricsInternalToken === DEV_METRICS_INTERNAL_TOKEN) {
     throw new Error("METRICS_INTERNAL_TOKEN must be a distinct production secret.");
   }
   // En production l'API vit toujours derrière le proxy TLS (PRODUCTION.md) :

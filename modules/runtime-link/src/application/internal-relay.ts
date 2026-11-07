@@ -10,10 +10,10 @@ import {
 import { logEvent } from "@openedbot/platform-observability";
 import { parseTraceparent, type TraceContext } from "@openedbot/platform-observability/trace-context";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
-import type { ApiConfig } from "@openedbot/platform-config/api-config";
+import { matchInternalBearer, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
+import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import { jsonBody } from "@openedbot/platform-config/http-body";
 import { SSE_HEARTBEAT_INTERVAL_MS } from "@openedbot/platform-config/sse-heartbeat";
-import { constantTimeEqual } from "@openedbot/platform-db/credential";
 import { relayFailureStatus, type RuntimeLinkBroker } from "./broker";
 import { parseProbeGeneration, type LinkProbeResult } from "@openedbot/runtimes/domain/link-probe";
 import {
@@ -63,16 +63,15 @@ export type InternalRelayHandlers = {
  * propriétaire (`X-OpenedBot-Relay-Hop: 1`). Un second hop est refusé 508.
  */
 export function runtimeLinkInternalRelay(
-  config: ApiConfig,
+  internal: InternalSecretsWith<"relay">,
   broker: RuntimeLinkBroker | null,
   locator: RuntimeLinkLocator = runtimeLinkLocator(),
   options: { isDraining?: () => boolean } = {},
 ): InternalRelayHandlers {
   const proxy = async (context: InternalRelayContext): Promise<Response> => {
-    const authorization = context.req.header("Authorization") ?? "";
-    if (!constantTimeEqual(authorization, `Bearer ${config.workerInternalToken}`)) {
-      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
-    }
+    const match = matchInternalBearer(internal, "relay", context.req.header("Authorization"));
+    internalAuthMetrics.recordBearer("relay", match.ok ? match.via : "refused", "proxy");
+    if (!match.ok) throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     const runtimeId = context.req.param("runtimeId");
     const url = new URL(context.req.url);
     const prefix = `${RUNTIME_LINK_INTERNAL_PREFIX}/${runtimeId}/proxy`;
@@ -136,10 +135,9 @@ export function runtimeLinkInternalRelay(
    * la requête publique est arrivée sur une autre instance que le propriétaire.
    */
   const control = async (context: InternalRelayContext): Promise<Response> => {
-    const authorization = context.req.header("Authorization") ?? "";
-    if (!constantTimeEqual(authorization, `Bearer ${config.workerInternalToken}`)) {
-      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
-    }
+    const match = matchInternalBearer(internal, "relay", context.req.header("Authorization"));
+    internalAuthMetrics.recordBearer("relay", match.ok ? match.via : "refused", "control");
+    if (!match.ok) throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     const runtimeId = context.req.param("runtimeId");
     const hopped = relayHopped((name) => context.req.header(name));
     const body = await jsonBody(context.req.raw);
@@ -188,10 +186,9 @@ export function runtimeLinkInternalRelay(
    * raccrochage 4005, génération changée) ; `forwardProbe` le borne.
    */
   const probe = async (context: InternalRelayContext): Promise<Response> => {
-    const authorization = context.req.header("Authorization") ?? "";
-    if (!constantTimeEqual(authorization, `Bearer ${config.workerInternalToken}`)) {
-      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
-    }
+    const match = matchInternalBearer(internal, "relay", context.req.header("Authorization"));
+    internalAuthMetrics.recordBearer("relay", match.ok ? match.via : "refused", "probe");
+    if (!match.ok) throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     const runtimeId = context.req.param("runtimeId");
     const hopped = relayHopped((name) => context.req.header(name));
     const body = await jsonBody(context.req.raw);

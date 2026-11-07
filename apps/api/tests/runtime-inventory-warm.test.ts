@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import type { HermesCapabilityInventory, HermesMcpInventory } from "@openedbot/hermes";
@@ -106,7 +107,7 @@ describe("POST /internal/runtime-inventory/changed", () => {
   const token = "internal-token-0123456789";
   function app() {
     const warmed: string[] = [];
-    const routes = internalInventoryRoutes({ workerInternalToken: token }, {
+    const routes = internalInventoryRoutes(testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: token }), {
       warm: (organizationId, runtimeId) => warmed.push(`${organizationId}/${runtimeId}`),
       idle: async () => {},
     });

@@ -1779,9 +1779,171 @@ Comportement identique (tests existants, golden inchangé) ; `runner.ts` sort du
 - **Secrets internes séparés.** `WORKER_INTERNAL_TOKEN` sert de bearer pour trois flux
   (publication d'événements, relais, signal d'inventaire) **et** de clé HMAC des clés de run.
   Cible : un secret par usage, la clé HMAC dérivée (HKDF) d'un secret maître distinct. La valeur
-  de dev est déjà refusée en production par l'API et le gateway (`api-config.ts:554`) ; le worker
-  exige une valeur mais n'interdit pas cette valeur précise (`apps/worker/src/config.ts:212-214`) :
-  à aligner.
+  de dev est refusée en production par l'API, le gateway (`api-config.ts:558`) et, depuis, le
+  worker (`apps/worker/src/config.ts:344`).
+  **Plan (S1b, 2026-11-07).** Inventaire des six usages de la valeur unique, présente dans les
+  trois processus (API, worker, link-gateway) :
+
+  | Usage | Émetteur | Vérificateur | Code |
+  |---|---|---|---|
+  | (a) publication d'événements | worker | API | `runner/events.ts`, `persist.ts` → `event-routes.ts:546` |
+  | (b) relais vers un hôte (proxy, dial, contrôle, sonde) | worker | route interne de l'API ou du link-gateway, qui transmet à l'instance qui tient le lien | `runtime-client.ts:92` → `internal-relay.ts:73/140/192`, `apps/api/src/index.ts:274/292/352` |
+  | (c) saut entre instances | API, link-gateway | autre instance | `instances.ts:171/220/359` |
+  | (d) rotation du jeton de lien, inventaire des sessions | worker (tâches de maintenance) | instance qui tient le lien | `runtime-links.ts:191/279` |
+  | (e) signal d'inventaire | link-gateway | API | `link-gateway/main.ts:39` → `runtime-inventory-warm.ts:107` |
+  | (f) clés de run des outils MCP (routine, réglages du bot) | worker (signe) | API (lit) | `creation.ts:275-278` → `routine-tool-routes.ts:178`, `bot-settings-tool-routes.ts:128` |
+
+  Une fuite depuis n'importe quel processus donne aujourd'hui les six : écrire dans le fil de
+  n'importe quelle organisation, piloter n'importe quel hôte relié (y compris faire tourner son
+  jeton de lien), fabriquer des clés de run. Le link-gateway, seul processus exposé aux hôtes,
+  détient tout.
+
+  *Secrets cibles* (un par rôle ; (b), (c) et (d) passent par les mêmes routes internes du relais,
+  donc un seul secret) :
+
+  | Variable | API | worker | link-gateway |
+  |---|---|---|---|
+  | `EVENTS_INTERNAL_TOKEN` (a) | vérifie | émet | — |
+  | `RELAY_INTERNAL_TOKEN` (b, c, d) | vérifie, émet | émet | vérifie, émet |
+  | `INVENTORY_INTERNAL_TOKEN` (e) | vérifie | — | émet |
+  | `RUN_KEY_SECRET` (f) | vérifie | signe | — |
+
+  La dérivation des clés de run ne change pas : `HMAC(HMAC(secret, libellé), runId)` est déjà une
+  sous-clé par libellé (`routine-run-key.ts:20-22`) ; seul le secret maître change, et il n'est
+  plus un bearer. Une clé de run n'expire pas (`runId.signature`) : elle vaut tant que son run vit,
+  et un run repris (identifiant Hermes conservé, `runner.ts:75`), remis en file à l'arrêt
+  (`worker-shutdown.ts:30`) ou réactivé depuis `unknown` (`run-review.ts:14`) garde la clé signée à
+  sa création. D'où `RUN_KEY_PREVIOUS_SECRET` et `RUN_KEY_PREVIOUS_CREATED_BEFORE` (API
+  seulement, l'un n'existe pas sans l'autre) : l'ancien secret n'est accepté que pour lire la clé
+  d'un run dont `created_at` précède cette borne (la fin de la convergence de P2, date fixée et
+  écrite dans le journal de bascule), jamais comme bearer ni pour signer. Une clé ancienne forgée
+  pour un run créé après la borne est refusée : à P3, la fuite de l'ancien secret ne donne plus
+  que les runs anciens encore vivants, cohorte qui ne peut que décroître. Retrait en P4, sur
+  preuve en base.
+  `METRICS_INTERNAL_TOKEN` reste à part et doit différer de tous. En dev et en préprod l'API tient
+  elle-même les WebSockets (`embedded`) ; en production le link-gateway les tient et l'API relaie
+  vers lui : les deux exigent `RELAY_INTERNAL_TOKEN`.
+
+  *Configuration* (un module unique `platform/config` lu par l'API, le link-gateway et le worker,
+  avec le rôle du processus) :
+  - valeur d'un rôle = la variable du rôle, sinon `WORKER_INTERNAL_TOKEN` (repli, comportement
+    d'aujourd'hui), sinon, hors production, une valeur de dev propre au rôle ;
+  - un processus n'exige que les rôles qu'il utilise (tableau ci-dessus) ; le link-gateway n'a ni
+    `EVENTS_INTERNAL_TOKEN` ni `RUN_KEY_SECRET`, et le code qui les utilise ne s'y compile pas
+    (valeur absente du type, pas une chaîne vide) ;
+  - en production : valeurs de dev refusées, valeurs explicites distinctes entre elles, de
+    `WORKER_INTERNAL_TOKEN` et de `METRICS_INTERNAL_TOKEN` ; un avertissement au démarrage pour
+    chaque rôle encore servi par le repli (auto-hébergement non migré : il démarre comme avant) ;
+  - vérification : la valeur du rôle, plus `WORKER_INTERNAL_TOKEN` tant qu'il est défini
+    (transition), plus, pour les seules clés de run, `RUN_KEY_PREVIOUS_SECRET` dans la cohorte
+    ci-dessus ; comparaison à temps constant, aucune autre valeur ;
+  - émission : `INTERNAL_TOKENS_EMIT=legacy` envoie `WORKER_INTERNAL_TOKEN` (et signe les clés de
+    run avec), `split` (défaut) envoie la valeur du rôle ; en production, si une variable de rôle
+    explicite **et** `WORKER_INTERNAL_TOKEN` coexistent, `INTERNAL_TOKENS_EMIT` doit être posée
+    explicitement (garde contre une bascule implicite pendant un déploiement progressif) ;
+    `legacy` sans `WORKER_INTERNAL_TOKEN` est refusé.
+
+  *Déploiement sans coupure* (mise à jour progressive : anciens et nouveaux conteneurs coexistent
+  à chaque phase ; une seule release de code, puis des changements d'environnement) :
+
+  | Phase | Environnement | Vérifient | Émettent, signent | Recouvrement |
+  |---|---|---|---|---|
+  | P1 | code N ; quatre secrets générés (`openssl rand -hex 32`), `EMIT=legacy`, ancien secret gardé | rôle + ancien | ancien | conteneurs N-1 n'émettent et ne vérifient que l'ancien : accepté partout |
+  | P2 | `EMIT=split` | rôle + ancien | rôle | conteneurs P1 émettent l'ancien, encore accepté ; nouveaux émettent le rôle, que tous acceptent depuis P1 |
+  | P3 | `WORKER_INTERNAL_TOKEN` et `EMIT` retirés ; `RUN_KEY_PREVIOUS_SECRET` = l'ancien et `RUN_KEY_PREVIOUS_CREATED_BEFORE` = borne de P2 (API) | rôle ; clés de run : rôle, ou précédent pour un run d'avant la borne | rôle | conteneurs P2 vérifient encore les deux et émettent déjà le rôle |
+  | P4 | `RUN_KEY_PREVIOUS_*` retirés, sur preuve P4 ci-dessous | rôle | rôle | aucune clé ancienne vivante |
+  | N+1 | code : `EMIT` et la vérification de l'ancien supprimés ; le repli d'auto-hébergement reste au moins une release annoncée de plus | rôle | rôle | aucun effet en production |
+
+  La séparation n'est effective qu'à P3 : tant que l'ancien secret est accepté, sa fuite garde
+  tous les pouvoirs. *Barrière entre phases* : on ne passe à la suivante qu'une fois les trois
+  services convergés (rapport Shuttle « Release identity verified », `UpdateState=completed` sans
+  retour arrière Swarm pour `api`, `worker`, `link-gateway`, une seule version de spécification par
+  service parmi ses tâches en cours, et pour chaque tâche les **références** de secrets Swarm
+  attachées (`Spec.ContainerSpec.Secrets` : noms versionnés par Shuttle, jamais les valeurs)
+  identiques à celles du service ; enfin la ligne de démarrage de **chaque** tâche en cours, qui
+  annonce son mode : rôles explicites, ancien accepté ou non, `EMIT`, cohorte de clés de run, sans
+  valeur ni empreinte de secret). Un retour arrière Swarm ou une tâche ancienne relancée arrête la
+  procédure.
+
+  *Preuves en base* (exécutées sur la base de production, résultat consigné dans le journal de
+  bascule ; « vivant » = tout statut non final, `unknown` et en file compris, la liste venant du
+  code des statuts et non recopiée à la main) :
+  - **P4** : `count(*)` des runs vivants avec `created_at < RUN_KEY_PREVIOUS_CREATED_BEFORE` = 0 ;
+  - **retour vers des vérificateurs `legacy` seuls** (code N-1, ou ancien secret seul) : une clé
+    est signée au démarrage de l'exécution (`creation.ts:275`), pas à la création du run ; tout
+    run existant au moment d'une passe `split`, quelle qu'elle soit, a donc pu recevoir une clé
+    `split`. Preuve par drain : après convergence de `EMIT=legacy`, `count(*)` des runs vivants
+    avec `created_at <` l'heure de cette convergence = 0 ; les runs créés ensuite n'ont que des
+    clés `legacy`. Sinon leurs appels d'outils MCP échoueraient (« run_key is not valid »)
+    jusqu'à leur fin.
+  - La preuve P4 reste juste pour la même raison : un run créé avant la borne mais démarré après
+    la convergence de P2 porte une clé du rôle, vérifiée sans le secret précédent.
+  Toute bascule en arrière invalide une preuve déjà faite : elle se refait après la nouvelle
+  convergence.
+
+  *Retour arrière* : P1 → image et environnement précédents (P1 n'a encore rien signé avec les
+  nouveaux secrets) ; P2 → `EMIT=legacy` ; P3 → remettre `WORKER_INTERNAL_TOKEN` **avec**
+  `INTERNAL_TOKENS_EMIT=split` (retour à P2 ; sans `EMIT`, la configuration refuse de démarrer) ;
+  revenir au code N-1 après P2 exige d'abord `EMIT=legacy` convergé, puis la preuve « retour
+  vers `legacy` » ci-dessus.
+
+  *Production (Shuttle, dépôt pro)* : chaque nouveau secret est un élément `secrets.items`
+  distinct, `expose: env`, livré aux seuls services du tableau, sa valeur dans le fichier hôte
+  `/etc/openedbot/shuttle.b64.env`. Ils ne doivent **jamais** figurer dans `OPENEDBOT_ENV_B64` :
+  `entrypoint.sh` source ce paquet après les variables injectées et les écraserait (et un
+  `RUN_KEY_SECRET` y reviendrait dans le link-gateway). L'entrypoint décode donc le paquet dans
+  un fichier privé et, **avant** de le sourcer, refuse de démarrer s'il contient une affectation,
+  même vide ou identique, de `EVENTS_INTERNAL_TOKEN`, `RELAY_INTERNAL_TOKEN`,
+  `INVENTORY_INTERNAL_TOKEN`, `RUN_KEY_SECRET`, `RUN_KEY_PREVIOUS_SECRET` ou
+  `RUN_KEY_PREVIOUS_CREATED_BEFORE` (avec ou sans `export`) ; les variables injectées par Shuttle
+  restent permises (tests dans pro). `WORKER_INTERNAL_TOKEN` reste dans le paquet jusqu'à
+  P3. Le rôle Ansible `openedbot_alpha`, `infra/scripts/secrets.sh` et `infra/preprod/render-env.sh`
+  génèrent et inventorient les quatre secrets ; la procédure de production est écrite dans
+  `DEPLOY-NOTES.md`, Ansible ne touchant pas l'environnement Shuttle.
+
+  *Consommateurs à migrer* : `tests/e2e/connector-live-k6.ts:41`,
+  `tests/e2e/runtime-link-live-continuity.ts:23` et leurs guides (secret du relais) ; le schéma
+  d'environnement (`env-schema/shared.ts:261`), les gabarits générés et `scripts/env.ts` ; les tests
+  d'intégration qui posent l'ancien secret ; `apps/worker/README.md`. `CHANGELOG.md` décrit la
+  migration de l'auto-hébergement (facultative, repli conservé) et les limites du retour arrière.
+
+  *Observabilité* : un compteur par rôle et par issue (accepté rôle, accepté ancien, refusé), par
+  instance, sur chaque vérificateur, y compris le relais du link-gateway avant `relayJournal`
+  (`internal-relay.ts:73`, `:86`) et les sondes qui changent un refus en `owner_unavailable`
+  (`instances.ts:231`) ; une ligne de journal par refus (rôle, route, instance, jamais le bearer) ;
+  les clés de run comptées à part, puisqu'elles reviennent en erreur d'outil
+  (`routine-tool-routes.ts:179`) : acceptées par le secret du rôle, acceptées par le secret
+  précédent (cohorte), refusées. Critères : zéro refus à chaque phase ; à P3, zéro **bearer**
+  ancien accepté (les clés de run de la cohorte restent acceptées jusqu'à P4) ; à P4, zéro clé
+  acceptée par le secret précédent depuis la preuve.
+
+  *Preuves* : tests de configuration par rôle (exigences, distinctions, valeurs de dev, règles
+  `EMIT`, `RUN_KEY_PREVIOUS_SECRETS` refusé comme bearer) ; chaque route interne refuse les secrets
+  des autres rôles et l'ancien une fois retiré ; émetteurs en `legacy` et en `split` ; une clé de
+  run signée avec un secret non configuré est refusée. Un test d'intégration dédié avec API,
+  worker et link-gateway réels (pas `run-trace-correlation`, dont la publication vise une adresse
+  morte et dont les erreurs de publication sont absorbées, `runner/events.ts:56`) : publication
+  d'événements reçue par l'API, appels MCP réels pour les deux libellés de clé de run, signal
+  d'inventaire, relais, en modes `embedded` et séparé ; recouvrements P1/P2/P3 rejoués avec deux
+  configurations simultanées ; reprise d'un run signé avant la bascule ; clé ancienne forgée pour
+  un run créé après la borne refusée ; P4 (secret précédent retiré : clé ancienne refusée) ; retours
+  arrière P2 → P1 et P3 → P2 sans refus.
+  **État (S1b, 2026-11-07)** : fait dans le code, production à basculer
+  (`DEPLOY-NOTES.md` du dépôt pro, « Internal secrets »). `platform/config/src/internal-secrets.ts`
+  lit les secrets par processus (`readInternalSecrets("api" | "worker" | "link-gateway")`) ; ils
+  ne sont plus dans `ApiConfig`. Le type des secrets d'un processus n'a de champ que pour ses
+  rôles : la passerelle ne compile aucun usage d'`events` ni de `runKey`. Compteurs :
+  `platform/observability/src/internal-auth.ts`, dans `/internal/metrics` de l'API. Preuves :
+  `platform/config/tests/internal-secrets.test.ts` (règles), `apps/api/tests/internal-secrets-routes.test.ts`
+  (chaque route contre chaque secret, par phase), `apps/api/tests/internal-secrets-overlap.test.ts`
+  (paires de phases voisines dans les deux sens, phase sautée refusée, P4 sans preuve refusé),
+  `tests/integration/routine-tool.ts` (cohorte des clés de run sur PostgreSQL réel),
+  `tests/integration/run-trace-correlation.ts` (worker, passerelle et connecteur réels, secrets
+  séparés par processus par défaut, `OPENEDBOT_TRACE_E2E_SECRETS=legacy` pour l'ancien), et la
+  garde de l'entrypoint dans pro. Écart au plan : la publication d'événements et le signal
+  d'inventaire sont prouvés contre les vraies routes en processus (test de recouvrement), pas
+  entre processus séparés ; `run-trace-correlation` prouve le relais entre processus séparés.
+
 - **Contrat du connecteur unique.** `contracts/connector` et `protocol/connector` sont des
   copies ; les noms de fonctionnalités sont une liste en Go et des constantes éparses dans 10
   fichiers TS. Cible : `protocol/connector` fait foi, `contracts/connector` le réexporte, un test
@@ -1892,6 +2054,7 @@ des consommateurs pro. S5 n'est plus une étape : ses règles s'appliquent à ch
 | **D5** Linux | WebKitGTK, deb et AppImage, lancement sous xvfb | Build CI + parcours de test ; perf WebKitGTK mesurée |
 | **D6** Retrait d'Electron | `apps/desktop` et toute trace supprimés ; Linux publié en Tauri ; Windows retiré jusqu'à D4 ; release unique macOS + Linux (section 4.3.6) | Plus aucune mention hors historique ; `release.ts` et `desktop-release.yml` vérifient sommes et signatures. **Fait** (2026-11-06), rien de publié |
 | **S1** Sûreté | Refus du changement de clé implicite (après comptage en prod) ; secrets séparés ; worker aligné sur le refus de la valeur de dev | Tests de la section 5 |
+| **S1b** Secrets internes séparés | Un secret par rôle (section 4.7), repli sur l'ancien pour l'auto-hébergement, bascule par phases d'environnement avec barrières | Tests de la section 4.7 ; production en P4 sans ancien secret ; zéro refus interne aux compteurs pendant les phases |
 | **S2a** Inventaire | Inventaire des invariants des 16 écritures de `runs` ([0002](0002-invariants-des-runs.md)) | Document d'invariants relu |
 | **S2b** Primitives de création | Primitives transactionnelles + commandes explicites ; trigger 0091 conservé | Garde : aucune écriture de `runs`/`workflows` hors des primitives |
 | **S2c** Allocation d'événements | Une seule primitive : verrou du run puis verrou du curseur, puis calcul, dans la transaction qui insère | Garde sur `max(sequence)` hors primitive ; test de producteurs concurrents |
@@ -1942,6 +2105,29 @@ machine Linux physique ni sous Wayland. Aucun test sur WebView2 ni aucun test Po
 n'a été fait. Les autres points marqués `I` restent à confirmer.
 
 ## 10. Historique de revue
+
+**Revue Codex S1b n° 1 (2026-11-07)**, sur le plan des secrets internes : avis « à corriger »,
+aucun P0. Intégré en 4.7 :
+- P1 : une attente de 15 min ne prouve pas l'extinction des clés de run anciennes (reprises,
+  remises en file, `unknown` réactivés) : `RUN_KEY_PREVIOUS_SECRETS` et phase P4 sur preuve en base ;
+- P1 : retour arrière de P3 contradictoire avec la règle `EMIT` : ancien secret **et**
+  `EMIT=split` ;
+- P1 : barrières de convergence entre phases ;
+- P1 : secrets Shuttle hors du paquet commun, garde dans l'entrypoint ;
+- P2 : consommateurs oubliés (e2e, préprod, schéma, `scripts/env.ts`), repli d'auto-hébergement
+  gardé au-delà de N+1, compteurs de refus par rôle, test d'intégration dédié (et non
+  `run-trace-correlation`).
+
+**Revue Codex S1b n° 2 (2026-11-07)** : avis « pas prêt », aucun P0. Intégré : le secret précédent
+des clés de run limité à une cohorte (`RUN_KEY_PREVIOUS_CREATED_BEFORE`) ; une preuve en base par
+retrait et par retour arrière, refaite après toute bascule en arrière ; barrières sur les
+références de secrets de chaque tâche ; garde de l'entrypoint avant de sourcer, variables
+nommées ; compteurs distincts bearer ancien / clé de run précédente ; tests de P4, des retours
+arrière et d'une clé ancienne forgée pour un run récent.
+
+**Revue Codex S1b n° 3 (2026-11-07)** : un P1 restant, intégré : la preuve de retour vers
+`legacy` ne pouvait pas filtrer sur `created_at` (la clé est signée au démarrage) ; elle devient
+un drain de tous les runs antérieurs à la convergence en `legacy`.
 
 **Revue Codex n° 1 (2026-11-06)** — avis : « à corriger avant validation ». Corrections intégrées :
 

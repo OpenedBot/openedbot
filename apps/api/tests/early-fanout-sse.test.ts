@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { organizationEventEnvelope } from "@openedbot/contracts-events";
@@ -58,7 +59,7 @@ describe("SSE avant commit", () => {
     const published: unknown[] = [];
     const unsubscribe = hub.subscribe(organizationId, (entry) => { published.push(entry); });
     try {
-      const routes = internalEventRoutes(fakeRunEventsDb([]), { workerInternalToken: "worker-secret" } as ApiConfig, hub);
+      const routes = internalEventRoutes(fakeRunEventsDb([]), testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: "worker-secret" }), hub);
       routes.onError((error, context) => {
         if (error instanceof HttpError && error.status === 400) return context.json({ error: error.code }, 400);
         throw error;
@@ -80,7 +81,7 @@ describe("SSE avant commit", () => {
     const published: unknown[] = [];
     const unsubscribe = hub.subscribe(organizationId, (entry) => { published.push(entry); });
     try {
-      const routes = internalEventRoutes(fakeRunEventsDb([], { liveRun: identity }), { workerInternalToken: "worker-secret" } as ApiConfig, hub);
+      const routes = internalEventRoutes(fakeRunEventsDb([], { liveRun: identity }), testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: "worker-secret" }), hub);
       const supplied = organizationEventEnvelope({ ...base, botId: "wrong-bot", turnId: "wrong-turn", sessionKey: "wrong-session", leaseGeneration: 4, occurredAt });
       const response = await routes.request("http://localhost/publish", {
         method: "POST",
@@ -97,7 +98,7 @@ describe("SSE avant commit", () => {
     const published: Array<{ sequence: number }> = [];
     const unsubscribe = hub.subscribe(organizationId, (entry) => { published.push(entry as { sequence: number }); });
     try {
-      const routes = internalEventRoutes(fakeRunEventsDb([], { liveRun: identity }), { workerInternalToken: "worker-secret" } as ApiConfig, hub);
+      const routes = internalEventRoutes(fakeRunEventsDb([], { liveRun: identity }), testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: "worker-secret" }), hub);
       routes.onError((error, context) => {
         if (error instanceof HttpError && error.status === 400) return context.json({ error: error.code }, 400);
         throw error;
@@ -129,7 +130,7 @@ describe("SSE avant commit", () => {
     const buffer = { text: "" };
     await Bun.sleep(20);
 
-    const publish = internalEventRoutes(fakeRunEventsDb(rows, { liveRun: identity }), { workerInternalToken: "worker-secret" } as ApiConfig, hub);
+    const publish = internalEventRoutes(fakeRunEventsDb(rows, { liveRun: identity }), testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: "worker-secret" }), hub);
     const early = organizationEventEnvelope({
       ...base,
       ...identity,

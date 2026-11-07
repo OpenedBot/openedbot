@@ -8,6 +8,35 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Sécurité
+
+- **Un secret interne par usage au lieu d'un seul.** L'API, le worker et la
+  passerelle de lien partageaient `WORKER_INTERNAL_TOKEN` pour tous leurs
+  appels internes et pour signer les clés de run des outils MCP : une fuite
+  depuis n'importe lequel des trois donnait tout. Chaque usage a désormais son
+  secret, et chaque processus ne détient que les siens :
+  `EVENTS_INTERNAL_TOKEN` (publication d'événements, API et worker),
+  `RELAY_INTERNAL_TOKEN` (relais du lien, les trois), `INVENTORY_INTERNAL_TOKEN`
+  (signal d'inventaire, API et passerelle) et `RUN_KEY_SECRET` (clés de run,
+  API et worker, jamais un bearer). La passerelle, seul processus exposé aux
+  hôtes, ne peut plus ni publier d'événements ni signer de clé de run. Chaque
+  route interne refuse le secret des autres rôles ; les refus et les
+  acceptations transitoires se comptent par rôle (journal `internal_auth.*`,
+  `/internal/metrics` de l'API), sans jamais journaliser de secret.
+  **Auto-hébergement : rien à faire pour continuer.** Un usage sans sa
+  variable retombe sur `WORKER_INTERNAL_TOKEN`, et l'hôte démarre comme
+  avant (le démarrage dit quels rôles sont encore sur ce repli). Pour séparer,
+  sans coupure : poser les quatre secrets avec `INTERNAL_TOKENS_EMIT=legacy`
+  en gardant l'ancien, déployer ; passer à `split`, déployer ; retirer
+  `WORKER_INTERNAL_TOKEN` et `INTERNAL_TOKENS_EMIT` en posant
+  `RUN_KEY_PREVIOUS_SECRET` (l'ancienne valeur) et
+  `RUN_KEY_PREVIOUS_CREATED_BEFORE` (la fin de l'étape précédente) sur l'API,
+  déployer ; les retirer quand plus aucun run créé avant cette date n'est en
+  cours. Ne sautez pas d'étape : deux étapes voisines se comprennent, pas
+  deux étapes éloignées. Retour arrière depuis la troisième : remettre
+  l'ancien secret **avec** `INTERNAL_TOKENS_EMIT=split`. Détail :
+  `docs/architecture/0001-refonte-tauri-et-produit.md`, section 4.7.
+
 ## 1.1.1 — 2026-11-06
 
 ### Ajouté

@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import type { Server, SQL } from "bun";
 import { claimRun } from "../../modules/execution/src/application/queue";
 import { executeRun } from "../../modules/execution/src/application/runner";
@@ -286,7 +287,7 @@ async function main(): Promise<void> {
         workerId: `worker-${crypto.randomUUID()}`,
         apiInternalUrl: relayOrigin,
         runtimeLinkInternalUrl: relayOrigin,
-        apiInternalToken: INTERNAL_TOKEN,
+        internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: INTERNAL_TOKEN }),
         tokenEncryption: {} as WorkerConfig["tokenEncryption"],
         hermesMtls: null,
         hermesEndpointPolicy: {

@@ -15,6 +15,7 @@
  * workflow, a workflow with and without "Never wait" and a workflow row gone,
  * and both choice sets.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { afterAll, describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import { existsSync, readFileSync } from "node:fs";
@@ -121,7 +122,7 @@ function fakeTx(state: OrgState, workflow: { neverWait: boolean } | null, writes
   }) as unknown as SQL;
 }
 
-const CONFIG = { workerId: "worker-1", apiInternalUrl: "http://api.test", apiInternalToken: "tok", blob: { driver: "file" as const, root: "/nonexistent" } } as WorkerConfig;
+const CONFIG = { workerId: "worker-1", apiInternalUrl: "http://api.test", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "tok" }), blob: { driver: "file" as const, root: "/nonexistent" } } as WorkerConfig;
 
 async function runCase(state: OrgState, gate: GateIdentity, command: string | null, mode: string | null, workflow: (typeof WORKFLOWS)[string], choices: string[]): Promise<string[]> {
   const writes: unknown[] = [];

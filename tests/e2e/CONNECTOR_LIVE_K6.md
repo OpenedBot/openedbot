@@ -15,7 +15,7 @@ de serveur, ne compile pas le produit, ne déploie rien et ne change pas de runt
 Le Makefile charge les fichiers `.env.local` habituels. Fournir explicitement :
 
 - `E2E_EMAIL` et `E2E_PASSWORD` : compte de test owner/admin dans l'organisation ;
-- `WORKER_INTERNAL_TOKEN` : secret de relais interne correspondant à l'API ;
+- `RELAY_INTERNAL_TOKEN` : secret du relais interne de l'API (sur un hôte non migré, `WORKER_INTERNAL_TOKEN`) ;
 - `K6_BIN` : chemin du binaire officiel k6, ou installer k6 dans `PATH`.
 
 Le compte n'est pas déduit du Git, d'un seed ou d'une première ligne en base.

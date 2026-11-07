@@ -1,4 +1,5 @@
 import { chmod, rename, unlink, writeFile } from "node:fs/promises";
+import { readInternalSecrets } from "../platform/config/src/internal-secrets";
 import { basename } from "node:path";
 import { r2ConfigurationProblems } from "../platform/config/src/blob-driver";
 import { assertLegalFile, DEFAULT_LEGAL_MAX_BYTES, MAX_LEGAL_MAX_BYTES } from "../apps/api/src/infrastructure/config";
@@ -110,10 +111,10 @@ async function runCheck(): Promise<void> {
     if (values.BLOB_DRIVER && values.BLOB_DRIVER !== "r2" && values.BLOB_DRIVER !== "file") {
       throw new Error("BLOB_DRIVER must be r2 or file.");
     }
-    if (values.WORKER_INTERNAL_TOKEN === "openedbot-worker-dev-token") {
-      throw new Error("WORKER_INTERNAL_TOKEN must not be the development default in production.");
-    }
-    if (values.METRICS_INTERNAL_TOKEN === "openedbot-metrics-dev-token" || values.METRICS_INTERNAL_TOKEN === values.WORKER_INTERNAL_TOKEN) {
+    // The internal secrets, as each process reads them (S1b): a role it holds has
+    // its variable or the WORKER_INTERNAL_TOKEN fallback, no dev value, all distinct.
+    for (const process of ["api", "worker", "link-gateway"] as const) readInternalSecrets(process, "production", values);
+    if (values.METRICS_INTERNAL_TOKEN === "openedbot-metrics-dev-token") {
       throw new Error("METRICS_INTERNAL_TOKEN must be a distinct production secret.");
     }
     const alertWebhook = new URL(values.ALERT_WEBHOOK_URL!);

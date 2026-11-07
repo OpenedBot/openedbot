@@ -22,6 +22,7 @@
     "@openedbot/conversation": "workspace:*",
     "@openedbot/hermes": "workspace:*",
     "@openedbot/notifications": "workspace:*",
+    "@openedbot/platform-config": "workspace:*",
     "@openedbot/platform-db": "workspace:*",
     "@openedbot/platform-observability": "workspace:*",
     "@openedbot/roster": "workspace:*",

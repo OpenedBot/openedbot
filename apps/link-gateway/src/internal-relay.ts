@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { ApiConfig } from "@openedbot/platform-config/api-config";
+import type { InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
 import type { RuntimeLinkBroker } from "@openedbot/runtime-link/application/broker";
 import type { RuntimeLinkLocator } from "@openedbot/runtime-link/application/instances";
 import { runtimeLinkInternalRelay } from "@openedbot/runtime-link/application/internal-relay";
@@ -10,13 +10,13 @@ import { runtimeLinkInternalRelay } from "@openedbot/runtime-link/application/in
  * préfixe.
  */
 export function runtimeLinkInternalRoutes(
-  config: ApiConfig,
+  internal: InternalSecretsWith<"relay">,
   broker: RuntimeLinkBroker,
   locator: RuntimeLinkLocator,
   options: { isDraining?: () => boolean } = {},
 ): Hono {
   const routes = new Hono();
-  const relay = runtimeLinkInternalRelay(config, broker, locator, options);
+  const relay = runtimeLinkInternalRelay(internal, broker, locator, options);
   routes.all("/:runtimeId/proxy/*", (context) => relay.proxy(context));
   routes.post("/:runtimeId/control", (context) => relay.control(context));
   routes.post("/:runtimeId/probe", (context) => relay.probe(context));

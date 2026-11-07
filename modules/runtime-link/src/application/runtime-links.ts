@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { internalBearer, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
 import { createHash, randomBytes } from "node:crypto";
 import { holdUnconfirmedLinkTokenRotation, rotateLinkToken, undoLinkTokenRotation } from "@openedbot/runtimes/application/runtime-link-rows";
 import { pgTextArray } from "@openedbot/platform-db/text-array";
@@ -133,7 +134,8 @@ export type LinkFetch = (input: string, init?: RequestInit) => Promise<Response>
 export type LinkControlOptions = {
   apiInternalUrl: string;
   runtimeLinkInternalUrl?: string;
-  apiInternalToken: string;
+  /** The relay secret: these passes call the relay's control and proxy routes. */
+  internalSecrets: InternalSecretsWith<"relay">;
   fetchImpl?: LinkFetch;
   now?: () => Date;
 };
@@ -188,7 +190,7 @@ export async function rotateStaleLinkTokens(db: SQL, maxAgeHours: number, option
     try {
       const response = await fetchImpl(`${linkOrigin(options)}/internal/runtime-links/${encodeURIComponent(runtime.id)}/control`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${options.apiInternalToken}`, "Content-Type": "application/json" },
+        headers: { Authorization: internalBearer(options.internalSecrets, "relay"), "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "rotate", runtimeId: runtime.id, linkToken }),
         cache: "no-store",
         // Jamais une attente sans fin : l'échéance tombe dans le `catch`, issue inconnue.
@@ -276,7 +278,7 @@ export async function reconcileRuntimeSessions(db: SQL, options: LinkControlOpti
     try {
       const response = await fetchImpl(`${linkOrigin(options)}/internal/runtime-links/${encodeURIComponent(runtime.id)}/proxy/hermes-setup/sessions-inventory`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${options.apiInternalToken}` },
+        headers: { Authorization: internalBearer(options.internalSecrets, "relay") },
         cache: "no-store",
         // Jamais une attente sans fin : l'échéance tombe dans le `catch`, cet hôte est journalisé indisponible.
         signal: AbortSignal.timeout(LINK_SESSIONS_INVENTORY_TIMEOUT_MS),

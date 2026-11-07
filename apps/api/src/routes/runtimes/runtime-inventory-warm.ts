@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { isUuid } from "@openedbot/contracts-primitives";
 import { logger } from "@openedbot/platform-observability";
 import { readThrough, type RuntimeReadKind } from "@openedbot/runtimes/application/runtime-read-snapshots";
-import type { ApiConfig } from "../../infrastructure/config";
-import { constantTimeEqual } from "../../infrastructure/crypto";
+import { matchInternalBearer, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
+import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import type { IntegrationRouteContext } from "./runtime-integration-context";
 import { keepIntegrations, liveIntegrationsRead } from "./runtime-integration-inventory-routes";
@@ -96,17 +96,17 @@ export function createInventoryWarmer(ctx: IntegrationRouteContext): InventoryWa
  * `POST /internal/runtime-inventory/changed` : le signal d'une passerelle de
  * lien séparée (`RUNTIME_LINK_MODE=separate`), qui reçoit `inventory.changed`
  * dans son propre processus et n'a pas la composition de l'inventaire. Même
- * bearer interne que `/internal/events`. Le corps ne nomme qu'un runtime : la
+ * secret : celui du signal d'inventaire (`INVENTORY_INTERNAL_TOKEN`), pas celui
+ * des événements. Le corps ne nomme qu'un runtime : la
  * relecture passe par `readRuntime`, sous le tenant de l'organisation, et ne
  * fait rien si ce runtime n'en est plus le runtime actif.
  */
-export function internalInventoryRoutes(config: Pick<ApiConfig, "workerInternalToken">, warmer: InventoryWarmer): Hono {
+export function internalInventoryRoutes(internal: InternalSecretsWith<"inventory">, warmer: InventoryWarmer): Hono {
   const routes = new Hono();
   routes.post("/changed", async (context) => {
-    const authorization = context.req.header("Authorization") ?? "";
-    if (!constantTimeEqual(authorization, `Bearer ${config.workerInternalToken}`)) {
-      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification interne invalide.");
-    }
+    const match = matchInternalBearer(internal, "inventory", context.req.header("Authorization"));
+    internalAuthMetrics.recordBearer("inventory", match.ok ? match.via : "refused", "/internal/runtime-inventory/changed");
+    if (!match.ok) throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification interne invalide.");
     const body = await jsonBody(context.req.raw) as { organizationId?: unknown; runtimeId?: unknown };
     if (typeof body.organizationId !== "string" || !isUuid(body.organizationId)
       || typeof body.runtimeId !== "string" || !isUuid(body.runtimeId)) {

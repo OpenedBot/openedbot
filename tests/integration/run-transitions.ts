@@ -23,6 +23,7 @@
  * On `develop` before S2d, parts 1 (writes after expiry, before the sweep),
  * 3, 4 and 5 fail; part 2 is new (the function did not exist).
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import type { SQL } from "bun";
 import { claimRun } from "../../modules/execution/src/application/queue";
@@ -113,7 +114,7 @@ await withDisposablePostgres("openedbot4_s2d_transitions", async ({ owner, conne
   const journal = async (name: Name) => (await owner<Array<{ sequence: number; type: string }>>`
     select sequence, type from run_events where run_id = ${R[name]} order by sequence`).map((row) => `${row.sequence}:${row.type}`).join(",");
   const config = (workerId: string) => ({
-    workerId, apiInternalUrl: "http://127.0.0.1:9", apiInternalToken: "s2d", hermesMtls: null, leaseSeconds: 30,
+    workerId, apiInternalUrl: "http://127.0.0.1:9", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "s2d" }), hermesMtls: null, leaseSeconds: 30,
     runInactivityMs: 20_000, runTimeoutMs: 30_000, reconciliationTimeoutMs: 10_000, billingEnforced: false,
     cachedInputTokenWeight: 0.1, webAppUrl: "http://127.0.0.1:1420",
   }) as unknown as WorkerConfig;
