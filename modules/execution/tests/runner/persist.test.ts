@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,7 +53,7 @@ describe("persistEvents : pièces du runtime", () => {
     const config = {
       workerId: "worker-1",
       apiInternalUrl: "http://api.test",
-      apiInternalToken: "tok",
+      internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "tok" }),
       blob: { driver: "file" as const, root },
     } as WorkerConfig;
     const context = {
@@ -142,7 +143,7 @@ describe("persistEvents : revue d'un run sans étape de workflow (0175)", () => 
       return Promise.resolve([]);
     };
     const db = { begin: async (fn: (inner: typeof tx) => Promise<unknown>) => fn(tx) } as unknown as SQL;
-    const config = { workerId: "worker-1", apiInternalUrl: "http://api.test", apiInternalToken: "tok" } as WorkerConfig;
+    const config = { workerId: "worker-1", apiInternalUrl: "http://api.test", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "tok"  })} as WorkerConfig;
     const original = globalThis.fetch;
     globalThis.fetch = (async () => new Response(null, { status: 204 })) as unknown as typeof fetch;
     try {

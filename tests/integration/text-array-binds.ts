@@ -13,6 +13,7 @@
  *    unattributed-session pass threw on every host announcing a session).
  * 3. The creation-audit cross-check over dispatch hashes and remote run ids.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { enqueueProfileDelete } from "../../modules/portability/src/sql/delete-jobs";
 import { reconcileRuntimeSessions } from "../../modules/runtime-link/src/application/runtime-links";
 import { crossCheck } from "../../apps/api/src/routes/runtimes/runtime-audit-routes";
@@ -76,7 +77,7 @@ await withDisposablePostgres("openedbot133_text_arrays", async ({ owner: target,
   };
   const options = {
     apiInternalUrl: "http://link.invalid",
-    apiInternalToken: "openedbot133",
+    internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "openedbot133" }),
     fetchImpl: async () => Response.json(inventory),
   };
   const first = await reconcileRuntimeSessions(worker, options);

@@ -7,6 +7,7 @@
  * nothing), the routine-run guard, the schedule forms and minimum interval,
  * and that a tenant's bearer never reaches another tenant's run.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import type { AppVariables } from "../../apps/api/src/routes/identity/auth";
 import { routineToolMcpRoutes, routineToolSecretHash } from "../../apps/api/src/routes/execution/routine-tool-routes";
@@ -55,7 +56,7 @@ await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connec
   app.onError((error, context) => error instanceof HttpError
     ? context.json({ code: error.code }, error.status as 401)
     : context.json({ code: "INTERNAL" }, 500));
-  app.route("/api/mcp/routines", routineToolMcpRoutes(db, { workerInternalToken: SECRET }));
+  app.route("/api/mcp/routines", routineToolMcpRoutes(db, testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: SECRET })));
 
   let rpc = 0;
   const post = (org: string, bearer: string | null, body: unknown) => app.request(`/api/mcp/routines/${org}`, {
@@ -135,6 +136,36 @@ await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connec
   assert(cross.error, "another tenant's run must not be visible");
   assert(!(await call(BOT_B, { action: "list" }, { org: ORG_B, bearer: BEARER_B })).error, "tenant B lists its own");
 
+  // S1b: one secret per role. The run key is signed with RUN_KEY_SECRET; the former
+  // secret reads only the keys of runs created before RUN_KEY_PREVIOUS_CREATED_BEFORE.
+  const NEW_SECRET = "integration-run-key-secret";
+  const listWith = async (env: Record<string, string>, runKey: string) => {
+    const scoped = new Hono<{ Variables: AppVariables }>();
+    scoped.route("/api/mcp/routines", routineToolMcpRoutes(db, testInternalSecrets("api", env)));
+    const response = await scoped.request(`/api/mcp/routines/${ORG_A}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${BEARER_A}` },
+      body: JSON.stringify({ jsonrpc: "2.0", id: ++rpc, method: "tools/call", params: { name: "routine_manage", arguments: { run_key: runKey, action: "list" } } }),
+    });
+    const json = await response.json() as { result: { content: Array<{ text: string }>; isError: boolean } };
+    return { error: json.result.isError, text: json.result.content[0]!.text };
+  };
+  const live = runs.get(BYPASS)!;
+  const createdAt = (await owner<Array<{ at: Date }>>`select created_at as at from runs where id = ${live}`)[0]!.at;
+  const after = new Date(createdAt.getTime() + 60_000).toISOString();
+  const before = new Date(createdAt.getTime() - 60_000).toISOString();
+  const oldKey = signRoutineRunKey(SECRET, live), newKey = signRoutineRunKey(NEW_SECRET, live);
+  assert(!(await listWith({ RUN_KEY_SECRET: NEW_SECRET }, newKey)).error, "a key signed with RUN_KEY_SECRET must pass");
+  assert(!(await listWith({ RUN_KEY_SECRET: NEW_SECRET, RUN_KEY_PREVIOUS_SECRET: SECRET, RUN_KEY_PREVIOUS_CREATED_BEFORE: after }, oldKey)).error,
+    "the previous secret must read the key of a run created before its bound");
+  assert((await listWith({ RUN_KEY_SECRET: NEW_SECRET, RUN_KEY_PREVIOUS_SECRET: SECRET, RUN_KEY_PREVIOUS_CREATED_BEFORE: createdAt.toISOString() }, oldKey)).error,
+    "a run created at the bound is outside the cohort");
+  assert((await listWith({ RUN_KEY_SECRET: NEW_SECRET, RUN_KEY_PREVIOUS_SECRET: SECRET, RUN_KEY_PREVIOUS_CREATED_BEFORE: before }, oldKey)).error,
+    "a key forged with the previous secret for a run created after its bound must be refused");
+  assert((await listWith({ RUN_KEY_SECRET: NEW_SECRET }, oldKey)).error, "after P4 the former secret must read no key");
+  assert(!(await listWith({ RUN_KEY_SECRET: NEW_SECRET, WORKER_INTERNAL_TOKEN: SECRET, INTERNAL_TOKENS_EMIT: "split" }, oldKey)).error,
+    "during P2 the former secret still verifies run keys");
+
   await db.close();
-  console.log("routine-tool: 1 handshake, 4 modes, routine guard, schedules and tenant isolation proven");
+  console.log("routine-tool: 1 handshake, 4 modes, routine guard, schedules, tenant isolation and run-key cohort proven");
 });

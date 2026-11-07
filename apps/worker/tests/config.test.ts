@@ -96,7 +96,7 @@ describe("transactional email transports", () => {
   test("the development internal token is refused in production", () => {
     expect(() => readWorkerConfig(productionEnvironment({ WORKER_INTERNAL_TOKEN: "openedbot-worker-dev-token", TRANSACTIONAL_EMAIL_RESEND_API_KEY: "re_test-secret" }))).toThrow(/development default/);
     expect(() => readWorkerConfig(productionEnvironment({ WORKER_INTERNAL_TOKEN: "  openedbot-worker-dev-token  ", TRANSACTIONAL_EMAIL_RESEND_API_KEY: "re_test-secret" }))).toThrow(/development default/);
-    expect(readWorkerConfig(testEnvironment()).apiInternalToken).toBe("openedbot-worker-dev-token");
+    expect(readWorkerConfig(testEnvironment()).internalSecrets.roles.events.value).toBe("openedbot-events-dev-token");
   });
 
   test("SMTP alone is accepted outside production", () => {

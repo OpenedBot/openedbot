@@ -1,4 +1,5 @@
 import { memberInvitationRoutes } from "./routes/identity/member-invitation-routes";
+import { describeInternalSecrets, readInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { workspaceRoutes } from "./routes/identity/workspace-routes";
 import { Hono } from "hono";
 import { authMiddleware, authRoutes, protectedAuthRoutes, type AppVariables } from "./routes/identity/auth";
@@ -135,6 +136,8 @@ const MAX_REQUEST_BODY_BYTES = readRequestBodyLimit(process.env.API_MAX_BODY_BYT
 const baseConfig = readApiConfig();
 const runtimeLinkConfig = readRuntimeLinkConfig();
 if (baseConfig.environment === "production") assertProductionConfig(baseConfig);
+// One secret per internal role (ADR 0001, S1b): the API checks all four and relays.
+const internalSecrets = readInternalSecrets("api", baseConfig.environment);
 const db = createDatabase(baseConfig.databaseUrl, baseConfig.databaseMaxConnections);
 await initializeProductFeatures(db, isExplicitDevelopmentEnvironment());
 const productFeatures = await readProductFeatures(db);
@@ -281,12 +284,12 @@ const linkBroker = runtimeLinkConfig.mode === "embedded"
 const instanceRegistry = createApiInstanceRegistry(db, {
   instanceId,
   apiInternalUrl: config.apiInternalUrl,
-  workerInternalToken: config.workerInternalToken,
+  relay: internalSecrets,
 }, startedAt);
 const linkLocator = createRuntimeLinkLocator(db, {
   instanceId,
   apiInternalUrl: config.apiInternalUrl,
-  workerInternalToken: config.workerInternalToken,
+  relay: internalSecrets,
 });
 installRuntimeLinkLocator(linkLocator);
 installRuntimeLinks(instanceAwareRuntimeLinks(linkBroker ? brokerRuntimeLinks(linkBroker) : NO_RUNTIME_LINKS, linkLocator));
@@ -345,11 +348,11 @@ app.route("/api/waitlist", waitlistRoutes(db, config));
 // Depuis l'étape 11.3, le plug-in qui apporte `supportDesk` y répond ; sans
 // lui, 404 `NOT_FOUND` sur tout le préfixe (solo).
 app.route("/", supportDeskRoutes(supportDesk, proContext, proMountWarning, { trustProxy: config.trustProxy }));
-app.route("/internal/events", internalEventRoutes(db, config, hub, undefined, () => !eventRealtime.connected()));
-app.route("/internal/runtime-inventory", internalInventoryRoutes(config, inventoryWarmer));
-// Relais du lien connecteur pour le worker : même bearer interne, flux dans
+app.route("/internal/events", internalEventRoutes(db, internalSecrets, hub, undefined, () => !eventRealtime.connected()));
+app.route("/internal/runtime-inventory", internalInventoryRoutes(internalSecrets, inventoryWarmer));
+// Relais du lien connecteur pour le worker : le secret du relais, flux dans
 // les deux sens, jamais compressé (hors `/api/*`, et exclu par chemin).
-app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(config, linkBroker, linkLocator));
+app.route(RUNTIME_LINK_INTERNAL_PREFIX, runtimeLinkInternalRoutes(internalSecrets, linkBroker, linkLocator));
 app.route("/internal/metrics", internalMetricsRoutes(config, db, hub, blobs, runtimeMetrics, () => eventRealtime.status()));
 
 app.route("/api/hooks", webhookIngressRoutes(db, config));
@@ -359,8 +362,8 @@ app.route("/api/hooks", webhookIngressRoutes(db, config));
 app.route("/api/mcp-oauth", mcpOauthCallbackRoutes(db, config));
 // `routine_manage` (DEV-209) : appelé par le gateway Hermes de l'hôte, en
 // https, avec le bearer du runtime et la clé du run ; jamais une session.
-app.route("/api/mcp/routines", routineToolMcpRoutes(db, config));
-app.route("/api/mcp/bot-settings", botSettingsToolMcpRoutes(db, config));
+app.route("/api/mcp/routines", routineToolMcpRoutes(db, internalSecrets));
+app.route("/api/mcp/bot-settings", botSettingsToolMcpRoutes(db, internalSecrets));
 // Montages `public` des plug-ins pro, sous `/api/pro/<id>` : avant l'auth, et
 // nommés dans l'allow-list ci-dessous par `isProPublicPath`.
 if (installedPlugins.length > 0) {
@@ -529,6 +532,7 @@ logger.info({
   url: server.url.toString(),
   environment: config.environment,
   blobDriver: config.blob.driver,
+  internalSecrets: describeInternalSecrets(internalSecrets),
 }, "api started");
 // Le disque à la place de R2 : chaque démarrage le dit, avec ce qui manque à R2.
 if (config.blob.driver === "file" && config.blob.fallbackReason) {

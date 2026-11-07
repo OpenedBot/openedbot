@@ -1,7 +1,7 @@
 {
   "apps/api/src/routes/conversation/conversation-message-routes.ts": 602,
   "apps/api/src/routes/conversation/message-version-routes.ts": 633,
-  "apps/api/src/routes/events/event-routes.ts": 677,
+  "apps/api/src/routes/events/event-routes.ts": 675,
   "apps/api/src/routes/execution/routine-routes.ts": 910,
   "apps/api/src/routes/identity/auth.ts": 722,
   "apps/console/src/components/boardui/agent-editor-panel.tsx": 723,
@@ -36,6 +36,6 @@
   "modules/roster/src/sql/bots.ts": 638,
   "modules/runtime-link/src/application/gateway.ts": 703,
   "modules/runtime-link/src/application/link-connection.ts": 777,
-  "platform/config/src/api-config.ts": 880,
+  "platform/config/src/api-config.ts": 875,
   "platform/hermes/src/contracts.ts": 768
 }

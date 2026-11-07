@@ -1,3 +1,4 @@
+import { internalBearer } from "@openedbot/platform-config/internal-secrets";
 import {
   createRelayTransport,
   createDirectTransport,
@@ -37,7 +38,7 @@ export type RuntimeClientContext = {
 
 export type RuntimeClientConfig = Pick<
   WorkerConfig,
-  "apiInternalUrl" | "apiInternalToken" | "runtimeLinkInternalUrl"
+  "apiInternalUrl" | "internalSecrets" | "runtimeLinkInternalUrl"
 > & Partial<Pick<WorkerConfig, "tokenEncryption" | "hermesEndpointPolicy" | "hermesMtls" | "hermesTimeouts">>;
 
 /** En-tête posé par le relais quand la réponse décrit une panne du LIEN, pas une réponse gateway. */
@@ -84,12 +85,12 @@ export function relayProxyUrl(apiInternalUrl: string, runtimeId: string, path: s
  */
 export function createWorkerRelayDialer(
   runtimeId: string,
-  config: Pick<RuntimeClientConfig, "apiInternalUrl" | "apiInternalToken" | "runtimeLinkInternalUrl">,
+  config: Pick<RuntimeClientConfig, "apiInternalUrl" | "internalSecrets" | "runtimeLinkInternalUrl">,
   fetchImpl: typeof fetch = fetch,
 ): RelayDialer {
   return async (request: RelayRequest, signal?: AbortSignal): Promise<Response> => {
     const headers = new Headers(request.headers);
-    headers.set("Authorization", `Bearer ${config.apiInternalToken}`);
+    headers.set("Authorization", internalBearer(config.internalSecrets, "relay"));
     const parent = currentTrace();
     const trace = parent ? childTraceContext(parent) : null;
     if (trace) headers.set(RELAY_TRACEPARENT_HEADER, formatTraceparent(trace));

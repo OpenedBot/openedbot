@@ -12,6 +12,7 @@
  *    served by the other provider: it fails with `PROVIDER_AUTH_REQUIRED`
  *    naming the provider, and the next run still goes to that provider.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import { encryptSecret, secretEncryptionKey } from "../../platform/hermes/src/index.ts";
 import { conversationRoutes } from "../../apps/api/src/routes/conversation/conversation-routes";
@@ -120,7 +121,7 @@ try {
     const workerConfig: WorkerConfig = {
       workerId: "openedbot132-worker",
       apiInternalUrl: "http://127.0.0.1:9",
-      apiInternalToken: "openedbot132",
+      internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "openedbot132" }),
       tokenEncryption: { current: key, previous: [] },
       hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],

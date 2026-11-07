@@ -1,4 +1,5 @@
 import { isUuid } from "@openedbot/contracts-primitives";
+import { internalBearer, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
 import { RelayDialError, type RelayDialer } from "@openedbot/hermes";
 import { relayStageOf } from "@openedbot/contracts-connector";
 import type { Db } from "@openedbot/platform-db";
@@ -64,7 +65,8 @@ export type InstanceRegistry = {
 export type LocatorConfig = {
   instanceId: string;
   apiInternalUrl: string;
-  workerInternalToken: string;
+  /** The relay secret: hops between instances call the owner's relay routes. */
+  relay: InternalSecretsWith<"relay">;
 };
 
 type OwnerRow = {
@@ -168,7 +170,7 @@ export function createRuntimeLinkLocator(
       const target = await remoteUrl(runtimeId);
       if (!("url" in target)) throw unavailableDial(target.detail);
       const headers = new Headers(request.headers);
-      headers.set("Authorization", `Bearer ${config.workerInternalToken}`);
+      headers.set("Authorization", internalBearer(config.relay, "relay"));
       let response: Response;
       try {
         response = await fetchImpl(proxyUrl(target.url, runtimeId, request.path), {
@@ -217,7 +219,7 @@ export function createRuntimeLinkLocator(
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${config.workerInternalToken}`,
+              Authorization: internalBearer(config.relay, "relay"),
               "Content-Type": "application/json",
               [RUNTIME_LINK_RELAY_HOP_HEADER]: "1",
             },
@@ -356,7 +358,7 @@ async function forwardControl(
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${config.workerInternalToken}`,
+          Authorization: internalBearer(config.relay, "relay"),
           "Content-Type": "application/json",
           [RUNTIME_LINK_RELAY_HOP_HEADER]: "1",
         },

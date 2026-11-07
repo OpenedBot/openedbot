@@ -237,7 +237,7 @@ describe("ENV_SCHEMA: single source of truth for the environment", () => {
       "PUSH_VAPID_PRIVATE_KEY", "PUSH_VAPID_PUBLIC_KEY", "PUSH_VAPID_SUBJECT",
       "R2_ACCESS_KEY_ID", "R2_BUCKET", "R2_ENDPOINT", "R2_SECRET_ACCESS_KEY", "RUNTIME_TOKEN_ENCRYPTION_KEY",
       "TRANSACTIONAL_EMAIL_FROM", "WEB_APP_URL", "WORKER_DATABASE_URL",
-      "WORKER_INTERNAL_TOKEN",
+      // The internal secrets are required per role, not by name (S1b): readInternalSecrets.
     ]);
     expect(requiredEnvNames("test")).toEqual([]);
   });

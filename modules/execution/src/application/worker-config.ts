@@ -1,4 +1,5 @@
 import type { HermesClientTimeouts } from "@openedbot/hermes";
+import type { InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
 import type { EndpointPolicy } from "@openedbot/hermes/endpoint";
 import type { HermesMtlsIdentity } from "@openedbot/hermes/mtls";
 import type { SecretKeyring } from "@openedbot/hermes/secrets";
@@ -13,7 +14,8 @@ export type WorkerConfig = {
   apiInternalUrl: string;
   /** Dedicated connector gateway; omitted by legacy callers in monolithic mode. */
   runtimeLinkInternalUrl?: string;
-  apiInternalToken: string;
+  /** One secret per internal role (ADR 0001, S1b): events, relay, run keys. */
+  internalSecrets: InternalSecretsWith<"events" | "relay" | "runKey">;
   tokenEncryption: SecretKeyring;
   /** Process-wide outbound identity; certificate material is never persisted. */
   hermesMtls: HermesMtlsIdentity | null;

@@ -91,7 +91,7 @@ function uncommittedEnvelope(context: RunContext, event: RunEvent): Organization
 }
 
 async function publishUncommittedEvents(
-  config: Pick<WorkerConfig, "apiInternalUrl" | "apiInternalToken">,
+  config: Pick<WorkerConfig, "apiInternalUrl" | "internalSecrets">,
   context: RunContext,
   events: RunEvent[],
 ): Promise<void> {

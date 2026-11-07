@@ -2,6 +2,7 @@
  * SSE, worker persistence, journal identity and cleanup are all required.
  * Lifecycle commands require explicit argv AND E2E_ALLOW_API_RESTARTS=1.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, isAbsolute } from "node:path";
@@ -20,7 +21,8 @@ if (need("E2E_ALLOW_REAL_RUNS") !== "1") throw new Error("Real provider charges 
 const email = need("E2E_EMAIL"), password = need("E2E_PASSWORD"), runtimeId = need("E2E_RUNTIME_ID");
 const provider = need("E2E_PROVIDER"), model = need("E2E_MODEL"), input = need("E2E_RUN_INPUT");
 const endInput = process.env.E2E_END_RUN_INPUT ?? "Reply with only CONTINUITY_END_OK.";
-const internalToken = need("WORKER_INTERNAL_TOKEN"), metricsToken = need("METRICS_INTERNAL_TOKEN");
+// The relay secret (S1b); an unmigrated host still runs on the former single one.
+const internalToken = process.env.RELAY_INTERNAL_TOKEN || need("WORKER_INTERNAL_TOKEN"), metricsToken = need("METRICS_INTERNAL_TOKEN");
 function origin(value: string) {
   const url = new URL(value);
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash || (url.protocol !== "https:"
@@ -121,7 +123,7 @@ try {
   let lastBoot = await boot(); result.initialBoot = lastBoot;
   const catalog = await api<{ providers: Array<{ slug: string; authenticated: boolean; models: Array<{ id: string }> }> }>(`/api/runtimes/${runtimeId}/models`);
   assert(catalog.providers.some((entry) => entry.slug === provider && entry.authenticated && entry.models.some((entry) => entry.id === model)), "Explicit provider/model is unavailable; no fallback is allowed.");
-  const dial = createWorkerRelayDialer(runtimeId, { apiInternalUrl: apiURL, apiInternalToken: internalToken, runtimeLinkInternalUrl: gatewayURL });
+  const dial = createWorkerRelayDialer(runtimeId, { apiInternalUrl: apiURL, internalSecrets: testInternalSecrets("worker", { RELAY_INTERNAL_TOKEN: internalToken }), runtimeLinkInternalUrl: gatewayURL });
   assert((await dial({ method: "GET", path: "/health", headers: {}, body: null }, AbortSignal.timeout(5000))).ok, "Separate gateway health failed.");
   await Bun.write(join(artifacts, "journal-before.json"), JSON.stringify(baseline, null, 2));
   console.info(JSON.stringify({ event: "real_inference_opt_in", runtimeId, provider, model, artifacts, observationSeconds: seconds, plannedRealRuns: 2, restartMode: restartArgv ? "explicit-command" : "externally-coordinated", note: "Provider usage may be billed." }));

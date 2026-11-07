@@ -1,3 +1,4 @@
+import { readInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -203,11 +204,12 @@ describe("production configuration", () => {
     expect(config.webOrigins).toEqual(["https://app.openedbot.example", "https://legacy.openedbot.example"]);
   });
 
+  // The internal secrets are read apart from ApiConfig (S1b, internal-secrets.ts).
   test("rejects the development worker token in production", () => {
-    expect(() => assertProductionConfig(readApiConfig({
+    expect(() => readInternalSecrets("api", "production", {
       ...production,
       WORKER_INTERNAL_TOKEN: "openedbot-worker-dev-token",
-    }))).toThrow(/WORKER_INTERNAL_TOKEN/);
+    })).toThrow(/WORKER_INTERNAL_TOKEN must not be a development default/);
   });
 
   // Le lien connecteur limite les montées WebSocket par IP cliente ; derrière
@@ -222,8 +224,12 @@ describe("production configuration", () => {
   test("requires a dedicated production metrics token", () => {
     expect(() => assertProductionConfig(readApiConfig({
       ...production,
-      METRICS_INTERNAL_TOKEN: production.WORKER_INTERNAL_TOKEN,
+      METRICS_INTERNAL_TOKEN: "openedbot-metrics-dev-token",
     }))).toThrow(/METRICS_INTERNAL_TOKEN/);
+    expect(() => readInternalSecrets("api", "production", {
+      ...production,
+      METRICS_INTERNAL_TOKEN: production.WORKER_INTERNAL_TOKEN,
+    })).toThrow(/METRICS_INTERNAL_TOKEN/);
   });
 
   test("requires VAPID keys in production", () => {

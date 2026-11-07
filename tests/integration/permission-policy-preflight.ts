@@ -5,6 +5,7 @@
  * `PERMISSION_POLICY_NOT_EFFECTIVE` before any Hermes call. The same bot in a
  * `legacy` organization keeps today's behavior and reaches Hermes.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { encryptSecret, secretEncryptionKey } from "../../platform/hermes/src/index.ts";
 import { claimRun } from "../../modules/execution/src/application/queue";
 import { executeRun } from "../../modules/execution/src/application/runner";
@@ -66,7 +67,7 @@ try {
     const workerConfig: WorkerConfig = {
       workerId: "perm2-preflight-worker",
       apiInternalUrl: "http://127.0.0.1:9",
-      apiInternalToken: "perm2",
+      internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "perm2" }),
       tokenEncryption: { current: key, previous: [] },
       hermesMtls: null,
       hermesEndpointPolicy: { environment: "test", testHttpUrl: endpoint } as WorkerConfig["hermesEndpointPolicy"],

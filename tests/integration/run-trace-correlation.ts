@@ -19,6 +19,7 @@
  * drops the header (no trace line, nothing reaches Hermes). Every connector
  * already installed keeps working with this openedbot.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -48,6 +49,20 @@ const THREAD = crypto.randomUUID();
 const RUNTIME = crypto.randomUUID();
 const LINK_TOKEN = `trace-link-${crypto.randomUUID()}`;
 const WORKER_TOKEN = `trace-worker-${crypto.randomUUID()}`;
+/**
+ * S1b: by default each process holds only its own secrets, the production
+ * layout: the gateway relay + inventory (no events, no run key), the worker
+ * events + relay + run key. OPENEDBOT_TRACE_E2E_SECRETS=legacy replays the
+ * former single secret, which every unmigrated host still runs on.
+ */
+const SPLIT = process.env.OPENEDBOT_TRACE_E2E_SECRETS !== "legacy";
+const RELAY_TOKEN = `trace-relay-${crypto.randomUUID()}`;
+const GATEWAY_SECRETS: Record<string, string> = SPLIT
+  ? { RELAY_INTERNAL_TOKEN: RELAY_TOKEN, INVENTORY_INTERNAL_TOKEN: `trace-inventory-${crypto.randomUUID()}` }
+  : { WORKER_INTERNAL_TOKEN: WORKER_TOKEN };
+const WORKER_SECRETS: Record<string, string> = SPLIT
+  ? { EVENTS_INTERNAL_TOKEN: `trace-events-${crypto.randomUUID()}`, RELAY_INTERNAL_TOKEN: RELAY_TOKEN, RUN_KEY_SECRET: `trace-run-key-${crypto.randomUUID()}` }
+  : { WORKER_INTERNAL_TOKEN: WORKER_TOKEN };
 const ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -169,13 +184,19 @@ try {
         ...process.env, OPENEDBOT_ENV: "test", NODE_ENV: "test", OPENEDBOT_LOG_DIR: "off",
         API_DATABASE_URL: url, RUNTIME_LINK_MODE: "separate", RUNTIME_LINK_HOST: "127.0.0.1",
         RUNTIME_LINK_PORT: String(linkPort), RUNTIME_LINK_INTERNAL_URL: linkUrl,
-        RUNTIME_LINK_PUBLIC_URL: linkUrl, WORKER_INTERNAL_TOKEN: WORKER_TOKEN,
+        RUNTIME_LINK_PUBLIC_URL: linkUrl, WORKER_INTERNAL_TOKEN: undefined, ...GATEWAY_SECRETS,
         RUNTIME_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY, API_INTERNAL_URL: "http://127.0.0.1:9",
       },
     });
     children.push(gateway);
     await waitUntil(() => jsonLines(gateway.lines).some((line) => line.event === "runtime_link.gateway_started"), 20_000,
       "the link gateway did not start");
+    if (SPLIT) {
+      // The gateway announces its mode and holds neither the events secret nor the run-key one.
+      const started = jsonLines(gateway.lines).find((line) => line.event === "runtime_link.gateway_started") as { internalSecrets?: { roles?: Record<string, string>; legacyAccepted?: boolean } } | undefined;
+      assert(JSON.stringify(started?.internalSecrets?.roles) === JSON.stringify({ relay: "explicit", inventory: "explicit" }) && started?.internalSecrets?.legacyAccepted === false,
+        `the gateway must hold relay and inventory only: ${JSON.stringify(started?.internalSecrets)}`);
+    }
 
     // 2. The real connector, linked to that gateway, relaying to the recorded fake Hermes.
     const connector = spawnJournaled("connector", [binary, "-test.run", "^TestTraceE2EHost$", "-test.v", "-test.count=1"], {
@@ -190,7 +211,7 @@ try {
     });
     children.push(connector);
     // Untraced probe (no run context): the link answers once the host is admitted.
-    const probe = createWorkerRelayDialer(RUNTIME, { apiInternalUrl: linkUrl, apiInternalToken: WORKER_TOKEN, runtimeLinkInternalUrl: linkUrl });
+    const probe = createWorkerRelayDialer(RUNTIME, { apiInternalUrl: linkUrl, internalSecrets: testInternalSecrets("worker", WORKER_SECRETS), runtimeLinkInternalUrl: linkUrl });
     await waitUntil(async () => (await probe({ method: "GET", path: "/health", headers: {}, body: null }).catch(() => null))?.status === 200,
       30_000, "the connector never linked");
     hermesRequests.length = 0;
@@ -217,7 +238,7 @@ try {
     // 4. The real worker claim loop and runner, journaled in memory.
     const workerDb = await connect("openedbot_worker");
     const config = readWorkerConfig({
-      OPENEDBOT_ENV: "test", WORKER_ID: "trace-e2e-worker", WORKER_INTERNAL_TOKEN: WORKER_TOKEN,
+      OPENEDBOT_ENV: "test", WORKER_ID: "trace-e2e-worker", ...WORKER_SECRETS,
       RUNTIME_TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY, RUNTIME_LINK_MODE: "separate", RUNTIME_LINK_INTERNAL_URL: linkUrl,
       API_INTERNAL_URL: "http://127.0.0.1:9", BLOB_DRIVER: "file", BLOB_FILE_ROOT: join(scratch, "blobs"), WORKER_POLL_MS: "50",
     });
@@ -281,8 +302,10 @@ try {
     show("connector", connectorLines.find((line) => line.includes("POST /v1/runs")) ?? "(no trace line: the header is dropped)");
     show("hermes", hermesRequests.find((request) => request.method === "POST" && request.path === "/v1/runs"));
     show("worker", pick(ofRun.find((record) => record.event === "run.latency")));
+    const refusals = jsonLines(gateway.lines).filter((line) => String(line.event).startsWith("internal_auth.refused"));
+    assert(refusals.length === 0, `the gateway refused internal calls: ${JSON.stringify(refusals)}`);
     console.log(`worker events under the trace: ${[...new Set(tracedWorker.map((record) => record.event))].join(", ")}`);
-    console.log(`\nrun trace correlation passed: ${tracedWorker.length} traced worker lines, ${relayed.length} relayed requests, ${gatewayLines.length} gateway lines, ${connectorLines.length} connector lines, ${tracedHermes.length}/${hermesRequests.length} Hermes requests traced${LEGACY_REF ? `; ${LEGACY_REF} drops the header and the run still completes` : ""}.`);
+    console.log(`\nrun trace correlation passed: ${tracedWorker.length} traced worker lines, ${relayed.length} relayed requests, ${gatewayLines.length} gateway lines, ${connectorLines.length} connector lines, ${tracedHermes.length}/${hermesRequests.length} Hermes requests traced${LEGACY_REF ? `; ${LEGACY_REF} drops the header and the run still completes` : ""}; internal secrets ${SPLIT ? "split per process" : "single (legacy)"}.`);
   });
 } finally {
   await Promise.allSettled(children.map((child) => child.stop()));

@@ -23,6 +23,7 @@
  *     slot and the bot; a retry is refused for a service run, a legacy
  *     inbound handoff (it could not deliver to its courier) and a room.
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import { encryptSecret, secretEncryptionKey } from "../../platform/hermes/src/index.ts";
 import { conversationRoutes } from "../../apps/api/src/routes/conversation/conversation-routes";
@@ -89,7 +90,7 @@ await withDisposablePostgres("openedbot2_s2b_unknown", async ({ owner, connect }
   const config: WorkerConfig = {
     workerId: "s2a-worker",
     apiInternalUrl: "http://127.0.0.1:9",
-    apiInternalToken: "s2a",
+    internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "s2a" }),
     tokenEncryption: { current: key, previous: [] },
     hermesMtls: null,
     hermesEndpointPolicy: { environment: "test", testHttpUrl: "http://127.0.0.1:9" } as WorkerConfig["hermesEndpointPolicy"],

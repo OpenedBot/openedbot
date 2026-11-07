@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, spyOn, test } from "bun:test";
 import { LINK_CONTROL_FORWARD_TIMEOUT_MS, RUNTIME_LINK_RELAY_STAGE_HEADER } from "../src/application/instances";
 import {
@@ -28,7 +29,7 @@ function fakeDb(captured: Captured[], options: { due?: Array<{ id: string; organ
   }) as unknown as Bun.SQL;
 }
 
-const control = { apiInternalUrl: "http://127.0.0.1:8790", apiInternalToken: "worker-token" };
+const control = { apiInternalUrl: "http://127.0.0.1:8790", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "worker-token"  })};
 const due = [{ id: "8f3b2c1d-1111-4222-8333-444455556666", organizationId: "org-1" }];
 
 /**

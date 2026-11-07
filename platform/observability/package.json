@@ -10,6 +10,7 @@
   "type": "module",
   "exports": {
     ".": "./src/logger.ts",
+    "./internal-auth": "./src/internal-auth.ts",
     "./log-pretty": "./src/log-pretty.ts",
     "./log/channels": "./src/log/channels.ts",
     "./log/context": "./src/log/context.ts",

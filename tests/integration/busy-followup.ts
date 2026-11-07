@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { SQL, type Server } from "bun";
@@ -296,7 +297,6 @@ async function main(): Promise<void> {
       const workerTwoId = "worker-" + crypto.randomUUID();
       const apiConfig = {
         billingEnforced: false,
-        workerInternalToken: INTERNAL_WORKER_TOKEN,
       } as ApiConfig;
       const blobStore = { driver: "file" } as BlobStore;
 
@@ -396,7 +396,7 @@ async function main(): Promise<void> {
         workerId,
         apiInternalUrl: "http://127.0.0.1",
         runtimeLinkInternalUrl: relayOrigin,
-        apiInternalToken: INTERNAL_WORKER_TOKEN,
+        internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: INTERNAL_WORKER_TOKEN }),
         tokenEncryption: {} as WorkerConfig["tokenEncryption"],
         hermesMtls: null,
         hermesEndpointPolicy: {

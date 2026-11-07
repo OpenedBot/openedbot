@@ -12,12 +12,12 @@ import {
   DEFAULT_EVENTS_FALLBACK_POLL_MS,
   DEFAULT_EVENTS_REPLAY_WINDOW_EVENTS,
   DEFAULT_EVENTS_REPLAY_WINDOW_MS,
-  type ApiConfig,
   type EventsConfig,
 } from "../../infrastructure/config";
+import { matchInternalBearer, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
+import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
-import { constantTimeEqual } from "../../infrastructure/crypto";
 import type { AppVariables } from "../identity/auth";
 import { EventHub } from "@openedbot/notifications/application/event-hub";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
@@ -535,18 +535,16 @@ async function fanOutUncommitted(db: Db, hub: EventHub, events: OrganizationEven
  */
 export function internalEventRoutes(
   db: Db,
-  config: ApiConfig,
+  internal: InternalSecretsWith<"events">,
   hub: EventHub,
   wake: (organizationId: string) => void = (organizationId) => wakeReplayPoller(hub, organizationId),
   commitHintsNeeded: () => boolean = () => true,
 ): Hono {
   const routes = new Hono();
   routes.post("/publish", async (context) => {
-    const authorization = context.req.header("Authorization") ?? "";
-    const expected = `Bearer ${config.workerInternalToken}`;
-    if (!constantTimeEqual(authorization, expected)) {
-      throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
-    }
+    const match = matchInternalBearer(internal, "events", context.req.header("Authorization"));
+    internalAuthMetrics.recordBearer("events", match.ok ? match.via : "refused", "/internal/events/publish");
+    if (!match.ok) throw new HttpError(401, "WORKER_AUTH_INVALID", "Authentification worker invalide.");
     // Body: one event (original shape) or a batch `{ events: [...] }`. A batch
     // is validated whole before any fan-out, then delivered in array order.
     const body = await jsonBody(context.req.raw);

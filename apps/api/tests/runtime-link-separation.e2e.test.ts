@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { expect, test } from "bun:test";
 import { createPrivateKey, randomBytes } from "node:crypto";
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -43,7 +44,7 @@ async function testDeviceKey(): Promise<{ credentials: string; publicKey: string
   } });
   const app = new Hono();
   let gateway: ReturnType<typeof startRuntimeLinkServer>;
-  app.route("/internal/runtime-links", runtimeLinkInternalRoutes(config, broker, undefined, { isDraining: () => gateway.draining }));
+  app.route("/internal/runtime-links", runtimeLinkInternalRoutes(testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: token }), broker, undefined, { isDraining: () => gateway.draining }));
   // The proof of possession names the URL the host really dialed: the random
   // loopback port is only known once the listener is up, so the list is filled then.
   const wsUrls: string[] = [];
@@ -86,7 +87,7 @@ async function testDeviceKey(): Promise<{ credentials: string; publicKey: string
     const connection = broker.connection(runtimeId);
     const first = await startApi();
     const apiURL = `http://127.0.0.1:${first.port}`;
-    const dial = createWorkerRelayDialer(runtimeId, { apiInternalUrl: apiURL, apiInternalToken: token, runtimeLinkInternalUrl: linkURL });
+    const dial = createWorkerRelayDialer(runtimeId, { apiInternalUrl: apiURL, internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: token }), runtimeLinkInternalUrl: linkURL });
     const transport = createRelayTransport({ runtimeId, dial });
     const mutation = (id: string) => transport.send("/v1/runs", { method: "POST", body: JSON.stringify({ id }) }, "mutation");
     const stream = await dial({ method: "GET", path: "/v1/runs/survive-stream/events", headers: {}, body: null });

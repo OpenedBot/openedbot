@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
 import { EventHub } from "../../modules/notifications/src/application/event-hub";
 import type { WorkerConfig } from "../../modules/execution/src/application/worker-config";
@@ -192,7 +193,7 @@ async function main(): Promise<void> {
       replayWindowEvents: 2,
     }));
     const internalToken = `integration-${crypto.randomUUID()}`;
-    app.route("/internal/events", internalEventRoutes(apiDb, { workerInternalToken: internalToken } as ApiConfig, hub));
+    app.route("/internal/events", internalEventRoutes(apiDb, testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: internalToken }), hub));
 
     const apiOrigin = "http://fast-path.integration";
     const originalFetch = globalThis.fetch;
@@ -241,7 +242,7 @@ async function main(): Promise<void> {
       const workerConfig = {
         workerId,
         apiInternalUrl: apiOrigin,
-        apiInternalToken: internalToken,
+        internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: internalToken }),
       } as WorkerConfig;
       const blockedWorkerDb = pauseAfterRunEventInsert(workerDb, reachedInsert, released);
       persistence = persistEvents(blockedWorkerDb, workerConfig, context as never, 2, events as never[]);

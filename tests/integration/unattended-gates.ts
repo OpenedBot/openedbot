@@ -13,6 +13,7 @@
  *     `APPROVAL_EXPIRED` (the third outcome, an unconfirmed stop, keeps
  *     `APPROVAL_EXPIRY_STOP_OUTCOME_UNKNOWN` from `markRunUnknown`).
  */
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import type { WorkerConfig } from "../../modules/execution/src/application/worker-config";
 import { persistEvents } from "../../modules/execution/src/application/runner";
 import { reconcileHermesRun } from "../../modules/execution/src/application/runner/reconcile";
@@ -46,7 +47,7 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
       values (${bot}, ${org}, ${section}, ${`Scout ${next}`}, ${`scout-${next}`}, ${next}, ${mode})`;
     bots.set(`${org}:${mode}`, bot);
   }
-  const config = { workerId: WORKER, apiInternalUrl: "http://127.0.0.1:9", apiInternalToken: "unused" } as WorkerConfig;
+  const config = { workerId: WORKER, apiInternalUrl: "http://127.0.0.1:9", internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "unused"  })} as WorkerConfig;
 
   /** One thread, routine workflow and leased run, then one gate through `persistEvents`. */
   async function gate(org: string, mode: string, neverWait: boolean, gateIdentity: Record<string, unknown>) {

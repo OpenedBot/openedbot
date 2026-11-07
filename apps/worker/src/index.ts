@@ -1,4 +1,5 @@
 import { SQL } from "bun";
+import { describeInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { createWorkerService } from "./application/worker-service";
 import { readWorkerConfig } from "./config";
 import { createRunQueueNotifications } from "./infrastructure/run-queue-notifications";
@@ -52,6 +53,7 @@ process.once("SIGTERM", () => stop("SIGTERM"));
 logEvent("worker.started", {
   workerId: config.workerId, environment: config.environment, bunVersion: Bun.version,
   mode: pro.plugins.length ? "pro" : "solo", plugins: pro.plugins.map((plugin) => plugin.manifest.id),
+  internalSecrets: describeInternalSecrets(config.internalSecrets),
 });
 if (config.blob.driver === "file" && config.blob.fallbackReason) {
   logEvent("worker.blob_fallback_file", { root: config.blob.root, reason: config.blob.fallbackReason }, "warn");

@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { runKeySigningSecret } from "@openedbot/platform-config/internal-secrets";
 import { fitHermesRunImages, type HermesClient } from "@openedbot/hermes";
 import type { RunTrace } from "@openedbot/platform-observability/run-trace";
 import { imageNotSentNote } from "@openedbot/conversation/domain/attachments";
@@ -272,10 +273,10 @@ async function composeRunRequest(
   // ni un tour de salon, ni une étape de workflow, ni un courrier entrant
   // ne la reçoivent, et l'API refuse de toute façon un bot non activé.
   const withRoutineKey = context.routineToolEnabled && prompt.instructions.includes(ROUTINE_TOOL_RUNTIME_NAME)
-    ? withRoutineRunKey(steppedInput, signRoutineRunKey(config.apiInternalToken, context.id))
+    ? withRoutineRunKey(steppedInput, signRoutineRunKey(runKeySigningSecret(config.internalSecrets), context.id))
     : steppedInput;
   const input = context.botSettingsToolEnabled && prompt.instructions.includes(BOT_SETTINGS_TOOL_RUNTIME_NAME)
-    ? withBotSettingsRunKey(withRoutineKey, signBotSettingsRunKey(config.apiInternalToken, context.id))
+    ? withBotSettingsRunKey(withRoutineKey, signBotSettingsRunKey(runKeySigningSecret(config.internalSecrets), context.id))
     : withRoutineKey;
   // Playbooks et « plan d'abord » dépendent du message : Hermes pose les
   // instructions en fin de prompt système, sous son point de cache, et

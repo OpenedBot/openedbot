@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
 import type { RunEvent } from "../../src/domain/hermes-events";
@@ -11,7 +12,7 @@ const occurredAt = new Date("2026-10-03T12:00:00.000Z");
 const config = {
   workerId: "worker-1",
   apiInternalUrl: "http://api.test",
-  apiInternalToken: "tok",
+  internalSecrets: testInternalSecrets("worker", { WORKER_INTERNAL_TOKEN: "tok" }),
 } as WorkerConfig;
 
 const context = {

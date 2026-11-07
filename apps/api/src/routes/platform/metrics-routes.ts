@@ -1,4 +1,5 @@
 import { isoInstant } from "@openedbot/contracts-primitives";
+import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import { Hono } from "hono";
 import { totalmem } from "node:os";
 import type { ApiConfig } from "../../infrastructure/config";
@@ -105,6 +106,8 @@ export function internalMetricsRoutes(
       sseConnections: hub.subscriberCount(),
       activeRuns,
       api: runtimeMetrics.snapshot(),
+      // This API process only: the gateway and the worker log theirs (`internal_auth.*`).
+      internalAuth: internalAuthMetrics.snapshot(),
       eventLink: eventLink(),
       attachments: {
         activeBytes: Number(attachmentRows[0]?.activeBytes ?? 0),
@@ -143,6 +146,7 @@ type MetricsReport = {
   sseConnections: number;
   activeRuns: number;
   api: { startedAt: string; requestsTotal: number; serverErrorsTotal: number };
+  internalAuth: { bearers: Record<string, number>; runKeys: Record<string, number> };
   eventLink: EventLinkStatus | null;
   attachments: {
     activeBytes: number;
@@ -228,6 +232,20 @@ export function normalizeOperationalMetrics(row: OperationalMetricsRow | undefin
   };
 }
 
+/** `role.outcome` counts of the internal verifiers of this process (S1b). */
+function internalAuthLines(counts: MetricsReport["internalAuth"]): string[] {
+  const lines: string[] = [];
+  for (const [kind, entries] of [["bearer", counts.bearers], ["run_key", counts.runKeys]] as const) {
+    const metric = `openedbot_internal_auth_${kind}_total`;
+    lines.push(`# TYPE ${metric} counter`);
+    for (const [key, value] of Object.entries(entries)) {
+      const [subject, outcome] = key.split(".");
+      lines.push(`${metric}{${kind === "bearer" ? "role" : "label"}="${subject}",outcome="${outcome}"} ${value}`);
+    }
+  }
+  return lines;
+}
+
 function prometheus(report: MetricsReport): string {
   const lines = [
     "# TYPE openedbot_process_rss_bytes gauge",
@@ -244,6 +262,7 @@ function prometheus(report: MetricsReport): string {
     `openedbot_api_requests_total ${report.api.requestsTotal}`,
     "# TYPE openedbot_api_server_errors_total counter",
     `openedbot_api_server_errors_total ${report.api.serverErrorsTotal}`,
+    ...internalAuthLines(report.internalAuth),
     ...eventLinkLines(report.eventLink),
     `openedbot_attachment_active_bytes ${report.attachments.activeBytes}`,
     `openedbot_attachment_orphaned ${report.attachments.orphaned}`,

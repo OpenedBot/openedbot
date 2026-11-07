@@ -10,12 +10,13 @@ import {
   readBotSettingsToolArgs,
   type BotSettingsToolArgs,
 } from "@openedbot/execution/domain/bot-settings-tool";
-import { readBotSettingsRunKey } from "@openedbot/execution/application/bot-settings-run-key";
+import { readBotSettingsRunKeyWith } from "@openedbot/execution/application/bot-settings-run-key";
 import { proposeBotSettings } from "@openedbot/roster/application/bot-setting-proposals";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import type { AppVariables } from "../identity/auth";
-import type { ApiConfig } from "../../infrastructure/config";
+import { runKeyCohortAllows, runKeyVerifiers, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
+import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readBearer } from "../../interfaces/http/request-readers";
 
@@ -29,6 +30,7 @@ type JsonRpcResponse =
   | { jsonrpc: "2.0"; id: JsonRpcId; error: { code: number; message: string } };
 type CallerRow = {
   runId: string;
+  createdAt: Date;
   botId: string | null;
   threadId: string;
   status: string;
@@ -43,7 +45,7 @@ export function botSettingsToolSecretHash(secret: string): string {
 
 export function botSettingsToolMcpRoutes(
   db: Db,
-  config: Pick<ApiConfig, "workerInternalToken">,
+  internal: InternalSecretsWith<"runKey">,
 ): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
   routes.get("/:organizationId", (context) => context.body(null, 405, { Allow: "POST" }));
@@ -64,7 +66,7 @@ export function botSettingsToolMcpRoutes(
     const hasId = Object.hasOwn(body, "id");
     const id = readId(body.id);
     if (!hasId) return context.body(null, 202);
-    const response = await answer(db, config, { organizationId, enabledBotIds: known[0].enabledBotIds ?? [] }, id, method, body.params);
+    const response = await answer(db, internal, { organizationId, enabledBotIds: known[0].enabledBotIds ?? [] }, id, method, body.params);
     return context.json(response);
   });
   return routes;
@@ -72,7 +74,7 @@ export function botSettingsToolMcpRoutes(
 
 async function answer(
   db: Db,
-  config: Pick<ApiConfig, "workerInternalToken">,
+  internal: InternalSecretsWith<"runKey">,
   scope: ToolScope,
   id: JsonRpcId,
   method: string,
@@ -104,7 +106,7 @@ async function answer(
     if (!isRecord(params) || params.name !== BOT_SETTINGS_TOOL_NAME) {
       return { jsonrpc: "2.0", id, error: { code: -32602, message: `Unknown tool; this server only serves ${BOT_SETTINGS_TOOL_NAME}.` } };
     }
-    const outcome = await callBotSettingsTool(db, config, scope, params.arguments);
+    const outcome = await callBotSettingsTool(db, internal, scope, params.arguments);
     return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: outcome.text }], isError: outcome.isError } };
   }
   return { jsonrpc: "2.0", id, error: { code: -32601, message: `Method not found: ${method}` } };
@@ -114,7 +116,7 @@ const fail = (text: string): ToolOutcome => ({ text, isError: true });
 
 export async function callBotSettingsTool(
   db: Db,
-  config: Pick<ApiConfig, "workerInternalToken">,
+  internal: InternalSecretsWith<"runKey">,
   scope: ToolScope,
   rawArgs: unknown,
 ): Promise<ToolOutcome> {
@@ -125,13 +127,17 @@ export async function callBotSettingsTool(
     if (error instanceof BotSettingsToolInputError) return fail(error.message);
     throw error;
   }
-  const runId = readBotSettingsRunKey(config.workerInternalToken, args.runKey);
-  if (!runId) return fail("run_key is not valid: copy it exactly from your instructions.");
+  const read = readBotSettingsRunKeyWith(runKeyVerifiers(internal), args.runKey);
+  if (!read) {
+    internalAuthMetrics.recordRunKey("bot-settings", "refused");
+    return fail("run_key is not valid: copy it exactly from your instructions.");
+  }
+  const runId = read.runId;
 
   try {
     return await withTenant(db, scope.organizationId, async (tx) => {
       const caller = (await tx<CallerRow[]>`
-        select r.id as "runId", r.bot_id as "botId", r.thread_id as "threadId", r.status,
+        select r.id as "runId", r.created_at as "createdAt", r.bot_id as "botId", r.thread_id as "threadId", r.status,
                -- A plan-only turn (0155) is a plan run whatever the bot's mode.
                case when r.plan_only or coalesce(w.plan_only, false) then 'plan' else b.permission_mode end as "permissionMode"
           from runs r
@@ -139,7 +145,16 @@ export async function callBotSettingsTool(
           left join workflows w on w.organization_id = r.organization_id and w.id = r.workflow_id
          where r.organization_id = ${scope.organizationId} and r.id = ${runId}
       `)[0];
-      if (!caller?.botId) return fail("run_key does not match a run of yours.");
+      if (!caller?.botId) {
+        internalAuthMetrics.recordRunKey("bot-settings", "refused");
+        return fail("run_key does not match a run of yours.");
+      }
+      // A key read through the previous secret is valid only for the runs created before its bound.
+      if (!runKeyCohortAllows(read.verifier, new Date(caller.createdAt))) {
+        internalAuthMetrics.recordRunKey("bot-settings", "refused");
+        return fail("run_key is not valid: copy it exactly from your instructions.");
+      }
+      internalAuthMetrics.recordRunKey("bot-settings", read.verifier.via);
       if (!scope.enabledBotIds.includes(caller.botId)) {
         return fail("bot_settings_propose is switched off for you: the operator can enable self-edit proposals in the agent editor.");
       }

@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { afterAll, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { RelayDialError } from "@openedbot/hermes";
@@ -29,7 +30,7 @@ import type { Db } from "@openedbot/platform-db";
 
 const TOKEN = "worker-secret";
 const RUNTIME_ID = "5f0f8a3a-1111-4222-8333-444455556666";
-const config = { workerInternalToken: TOKEN } as ApiConfig;
+const config = testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: TOKEN });
 
 const silentLiveness: LinkLivenessStore = {
   connected: async () => {},
@@ -268,7 +269,7 @@ describe("relais inter-instances du lien connecteur", () => {
       host.ws.addEventListener("close", (event) => resolve({ code: event.code, reason: event.reason }), { once: true });
     });
     const db = (async () => [{ instanceId: "api-b", internalUrl: owner.url, instanceLive: true }]) as unknown as Db;
-    const locator = createRuntimeLinkLocator(db, { instanceId: "api-a", apiInternalUrl: "http://api-a:8790", workerInternalToken: TOKEN });
+    const locator = createRuntimeLinkLocator(db, { instanceId: "api-a", apiInternalUrl: "http://api-a:8790", relay: testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: TOKEN  })});
     expect(await locator.forwardClose(RUNTIME_ID, RELAY_CLOSE_REVOKED, "LINK_REVOKED")).toBe(true);
     expect(await closed).toEqual({ code: 4004, reason: "LINK_REVOKED" });
     expect(owner.broker.connected(RUNTIME_ID)).toBe(false);

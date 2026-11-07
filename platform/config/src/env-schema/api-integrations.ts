@@ -7,9 +7,22 @@ export const API_INTEGRATIONS_ENV: readonly EnvVar[] = [
     scope: "api",
     tier: "production",
     requiredWhen: { environment: ["production"] },
-    doc: "Bearer of /api/metrics; must differ from WORKER_INTERNAL_TOKEN and from the development default.",
+    doc: "Bearer of /api/metrics; must differ from every internal secret and from the development default.",
     example: "",
     secret: true,
+  },
+  {
+    name: "RUN_KEY_PREVIOUS_SECRET",
+    scope: "api",
+    tier: "default_only",
+    doc: "Cut-over only: the former run-key secret, accepted to read (never sign) the run keys of runs created before RUN_KEY_PREVIOUS_CREATED_BEFORE; set with it, removed once no such run is alive.",
+    secret: true,
+  },
+  {
+    name: "RUN_KEY_PREVIOUS_CREATED_BEFORE",
+    scope: "api",
+    tier: "default_only",
+    doc: "Cut-over only: ISO 8601 instant bounding the runs whose keys RUN_KEY_PREVIOUS_SECRET may read.",
   },
   {
     name: "FILES_CDN_URL",

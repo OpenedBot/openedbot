@@ -1,3 +1,4 @@
+import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 // Ephemeral API facade process for the runtime link continuity proof; production internal routes, fixture
 // ownership lookup. Its lifecycle must never own the connector WebSocket.
 import { Hono } from "hono";
@@ -14,8 +15,8 @@ const broker = new RuntimeLinkBroker({ instanceId: "api-fixture", log: () => {},
 } });
 const app = new Hono();
 app.get("/api/health", (c) => c.json({ fixture: true, pid: process.pid }));
-app.route("/internal/runtime-links", runtimeLinkInternalRoutes(config, broker, createRuntimeLinkLocator(db, {
-  instanceId: "api-fixture", apiInternalUrl: "http://127.0.0.1", workerInternalToken: token,
+app.route("/internal/runtime-links", runtimeLinkInternalRoutes(testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: token }), broker, createRuntimeLinkLocator(db, {
+  instanceId: "api-fixture", apiInternalUrl: "http://127.0.0.1", relay: testInternalSecrets("api", { WORKER_INTERNAL_TOKEN: token }),
 })));
 const server = Bun.serve({ hostname: "127.0.0.1", port: Number(process.env.OPENEDBOT_LINK_E2E_API_PORT || 0), fetch: app.fetch });
 console.log(JSON.stringify({ port: server.port, pid: process.pid }));
