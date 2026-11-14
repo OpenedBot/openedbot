@@ -1,0 +1,56 @@
+---
+title: Questions fréquentes
+description: Compte, machine, sécurité, et ce que edge-setup fait réellement.
+icon: CircleHelp
+---
+
+## Dois-je acheter un nom de domaine ?
+
+Non. Avec `edge-setup`, vous n’ouvrez aucun port sur votre routeur et vous n’avez besoin ni d’un nom de domaine, ni d’un certificat sur la machine.
+
+## Puis-je préparer un bot avant d’avoir une machine ?
+
+Oui. Il ne répondra que lorsque la machine sera reliée et indiquée comme prête. Voir [Créer un bot](/fr/docs/bot).
+
+## L’installation durcit-elle mon serveur ?
+
+Non. `sudo edge-setup up --yes` installe Hermes et prépare la machine à être reliée. Il ne configure ni le pare-feu, ni SSH, ni fail2ban. Chaque protection s’ajoute par une option. Le profil recommandé pour un serveur Internet est dans [edge-setup](/fr/docs/edge-setup).
+
+## Puis-je utiliser un serveur qui héberge déjà d’autres services ?
+
+Ce n’est pas conseillé. Réservez une machine à vos bots : les options de durcissement de `edge-setup` prennent la main sur SSH, le pare-feu et Docker, et peuvent casser les services déjà installés. Voir [edge-setup](/fr/docs/edge-setup).
+
+## Le téléchargement est-il signé ?
+
+Oui. Chaque release est signée par le workflow de release d’openedbot sur
+GitHub, sans clé à garder (Sigstore), et la signature est inscrite dans un
+journal de transparence public. Le script d’installation et
+`edge-setup upgrade` vérifient la signature, puis la somme SHA-256 du binaire, avant
+d’installer quoi que ce soit : rien n’est installé si l’un des contrôles
+échoue. Une compromission de nos sites de publication ne suffit donc pas à
+faire accepter un autre binaire. `edge-setup self-verify` refait ces contrôles
+à la demande. Voir [edge-setup](/fr/docs/edge-setup).
+
+## openedbot peut-il se connecter en SSH chez moi ?
+
+Non. openedbot n’ouvre jamais de session sur votre machine. La seule action de ce genre qu’il peut demander est le redémarrage d’Hermes, quand vous cliquez pour le faire.
+
+## Que se passe-t-il si je perds l’accès SSH après un durcissement ?
+
+Une option qui ferme l’accès arme un retour en arrière de 600 secondes. Sans `edge-setup verify-access` depuis une **nouvelle** session, l’accès précédent est restauré. Le détail est dans [edge-setup](/fr/docs/edge-setup).
+
+## Quelle machine pour mes bots ?
+
+Un serveur Debian 12 ou plus, ou Ubuntu 24.04 ou plus, loué ou chez vous. Les autres systèmes ne sont pas pris en charge. Les étapes sont dans [Relier une machine](/fr/docs/machine).
+
+## openedbot fonctionne-t-il seulement avec Hermes ?
+
+Hermes est l’agent de référence : `edge-setup` l’installe pour vous. openedbot accepte aussi d’autres agents ou passerelles qui implémentent son protocole de connexion public et versionné.
+
+## openedbot est-il open source ?
+
+Oui. Le cœur d’openedbot est sous licence AGPL-3.0 ; `edge-setup` et le protocole de connexion, qui tournent sur votre serveur ou dans des agents tiers, restent sous Apache-2.0. Des extensions payantes facultatives peuvent ajouter des fonctions, et openedbot fonctionne pleinement sans elles. Une licence commerciale permet d’utiliser le cœur sans les obligations de l’AGPL : écrivez à [kaubree@devaubree.fr](mailto:kaubree@devaubree.fr).
+
+## Où écrire au support ?
+
+Voir [Contacter le support](/fr/docs/support). N’envoyez ni mot de passe, ni ticket, ni clé.

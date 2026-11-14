@@ -1,0 +1,58 @@
+---
+import '@fontsource-variable/figtree';
+import '@fontsource/jetbrains-mono/400.css';
+import '../styles/landing.css';
+
+type Props = {
+  title: string;
+  description?: string;
+  lang?: 'en' | 'fr';
+  /** Same page in the other language, for `hreflang`. */
+  alternate?: string;
+  noindex?: boolean;
+};
+
+const { title, description, lang = 'en', alternate, noindex = false } = Astro.props;
+const fullTitle = `${title} | openedbot`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const other = lang === 'en' ? 'fr' : 'en';
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    {description && <meta name="description" content={description} />}
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+    {alternate && <link rel="alternate" hreflang={other} href={new URL(alternate, Astro.site)} />}
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta property="og:title" content={fullTitle} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content={lang === 'en' ? 'en_US' : 'fr_FR'} />
+    <meta property="og:url" content={canonical} />
+    <!-- Before the first paint: hide what `Motion.astro` reveals, only if it can run. -->
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        if (!('IntersectionObserver' in window) || !('animate' in Element.prototype)) return;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        root.dataset.motion = 'on';
+        setTimeout(() => {
+          if (!('motionReady' in root.dataset)) delete root.dataset.motion;
+        }, 2500);
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="landing">
+      <slot />
+    </div>
+  </body>
+</html>

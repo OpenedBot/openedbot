@@ -1,0 +1,13 @@
+# Operator state written next to the checkout by the legacy tool; never versioned.
+.data/
+# Local Claude Code settings.
+.claude/settings.local.json
+# Build artefacts.
+/dist/
+/dist-signed/
+/edge-setup
+/hermes-setup
+# Integration scratch.
+/tmp/
+# ctx index.
+.ctx/

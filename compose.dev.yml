@@ -1,0 +1,57 @@
+# Development infrastructure for contributors: PostgreSQL and Mailpit, nothing
+# else. Never used in production.
+#
+# Started by scripts/dev-infra.sh (through `make setup`, `make db-up` and
+# `make mailpit-up`) only when .env.local says OPENEDBOT_DEV_INFRA=compose,
+# which `make setup` writes into a NEW .env.local when no shared
+# `infra-postgres` container exists on this machine. A workstation that already
+# runs its own PostgreSQL / Mailpit keeps them and never starts this file.
+#
+# By hand: docker compose -f compose.dev.yml up -d --wait
+#          docker compose -f compose.dev.yml down        (data kept)
+#          docker compose -f compose.dev.yml down -v     (data deleted)
+#
+# The project name and the container names are fixed so that every checkout
+# and worktree of this repository shares the same two containers. Ports are
+# bound to loopback only and match .env.example (API_DATABASE_URL on 5432,
+# TRANSACTIONAL_EMAIL_SMTP_URL on 1025, the Mailpit UI on 8025).
+name: openedbot-dev
+
+services:
+  postgres:
+    # Same image and digest as the PostgreSQL service of .github/workflows/core-ci.yml.
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    container_name: openedbot-dev-postgres
+    environment:
+      # Development-only superuser, reachable from 127.0.0.1 only. scripts/db.sh
+      # creates the openedbot database and its roles inside this container.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    container_name: openedbot-dev-mailpit
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    name: openedbot-dev-postgres-data

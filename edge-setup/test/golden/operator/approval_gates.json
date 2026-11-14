@@ -1,0 +1,295 @@
+[
+  {
+    "name": "write_file",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 4820990ec74e8c6366e344181c2119eaa169b383abf6c695f92fe47d874bbbc4 {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"fa6148a60364a6a60ffdf6abe6eac6f3aefa65e9435f8c9ad204cc9518e18e03\",\"args\":{\"path\":\"notes/todo.md\",\"size\":5}}",
+      "rule_key": "openedbot/v1/write_file"
+    },
+    "tool": "write_file"
+  },
+  {
+    "name": "write_file_empties",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 4e655998541bfb09b8d4b7eaf0f3982ad7ebaea53535208a07f03b67366fe8ba {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"a57fc3d0dbb078d9a6f7afdab74ac5af1471af0c64467074beeb67f85ce077a0\",\"args\":{\"path\":\"notes/todo.md\",\"size\":0}}",
+      "rule_key": "openedbot/v1/write_file"
+    },
+    "tool": "write_file"
+  },
+  {
+    "name": "write_file_sensitive",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool write_file.\nopenedbot-gate/v1 6f093c0b9a1cd86c876defbe15814deae4ec3370263304e22a183fd9807d9cef {\"v\":1,\"tool\":\"write_file\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"8a5da9b01b863e091fb1ae927b7e77806ed7cc3adbc4170222d442fa9e2e6dd9\",\"args\":{\"path\":\"/root/.ssh/authorized_keys\",\"size\":16}}",
+      "rule_key": "openedbot/v1/write_file"
+    },
+    "tool": "write_file"
+  },
+  {
+    "name": "patch_replace",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 d595b944e0b8b05e53769dba66d797b040a9ba988f6b3bd600cafb3c267f67d9 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"b2ccc1317993e293adf527b583b3e4b74c1bac1f5965b5006f1fb5a2ae744b38\",\"args\":{\"paths\":[\"src/app.py\"],\"ops\":[\"replace\"]}}",
+      "rule_key": "openedbot/v1/patch"
+    },
+    "tool": "patch"
+  },
+  {
+    "name": "patch_v4a_delete",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 1b95210a400441b5b8b03b88c7afa6842279dbbd4d505d1dce8107ac7a2d352b {\"v\":1,\"tool\":\"patch\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"7d8f40a55bac775b7d431bb978567bdafd27b9da81009f1116777916db313ef5\",\"args\":{\"paths\":[\"src/a.py\",\"src/b.py\"],\"ops\":[\"delete\",\"update\"]}}",
+      "rule_key": "openedbot/v1/patch"
+    },
+    "tool": "patch"
+  },
+  {
+    "name": "patch_unreadable",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool patch.\nopenedbot-gate/v1 a66ac982834abd9b3cf16c8c157b44d84a99c6e8ca5a0f17e71f84ef515b26d3 {\"v\":1,\"tool\":\"patch\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"04280b3c739264080aab9990c27c4ff7d4a62aa75e31155e28677dcabc2dc4e5\",\"args\":{\"paths\":[],\"ops\":[]}}",
+      "rule_key": "openedbot/v1/patch"
+    },
+    "tool": "patch"
+  },
+  {
+    "name": "skill_single_create_023",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool skill_manage.\nopenedbot-gate/v1 3598d049014ec6365d8b6869010628bfcc63485b4c4aeb6b953170bf8f5f172e {\"v\":1,\"tool\":\"skill_manage\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"810ee0517710689e7a4fa9c8600214d0f39720eda196f2d7f5eec2eb2fe77408\",\"args\":{\"action\":\"create\",\"name\":\"e2e-fixture-create\"}}",
+      "rule_key": "openedbot/v1/skill_manage"
+    },
+    "tool": "skill_manage"
+  },
+  {
+    "name": "skill_delete",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool skill_manage.\nopenedbot-gate/v1 03f27a9d4ea67b8f83abcec398c3af9e1956003cfaccb889f5c6e644be76c2a2 {\"v\":1,\"tool\":\"skill_manage\",\"deletes\":\"yes\",\"opaque\":false,\"digest\":\"0f95486742987b9de19e5e38436ae44b37728bfe70d493302c4027d2f86ec3c1\",\"args\":{\"action\":\"delete\",\"name\":\"plan\"}}",
+      "rule_key": "openedbot/v1/skill_manage"
+    },
+    "tool": "skill_manage"
+  },
+  {
+    "name": "send_message",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool send_message.\nopenedbot-gate/v1 305aeddc98c43fa4b684ecb5d89a584f94d9c611ffe214306e829f15f782f25e {\"v\":1,\"tool\":\"send_message\",\"deletes\":\"no\",\"opaque\":false,\"digest\":\"07cd5a8543801a18bd0d256e3a903ceb83fadbde61ebdf63586ee4bfc81e2a5d\",\"args\":{\"action\":\"send\",\"target\":\"telegram:42\",\"platform\":\"telegram\"}}",
+      "rule_key": "openedbot/v1/send_message"
+    },
+    "tool": "send_message"
+  },
+  {
+    "name": "execute_code",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool execute_code.\nopenedbot-gate/v1 9b24e634b4171cd91c3ea758ae88778b97a968c98d6594734734b4a11e78aee5 {\"v\":1,\"tool\":\"execute_code\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"5042e249312efe2f73490958fe0ff77c27bc08a69a2c190b612876a721784b27\",\"args\":{\"language\":\"python\",\"size\":8}}",
+      "rule_key": "openedbot/v1/execute_code"
+    },
+    "tool": "execute_code"
+  },
+  {
+    "name": "cronjob",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool cronjob.\nopenedbot-gate/v1 a5865403a800bdc066022693d58857b8f7e875921703c5184370a8a3e2207c54 {\"v\":1,\"tool\":\"cronjob\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"e7e4f446ad1ae5e2af6590a040d2d75379b5304927c51104e9519bdac0965184\",\"args\":{}}",
+      "rule_key": "openedbot/v1/cronjob"
+    },
+    "tool": "cronjob"
+  },
+  {
+    "name": "mcp",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__linear__create_issue.\nopenedbot-gate/v1 a15e4d5d3d6fe2042af65518d66a2eda70a16894ba02e602a32aefe1499561a6 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"09619dd27817a84ac9bd6c4f93e8f03f520932ccea5e96c6618e04e46ce59102\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\",\"arguments\":{\"api_token\":\"sk-***\",\"title\":\"Bug\"}}}",
+      "rule_key": "openedbot/v1/mcp:linear:create_issue"
+    },
+    "tool": "mcp__linear__create_issue"
+  },
+  {
+    "name": "mcp_legacy_name",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp_old_server_search.\nopenedbot-gate/v1 0143db8b0a7dfc565b41125f4d4038a06cc6ed3771da882bb84e59a162615271 {\"v\":1,\"tool\":\"mcp:old_server:search\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"a69fbbcf7209c6f659a75067c9fa03037c2ae23f55a6f854d5994209129bbbf6\",\"args\":{\"server\":\"old_server\",\"tool\":\"search\",\"arguments\":{\"q\":\"x\"}}}",
+      "rule_key": "openedbot/v1/mcp:old_server:search"
+    },
+    "tool": "mcp_old_server_search"
+  },
+  {
+    "name": "mcp_large",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__linear__create_issue.\nopenedbot-gate/v1 b4b25b712cde6eec7786e8224eeb1f3d15052a2117e04f86473358188291a167 {\"v\":1,\"tool\":\"mcp:linear:create_issue\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"d98928fc58acc4202c1b1fdca987a4b3c536e78e4fd7ccc741d913747f86f9b3\",\"args\":{\"server\":\"linear\",\"tool\":\"create_issue\"}}",
+      "rule_key": "openedbot/v1/mcp:linear:create_issue"
+    },
+    "tool": "mcp__linear__create_issue"
+  },
+  {
+    "name": "mcp_unregistered",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__ghost__tool."
+    },
+    "tool": "mcp__ghost__tool"
+  },
+  {
+    "name": "blocked",
+    "result": {
+      "action": "block",
+      "message": "Blocked write_file: this tool is blocked for this bot."
+    },
+    "tool": "write_file"
+  },
+  {
+    "name": "routine_list",
+    "result": null,
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_plan_mode",
+    "result": null,
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_blocked",
+    "result": {
+      "action": "block",
+      "message": "Blocked mcp__openedbot_routines__routine_manage: this tool is blocked for this bot."
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_create",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 0246c966a4528a3c52648325afaef5007c0b803b996d2baca82c1c34f6d9f36d {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"507f60e10938cb157b8f5b93b0f81966d58efe4eba3f4175a3eba5b0461e195d\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"create\",\"name\":\"Weekly review\",\"prompt\":\"Ask what moved this week.\",\"schedule\":\"every monday at 9am\",\"timezone\":\"Europe/Paris\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_create_long_prompt",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 7c4e4167917f16f920f92304cf78b30be59f3e77dc6df11cfdfda386c49c04e9 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":true,\"digest\":\"a82849ca26a4db4244c364bfcba72b3b087934d117a2b7a336a84294a4fdc7fc\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"create\",\"name\":\"Weekly review\",\"schedule\":\"every monday at 9am\",\"timezone\":\"Europe/Paris\",\"prompt_chars\":900}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_create_plan_mode",
+    "result": {
+      "action": "block",
+      "message": "Blocked mcp__openedbot_routines__routine_manage: this bot is in plan mode."
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_case",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 960c8d4501dbea235f280f7034cd479c08b69a56722cd29c38616f3f2d4a1089 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"005886fba26162756a73edb69d323368e0badbdb06315fafe80175922f0ffbef\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"LIST\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_type",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 2d1db0840e2f7bce5b1841316f3e4f0b85d948b66aa41ba7dc3425b2802b2fa0 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"51597c52c9e383497e717fb61f2f13aeb64a4019e72a8dc69d05c7aad906ce35\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":[\"list\"]}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_space",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 0f08fb38d669ca7944bd3d6bb46050ae7490b93699d4e9ec208353d8d5f85040 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"15ceebf9a9529ea6212b44f1782ea8a3033bf864d2078fcb3c65ec742af2a2f2\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"list \"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_zero_width",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 dc886f213b552ecbe26110f780e6ec9e81d1553eb5891b2aa1b30393b30e6ce1 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"6bd3e7b38cbab361e3036d82825f73d3e6b820d079ea92645a80c2be7a75a0a5\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"list\\u200b\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_title",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 6c98be1310747d8de35f46430e0ef55772235a81b33896334b1f4649ff20fbfd {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"5c235b5c5d3d217b52ccb6b6cf0dc19dc1ee5045152623cee1718106733f1936\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"List\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_unclassified_prefix",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 6f0e87d8918acadc6aac235aaac2cde1c8bb037ebba360d08ed471e935f93d35 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"65a87cbd7312659dbbc7a45f170de508d98f642e5c4020b0e91986e46e997215\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"lists\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_json_string",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 6cf929396e65401453ad0b761818e3ce0786b61cdad2bdb178b29e57648de428 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"638d171c0a00d984831941dd55f560f2783296e3504a0cf89111261f4a35a678\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_registry_raises",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage."
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_no_action",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 f7b4f29a247e24001bb677ce206edfbff9f0e8d3418f8494ad8a3a30fae18fdc {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"297df275ddd8b20517b2234341df135e36fa701454f880b52a0a77ced99d626b\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_no_args",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_routines__routine_manage.\nopenedbot-gate/v1 10302b4fbe0b3f86fed2a19697cdf73dd4df40c4dc5d1b46bf6919b4d5305af0 {\"v\":1,\"tool\":\"mcp:openedbot_routines:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\",\"args\":{\"server\":\"openedbot_routines\",\"tool\":\"routine_manage\",\"arguments\":{}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_routines:routine_manage"
+    },
+    "tool": "mcp__openedbot_routines__routine_manage"
+  },
+  {
+    "name": "routine_list_other_server",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__other__routine_manage.\nopenedbot-gate/v1 67adab8c41e932223035178f60c05f3fc238d946c936d88fe3ca4f41ff8d008b {\"v\":1,\"tool\":\"mcp:other:routine_manage\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"584e7600815c4c752e42f8f3c00aa4bf1597f13bb08ed5de443b33097e1a1751\",\"args\":{\"server\":\"other\",\"tool\":\"routine_manage\",\"arguments\":{\"action\":\"list\"}}}",
+      "rule_key": "openedbot/v1/mcp:other:routine_manage"
+    },
+    "tool": "mcp__other__routine_manage"
+  },
+  {
+    "name": "bot_settings",
+    "result": {
+      "action": "approve",
+      "message": "Approve write-capable tool mcp__openedbot_bot_settings__bot_settings_propose.\nopenedbot-gate/v1 8da5b64178c921d0dc92f2028e136733204b44d077539f17c65554617fe2fef3 {\"v\":1,\"tool\":\"mcp:openedbot_bot_settings:bot_settings_propose\",\"deletes\":\"unknown\",\"opaque\":false,\"digest\":\"95970485ef20e0822cb88d308da648e499ddb2f8b034297d653424bbf08292c1\",\"args\":{\"server\":\"openedbot_bot_settings\",\"tool\":\"bot_settings_propose\",\"arguments\":{\"label\":\"Brief\",\"reason\":\"Shorter answers\"}}}",
+      "rule_key": "openedbot/v1/mcp:openedbot_bot_settings:bot_settings_propose"
+    },
+    "tool": "mcp__openedbot_bot_settings__bot_settings_propose"
+  }
+]

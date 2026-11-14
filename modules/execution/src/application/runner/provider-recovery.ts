@@ -1,0 +1,473 @@
+import type { SQL } from "bun";
+import {
+  type HermesClient,
+  HermesClientError,
+  type HermesModelOptions,
+} from "@openedbot/hermes";
+import { NO_USABLE_PROVIDER_CODE } from "@openedbot/contracts-errors";
+import { NO_USABLE_PROVIDER_MESSAGE } from "../../domain/hermes-events";
+import type { ModelAssignmentMode } from "@openedbot/contracts-api";
+import { isVirtualAggregateProvider } from "../../domain/provider-failure";
+import { resolveRunnableSelection, type ResolvedRunSelection } from "../../domain/run-selection";
+import {
+  applyFallbackProfileModel,
+  enqueueQuotaReachedEmail,
+  fallbackFailureMessage,
+  loadActiveIncidents,
+  planProviderRetry,
+  providerAuthRequiredPayload,
+  providerFallbackPayload,
+  PROVIDER_FALLBACK_EVENT,
+  recordProviderIncident,
+  type ProviderRetryState,
+} from "../provider-fallback";
+import { rememberWarmModelSelection } from "../warm-model-selection";
+import type { WorkerConfig } from "../worker-config";
+import { NamedRunError } from "./failure";
+import { persistUnnumberedEvents } from "./persist";
+import type { RunContext } from "./types";
+import { describe, log } from "./util";
+import { markCreateIntent } from "./lease-transitions";
+import { RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
+
+/**
+ * Le couple que ce run demandera, selon le mode d'attribution de l'organisation.
+ *
+ * `per_bot` : le modèle du bot prime, et son fournisseur reste implicite pour
+ * que `resolveRunnableSelection` aille chercher celui qui le sert vraiment (un
+ * même id est listé par plusieurs fournisseurs). Le choix global ne sert qu'aux
+ * bots qui n'ont rien.
+ *
+ * `global` : le choix global l'emporte, fournisseur compris. Le modèle propre du
+ * bot n'est pas lu, mais il n'est pas perdu non plus : il dort en base et
+ * revient dès que l'organisation repasse en `per_bot`. Sans choix global posé,
+ * il n'y a rien à imposer, donc le modèle du bot reprend la main plutôt que de
+ * laisser le run sans modèle du tout.
+ */
+export function applyRuntimeModelSelection(
+  bot: { model: string | null; reasoningEffort: string | null; fastMode?: boolean },
+  runtime: { provider: string | null; model: string | null; reasoningEffort: string | null },
+  assignmentMode: ModelAssignmentMode = "per_bot",
+): { provider: string | null; model: string | null; reasoningEffort: string | null; fastMode?: boolean } {
+  const runtimeModel = runtime.model?.trim() || null;
+  // The global choice carries no fast mode: it is the bot's own switch.
+  if (assignmentMode === "global" && runtimeModel) {
+    return {
+      model: runtimeModel,
+      provider: runtime.provider?.trim() || null,
+      reasoningEffort: runtime.reasoningEffort?.trim() || null,
+    };
+  }
+  const explicitModel = bot.model?.trim() || null;
+  return {
+    model: explicitModel ?? runtimeModel,
+    provider: explicitModel ? null : runtime.provider?.trim() || null,
+    reasoningEffort: bot.reasoningEffort?.trim() || runtime.reasoningEffort?.trim() || null,
+    ...(bot.fastMode === true ? { fastMode: true } : {}),
+  };
+}
+
+export { resolveRunnableSelection, type ResolvedRunSelection };
+
+/**
+ * The provider chosen for this run when the catalogue says its login is gone.
+ *
+ * `resolveRunnableSelection` only keeps authenticated providers, so a chosen
+ * provider that lost its login (removed, or a pool the host no longer reports
+ * as logged in) used to fall through to the runtime's provider or the first
+ * runnable one: the run was served by someone else with no
+ * `run.provider_fallback` event, and the header kept naming the configured
+ * model. Same invariant as the create path: an authentication failure of the
+ * chosen provider is never served by another provider. The run fails with
+ * `PROVIDER_AUTH_REQUIRED` instead, naming the provider to reconnect.
+ *
+ * A chosen provider that is no longer in the catalogue at all counts too:
+ * upstream's `/api/model/options` lists authenticated providers only
+ * (`hermes_cli/inventory.py`, `build_model_options_payload`), so a provider
+ * whose login was removed usually vanishes rather than reading
+ * `authenticated: false`. Resolution would otherwise serve the run on the
+ * runtime's provider or the first runnable one, silently, with no
+ * `run.provider_fallback` event. Like a refused login, a vanished provider
+ * does not come back on its own: the operator reconnects it (or picks
+ * another model), so it fails the same way rather than falling back.
+ *
+ * Only an explicit provider counts: a model-only choice (`per_bot`) leaves the
+ * provider to the resolution, which picks one that serves the model. A quota
+ * incident still routes around the provider (it clears on its own, and a
+ * rate-limited pool stays listed upstream), and a virtual aggregate has no
+ * login to reconnect.
+ */
+export function chosenProviderAuthRequired(
+  catalog: HermesModelOptions,
+  selection: ResolvedRunSelection,
+  incidents: ReadonlyArray<{ provider: string; until: Date | string; kind?: "quota" | "auth" }> = [],
+): string | null {
+  const chosen = selection.model ? selection.provider?.trim() || null : null;
+  if (!chosen || isVirtualAggregateProvider(chosen)) return null;
+  const entry = catalog.providers.find((provider) => provider.slug === chosen);
+  if (entry?.authenticated) return null;
+  const now = Date.now();
+  const quotaBlocked = incidents.some((incident) =>
+    incident.provider === chosen && incident.kind !== "auth" && new Date(incident.until).getTime() > now,
+  );
+  return quotaBlocked ? null : chosen;
+}
+
+/**
+ * Le modèle envoyé à Hermes est écrit sur le run au passage `creating`,
+ * pas relu plus tard depuis le bot : un changement de préférence ne
+ * réécrit pas l’historique.
+ */
+export async function persistResolvedRunModel(
+  db: SQL,
+  config: Pick<WorkerConfig, "workerId">,
+  context: Pick<RunContext, "id" | "organizationId" | "leaseGeneration">,
+  model: string | null,
+): Promise<boolean> {
+  return markCreateIntent(db, config, context, model);
+}
+
+export function fallbackAwareError(error: unknown, retryState: ProviderRetryState): unknown {
+  if (!retryState.fallback) return error;
+  const original = error instanceof Error ? error.message : String(error);
+  const message = fallbackFailureMessage(original, retryState.fallback);
+  if (error instanceof HermesClientError) {
+    return new HermesClientError(message, error.status, error.code, {
+      requestDelivery: error.requestDelivery ?? undefined,
+      retryAfterMs: error.retryAfterMs ?? undefined,
+      diagnostic: error.diagnostic ?? undefined,
+      reference: error.reference ?? undefined,
+    });
+  }
+  if (error instanceof NamedRunError) return new NamedRunError(error.code, message, error.details);
+  return new NamedRunError("HERMES_RUN_FAILED", message);
+}
+
+/**
+ * What the runner does after a provider failure.
+ *
+ * `retry` carries the sequence of the `run.provider_fallback` event it just
+ * wrote (null if the lease was lost before): a run whose normaliser is
+ * already open must skip it, or its next event proposes the same sequence,
+ * refused since S2c (`RUN_EVENT_SEQUENCE_CONFLICT`); it used to be dropped by
+ * `on conflict do nothing` (measured 2026-10-24: the first characters of every
+ * answer after a fallback, "ello" for "hello"). `auth_required` names the provider whose
+ * login was refused: the run fails with `PROVIDER_AUTH_REQUIRED`.
+ */
+export type ProviderRecovery =
+  | { action: "retry"; selection: ResolvedRunSelection; state: ProviderRetryState; fallbackSequence: number | null }
+  | { action: "auth_required"; provider: string }
+  | { action: "give_up" };
+
+export async function recoverProviderFailure(
+  db: SQL,
+  config: WorkerConfig,
+  client: HermesClient,
+  context: RunContext,
+  error: unknown,
+  selection: ResolvedRunSelection,
+  retryState: ProviderRetryState,
+  /** Keep incidents/auth errors, but never replay a request whose effects may have begun. */
+  allowRetry = true,
+): Promise<ProviderRecovery> {
+  const catalog = await client.modelOptions().catch(() => null);
+  const incidents = await loadActiveIncidents(db, context.organizationId, context.runtimeId);
+  const plan = planProviderRetry(error, selection, catalog, incidents, retryState, {
+    runtimeSelectedProvider: context.runtimeSelectedProvider,
+    runtimeSelectedModel: context.runtimeSelectedModel,
+  });
+  const fallback = allowRetry && plan.action === "retry" ? plan.state.fallback : null;
+  const failedProvider = servingProvider(
+    catalog,
+    context.hermesProfile,
+    selection.provider ?? retryState.fromProvider,
+  );
+  // Sans repli, la panne s'enregistre quand même : quand tous les fournisseurs
+  // sont morts, l'incident est le seul signal qui passe l'affichage en KO.
+  if (plan.kind === "quota" || plan.kind === "auth") {
+    // L'erreur d'un run arrive en trame SSE : un objet, dont le diagnostic vit
+    // dans `message` / `error` (voir `describe`).
+    const message = describe(error).slice(0, 500);
+    if (failedProvider) {
+      await recordProviderIncident(db, {
+        organizationId: context.organizationId,
+        runtimeId: context.runtimeId,
+        provider: failedProvider,
+        kind: plan.kind,
+        runId: context.id,
+        message,
+        fallbackProvider: fallback?.provider ?? null,
+        fallbackModel: fallback?.model ?? null,
+      });
+    }
+    if (failedProvider) {
+      await enqueueQuotaReachedEmail(db, {
+        organizationId: context.organizationId,
+        runtimeId: context.runtimeId,
+        provider: failedProvider,
+        kind: plan.kind,
+        occurredAt: new Date(),
+        fallbackProvider: fallback?.provider ?? null,
+        fallbackModel: fallback?.model ?? null,
+        settingsUrl: `${config.webAppUrl}/settings/models`,
+        webAppUrl: config.webAppUrl,
+      }).catch((emailError) => {
+        log("worker.provider_quota_email_failed", { runId: context.id, error: describe(emailError) });
+      });
+    }
+  }
+  if (plan.kind === "auth" && failedProvider) {
+    log("worker.provider_auth_required", { runId: context.id, organizationId: context.organizationId, provider: failedProvider });
+    return { action: "auth_required", provider: failedProvider };
+  }
+  if (!allowRetry && plan.action === "retry") {
+    log("worker.provider_fallback_blocked", {
+      runId: context.id, organizationId: context.organizationId, reason: "tools_or_incomplete_stream",
+    });
+  }
+  if (!allowRetry || plan.action !== "retry" || !plan.selection.provider || !plan.selection.model || !fallback) return { action: "give_up" };
+  // Le repli n'existe que si le profil le porte : sans cette écriture le
+  // prochain `createRun` repart sur le fournisseur du profil et rejoue la même
+  // panne, une fois par tentative.
+  const applied = await applyFallbackProfileModel(
+    client,
+    context.hermesProfile,
+    context,
+    { provider: fallback.provider, model: fallback.model },
+  );
+  if (context.hermesProfile && !applied) {
+    log("worker.profile_model_not_applied", {
+      runId: context.id,
+      profile: context.hermesProfile,
+      provider: fallback.provider,
+      model: fallback.model,
+      capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
+    });
+    // Le repli repartirait chez le fournisseur du profil, celui qui vient
+    // d'échouer : pas de nouvelle tentative sous une étiquette fausse.
+    if (profileServesOtherProvider(catalog, fallback.provider)) return { action: "give_up" };
+  }
+  const committed = await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
+    type: PROVIDER_FALLBACK_EVENT,
+    occurredAt: new Date(),
+    payload: providerFallbackPayload(plan.state.fromProvider, fallback),
+  }]);
+  log("worker.provider_fallback", {
+    runId: context.id,
+    organizationId: context.organizationId,
+    from: plan.state.fromProvider,
+    to: fallback.provider,
+    model: fallback.model,
+    reason: fallback.reason,
+    profileApplied: applied,
+  });
+  // Null when the lease was lost meanwhile: the next write of this run is refused anyway.
+  const fallbackSequence = committed.find((event) => event.type === PROVIDER_FALLBACK_EVENT)?.sequence ?? null;
+  return { action: "retry", selection: plan.selection, state: plan.state, fallbackSequence };
+}
+
+/**
+ * Le profil multiplexé route sur un AUTRE fournisseur que celui demandé : tant
+ * que son bloc `model` n'est pas réécrit, le prompt partirait chez lui. Un bloc
+ * vide ou un catalogue illisible ne prouve pas l'écart.
+ */
+export function profileServesOtherProvider(
+  catalog: { provider: string | null } | null,
+  requestedProvider: string,
+): boolean {
+  const current = catalog?.provider?.trim();
+  return Boolean(current) && current !== requestedProvider;
+}
+
+/** The error a new run fails with when its model could not be set on its profile. */
+export function profileModelNotAppliedError(provider: string, model: string): NamedRunError {
+  return new NamedRunError(
+    "PROFILE_MODEL_NOT_APPLIED",
+    "Le modèle choisi n’a pas pu être appliqué au profil Hermes de ce bot : le run n’a pas été lancé, pour ne pas répondre avec un autre fournisseur. Réessayez dans un instant.",
+    { provider, model },
+  );
+}
+
+/** The error a run fails with when its provider refused the bot's login. */
+export function providerAuthRequiredError(provider: string): NamedRunError {
+  const payload = providerAuthRequiredPayload(provider);
+  return new NamedRunError(payload.errorCode, payload.message, { provider });
+}
+
+/**
+ * Un seul appel catalogue par executeRun, et uniquement pour un run neuf.
+ *
+ * Catalogue injoignable : un incident réseau transitoire ne doit pas bloquer un
+ * run qui sait déjà quel modèle il veut, donc la sélection stockée part telle
+ * quelle et Hermes tranche. Mais SANS modèle stocké il n'y a rien à envoyer, et
+ * `stored` est un objet toujours truthy : le garde `if (!selection)` passait,
+ * les champs étaient omis, et Hermes retombait sur son défaut : d'où sa consigne
+ * CLI (« Run 'hermes model' ») dans le fil au lieu de notre phrase produit.
+ */
+export async function resolveSelectionForNewRun(
+  db: SQL,
+  client: HermesClient,
+  context: RunContext,
+  /** The same catalogue read, already started with the preflight inventory. */
+  prefetchedCatalog: Promise<HermesModelOptions | null> | null = null,
+  /** Present only for a new run. A stable resolution is remembered for the warm path. */
+  warmKey: string | null = null,
+): Promise<ResolvedRunSelection | null> {
+  const stored: ResolvedRunSelection = {
+    provider: context.provider,
+    model: context.model,
+    reasoningEffort: context.reasoningEffort,
+  };
+  // A bot with no model of its own follows the automatic choice. The `model:`
+  // block of the profile openedbot manages for it is not a choice: it was
+  // cloned from the host, then a run wrote its fallback in it, and reading it
+  // first froze the bot on that first pick while the console names the
+  // current one (`automaticModel`). The host's default profile says the
+  // current one; the bot's profile still says which providers it can run and
+  // what the gateway routes on. Read side by side with the profile's own.
+  const followsAutomatic = !stored.model && context.hermesProfileManaged && Boolean(context.hermesProfile);
+  const hostDefaultRead = followsAutomatic ? client.defaultProfileModelOptions().catch(() => null) : null;
+  const catalog = await (prefetchedCatalog ?? client.modelOptions().catch(() => null));
+  if (profileCatalogMissingCurrent(catalog, stored, context.hermesProfile)) {
+    log("worker.profile_model_unset", {
+      runId: context.id,
+      profile: context.hermesProfile,
+      selectedProvider: stored.provider,
+      selectedModel: stored.model,
+    });
+  }
+  if (!catalog) return stored.model ? stored : null;
+  const incidents = await loadActiveIncidents(db, context.organizationId, context.runtimeId);
+  const authRequired = chosenProviderAuthRequired(catalog, stored, incidents);
+  if (authRequired) {
+    log("worker.provider_auth_required", {
+      runId: context.id,
+      organizationId: context.organizationId,
+      provider: authRequired,
+      stage: "selection",
+    });
+    throw providerAuthRequiredError(authRequired);
+  }
+  const hostDefault = hostDefaultRead ? await hostDefaultRead : null;
+  if (hostDefaultRead && !hostDefault) {
+    // Unreadable: the profile's own block decides, as before.
+    log("worker.host_default_model_unread", { runId: context.id, profile: context.hermesProfile });
+  }
+  // `stored` stays without the fast mode: it is what runs when the catalogue
+  // cannot be read, and nothing then proves the model offers it.
+  const resolved = resolveRunnableSelection(
+    hostDefault ? { ...catalog, provider: hostDefault.provider, model: hostDefault.model } : catalog,
+    context.fastMode === true ? { ...stored, fastMode: true } : stored,
+    incidents,
+    { provider: context.runtimeSelectedProvider, model: context.runtimeSelectedModel },
+  );
+  // Mesuré le 04-09 : sous `/p/<slug>` le gateway lit `model.provider` dans la
+  // config du profil, pas le `provider` du run. La comparaison porte donc sur le
+  // bloc EFFECTIF du profil, que ce même catalogue relit (`catalog.provider` /
+  // `catalog.model` sous `/p/<slug>`), et non sur la sélection stockée : comparer
+  // à la sélection réécrivait le profil à chaque run même quand il était déjà
+  // juste, pour une mutation hôte qui tient une minute au pire.
+  if (
+    resolved?.model
+    && !profileModelWriteNeeded(catalog, resolved, context.hermesProfile)
+  ) {
+    rememberWarmModelSelection(warmKey, resolved, Date.now());
+  }
+  if (resolved?.provider && resolved.model && profileModelWriteNeeded(catalog, resolved, context.hermesProfile)) {
+    const selection = { provider: resolved.provider, model: resolved.model };
+    const applied = await applyFallbackProfileModel(client, context.hermesProfile, context, selection);
+    if (!applied) {
+      log("worker.profile_model_not_applied", {
+        runId: context.id,
+        profile: context.hermesProfile,
+        provider: selection.provider,
+        model: selection.model,
+        profileProvider: catalog.provider,
+        profileModel: catalog.model,
+        capability: context.linkFeatures.includes(RELAY_FEATURE_PROFILE_MANAGEMENT),
+      });
+      // Le gateway route sur le fournisseur du profil, pas sur celui du corps
+      // du run : lancer quand même afficherait le modèle demandé pendant qu'un
+      // autre fournisseur répond.
+      if (profileServesOtherProvider(catalog, selection.provider)) {
+        throw profileModelNotAppliedError(selection.provider, selection.model);
+      }
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Le fournisseur qui a RÉELLEMENT servi le run, à qui un incident s'impute.
+ *
+ * Sous un profil multiplexé le gateway route sur le bloc `model` du profil et
+ * ignore le `provider` du corps du run : le fournisseur demandé n'est alors pas
+ * celui qui a échoué. Mesuré le 10-09 : profil cloué sur `openai-codex`, quota
+ * Codex épuisé, et openedbot bannissait `xai-oauth` six heures : le fournisseur que
+ * l'opérateur venait justement de choisir, et qui allait bien.
+ *
+ * Le bloc du profil est relu dans le catalogue du run (`/p/<slug>/api/model/options`).
+ * Bloc vide ou catalogue illisible : on retombe sur le fournisseur demandé,
+ * faute de mieux.
+ */
+export function servingProvider(
+  catalog: { provider: string | null } | null,
+  hermesProfile: string | null,
+  requested: string | null,
+): string | null {
+  if (!hermesProfile) return requested;
+  return catalog?.provider?.trim() || requested;
+}
+
+/**
+ * Le bloc `model` du profil doit-il être réécrit avant ce run.
+ *
+ * Vrai seulement quand un profil est en jeu, que la résolution nomme un couple
+ * complet, et que ce couple s'écarte de celui que le gateway lit aujourd'hui.
+ * Un bloc profil encore vide compte comme un écart : le gateway retomberait
+ * sinon sur son défaut.
+ */
+export function profileModelWriteNeeded(
+  catalog: { provider: string | null; model: string | null } | null,
+  resolved: { provider: string | null; model: string | null } | null,
+  hermesProfile: string | null,
+): boolean {
+  if (!hermesProfile || !catalog) return false;
+  if (!resolved?.provider || !resolved.model) return false;
+  return resolved.provider !== catalog.provider?.trim() || resolved.model !== catalog.model?.trim();
+}
+
+/**
+ * Catalogue relu sous `/p/<slug>/api/model/options` : `current_provider` /
+ * `current_model` (champs `provider` / `model`) nuls alors qu'une sélection
+ * est posée. Le multiplexage ignore alors le `provider` du run.
+ */
+export function profileCatalogMissingCurrent(
+  catalog: { provider: string | null; model: string | null } | null,
+  selection: { provider: string | null; model: string | null },
+  hermesProfile: string | null,
+): boolean {
+  if (!hermesProfile || !catalog) return false;
+  const posed = Boolean(selection.provider?.trim() || selection.model?.trim());
+  if (!posed) return false;
+  return !catalog.provider?.trim() && !catalog.model?.trim();
+}
+
+/**
+ * Échec avant même l’appel à Hermes : aucun fournisseur utilisable. On passe
+ * par persistUnnumberedEvents pour que le message remonte dans le fil exactement comme
+ * un run.error Hermes, sans jamais repasser par la file de retry.
+ */
+export async function failWithoutUsableProvider(db: SQL, config: WorkerConfig, context: RunContext): Promise<void> {
+  await persistUnnumberedEvents(db, config, context, context.lastHermesSequence, [{
+    type: "run.error",
+    occurredAt: new Date(),
+    payload: { message: NO_USABLE_PROVIDER_MESSAGE, errorCode: NO_USABLE_PROVIDER_CODE },
+  }]);
+  log("worker.run_failed", {
+    runId: context.id,
+    organizationId: context.organizationId,
+    code: NO_USABLE_PROVIDER_CODE,
+    error: NO_USABLE_PROVIDER_MESSAGE,
+  });
+}

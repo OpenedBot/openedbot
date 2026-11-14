@@ -1,0 +1,117 @@
+/*
+  Thread lab (dev only, `/dev/thread-lab`): the motion of the response
+  approaches ported from streaming-ui.pulseview.app/responses. Imported by
+  `screens/dev/thread-lab.tsx`, so a production build never ships it.
+*/
+
+/* "Streaming Text" (Transitions): each NEW word condenses out of a 1 px blur. */
+.lab-word {
+  animation: lab-word-in 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lab-word-in {
+  from {
+    opacity: 0;
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* "Thinking Shimmer": a gradient clipped to the label, one pass every 1.8 s. */
+.lab-shimmer {
+  color: transparent;
+  background-image: linear-gradient(110deg, var(--bui-text-tertiary) 30%, var(--bui-text-primary) 50%, var(--bui-text-tertiary) 70%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: lab-shimmer 1.8s linear infinite;
+}
+
+@keyframes lab-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* "Thinking States": two labels stacked in one cell, a narrow band sweeps the live one every 2 s. */
+.lab-swap {
+  display: inline-grid;
+  white-space: nowrap;
+}
+
+.lab-swap-item {
+  position: relative;
+  grid-area: 1 / 1;
+  color: var(--bui-text-secondary);
+  animation: lab-swap-in 150ms ease-in-out both;
+}
+
+.lab-swap-item::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: transparent;
+  background-image: linear-gradient(90deg, transparent 40%, var(--bui-text-primary) 50%, transparent 60%);
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: lab-swap-band 2s linear infinite;
+}
+
+.lab-swap-item[data-leaving] {
+  animation: lab-swap-out 150ms ease-in-out both;
+}
+
+@keyframes lab-swap-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(8px);
+  }
+}
+
+@keyframes lab-swap-out {
+  to {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes lab-swap-band {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+/* "Agent Activity": rows fade out under the top edge while the list glides up. */
+.lab-feed-mask {
+  -webkit-mask-image: linear-gradient(transparent 0, #000 32px);
+  mask-image: linear-gradient(transparent 0, #000 32px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-word,
+  .lab-shimmer,
+  .lab-swap-item,
+  .lab-swap-item::before,
+  .lab-swap-item[data-leaving] {
+    animation: none;
+  }
+
+  .lab-shimmer {
+    color: var(--bui-text-secondary);
+    background: none;
+  }
+}

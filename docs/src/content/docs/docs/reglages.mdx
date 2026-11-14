@@ -1,0 +1,67 @@
+---
+title: Set up your bots and your account
+description: Manage models, tools, memory, routines, approvals and your account.
+icon: Settings
+---
+
+A bot's settings are in **Manage the bot…**, from the bot's menu: they apply to that bot only. The console's **Settings** apply to your workspace and all your bots.
+
+## AI provider and model
+
+The AI provider makes your bots talk and charges for their answers, depending on your account with it. The provider, model and effort used by default are set in **Settings > Models**.
+
+For a single bot, choose its model in **Manage the bot… > Model** and, when your machine allows it, its own keys in **Manage the bot… > Provider keys**.
+
+The provider keys stay on the machine you linked. Never copy them into a conversation.
+
+## Persona
+
+The persona tells the bot who it is, what its mission is and how to help you. You change it in **Manage the bot… > Persona**. See [Customize your bot](/docs/bot#customize-your-bot).
+
+## Tools and connectors
+
+- **Manage the bot… > Skills and tools** and **Manage the bot… > MCP connectors**: what this bot can use.
+- **Settings > Connectors**: the tools, MCP servers and skills your machine offers, read-only.
+
+Turn on only what the bot needs.
+
+## Memory
+
+Each bot can keep its own facts from one conversation to the next. In **Manage the bot… > Memory**, you can view them, **Add** some, **Correct** them or make the bot **Forget** them. The bot does not automatically keep everything said in its conversations.
+
+## Routines
+
+A routine is a task a bot carries out regularly. In **Manage the bot… > Routines**, choose **New routine**, then a name, a **Schedule** and the **Message** that tells the bot what to do. You can pause a routine or turn it back on. Its results arrive in the bot's conversation.
+
+## Actions to approve
+
+Some actions wait for your decision. Read the request in the conversation, then choose **Allow once** or **Deny**. Each request needs its own decision. Pending requests are also gathered in **Inbox**.
+
+A bot's **Permission mode**, chosen in its conversation, says what it can do without asking you:
+
+- **Auto review**: an automatic reviewer answers, and asks you when it hesitates.
+- **Ask**: every write or risky command is put to you.
+- **Plan mode**: the bot reads and plans; writes are blocked.
+- **Full access**: writes run without asking; the baseline protections still apply.
+
+A bot's own rules are in **Manage the bot… > Approval rules**. The log of your decisions is in **Settings > Decisions**, and the rules applied to the whole workspace in **Settings > Policies**.
+
+## Your account and your workspace
+
+- **Settings > My account**: your **Username** (the one your bots use), the **Sign-in** section (address and Google account) and the **Members** of your workspace. The display name comes from your sign-in provider and is not changed here.
+- **Settings > Appearance and language**: the theme and the language, saved in this browser.
+- **Settings > Security**: the current session and connected devices. If your account already has a password, you can also change it; new accounts sign in with an email code or Google.
+
+## Email alerts
+
+In **Settings > Notifications**, enable **Approval needed**, **Task completed** and **Task failed or needs review** separately. All three are disabled by default. Preferences apply to your account in the current workspace and follow you across devices.
+
+Alerts concern your tasks and routines you own, even while the console is closed. Enabling an alert does not replay old events. Disabling it suppresses pending sends; an email already handed to the transport cannot be recalled. Sign-in and security emails are independent.
+
+## Export and recovery
+
+Open **Files** in a conversation to search received and generated attachments, preview or download them, and return to their original message.
+
+**Export conversation** creates Markdown containing messages and attachment references, without file binaries. Download the files you want to keep separately. Administrators can also **Export bot configuration** as versioned JSON containing its persona, model, preferences and routines. Provider credentials and connector secrets are excluded; text you entered yourself remains in the export.
+
+These exports are readable documents, not importable backups. For a self-hosted installation, back up PostgreSQL, attachment storage, each host’s Hermes data and the encryption keys together. The operator procedure is in the repository’s `docs/recovery.md`. Test recovery on isolated infrastructure before relying on it.

@@ -1,0 +1,351 @@
+/*
+  Mode home: `/bot` and `/cs`.
+
+  Not a presentation page: the mode's index. It lives INSIDE the application
+  shell, so it takes its tokens (`--background`, `--foreground`,
+  `--border`, `--accent-600`) and follows the light/dark theme instead of imposing
+  its own dark world. Colour serves only one thing: the action.
+
+  The signature is the hairline between two lines. Solid on `/bot`: a register
+  that runs on, a contact does not stand out. Dotted on `/cs`: the
+  perforation of a stub book: a session tears off and is archived.
+*/
+
+.openedbot-mode {
+  --mode-gutter: clamp(1.25rem, 5vw, 3rem);
+  --mode-rule: color-mix(in oklab, var(--border) 90%, transparent);
+  --mode-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.openedbot-mode-guide {
+  width: min(100%, 46rem);
+  margin-inline: auto;
+  padding: clamp(2rem, 6vw, 4.5rem) var(--mode-gutter) clamp(3rem, 8vw, 6rem);
+}
+
+/* The launcher carries a field, pills and a button on the same line. */
+.openedbot-mode-guide[data-kind="chat"] {
+  width: min(100%, 52rem);
+}
+
+.openedbot-mode-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.openedbot-mode-eyebrow {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/*
+  A single coloured affordance on the page. It is in `--accent-600` because
+  that is the accent the operator chose in their settings: the page does not
+  pull a green back to itself.
+*/
+.openedbot-mode-cta {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-600);
+  color: var(--accent-contrast);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms var(--mode-ease);
+}
+
+.openedbot-mode-cta:hover {
+  background: var(--accent-700);
+}
+
+:root[data-keyboard-focus] .openedbot-mode-cta:focus-visible,
+:root[data-keyboard-focus] .openedbot-mode-row-target:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/*
+  The statement. Two sentences: the first states the fact, the second, in
+  italic of the same face, says what it costs. The italic carries the
+  distinction between the two modes; no highlighter takes that on.
+*/
+.openedbot-mode-title {
+  margin: 1.5rem 0 0;
+  max-width: 16ch;
+  font-family: var(--font-serif);
+  font-size: clamp(34px, 5.2vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.openedbot-mode-title em {
+  display: block;
+  color: var(--muted-foreground);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.openedbot-mode-lead {
+  margin: 1.15rem 0 0;
+  max-width: 46ch;
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.openedbot-mode-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin: 1.25rem 0 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.openedbot-mode-facts span + span::before {
+  content: "·";
+  margin-right: 1.1rem;
+  opacity: 0.55;
+}
+
+.openedbot-mode-index {
+  margin-top: clamp(2.5rem, 6vw, 4rem);
+  border-top: 1px solid var(--mode-rule);
+}
+
+.openedbot-mode-index-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 1rem 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.openedbot-mode-index-title span {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
+.openedbot-mode-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+  The hairline. `/bot`: solid: the register is continuous. `/cs`: dotted: the
+  line is a detachable stub. This is the only place where the two pages
+  diverge visually, and it says exactly what separates them.
+*/
+.openedbot-mode-row + .openedbot-mode-row {
+  border-top: 1px solid var(--mode-rule);
+}
+
+[data-kind="chat"] .openedbot-mode-row + .openedbot-mode-row {
+  border-top-style: dashed;
+}
+
+.openedbot-mode-row-target {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.5rem;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 140ms var(--mode-ease);
+}
+
+.openedbot-mode-row-target:hover {
+  background: var(--surface-hover);
+}
+
+.openedbot-mode-row-target:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.openedbot-mode-row-text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.openedbot-mode-row-text strong {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openedbot-mode-row-text > span {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openedbot-mode-row-meta {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.openedbot-mode-row-go {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 140ms var(--mode-ease),
+    transform 140ms var(--mode-ease);
+}
+
+.openedbot-mode-row-target:hover .openedbot-mode-row-go,
+:root[data-keyboard-focus] .openedbot-mode-row-target:focus-visible .openedbot-mode-row-go {
+  opacity: 1;
+  transform: none;
+}
+
+.openedbot-mode-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  padding: 1.75rem 0.5rem 0.5rem;
+}
+
+.openedbot-mode-empty p {
+  margin: 0;
+  max-width: 42ch;
+}
+
+.openedbot-mode-empty p:first-child {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.openedbot-mode-empty p + p {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.openedbot-mode-empty .openedbot-mode-cta {
+  margin-top: 0.75rem;
+}
+
+/* Appearance on mount: the lines settle, offset by their rank. */
+.openedbot-mode-row {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.openedbot-mode-guide.in .openedbot-mode-row {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 420ms var(--mode-ease),
+    transform 420ms var(--mode-ease);
+  transition-delay: calc(min(var(--i, 0), 8) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-mode-row {
+    opacity: 1;
+    transform: none;
+  }
+
+  .openedbot-mode-guide.in .openedbot-mode-row,
+  .openedbot-mode-cta,
+  .openedbot-mode-row-target,
+  .openedbot-mode-row-go {
+    transition-duration: 0.01ms;
+    transition-delay: 0ms;
+  }
+
+  .openedbot-mode-row-go {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* On touch, no hover reveals the arrow: it stays put. */
+@media (pointer: coarse) {
+  .openedbot-mode-row-go {
+    opacity: 1;
+    transform: none;
+  }
+
+  .openedbot-mode-row-target:hover {
+    background: none;
+  }
+}
+
+.openedbot-mode-cta:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.openedbot-mode-cta:disabled:hover {
+  background: var(--accent-600);
+}
+
+/* On touch: 44 pt on what is tapped (HIG / WCAG 2.5.8), no hover carries information. */
+@media (pointer: coarse) {
+  .openedbot-mode-cta {
+    min-height: 44px;
+  }
+
+  .openedbot-mode-cta:hover {
+    background: var(--accent-600);
+  }
+}

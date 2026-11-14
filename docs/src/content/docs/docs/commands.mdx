@@ -1,0 +1,148 @@
+---
+title: Commands
+description: Table of edge-setup verbs, provider credentials and named instances. Most mutations require --yes. No flag accepts a secret.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Mutating commands generally require `--yes`. A new protection affecting access requires `--console-confirmed`; `verify-access` confirms it without `--yes`.
+No flag accepts a secret.
+
+<Aside type="caution" title="Options come before the name">
+Argument parsing stops at the first word that is not an option.
+On verbs that take a name (`credentials`, `toolsets`, `mcp`), writing
+`credentials add anthropic --yes` leaves `--yes` unread and the command is
+refused for extra arguments. The order that works is
+`credentials add --yes anthropic`.
+</Aside>
+
+After the first `up`, stop prefixing with `sudo`
+on Linux. `version`, `help` and `self-verify`
+never require root. `audit`, `export`, `verify-access` and `auto-upgrade` are Linux commands.
+
+| Command | Read-only | Effect |
+|---|---|---|
+| `audit [--strict]` | report | Security inventory: mandatory checks and selected options; the others are `SKIP` (root-only report). |
+| `credentials list\|add\|login\|remove` | `list` | Provider key through stdin or a 0600 file, or OAuth through a device code (`login`), proven through `/api/model/options`. See [Provider credentials](#provider-credentials). |
+| `deploy-key set\|status` | | Sets (on stdin) or describes the host's deployment key, the one that tags a binary for `upgrade --from --tag`. Internal path, never needed by a customer. |
+| `detect` | yes | Host facts, recommended mode, preflight. |
+| `doctor` | yes | Checks the runtime end to end (loopback gateway, anonymous refusal, catalog); reports an inactive link instance. |
+| `export [--json\|--md]` | yes | Non-secret coordinates for openedbot; the bearer never appears in them. |
+| `help` | yes | Lists the commands (`-h` and `--help` too). No root. |
+| `link --openedbot URL` | | Connector link handshake, token persisted 0600, device key sealed, daemon started. See the flags below. |
+| `mcp list\|add\|remove` | `list` | CLI equivalent of the MCP actions the console runs over the link: `add --url https://… --yes <name>`, `remove --yes <name>`. The token goes through a 0600 file (`--auth header --token-file F`). |
+| `plan` | yes | What `up` would do, without writing anything. |
+| `reset` | | Removes the installation; runtime data is retained by default. |
+| `self-verify [--release-url]` | yes | Manual diagnostic: verifies the signature of the release's `SHA256SUMS`, then checks that the current binary is listed in it. Never run implicitly on each command. No root. |
+| `status` | yes | Phases, mode, transaction markers, installed versions, and one line per link instance (origin, runtime, unit, device key, tier and owner; JSON `connectors[]`). |
+| `toolsets list\|enable\|disable` | `list` | CLI equivalent of the toolset actions the console runs over the link: `enable --yes <name>`, `disable --yes <name>`, re-read from the runtime inventory. A toolset from the forbidden list is refused. |
+| `uninstall --yes` | | `reset` under the name people look for, plus the data choice: removes `edge-setup`, the runtime and its services. On a terminal, it asks whether to keep the runtime data (Enter keeps it; destroying it requires typing `purge`). Off a terminal, the choice comes from `--keep-data` or from `--purge-data --i-understand-data-loss`. Accepts the other `reset` options, `--plan` included. |
+| `unlink [--name <instance>] --yes` | | Stops and disables the connector of one instance (the default one without `--name`), then removes its local link (`link.json`, token, link context and origin). Keeps its device key and the Hermes data. The runtime stays in openedbot, offline, to be removed there if needed. |
+| `up` | | Installs the minimal runtime under `hermes`, the loopback gateway and the connector. The global protections are all opt-in, through positive options. See [`up` options](#up-options). |
+| `update` | | On its own: code 69 (not implemented). `update --self [--yes]` is the alias of `upgrade` (including its options). |
+| `upgrade --yes [--release-url URL]` | | Downloads the new release over HTTPS, verifies the Sigstore signature of its `SHA256SUMS` then, once, its SHA-256 against that manifest (an unsigned release is refused), replaces the installed binary and restarts its units; also rewrites `hermes-gateway.service` when it differs from the one the binary renders, and restarts the gateway only if the host is idle. `--from FILE --tag HEX` (HMAC-SHA256 under the key set by `deploy-key set`) remains an internal path for `make deploy` over SSH. |
+| `auto-upgrade enable\|disable --yes`, `auto-upgrade status` | | Sets or removes the automatic upgrade timer (every 6 h): only a newer `vX.Y.Z` release that is signed and matches its `SHA256SUMS` is installed, the link is proven on the new binary, and the old one is put back otherwise. On by default after `up` on Linux; `disable` is remembered. |
+| `verify-access` | | From a **new** SSH session: proves the new access and disarms an SSH/UFW/fail2ban/quarantine rollback. |
+| `version` | yes | Prints the binary version (`--version` too). No root. |
+
+## Option defaults and platform scope
+
+This table is the option reference. Unless stated otherwise, boolean flags default to false and text options to empty. Flags that name a file accept a path, not the secret itself. Put options before a positional name. `--yes` confirms mutations; previews do not need it. `verify-access` confirms a guarded Linux access change without `--yes`.
+
+| Command | Flags, defaults and purpose | Platform / confirmation |
+|---|---|---|
+| `detect`, `status` | `--json`: machine-readable output. | Linux; no confirmation. |
+| `audit` | `--strict`: exit 1 for FAIL or UNKNOWN. | Linux; no confirmation; writes a root-only report. |
+| `export` | `--json`: JSON; `--md`: Markdown (default); mutually exclusive. | Linux; no confirmation. |
+| `plan`, `up` | `--yes`: confirm `up`; `--dry-run`: preview. | Linux; `up` needs `--yes` except preview; `plan` needs neither. |
+| `plan`, `up` | `--admin-key FILE`: file containing one ssh-ed25519 public key, required when newly selecting SSH hardening; `--admin-sudo password\|nopasswd`: sudo policy, default `password`; `--admin-password-file FILE`: 0600 password file for non-interactive password sudo; otherwise a hidden prompt or generated password shown once. | Linux, with SSH hardening. |
+| `plan`, `up` | `--console-confirmed`: confirm out-of-band access for a new access-changing policy; `--detach`: return after arming rollback. | Linux; access-changing `up` needs `--console-confirmed` and `--yes`. |
+| `plan`, `up` | `--sandbox`: rootless Docker sandbox; `--persistent-journal`: persist journald; `--unattended-upgrades`: security updates; `--sudo-logging`: root-only sudo log; `--password-policy`: PAM password policy; `--disable-llmnr`: disable LLMNR; `--firewall`: manage UFW and refuse undeclared inbound rules; `--allow-inbound PORT/tcp\|udp`: repeatable opening, requires `--firewall`; `--fail2ban`: SSH jail; `--ssh-hardening`: harden SSH and create an admin account, requiring `--admin-key` when newly selected; `--quarantine-cloud-user`: quarantine the cloud-init account, requiring SSH hardening selected or already active. | Linux; optional protections require Debian 13 or later; sandbox also needs cgroup v2. |
+| `plan`, `up` | `--auto-upgrade`: enable the timer, including after refusal; `--no-auto-upgrade`: disable and remember refusal. Default on Linux: enabled unless previously declined. | Linux. |
+| `link` | `--openedbot URL`: HTTPS origin (default `https://link.openedbot.app`); `--ticket-file FILE`: 0600 ticket file (otherwise stdin or hidden prompt); `--name NAME`: named instance (default instance if omitted); `--yes`: confirm. `--insecure-openedbot` permits HTTP loopback for development only. `--rekey` is retired and refuses. | Linux; requires `--yes`. |
+| `unlink` | `--name NAME`: instance (default if omitted); `--yes`: confirm. | Linux; requires `--yes`. |
+| `credentials list\|add\|login\|remove` | `--label LABEL`: add defaults to `operator-<date>`, remove requires it; `--api-key-file FILE`: 0600 key file (otherwise stdin or hidden prompt); `--yes`: confirm. | Linux; add, login and remove require `--yes`. |
+| `toolsets list\|enable\|disable` | `--yes`: confirm. | Linux; enable and disable require `--yes`. |
+| `mcp list\|add\|remove` | `--url URL`: HTTPS endpoint for add; `--auth none\|header\|oauth`: default `none`; `--token-file FILE`: 0600 bearer file for header auth; `--yes`: confirm. | Linux; add and remove require `--yes`. |
+| `auto-upgrade enable\|disable\|status` | `--yes`: confirm enable/disable; `status --json`: machine-readable status. | Linux; enable and disable require `--yes`. |
+| `upgrade`, `update --self` | `--yes`: confirm; `--release-url URL`: release base (default official release service); `--version vX.Y.Z`: signed version (default LATEST); `--allow-downgrade`: accept a version not newer; `--dry-run`: verify and preview. `--from FILE --tag HEX`: uploaded binary and HMAC tag under the deployment key. | Linux; `--yes` required except Linux preview. |
+| `self-verify` | `--release-url URL`: release base (default official release service). | Linux; no confirmation. |
+| `reset`, `uninstall` | `--yes`: confirm; `--plan` or `--dry-run`: preview; `--purge-data`: destroy runtime data, requiring `--i-understand-data-loss`. `uninstall --keep-data` keeps it without prompting. | Linux; mutation requires `--yes`, preview does not. |
+| `reset`, `uninstall` | `--purge-packages`: purge Docker packages; `--legacy`: remove old Linux namespace; `--purge-tailscale`: also remove Tailscale with `--legacy`; `--remove-admin`: remove administrator; `--restore-cloud-user`: restore quarantined account. | Linux. |
+
+Global `--no-color` disables ANSI color. Secrets are read from stdin, a hidden prompt or a private file as applicable, never as flag values. `deploy-key set` reads the deployment key from stdin; `deploy-key status` reports its presence. `help`, `version`, `doctor` and `verify-access` have no command-specific options. `update` alone is not implemented; `--self` forwards the upgrade options.
+
+## `link` flags
+
+See the [option reference](#option-defaults-and-platform-scope).
+
+## `up` options
+
+See the [option reference](#option-defaults-and-platform-scope).
+
+## Provider credentials
+
+Four verbs, no others: `list`, `add`, `login`, `remove`.
+
+```bash
+edge-setup credentials list
+umask 077; printf '%s' 'sk-…' > /root/anthropic.key
+edge-setup credentials add --api-key-file /root/anthropic.key --yes anthropic
+# or: printf '%s\n' 'sk-…' | edge-setup credentials add --yes anthropic
+edge-setup credentials remove --label operator-20260901 --yes anthropic
+edge-setup credentials login --yes openai-codex
+```
+
+The key goes through stdin or a `0600` file, never as an argument. The
+provider name comes **last**. `--label` names the credential (by default
+`operator-<date>` for `add`, required for `remove`).
+
+`add` is validated only after re-reading `/api/model/options` on the loopback:
+"the CLI said yes" is not enough.
+
+`login` runs `hermes auth add <provider> --no-browser` as the service
+user, shows the URL and the device code, waits, then proves the access
+against the catalog.
+
+### From openedbot
+
+In link mode, the same actions can be done from the interface (Settings ›
+Models › provider) without touching the host.
+
+The operator (`hermes-operator.service`) is the only process that runs
+`hermes auth add` as the service user. The connector announces this
+capability to openedbot; the key travels to the stdin of `hermes auth add`,
+never into argv or a log. An older host without an operator stays in manual
+mode on the openedbot side.
+
+A credential can also be set **per profile**, without changing the host's
+default provider: this gives a bot with its own Hermes profile its own
+provider credentials. The action stays the same: the operator runs it, then
+re-reads before answering.
+
+No shell, no free-form command and no file path go through the link.
+
+## Named instances
+
+A `hermes-connector` is **one** link: one `link.json`, one device key, one
+unit, one state directory. `link --name <name>` (`default`, `runs`,
+`diagnostics` and `creation-audit` are reserved) creates a **named instance**
+next to the default link, for example a production and a development link on
+the same host:
+
+| | default instance (no `--name`) | instance `<name>` |
+|---|---|---|
+| link | `/etc/hermes/connector/link.json` | `/etc/hermes/connector/<name>/link.json` |
+| sealed device key | `/etc/hermes/connector/device.key.cred` | `/etc/hermes/connector/<name>/device.key.cred` |
+| unit | `hermes-connector.service` | `hermes-connector@<name>.service` |
+| state | `/var/lib/hermes-connector` | `/var/lib/hermes-connector/<name>` |
+
+Two instances are two distinct runtimes on the openedbot side. What stays
+shared is the host itself: the gateway bearer, the profiles, the sessions
+and the operator socket.
+
+`link` writes the link of the targeted instance, whatever the previous one
+was: it does not refuse another origin. Before reading the ticket, it reports
+the origin it is leaving and the runtime that openedbot keeps although the
+host will no longer call it back. To keep both links, create the second one
+with `--name dev`. `status` lists every instance; `unlink` takes the same `--name`.

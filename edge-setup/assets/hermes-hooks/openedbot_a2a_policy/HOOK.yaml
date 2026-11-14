@@ -1,0 +1,4 @@
+name: openedbot_a2a_policy
+description: Start the private A2A policy snapshot in the running gateway.
+events:
+  - gateway:startup

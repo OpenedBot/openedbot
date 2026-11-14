@@ -1,0 +1,206 @@
+/*
+  Agent Activity and Tool Result (thread-turn-activity.tsx,
+  thread-tool-result.tsx): components 11 and 12 of the Stream collection of
+  streaming-ui.pulseview.app, on BoardUI tokens. The curves and durations are
+  theirs:
+  - EASE_OUT      fades and the fold;
+  - SPRING_LAYOUT rows entering;
+  - SPRING_SWAP   chevrons (and `RollText`, in app.css).
+  Every motion here stops under `prefers-reduced-motion`: the fold, the rows,
+  the shimmer and the swaps become instant, nothing else changes.
+*/
+:root {
+  --openedbot-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --openedbot-spring-layout: cubic-bezier(0.22, 1.12, 0.36, 1);
+  --openedbot-spring-swap: cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+
+/*
+  The fold (`ActivityDisclosure`): `grid-template-rows` 1fr / 0fr, so the
+  height animates without any measurement. 220 ms to open, 140 ms to close,
+  with a top-down clip and a 4 px lift, as pulseview's `disclosure()`.
+*/
+.openedbot-disclosure {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 0% 0);
+  transition:
+    grid-template-rows 0.22s var(--openedbot-ease-out),
+    opacity 0.22s var(--openedbot-ease-out),
+    transform 0.22s var(--openedbot-ease-out),
+    clip-path 0.22s var(--openedbot-ease-out);
+}
+.openedbot-disclosure[data-open="false"] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  clip-path: inset(0 0 100% 0);
+  transition-duration: 0.14s;
+}
+.openedbot-disclosure-inner {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/*
+  A row entering the live feed: opacity in 180 ms, a 6 px rise in 500 ms on
+  the layout spring. Only while the turn is live: a concluded turn, or one
+  read back from history, never replays its entries.
+*/
+[data-turn-activity][data-live] [data-activity-row] {
+  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[data-turn-activity][data-live] .openedbot-activity-list [data-activity-row]::before {
+  animation: openedbot-guide-draw 0.14s linear both;
+}
+
+/* Chevrons turn on the swap spring. */
+.openedbot-activity-chevron {
+  transition: transform 0.2s var(--openedbot-ease-out), color 0.15s ease;
+}
+
+/* The Tool Result log: a quiet panel that scrolls without a bar. */
+.openedbot-tool-log {
+  max-height: 160px;
+  overscroll-behavior: contain;
+}
+
+/*
+  On the phone shell every control of the feed is a 44 pt target (PWA
+  contract): the turn header, a Tool Result trigger, its copy and detail
+  buttons, a search's sources toggle. Desktop keeps
+  pulseview's compact sizes.
+*/
+[data-mobile-shell] [data-activity-head],
+[data-mobile-shell] [data-tool-result] > button,
+[data-mobile-shell] [data-search-sources-toggle] {
+  min-height: 2.75rem;
+}
+[data-mobile-shell] [data-tool-copy],
+[data-mobile-shell] [data-tool-inspect] {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+/*
+  Thinking Shimmer, as the reference app's status label (`sand-shimmer-text`, 0.78.1):
+  the ink at 40 % up to a quarter, full at 60 %, 40 % again from three
+  quarters; two label-widths wide; one pass every 2.2 s in 60 steps. Used by
+  the thread's thinking status and the run dock.
+*/
+.openedbot-thinking-shimmer {
+  --openedbot-shimmer-dim: color-mix(in srgb, var(--bui-text-primary) 40%, transparent);
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--openedbot-shimmer-dim) 0%,
+    var(--openedbot-shimmer-dim) 25%,
+    var(--bui-text-primary) 60%,
+    var(--openedbot-shimmer-dim) 75%,
+    var(--openedbot-shimmer-dim) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: openedbot-thinking-shimmer 2.2s steps(60, end) infinite;
+}
+@keyframes openedbot-thinking-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+  The thread's thinking status (`thread-thinking-status.tsx`): the reference app's
+  typing mark, three round dots in the bot's colour (`--bot-tint`, posed on
+  the thread column; the text colour otherwise), 15 px wide. They do not
+  wave: the mark pops in once (`thread-motion.css`) and the shimmering label
+  carries the liveness.
+*/
+.openedbot-thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5px;
+  color: var(--bot-tint, currentColor);
+}
+.openedbot-thinking-dots > i {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+/*
+  Agent log: the rows under the status hang from a 1 px guide. Each row
+  carries its own curved branch (`::before`) and the stretch of trunk down to
+  the next row (`::after`), so no measurement is needed whatever the row's
+  height. In a live turn a branch draws in 0.14 s and its row blurs in
+  (`tpl-guide`, `tpl-reveal`).
+*/
+.openedbot-activity-list {
+  --openedbot-guide-x: 7px;
+  --openedbot-guide-gap: 1.125rem;
+  margin-inline-start: var(--openedbot-guide-x);
+  padding-inline-start: var(--openedbot-guide-gap);
+}
+.openedbot-activity-list [data-activity-row] {
+  position: relative;
+}
+.openedbot-activity-list [data-activity-row]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--openedbot-guide-gap) * -1);
+  width: calc(var(--openedbot-guide-gap) - 4px);
+  height: 0.9375rem;
+  border-left: 1px solid var(--bui-border-button-default);
+  border-bottom: 1px solid var(--bui-border-button-default);
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
+}
+.openedbot-activity-list [data-activity-row]::after {
+  content: "";
+  position: absolute;
+  top: 0.9375rem;
+  bottom: -0.125rem;
+  left: calc(var(--openedbot-guide-gap) * -1);
+  border-left: 1px solid var(--bui-border-button-default);
+  pointer-events: none;
+}
+.openedbot-activity-list > [data-activity-row]:last-child::after,
+.openedbot-activity-list > :last-child > [data-activity-row]:last-child::after {
+  display: none;
+}
+@keyframes openedbot-guide-draw {
+  from {
+    clip-path: inset(0 100% 100% 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-disclosure,
+  .openedbot-disclosure[data-open="false"] {
+    transition: none;
+    transform: none;
+  }
+  .openedbot-thinking-shimmer {
+    animation: none;
+    color: var(--bui-text-secondary);
+    background: none;
+  }
+  [data-turn-activity][data-live] [data-activity-row] {
+    animation: none;
+  }
+  [data-turn-activity][data-live] .openedbot-activity-list [data-activity-row]::before {
+    animation: none;
+  }
+  .openedbot-activity-chevron {
+    transition: none;
+  }
+}

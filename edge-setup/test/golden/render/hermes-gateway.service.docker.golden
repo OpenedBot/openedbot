@@ -1,0 +1,156 @@
+[Unit]
+Description=Hermes Agent gateway for hermes
+After=network-online.target
+Wants=network-online.target
+# The rootless dockerd lives in the service user's manager (lingering). At
+# boot this system unit used to start first: the docker.sock bind below was
+# skipped (its leading -) and every execute_code failed with "docker version
+# failed" until the gateway was restarted by hand (seen on a production host
+# on 2026-10-17). user@.service reports ready once that manager reached its
+# default target, rootless dockerd (Type=notify) included.
+After=user@998.service
+Wants=user@998.service
+# Restart=on-failure with RestartSec=3 restarts forever by default: a gateway
+# that cannot read its own configuration would burn a small VPS at twenty
+# restarts a minute and bury the cause in the journal. Ten attempts over ten
+# minutes absorb a transient failure; beyond that the unit stops and says so,
+# and `up` or `upgrade` starts it again once the cause is fixed.
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/srv/hermes/data/workspace
+Environment=HOME=/srv/hermes/data/home
+Environment=HERMES_HOME=/srv/hermes/data
+Environment=PATH=/usr/local/lib/hermes-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+# Rootless dockerd of the service user: the gateway spawns its sandboxes
+# there. No /var/run/docker.sock and no docker group: root inside a sandbox is
+# the unprivileged `hermes` uid on the host.
+Environment=DOCKER_HOST=unix:///run/user/998/docker.sock
+Environment=XDG_RUNTIME_DIR=/run/user/998
+# ProtectHome=tmpfs hides /run/user as well as every real home. Re-expose only
+# the already-proven rootless daemon socket; a read-only bind still permits
+# connect(2), without exposing the user D-Bus or another account's runtime dir.
+# The unit is rendered and started in P5, before P4 creates the rootless
+# socket: the leading `-` makes systemd skip a missing source instead of
+# failing the unit at NAMESPACE (226). P4 restarts the gateway once the
+# socket exists, so the bind is always in place when the sandbox is proven.
+BindReadOnlyPaths=-/run/user/998/docker.sock
+# user@.service ready does not mean the rootless socket exists: on 2026-10-26
+# a reboot started this unit at 23:39:36 and dockerd created its socket at
+# 23:39:38, so the bind above was skipped and every sandboxed tool failed
+# until a manual restart. Once rootless docker is installed (its user unit
+# exists), wait for the socket, at most 60 s, before the namespace is built;
+# past that, fail this attempt so Restart=on-failure rebuilds the namespace
+# once the socket appears. Starting without its bind would keep tools broken
+# until a manual restart. The first install, before rootless docker exists,
+# does not wait. `+` runs as root outside the sandbox, where the socket is visible.
+ExecStartPre=+/bin/sh -c 'test -e /home/hermes/.config/systemd/user/docker.service || exit 0; for i in $$(seq 1 60); do test -S /run/user/998/docker.sock && exit 0; sleep 1; done; echo "rootless docker socket still missing after 60 s; retrying gateway startup" >&2; exit 1'
+EnvironmentFile=/srv/hermes/data/runtime.env
+# It is the gateway that serves the HTTP API: `api_server` is one of its
+# channels, configured by the API_SERVER_* variables above. `hermes serve` is
+# something else: the JSON-RPC backend of the upstream desktop app, on 9119.
+ExecStart=/usr/local/lib/hermes-agent/venv/bin/hermes gateway run --replace
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+# Read-only everywhere but the runtime data: the venv, Node and the tool stay
+# root-owned and unwritable, /tmp and /var/tmp are private.
+ProtectSystem=strict
+ReadWritePaths=/srv/hermes/data
+ProtectHome=tmpfs
+# A compromised gateway must not read connector state or call the privileged
+# operator merely because both services use the hermes uid.
+InaccessiblePaths=-/etc/hermes/connector -/var/lib/hermes-connector -/run/hermes-operator
+# systemd hands a unit's credentials to its uid alone, and the connector shares
+# the hermes uid: its unsealed device key and link token sit readable in
+# /run/credentials/hermes-connector*.service. This unit loads no credential of
+# its own (it reads runtime.env through EnvironmentFile=), so hide the tree.
+InaccessiblePaths=-/run/credentials
+# /run/credentials may not exist yet when this unit starts: systemd creates it
+# for the first unit that holds a credential, which can be the connector,
+# ordered after this one. The leading - above skips a missing path, so create
+# it first (the + runs this one command as root, outside the sandbox).
+ExecStartPre=+/bin/mkdir -p -m 0755 /run/credentials
+# No PrivatePIDs= here: Hermes 0.22 proves its live gateway from the host's
+# process view, and a private PID namespace makes the gateway record PID 1, so
+# host-side profile commands (delete, create, rename) miss the multiplexer.
+# The connector keeps its own PrivatePIDs= and marks itself non-dumpable.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Agent-driven code runs in this process tree (the `local` backend, the Node
+# bridges, the docker CLI of the sandbox backend), so each option below was
+# proved on a Debian 13 host (systemd 257) with real agent tools: the terminal
+# tool in a rootless Docker sandbox through the API, and, in a copy of this
+# unit, Python (multiprocessing, ctypes callbacks, SQLite WAL, setrlimit),
+# Node.js (JIT, WebAssembly, fetch, child processes), npx, git, tar, curl,
+# PTYs, /dev/shm and `docker run` with a workspace volume.
+# Two options were tried and left out because they break that workload:
+# - MemoryDenyWriteExecute= kills Node.js at its first JIT tier-up
+#   (SIGTRAP in Runtime_BytecodeBudgetInterrupt), npx included;
+# - ProcSubset=pid hides /proc/meminfo, /proc/cpuinfo and /proc/loadavg:
+#   os.cpus() in Node returns an empty list and psutil-style probes fail.
+# UMask= is left at 0022 on purpose: the workspaces are bind-mounted into the
+# sandboxes, where a non-root image user maps to a subordinate uid; 0027
+# would hide every file the agent writes from it.
+# RestrictNamespaces= refuses unshare(2) and setns(2): an agent cannot build
+# its own container or user namespace (unshare, bwrap, a sandboxed Chromium)
+# inside this unit. Sandboxes belong to the rootless dockerd, which runs in the
+# service user's manager outside this unit; the browser runs there too.
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectHostname=true
+SystemCallArchitectures=native
+# @system-service as is: nothing in it broke the workload above. @privileged
+# and @resources are not removed from it: fchown(2) on the service user's own
+# files and setrlimit(2) are ordinary tool calls (tar, pip, shells, Python). Everything @system-service leaves
+# out (mount, module, reboot, swap, raw I/O, clock, debug/ptrace, obsolete
+# ABIs) fails with EPERM instead of killing the caller.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RestrictNamespaces=true
+# A private /dev (null, zero, random, tty, pts, shm): no disk, no hardware.
+PrivateDevices=true
+# Only the processes of the service user are visible in /proc (its own
+# gateway, the connector, the rootless dockerd and its sandboxes).
+ProtectProc=invisible
+# A user namespace that maps only root (without capabilities) and the service
+# user: every other account and group shows as nobody, and a process that
+# escapes the other options holds no other uid.
+PrivateUsers=true
+# SysV and POSIX IPC objects of the service user are removed when the
+# gateway stops; sandboxes keep their own IPC namespace in the rootless
+# dockerd and are not affected.
+RemoveIPC=true
+# cgroup-scoped BPF address filter: it covers this unit and every process it
+# spawns, which is what makes it the system-wide layer. With the `local`
+# terminal backend there is no container at all: agent-driven code runs in this
+# very process tree, so this is the only boundary left between it and the cloud
+# metadata endpoint. Independent of UFW and of Docker: it still holds if the
+# firewall is flushed.
+# Per systemd.resource-control(5) the two lists are applied in turn: an address
+# that matches IPAddressAllow= is granted, otherwise one that matches
+# IPAddressDeny= is refused, otherwise it is granted. There is no
+# IPAddressAllow= line here on purpose: `any` would match every address first
+# and leave both ranges reachable. With the allow list empty the ranges below
+# are refused and every other address (model providers, loopback) falls to the
+# last rule and passes.
+# Never deny 127.0.0.0/8 here: the filter is applied to ingress as well, and
+# the connector's authenticated loopback calls to 127.0.0.1:8642
+# would die with it.
+IPAddressDeny=169.254.0.0/16
+IPAddressDeny=fd00:ec2::/64
+
+[Install]
+WantedBy=multi-user.target

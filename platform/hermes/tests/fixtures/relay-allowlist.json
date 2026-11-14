@@ -1,0 +1,422 @@
+[
+  {
+    "method": "GET",
+    "path": "^/api/mcp/servers$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/api/model/options$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "POST",
+    "path": "^/api/sessions$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "DELETE",
+    "path": "^/api/sessions/(?:[A-Za-z0-9._~-]|%3[Aa]){1,256}$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/api/sessions/(?:[A-Za-z0-9._~-]|%3[Aa]){1,256}$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/api/sessions/(?:[A-Za-z0-9._~-]|%3[Aa]){1,256}/messages$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/health$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/a2a/agent-card$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/a2a/audit$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/a2a/peers$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/a2a/peers/[a-z0-9][a-z0-9._-]{0,63}/token$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/a2a/peers/[a-z0-9][a-z0-9._-]{0,63}/token$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/a2a/peers/[a-z0-9][a-z0-9._-]{0,63}/trust$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/capabilities$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/gateway$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/gateway/restart$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/gateway/restart/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/mcp/catalog/[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/mcp/servers$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/mcp/servers$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}/oauth$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}/oauth/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}/oauth/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}/oauth/callback$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/model-context$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/approval-policy$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "PUT",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/approval-policy$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/avatar$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/bundled-skills$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/mcp/servers/[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/memory$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/memory$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/model$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/providers/[a-z0-9][a-z0-9_-]{0,63}/credentials$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/providers/[a-z0-9][a-z0-9_-]{0,63}/credentials$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/[a-z0-9][a-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/[a-z0-9][a-z0-9_-]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/hub/install$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/hub/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/skills/hub/scan$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/toolsets/[a-z0-9][a-z0-9_]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/profiles/[a-z0-9][a-z0-9_-]{0,62}/workspace/files/(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|jpg|jpeg|webp|pdf))$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/profiles/models$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/provider-sdks$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/providers/[a-z0-9][a-z0-9_-]{0,63}/credentials$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/providers/[a-z0-9][a-z0-9_-]{0,63}/oauth$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "DELETE",
+    "path": "^/hermes-setup/providers/[a-z0-9][a-z0-9_-]{0,63}/oauth/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/providers/[a-z0-9][a-z0-9_-]{0,63}/oauth/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/sessions-inventory$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/skills$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/skills/hub/inspect$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/skills/hub/search$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/toolsets$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "POST",
+    "path": "^/hermes-setup/toolsets/[a-z0-9][a-z0-9_]{0,63}$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/usage$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/hermes-setup/workspace/files/(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\\.(?:png|jpg|jpeg|webp|pdf))$",
+    "events": false,
+    "host": true
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/capabilities$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/models$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "POST",
+    "path": "^/v1/runs$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/runs/[A-Za-z0-9._~-]{1,128}$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "POST",
+    "path": "^/v1/runs/[A-Za-z0-9._~-]{1,128}/(stop|steer|approval|resolve-unknown)$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/runs/[A-Za-z0-9._~-]{1,128}/events$",
+    "events": true,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/skills$",
+    "events": false,
+    "host": false
+  },
+  {
+    "method": "GET",
+    "path": "^/v1/toolsets$",
+    "events": false,
+    "host": false
+  }
+]

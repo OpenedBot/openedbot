@@ -1,0 +1,238 @@
+---
+// Trust perimeter: operator SSH, host units, outbound link to openedbot,
+// open egress to model providers. A static rendering of the former
+// interactive React Flow canvas (same nodes, edges and labels).
+
+const ICONS = {
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
+  server:
+    '<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  key: '<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+} as const;
+
+// Bilingual like the site: French under /fr/, English everywhere else.
+const fr = Astro.url.pathname.startsWith('/fr/');
+const T = fr
+  ? {
+      label: 'Périmètre de confiance',
+      operator: 'Poste opérateur',
+      operatorSub: 'ssh :22 vers l’hôte',
+      host: 'Hôte (VPS / homelab)',
+      hostSub: 'ce qui tourne chez vous',
+      outbound: 'wss sortant',
+      remoteSub: 'prod : openedbot.app, dev : tunnel SSH',
+      providers: 'Fournisseurs de modèles',
+      providersSub: 'egress ouvert, hors métadonnées cloud',
+      once: 'root, une fois',
+      verbs: 'verbes nommés',
+      link: 'lien sortant',
+      caption:
+        'Le poste opérateur atteint l’hôte par ssh :22. L’hôte ouvre un lien wss sortant vers openedbot et sort vers les fournisseurs de modèles (egress).',
+    }
+  : {
+      label: 'Trust perimeter',
+      operator: 'Operator workstation',
+      operatorSub: 'ssh :22 to the host',
+      host: 'Host (VPS / homelab)',
+      hostSub: 'services running on the host',
+      outbound: 'outbound wss',
+      remoteSub: 'prod: openedbot.app, dev: SSH tunnel',
+      providers: 'Model providers',
+      providersSub: 'open egress, except cloud metadata',
+      once: 'root, once',
+      verbs: 'named verbs',
+      link: 'outbound link',
+      caption:
+        'The operator workstation reaches the host over ssh :22. The host opens an outbound wss link to openedbot and reaches the model providers (egress).',
+    };
+
+const HOST_ITEMS = [
+  { name: 'edge-setup', note: T.once },
+  { name: 'hermes-operator', note: T.verbs },
+  { name: 'hermes-connector', note: T.link },
+  { name: 'gateway', note: '127.0.0.1:8642' },
+  { name: 'sandbox', note: 'docker rootless' },
+];
+---
+
+<figure class="tf not-content" aria-label={T.label}>
+  <div class="tf-grid">
+    <div class="tf-node tf-operator">
+      <svg class="tf-glyph" viewBox="0 0 24 24" aria-hidden="true" set:html={ICONS.terminal} />
+      <div>
+        <p class="tf-title">{T.operator}</p>
+        <p class="tf-sub">{T.operatorSub}</p>
+      </div>
+    </div>
+
+    <div class="tf-edge tf-edge-ssh" aria-hidden="true"><span>ssh :22</span></div>
+
+    <div class="tf-node tf-host">
+      <div class="tf-head">
+        <svg class="tf-glyph tf-glyph-accent" viewBox="0 0 24 24" aria-hidden="true" set:html={ICONS.server} />
+        <div>
+          <p class="tf-title">{T.host}</p>
+          <p class="tf-sub">{T.hostSub}</p>
+        </div>
+      </div>
+      <ul>
+        {HOST_ITEMS.map((item) => (
+          <li><strong>{item.name}</strong><span>{item.note}</span></li>
+        ))}
+      </ul>
+    </div>
+
+    <div class="tf-edge tf-edge-live" aria-hidden="true"><span>{T.outbound}</span></div>
+
+    <div class="tf-node tf-remote">
+      <svg class="tf-glyph" viewBox="0 0 24 24" aria-hidden="true" set:html={ICONS.cloud} />
+      <div>
+        <p class="tf-title">openedbot</p>
+        <p class="tf-sub">{T.remoteSub}</p>
+      </div>
+    </div>
+
+    <div class="tf-edge tf-edge-down" aria-hidden="true"><span>egress</span></div>
+
+    <div class="tf-node tf-providers">
+      <svg class="tf-glyph" viewBox="0 0 24 24" aria-hidden="true" set:html={ICONS.key} />
+      <div>
+        <p class="tf-title">{T.providers}</p>
+        <p class="tf-sub">{T.providersSub}</p>
+      </div>
+    </div>
+  </div>
+  <figcaption class="sr-only">{T.caption}</figcaption>
+</figure>
+
+<style>
+  .tf {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.75rem;
+    background-color: var(--sl-color-bg-nav);
+    background-image: radial-gradient(var(--sl-color-gray-5) 1px, transparent 1px);
+    background-size: 18px 18px;
+    overflow-x: auto;
+  }
+  .tf-grid {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) 5.5rem minmax(13rem, 1.2fr) 6.5rem minmax(10rem, 1fr);
+    grid-template-areas:
+      'operator ssh host live remote'
+      '. . down . .'
+      '. . providers . .';
+    align-items: center;
+    min-width: 46rem;
+  }
+  .tf-operator { grid-area: operator; }
+  .tf-edge-ssh { grid-area: ssh; }
+  .tf-host { grid-area: host; }
+  .tf-edge-live { grid-area: live; }
+  .tf-remote { grid-area: remote; }
+  .tf-edge-down { grid-area: down; }
+  .tf-providers { grid-area: providers; }
+
+  .tf-node {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.6rem;
+    background: var(--sl-color-bg);
+    font-size: var(--sl-text-sm);
+    line-height: 1.35;
+  }
+  .tf-node p { margin: 0; }
+  .tf-host { flex-direction: column; border-color: var(--sl-color-accent); }
+  .tf-head { display: flex; gap: 0.75rem; align-items: flex-start; }
+  .tf-title { font-weight: 600; color: var(--sl-color-white); }
+  .tf-sub { color: var(--sl-color-gray-2); font-size: var(--sl-text-xs); }
+  .tf-glyph {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--sl-color-gray-2);
+  }
+  .tf-glyph-accent { color: var(--sl-color-accent-high); }
+  .tf-host ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    display: grid;
+    gap: 0.25rem;
+  }
+  .tf-host li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.3rem;
+    background: var(--sl-color-gray-6);
+    font-size: var(--sl-text-xs);
+  }
+  .tf-host li span { color: var(--sl-color-gray-2); font-family: var(--sl-font-mono); }
+
+  .tf-edge {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 2rem;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-2);
+  }
+  .tf-edge::before {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    right: 0.6rem;
+    top: 50%;
+    border-top: 1.5px solid var(--sl-color-gray-3);
+  }
+  .tf-edge::after {
+    content: '';
+    position: absolute;
+    right: 0.25rem;
+    top: calc(50% - 0.3rem);
+    border: 0.3rem solid transparent;
+    border-left: 0.45rem solid var(--sl-color-gray-3);
+    border-right: 0;
+  }
+  .tf-edge span {
+    position: relative;
+    padding: 0 0.3rem;
+    background: var(--sl-color-bg-nav);
+    white-space: nowrap;
+  }
+  .tf-edge-live::before { border-top-style: dashed; border-top-color: var(--sl-color-accent); }
+  .tf-edge-live::after { border-left-color: var(--sl-color-accent); }
+  .tf-edge-down { height: 3rem; }
+  .tf-edge-down::before {
+    left: 50%;
+    right: auto;
+    top: 0.25rem;
+    bottom: 0.6rem;
+    border-top: 0;
+    border-left: 1.5px solid var(--sl-color-gray-3);
+  }
+  .tf-edge-down::after {
+    right: auto;
+    left: calc(50% - 0.3rem);
+    top: auto;
+    bottom: 0.15rem;
+    border: 0.3rem solid transparent;
+    border-top: 0.45rem solid var(--sl-color-gray-3);
+    border-bottom: 0;
+  }
+</style>

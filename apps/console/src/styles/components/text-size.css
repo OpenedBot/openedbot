@@ -1,0 +1,62 @@
+/*
+  Settings › Appearance › Text size, in a browser (`lib/shell/text-size.ts`).
+
+  The desktop shell zooms the whole window; a page cannot set its own zoom,
+  and a CSS `zoom` on the root shrinks every `100dvh` with it and shifts
+  every positioned menu (Floating UI reads unzoomed coordinates and writes
+  zoomed ones). So the browser scales the text instead: `text-size.ts` sets
+  `--openedbot-text-scale` (size / 14) on `<html>`, never in the desktop
+  app, where it stays unset and every rule here is the authored pixels.
+
+  - The root font: every `rem` (Tailwind's `text-sm`, spacing, controls,
+    icons) follows, in the user's own browser base.
+  - The type tokens of `browser/ui-kit` (`text-body`, `text-body-medium`…)
+    multiply themselves (`app.css`).
+  - The arbitrary pixel sizes of the console (`text-[13px]`,
+    `leading-[22px]`) are listed below, in the utilities layer, after
+    Tailwind's own rule of the same name: same specificity, so a variant
+    or a later class keeps winning as before. `tests/lib/shell/text-size.test.ts`
+    fails on a size used in `src/` and missing here.
+
+  The mobile shell keeps the system's size: the setting is not offered there
+  (`screens/settings/general/appearance.tsx`), so a size stored in a wide
+  window must not follow the page into it.
+*/
+:root {
+  font-size: calc(100% * var(--openedbot-text-scale, 1));
+}
+
+:root[data-openedbot-shell="mobile"] {
+  /* Beats the inline property set by `text-size.ts`. */
+  --openedbot-text-scale: 1 !important;
+}
+
+@layer utilities {
+  .text-\[7px\] { font-size: calc(7px * var(--openedbot-text-scale, 1)); }
+  .text-\[9px\] { font-size: calc(9px * var(--openedbot-text-scale, 1)); }
+  .text-\[10px\] { font-size: calc(10px * var(--openedbot-text-scale, 1)); }
+  .text-\[11px\] { font-size: calc(11px * var(--openedbot-text-scale, 1)); }
+  .text-\[12px\] { font-size: calc(12px * var(--openedbot-text-scale, 1)); }
+  .text-\[12\.5px\] { font-size: calc(12.5px * var(--openedbot-text-scale, 1)); }
+  .text-\[13px\] { font-size: calc(13px * var(--openedbot-text-scale, 1)); }
+  .text-\[14px\] { font-size: calc(14px * var(--openedbot-text-scale, 1)); }
+  .text-\[15px\] { font-size: calc(15px * var(--openedbot-text-scale, 1)); }
+  .text-\[17px\] { font-size: calc(17px * var(--openedbot-text-scale, 1)); }
+  .text-\[18px\] { font-size: calc(18px * var(--openedbot-text-scale, 1)); }
+  .text-\[22px\] { font-size: calc(22px * var(--openedbot-text-scale, 1)); }
+
+  .leading-\[10px\] { line-height: calc(10px * var(--openedbot-text-scale, 1)); }
+  .leading-\[15px\] { line-height: calc(15px * var(--openedbot-text-scale, 1)); }
+  .leading-\[16\.25px\] { line-height: calc(16.25px * var(--openedbot-text-scale, 1)); }
+  .leading-\[18px\] { line-height: calc(18px * var(--openedbot-text-scale, 1)); }
+  .leading-\[19\.25px\] { line-height: calc(19.25px * var(--openedbot-text-scale, 1)); }
+  .leading-\[19\.5px\] { line-height: calc(19.5px * var(--openedbot-text-scale, 1)); }
+  .leading-\[20px\] { line-height: calc(20px * var(--openedbot-text-scale, 1)); }
+  .leading-\[21px\] { line-height: calc(21px * var(--openedbot-text-scale, 1)); }
+  .leading-\[22px\] { line-height: calc(22px * var(--openedbot-text-scale, 1)); }
+  .leading-\[22\.5px\] { line-height: calc(22.5px * var(--openedbot-text-scale, 1)); }
+
+  @media (width >= 40rem) {
+    .sm\:text-\[13px\] { font-size: calc(13px * var(--openedbot-text-scale, 1)); }
+  }
+}

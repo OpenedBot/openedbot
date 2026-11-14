@@ -1,0 +1,301 @@
+# Contrôles du cœur TypeScript (apps, platform, contracts, modules, browser,
+# tests, scripts) : typecheck, frontières et licences, tests unitaires,
+# parcours console et budget du bundle, puis tests d'intégration contre un
+# PostgreSQL jetable ; et le shell Rust de l'app de bureau : cargo test et
+# clippy sur macOS, et sous Linux les mêmes plus les paquets deb / AppImage
+# démarrés sous Xvfb. Aucun plug-in pro (./plugins) en CI : le cœur tourne en
+# solo, c'est attendu. Aucun secret, aucun .env.local : les cibles make
+# tournent sur leurs valeurs par défaut.
+# Actions épinglées par SHA ; Bun épinglé par packageManager (package.json).
+#
+# Minutes de runner comptées (macOS bien plus cher et plus rare que Linux,
+# chaque job arrondi à la minute) : un run ne joue que ce que le changement
+# peut casser.
+#   - Toute pull request vers main ou develop lance ce workflow, fork
+#     compris : il ne lit aucun secret (contrat :
+#     tests/scripts/release-workflows-contract.ts). À la demande :
+#     `gh workflow run core-ci.yml --ref <branche>` joue tout.
+#   - Le job `plan` (.github/scripts/ci-plan.sh) saute le job macOS quand ni
+#     le shell ni son contrat ne changent, et le job Linux quand en plus rien
+#     de ce qu'il embarque (console, dépendances) ne change.
+#   - Un push sur main dont l'arbre est exactement celui d'une PR déjà verte
+#     (squash d'une branche à jour) ne rejoue rien : `plan` donne l'adresse du
+#     run qui l'a validé et le workflow s'arrête là.
+name: core-ci
+
+on:
+  # No trigger-level `paths`: the path scopes are decided per job by `plan`,
+  # so that `core-ci ok` always reports on a pull request to main or develop.
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  # A new push to a PR cancels its obsolete run; every commit on main keeps
+  # its own complete result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    # What this run has to prove: nothing when the pushed tree was already
+    # validated by a pull request run, each desktop job only when something
+    # it builds changed. In doubt (manual run, nothing to diff, API
+    # unreachable) every job runs.
+    name: Plan (validated tree, path scopes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Lists this workflow's successful pull request runs.
+      actions: read
+    outputs:
+      validated: ${{ steps.plan.outputs.validated }}
+      desktop_mac: ${{ steps.plan.outputs.desktop_mac }}
+      desktop_linux: ${{ steps.plan.outputs.desktop_linux }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          WORKFLOW: core-ci.yml
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        # desktop_mac: the Rust shell, and the native bridge contract its
+        # tests compare the generated bindings to; the console is a
+        # placeholder there. The root Makefile is left out on purpose (a
+        # macOS runner minute costs far more than a Linux one): the job only takes its
+        # two-command `desktop-tauri-check` target from it.
+        # desktop_linux: the same, plus what the packages embed and start:
+        # the console and the workspaces it imports, and the locked
+        # dependencies.
+        run: >-
+          .github/scripts/ci-plan.sh
+          'desktop_mac=^(apps/desktop-tauri/|contracts/native-bridge/)|^\.github/workflows/core-ci\.yml$'
+          'desktop_linux=^(apps/desktop-tauri/|apps/console/|browser/|contracts/)|^(Makefile|package\.json|bun\.lock|\.github/workflows/core-ci\.yml)$'
+
+  checks:
+    # One job, one install: five jobs of a few seconds each were each counted
+    # as a full runner minute. Every step still runs and reports when an earlier one
+    # fails.
+    # Unit tests include tests/scripts/make-dev-contract.sh (real `make dev`
+    # with stubbed launchers and a temporary env file), the Python
+    # provider-fault test (python3 ships with ubuntu-24.04) and the vite
+    # build-id test, which needs git (also preinstalled). The bundle budget is
+    # a solo console build held under the first-load budgets: entry
+    # chunk and first load, gzip (apps/console/scripts/bundle-budget.ts).
+    name: Checks (typecheck, boundaries, unit, console journeys, bundle budget)
+    needs: [plan]
+    if: needs.plan.outputs.validated != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - id: install
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: make typecheck
+      - name: Dependency boundaries and licences
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: make deps-check
+      - name: Unit tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: make test-unit
+      - name: Console journeys
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: make e2e-console
+      - name: Console bundle budget
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: make bundle-budget
+
+  integration:
+    # Migrations, tenant RLS, replays and queues against a throwaway
+    # PostgreSQL, same major and image as the dev-infra container. With
+    # INTEGRATION_DATABASE_URL set, `make test-integration` skips db-up (no
+    # docker), postgres-rls.sh creates the roles and the openedbot_integration
+    # database through the admin URL and drops it on exit, and every bun
+    # script creates and drops its own uniquely named database. Trust auth
+    # keeps any password out of this file: the service lives only as long as
+    # this job, on an ephemeral runner with no inbound access.
+    name: Integration tests (PostgreSQL 17)
+    needs: [plan]
+    if: needs.plan.outputs.validated != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      INTEGRATION_ADMIN_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/postgres
+      INTEGRATION_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/openedbot_integration
+      # mvp-recovery.ts dumps and restores with the server's major: the
+      # runner's preinstalled client is 16, which refuses a 17 server.
+      INTEGRATION_PG_BIN: /usr/lib/postgresql/17/bin
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      # run-trace-correlation.ts builds and runs the real edge-setup connector.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - name: PostgreSQL client and server versions
+        # postgres-rls.sh drives psql (the runner's preinstalled client);
+        # pg_dump and pg_restore 17 come from the PGDG repository, set up by
+        # postgresql-common's own script.
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq --no-install-recommends postgresql-client-17
+          "$INTEGRATION_PG_BIN/pg_dump" --version
+          "$INTEGRATION_PG_BIN/pg_restore" --version
+          psql --version
+          psql -v ON_ERROR_STOP=1 -At "$INTEGRATION_ADMIN_DATABASE_URL" -c 'show server_version'
+      - run: make test-integration
+
+  desktop-tauri:
+    # The Rust shell of the desktop app: cargo test (IPC
+    # refusals, single-flight refresh, keystore, popup host, Google door,
+    # diagnostics, bindings up to date) and clippy -D warnings. On macOS: the
+    # shell's macOS modules (menus, Dock menu, WebKit purge, objc2) only
+    # compile there, and the placeholder console of `build.rs` stands in for
+    # the console build. Toolchain from rustup (preinstalled on the runner).
+    name: Desktop shell (Rust)
+    needs: [plan]
+    if: needs.plan.outputs.desktop_mac == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
+          cargo --version && cargo clippy --version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            apps/desktop-tauri/src-tauri/target
+          key: desktop-tauri-${{ runner.os }}-${{ hashFiles('apps/desktop-tauri/src-tauri/Cargo.lock') }}
+          restore-keys: desktop-tauri-${{ runner.os }}-
+      - run: make desktop-tauri-check
+
+  desktop-linux:
+    # The Tauri shell on Linux: cargo test (IPC refusals, the
+    # vault refusing without a Secret Service, bindings), the Secret Service
+    # round trip under an unlocked GNOME Keyring, clippy -D warnings; then the
+    # deb and the AppImage, unsigned (no secret here), each started under Xvfb
+    # until the embedded console draws its sign-in page. Same packages and
+    # commands as the local image (apps/desktop-tauri/linux/Dockerfile,
+    # `make desktop-tauri-linux-check`).
+    name: Desktop shell (Linux)
+    needs: [plan]
+    if: needs.plan.outputs.desktop_linux == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_VERSION: 1.98.0
+      TAURI_DRIVER_VERSION: 2.1.0
+      CARGO_TERM_COLOR: never
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: sudo apps/desktop-tauri/linux/install-deps.sh build test
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy
+          rustup default "$RUST_VERSION"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.cargo/bin/tauri-driver
+            apps/desktop-tauri/src-tauri/target
+          key: desktop-linux-${{ runner.os }}-${{ hashFiles('apps/desktop-tauri/src-tauri/Cargo.lock') }}
+          restore-keys: desktop-linux-${{ runner.os }}-
+      - run: bun install --frozen-lockfile
+      - name: cargo test, Secret Service, clippy
+        working-directory: apps/desktop-tauri/src-tauri
+        run: |
+          cargo test --locked
+          ../linux/session.sh --keyring cargo test --locked -- --ignored --exact linux::tests::secret_service_round_trip
+          cargo clippy --all-targets --locked -- -D warnings
+      - name: deb and AppImage (unsigned)
+        run: bun apps/desktop-tauri/scripts/build-linux.ts --version 0.0.0-ci --unsigned --out "$RUNNER_TEMP/dist-linux"
+      - name: Start under Xvfb (AppImage, then the installed deb)
+        run: |
+          command -v tauri-driver >/dev/null || cargo install tauri-driver --version "$TAURI_DRIVER_VERSION" --locked
+          apps/desktop-tauri/linux/session.sh --keyring bun apps/desktop-tauri/scripts/linux-e2e.ts --scenario smoke \
+            --artifacts "$RUNNER_TEMP/dist-linux/0.0.0-ci/x86_64" --evidence "$RUNNER_TEMP/linux-smoke"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        # Diagnostics only, on failure: never blocking (a full artifact
+        # storage must not turn a green check red), and kept one day.
+        if: failure()
+        continue-on-error: true
+        with:
+          name: desktop-linux-smoke
+          path: ${{ runner.temp }}/linux-smoke
+          if-no-files-found: ignore
+          retention-days: 1
+
+  ci-ok:
+    # The single check to require. It passes only when the plan succeeded,
+    # the checks and the integration tests succeeded, and each desktop job
+    # did what the plan said: succeeded when its scope changed, was skipped
+    # otherwise. A failed or cancelled job fails it, and so does a job skipped
+    # for any other reason. Not run on a push `plan` found already validated:
+    # the pull request run it points to carries the result.
+    name: core-ci ok
+    if: always() && needs.plan.outputs.validated != 'true'
+    needs: [plan, checks, integration, desktop-tauri, desktop-linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check every job result
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e '
+            def want($on): if $on then "success" else "skipped" end;
+            .plan.outputs as $o
+            | (.plan.result == "success")
+              and ($o.validated == "false")
+              and ([$o.desktop_mac, $o.desktop_linux] | all(. == "true" or . == "false"))
+              and (.checks.result == "success")
+              and (.integration.result == "success")
+              and (."desktop-tauri".result == want($o.desktop_mac == "true"))
+              and (."desktop-linux".result == want($o.desktop_linux == "true"))' > /dev/null

@@ -1,0 +1,19 @@
+# gitleaks configuration: default rules plus an allowlist of files reviewed on
+# 2026-10-28. Every entry below is a test fixture, a golden vector, a public
+# hash pin or an e-mail preview sample - never a live credential. Review any
+# new finding before adding a path here. Run: gitleaks git . -c .gitleaks.toml
+title = "edge-setup gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Reviewed test fixtures, golden vectors and samples"
+paths = [
+  '''^internal/commands/runtime_cli_test\.go$''',
+  '''^internal/connector/testdata/creation-audit-v2\.json$''',
+  '''^internal/enroll/enroll_test\.go$''',
+  '''^internal/operator/host_mac_test\.go$''',
+  '''^internal/pins/pins\.go$''',
+  '''^test/golden/relay-frames/vectors\.json$''',
+]

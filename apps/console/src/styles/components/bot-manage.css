@@ -1,0 +1,77 @@
+/*
+  « Gérer le bot » on desktop: the reference app's settings window, values read
+  from its tokens (`the reference app`, `settings-modal.css`, 02-11-2026).
+  Grey panel, cards one step above and borderless (radius 12 px), a
+  rule between two rows inset by 16 px, group title in regular
+  13/18, row title 14/20 medium, values at 60 % of the text. The modal has a
+  radius of 14 px and a 1 px hairline instead of a border.
+*/
+.openedbot-manage {
+  --openedbot-manage-canvas: #f5f5f6;
+  --openedbot-manage-card: #ffffff;
+  --openedbot-manage-hover: #f0f0f2;
+  --openedbot-manage-divider: rgba(20, 20, 20, 0.07);
+  --openedbot-manage-ring: rgba(20, 20, 20, 0.1);
+  --openedbot-manage-title: #141414;
+  --openedbot-manage-caption: #3a3a3c;
+  --openedbot-manage-muted: rgba(20, 20, 20, 0.6);
+  border: 0;
+  border-radius: 14px;
+  background-color: var(--openedbot-manage-canvas);
+  box-shadow: var(--shadow-elevated), 0 0 0 1px var(--openedbot-manage-ring);
+}
+
+.dark .openedbot-manage {
+  --openedbot-manage-canvas: #1a1a1a;
+  --openedbot-manage-card: #212121;
+  --openedbot-manage-hover: #242424;
+  --openedbot-manage-divider: rgba(255, 255, 255, 0.035);
+  --openedbot-manage-ring: rgba(255, 255, 255, 0.1);
+  --openedbot-manage-title: #ffffff;
+  --openedbot-manage-caption: #dcdcdc;
+  --openedbot-manage-muted: rgba(255, 255, 255, 0.59);
+}
+
+.openedbot-manage-group {
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: var(--openedbot-manage-card);
+}
+
+.openedbot-manage-group > li + li {
+  position: relative;
+}
+
+.openedbot-manage-group > li + li::before {
+  content: "";
+  position: absolute;
+  inset-inline: 16px;
+  top: 0;
+  height: 1px;
+  background-color: var(--openedbot-manage-divider);
+  pointer-events: none;
+}
+
+.openedbot-manage-row:hover:not(:disabled) {
+  background-color: var(--openedbot-manage-hover);
+}
+
+.openedbot-manage-caption {
+  color: var(--openedbot-manage-caption);
+  font-size: calc(13px * var(--openedbot-text-scale, 1));
+  font-weight: 400;
+  line-height: calc(18px * var(--openedbot-text-scale, 1));
+}
+
+.openedbot-manage-title {
+  color: var(--openedbot-manage-title);
+  font-size: calc(14px * var(--openedbot-text-scale, 1));
+  font-weight: 500;
+  line-height: calc(20px * var(--openedbot-text-scale, 1));
+}
+
+.openedbot-manage-muted {
+  color: var(--openedbot-manage-muted);
+  font-size: calc(13px * var(--openedbot-text-scale, 1));
+  line-height: calc(18px * var(--openedbot-text-scale, 1));
+}

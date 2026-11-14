@@ -1,0 +1,24 @@
+import { ageSince, type Locale, type MessageKey } from "@openedbot/browser-i18n";
+import type { GlobalSearchHitDto } from "@openedbot/roster/domain/global-search";
+
+type Translate = (key: MessageKey, params?: Record<string, string | number>) => string;
+
+/**
+ * The line under a search result's excerpt, like the reference app:
+ * « Sniffer à vous · il y a 9 j », « Vous à Lead dev · il y a 2 j ». In a
+ * group, the answer says where it was written (« Lead dev dans Équipe »).
+ */
+export function searchHitMeta(
+  hit: Pick<GlobalSearchHitDto, "kind" | "role" | "authorName" | "conversationName" | "groupId" | "occurredAt">,
+  t: Translate,
+  locale: Locale,
+): string {
+  const who = hit.kind === "conversation"
+    ? t("commandPalette.hitConversation")
+    : hit.role === "user"
+      ? t("commandPalette.hitFromYou", { name: hit.conversationName })
+      : hit.groupId
+        ? t("commandPalette.hitInGroup", { author: hit.authorName ?? hit.conversationName, name: hit.conversationName })
+        : t("commandPalette.hitToYou", { author: hit.authorName ?? hit.conversationName });
+  return `${who} · ${ageSince(locale, hit.occurredAt)}`;
+}

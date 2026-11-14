@@ -1,0 +1,34 @@
+{
+  "name": "@openedbot/roster",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    "./application/*": "./src/application/*.ts",
+    "./domain/*": "./src/domain/*.ts"
+  },
+  "scripts": {
+    "test": "bun test tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*",
+    "@openedbot/contracts-connector": "workspace:*",
+    "@openedbot/contracts-errors": "workspace:*",
+    "@openedbot/contracts-events": "workspace:*",
+    "@openedbot/contracts-i18n": "workspace:*",
+    "@openedbot/contracts-locale": "workspace:*",
+    "@openedbot/contracts-primitives": "workspace:*",
+    "@openedbot/conversation": "workspace:*",
+    "@openedbot/hermes": "workspace:*",
+    "@openedbot/identity": "workspace:*",
+    "@openedbot/platform-config": "workspace:*",
+    "@openedbot/platform-db": "workspace:*",
+    "@openedbot/runtimes": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

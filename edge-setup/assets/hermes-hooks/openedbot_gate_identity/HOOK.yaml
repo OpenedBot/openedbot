@@ -1,0 +1,4 @@
+name: openedbot_gate_identity
+description: Keep the approval pattern_key on Hermes 0.23 session prompts, so openedbot can tell its own plugin gates apart.
+events:
+  - gateway:startup

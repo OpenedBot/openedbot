@@ -1,0 +1,208 @@
+---
+title: edge-setup
+description: What the tool installs on your machine, what it does not install, and how to check it.
+icon: Wrench
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`edge-setup` prepares the machine that runs your bots, so you do not have to install and connect Hermes by hand. It installs pinned Hermes, its runtime dependencies, a local gateway and a connector; `link` connects that machine to your openedbot workspace with a console ticket.
+
+It runs on Linux (Debian 12+ or Ubuntu 24.04+, systemd), on `amd64` or `arm64`. It does not open an inbound port, encrypt your disk, or harden the host by default.
+
+Typical path: install the binary, run `up`, create a ticket in the console and run `link`, optionally harden a supported Linux host, then use `status` and `doctor`, `upgrade`, and finally `reset` when needed. See the [complete command and option reference](/docs/commands).
+
+This page is the tool's reference. The console path is still [Link a machine](/docs/machine). What we guarantee is in [Security](/docs/confiance).
+
+<Aside type="caution" title="A dedicated machine">
+Dedicate to `edge-setup` a machine that hosts no other services. The hardened profile takes over SSH (a single administration account allowed), the UFW firewall (everything denied by default, nothing opened implicitly) and Docker (rootless, pinned packages). On a server that already serves something else, it can cut off your access or break those services.
+</Aside>
+
+<Aside type="caution" title="up alone hardens nothing">
+`sudo edge-setup up --yes` installs Hermes and prepares the machine to be linked, without publishing anything to the Internet. It configures neither SSH, nor UFW, nor fail2ban, nor PAM, nor journald. On Linux it turns on edge-setup automatic updates (see below), unless they were declined. An Internet-facing machine that stops there has **not** been hardened.
+</Aside>
+
+## What the tool does
+
+- Installs a pinned, verified version of Hermes under a dedicated unprivileged account.
+- Links the machine to your openedbot workspace (`link`) with a single-use ticket.
+- Can set up, **if you ask for it**, a rootless sandbox, UFW, fail2ban, SSH hardening, a persistent journal, unattended-upgrades, a password policy, a sudo log, and LLMNR shutdown.
+- Updates the binary (`upgrade`) after verifying the release signature, then the binary's SHA-256 against `SHA256SUMS`.
+- Lets openedbot read, on request, **one** image or **one** PDF a bot saved at the root of its work folder (`/workspace`), to attach it to its answer. A plain file name, never a path; 1 MB at most; the content must really be an image (PNG, JPEG, WebP) or a PDF. Nothing else on the machine can be read this way.
+
+## What the tool does not do
+
+- It is not a generic hardener for a VPS that hosts anything other than Hermes.
+- It opens no inbound port. SSH is open only if you declare `--allow-inbound 22/tcp` with `--firewall`.
+- It does not encrypt the disk. A provider snapshot is a plaintext copy of everything on the machine, keys included.
+- It does not filter the bot’s outbound Internet traffic; Linux units block cloud metadata addresses.
+- It does not isolate two openedbot workspaces linked to the same machine: they see the same data.
+- It does not yet isolate one bot's work folder from the other bots on the same machine.
+
+Mutating commands generally require `--yes`; see the command reference for exceptions. An option that can close access also requires `--console-confirmed`. No flag accepts a secret: use stdin or a `0600` file.
+
+## Install and check integrity
+
+The commands and paths below apply to Linux.
+
+The simplest path is the install script. It installs the version it was published with, verifies the release signature then the binary's SHA-256 checksum, and installs nothing if either check fails. Run these commands on the machine:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh
+sudo edge-setup up --yes
+```
+
+The script takes two options:
+
+```bash
+# check everything and print the install step, writing nothing
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh -s -- --dry-run
+# another version than the script's (or --version latest, explicitly)
+curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh -s -- --version vX.Y.Z
+```
+
+By hand, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installed, the same checks in the same order:
+
+```bash
+V=vX.Y.Z   # the version to install; https://releases.openedbot.app/edge-setup/LATEST names the newest
+U=https://releases.openedbot.app/edge-setup/$V
+A=edge-setup_linux_$(dpkg --print-architecture)
+curl --proto '=https' --tlsv1.2 -fsSL -O "$U/$A" -O "$U/SHA256SUMS" -O "$U/SHA256SUMS.sigstore.json"
+cosign verify-blob --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/OpenedBot/openedbot/.github/workflows/edge-setup-release.yml@refs/tags/edge-setup/$V" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+sudo install -m 0755 "$A" /usr/local/sbin/edge-setup
+sudo edge-setup up --yes
+```
+
+1. `V` is the version to install, `A` the binary for the machine (`amd64` or `arm64`).
+2. Downloads from `releases.openedbot.app` the binary, its checksums (`SHA256SUMS`) and their signature (`SHA256SUMS.sigstore.json`).
+3. Verifies the signature: it must come from openedbot's release workflow, run on the tag of that version. The command must print `Verified OK`; otherwise, go no further.
+4. Checks the binary's SHA-256 checksum. The command must print `OK`; otherwise, go no further.
+5. Installs the binary as `/usr/local/sbin/edge-setup`.
+6. Installs Hermes under an unprivileged account, keeps it reachable from the machine only (no inbound port) and sets up the encrypted outbound connection to openedbot.
+
+Then open the ticket in the console (it is valid for five minutes) and link the machine:
+
+```bash
+edge-setup link --openedbot https://link.openedbot.app --yes
+```
+
+`https://link.openedbot.app` is the default origin: `edge-setup link --yes` does the same. `edge-setup` asks for the ticket without showing it: paste it at the prompt. It appears neither on the command line nor in the shell history, and works only once.
+
+On-demand checks, before or after `up`:
+
+```bash
+edge-setup self-verify
+sudo edge-setup detect
+sudo edge-setup plan
+```
+
+No other command runs `self-verify` implicitly. If the releases do not respond or do not serve a verifiable version, `upgrade` and `self-verify` fail without changing anything.
+
+Releases **are signed**: the signature, made by openedbot's release workflow on GitHub for the tag of that version and logged in Sigstore's public transparency log, proves where the checksums come from; the SHA-256 checksum then binds the binary to those checksums. A compromise of our release sites is not enough to get another binary accepted. A release without a signature (up to v0.0.2) is refused. See [Security](/docs/confiance).
+
+## Hardening options
+
+Protections already in place stay active on a later `up`: leaving out a flag does not turn them off. Optional protections require Debian 13 or later. `--sandbox` requires cgroup v2.
+
+The [command reference](/docs/commands#option-defaults-and-platform-scope) describes each option, its default and platform.
+
+An option that closes access arms a 600 s rollback. From **another** SSH session, with the administration account:
+
+```bash
+ssh hermes-admin@YOUR_HOST
+edge-setup verify-access
+```
+
+Without this confirmation, the affected SSH, UFW, fail2ban or cloud-init account settings are restored. Replace `YOUR_HOST` with your host address.
+
+### Checks afterwards
+
+```bash
+edge-setup status
+edge-setup doctor
+edge-setup audit --strict
+```
+
+`doctor` checks that Hermes works and can be reached only from the machine. It warns if the expected firewall is missing, if a link is inactive, or if automatic updates are off. `audit --strict` writes a report readable by root only; a `SKIP` on a protection you did not select is not a failure.
+
+## Recommended profile (Internet-facing server)
+
+Debian 13, cgroup v2, and a TPM2 chip if the provider offers one: a disk snapshot is then not enough to pass off a copy of the machine as yours.
+
+```bash
+sudo edge-setup up \
+  --sandbox --persistent-journal --unattended-upgrades \
+  --sudo-logging --password-policy --disable-llmnr \
+  --firewall --allow-inbound 22/tcp --fail2ban \
+  --ssh-hardening --quarantine-cloud-user \
+  --auto-upgrade \
+  --admin-key /root/admin.pub --console-confirmed --yes
+```
+
+Then, within 600 s, run `verify-access` from a new session. After that:
+
+```bash
+edge-setup link --openedbot https://link.openedbot.app --yes
+edge-setup doctor
+edge-setup audit --strict
+```
+
+On an isolated network, `sudo edge-setup up --yes` is enough to link the machine. That is not hardening.
+
+The administration account has full sudo rights; the default requires a password. Protect its SSH key and password.
+
+## Update and roll back
+
+```bash
+edge-setup upgrade --yes
+edge-setup self-verify
+edge-setup auto-upgrade enable --yes
+edge-setup auto-upgrade status
+```
+
+`upgrade` downloads the new version over HTTPS, verifies the release signature then, **once**, the binary against `SHA256SUMS`, and puts it in place. If Hermes needs to restart, it does so only while your bots are not working, and the previous version comes back if Hermes stops responding afterwards; otherwise the restart stays pending.
+
+`auto-upgrade` (every 6 h) installs only a newer `vX.Y.Z` version, never while your bots are working, then **checks** within 2 min that the machine is still linked. Otherwise the previous version is put back. On by default on Linux since v1.5.3: `up` turns it on, unless `--no-auto-upgrade`. `auto-upgrade disable --yes` turns it off, and later `up` runs leave it off until `auto-upgrade enable --yes`. Next to an available update, the console shows whether the host updates itself.
+
+openedbot never updates your machine for you. A version that is too old is flagged in the console; you decide whether to update.
+
+## Uninstall
+
+First see what would be removed, without touching anything:
+
+```bash
+sudo edge-setup uninstall --plan
+```
+
+Then uninstall, keeping the data or destroying it:
+
+```bash
+sudo edge-setup uninstall --yes --keep-data
+sudo edge-setup uninstall --yes --purge-data --i-understand-data-loss
+```
+
+`uninstall` removes Hermes, its services and the tool-managed `edge-setup` command. A binary installed by a Linux package must be removed with the package manager. Hermes's data (its access token, your AI provider credentials, the bots' workspaces) stays in place with `--keep-data`: a later `edge-setup up` finds it as it was. `--purge-data` destroys it with no way back and requires `--i-understand-data-loss`.
+
+Without either option, `uninstall` asks in the terminal: Enter keeps the data, destroying it requires typing `purge`. Outside a terminal, it refuses and changes nothing. The administration account created by `--ssh-hardening` stays in place.
+
+## Quick troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| `verify-access` refuses | New SSH session with the admin key, not the one that ran `up`. The 600 s window is still running. |
+| Locked out before `verify-access` | Wait for the rollback (≤ 600 s). `status` shows `rolled_back=true`. |
+| `doctor` reports a Hermes installation that needs updating | `sudo edge-setup upgrade --yes` or `sudo edge-setup up --yes`. |
+| `cosign` does not print `Verified OK` | Do not install the binary. Check that `V` names a signed version (v0.0.3 or later); never loosen the expected identity. |
+| `sha256sum` does not print `OK` | Download again; do not install the binary. |
+| "must run as root" | Run the command again with `sudo`. |
+| Machine already hosts other services | Stop. Use a dedicated machine. |
+
+Ticket refused or expired, machine not found or removed in the console: see [Solve a problem](/docs/depannage).
+
+What we guarantee: [Security](/docs/confiance). Short
+questions: [FAQ](/docs/faq). The console path:
+[Link a machine](/docs/machine).

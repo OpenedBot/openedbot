@@ -1,0 +1,20 @@
+/** The link state of a runtime row, written by the connector link (runtime-link) and the worker. */
+export {
+  bumpToolsetEpoch,
+  expireRotatedLinkTokens,
+  holdUnconfirmedLinkTokenRotation,
+  insertConnectorRuntime,
+  markCapabilitiesChanged,
+  markInventoryChanged,
+  markLinkConnected,
+  markLinkDisconnected,
+  markLinkSeen,
+  registerLinkDevicePublicKey,
+  replaceLinkTokenEmergency,
+  rotateLinkToken,
+  setLinkFeatures,
+  settleLinkTokenRotation,
+  undoLinkTokenRotation,
+  writeLinkAgent,
+  writeLinkOrigin,
+} from "../sql/runtime-link-rows";

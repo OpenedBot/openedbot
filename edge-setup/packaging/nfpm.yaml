@@ -1,0 +1,17 @@
+name: edge-setup
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: openedbot <noreply@example.invalid>
+description: Installs, hardens and links a Hermes agent runtime on this host.
+homepage: https://docs.openedbot.app/docs/edge-setup
+license: Apache-2.0
+contents:
+  - src: ./dist/edge-setup_linux_${ARCH}
+    dst: /usr/sbin/edge-setup
+    file_info:
+      mode: 0755
+scripts:
+  prerm: ./packaging/prerm.sh

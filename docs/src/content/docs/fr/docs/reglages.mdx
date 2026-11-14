@@ -1,0 +1,69 @@
+---
+title: Régler vos bots et votre compte
+description: Gérez les modèles, les outils, la mémoire, les routines, les approbations et votre compte.
+icon: Settings
+---
+
+Les réglages d’un bot se trouvent dans **Gérer le bot…**, depuis le menu du bot : ils ne concernent que lui. Les **Réglages** de la console concernent votre espace et tous vos bots.
+
+## Fournisseur d’IA et modèle
+
+Le fournisseur d’IA fait parler vos bots et facture leurs réponses selon votre compte chez lui. Le fournisseur, le modèle et l’effort utilisés par défaut se règlent dans **Réglages > Modèles**.
+
+Pour un seul bot, choisissez son modèle dans **Gérer le bot… > Modèle**, et, quand votre machine le permet, ses propres clés dans **Gérer le bot… > Clés fournisseur**.
+
+Les clés du fournisseur restent sur la machine que vous avez reliée. Ne les copiez jamais dans une conversation.
+
+## Persona
+
+La persona dit au bot qui il est, quelle est sa mission et comment vous aider. Elle se modifie dans **Gérer le bot… > Persona**. Voir [Personnaliser votre bot](/fr/docs/bot#personnaliser-votre-bot).
+
+## Outils et connecteurs
+
+- **Gérer le bot… > Skills et outils** et **Gérer le bot… > Connecteurs MCP** : ce que ce bot peut utiliser.
+- **Réglages > Connecteurs** : les outils, serveurs MCP et skills que votre machine propose, en lecture seule. Votre machine prévient openedbot dès que l’un d’eux change, même si le changement est fait directement sur elle : la page s’ouvre déjà à jour. **Actualiser** relit la machine sur-le-champ.
+
+Activez seulement ce dont le bot a besoin.
+
+## Mémoire
+
+Chaque bot peut garder ses propres faits d’une conversation à l’autre. Dans **Gérer le bot… > Mémoire**, vous pouvez les consulter, en **Ajouter**, les **Corriger** ou les faire **Oublier**. Le bot ne garde pas automatiquement tout ce qui se dit dans ses conversations.
+
+## Routines
+
+Une routine est une tâche qu’un bot réalise régulièrement. Dans **Gérer le bot… > Routines**, choisissez **Nouvelle routine**, puis un nom, une **Planification** et le **Message** qui dit au bot quoi faire. Vous pouvez mettre une routine en pause ou la réactiver. Ses résultats arrivent dans la conversation du bot.
+
+## Actions à approuver
+
+Certaines actions attendent votre décision. Lisez la demande dans la conversation, puis choisissez **Autoriser une fois** ou **Refuser**. Chaque demande nécessite une décision distincte. Les demandes en attente sont aussi rassemblées dans **À traiter**.
+
+Le **Mode de permission** d’un bot, choisi dans sa conversation, dit ce qu’il peut faire sans vous demander :
+
+- **Revue auto** : un relecteur automatique répond, et vous sollicite quand il hésite.
+- **Demander** : chaque écriture ou commande à risque vous est demandée.
+- **Mode plan** : le bot lit et planifie ; les écritures sont bloquées.
+- **Accès complet** : les écritures s’exécutent sans demande ; les protections de base restent appliquées.
+
+Les règles propres à un bot sont dans **Gérer le bot… > Règles d’approbation**. Le journal de vos décisions est dans **Réglages > Décisions**, et les règles appliquées à tout l’espace dans **Réglages > Politiques**.
+
+## Votre compte et votre espace
+
+- **Réglages > Mon compte** : votre **Nom d’utilisateur** (celui que vos bots emploient), la section **Connexion** (adresse et compte Google) et les **Membres** de votre espace. Le nom affiché vient de votre fournisseur de connexion et ne se modifie pas ici.
+- **Réglages > Apparence et langue** : le thème et la langue, enregistrés dans ce navigateur.
+- **Réglages > Sécurité** : la session en cours et les appareils connectés. Si votre compte possède déjà un mot de passe, vous pouvez aussi le modifier ; les nouveaux comptes se connectent par code e-mail ou avec Google.
+
+## Alertes par e-mail
+
+Dans **Réglages > Notifications**, activez séparément **Approbation attendue**, **Mission terminée** et **Mission à vérifier ou en échec**. Les trois sont désactivées par défaut. Ces préférences concernent votre compte dans l’espace courant et sont conservées d’un appareil à l’autre.
+
+Les alertes concernent vos missions et les routines dont vous êtes propriétaire. Elles arrivent même quand la console est fermée. L’activation ne renvoie pas les anciennes alertes. La désactivation empêche les prochains envois encore en attente ; un e-mail déjà transmis ne peut pas être rappelé. Les e-mails de connexion et de sécurité sont indépendants.
+
+## Export et récupération
+
+Dans une conversation, **Fichiers** rassemble les pièces jointes reçues et produites. Vous pouvez rechercher un nom, consulter un aperçu, télécharger un fichier ou ouvrir son message d’origine.
+
+**Exporter la conversation** produit un Markdown avec les messages et les références des pièces jointes, sans leurs fichiers binaires. Téléchargez séparément les fichiers à conserver. Les administrateurs disposent aussi de **Exporter la configuration du bot**, un JSON versionné avec sa persona, son modèle, ses préférences et ses routines. Les clés fournisseur et secrets des connecteurs ne sont pas exportés ; les textes que vous avez vous-même renseignés restent dans l’export.
+
+Ces exports sont lisibles mais ne se réimportent pas depuis la console. Ils ne remplacent pas une sauvegarde complète.
+
+Pour une installation que vous exploitez vous-même, sauvegardez ensemble la base PostgreSQL, le stockage des pièces jointes, les données Hermes de chaque hôte et les clés de chiffrement de la configuration. Une base seule ne suffit pas à récupérer les fichiers ni les secrets chiffrés. La procédure opérateur est dans `docs/recovery.md` du dépôt. Testez la restauration sur une infrastructure isolée avant toute panne réelle.

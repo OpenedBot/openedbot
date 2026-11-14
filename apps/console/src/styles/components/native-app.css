@@ -1,0 +1,53 @@
+/*
+  Desktop app: the interface behaves like a desktop
+  app, not like a page. Browser and PWA see none of these
+  rules (`:root[data-native-titlebar]`, set by `lib/platform/native-titlebar.ts`).
+
+  - Controls and the frame (rail, top bar, sidebar, menus)
+    are not selectable: a double-click on a button does not highlight
+    its label. Content (messages, code, fields, settings) stays
+    selectable: a field always is, even under `user-select: none`.
+  - The control cursor (the hand, « interdit » when they are disabled)
+    lives in `interactive-cursor.css`, everywhere and not only here.
+  - Images and links of the frame cannot be dragged out of the
+    window (the logo, an avatar, a sidebar conversation).
+  - macOS: text smoothed in greyscale, the weight of native apps
+    (Chromium renders it bolder by default).
+*/
+
+:root[data-native-titlebar] :is(
+  [data-board-topbar],
+  #openedbot-board-sidebar,
+  button,
+  [role="button"],
+  [role="menu"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="tab"],
+  [role="switch"],
+  [role="tooltip"]
+) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A field in the frame (search) is always selectable. */
+:root[data-native-titlebar] :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+:root[data-native-titlebar] :is(
+  [data-board-topbar],
+  #openedbot-board-sidebar,
+  button
+) :is(img, a) {
+  -webkit-user-drag: none;
+}
+
+:root[data-native-titlebar="mac"] body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

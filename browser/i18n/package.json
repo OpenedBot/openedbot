@@ -1,0 +1,26 @@
+{
+  "name": "@openedbot/browser-i18n",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./provider": "./src/provider.tsx",
+    "./messages.fr": "./src/messages.fr.ts",
+    "./messages.en": "./src/messages.en.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-i18n": "workspace:*",
+    "@openedbot/contracts-locale": "workspace:*",
+    "react": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "@types/react": "^19.0.8",
+    "typescript": "^5.9.3"
+  }
+}

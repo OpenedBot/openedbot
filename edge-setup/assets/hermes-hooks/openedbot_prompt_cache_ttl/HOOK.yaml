@@ -1,0 +1,4 @@
+name: openedbot_prompt_cache_ttl
+description: Let a /v1/runs request choose its prompt-cache tier (model_options.prompt_cache_ttl).
+events:
+  - gateway:startup

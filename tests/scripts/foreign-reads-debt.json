@@ -1,0 +1,516 @@
+{
+  "until": "2027-06-30",
+  "reason": "Lectures de tables d'un autre contexte (module, application ou plug-in) en SQL en ligne, gelées par fichier et par table. Chacune passera par la couche application du propriétaire ; un compte ne fait que baisser (--record).",
+  "files": {
+    "apps/api/src/routes/conversation/approval-routes.ts": {
+      "approval_requests": 3,
+      "bots": 1,
+      "organizations": 1,
+      "runs": 3,
+      "threads": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/conversation/attachment-routes.ts": {
+      "attachments": 1
+    },
+    "apps/api/src/routes/conversation/conversation-followup.ts": {
+      "attachments": 2,
+      "bots": 2,
+      "messages": 3,
+      "run_events": 1,
+      "run_steering_attempts": 4,
+      "runs": 7,
+      "threads": 1,
+      "workflows": 5
+    },
+    "apps/api/src/routes/conversation/conversation-input.ts": {
+      "bot_groups": 1,
+      "bots": 1,
+      "group_members": 1
+    },
+    "apps/api/src/routes/conversation/conversation-message-routes.ts": {
+      "attachments": 1,
+      "bot_groups": 1,
+      "bots": 4,
+      "group_members": 2,
+      "messages": 4,
+      "profile_import_items": 1,
+      "tenant_deletions": 1,
+      "threads": 1
+    },
+    "apps/api/src/routes/conversation/conversation-routes.ts": {
+      "messages": 2,
+      "runs": 1,
+      "threads": 4
+    },
+    "apps/api/src/routes/conversation/conversation-thread-routes.ts": {
+      "approval_requests": 1,
+      "bots": 3,
+      "message_ingress": 1,
+      "message_reactions": 1,
+      "messages": 2,
+      "organizations": 1,
+      "run_events": 1,
+      "runs": 2,
+      "runtimes": 1,
+      "threads": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/conversation/message-version-routes.ts": {
+      "approval_requests": 1,
+      "attachments": 1,
+      "bots": 3,
+      "message_versions": 6,
+      "messages": 1,
+      "runs": 2,
+      "threads": 3,
+      "workflows": 1
+    },
+    "apps/api/src/routes/conversation/message-version-source.ts": {
+      "bots": 2,
+      "messages": 2,
+      "runs": 2,
+      "threads": 2,
+      "workflows": 2
+    },
+    "apps/api/src/routes/conversation/run-routes.ts": {
+      "runs": 1
+    },
+    "apps/api/src/routes/conversation/search-routes.ts": {
+      "bots": 4,
+      "messages": 1,
+      "thread_hides": 2,
+      "thread_message_counters": 1,
+      "threads": 2
+    },
+    "apps/api/src/routes/conversation/thread-history-routes.ts": {
+      "approval_requests": 1,
+      "bots": 3,
+      "message_ingress": 1,
+      "message_reactions": 1,
+      "messages": 2,
+      "organizations": 1,
+      "run_events": 1,
+      "runs": 3,
+      "runtimes": 1,
+      "thread_compactions": 1,
+      "threads": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/events/event-routes.ts": {
+      "run_events": 3,
+      "runs": 1,
+      "threads": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/execution/bot-settings-tool-install-routes.ts": {
+      "bots": 1,
+      "runtime_bot_settings_tools": 1
+    },
+    "apps/api/src/routes/execution/bot-settings-tool-routes.ts": {
+      "bots": 1,
+      "runs": 1,
+      "runtime_bot_settings_tools": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/execution/routine-routes.ts": {
+      "bot_groups": 2,
+      "bots": 3,
+      "group_members": 1,
+      "message_ingress": 2,
+      "routine_executions": 1,
+      "routines": 6,
+      "runs": 2,
+      "threads": 1,
+      "workflows": 2
+    },
+    "apps/api/src/routes/execution/routine-tool-routes.ts": {
+      "bots": 1,
+      "routine_executions": 1,
+      "routines": 2,
+      "runs": 1,
+      "runtime_routine_tools": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/execution/workflow-retry-source.ts": {
+      "messages": 1,
+      "runs": 1,
+      "workflows": 1
+    },
+    "apps/api/src/routes/execution/workflow-routes.ts": {
+      "bot_groups": 1,
+      "bots": 2,
+      "run_steering_attempts": 1,
+      "runs": 4,
+      "threads": 2,
+      "users": 1,
+      "workflows": 4
+    },
+    "apps/api/src/routes/identity/mobile-connect-routes.ts": {
+      "mobile_connect_tickets": 1
+    },
+    "apps/api/src/routes/inbox/inbox-routes.ts": {
+      "approval_requests": 2,
+      "bot_groups": 4,
+      "bots": 2,
+      "runs": 2,
+      "threads": 6,
+      "users": 1,
+      "workflows": 2
+    },
+    "apps/api/src/routes/notifications/push-subscription-routes.ts": {
+      "push_subscriptions": 3
+    },
+    "apps/api/src/routes/overview/misc-routes.ts": {
+      "approval_requests": 3,
+      "bot_permission_grants": 1,
+      "bots": 2,
+      "decisions": 1,
+      "memberships": 1,
+      "organizations": 1,
+      "runs": 2,
+      "runtime_permission_settings": 2,
+      "threads": 2,
+      "users": 5
+    },
+    "apps/api/src/routes/overview/usage-queries.ts": {
+      "bots": 1,
+      "runs": 2
+    },
+    "apps/api/src/routes/platform/metrics-routes.ts": {
+      "attachments": 1,
+      "service_instances": 1
+    },
+    "apps/api/src/routes/portability/team-import-routes.ts": {
+      "bot_groups": 1,
+      "bots": 3,
+      "sections": 2
+    },
+    "apps/api/src/routes/roster/bot-permission-grant-routes.ts": {
+      "bots": 1
+    },
+    "apps/api/src/routes/roster/computer-routes.ts": {
+      "bots": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-audit-routes.ts": {
+      "runs": 1,
+      "runtime_audit_verifications": 2,
+      "runtime_link_dispatches": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-direct-access.ts": {
+      "runtime_link_events": 2
+    },
+    "apps/api/src/routes/runtimes/runtime-enrollment-routes.ts": {
+      "runtime_enrollments": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-exposure-routes.ts": {
+      "runtimes": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-instance-routes.ts": {
+      "runtime_link_diagnostics": 1,
+      "runtime_link_events": 2,
+      "runtimes": 4
+    },
+    "apps/api/src/routes/runtimes/runtime-integration-profile-routes.ts": {
+      "bots": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-link-token-routes.ts": {
+      "runtime_link_events": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-model-routes.ts": {
+      "bot_profile_provisions": 1,
+      "bots": 1,
+      "runtime_link_events": 2
+    },
+    "apps/api/src/routes/runtimes/runtime-public.ts": {
+      "bots": 1,
+      "runtime_provider_incidents": 1
+    },
+    "apps/api/src/routes/runtimes/runtime-routes.ts": {
+      "runtime_enrollments": 1
+    },
+    "apps/api/src/routes/webhooks/sql.ts": {
+      "bot_groups": 1,
+      "bots": 4,
+      "group_members": 2,
+      "tenant_deletions": 1,
+      "threads": 6,
+      "workflows": 2
+    },
+    "apps/worker/src/maintenance/approval-policy-reconciliation.ts": {
+      "api_instances": 2,
+      "bot_profile_provisions": 1,
+      "bots": 2,
+      "organizations": 2,
+      "runtimes": 1
+    },
+    "apps/worker/src/maintenance/capability-baseline-reconciliation.ts": {
+      "api_instances": 2,
+      "bot_profile_provisions": 1,
+      "bots": 3,
+      "organizations": 1,
+      "runtimes": 2
+    },
+    "apps/worker/src/maintenance/runtime-model-selection.ts": {
+      "bot_profile_provisions": 1,
+      "bots": 1
+    },
+    "modules/conversation/src/application/compact-room-request.ts": {
+      "bots": 1,
+      "group_members": 2,
+      "operator_profiles": 1,
+      "organizations": 1,
+      "runs": 1
+    },
+    "modules/conversation/src/application/compact-thread.ts": {
+      "bots": 1,
+      "runs": 1
+    },
+    "modules/conversation/src/sql/organization-cursor.ts": {
+      "run_events": 1
+    },
+    "modules/conversation/src/sql/thread-history.ts": {
+      "runs": 4,
+      "workflows": 1
+    },
+    "modules/execution/src/application/disconnected-runtime-runs.ts": {
+      "api_instances": 1,
+      "runtimes": 1
+    },
+    "modules/execution/src/application/provider-fallback.ts": {
+      "memberships": 1,
+      "organizations": 1,
+      "users": 1
+    },
+    "modules/execution/src/application/queue.ts": {
+      "bot_profile_provisions": 1,
+      "bots": 1,
+      "runtimes": 1,
+      "threads": 1
+    },
+    "modules/execution/src/application/routine-tool-state.ts": {
+      "bot_profile_provisions": 1,
+      "bots": 1,
+      "runtimes": 1
+    },
+    "modules/execution/src/application/routines.ts": {
+      "bot_groups": 1,
+      "bots": 2,
+      "group_members": 1,
+      "threads": 2
+    },
+    "modules/execution/src/application/run-creation.ts": {
+      "bots": 1
+    },
+    "modules/execution/src/application/run-receipts.ts": {
+      "messages": 1
+    },
+    "modules/execution/src/application/runner/admission.ts": {
+      "profile_import_items": 1
+    },
+    "modules/execution/src/application/runner/cancel.ts": {
+      "messages": 1
+    },
+    "modules/execution/src/application/runner/context.ts": {
+      "bots": 1,
+      "operator_profiles": 1,
+      "organizations": 1,
+      "runtimes": 1,
+      "sections": 1,
+      "threads": 1
+    },
+    "modules/execution/src/application/runner/core-permission-rules.ts": {
+      "organization_permission_policies": 1
+    },
+    "modules/execution/src/application/runner/handoff.ts": {
+      "bots": 1,
+      "threads": 1
+    },
+    "modules/execution/src/application/runner/history.ts": {
+      "attachments": 1,
+      "message_versions": 1,
+      "messages": 2
+    },
+    "modules/execution/src/application/runner/instructions.ts": {
+      "bot_playbooks": 1,
+      "bots": 2,
+      "playbooks": 1,
+      "threads": 1
+    },
+    "modules/execution/src/application/runner/permission-gate.ts": {
+      "bots": 1,
+      "organizations": 2
+    },
+    "modules/execution/src/application/runner/persist.ts": {
+      "bot_groups": 1,
+      "bots": 1,
+      "group_members": 2,
+      "threads": 1
+    },
+    "modules/execution/src/application/runner/room-lines.ts": {
+      "bots": 1,
+      "messages": 1
+    },
+    "modules/execution/src/application/runner/rooms.ts": {
+      "bot_groups": 2,
+      "bots": 2,
+      "group_member_read_positions": 1,
+      "group_members": 3,
+      "messages": 1
+    },
+    "modules/execution/src/application/runner/workflows.ts": {
+      "bots": 2,
+      "threads": 1
+    },
+    "modules/execution/src/application/runtime-direct.ts": {
+      "runtimes": 2
+    },
+    "modules/execution/src/application/terminal-event-completion.ts": {
+      "bots": 2,
+      "messages": 2
+    },
+    "modules/execution/src/application/tool-errors.ts": {
+      "message_ingress": 1
+    },
+    "modules/identity/src/sql/deletions.ts": {
+      "attachments": 1,
+      "message_ingress": 1,
+      "profile_delete_jobs": 3,
+      "profile_import_jobs": 3,
+      "runs": 2
+    },
+    "modules/identity/src/sql/product-features.ts": {
+      "product_features": 1
+    },
+    "modules/notifications/src/application/push-notifications.ts": {
+      "bots": 1,
+      "memberships": 2,
+      "organizations": 2,
+      "runtime_connector_notices": 1,
+      "runtimes": 1
+    },
+    "modules/notifications/src/sql/apns-devices.ts": {
+      "bot_groups": 1,
+      "memberships": 2,
+      "threads": 1,
+      "workflows": 3
+    },
+    "modules/portability/src/application/delete-executor.ts": {
+      "tenant_deletions": 1
+    },
+    "modules/portability/src/application/executor.ts": {
+      "attachments": 1,
+      "bot_groups": 1,
+      "bots": 1,
+      "runtimes": 1,
+      "sections": 1,
+      "tenant_deletions": 1
+    },
+    "modules/portability/src/application/host-profile-delete.ts": {
+      "bots": 2,
+      "group_members": 3,
+      "message_ingress": 1,
+      "runs": 3,
+      "threads": 4
+    },
+    "modules/portability/src/sql/delete-jobs.ts": {
+      "runtimes": 1,
+      "tenant_deletions": 1
+    },
+    "modules/portability/src/sql/jobs.ts": {
+      "bots": 1,
+      "runtimes": 1,
+      "sections": 2,
+      "tenant_deletions": 1
+    },
+    "modules/roster/src/application/profile-provisions.ts": {
+      "organizations": 1
+    },
+    "modules/roster/src/application/tool-policies.ts": {
+      "organizations": 2
+    },
+    "modules/roster/src/sql/bot-activity.ts": {
+      "messages": 1,
+      "run_events": 1,
+      "runs": 4,
+      "threads": 2,
+      "tool_errors": 1
+    },
+    "modules/roster/src/sql/bot-purge.ts": {
+      "attachments": 1,
+      "message_ingress": 1,
+      "messages": 1,
+      "threads": 2
+    },
+    "modules/roster/src/sql/bots.ts": {
+      "approval_requests": 1,
+      "message_ingress": 1,
+      "messages": 2,
+      "organization_permission_policies": 1,
+      "organizations": 1,
+      "profile_import_items": 2,
+      "profile_import_jobs": 2,
+      "run_events": 1,
+      "runs": 5,
+      "thread_hides": 1,
+      "thread_reads": 1,
+      "threads": 6
+    },
+    "modules/roster/src/sql/groups.ts": {
+      "approval_requests": 1,
+      "message_ingress": 1,
+      "messages": 2,
+      "run_events": 1,
+      "runs": 3,
+      "thread_hides": 1,
+      "thread_reads": 1,
+      "threads": 5
+    },
+    "modules/roster/src/sql/permission-grants.ts": {
+      "approval_requests": 1,
+      "users": 1
+    },
+    "modules/roster/src/sql/profile-reservations.ts": {
+      "profile_import_items": 2
+    },
+    "modules/runtime-link/src/application/connector-notices.ts": {
+      "memberships": 1,
+      "organizations": 1,
+      "runtimes": 1,
+      "users": 1
+    },
+    "modules/runtime-link/src/application/gateway.ts": {
+      "memberships": 1,
+      "organizations": 1,
+      "runtimes": 1,
+      "users": 1
+    },
+    "modules/runtime-link/src/application/link-alerts.ts": {
+      "memberships": 1,
+      "organizations": 1,
+      "runtime_enrollments": 1,
+      "runtimes": 3,
+      "users": 1
+    },
+    "modules/runtime-link/src/application/link-persistence.ts": {
+      "runtimes": 2
+    },
+    "modules/runtime-link/src/application/runtime-links.ts": {
+      "runs": 1,
+      "runtimes": 2,
+      "threads": 1
+    },
+    "modules/runtimes/src/application/runtime-mode.ts": {
+      "organizations": 1
+    },
+    "modules/runtimes/src/sql/link-vitality.ts": {
+      "api_instances": 2
+    },
+    "modules/runtimes/src/sql/permission-settings.ts": {
+      "users": 1
+    },
+    "modules/runtimes/src/sql/runtime-rows.ts": {
+      "runtime_link_events": 6
+    }
+  }
+}

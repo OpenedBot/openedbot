@@ -1,0 +1,88 @@
+#!/usr/bin/env bun
+import { SQL } from "bun";
+import {
+  assertDevResetAllowed,
+  DEV_RESET_PRESERVED_TABLES,
+  performDevDataReset,
+} from "../src/application/dev-reset";
+
+/**
+ * Terminal twin of `POST /api/onboarding/reset {"scope":"full"}`, called by
+ * `make db-reset-keep-users CONFIRM=yes`. It has NO list of its own: everything
+ * comes from `src/application/dev-reset.ts`, like the route.
+ *
+ * The DSN must be able to `truncate`: `openedbot_api` cannot (it does not own
+ * the tables and has no `delete` on the append-only tables). Failing
+ * `DEV_RESET_DATABASE_URL`, it is rebuilt from the shared PostgreSQL
+ * container, exactly as `scripts/db.sh` which runs there as `$POSTGRES_USER`.
+ */
+
+function fail(message: string): never {
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
+}
+
+function databaseOfApiUrl(value: string | undefined): { database: string; port: string } {
+  try {
+    const url = new URL(value?.trim() ?? "");
+    return { database: decodeURIComponent(url.pathname.replace(/^\//u, "")) || "openedbot", port: url.port || "5432" };
+  } catch {
+    return { database: "openedbot", port: "5432" };
+  }
+}
+
+async function resolveDatabaseUrl(): Promise<string> {
+  const explicit = process.env.DEV_RESET_DATABASE_URL?.trim();
+  if (explicit) return explicit;
+
+  const container = process.env.OPENEDBOT_POSTGRES_CONTAINER?.trim() || "infra-postgres";
+  // Same database and host port as the API: both come from its DSN.
+  const { database, port } = databaseOfApiUrl(process.env.API_DATABASE_URL);
+  const probe = Bun.spawnSync([
+    "docker",
+    "exec",
+    container,
+    "sh",
+    "-ceu",
+    'printf "%s\n%s\n" "$POSTGRES_USER" "$POSTGRES_PASSWORD"',
+  ]);
+  if (probe.exitCode !== 0) {
+    fail(
+      `Impossible de lire les identifiants du conteneur ${container}. ` +
+        "Démarrez-le (make db-up) ou fournissez DEV_RESET_DATABASE_URL.",
+    );
+  }
+  const [user, password] = new TextDecoder().decode(probe.stdout).split("\n");
+  if (!user || !password) {
+    fail(`Le conteneur ${container} n'expose pas POSTGRES_USER/POSTGRES_PASSWORD ; fournissez DEV_RESET_DATABASE_URL.`);
+  }
+  const credentials = `${encodeURIComponent(user)}:${encodeURIComponent(password)}`;
+  return `postgres://${credentials}@127.0.0.1:${port}/${database}`;
+}
+
+if (process.env.OPENEDBOT_DEV_RESET_CONFIRM !== "yes") {
+  fail(
+    "Refus : le vidage supprime les données applicatives locales. " +
+      "Relancez avec `make db-reset-keep-users CONFIRM=yes`.",
+  );
+}
+
+const environment = (process.env.OPENEDBOT_ENV ?? process.env.NODE_ENV ?? "development").trim();
+const databaseUrl = await resolveDatabaseUrl();
+try {
+  assertDevResetAllowed({ environment, databaseUrl });
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
+
+const sql = new SQL({ url: databaseUrl, max: 1 });
+try {
+  const report = await performDevDataReset(sql);
+  process.stdout.write(
+    `Vidées (${report.truncatedTables.length}) : ${report.truncatedTables.join(", ")}\n` +
+      `Préservées (${DEV_RESET_PRESERVED_TABLES.length}) : ${report.preservedTables.join(", ")}\n` +
+      `Accueil remis à zéro : ${report.organizationsReset} espace(s), ${report.usersReset} personne(s).\n`,
+  );
+} finally {
+  await sql.close();
+}

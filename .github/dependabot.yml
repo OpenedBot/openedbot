@@ -1,0 +1,40 @@
+# Weekly version updates, one grouped pull request per ecosystem, against
+# develop (where every change lands before main). Security updates are not
+# grouped and arrive as soon as an advisory is published.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: bun
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      bun:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /edge-setup
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      gomod:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /apps/desktop-tauri/src-tauri
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      cargo:
+        patterns: ["*"]

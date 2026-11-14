@@ -1,0 +1,80 @@
+[Unit]
+Description=Hermes outbound link to openedbot
+After=network-online.target hermes-gateway.service
+Wants=network-online.target
+# Installed by `up`, started only once `link` has written the link file.
+ConditionPathExists=/etc/hermes/connector/link.json
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+# The gateway bearer and the link token are never in the environment: systemd
+# copies them into $CREDENTIALS_DIRECTORY. systemd reserves that directory to
+# the uid of the unit, not to the unit, and the gateway shares the hermes uid:
+# see the device key below for what keeps it out of reach.
+LoadCredential=runtime.env:/srv/hermes/data/runtime.env
+LoadCredential=link.json:/etc/hermes/connector/link.json
+# The Ed25519 device key (proof of possession) is sealed by systemd-creds;
+# PID 1 unseals it into $CREDENTIALS_DIRECTORY. Any process of the hermes uid
+# could read that copy, the gateway's included, so three things keep it out of
+# reach: the gateway unit masks /run/credentials, this process marks itself
+# non-dumpable (PR_SET_DUMPABLE) before it reads a credential, so no other
+# process of the uid can open its /proc entries. The gateway shares the host's
+# process view (Hermes proves its live gateway from it) and can see this PID,
+# never its root, fd, environ or memory.
+LoadCredentialEncrypted=device.key:/etc/hermes/connector/device.key.cred
+StateDirectory=hermes-connector
+StateDirectoryMode=0700
+ExecStart=/usr/local/lib/hermes-setup/edge-setup internal connector
+Restart=always
+RestartSec=5
+# 78: openedbot revoked the link. Restarting would only knock again;
+# `edge-setup link` restarts the unit. A link refused 10 times in a row keeps
+# running and retries every 30 min instead.
+# 75: only connectors before 2026-11-11, when a loopback origin (a dev
+# tunnel) refused every dial for a minute; `make link-dev-up` restarts them.
+# A current connector retries a down tunnel every 30 s and never exits so.
+RestartPreventExitStatus=78 75
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# The connector shares the hermes uid but not its filesystem, and, on systemd
+# 257 and later only (older versions ignore PrivatePIDs=), it gets its own
+# process view. PID 1 opens LoadCredential sources before applying this namespace.
+InaccessiblePaths=/srv/hermes/data
+InaccessiblePaths=-/run/user/998
+PrivatePIDs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# A static Go client that dials out and calls two local endpoints: it needs no
+# capability, device, namespace, clock, kernel log or privileged system call,
+# and sees no process of another uid (systemd-analyze security: 1.x). No
+# RemoveIPC=: it removes the IPC objects of the whole hermes uid when this unit
+# stops, the gateway's POSIX semaphores included.
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=true
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+UMask=0077
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+IPAddressDeny=169.254.0.0/16
+IPAddressDeny=fd00:ec2::/64
+
+[Install]
+WantedBy=multi-user.target

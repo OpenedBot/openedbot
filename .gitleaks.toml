@@ -1,0 +1,96 @@
+# gitleaks configuration: default rules plus an allowlist of files reviewed on
+# 2026-10-28. Every entry below is a test fixture, a golden vector, a public
+# hash pin or an e-mail preview sample - never a live credential. Review any
+# new finding before adding a path here. Run: gitleaks git . -c .gitleaks.toml
+title = "openedbot-main gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Reviewed test fixtures, golden vectors and samples"
+paths = [
+  '''^apps/api/tests/permission-rule-routes\.test\.ts$''',
+  '''^apps/console/tests/components/support/support-panel\.test\.tsx$''',
+  '''^apps/console/tests/lib/run/tool-progress-label\.test\.tsx$''',
+  '''^apps/console/tests/screens/settings/installation/runtime-link-rotation\.test\.tsx$''',
+  '''^edge-setup/internal/connector/testdata/creation-audit-v2\.json$''',
+  '''^edge-setup/internal/journal/journal_test\.go$''',
+  '''^modules/execution/tests/gate-identity\.test\.ts$''',
+  '''^modules/execution/tests/review-verdict\.test\.ts$''',
+  '''^modules/notifications/src/domain/email/samples\.ts$''',
+  '''^modules/notifications/tests/email-templates\.test\.ts$''',
+  '''^platform/hermes/tests/a2a-policy\.test\.ts$''',
+  '''^platform/hermes/tests/fixtures/creation-audit/creation-audit-v2\.json$''',
+  '''^platform/hermes/tests/fixtures/relay-frames\.vectors\.json$''',
+  '''^platform/integrations/tests/apns\.test\.ts$''',
+]
+
+# Reviewed on 2026-11-01 before the repository went public. Unlike the path list
+# above (a global path allowlist skips the whole file), each entry below is
+# attached to the one rule that fired (generic-api-key) and requires BOTH the
+# file AND the exact fixture value: any other value in the same file is still
+# reported.
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Relay-frame golden vectors: base64 of fixed sample strings, not link tokens"
+condition = "AND"
+paths = [
+  '''^edge-setup/test/golden/relay-frames/vectors\.json$''',
+  '''^protocol/connector/fixtures/relay-frames\.vectors\.json$''',
+]
+regexes = [
+  '''^(Qm9vbXNoYWthbGFrYTEyMzQ1Njc4OTA|Um90YXRlZFRva2VuMTIzNDU2Nzg5MA|Boomshakalaka1234567890)$''',
+]
+
+[[rules.allowlists]]
+description = "Go test constants: the 0123456789abcdef placeholder token"
+condition = "AND"
+paths = [
+  '''^edge-setup/internal/commands/runtime_cli_test\.go$''',
+  '''^edge-setup/internal/operator/host_mac_test\.go$''',
+]
+regexes = ['''^0123456789abcdef0123456789abcdef$''']
+
+[[rules.allowlists]]
+description = "Enrollment parser test: a malformed ticket the parser must refuse"
+condition = "AND"
+paths = ['''^edge-setup/internal/enroll/enroll_test\.go$''']
+regexes = ['''^2b5a1f3e-7c2d-4e8a-9b1c-0d1e2f3a4b5c\.short$''']
+
+[[rules.allowlists]]
+description = "Public SHA-256 pin of Docker's APT signing key"
+condition = "AND"
+paths = ['''^edge-setup/internal/pins/pins\.go$''']
+regexes = ['''^1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570$''']
+
+[[rules.allowlists]]
+description = "Password generator alphabet constant (no secret: the alphabet itself)"
+condition = "AND"
+paths = ['''^edge-setup/internal/commands/admin_password\.go$''']
+regexes = ['''^ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789$''']
+
+[[rules.allowlists]]
+description = "Approval gate test: a made-up run key the gate descriptor must never carry, not a signed key (reviewed 2026-11-12)"
+condition = "AND"
+paths = ['''^edge-setup/internal/operator/approval_policy_gate_test\.go$''']
+regexes = ['''^0b7c3a52-5d0e-4c55-9a4c-2b8d1f0e6a11\.FixtureRunKeyFixtureRunKeyFixture$''']
+
+[[rules.allowlists]]
+description = "E2E MCP fixture: the fixed label the offline probe returns, not a credential (reviewed 2026-11-09)"
+condition = "AND"
+paths = ['''^tests/e2e/bot/kit/p1-mcp-fixture\.ts$''']
+regexes = ['''^E2E_FIXTURE_UNAVAILABLE$''']
+
+[[rules.allowlists]]
+description = "API error journal test: a fake invitation token the journal must redact"
+condition = "AND"
+paths = ['''^apps/api/tests/unhandled-error-journal\.test\.ts$''']
+regexes = ['''^Zq3v9XlYk2Rr7TtUuPpWwAaBbCcDdEeFfGg_hh-ii$''']
+
+[[rules.allowlists]]
+description = "Access-log test: a fake invitation token the log must never carry"
+condition = "AND"
+paths = ['''^platform/observability/tests/access-log\.test\.ts$''']
+regexes = ['''^inv_Zq8f3K1mW9pX2bN7cR4tY6uA0sD5eG$''']

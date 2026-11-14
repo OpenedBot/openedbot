@@ -1,0 +1,376 @@
+/*
+  Home `/`: bloub's paper scene (`#etat=orbit&stop`).
+  One accent: the interface night blue. Saturation lives in the pebble's
+  measured rings, not in a palette of CTAs.
+*/
+
+.openedbot-salon-shell,
+.openedbot-salon {
+  --salon-paper: #f5f5f6;
+  --salon-hole: #f9f9f9;
+  --salon-ink: #17203a;
+  --salon-muted: #6e7382;
+  --salon-line: #e3e5ea;
+  --salon-accent: #17203a;
+  --salon-accent-ink: #f5f4ef;
+  --salon-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --salon-ease-io: cubic-bezier(0.4, 0, 0.2, 1);
+  --salon-dur-reveal: 600ms;
+  --salon-dur-hover: 240ms;
+  --salon-r-pill: 999px;
+  background: var(--salon-paper);
+  color: var(--salon-ink);
+}
+
+.dark .openedbot-salon-shell,
+.dark .openedbot-salon {
+  /* The main card's grey (the reference app's canvas): the home is not a darker hole in it. */
+  --salon-paper: #1a1a1a;
+  --salon-hole: #f5f4ef;
+  --salon-ink: #f5f4ef;
+  --salon-muted: #a6a39a;
+  --salon-line: rgba(255, 255, 255, 0.08);
+  --salon-accent: #f5f4ef;
+  --salon-accent-ink: #11130a;
+}
+
+.openedbot-salon-shell header,
+.openedbot-salon-shell [data-mobile-header] {
+  background: var(--salon-paper);
+  border-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
+}
+
+/*
+  Phone: the iOS navigation bar of a root screen. It sits
+  ON the scene (absolute in the column, never `fixed`), opaque. No
+  `backdrop-filter`: as soon as the scene is a layer (the drawer slide)
+  under the `black-translucent` status bar, WebKit paints the filter onto the
+  bar itself. At rest the scene is no longer transformed. The hairline
+  exists only when content has passed under the bar (`data-scrolled`,
+  set by the screen). The scroller's top padding is scroll travel: the pebble
+  starts under the bar, it is not born underneath.
+*/
+[data-mobile-shell] .openedbot-salon-shell [data-mobile-header] {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  z-index: 2;
+  border-bottom-color: transparent;
+  background: var(--salon-paper);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: border-color 180ms ease;
+}
+
+[data-mobile-shell] .openedbot-salon-shell:has(.openedbot-salon[data-scrolled]) [data-mobile-header] {
+  border-bottom-color: color-mix(in srgb, var(--salon-line) 80%, transparent);
+}
+
+[data-mobile-shell] .openedbot-salon-shell .openedbot-salon {
+  padding-top: calc(var(--openedbot-safe-top) + 2.75rem);
+}
+
+.openedbot-salon {
+  position: relative;
+  isolation: isolate;
+  /* The page fits in the window: nothing to scroll, so no bar. */
+  height: 100%;
+  overflow: hidden;
+}
+
+/*
+  A centered column, like an agent app that opens onto an empty
+  conversation: the window is already the product, the Salon is not a
+  welcome page (neither explanatory cards nor a watermark, taken from the
+  desktop app skin on 2026-10-13).
+*/
+.openedbot-salon-guide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 560px);
+  height: 100%;
+  min-height: 0;
+  margin-inline: auto;
+  padding: 2rem clamp(1.25rem, 4vw, 2.5rem) 3rem;
+  text-align: center;
+}
+
+/* The mascot is a presence, not a hero: small, whole, above the title. */
+.openedbot-salon-blob {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: 104px;
+  height: 104px;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+  The SVG fills its box, and it is the viewBox (`xMidYMid meet`) that keeps the
+  square. With `height: 100%` + `aspect-ratio` on a flex item, WebKit
+  fell back to `auto`: the SVG took the full width, overflowed the box
+  on both sides (centered), and the top of the pebble passed under the header,
+  invisible, since nothing scrolls above the origin.
+*/
+.salon-orbit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.openedbot-salon-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.openedbot-salon-eyebrow {
+  --a: 0deg;
+  display: inline-flex;
+  align-items: center;
+  margin: 1.25rem 0 0;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--salon-r-pill);
+  background:
+    linear-gradient(var(--salon-paper), var(--salon-paper)) padding-box,
+    conic-gradient(from var(--a), var(--salon-ink), transparent 32%, var(--salon-ink)) border-box;
+  color: var(--salon-muted);
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--openedbot-text-scale, 1));
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: salon-spin 8s linear infinite;
+}
+
+@property --a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.openedbot-salon-title {
+  margin: 0.75rem 0 0;
+  color: var(--salon-ink);
+  font-family: var(--font-sans);
+  font-size: clamp(26px, 4vh, 34px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.openedbot-salon-lead {
+  margin: 0.6rem 0 0;
+  max-width: 34ch;
+  color: var(--salon-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.openedbot-salon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.openedbot-salon-cta,
+.openedbot-salon-ghost {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.15rem;
+  border-radius: var(--salon-r-pill);
+  font-size: 0.9375rem;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    transform var(--salon-dur-hover) var(--salon-ease-io),
+    background var(--salon-dur-hover) var(--salon-ease-io),
+    border-color var(--salon-dur-hover) var(--salon-ease-io);
+}
+
+.openedbot-salon-cta {
+  border: 1px solid transparent;
+  background: var(--salon-accent);
+  color: var(--salon-accent-ink);
+}
+
+.openedbot-salon-cta:hover {
+  transform: translateY(-2px);
+}
+
+.openedbot-salon-cta:active {
+  transform: translateY(1px);
+}
+
+.openedbot-salon-ghost {
+  border: 1px solid var(--salon-line);
+  background: transparent;
+  color: var(--salon-ink);
+}
+
+.openedbot-salon-ghost:hover {
+  background: color-mix(in srgb, var(--salon-ink) 5%, transparent);
+  transform: translateY(-2px);
+}
+
+:root[data-keyboard-focus] .openedbot-salon-cta:focus-visible,
+:root[data-keyboard-focus] .openedbot-salon-ghost:focus-visible {
+  outline: 2px solid var(--salon-ink);
+  outline-offset: 3px;
+}
+
+/*
+  On the phone, a single column that scrolls. The mobile shell already hides its
+  bars; we hide it here too for the narrow desktop browser.
+
+  The query is THE SAME as `useIsMobile` (`use-mobile.ts`): width < 768, or
+  a finger and height < 768 (an iPhone in landscape, an iPad mini in portrait).
+  At 719 px the mobile shell opened onto the desktop scene `overflow: hidden`,
+  and the bottom of the Salon disappeared with no way to scroll.
+*/
+@media (max-width: 767px), ((pointer: coarse) and (max-height: 767px)) {
+  .openedbot-salon {
+    height: auto;
+    overflow-y: auto;
+    /* The rubber-band stays in the scene, never on the document. */
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
+  }
+
+  .openedbot-salon::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+    `flex: none` on both, and it is not decorative. The desktop scene
+    sets `min-height: 0` on the guide AND on the pebble: in the scrolling
+    column, the guide shrank to the scroller's height instead of
+    overflowing, and the pebble (the only child willing to drop below its
+    content) absorbed the whole shrink: 0 px on an iPhone 15 Pro
+    Max, a pebble "cropped under the header" on a taller screen.
+  */
+  .openedbot-salon-guide {
+    display: flex;
+    flex: none;
+    height: auto;
+    /* The pebble and its sentence, centered in what remains under the bar. */
+    min-height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding-bottom: 3rem;
+    /* The dotted hairlines are a page cue: an app does not have them. */
+    border-left: 0;
+    border-right: 0;
+    text-align: center;
+  }
+
+  .openedbot-salon-blob {
+    flex: none;
+    width: 100%;
+    height: min(70vw, 20rem);
+  }
+
+  .openedbot-salon-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .openedbot-salon-title,
+  .openedbot-salon-lead {
+    text-align: center;
+  }
+
+  /* iOS body: 17 pt, a short sentence, not a page lede. */
+  .openedbot-salon-lead {
+    margin: 0;
+    max-width: 28ch;
+    font-size: 17px;
+    line-height: 1.45;
+  }
+
+  .openedbot-salon-actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity var(--salon-dur-reveal) var(--salon-ease-out),
+    transform var(--salon-dur-reveal) var(--salon-ease-out);
+}
+
+[data-reveal].in {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes salon-spin {
+  to {
+    --a: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-salon-eyebrow,
+  .openedbot-salon-cta,
+  .openedbot-salon-ghost,
+  [data-reveal] {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Under a finger: no hover, a press feedback (`pressed`), like `.openedbot-press`. */
+@media (pointer: coarse) {
+  .openedbot-salon-cta:hover,
+  .openedbot-salon-ghost:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .openedbot-salon-cta,
+  .openedbot-salon-ghost {
+    transition:
+      transform 120ms ease-out,
+      opacity 120ms ease-out,
+      background-color 120ms ease-out;
+  }
+
+  .openedbot-salon-cta:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+
+  .openedbot-salon-ghost:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--salon-ink) 8%, transparent);
+  }
+}

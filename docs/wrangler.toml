@@ -1,0 +1,13 @@
+# docs.openedbot.app: the static build in dist/, served to everyone. No Worker
+# code: Cloudflare serves the assets directly and public/_headers applies.
+# Custom domain only, no workers.dev alias.
+name = "openedbot-docs"
+compatibility_date = "2026-10-26"
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "docs.openedbot.app", custom_domain = true }]
+
+[assets]
+directory = "./dist"
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"

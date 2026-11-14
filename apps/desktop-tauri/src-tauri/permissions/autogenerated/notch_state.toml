@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notch-state"
+description = "Enables the notch_state command without any pre-configured scope."
+commands.allow = ["notch_state"]
+
+[[permission]]
+identifier = "deny-notch-state"
+description = "Denies the notch_state command without any pre-configured scope."
+commands.deny = ["notch_state"]

@@ -1,0 +1,338 @@
+# Publishes the desktop app's GitHub release on a desktop/vX.Y.Z tag, from the
+# files already published on R2 (https://releases.openedbot.app/desktop/vX.Y.Z/).
+# Nothing is built here: the macOS app is signed with the Developer ID and
+# notarised on a Mac, and every update artifact is signed with the update key,
+# which never leaves that Mac (apps/desktop-tauri: build-mac.ts and
+# build-linux.ts --identity production, then release.ts).
+#
+# The workflow downloads the files R2 lists in SHA256SUMS, checks them (sums,
+# update signatures against apps/desktop-tauri/updater.pub, Gatekeeper and the
+# team for the dmg, package metadata and a start under Xvfb for Linux), then
+# copies the installers into the GitHub release under stable names, so
+# https://github.com/OpenedBot/openedbot/releases/latest/download/<file>
+# always serves the newest build:
+#
+#   openedbot-mac-arm64.dmg           macOS, Apple Silicon
+#   openedbot-linux-amd64.deb         Debian, Ubuntu (x86_64)
+#   openedbot-linux-x86_64.AppImage   other Linux (x86_64)
+#   openedbot-linux-arm64.deb         Debian, Ubuntu (arm64)
+#   openedbot-linux-aarch64.AppImage  other Linux (arm64)
+#
+# Nothing on R2 for this version, or one file that does not check: the
+# workflow fails and nothing is published.
+#
+# No workflow artifact carries the files between jobs (an exhausted artifact
+# storage quota once stopped a release): every job downloads
+# what it needs from R2 itself (apps/desktop-tauri/scripts/fetch-r2-release.sh)
+# and checks it against the SHA256SUMS the job `fetch` verified, pinned by its
+# SHA-256 (output `sums`), so all jobs see the very bytes `fetch` verified.
+#
+# Blocking update test (desktop-update-canary.yml): before the GitHub release,
+# the published dmg of the release the stable channel serves (N-1) is
+# installed on a macOS runner and must update itself to this version through
+# the beta manifest, then refuse a forged update. So the order is: R2 upload,
+# release.ts verify, beta manifest, tag; the stable manifest is promoted only
+# once this workflow is green. A re-run after that promotion names the release
+# to update from (workflow_dispatch input from_version). When stable serves a
+# number that is not lower than the tag (renumbering), the canary runs as a
+# harness on the tag itself and a warning says why (job canary-from).
+# Actions pinned by SHA; Bun pinned by packageManager (package.json).
+name: desktop-release
+
+on:
+  push:
+    tags: ["desktop/v*"]
+  # A re-run on a tag (a release that failed half-way); a branch is refused.
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: Release to update from (X.Y.Z); empty, the one the stable channel serves
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Resolve the version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        # The ref goes through the environment, never the script body: `${{ }}`
+        # is substituted before the shell reads the line.
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" != tag ]; then
+            echo "run this workflow on a desktop/vX.Y.Z tag, not on $REF_TYPE $REF_NAME" >&2
+            exit 2
+          fi
+          version="${REF_NAME#desktop/v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$'; then
+            echo "tag $REF_NAME is not desktop/vX.Y.Z" >&2
+            exit 2
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  fetch:
+    # Every file SHA256SUMS lists, then release.ts verify: the list is exactly
+    # the release's files, each sum matches, and every update artifact
+    # (.app.tar.gz, AppImage) is signed by the update key for this version.
+    name: Fetch and verify the files on R2
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      sums: ${{ steps.verify.outputs.sums }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Download
+        id: download
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          bash apps/desktop-tauri/scripts/fetch-r2-release.sh "$VERSION" r2 - | tee "$RUNNER_TEMP/fetch.out"
+          ls -l r2
+      - name: Verify sums and update signatures
+        id: verify
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          bun apps/desktop-tauri/scripts/release.ts verify --version "$VERSION" --dir r2
+          # Published only once verified: the other jobs check their own
+          # downloads against this SHA256SUMS.
+          tail -n 1 "$RUNNER_TEMP/fetch.out" | grep -E '^sums=[0-9a-f]{64}$' >> "$GITHUB_OUTPUT"
+
+  canary-from:
+    # The release the update canary installs first: the one the stable channel
+    # serves, older than this one (the beta manifest names this one, stable is
+    # promoted after this workflow), or the from_version input, which must be
+    # older. Renumbering path (apps/desktop-tauri/scripts/canary-from.ts): when
+    # stable serves a number that is not lower (history restarted at 0.1.0 on
+    # 2026-11-12 while stable served 1.1.4; or stable promoted before this
+    # run), no installed release can update to this one (the updater refuses
+    # a downgrade): the canary runs its harness on this version (from = to,
+    # beta feed when stable is higher) and a warning says the N-1 -> N proof
+    # was skipped.
+    name: Resolve the release to update from
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      from: ${{ steps.f.outputs.from }}
+      feed: ${{ steps.f.outputs.feed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - id: f
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          FROM_INPUT: ${{ inputs.from_version }}
+        run: |
+          if [ -n "$FROM_INPUT" ]; then
+            set -- --requested "$FROM_INPUT"
+          else
+            stable="$(curl -fsS --proto '=https' --retry 3 https://releases.openedbot.app/desktop/solo/stable/latest.json | jq -r .version)"
+            set -- --stable "$stable"
+          fi
+          bun apps/desktop-tauri/scripts/canary-from.ts --release "$VERSION" "$@" --output "$GITHUB_OUTPUT"
+
+  update-canary:
+    # Blocking: no GitHub release unless the previous release updates itself to this one.
+    name: macOS update canary
+    needs: [version, fetch, canary-from]
+    uses: ./.github/workflows/desktop-update-canary.yml
+    with:
+      from: ${{ needs.canary-from.outputs.from }}
+      to: ${{ needs.version.outputs.version }}
+      # Empty on the normal path: the canary's default (the beta manifest).
+      feed: ${{ needs.canary-from.outputs.feed }}
+
+  mac:
+    # The dmg R2 serves, checked as a downloaded copy: Gatekeeper, the stapled
+    # ticket, the team that signed it, the bundle id and the version.
+    name: macOS dmg
+    needs: [version, fetch]
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the dmg from R2
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          SUMS: ${{ needs.fetch.outputs.sums }}
+        run: bash apps/desktop-tauri/scripts/fetch-r2-release.sh "$VERSION" r2 "$SUMS" "openedbot_${VERSION}_aarch64.dmg"
+      - name: Check the dmg
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          dmg="r2/openedbot_${VERSION}_aarch64.dmg"
+          spctl -a -t open --context context:primary-signature -vv "$dmg"
+          xcrun stapler validate "$dmg"
+          mount="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$dmg"
+          app="$mount/openedbot.app"
+          id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+          short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          spctl -a -vv "$app"
+          xcrun stapler validate "$app"
+          # Gatekeeper accepts any notarised developer: the app must be OpenedBot's.
+          team="$(codesign -dv "$app" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+          hdiutil detach "$mount"
+          if [ "$team" != QDC76LMF29 ]; then
+            echo "$dmg is signed by team '$team', want QDC76LMF29" >&2
+            exit 1
+          fi
+          if [ "$id" != app.openedbot.desktop ] || [ "$short" != "$VERSION" ]; then
+            echo "$dmg holds $id $short, want app.openedbot.desktop $VERSION" >&2
+            exit 1
+          fi
+
+  linux:
+    # The deb and the AppImage R2 serves for one architecture, on a runner of
+    # that architecture: the deb's metadata (package, version, the 1.0.x
+    # package it replaces, the openedbot:// handler), then each one started
+    # under Xvfb, which must still run after 20 s (timeout exits 124).
+    name: Linux deb and AppImage (${{ matrix.arch }})
+    needs: [version, fetch]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: x86_64
+            deb-arch: amd64
+            elf: x86-64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            deb-arch: arm64
+            elf: ARM aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the deb and the AppImage from R2
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          SUMS: ${{ needs.fetch.outputs.sums }}
+          ARCH: ${{ matrix.arch }}
+        run: bash apps/desktop-tauri/scripts/fetch-r2-release.sh "$VERSION" r2 "$SUMS" "openedbot_${VERSION}_${ARCH}.deb" "openedbot_${VERSION}_${ARCH}.AppImage"
+      - run: sudo apps/desktop-tauri/linux/install-deps.sh test
+      - name: Check the packages
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          DEB_ARCH: ${{ matrix.deb-arch }}
+          ELF: ${{ matrix.elf }}
+        run: |
+          deb="r2/openedbot_${VERSION}_${ARCH}.deb"
+          appimage="r2/openedbot_${VERSION}_${ARCH}.AppImage"
+          dpkg-deb --info "$deb"
+          [ "$(dpkg-deb --field "$deb" Package)" = openedbot ]
+          [ "$(dpkg-deb --field "$deb" Version)" = "$VERSION" ]
+          [ "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH" ]
+          # Installed over the 1.0.x package, it takes its place instead of failing on shared files.
+          dpkg-deb --field "$deb" Replaces | grep -qw openedbot-desktop
+          dpkg-deb --field "$deb" Conflicts | grep -qw openedbot-desktop
+          # The Google return (openedbot://auth/callback) needs the scheme handler.
+          # Tauri's deb lists `usr/…` without the `./` of electron-builder's: match either.
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards '*usr/share/applications/*.desktop' | tee /dev/stderr | grep -q 'x-scheme-handler/openedbot'
+          file "$appimage" | tee /dev/stderr | grep -q "ELF 64-bit.*$ELF"
+          chmod +x "$appimage"
+      - name: Start the installed deb, then the AppImage
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          sudo apt-get install -y -qq "./r2/openedbot_${VERSION}_${ARCH}.deb"
+          for app in /usr/bin/openedbot "./r2/openedbot_${VERSION}_${ARCH}.AppImage"; do
+            set +e
+            apps/desktop-tauri/linux/session.sh --keyring timeout 20 "$app"
+            status=$?
+            set -e
+            [ "$status" -eq 124 ] || { echo "$app exited with $status before 20 s" >&2; exit 1; }
+          done
+
+  release:
+    name: Publish the GitHub release
+    needs: [version, fetch, mac, linux, update-canary]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the installers from R2, under the release names
+        # The same bytes the mac and linux jobs checked: SHA256SUMS pinned by
+        # the fetch job, each file checked against it.
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          SUMS: ${{ needs.fetch.outputs.sums }}
+        run: |
+          bash apps/desktop-tauri/scripts/fetch-r2-release.sh "$VERSION" r2 "$SUMS" \
+            "openedbot_${VERSION}_aarch64.dmg" \
+            "openedbot_${VERSION}_x86_64.deb" "openedbot_${VERSION}_x86_64.AppImage" \
+            "openedbot_${VERSION}_aarch64.deb" "openedbot_${VERSION}_aarch64.AppImage"
+          mkdir -p out
+          cp "r2/openedbot_${VERSION}_aarch64.dmg" out/openedbot-mac-arm64.dmg
+          cp "r2/openedbot_${VERSION}_x86_64.deb" out/openedbot-linux-amd64.deb
+          cp "r2/openedbot_${VERSION}_x86_64.AppImage" out/openedbot-linux-x86_64.AppImage
+          cp "r2/openedbot_${VERSION}_aarch64.deb" out/openedbot-linux-arm64.deb
+          cp "r2/openedbot_${VERSION}_aarch64.AppImage" out/openedbot-linux-aarch64.AppImage
+          ls -l out
+      - name: Checksums and notes
+        working-directory: out
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          sha256sum openedbot-mac-arm64.dmg openedbot-linux-amd64.deb openedbot-linux-x86_64.AppImage openedbot-linux-arm64.deb openedbot-linux-aarch64.AppImage > SHA256SUMS
+          cat SHA256SUMS
+          {
+            echo "openedbot desktop $VERSION."
+            echo
+            echo "| System | File |"
+            echo "|---|---|"
+            echo "| macOS, Apple Silicon | \`openedbot-mac-arm64.dmg\` |"
+            echo "| Debian, Ubuntu (x86_64) | \`openedbot-linux-amd64.deb\` |"
+            echo "| Other Linux (x86_64) | \`openedbot-linux-x86_64.AppImage\` |"
+            echo "| Debian, Ubuntu (arm64) | \`openedbot-linux-arm64.deb\` |"
+            echo "| Other Linux (arm64) | \`openedbot-linux-aarch64.AppImage\` |"
+            echo
+            echo "macOS: signed with a Developer ID and notarised by Apple; it opens without a warning and updates itself."
+            echo "Linux: the AppImage updates itself (make it executable, then run it). The deb installs with \`sudo apt install ./openedbot-linux-amd64.deb\` (or arm64), takes the place of an earlier openedbot package, and is updated by installing the next one. The packages are not signed; their update artifacts are."
+            echo
+            echo "The same files and the update artifacts are served by https://releases.openedbot.app/desktop/v$VERSION/ (SHA256SUMS there)."
+          } > ../notes.md
+      - name: Create or update the release
+        # A re-run of the same tag replaces the files instead of failing.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          files="out/openedbot-mac-arm64.dmg out/openedbot-linux-amd64.deb out/openedbot-linux-x86_64.AppImage out/openedbot-linux-arm64.deb out/openedbot-linux-aarch64.AppImage out/SHA256SUMS"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # shellcheck disable=SC2086
+            gh release upload "$TAG" $files --clobber
+          else
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $files --verify-tag --latest --title "openedbot desktop $VERSION" --notes-file notes.md
+          fi
+          echo "Release $TAG: https://github.com/$GH_REPO/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"

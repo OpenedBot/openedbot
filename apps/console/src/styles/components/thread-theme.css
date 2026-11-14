@@ -1,0 +1,517 @@
+/*
+ * The thread of a bot as the reference app's chat, the streaming-ui template
+ * (MakFly/streaming-ui): its tokens (`C`, the reference app's
+ * computed styles, dark), its answer typography (`Answer`), its user bubble
+ * (`UserTurn`), its composer (`Composer`). Scope: the thread column
+ * (`data-thread-column`, conversation.tsx): header, messages, composer.
+ *
+ * The reference app is dark only: the dark values are its own; the light ones are the
+ * same roles transposed onto a white page. BoardUI utilities read their
+ * tokens live (`@theme inline`, boardui.css): redefining them here repaints
+ * the column without touching the rest of the app.
+ */
+:root {
+  --stream-base: #ffffff;
+  --stream-side: #f7f6f5;
+  --stream-raised: #f2f1ef;
+  --stream-line: rgb(13 13 13 / 0.08);
+  --stream-line-focus: rgb(13 13 13 / 0.14);
+  /* The composer card: white and lifted in light (hairline edge + soft shadow). */
+  --stream-composer: #ffffff;
+  --stream-composer-shadow: 0 1px 2px rgb(13 13 13 / 0.04), 0 4px 16px rgb(13 13 13 / 0.05);
+  --stream-composer-shadow-focus: 0 1px 2px rgb(13 13 13 / 0.05), 0 4px 18px rgb(13 13 13 / 0.08);
+  --stream-fg: #0d0d0d;
+  --stream-fg2: #6e6e6e;
+  --stream-fg3: #8f8f8f;
+  --stream-hover: rgb(13 13 13 / 0.05);
+  /* The composer's « + » disc, one step above the raised colour. */
+  --stream-fill: rgb(13 13 13 / 0.06);
+  --stream-fill-hover: rgb(13 13 13 / 0.1);
+  /* The arrow on the composer's blue send button. */
+  --stream-send-ink: #000000;
+  --stream-blue: #299fff;
+  /* the reference app's message bubbles (desktop app, Sand Light), see below. */
+  --openedbot-bubble-agent: rgb(28 28 28 / 0.06);
+  --openedbot-bubble-user: #1c1c1c;
+  --openedbot-bubble-user-text: #ffffff;
+  --openedbot-bubble-specular: rgb(255 255 255 / 0.16);
+  --openedbot-bubble-specular-user: rgb(255 255 255 / 0.06);
+  --openedbot-bubble-edge: rgb(28 28 28 / 0.06);
+  --openedbot-code-inline: rgb(28 28 28 / 0.04);
+}
+
+.dark {
+  --stream-base: #131211;
+  --stream-side: #181716;
+  --stream-raised: #201f1d;
+  --stream-line: rgba(252, 252, 252, 0.06);
+  --stream-line-focus: rgba(252, 252, 252, 0.1);
+  /* Dark keeps the flat raised pill. */
+  --stream-composer: #201f1d;
+  --stream-composer-shadow: none;
+  --stream-composer-shadow-focus: none;
+  --stream-fg: #fcfcfc;
+  --stream-fg2: #9e9e9e;
+  --stream-fg3: #858585;
+  --stream-hover: rgba(252, 252, 252, 0.06);
+  --stream-fill: rgba(252, 252, 252, 0.1);
+  --stream-fill-hover: rgba(252, 252, 252, 0.15);
+  --stream-send-ink: #ffffff;
+  --stream-blue: #299fff;
+  /* Sand Dark. */
+  --openedbot-bubble-agent: rgb(245 245 245 / 0.04);
+  --openedbot-bubble-user: rgb(245 245 245 / 0.18);
+  --openedbot-bubble-user-text: #f5f5f5;
+  --openedbot-bubble-specular: rgb(255 255 255 / 0.03);
+  --openedbot-bubble-specular-user: rgb(255 255 255 / 0.01);
+  --openedbot-bubble-edge: rgb(245 245 245 / 0.04);
+  --openedbot-code-inline: rgb(245 245 245 / 0.02);
+}
+
+/* The bot's own fill for the user's bubble, per theme (`botTintStyle`). */
+[data-thread-column] {
+  --openedbot-user-fill: var(--openedbot-user-fill-light);
+}
+
+.dark [data-thread-column] {
+  --openedbot-user-fill: var(--openedbot-user-fill-dark);
+}
+
+[data-thread-column] {
+  color: var(--stream-fg);
+  --bui-text-primary: var(--stream-fg);
+  --bui-text-secondary: var(--stream-fg2);
+  --bui-text-tertiary: var(--stream-fg3);
+}
+
+/* The page is grok's. Desktop only: the mobile scene keeps its card (`boardui.css`). */
+[data-thread-column]:not([data-mobile-scene] *) {
+  background-color: var(--stream-base);
+  --agent-glyph-mask: var(--stream-base);
+}
+
+/*
+ * ── Message bubbles: the reference app, the desktop app (`dist/renderer`, `sand-*`) ──
+ * Every answer sits in the agent bubble: the base ink at 6 % (light) / 4 %
+ * (dark), a white specular sheen from the top, a half pixel edge. The user's
+ * bubble is the base ink (light) or a 18 % veil (dark), or, in a bot's DM,
+ * that bot's colour (`--openedbot-user-fill`, `botUserBubbleFill`); its text is
+ * `text/on-primary`. Radius 18, padding 7 / 12, at most min(80 %, 560 px,
+ * 100 % − 82 px): the geometry is in the markup (thread-messages.tsx).
+ */
+[data-assistant-layout="stream"],
+[data-user-bubble] {
+  box-shadow:
+    inset 0 0.5px 0 var(--openedbot-bubble-specular),
+    inset 0 -0.5px 0 var(--openedbot-bubble-specular),
+    inset 0 0 0 0.5px var(--openedbot-bubble-edge);
+}
+
+[data-assistant-layout="stream"] {
+  background-color: var(--openedbot-bubble-agent);
+  background-image: linear-gradient(to bottom, var(--openedbot-bubble-specular), transparent);
+}
+
+/* ── Answer (`Answer`): the reference app's typography inside the bubble ────────── */
+
+[data-assistant-layout="stream"] .prose {
+  color: var(--stream-fg);
+  font-size: calc(15px * var(--openedbot-text-scale, 1));
+  line-height: calc(22.5px * var(--openedbot-text-scale, 1));
+  /* Typography's own inks are light-theme only (no `prose-invert` here): the
+     thread's tokens instead, so every role follows the theme. */
+  --tw-prose-body: var(--stream-fg);
+  --tw-prose-headings: var(--stream-fg);
+  --tw-prose-lead: var(--stream-fg2);
+  --tw-prose-links: var(--stream-fg);
+  --tw-prose-bold: var(--stream-fg);
+  --tw-prose-counters: var(--stream-fg);
+  --tw-prose-bullets: var(--stream-fg);
+  --tw-prose-hr: var(--stream-line);
+  --tw-prose-quotes: var(--stream-fg2);
+  --tw-prose-quote-borders: var(--stream-line);
+  --tw-prose-captions: var(--stream-fg3);
+  --tw-prose-kbd: var(--stream-fg);
+  --tw-prose-code: var(--stream-fg);
+  --tw-prose-pre-code: var(--stream-fg);
+  --tw-prose-pre-bg: var(--stream-side);
+  --tw-prose-th-borders: var(--stream-line);
+  --tw-prose-td-borders: var(--stream-line);
+}
+
+/*
+ * Inline code, the reference app's (`sand-*` on the transcript's `code` mark): the
+ * text's own ink, mono at 0.9 em, 2 px aside, radius 4, on `bg/quaternary`,
+ * the base ink at 4 % (light) / 2 % (dark).
+ */
+[data-assistant-layout="stream"] .prose :not(pre) > code {
+  color: inherit;
+  background-color: var(--openedbot-code-inline);
+  border-radius: 4px;
+  padding: 0 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  font-weight: inherit;
+}
+
+/* `:where`: the reset must lose to the spacing rules below. */
+[data-assistant-layout="stream"] .prose :where(p, h1, h2, h3, h4, h5, h6, ul, ol, li, figure, blockquote, [data-md-table], [data-code-block]) {
+  margin: 0;
+}
+
+/* Blocks 15 px apart; a heading 30 px under what precedes it; the block under a heading 10 px. */
+[data-assistant-layout="stream"] .prose > * + * {
+  margin-top: 15px;
+}
+
+[data-assistant-layout="stream"] .prose > * + :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 30px;
+}
+
+[data-assistant-layout="stream"] .prose > :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: 10px;
+}
+
+[data-assistant-layout="stream"] .prose :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--stream-fg);
+  font-size: calc(20px * var(--openedbot-text-scale, 1));
+  line-height: calc(28px * var(--openedbot-text-scale, 1));
+  font-weight: 550;
+  letter-spacing: 0;
+}
+
+[data-assistant-layout="stream"] .prose :is(strong, b) {
+  color: var(--stream-fg);
+  font-weight: 550;
+}
+
+/* Lists: `flex flex-col gap-[7px] ps-6`, items `ps-0.5`. */
+[data-assistant-layout="stream"] .prose :is(ul, ol) {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-inline-start: 24px;
+}
+
+[data-assistant-layout="stream"] .prose ul {
+  list-style-type: disc;
+}
+
+[data-assistant-layout="stream"] .prose ol {
+  list-style-type: decimal;
+}
+
+[data-assistant-layout="stream"] .prose li {
+  padding-inline-start: 2px;
+}
+
+[data-assistant-layout="stream"] .prose li::marker {
+  color: var(--stream-fg);
+}
+
+[data-assistant-layout="stream"] .prose li > :is(ul, ol) {
+  margin-top: 7px;
+}
+
+[data-assistant-layout="stream"] .prose a {
+  color: var(--stream-fg);
+  text-decoration-line: underline;
+  text-decoration-color: var(--stream-fg3);
+  text-underline-offset: 2px;
+}
+
+/* A table: `MarkdownTable`, a 16 px card on the side colour, 14/21, cells 16 × 10. */
+[data-assistant-layout="stream"] [data-md-table] {
+  border-radius: 16px;
+  border: 1px solid var(--stream-line);
+  background-color: var(--stream-side);
+}
+
+[data-assistant-layout="stream"] [data-md-table] table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: calc(14px * var(--openedbot-text-scale, 1));
+  line-height: calc(21px * var(--openedbot-text-scale, 1));
+}
+
+[data-assistant-layout="stream"] [data-md-table] :is(th, td) {
+  padding: 10px 16px;
+  border: 0;
+  color: inherit;
+  text-align: start;
+  vertical-align: top;
+}
+
+[data-assistant-layout="stream"] [data-md-table] th {
+  font-weight: 550;
+}
+
+[data-assistant-layout="stream"] [data-md-table] :is(thead, thead tr) {
+  background: transparent;
+  border: 0;
+}
+
+[data-assistant-layout="stream"] [data-md-table] tbody tr {
+  border-top: 1px solid var(--stream-line);
+}
+
+/* Code: a 16 px card on the side colour, mono 13/20, 16 × 12 inside. */
+[data-assistant-layout="stream"] [data-code-block] {
+  border-radius: 16px;
+  border-color: var(--stream-line);
+  background-color: var(--stream-side);
+}
+
+[data-assistant-layout="stream"] [data-code-block] > [data-code-copy] {
+  border-color: var(--stream-line);
+  background-color: var(--stream-side);
+}
+
+[data-assistant-layout="stream"] [data-code-block] > :is(.openedbot-code, pre) {
+  padding: 12px 16px;
+  font-size: calc(13px * var(--openedbot-text-scale, 1));
+  line-height: calc(20px * var(--openedbot-text-scale, 1));
+}
+
+/* ── User bubble (the reference app, above) ─────────────────────────────────────── */
+
+[data-user-bubble] {
+  background-color: var(--openedbot-user-fill, var(--openedbot-bubble-user));
+  background-image: linear-gradient(to bottom, var(--openedbot-bubble-specular-user), transparent);
+  color: var(--openedbot-bubble-user-text);
+}
+
+[data-user-bubble] [data-mention] {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* A thread with one bot: grok names no one above its turns (rooms keep the author). */
+[data-thread-column][data-thread-solo] [data-tool-author] {
+  display: none;
+}
+
+/* ── Date separator: a centred line of text, no chip ────────────────────── */
+
+[data-thread-date] {
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+[data-thread-date] .bui-date-chip {
+  border-radius: 0;
+  background: none;
+  padding: 6px 0;
+  font-size: calc(13px * var(--openedbot-text-scale, 1));
+  line-height: calc(16px * var(--openedbot-text-scale, 1));
+  font-weight: 400;
+  color: var(--stream-fg3);
+}
+
+/* ── Composer (`Composer`), desktop ─────────────────────────────────────── */
+
+/*
+ * the reference app's prompt (0.79.3, measured on screen): a 44 px pill as wide as the
+ * thread lane (960 px, `thread-timeline.css`), one row padded 7 px above
+ * and below (8 px at the ends): the filled 28 px « + » on the left, the field
+ * (15/24) in the middle, the model or the status tab, then the 28 px send
+ * button: Apple systemBlue (`--btn-accent`), a black arrow (white in
+ * dark). Its radius of 22 keeps a
+ * card rounded when a goal or attachments sit above the row. As soon as the
+ * text asks for a second line (`data-composer-expanded`, `composer-pill.ts`)
+ * it opens into a card: radius 18, the field across the whole width, the
+ * controls underneath. The touch shell keeps its own grid (`mobile.css`).
+ * Paint: a white card with a hairline edge and a soft shadow in light, the flat
+ * raised pill in dark (`--stream-composer*`; `--stream-raised` stays shared).
+ */
+@media (min-width: 40rem) {
+  [data-thread-column] [data-composer-shell] {
+    border-radius: 22px;
+    border: 1px solid var(--stream-line);
+    background-color: var(--stream-composer);
+    box-shadow: var(--stream-composer-shadow);
+    padding: 0;
+    transition:
+      border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  [data-thread-column] [data-composer-shell]:has([data-composer-expanded]) {
+    border-radius: 18px;
+  }
+
+  [data-thread-column] [data-composer-shell]:focus-within {
+    border-color: var(--stream-line-focus);
+    box-shadow: var(--stream-composer-shadow-focus);
+  }
+
+  [data-thread-column] [data-composer-shell] > :is([data-composer-goal], [data-composer-plan-first], [data-composer-attachments]) {
+    padding-inline: 18px;
+    padding-top: 12px;
+  }
+
+  [data-thread-column] [data-composer-row] {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0 8px;
+    /* 7 + 28 + 7 inside the 1 px line: the reference app's 44 px pill. */
+    padding: 7px 8px;
+  }
+
+  [data-thread-column] [data-composer-row][data-composer-expanded] {
+    flex-wrap: wrap;
+    gap: 0 4px;
+    padding: 0 8px 8px;
+  }
+
+  [data-thread-column] [data-composer-field] {
+    order: 1;
+    flex: 1 1 0%;
+    margin: 0;
+    padding: 0;
+  }
+
+  [data-thread-column] [data-composer-expanded] > [data-composer-field] {
+    order: -1;
+    flex: 1 0 100%;
+    margin: 0 4px 8px 0;
+  }
+
+  [data-thread-column] [data-composer-field] :is(textarea, [data-composer-mcp-highlight]) {
+    min-height: 28px;
+    max-height: 400px;
+    padding: 2px 4px;
+    font-size: calc(15px * var(--openedbot-text-scale, 1));
+    line-height: calc(24px * var(--openedbot-text-scale, 1));
+    letter-spacing: 0;
+  }
+
+  [data-thread-column] [data-composer-expanded] > [data-composer-field] :is(textarea, [data-composer-mcp-highlight]) {
+    min-height: 34px;
+    padding: 10px 8px 0;
+  }
+
+  [data-thread-column] [data-composer-field] textarea {
+    caret-color: var(--stream-fg);
+  }
+
+  [data-thread-column] [data-composer-field] textarea::placeholder {
+    color: var(--stream-fg2);
+  }
+
+  /* « + »: a filled 28 px disc, the 16 px glyph in the primary ink. */
+  [data-thread-column] [data-composer-attachment] {
+    order: 0;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border-radius: 9999px;
+    background-color: var(--stream-fill);
+    color: var(--stream-fg);
+  }
+
+  [data-thread-column] [data-composer-attachment]:is(:hover:not(:disabled), [data-state="open"]) {
+    background-color: var(--stream-fill-hover);
+  }
+
+  [data-thread-column] [data-composer-attachment] svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  [data-thread-column] [data-composer-status] {
+    order: 2;
+  }
+
+  [data-thread-column] [data-composer-model] {
+    order: 3;
+    margin-inline: 0;
+  }
+
+  /* On the card's second row, the model or the status tab opens the right group. */
+  [data-thread-column] [data-composer-expanded] > :is([data-composer-status], [data-composer-model]) {
+    margin-inline: auto 0;
+  }
+
+  [data-thread-column] [data-composer-expanded] > [data-composer-status] ~ [data-composer-model] {
+    margin-inline: 0;
+  }
+
+  /* The primary button closes the row on the right. */
+  [data-thread-column] [data-composer-primary-action] {
+    order: 4;
+    margin: 0;
+    height: 28px;
+    min-height: 28px;
+  }
+
+  [data-thread-column] [data-composer-expanded] > [data-composer-primary-action] {
+    margin-inline-start: auto;
+  }
+
+  [data-thread-column] [data-composer-expanded] > :is([data-composer-model], [data-composer-status]) ~ [data-composer-primary-action] {
+    margin-inline-start: 0;
+  }
+
+  [data-thread-column] :is([data-composer-send-action], [data-composer-stop-action]) {
+    width: 28px;
+    padding: 0;
+  }
+
+  /* Send: Apple systemBlue, the arrow black (white in dark) at 16, popping in on its spring. */
+  [data-thread-column] [data-composer-send-action] {
+    background: var(--btn-accent);
+    color: var(--stream-send-ink);
+    opacity: 1;
+  }
+
+  [data-thread-column] [data-composer-send-action]:not(:disabled) {
+    animation: stream-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  [data-thread-column] [data-composer-send-action]:not(:disabled):hover {
+    background: var(--btn-accent-hover);
+  }
+
+  [data-thread-column] [data-composer-send-action] svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Nothing to send: the same blue, faded, the same arrow. */
+  [data-thread-column] [data-composer-send-action]:disabled {
+    background: var(--btn-accent);
+    color: var(--stream-send-ink);
+    opacity: 0.35;
+  }
+
+  /* Stop: the primary ink, a 10 px square of the page colour. */
+  [data-thread-column] [data-composer-stop-action] {
+    background: var(--stream-fg);
+    color: var(--stream-base);
+  }
+
+  [data-thread-column] [data-composer-stop-action]:hover {
+    opacity: 0.9;
+  }
+
+  [data-thread-column] [data-composer-stop-action] svg {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+}
+
+/* The status line under the card: grok has none, ours stays quiet. */
+[data-thread-column] [data-composer-statusline] {
+  color: var(--stream-fg3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-thread-column] [data-composer-send-action]:not(:disabled) {
+    animation: none;
+  }
+}

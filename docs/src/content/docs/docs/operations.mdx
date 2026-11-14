@@ -1,0 +1,354 @@
+---
+title: Operations
+description: Phases P1 to P9 of up, the 600 s rollback, checks and upgrades.
+---
+
+The first pass (`detect`, `up`, `link`, provider key) is in
+[Getting started](/docs/getting-started). This page covers what happens **after**:
+phases, options, checks and `upgrade`.
+
+After the first `up`, stop prefixing `edge-setup` with `sudo`: the tool
+installs `/usr/local/bin/edge-setup` and re-executes itself (see
+[Getting started](/docs/getting-started)).
+
+## `up`: install the runtime and choose the protections
+
+```bash
+sudo edge-setup up --yes
+```
+
+This minimal command creates the single `hermes` system account, installs the
+runtime and the confined units, keeps the gateway on loopback and installs
+the outbound connector. It changes no global policy of the VPS.
+
+Full hardened profile, only if the customer chooses it:
+
+```bash
+sudo edge-setup up \
+  --sandbox --persistent-journal --unattended-upgrades \
+  --sudo-logging --password-policy --disable-llmnr \
+  --firewall --allow-inbound 22/tcp --fail2ban \
+  --ssh-hardening --quarantine-cloud-user \
+  --admin-key /root/admin.pub --console-confirmed --yes
+```
+
+The openedbot environment does not change the VPS topology. In production, the connector
+targets `wss://link.openedbot.app` (the former origin `wss://openedbot.app` is
+still accepted). In development, it targets the VPS loopback
+exposed by a reverse SSH tunnel (as an advanced option, the HTTPS origin of a
+Cloudflare tunnel started by hand); the tunnel never sits
+in front of the VPS gateway. The VPS network
+stays limited to the loopback gateway and the outbound link.
+
+Required phases: P1 binary copy, P2 APT index, P3/P5 `hermes` account
+and runtime pinned on `127.0.0.1:8642`, P8 outbound connector, P9 proofs and
+audit. The persistent journal, P4/P6 sandbox and each P7 action
+run only when their positive option is present.
+
+When a new option affects access, `up` prints "Rollback armed for
+600 s" with
+`ssh hermes-admin@YOUR_HOST` then `verify-access` (replace the documentation
+address with the VPS address; the binary's message still prefixes `sudo`;
+auto-sudo makes the prefix unnecessary). Type:
+
+```bash
+ssh hermes-admin@YOUR_HOST
+edge-setup verify-access
+```
+
+`verify-access` requires a new session and disarms the timer. With
+`--ssh-hardening`, it also proves the admin account, its key, sudo and the sshd
+policy. Without a commit, the timer restores only the components selected in
+this transaction (SSH, UFW, fail2ban or the cloud-init account).
+The rollback deletes `hermes-admin`, its password and its sudo rule, but
+deliberately keeps sudo logging (`81-hermes-logging`); the copy of the rule
+kept in `/var/lib/hermes-host-hardening` holds no secret.
+
+The [command reference](/docs/commands#option-defaults-and-platform-scope) lists the options and platform requirements.
+
+The old negative options are removed and refused. A later `up`
+merges the new selections with the existing state: a missing flag never
+disables a protection that is already managed. `audit` prints
+`SKIP` for each unselected optional check; `--strict` does not fail
+on these `SKIP` results.
+
+A reboot required by updates stops `up` **before** any access change;
+running the same command again after the restart resumes at the same point.
+Check that the machine really rebooted (`uptime`, no
+`/var/run/reboot-required`) before running it again: otherwise `up` stops again
+at the same checkpoint.
+
+## Verify
+
+```bash
+edge-setup status          # phases, markers, units
+edge-setup doctor          # loopback-only gateway, anonymous refusal, exact catalog
+edge-setup audit --strict  # PASS/WARN/FAIL/SKIP, root-only report under /var/lib/hermes/audit
+```
+
+Symptoms (`verify-access` refused, rollback, silent gateway, closed link):
+[Troubleshooting](/docs/troubleshooting).
+
+## Preview, journal
+
+Some commands offer a preview. These examples are for Linux:
+
+```bash
+edge-setup up --dry-run          # the phase plan, like `plan`, with the given options
+edge-setup upgrade --dry-run     # resolves, downloads, checks signature and SHA-256, installs nothing
+edge-setup uninstall --dry-run   # the `--plan` list, runtimes to revoke included
+```
+
+Commands that change the host (run as root) append their output to the
+journal `/var/lib/hermes-setup/journal.jsonl`: one JSON line per printed line
+(`at`, `cmd`, `event` = `start`, `out`, `err` or `end`, exit code). The file
+is root 0600, never opened through a symbolic link, and rotates at 1 MiB to
+`journal.jsonl.1`. No command prints a secret; the journal also masks
+anything shaped like one (`Bearer …`, enrollment ticket, `*_TOKEN=`,
+`*_KEY=`, credentials in a URL, long runs of token characters). An
+unavailable journal (full disk, non-private file) is reported and does not
+stop the command.
+
+```bash
+sudo tail -n 20 /var/lib/hermes-setup/journal.jsonl
+```
+
+## Output and color
+
+`audit`, `status`, `doctor`, `plan`, `up` and `help` color their output
+**only** when standard output is a real terminal. In a pipe,
+a log file or `up --detach`, output stays plain text; `--json`
+never contains an ANSI sequence.
+
+```bash
+edge-setup status --no-color
+NO_COLOR=1 edge-setup status         # https://no-color.org
+EDGE_SETUP_COLOR=never edge-setup audit
+```
+
+To force it (terminal misdetected, recording a demo):
+
+```bash
+EDGE_SETUP_COLOR=always edge-setup plan --ssh-hardening
+```
+
+Outside a terminal, the progress bar of the `up` phases degrades to one
+line per step (`[ 25%] P1 …`) instead of a line rewritten in place.
+
+## Update
+
+The only update path is `upgrade`. `update --self` is its alias;
+`update` alone exits 69 (not implemented).
+
+`upgrade` replaces the installed binary **and** restarts the units that
+run it. Replacing the file alone is not enough: `hermes-operator`
+would still run the old code.
+
+The binaries are served by the public origin
+`https://releases.openedbot.app/edge-setup` (if this origin does not respond,
+`upgrade` fails without changing anything). `upgrade` resolves one version (the
+`LATEST` pointer, or a `--release-url` ending in `/vX.Y.Z`), reads
+`SHA256SUMS` and `SHA256SUMS.sigstore.json` from that version's immutable
+directory and verifies the Sigstore signature for the only accepted identity:
+the `.github/workflows/edge-setup-release.yml` workflow run on the tag
+`edge-setup/vX.Y.Z`, issued by `https://token.actions.githubusercontent.com`.
+It then checks the downloaded binary's digest once against that
+`SHA256SUMS`, and executes or writes nothing before both checks pass. A release
+without a signature (every release up to v0.0.2) is refused. The Sigstore
+trusted root comes from its TUF repository (`tuf-repo-cdn.sigstore.dev`),
+cached in `/var/lib/hermes-setup/sigstore`.
+`upgrade` does not repeat these checks during other commands;
+`self-verify` runs the same signature check on demand, then compares the
+current binary with `SHA256SUMS` instead of downloading one.
+`--release-url` points to another `https://` mirror if needed (a URL is
+not a secret); it must serve `LATEST` or be given with `/vX.Y.Z`, and publish
+the original signatures. The old GitHub releases repository is refused
+(exit 2).
+
+```bash
+# Normal path: release over HTTPS, signature then SHA-256 checked before writing
+edge-setup upgrade --yes
+# historical alias, same code path (release only)
+edge-setup update --self --yes
+
+# Manual diagnostic, never run implicitly on every command
+edge-setup self-verify
+edge-setup self-verify --release-url URL
+
+# Internal: deploy an unpublished local build over SSH, tagged HMAC-SHA256
+make deploy HOST=user@host
+```
+
+The `--from` path accepts only a **tagged** binary, with a deploy key
+shared between the workstation and the VPS. Once per host:
+
+```bash
+# On the workstation: a private 32-byte key
+mkdir -p ~/.config/edge-setup && (umask 077; openssl rand -hex 32 > ~/.config/edge-setup/deploy.key)
+# On the VPS: the same key, read from stdin (never as an argument), written root 0600
+ssh -t user@host sudo edge-setup deploy-key set < ~/.config/edge-setup/deploy.key
+# Check without printing the value
+edge-setup deploy-key status
+```
+
+Gates, in order: `--yes`, root, no active transaction, deploy key
+present. The internal path used by `make deploy` drops the
+binary with `scp` (mode 0600), then calls `upgrade --from FILE --tag HEX`
+over SSH. The tag is `HMAC-SHA256(key, "hermes-setup upgrade v1\n" +
+sha256(binary) + "\n")`, computed by `make deploy` with `openssl` and
+recomputed by the VPS: a wrong tag, a missing key, or a file that is
+not an ELF executable is refused (code 2) without writing anything. A bare digest
+(`--sha256`, removed) only proved the integrity of the transfer, not who had
+produced the file; it is refused with a message that names `--tag`. This
+path is for developer-controlled builds, not for public installs or
+updates; the public release stays verified by its signature and its SHA-256.
+
+`upgrade --version vX.Y.Z` installs a precise version, signed like the
+others; a version older than the installed one is refused.
+
+Rollback: `upgrade` keeps the binary in place
+(`/usr/local/lib/hermes-setup/edge-setup.previous`) before replacing it, then
+proves the new version: finalization by the new binary, active units, the
+gateway's `/health`, each connector's link admitted again. If a proof fails,
+the previous binary is put back, finalizes in turn, and the command exits in
+failure saying what was restored. Automatic upgrade already followed this
+path.
+
+`upgrade` always restarts `hermes-operator`, and runs `try-restart` on
+`hermes-connector` if it exists, so that the link re-announces the current
+`features`. Then, in openedbot, run "Check the link" on the runtime.
+
+`upgrade` (automatic runs included) also brings the
+`hermes-gateway` unit. Only `up` used to write it: a fix to the unit (masked
+directories, refusal of cloud metadata, resolver exception) never reached
+an installed host. `upgrade` now renders the unit with the exact parameters
+of `up` (sandbox variant read from the state, uid of the `hermes` account,
+resolvers from `/etc/resolv.conf`) and compares it to the installed file:
+
+- identical: nothing is written, nothing restarts;
+- different only in comments or blank lines: the file is
+  rewritten atomically and systemd is reloaded, but systemd sees
+  no change. The gateway is neither restarted nor marked, even when idle, and
+  `upgrade` says so ("comment-only");
+- different in its directives: the file is rewritten atomically and
+  systemd is reloaded. If the host is idle (no active transaction,
+  no run in progress in the connector journal: the signal the automatic update
+  relies on), `hermes-gateway` restarts and `/health` is proven.
+  Otherwise the gateway is left alone: the "Restart pending" marker
+  is set (the same one set by an MCP write or an MCP OAuth authorization,
+  a profile's MCP toggle and writing an A2A peer token), the
+  console shows it, and the owner restarts with the existing verb
+  `POST /hermes-setup/gateway/restart` or `systemctl restart hermes-gateway`.
+  `upgrade` says which of the two paths it took;
+- if `/health` does not respond after the restart, the previous unit is
+  put back, reloaded, the gateway restarted on it, and `upgrade` exits with
+  a failure (automatic upgrades also restore the previous binary).
+
+`upgrade` never writes a missing unit (`up` installs the runtime) and
+guesses no parameter: without a state file or without a `hermes` account, the unit
+is left as is and the message points to `up --yes`. `audit`
+(`hermes_gateway_unit`) and `doctor` warn as long as the installed unit
+differs from the one the binary renders, with the remedy
+`sudo edge-setup upgrade --yes` or `sudo edge-setup up --yes`.
+
+### Automatic update
+
+On by default on Linux since v1.5.3: `up` installs it, unless
+`--no-auto-upgrade`, and a refusal (`--no-auto-upgrade` or
+`auto-upgrade disable --yes`) is kept in
+`/var/lib/hermes-setup/auto-upgrade.declined` for later `up` runs.
+`auto-upgrade enable --yes` (or `up --auto-upgrade`) clears it. A host that
+disabled it before v1.5.3 (runs recorded, timer gone) counts as a refusal.
+`auto-upgrade enable --yes` installs
+`hermes-setup-upgrade.timer`: every 6 h (random delay of up to 1 h,
+caught up at boot if the host was off), it runs the automatic upgrade.
+The host pulls the release: openedbot triggers nothing, and the link
+carries no update verb.
+
+```bash
+edge-setup auto-upgrade enable --yes
+edge-setup auto-upgrade status          # last run, next run
+edge-setup auto-upgrade disable --yes
+```
+
+A run installs a release only if all of these conditions hold, in
+order:
+
+1. `SHA256SUMS` is readable over HTTPS, its signature `SHA256SUMS.sigstore.json`
+   verifies for the version's tag, and it lists the host architecture. A
+   release that is unreadable, unsigned or whose signature does not verify is
+   not a failure: the run records it as `blocked` and exits 0.
+2. The installed binary is not already the release binary, and the release has
+   not been rejected on this host in the last 24 h. This check uses
+   `SHA256SUMS`, without downloading the binary, which must then match
+   its digest.
+3. No active transaction, and no run in progress in the connector
+   journal. Runs postpone the update by 24 h at most. Once the
+   release is installed, the same signal decides whether the gateway restarts on a
+   modified unit or whether its restart stays pending.
+4. The version is a `vX.Y.Z` strictly newer than the installed
+   version. A development build (`v0.0.2-2-gabc1234-dirty`) is
+   never replaced by an older release.
+
+The replaced binary is kept in
+`/usr/local/lib/hermes-setup/edge-setup.previous`. The new binary
+finishes the upgrade like `upgrade --yes`, then must **prove** the link within
+2 min: `hermes-operator` active with its socket, and every connector
+instance that was active before the upgrade admitted again by openedbot under the
+new version, still active 10 s later. Admission is read from the
+`link-admitted` marker, written on receipt of `link.context`, which only
+follows an accepted proof of possession. Otherwise the old binary is put back
+and proven the same way; the rejected release is set aside for 24 h
+(`status` reports `held_back` and the time it resumes), then retried, at most
+once a day while it keeps failing. A newer release is tried on the
+next run.
+
+The result is in `/var/lib/hermes-setup/auto-upgrade.json` and in
+`status`. `doctor` reports a rollback (warning) and a failed
+rollback (problem). A manual `upgrade` and an automatic run
+never run at the same time (`upgrade.lock`).
+
+## Link proof of possession
+
+Since proof of possession (docs/CONNECTOR.md), every linked host holds
+an Ed25519 device key sealed by `systemd-creds` (TPM2 if present, otherwise the
+host key) in `/etc/hermes/connector/device.key.cred`. `link` creates it;
+`up` and `upgrade` create it afterwards on a host linked before it existed.
+To replace it (regenerated host key, cloned VPS, suspected leak), enroll the
+host again: openedbot refuses any key that differs from the one it registered,
+so that a stolen link token is never enough to impose another key. In
+openedbot, *Settings › Runtime › Replace the runtime* opens a ticket; on the
+host:
+
+```bash
+edge-setup link --openedbot https://link.openedbot.app --yes
+edge-setup status
+```
+
+Paste the ticket at the hidden prompt: the enrollment seals a new key and has
+it registered. If the new runtime shows as pending in openedbot, confirm the
+replacement; if the old connector was already disconnected, openedbot switches
+on its own. If `link` fails after spending the ticket, remove the pending
+runtime in openedbot, then start again with a new ticket.
+
+`link --rekey` is retired: it refuses and changes nothing. edge-setup v1.5.0
+and earlier still offer it, and replace the host's key before presenting it:
+do not run it, update edge-setup first. A host where it already ran is
+enrolled again as above.
+
+A host can carry several links, for example a production one and a
+development one. Each instance then has its own device key, unit and state,
+and the new enrollment takes the same `--name` as `link`; `status` lists them all.
+See [Named instances](/docs/commands#named-instances).
+
+## Backup and destruction
+
+What is worth backing up fits in `/srv/hermes/data`
+(`runtime.env`, `config.yaml`, `.env` with the provider keys, `workspaces/`).
+Encrypt before it leaves the host (`age -p`), and remember that a provider
+snapshot is a plaintext copy of all of this, bearer included.
+
+`reset` removes what the tool installed (see [Reset](/docs/reset)). On
+a VPS, `shred` guarantees nothing: the storage is a virtualized volume. The
+protection that works is set up at creation (disk encryption), outside
+the scope of this tool.

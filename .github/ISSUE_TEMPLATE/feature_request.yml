@@ -1,0 +1,46 @@
+name: Feature request
+description: Describe a problem openedbot does not solve yet.
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start from the problem, not the solution. An idea still taking shape fits
+        better in Discussions.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine it working, from the user's side.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use today, or other approaches you weighed.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - console
+        - API/worker
+        - desktop
+        - edge-setup
+        - protocol
+        - docs
+        - not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to work on this myself, once the approach is agreed in this issue.

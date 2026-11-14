@@ -1,0 +1,15 @@
+# Review routing. The last matching pattern wins, so the explicit lines below
+# keep the sensitive areas owned even if the default changes.
+
+*                                                      @MakFly
+
+# Wire protocol shared with edge-setup: both implementations move together.
+/protocol/                                             @MakFly
+# Database schema: migrations are append-only and run in production.
+/db/migrations/                                        @MakFly
+# CI, release and repository settings.
+/.github/                                              @MakFly
+# Plug-in contract of the open core.
+/platform/plugins/                                     @MakFly
+# One-click MCP connectors: only vetted official vendor endpoints.
+/modules/runtimes/src/domain/mcp-connector-catalog.ts  @MakFly

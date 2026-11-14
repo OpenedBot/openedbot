@@ -1,0 +1,17 @@
+---
+import Landing from '../layouts/Landing.astro';
+import PillLink from '../components/landing/PillLink.astro';
+---
+
+<Landing title="Page not found" noindex>
+  <main class="not-found shell">
+    <p class="not-found-code">404</p>
+    <h1>This page does not exist.</h1>
+    <p class="lede">The address matches no page of the site. The documentation starts with the overview.</p>
+    <p class="lede" lang="fr">Cette page n’existe pas. La documentation commence par l’introduction.</p>
+    <div class="actions">
+      <PillLink href="/docs">Read the guide</PillLink>
+      <a href="/fr/docs" class="outline" lang="fr">Lire la doc en français</a>
+    </div>
+  </main>
+</Landing>

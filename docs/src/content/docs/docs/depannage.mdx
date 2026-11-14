@@ -1,0 +1,46 @@
+---
+title: Solve a problem
+description: Simple checks for your account, your machine and your bots.
+icon: LifeBuoy
+---
+
+## My bot does not answer
+
+1. Check that you are in the right workspace and that you opened the right bot.
+2. Open **Settings > Edge** and check your machine's status.
+3. Check that the bot's AI provider is still available: **Settings > Models**, or **Manage the bot… > Model** for that bot.
+4. If the bot is answering, wait or stop its answer before you send a new message.
+
+If the machine is not ready, follow the guide to [link your machine](/docs/machine). If the problem is about a provider or a model, see [the settings](/docs/reglages#ai-provider-and-model).
+
+## The conversation shows "Needs review"
+
+An answer was cut before openedbot knew whether it had finished (for example when the machine or the service restarts while the bot works). So as not to do the same action twice, the bot starts nothing else in this conversation. Click **Needs review**, at the top of the conversation, then:
+
+- **Reconcile**: openedbot asks your machine again what really happened. This is the right first choice.
+- **Abandon**: you give up on this answer.
+- **Retry with risk**: the bot starts again, at the risk of repeating an action already done.
+
+## I can't find my machine
+
+Check that you opened the right workspace, then open **Settings > Edge**. If no machine appears there, go through the steps on the [Link a machine](/docs/machine) page again.
+
+## My ticket has expired
+
+A ticket works only once and expires after five minutes. When the console shows "Ticket expiré" (ticket expired), close the window, choose **Appairer depuis le serveur** again, run the `edge-setup link` command on the machine again and paste the new ticket at the hidden prompt. Never paste it into a command and do not share it.
+
+## I can't open my account
+
+Sign in with the same method you used to sign up, Google or email address. If you forgot your password, use the **Forgot password?** link on the sign-in page.
+
+## My machine installation is stuck
+
+Run the commands shown in the console again, one at a time and in order. The most common symptoms and what to do about them are in [edge-setup](/docs/edge-setup#quick-troubleshooting). If the message you see is still hard to understand, [contact support](/docs/support).
+
+See also the [frequently asked questions](/docs/faq).
+
+## Need more help
+
+[Write to support](/docs/support). Say what you were trying to do, what you saw, the text of the error message if there is one, and since when the problem has been happening.
+
+Do not send your password, your provider keys or a ticket.

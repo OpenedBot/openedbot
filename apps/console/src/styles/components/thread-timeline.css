@@ -1,0 +1,253 @@
+/**
+ * The thread's scrolling container (`role="log"`, thread-timeline.tsx). A
+ * mutation inside (outgoing bubble, live turn that grows) must
+ * not make the composer or the shell above recompute layout:
+ * `contain: layout style` declares the boundary explicitly rather than
+ * letting the browser infer it from `overflow-y: auto` alone.
+ */
+.openedbot-thread-scroll-contain {
+  contain: layout style;
+}
+
+/**
+ * A room's team card (`RoomAnswerCard`, thread-timeline.tsx).
+ *
+ * The grey stays on EACH bubble, not on the card. The action row is
+ * the sibling after the bubble: if the card were the grey, the icons would fall
+ * inside it. There they sit below, aligned to the right edge, like a reply
+ * alone.
+ */
+[data-room-answer] article {
+  max-width: 100%;
+}
+
+[data-room-answer] [data-message-actions-row] {
+  justify-content: flex-end;
+  padding-inline: 2px;
+}
+
+[data-room-answer] article + article {
+  margin-top: 0.75rem;
+}
+
+[data-room-answer] [data-assistant-author] {
+  margin-bottom: 0;
+}
+
+/* The contribution's signature is ABOVE its bubble: without this
+   margin, the name sticks to the card. */
+[data-room-contribution] > [data-assistant-author] {
+  margin-bottom: 0.5rem;
+}
+
+/* The synthesis is the card's reply: the bot is already in the header.
+   « Réflexion… » while writing stays. */
+[data-room-synthesis] [data-assistant-author]:not([data-thinking]) {
+  display: none;
+}
+
+/* A signature above each contribution. The bubble's,
+   when the turn already had one, is not added again. */
+[data-room-contribution] article [data-assistant-author] {
+  display: none;
+}
+
+[data-room-contribution] + [data-room-contribution] {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--bui-border-button-default);
+}
+
+/* Team mode: the contributions, opened under the final reply. */
+[data-room-answer] [data-room-contributions] {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--bui-border-button-default);
+}
+
+/**
+ * Reading column of a bot's thread (`data-thread-column`, conversation.tsx).
+ *
+ * The thread, the docks and the composer center (`mx-auto`) in one
+ * width instead of stretching across the whole screen: 60rem (960 px), the reference app's `maxContentWidthPx` (0.79.3: its composer is `max-width: 960px` and
+ * the bubbles start and end on the composer's edges, measured on screen). Prose does not spread there: each
+ * reply is a bubble of 560 px at most (`thread-messages.tsx`). The scrolling row stays full width, so
+ * the scrollbar and the wheel work across the whole window. Below
+ * the column (phone, narrow window), nothing changes.
+ *
+ * Each row keeps its gutter: the max width adds it, so
+ * the CONTENT of each row lands on the same edges as the messages.
+ */
+[data-thread-column] {
+  /* The reference app: one 960 px lane for the bubbles and the composer. */
+  --openedbot-thread-column: 60rem;
+}
+
+[data-thread-column] [data-thread-messages] {
+  width: 100%;
+  max-width: var(--openedbot-thread-column);
+  margin-inline: auto;
+}
+
+/* Rows in `px-4 sm:px-6`: search, errors, approval, plan, activity. */
+[data-thread-column] :is(
+  [data-thread-lane],
+  [data-approval-dock],
+  [data-plan-dock],
+  [data-run-activity]
+) {
+  width: 100%;
+  max-width: calc(var(--openedbot-thread-column) + 3rem);
+  margin-inline: auto;
+}
+
+/* The composer, the reference app's: exactly the lane, its edges on the bubbles'. */
+[data-thread-column] :is([data-thread-composer], [data-composer-disabled-surface]) {
+  width: 100%;
+  max-width: var(--openedbot-thread-column);
+  margin-inline: auto;
+}
+
+/*
+ * The gutter of the reference app: at desktop width the thread, the docks and the
+ * composer keep 16 px on each side of their lane. The turn rail
+ * (`thread-turn-rail.tsx`, desktop only) is an overlay on the left edge of
+ * the thread whose ticks reach 34 px in (`pl-5` + `w-3.5`), the column the
+ * top bar's sidebar toggle sits in too: while it shows, the gutter is 4rem
+ * on both sides, so a narrowed thread (a side panel open) and its composer
+ * shrink together and keep 30 px clear of the longest tick instead of
+ * touching it. A wide window keeps its 960 px lane, centered on the composer
+ * either way.
+ */
+@media (min-width: 40rem) {
+  [data-thread-column] {
+    /* the reference app's lane and composer dock are both `px-4`. */
+    --openedbot-thread-gutter: 1rem;
+  }
+
+  [data-thread-column]:has([data-turn-rail]) {
+    --openedbot-thread-gutter: 4rem;
+  }
+
+  [data-thread-column] [role="log"] {
+    padding-inline: var(--openedbot-thread-gutter);
+  }
+
+  /*
+   * The composer is the lane itself: on a narrow window both shrink with the
+   * dock's gutter (100% is the log's content box, as wide as the dock's).
+   */
+  [data-thread-column]:not([data-mobile-scene] *) [data-thread-messages] {
+    max-width: min(var(--openedbot-thread-column), 100%);
+  }
+
+  [data-thread-column] :is([data-thread-lane], [data-approval-dock], [data-plan-dock], [data-run-activity]) {
+    padding-inline: var(--openedbot-thread-gutter);
+    max-width: calc(var(--openedbot-thread-column) + 2 * var(--openedbot-thread-gutter));
+  }
+
+  /* The dock: `px-4 pb-5`, the pill at 960 px. */
+  [data-thread-column] [data-thread-composer] {
+    padding-inline: var(--openedbot-thread-gutter);
+    padding-bottom: 20px;
+    max-width: calc(var(--openedbot-thread-column) + 2 * var(--openedbot-thread-gutter));
+  }
+
+  [data-thread-column] [data-composer-disabled-surface] {
+    max-width: none;
+  }
+}
+
+/* The initial silhouette already draws its rail; real marks appear with the rows. */
+[data-turn-rail]:has([data-thread-initial-layout="pending"]) [data-thread-turn-navigation] {
+  visibility: hidden;
+}
+
+/*
+ * « Stream Text » (streaming-ui.pulseview.app, Chat collection): while an
+ * answer streams, its newest characters sit in a blurred, masked tail and a
+ * solid caret follows them (`stream-tail-rehype.ts`, last block only). A
+ * finished answer carries neither. Under reduced motion the tail is plain
+ * text; the caret stays, it does not move on its own.
+ */
+.openedbot-stream-tail {
+  filter: blur(1.6px);
+  -webkit-mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
+  mask-image: linear-gradient(to right, #000 20%, rgb(0 0 0 / 0.2));
+}
+
+.openedbot-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1.5px;
+  border-radius: 1px;
+  background: var(--bui-text-primary);
+  vertical-align: text-bottom;
+  translate: 0 -0.5px;
+}
+
+/*
+  Caret blink (streaming-ui.pulseview.app `.sui-caret`: 1 s, steps(2)). Two
+  identical keyframes under two names: the stream tail flips `data-tick` on
+  every text update (`rehypeStreamTail`), which swaps the name and restarts
+  the blink, so the caret stays solid while tokens arrive.
+*/
+@keyframes openedbot-caret-blink-a {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes openedbot-caret-blink-b {
+  50% {
+    opacity: 0;
+  }
+}
+.openedbot-stream-caret {
+  animation: openedbot-caret-blink-a 1s steps(2, start) 0.45s infinite;
+}
+.openedbot-stream-caret[data-tick="1"] {
+  animation-name: openedbot-caret-blink-b;
+}
+
+/*
+  Block reveal (`tpl-reveal` of the reference): a paragraph or list item born
+  while the answer streams blurs in. Opacity, filter and transform only: no
+  layout shift, nothing the scroll pin has to chase.
+*/
+@keyframes openedbot-reveal {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(4px);
+  }
+}
+/* `backwards`: the end is the block's own style; held, one animation per block stayed in effect (see `.stream-w`). */
+.openedbot-reveal {
+  animation: openedbot-reveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* The action row of a finished answer rises in (`chat-fade-up`). */
+@keyframes openedbot-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.openedbot-fade-up {
+  animation: openedbot-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-stream-tail {
+    filter: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .openedbot-stream-caret {
+    animation: none;
+  }
+  .openedbot-reveal,
+  .openedbot-fade-up {
+    animation: none;
+  }
+}

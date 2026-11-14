@@ -1,0 +1,31 @@
+{
+  "name": "@openedbot/browser-face",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    "./artworks": "./src/artworks.ts",
+    "./bloub/decor": "./src/bloub/decor.ts",
+    "./bloub/engine": "./src/bloub/engine.ts",
+    "./bloub/eyefit": "./src/bloub/eyefit.ts",
+    "./bloub/repere": "./src/bloub/repere.ts",
+    "./bloub/skins": "./src/bloub/skins.ts",
+    "./mascot": "./src/mascot.ts",
+    "./mascot-art": "./src/mascot-art.ts",
+    "./presets": "./src/presets.ts",
+    "./text-stream-animator": "./src/text-stream-animator.ts",
+    "./voice-ui-state": "./src/voice-ui-state.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

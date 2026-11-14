@@ -1,0 +1,10 @@
+name: MVP email preferences
+---
+- extendedWaitUntil: { visible: { role: link, text: "Notifications" }, timeout: 10000 }
+- tapOn: { role: link, text: "Notifications" }
+- extendedWaitUntil: { visible: "Alertes par e-mail", timeout: 10000 }
+- assertJs: "Array.from(document.querySelectorAll('button[role=switch]')).length === 3 && Array.from(document.querySelectorAll('button[role=switch]')).every(x => x.getAttribute('aria-checked') === 'false')"
+- takeScreenshot: email-defaults
+- tapOn: { label: "Mission terminée" }
+- assertJs: "document.querySelector('button[aria-label=\"Mission terminée\"]').getAttribute('aria-checked') === 'true'"
+- takeScreenshot: email-enabled

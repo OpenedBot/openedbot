@@ -1,0 +1,207 @@
+---
+title: Link a machine through Tailscale
+description: Link your machine through Tailscale Funnel, with your Tailscale account, without edge-setup and without a domain of your own.
+icon: Network
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="In development">
+This path is not shipped. This page is only published in the
+development docs; the supported path is [edge-setup](/docs/machine).
+</Aside>
+
+This path replaces `edge-setup`. You install Hermes yourself, you lend
+openedbot an OAuth client of your tailnet for the time it takes to publish, and
+Tailscale publishes your machine over HTTPS under a `ts.net` address. Before you
+choose it, read [what you give up](/docs/direct-access)
+compared with `edge-setup`.
+
+<Aside type="caution" title="A public address, protected by your key alone">
+The `ts.net` address is public. The `API_SERVER_KEY` key is its only
+protection: make it long and random, as in step 0. Very long answers
+have not been validated on this path yet.
+</Aside>
+
+## Before you start
+
+- A Debian 12 or later, or Ubuntu 24.04 or later, machine with
+  `sudo`.
+- A Tailscale account, with at least one machine already connected to the tailnet
+  (your computer is enough). openedbot reads your tailnet's name from an
+  existing machine: on an empty tailnet, publishing fails.
+- In the Tailscale admin console, **DNS** page: MagicDNS and HTTPS certificates
+  turned on. Funnel needs them.
+- In the console, the **Tailscale Funnel** card must be clickable. If it
+  says "Not open yet on this deployment", this path is not
+  enabled on your instance: contact [support](/docs/support).
+- The `connector_only_enrollment` product setting must be off on the
+  instance. It is on by default: while it is on, **Add** is refused when you
+  declare the runtime, even if the card is clickable (see
+  [Direct access](/docs/direct-access#enabling-the-paths-on-a-deployment)).
+
+## Step 0: prepare Hermes on the machine
+
+Without `edge-setup`, installing and starting Hermes is up to you: follow
+[Prepare Hermes on the machine](/docs/direct-access#prepare-hermes-on-the-machine), then come back here. You will need
+the `API_SERVER_KEY` set there at step 3.
+
+## Step 1: create the OAuth client in Tailscale
+
+You do these steps in the Tailscale admin console, with an administrator account
+of the tailnet. The console wizard reminds you of them and opens both pages.
+
+1. **Access controls**, policy file: under `tagOwners`, declare the
+   openedbot tag if it does not exist, then save.
+
+   ```json
+   "tagOwners": {
+     "tag:openedbot-hermes": ["autogroup:admin"]
+   }
+   ```
+
+   Tailscale requires the tag to exist before an OAuth client can
+   carry it.
+
+2. **Settings › Trust credentials › OAuth clients**, then **Generate OAuth
+   client**. Name it `openedbot publication` and check these scopes:
+
+   ```text
+   +--------------+--------+
+   | Scope        | Access |
+   +--------------+--------+
+   | auth_keys    | Write  |
+   | policy_file  | Write  |
+   | devices      | Write  |
+   +--------------+--------+
+   ```
+
+3. In the client's **Tags** field, select `tag:openedbot-hermes`. Without this
+   tag, Tailscale refuses the auth key openedbot has to create.
+4. **Generate client**. Copy the **Client ID** and the **Client
+   Secret** right away: Tailscale shows them only once.
+
+## Step 2: publish from the console
+
+Open **Settings › Installation › Edge**, then **Add a runtime**.
+During onboarding, the same screen opens at the **Link my machine** step.
+
+1. Under **How does openedbot reach this runtime?**, choose **Direct access**.
+2. Under **How should the gateway be published?**, choose **Tailscale Funnel**,
+   then **Continue**.
+
+```text
++------------------------------------------------------------+
+| Step 1: Publish                                            |
++------------------------------------------------------------+
+| Machine name on the tailnet        [ my-vps            ]   |
+|   The hostname will be my-vps.<your-tailnet>.ts.net        |
+|                                                            |
+| Create the OAuth client for openedbot                          |
+|   [ Open the policy file ]                                 |
+|   [ Open Trust credentials ]                               |
+|                                                            |
+| Tailscale OAuth client ID          [ k123...           ]   |
+| Tailscale OAuth client secret      [ ***************** ]   |
+|                                                            |
+|                    [ Cancel ] [ Previous ] [ Publish ]     |
++------------------------------------------------------------+
+```
+
+3. **Machine name on the tailnet**: lowercase letters, digits and hyphens,
+   3 to 32 characters. A name already taken by a machine on the tailnet is refused.
+4. Paste the **Client ID** and the **Client Secret** from step 1, then click
+   **Publish**.
+
+openedbot allows publishing for the `tag:openedbot-hermes` tag in your
+policy file, then creates an auth key for that tag, valid for one
+day. It does not keep the OAuth client: you will revoke it at step 5.
+
+## Step 3: join the tailnet from the machine
+
+```text
+.------------------------------------------------------------.
+| Step 2: Install on the host                                |
+| Published hostname   my-vps.<your-tailnet>.ts.net          |
+| Publication          [ Waiting for the host ]              |
+|                                                            |
+|  1. Install Tailscale                         [ Copy ]     |
+|  2. Join the tailnet and publish the gateway  [ Copy ]     |
+|  3. Check the publication                     [ Copy ]     |
+|                                                            |
+| openedbot probes the hostname every five seconds.              |
+|                  [ Cancel ] [ Previous ] [ Continue ]      |
+'------------------------------------------------------------'
+```
+
+Copy the three commands one by one, in order, on the machine:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --auth-key <KEY> --hostname my-vps --advertise-tags tag:openedbot-hermes && sudo tailscale funnel --bg 8642
+tailscale funnel status
+```
+
+<Aside type="caution" title="Command 2 is shown only once">
+It carries the auth key. If you close the window before running
+it, openedbot cannot show it to you again. The publication stays listed under
+**Publications in progress**: click **Revoke**, then start again at
+step 2.
+</Aside>
+
+`tailscale funnel status` must show the address `https://my-vps.….ts.net`.
+In the console, the badge switches to **Reachable**, and **Continue**
+unlocks.
+
+## Step 4: register and test
+
+1. Give the runtime a **Name**.
+2. Paste the key from step 0 into **API_SERVER_KEY bearer**.
+3. Click **Test**. All three checks (**Edge reachable**,
+   **Authentication valid**, **Toolset contract**) must be
+   **Verified** for **Add** to become active.
+4. Click **Add**. If no runtime was serving, this one serves runs right away.
+   Otherwise the **Runtime added** window offers **Replace now**: the current
+   runtime keeps serving runs until you confirm the replacement.
+
+## Step 5: revoke the OAuth client
+
+In **Settings › Trust credentials**, revoke the `openedbot publication` client.
+The machine stays on the tailnet and the publication keeps running: the client
+was only needed to set it up.
+
+## If a test fails
+
+```text
++---------------------------+--------------------------------------------------+
+| Message in the console    | What to do                                       |
++---------------------------+--------------------------------------------------+
+| Publishing failed (...).  | Check the OAuth client's scopes and tag          |
+|                           | (step 1), and that a machine is already on the   |
+|                           | tailnet.                                         |
+| The hostname does not     | On the machine: tailscale status, then           |
+| exist yet.                | tailscale funnel status.                         |
+| Incorrect API_SERVER_KEY. | Copy the exact value again: grep API_SERVER_KEY  |
+|                           | ~/.hermes/.env.                                  |
+| The gateway is too old or | Check API_SERVER_ENABLED=true in                 |
+| api_server is disabled.   | ~/.hermes/.env, then sudo "$(command -v hermes)" |
+|                           | gateway restart --system.                        |
+| This is not a Hermes      | Another service answers instead of Hermes: stop  |
+| gateway.                  | it and restart Hermes.                           |
+| Disable the forbidden     | Run the hermes tools disable loop from step 0    |
+| toolsets on the host.     | again, then restart Hermes.                      |
++---------------------------+--------------------------------------------------+
+```
+
+## Remove this publication
+
+Deleting the runtime in the console does not touch your tailnet:
+openedbot no longer has an OAuth client to do it. On the machine, stop the
+publication and leave the tailnet:
+
+```bash
+sudo tailscale funnel reset
+sudo tailscale logout
+```
+
+Then remove the machine in the Tailscale admin console, **Machines** page.

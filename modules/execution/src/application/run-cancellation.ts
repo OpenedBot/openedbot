@@ -1,0 +1,301 @@
+import type { SQL } from "bun";
+import { appendRunEventsTx } from "../sql/run-events";
+import { NOW, RELEASE_LEASE, sqlExpr, transitionRuns } from "../sql/run-transitions";
+import type { RunStatus } from "../domain/run-transitions";
+import type { TransactionDb } from "@openedbot/platform-db";
+
+const ACTIVE_RUN_STATUSES = ["queued", "starting", "running", "awaiting_approval", "relaying"] as const;
+
+export type CancellationRun = {
+  id: string;
+  originRunId: string | null;
+  botId: string | null;
+  previousStatus: string;
+  status: "cancelled" | "requested" | "unknown";
+  workflowId: string | null;
+};
+
+type LockedRun = {
+  id: string;
+  originRunId: string | null;
+  botId: string | null;
+  status: string;
+  workflowId: string | null;
+  hermesRunId: string | null;
+  externalState: string;
+};
+
+type CancellationReason = { code: string; message: string };
+
+export async function requestThreadCancellationTx(
+  tx: TransactionDb,
+  organizationId: string,
+  threadId: string,
+  reason: CancellationReason,
+): Promise<CancellationRun[]> {
+  const lockTargets = () => tx<LockedRun[]>`
+      with primary_runs as (
+        select id from runs
+         where organization_id = ${organizationId} and thread_id = ${threadId}
+           and status in ${tx(ACTIVE_RUN_STATUSES)}
+      ), targets as (
+        select id from primary_runs
+        union
+        select child.id from runs child
+         where child.organization_id = ${organizationId}
+           and child.origin_run_id in (
+             select courier.id from runs courier
+              where courier.organization_id = ${organizationId} and courier.id in (select id from primary_runs)
+                and courier.status = 'relaying'
+           )
+           and child.status in ${tx(ACTIVE_RUN_STATUSES)}
+      )
+      select run.id, run.origin_run_id as "originRunId", run.bot_id as "botId", run.status,
+             run.workflow_id as "workflowId", run.hermes_run_id as "hermesRunId",
+             run.external_state as "externalState"
+        from runs run join targets on targets.id = run.id
+       order by (run.origin_run_id is null), run.id
+       for update of run
+    `;
+  // A completion transaction may have inserted the continuation while this
+  // transaction waited for the previous run. A second READ COMMITTED snapshot
+  // closes that race before any workflow row is locked.
+  const rows = mergeLockedRuns(await lockTargets(), await lockTargets());
+  return applyCancellationTx(tx, organizationId, rows, reason);
+}
+
+export async function requestRunCancellationTx(
+  tx: TransactionDb,
+  organizationId: string,
+  runId: string,
+  reason: CancellationReason,
+): Promise<CancellationRun[]> {
+  const lockTargets = () => tx<LockedRun[]>`
+      with requested as (
+        select workflow_id from runs
+         where organization_id = ${organizationId} and id = ${runId}
+      ), primary_runs as (
+        select id from runs
+         where organization_id = ${organizationId}
+           and (
+             id = ${runId}
+             or workflow_id = (select workflow_id from requested)
+           )
+           and status in ${tx(ACTIVE_RUN_STATUSES)}
+      ), targets as (
+        select id from primary_runs
+        union
+        select child.id from runs child
+         where child.organization_id = ${organizationId}
+           and child.origin_run_id in (
+             select courier.id from runs courier
+              where courier.organization_id = ${organizationId} and courier.id in (select id from primary_runs)
+                and courier.status = 'relaying'
+           )
+           and child.status in ${tx(ACTIVE_RUN_STATUSES)}
+      )
+      select run.id, run.origin_run_id as "originRunId", run.bot_id as "botId", run.status,
+             run.workflow_id as "workflowId", run.hermes_run_id as "hermesRunId",
+             run.external_state as "externalState"
+        from runs run join targets on targets.id = run.id
+       order by (run.origin_run_id is null), run.id
+       for update of run
+    `;
+  const rows = mergeLockedRuns(await lockTargets(), await lockTargets());
+  return applyCancellationTx(tx, organizationId, rows, reason);
+}
+
+export async function requestWorkflowCancellationTx(
+  tx: TransactionDb,
+  organizationId: string,
+  workflowId: string,
+  reason: CancellationReason,
+): Promise<CancellationRun[]> {
+  const lockTargets = () => tx<LockedRun[]>`
+      select id, origin_run_id as "originRunId", bot_id as "botId", status,
+             workflow_id as "workflowId", hermes_run_id as "hermesRunId",
+             external_state as "externalState"
+        from runs where organization_id = ${organizationId} and workflow_id = ${workflowId}
+          and status in ${tx(ACTIVE_RUN_STATUSES)}
+       order by id for update
+    `;
+  const rows = mergeLockedRuns(await lockTargets(), await lockTargets());
+  return applyCancellationTx(tx, organizationId, rows, reason);
+}
+
+export async function requestOrganizationCancellationTx(
+  tx: TransactionDb,
+  organizationId: string,
+  reason: CancellationReason,
+): Promise<CancellationRun[]> {
+  const lockTargets = () => tx<LockedRun[]>`
+      select id, origin_run_id as "originRunId", bot_id as "botId", status,
+             workflow_id as "workflowId", hermes_run_id as "hermesRunId",
+             external_state as "externalState"
+        from runs where organization_id = ${organizationId}
+          and status in ${tx(ACTIVE_RUN_STATUSES)}
+       order by (origin_run_id is null), id for update
+    `;
+  const rows = mergeLockedRuns(await lockTargets(), await lockTargets());
+  return applyCancellationTx(tx, organizationId, rows, reason);
+}
+
+function mergeLockedRuns(...sets: readonly LockedRun[][]): LockedRun[] {
+  return [...new Map(sets.flat().map((row) => [row.id, row])).values()]
+    .sort((left, right) => Number(left.originRunId === null) - Number(right.originRunId === null) || left.id.localeCompare(right.id));
+}
+
+async function applyCancellationTx(
+  tx: TransactionDb,
+  organizationId: string,
+  rows: readonly LockedRun[],
+  reason: CancellationReason,
+): Promise<CancellationRun[]> {
+  if (rows.length === 0) return [];
+  const sql = tx as unknown as SQL;
+  const workflowIds = [...new Set(rows.map((row) => row.workflowId).filter((id): id is string => Boolean(id)))].sort();
+  if (workflowIds.length > 0) await tx`
+    select id from workflows where organization_id = ${organizationId} and id in ${tx(workflowIds)}
+     order by id for update
+  `;
+  const sending = await tx<Array<{ runId: string }>>`
+    select run_id as "runId" from approval_requests
+     where organization_id = ${organizationId} and run_id in ${tx(rows.map((row) => row.id))}
+       and forward_state = 'sending'
+     order by run_id, gate_ordinal for update
+  `;
+  const sendingRunIds = new Set(sending.map((gate) => gate.runId));
+  const result: CancellationRun[] = [];
+  const settledHere: Array<{ id: string; threadId: string }> = [];
+
+  for (const row of rows) {
+    const approvalInFlight = sendingRunIds.has(row.id);
+    const safelyLocal = !approvalInFlight && (
+      row.status === "relaying" || row.externalState === "not_started" || row.externalState === "settled"
+    );
+    const canStopById = !approvalInFlight && row.hermesRunId !== null && row.externalState !== "ambiguous";
+    const status: CancellationRun["status"] = safelyLocal ? "cancelled" : canStopById ? "requested" : "unknown";
+
+    // The API acts on rows it holds locked, whoever leases them: the worker's
+    // own writes are fenced out by the new state.
+    const target = { organizationId, id: row.id };
+    const from = [row.status as RunStatus];
+    if (status === "cancelled") {
+      const moved = await transitionRuns(sql, {
+        target, fence: "unleased", transition: { from, to: { status: "cancelled", externalState: "settled" } },
+        set: { eventsComplete: true, errorCode: reason.code, errorMessage: reason.message, endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null },
+      });
+      for (const run of moved) settledHere.push({ id: run.id, threadId: run.threadId });
+    } else if (status === "requested") {
+      await transitionRuns(sql, {
+        target, fence: "unleased", transition: { from, to: { externalState: "stopping", remoteStopState: "requested" } },
+        set: {
+          errorCode: reason.code, errorMessage: reason.message, endedAt: null,
+          nextAttemptAt: sqlExpr`case when status = 'queued' then now() else next_attempt_at end`,
+        },
+      });
+    } else {
+      await transitionRuns(sql, {
+        target, fence: "unleased",
+        transition: { from, to: { status: "unknown", externalState: "ambiguous", remoteStopState: { map: { none: "ambiguous" } } } },
+        set: {
+          eventsComplete: false, errorCode: "CANCEL_OUTCOME_UNKNOWN",
+          errorMessage: "L’annulation croise un effet Hermes dont l’issue ne peut pas être confirmée.",
+          endedAt: null, ...RELEASE_LEASE, nextAttemptAt: null,
+        },
+      });
+    }
+    result.push({
+      id: row.id,
+      originRunId: row.originRunId,
+      botId: row.botId,
+      previousStatus: row.status,
+      status,
+      workflowId: row.workflowId,
+    });
+  }
+
+  await tx`
+    update approval_requests set
+      status = case when status = 'pending' then 'expired' else status end,
+      forward_state = case when forward_state = 'sending' then 'ambiguous' else 'expired' end,
+      resolved_at = coalesce(resolved_at, now()), forwarding_owner = null,
+      forwarding_lease_expires_at = null
+     where organization_id = ${organizationId} and run_id in ${tx(rows.map((row) => row.id))}
+       and (status = 'pending' or forward_state in ('pending','ready','sending'))
+  `;
+
+  for (const workflowId of workflowIds) {
+    const affected = result.filter((run) => run.workflowId === workflowId);
+    if (affected.some((run) => run.status === "unknown")) {
+      await tx`
+        update workflows set status = 'unknown', error_code = 'CANCEL_OUTCOME_UNKNOWN',
+          error_message = 'L’annulation croise un effet Hermes dont l’issue ne peut pas être confirmée.',
+          recovery_state = ${{ needsReview: true, cancelRequested: true }}, ended_at = null, updated_at = now()
+         where organization_id = ${organizationId} and id = ${workflowId}
+           and status not in ('completed','failed','expired')
+      `;
+    } else if (affected.some((run) => run.status === "requested")) {
+      await tx`
+        update workflows set error_code = 'CANCEL_REQUESTED', error_message = ${reason.message},
+          recovery_state = ${{ cancelRequested: true }}, ended_at = null, updated_at = now()
+         where organization_id = ${organizationId} and id = ${workflowId}
+           and status in ('queued','running','awaiting_approval','reconciling')
+      `;
+    } else {
+      await tx`
+        update workflows set status = 'cancelled', error_code = ${reason.code}, error_message = ${reason.message},
+          recovery_state = ${{ cancelRequested: true }}, ended_at = now(), updated_at = now()
+         where organization_id = ${organizationId} and id = ${workflowId}
+           and status in ('queued','running','awaiting_approval','reconciling')
+      `;
+    }
+  }
+  // A run settled here never reaches Hermes' stream, the only other source of the
+  // `cancelled` notice: without it, a client following the thread live (iOS, another
+  // console tab) keeps showing the run as thinking. Taken last: every row is held.
+  await appendRunEventsTx(sql, settledHere.map((run) => ({
+    organizationId, threadId: run.threadId, runId: run.id,
+    type: "system.notice", payload: { message: reason.message, kind: "cancelled" },
+  })));
+  return result;
+}
+
+export const MAINTENANCE_STEP_KINDS = ["memory", "compaction"] as const;
+/** What `lockActiveBotRuns` returns: every status a maintenance pass may still be in. */
+const MAINTENANCE_CANCELLABLE = ["queued", "starting", "running", "awaiting_approval", "relaying", "unknown"] as const satisfies readonly RunStatus[];
+
+export function isMaintenanceStepKind(stepKind: string | null | undefined): boolean {
+  return stepKind === "memory" || stepKind === "compaction";
+}
+
+/**
+ * Annule localement une passe de maintenance (`memory`, `compaction`) pour
+ * qu'un archivage ou une purge puisse continuer. Contrairement à
+ * `requestRunCancellationTx`, l'issue est toujours `cancelled` : ces runs
+ * n'ont pas à bloquer le cycle de vie du bot, même si Hermes n'a pas encore
+ * confirmé l'arrêt.
+ */
+export async function cancelMaintenanceRunsTx(
+  tx: TransactionDb,
+  organizationId: string,
+  runs: ReadonlyArray<{ id: string; threadId: string }>,
+  reason: CancellationReason,
+): Promise<void> {
+  if (runs.length === 0) return;
+  // The callers lock these rows first (`lockActiveBotRuns`); a dead type has no lease worth keeping.
+  const cancelled: typeof runs[number][] = [];
+  for (const run of runs) {
+    const moved = await transitionRuns(tx as unknown as SQL, {
+      target: { organizationId, id: run.id }, fence: "unleased",
+      transition: { from: MAINTENANCE_CANCELLABLE, to: { status: "cancelled", externalState: "settled" } },
+      set: { eventsComplete: true, errorCode: reason.code, errorMessage: reason.message, endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null },
+    });
+    if (moved.length > 0) cancelled.push(run);
+  }
+  // The updates hold every row: the primitive then takes the cursor once.
+  await appendRunEventsTx(tx as unknown as SQL, cancelled.map((run) => ({
+    organizationId, threadId: run.threadId, runId: run.id,
+    type: "run.error", payload: { message: reason.message, errorCode: reason.code },
+  })));
+}

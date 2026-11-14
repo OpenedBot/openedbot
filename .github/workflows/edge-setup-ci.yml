@@ -1,0 +1,226 @@
+# Contrôles d'edge-setup dans le monorepo OpenedBot/openedbot. edge-setup/,
+# docs/ (site de documentation, miroir de edge-setup/docs) et le cœur (moitié
+# TypeScript du contrat du lien) sont dans le même dépôt : un seul checkout,
+# plus de clé de déploiement. Actions épinglées par SHA ; Go épinglé par go.mod.
+#
+# Minutes de runner comptées (chaque job arrondi à la minute) : un run ne
+# joue que ce que le changement peut casser.
+#   - Toute pull request vers main ou develop lance ce workflow, fork
+#     compris : il ne lit aucun secret (contrat :
+#     tests/scripts/release-workflows-contract.ts). À la demande :
+#     `gh workflow run edge-setup-ci.yml --ref <branche>` joue tout.
+#   - Le job `changes` (.github/scripts/ci-plan.sh) décide par périmètre : le
+#     code Go et ses E2E pour edge-setup/, les tests et les scripts pour
+#     docs/ aussi, le contrat du lien pour ses deux moitiés.
+#   - Un push sur main dont l'arbre est exactement celui d'une PR déjà verte
+#     (squash d'une branche à jour) ne rejoue rien : `changes` donne
+#     l'adresse du run qui l'a validé et le workflow s'arrête là.
+name: edge-setup-ci
+
+on:
+  # No trigger-level `paths`: the path scopes are decided per job by `changes`,
+  # so that `edge-setup-ci ok` always reports on a pull request to main or develop.
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-setup-ci-${{ github.ref }}
+  # A new push to a PR cancels its obsolete run. Never on main: each push is
+  # only diffed against the one before, so a cancelled run would leave its
+  # own changes unchecked.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: edge-setup
+
+jobs:
+  changes:
+    # What this run has to prove: nothing when the pushed tree was already
+    # validated by a pull request run, otherwise one scope per kind of change.
+    # In doubt (manual run, nothing to diff, API unreachable) every job runs.
+    #   go        the Go code and everything else under edge-setup/
+    #   docs      the documentation site: `make test` compares it to
+    #             edge-setup/docs, the install bootstrap and its tests live there
+    #   contract  both halves of the link contract (`make contract-check`)
+    name: Changes (validated tree, path scopes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # Lists this workflow's successful pull request runs.
+      actions: read
+    outputs:
+      validated: ${{ steps.filter.outputs.validated }}
+      go: ${{ steps.filter.outputs.go }}
+      docs: ${{ steps.filter.outputs.docs }}
+      contract: ${{ steps.filter.outputs.contract }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: filter
+        working-directory: .
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          WORKFLOW: edge-setup-ci.yml
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          .github/scripts/ci-plan.sh
+          'go=^edge-setup/|^\.github/workflows/edge-setup-ci\.yml$'
+          'docs=^docs/'
+          'contract=^(edge-setup/|platform/hermes/|modules/runtimes/|contracts/|protocol/)|^(Makefile|package\.json|bun\.lock|\.github/workflows/edge-setup-ci\.yml)$'
+
+  checks:
+    # One job, one Go toolchain: static, tests, scripts and build were four
+    # jobs, each rounded up to a full runner minute. The static steps and build-all only
+    # concern the Go code; the tests and the scripts also run for a docs-only
+    # change. Tests and scripts still run and report when a static step fails;
+    # build-all runs only once everything before it passed.
+    name: Checks (static, tests, release assets, scripts, build-all)
+    needs: [changes]
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GO_CHANGED: ${{ needs.changes.outputs.go }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The binary version comes from `git describe --tags --match 'edge-setup/v*'`.
+          fetch-depth: 0
+      - id: go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - name: Install staticcheck and govulncheck (pinned versions and h1 sums)
+        # Versions and module sums live in edge-setup/Makefile
+        # (STATICCHECK_VERSION/SUM, GOVULNCHECK_VERSION/SUM); lint-tools
+        # installs them and checks the sum recorded in each binary.
+        if: env.GO_CHANGED == 'true'
+        run: make lint-tools
+      - name: Static (gofmt, vet, staticcheck, govulncheck)
+        if: env.GO_CHANGED == 'true'
+        run: make lint LINT_STRICT=1
+      - name: Integration tests compile
+        if: env.GO_CHANGED == 'true'
+        run: go vet -tags integration ./test/integration/...
+      - name: Tests (unit, docs mirror)
+        if: ${{ !cancelled() && steps.go.outcome == 'success' }}
+        run: make test
+      - name: Release assets and publication
+        if: ${{ !cancelled() && steps.go.outcome == 'success' }}
+        run: make test-release
+      - name: Install shellcheck v0.11.0 (pinned by SHA-256)
+        id: shellcheck
+        if: ${{ !cancelled() }}
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -fsSLo shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          echo "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf shellcheck.tar.xz
+          echo "$PWD/shellcheck-v0.11.0" >> "$GITHUB_PATH"
+      - name: Scripts (shellcheck)
+        if: ${{ !cancelled() && steps.shellcheck.outcome == 'success' }}
+        run: make shellcheck
+      - id: bun
+        if: ${{ !cancelled() }}
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install bootstrap (valid, invalid and missing signature, dry-run, pinned version)
+        if: ${{ !cancelled() && steps.bun.outcome == 'success' }}
+        working-directory: docs
+        run: bun test tests/install.test.ts
+      - name: Build (build-all)
+        if: env.GO_CHANGED == 'true'
+        run: make build-all
+
+  contract:
+    name: Connector contract (Go and TypeScript halves)
+    needs: [changes]
+    if: needs.changes.outputs.contract == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install the locked OpenedBot workspace
+        working-directory: .
+        run: bun install --frozen-lockfile
+      - run: make contract-check
+
+  e2e:
+    # A privileged systemd container per distribution: read-only commands,
+    # up, the previews, uninstall (data kept, revocation attempted against an
+    # unreachable origin) and reset. Docker rootless and cgroup limits need a
+    # VM: make integration-vm.
+    name: E2E (${{ matrix.base }})
+    needs: [changes, checks]
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ["debian:bookworm", "debian:trixie", "ubuntu:24.04", "ubuntu:26.04"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: edge-setup/go.mod
+          cache-dependency-path: edge-setup/go.sum
+      - run: make build
+      - name: Integration scenarios
+        env:
+          EDGE_SETUP_IT_BASE: ${{ matrix.base }}
+        run: go test -tags integration -count=1 -timeout 70m -run 'TestReadOnlyCommandsOnFreshHost|TestUpConnectorNoSSHHardening' -v ./test/integration/
+
+  ci-ok:
+    # The single check to require. It passes only when the path scopes were
+    # decided and every job did what they said: succeeded when its scope
+    # changed, was skipped otherwise. A failed or cancelled job fails it, and
+    # so does a job skipped for any other reason. Not run on a push `changes`
+    # found already validated: the pull request run it points to carries the
+    # result.
+    name: edge-setup-ci ok
+    if: always() && needs.changes.outputs.validated != 'true'
+    needs: [changes, checks, contract, e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check every job result
+        working-directory: .
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e '
+            def want($on): if $on then "success" else "skipped" end;
+            .changes.outputs as $o
+            | (.changes.result == "success")
+              and ($o.validated == "false")
+              and ([$o.go, $o.docs, $o.contract] | all(. == "true" or . == "false"))
+              and (.checks.result == want($o.go == "true" or $o.docs == "true"))
+              and (.contract.result == want($o.contract == "true"))
+              and (.e2e.result == want($o.go == "true"))' > /dev/null

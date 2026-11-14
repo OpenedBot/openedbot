@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Research brief",
+    "identifier": "official/research-brief",
+    "source": "official",
+    "trustLevel": "official",
+    "description": "Turn a question into a concise, sourced research brief.",
+    "tags": ["research", "writing"],
+    "skillMdPreview": "# Research brief\n\nCollect sources and summarize the answer."
+  },
+  {
+    "name": "Release notes",
+    "identifier": "trusted/release-notes",
+    "source": "trusted",
+    "trustLevel": "trusted",
+    "description": "Draft release notes from a set of changes.",
+    "tags": ["release", "writing"],
+    "skillMdPreview": "# Release notes\n\nGroup changes by user impact."
+  },
+  {
+    "name": "Community experiment",
+    "identifier": "community/experiment",
+    "source": "community",
+    "trustLevel": "community",
+    "description": "An unverified community skill for testing trust boundaries.",
+    "tags": ["community"],
+    "skillMdPreview": "# Community experiment\n\nThis preview is intentionally untrusted."
+  }
+]

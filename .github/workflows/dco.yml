@@ -1,0 +1,36 @@
+# Developer Certificate of Origin: every commit of a pull request must be
+# signed off by its author (`git commit -s`). See CONTRIBUTING.md.
+name: dco
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dco-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check Signed-off-by on every commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # The runner comes from the base revision (not editable by the pull
+        # request); only the adoption pull request falls back to its own copy.
+        run: |
+          if git cat-file -e "$BASE_SHA:.github/scripts/dco-run.sh" 2>/dev/null; then
+            git show "$BASE_SHA:.github/scripts/dco-run.sh" > "$RUNNER_TEMP/dco-run.sh"
+          else
+            cp .github/scripts/dco-run.sh "$RUNNER_TEMP/dco-run.sh"
+          fi
+          bash "$RUNNER_TEMP/dco-run.sh" "$BASE_SHA" "$HEAD_SHA"

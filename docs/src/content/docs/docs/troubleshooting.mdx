@@ -1,0 +1,118 @@
+---
+title: Troubleshooting
+description: SSH rollback triggered, verify-access refused, link closed (4401, 4004, 4001), LINK_BUSY, upgrade refused, tickets, exit codes.
+---
+
+Every refusal from the tool comes with a message; read it first. The
+exit codes (`2` refusal without mutation, `64` usage, `69` not implemented,
+`77` root required) are detailed in [Getting started](/docs/getting-started#exit-codes).
+
+`status` (read-only) shows the phases, the mode, the transaction markers
+and the installed versions; `doctor` checks the runtime end to end.
+
+## Initial installation
+
+The public installation goes through `curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh`,
+which downloads only from `releases.openedbot.app` and verifies the release
+signature before the binary's SHA-256. "carries no signature" names an
+unsigned release (up to v0.0.2): ask for a signed release with `--version`.
+"does not verify": do not work around it, nothing was installed.
+`--dry-run` runs every check without writing anything. Do not download from
+an old GitHub Releases address: that repository no longer exists. See
+[edge-setup](/docs/edge-setup). An architecture or system refusal
+during `detect` or `up` means the host is not supported;
+you need Debian 12+ or Ubuntu 24.04+, `amd64` or `arm64`, and systemd. An
+optional protection that is refused ("require Debian 13") must be removed from
+the `up` command on that host. Cgroup v2 is required only by `--sandbox`.
+
+## SSH access and rollback
+
+| Symptom | Action |
+|---|---|
+| `verify-access` refuses | Read its message: wrong session (open a **new** SSH connection with the admin key, not the session that ran `up`), `sudo` missing, log without `Accepted publickey`. Nothing is disarmed: the 600 s window is still running. |
+| Locked out before `verify-access` | Wait: the timer restores access within ≤ 600 s. `status` shows `rolled_back=true`. Investigate, then run `up` again. |
+| Rollback triggered (`rolled_back=true`) | The `hermes-hardening-rollback` timer restored the sshd drop-in, four UFW files and the cloud-init account from its backups, without reading the JSON state. `journalctl -u hermes-hardening-rollback` says why; run `up` again once the cause is understood. |
+| `rolled_back` but access still cut | Provider console. `journalctl -u hermes-hardening-rollback` explains which restore failed; the backups are under `/var/backups/hermes-access/`. |
+| `up`: "the admin account pre-exists and was not created by this tool" | Host provisioned by the old tool. From a **root** session: `edge-setup reset --yes --remove-admin`, then `up`. See [Reset](/docs/reset). |
+| `up`: "debian exists without authorized_keys; refusing to quarantine an unaudited state" | Remove the cloud-init account by hand (`userdel -r debian`) if it is no longer used, then run `up` again. |
+| `up` stops before P7: reboot required | `/var/run/reboot-required` exists. Reboot, run the same command again: it resumes at the same point. |
+| "must run as root" (code 77) | Self-elevation disabled (`EDGE_SETUP_NO_SUDO=1`) or `sudo` missing. Run from root, or install `sudo`. |
+
+## Transactions
+
+| Symptom | Action |
+|---|---|
+| "a transaction is active" (`upgrade`, `reset`, code 2) | The `/var/lib/hermes-host-hardening/active` marker exists. Wait for its commit (`verify-access`) or its rollback (600 s timer), then try again. |
+
+## Gateway and sandbox
+
+| Symptom | Action |
+|---|---|
+| Gateway silent | `doctor`; `journalctl -u hermes-gateway`. The bearer is in `/srv/hermes/data/runtime.env` (root or `hermes` only). |
+| `doctor` refuses a wildcard listener | The gateway must listen on `127.0.0.1:8642` only; a `0.0.0.0` in the Hermes configuration is a defect to fix, not to work around. |
+| Rootless Docker dead at boot (LXC) | Subuid range outside the CT's space, or `nesting` missing. See [LXC container](/docs/prerequisites#lxc-container-proxmox-ve); without nesting, do not select `--sandbox` (audit check `SKIP`). |
+
+## openedbot link
+
+`journalctl -u hermes-connector` (or `hermes-connector@<name>` for a
+named instance) shows the close code; the daemon reconnects with
+backoff (`1 s × 2^n`, capped at 60 s).
+
+| Symptom | Action |
+|---|---|
+| Link closed **4401** | Authentication refused: invalid ticket or link token, or `hello` missing. On the first `link`: the ticket is wrong, expired (5 min) or already used → open a new ticket in openedbot. On reconnection: the persisted token is no longer valid → new ticket + `link`. |
+| Link closed **4004** `LINK_REVOKED` | The runtime was revoked on the openedbot side. New ticket + `link`. |
+| Link closed **4001** `LINK_REPLACED` | A more recent connection for the same runtime took over: a second host, or a second daemon, uses the same token. Keep only one `hermes-connector` per instance; otherwise revoke and re-enroll. Two distinct **named** instances are two distinct runtimes and do not replace each other. |
+| `err LINK_POP_PENDING` | The request arrived before `link.proof`: proof of possession is not done yet on this session. Transient at the start of a session; if it persists, the device key is missing (`status` shows the sealed key per instance): `up --yes` seals one. |
+| Link closed **4401** `LINK_POP_FAILED` | Proof of possession refused. Most often the host presents a device key other than the one openedbot registered: regenerated host key, cloned host, or an older `link --rekey` (edge-setup v1.5.0 and earlier) already ran. openedbot never replaces a registered key: enroll the host again with a new ticket, see [Operations](/docs/operations). The connector keeps retrying, every 30 minutes after ten refusals. |
+| `link`: "replacing the link to `<origin>` (runtime `<id>`)" | This is not a refusal: the targeted instance was linked to another openedbot origin, and this ticket takes it over here, with no flag to set. The warning comes before the ticket is read; the openedbot you left keeps a runtime that the host will no longer call back, which you should remove there. To keep both links, create the new one alongside with `--name dev`. See [Named instances](/docs/commands#named-instances). |
+| A linked runtime no longer reports after a development `link` | A `link` without `--name` targets the default instance and changes its origin. `edge-setup status` lists each instance with its origin: if production no longer points where it should, re-enroll it with a new ticket, and redo the development link with `--name dev`. |
+| Link closed **4003** `LINK_PROBE_FAILED` | The enrollment probe (`/health`, `/v1/capabilities`, `/v1/toolsets`) failed through the pipe; no row is created, and the ticket remains usable until its TTL. `doctor`, then run `link` again. |
+| Close **1009** | WebSocket message larger than 4 MiB, or a host that keeps sending more than 8 MiB for a response openedbot has already refused. A request larger than 1 MiB or a response larger than 4 MiB, on its own, fails with `HERMES_PROTOCOL_LIMIT` without closing the link. Look at the offending request on the openedbot side. |
+| `err LINK_BUSY` | More than 64 requests in flight on the link; the request is refused `before_dispatch` (never sent to the gateway). Symptom of a slow gateway or of accumulated `events` streams: `doctor`, `journalctl -u hermes-gateway`. |
+| `err HERMES_OPERATOR_UNAVAILABLE` | The `/run/hermes-operator/operator.sock` socket does not respond: `systemctl status hermes-operator`. |
+| `link`: "the ticket must look like `<enrollmentId>.<secret>`" | The ticket read on stdin (or `--ticket-file`) is truncated or badly pasted. |
+| `link`: "the ticket was refused (wrong secret or already used)", "the ticket expired (5 minutes)", "the enrollment is not claimable" | Open a new ticket in openedbot (*Settings › Installation › Edge › Add a runtime › Pair from the server*). |
+| `--openedbot must be an https:// origin without path, query or credentials` | Pass the origin alone, without a path: `--openedbot https://link.openedbot.app`. |
+| In dev, `link` stops on `dial: … connection refused` to `localhost:8790` | Nothing listens on that port on the VPS side: the reverse SSH tunnel is not open on the workstation (`make link-dev-status` tells whether the one from `make link-dev-up` is running), or the VPS was reached through an `ssh` without `-R`. An existing link (`link` overwrites it, with no flag) and the runtime on the openedbot side have nothing to do with it: the ticket was not sent. Reopen the tunnel in a terminal on the workstation, then run the command again. |
+| In dev, the origin of a Cloudflare tunnel started by hand no longer responds, or its URL changed | This tunnel runs in front of the local openedbot application, not on the VPS, and a URL that changes is an origin that changes: check openedbot, then `cloudflared` on the development machine, create a new ticket, then run `link` again with the new origin. The gateway must stay on `127.0.0.1:8642`. |
+
+## `upgrade` refused
+
+On Linux, `upgrade` checks, in order: `--yes`, root, no active transaction,
+the Sigstore signature of `SHA256SUMS` for the version's tag, then, once, the
+SHA-256 of the new release against `SHA256SUMS`. A
+refusal (code 2) changes nothing. The other commands do not repeat this
+check. `--from` + `--tag` is reserved for the internal `make deploy` path
+over SSH, for an unpublished local build.
+
+| Message | Cause, action |
+|---|---|
+| "add --yes (nothing was changed)" | `upgrade` replaces the binary and restarts its units: confirm with `--yes`. |
+| "a transaction is active" | See *Transactions* above. |
+| "--from requires --tag `<hex>`", "--tag must be 64 hex characters", "--sha256 was removed" | Internal developer path: let `make deploy HOST=user@host` compute the HMAC tag and drop the build over SSH; a bare digest is no longer accepted. |
+| "no deployment key on this host; run `edge-setup deploy-key set`" | The VPS does not have the shared deployment key: set it once with `ssh -t HOST sudo edge-setup deploy-key set < ~/.config/edge-setup/deploy.key` ([Operations](/docs/operations)). |
+| "sha256 mismatch", "tag mismatch", "not an ELF executable" | The dropped file is not the expected binary, or was not tagged with this host's key. Download again or run `make deploy` again. |
+| "downloaded binary does not match SHA256SUMS" | The downloaded binary does not match its digest: truncated download, corrupted or substituted mirror. Do not work around it; run again, check `--release-url`. |
+| "SHA256SUMS: HTTP 404", "SHA256SUMS does not list edge-setup_linux_…" | The release (or the mirror) does not publish a `SHA256SUMS`, or not for this architecture. |
+| "this release carries no signature (SHA256SUMS.sigstore.json); only signed releases are installed" | The targeted release is not signed (every release up to v0.0.2), or the mirror does not publish the signatures. Target a signed release (v0.0.3 or later); a signed binary does not reinstall an unsigned release. |
+| "signature does not verify for …" | The signature does not come from the release workflow run on the tag of that version: substituted release or altered mirror. Do not work around it; nothing was written. |
+| "signature trust root (Sigstore TUF)" | The host cannot obtain Sigstore's trusted root: it must reach `tuf-repo-cdn.sigstore.dev` over HTTPS. |
+| "latest release pointer …" | The origin (or the mirror) does not serve a readable `LATEST`: try again, or target a version with `--release-url https://…/vX.Y.Z`. |
+| "candidate vX is older than the installed vY; add --allow-downgrade" | `upgrade` queries the candidate binary, already verified, then compares the two versions. It refuses an earlier version without writing anything. Pass `--allow-downgrade` to accept it deliberately. Two versions that are not both semver (`dev`, a commit hash) cannot be ordered: the comparison is then skipped with a message. |
+| "this binary (…) is not the released …" (`self-verify`) | The current binary is not the one listed for its architecture: local build or withdrawn release. Reinstall from a release. |
+
+## After an upgrade
+
+In openedbot, run "Check the link" on the runtime so that it re-reads
+`/hermes-setup/capabilities`: `upgrade` restarts `hermes-operator`
+(always) and `hermes-connector` (`try-restart`), and the link's `hello`
+re-announces the current `features`. If `upgrade` changed the directives of
+the `hermes-gateway` unit while runs were in progress, it did not restart
+it: the console shows "Restart pending", to run once no run is active
+anymore (or `sudo systemctl restart hermes-gateway`).
+
+## Backup, destruction
+
+See [Operations](/docs/operations#backup-and-destruction) and
+[Reset](/docs/reset).

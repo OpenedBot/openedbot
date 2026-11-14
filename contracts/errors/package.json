@@ -1,0 +1,21 @@
+{
+  "name": "@openedbot/contracts-errors",
+  "version": "1.0.0",
+  "private": true,
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "//publishConfig": "TODO(scope): GitHub Packages only accepts a scope equal to the owning org, so publishing needs @openedbot/* (org OpenedBot) instead of @openedbot/*, and private: false. Until that rename (and its import paths) is decided, this package publishes nothing.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./http-error": "./src/http-error.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

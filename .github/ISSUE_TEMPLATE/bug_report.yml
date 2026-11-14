@@ -1,0 +1,65 @@
+name: Bug report
+description: Something does not work as documented or as it used to.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Never paste a real link token,
+        enrollment ticket, gateway bearer, provider key, password or personal data:
+        replace them with placeholders. A security vulnerability goes to a private
+        advisory, not here.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Where the problem shows up.
+      options:
+        - console
+        - API/worker
+        - desktop
+        - edge-setup
+        - protocol
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest sequence that triggers the problem.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead. Error messages, redacted logs and screenshots help.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The openedbot commit or release, the desktop app version, or the output of `edge-setup version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, and how you run it (make dev, self-hosted, desktop app, hosted).
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context

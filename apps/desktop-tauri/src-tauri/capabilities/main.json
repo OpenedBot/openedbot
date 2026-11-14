@@ -1,0 +1,40 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The embedded console, in the main window and on the local origin only (no `remote` block): the native bridge, the sign-in event, and the three commands the notification plugin's `window.Notification` polyfill calls. No other plugin command is granted: the opener, the updater, the dialogs, the deep link and the global shortcut are driven from Rust.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "allow-read-access-token",
+    "allow-refresh",
+    "allow-open-external",
+    "allow-sign-out",
+    "allow-request-email-code",
+    "allow-verify-email-code",
+    "allow-start-google",
+    "allow-cancel-sign-in",
+    "allow-signin-state",
+    "allow-shell-info",
+    "allow-set-theme",
+    "allow-set-text-zoom",
+    "allow-set-titlebar-anchor",
+    "allow-start-window-drag",
+    "allow-toggle-maximize",
+    "allow-report-diagnostic",
+    "allow-update-state",
+    "allow-check-for-updates",
+    "allow-install-update",
+    "allow-report-update-required",
+    "allow-report-runs-in-progress",
+    "allow-set-update-auto-install",
+    "allow-notch-state",
+    "allow-set-notch-mode",
+    "allow-play-notch-demo"
+  ]
+}

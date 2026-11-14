@@ -1,0 +1,15 @@
+---
+import LangSwitch from '../LangSwitch.astro';
+
+/**
+ * Replaces Starlight's language select with the site's switch. English is the
+ * root locale and French lives under `/fr/`, so the same page in the other
+ * language only adds or drops that prefix.
+ */
+const lang = Astro.locals.starlightRoute.locale === 'fr' ? 'fr' : 'en';
+const path = Astro.url.pathname;
+const enPath = lang === 'fr' ? path.replace(/^\/fr(?=\/|$)/, '') || '/' : path;
+const frPath = lang === 'fr' ? path : `/fr${path}`;
+---
+
+<LangSwitch lang={lang} hrefs={{ en: enPath, fr: frPath }} />

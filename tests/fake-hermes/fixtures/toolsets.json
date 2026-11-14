@@ -1,0 +1,90 @@
+[
+  {
+    "name": "code_execution",
+    "label": "Code execution",
+    "description": "Runs code inside the runtime sandbox after an approval.",
+    "enabled": true,
+    "configured": true,
+    "tools": ["execute_code"]
+  },
+  {
+    "name": "terminal",
+    "label": "Terminal",
+    "description": "Shell commands on the runtime host.",
+    "enabled": true,
+    "configured": true,
+    "tools": ["terminal"]
+  },
+  {
+    "name": "file",
+    "label": "Files",
+    "description": "Read and write files in the runtime workspace.",
+    "enabled": true,
+    "configured": true,
+    "tools": ["read_file", "write_file", "patch"]
+  },
+  {
+    "name": "web",
+    "label": "Web",
+    "description": "Search and fetch web pages.",
+    "enabled": true,
+    "configured": true,
+    "tools": ["web_search", "web_extract"]
+  },
+  {
+    "name": "todo",
+    "label": "Todo",
+    "description": "Task planning and tracking for multi-step work.",
+    "enabled": false,
+    "configured": true,
+    "tools": ["todo_list"]
+  },
+  {
+    "name": "browser",
+    "label": "Browser",
+    "description": "Drives a headless browser session.",
+    "enabled": false,
+    "configured": true,
+    "tools": ["browser_navigate", "browser_snapshot", "browser_click"]
+  },
+  {
+    "name": "image_gen",
+    "label": "Image generation",
+    "description": "Generates images from a prompt.",
+    "enabled": false,
+    "configured": false,
+    "tools": ["image_generate"]
+  },
+  {
+    "name": "delegation",
+    "label": "Delegation",
+    "description": "Second scheduler; disabled by the openedbot contract.",
+    "enabled": false,
+    "configured": false,
+    "tools": ["delegate_task"]
+  },
+  {
+    "name": "memory",
+    "label": "Memory",
+    "description": "Native memory store; allowed on an isolated profile only.",
+    "enabled": false,
+    "configured": false,
+    "tools": ["memory"]
+  },
+  {
+    "name": "session_search",
+    "label": "Session search",
+    "description": "Searches past sessions; allowed on an isolated profile only.",
+    "enabled": false,
+    "configured": false,
+    "tools": ["session_search"]
+  },
+  {
+    "name": "cronjob",
+    "label": "Cron jobs",
+    "description": "Runtime-side scheduler; disabled by the openedbot contract.",
+    "enabled": false,
+    "configured": false,
+    "tools": ["cronjob_manage"]
+  }
+]

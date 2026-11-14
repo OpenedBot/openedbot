@@ -1,0 +1,28 @@
+{
+  "comment": "desktop/ of the bucket openedbot-releases after the manual clean-up of 2026-11-13, as the operator described it (v0.1.0 newest, v1.1.4 previous, solo/{beta,stable}/latest.json). Reconstructed, not an API dump: the upload times are approximate and only their order matters. Dry run: bun apps/desktop-tauri/scripts/prune-r2.ts --listing apps/desktop-tauri/scripts/fixtures/r2-desktop-2026-11-13.json",
+  "channels": { "stable": "1.1.4", "beta": "0.1.0" },
+  "objects": [
+    { "key": "desktop/solo/beta/latest.json", "last_modified": "2026-11-12T18:05:00Z" },
+    { "key": "desktop/solo/stable/latest.json", "last_modified": "2026-11-10T09:30:00Z" },
+    { "key": "desktop/v0.1.0/SHA256SUMS", "last_modified": "2026-11-12T18:00:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.AppImage", "last_modified": "2026-11-12T17:58:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.AppImage.sig", "last_modified": "2026-11-12T17:58:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.app.tar.gz", "last_modified": "2026-11-12T17:55:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.app.tar.gz.sig", "last_modified": "2026-11-12T17:55:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.deb", "last_modified": "2026-11-12T17:57:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_aarch64.dmg", "last_modified": "2026-11-12T17:54:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_x86_64.AppImage", "last_modified": "2026-11-12T17:56:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_x86_64.AppImage.sig", "last_modified": "2026-11-12T17:56:00Z" },
+    { "key": "desktop/v0.1.0/openedbot_0.1.0_x86_64.deb", "last_modified": "2026-11-12T17:56:00Z" },
+    { "key": "desktop/v1.1.4/SHA256SUMS", "last_modified": "2026-11-10T09:00:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.AppImage", "last_modified": "2026-11-10T08:58:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.AppImage.sig", "last_modified": "2026-11-10T08:58:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.app.tar.gz", "last_modified": "2026-11-10T08:55:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.app.tar.gz.sig", "last_modified": "2026-11-10T08:55:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.deb", "last_modified": "2026-11-10T08:57:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_aarch64.dmg", "last_modified": "2026-11-10T08:54:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_x86_64.AppImage", "last_modified": "2026-11-10T08:56:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_x86_64.AppImage.sig", "last_modified": "2026-11-10T08:56:00Z" },
+    { "key": "desktop/v1.1.4/openedbot_1.1.4_x86_64.deb", "last_modified": "2026-11-10T08:56:00Z" }
+  ]
+}

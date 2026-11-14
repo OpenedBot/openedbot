@@ -1,0 +1,12 @@
+[Unit]
+Description=Rollback uncommitted Hermes host hardening
+ConditionPathExists={{ .ActiveMarker }}
+
+[Timer]
+OnActiveSec={{ .DelaySeconds }}s
+AccuracySec=1s
+RemainAfterElapse=false
+Unit={{ .Unit }}.service
+
+[Install]
+WantedBy=timers.target

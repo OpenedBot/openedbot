@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-request-email-code"
+description = "Enables the request_email_code command without any pre-configured scope."
+commands.allow = ["request_email_code"]
+
+[[permission]]
+identifier = "deny-request-email-code"
+description = "Denies the request_email_code command without any pre-configured scope."
+commands.deny = ["request_email_code"]

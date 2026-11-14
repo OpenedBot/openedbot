@@ -1,0 +1,412 @@
+{
+  "$migrations": {
+    "0139_permission_review.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Crée runtime_review_profiles (relecteur automatique, hors du cœur) et les colonnes de revue d'approval_requests (execution)."
+      }
+    },
+    "0145_permission_rules.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Règles de permission en langage naturel (plug-in permissions) : la migration est appliquée en production, elle reste au cœur sans renumérotation. Le cœur ne lit ni n'écrit plus bot_permission_rules ; la colonne rules_mode de la politique d'organisation reste stockée et renvoyée telle quelle."
+      }
+    },
+    "0177_review_profile_verified_watermark.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Preuve du profil de revue du relecteur automatique (port approvalReviewer) : la migration est appliquée en production, elle reste au cœur sans renumérotation ; le cœur ne lit plus runtime_review_profiles."
+      }
+    },
+    "0146_staff_permission_unattended.sql": {
+      "owner": "permissions",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Redéfinit staff_permission_decisions (lecture backoffice, étape unattended)."
+      }
+    },
+    "0153_audit_worm_orphans.sql": {
+      "owner": "audit",
+      "debt": {
+        "until": "2026-12-31",
+        "reason": "Archive externe de l'audit (plug-in audit, port auditArchive) : la migration est appliquée en production, elle reste au cœur sans renumérotation. Le cœur n'écrit plus audit_worm_orphans : il confie les dépôts d'une transaction annulée au hook auditArchive.orphaned."
+      }
+    }
+  },
+  "account_deletions": "identity",
+  "api_errors": {
+    "owner": "apps/api",
+    "writers": [
+      "apps/worker"
+    ]
+  },
+  "api_instances": "runtime-link",
+  "audit_chain": "runtime-link",
+  "audit_worm_orphans": {
+    "owner": "audit",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Archive externe de l'audit (plug-in audit, port auditArchive) : la table et sa RLS restent au schéma du cœur, migrations 0153 et 0154 comprises. Le cœur ne la lit ni ne l'écrit plus ; le hook auditArchive.orphaned y marque les objets archivés dans une transaction annulée."
+    }
+  },
+  "alert_channels": "notifications",
+  "alert_deliveries": "notifications",
+  "apns_deliveries": "notifications",
+  "apns_devices": "notifications",
+  "approval_requests": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "attachments": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "bot_groups": {
+    "owner": "roster",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "bot_host_cleanups": "roster",
+  "bot_permission_grants": "roster",
+  "bot_permission_rules": {
+    "owner": "permissions",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Règles de permission en langage naturel (plug-in permissions) : la table, sa RLS et ses triggers restent au schéma du cœur, migration 0145 comprise, car elle est appliquée en production. Le cœur ne la lit ni ne l'écrit plus ; le relecteur automatique et l'éditeur des règles sont au plug-in."
+    }
+  },
+  "bot_permission_tool_policies": "roster",
+  "bot_playbooks": "roster",
+  "bots": {
+    "owner": "roster",
+    "writers": [
+      "apps/worker"
+    ]
+  },
+  "bot_profile_provisions": "roster",
+  "bot_setting_proposals": "roster",
+  "decisions": "execution",
+  "email_login_codes": "identity",
+  "email_outbox": {
+    "owner": "notifications",
+    "writers": [
+      "runtime-link"
+    ]
+  },
+  "email_outbox_events": "notifications",
+  "execution_commands": "execution",
+  "group_member_read_positions": {
+    "owner": "conversation",
+    "writers": [
+      "execution"
+    ]
+  },
+  "group_members": "roster",
+  "marketplace_entries": "marketplace",
+  "membership_events": "identity",
+  "memberships": "identity",
+  "message_ingress": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "message_reactions": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "message_versions": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "messages": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "mobile_connect_tickets": {
+    "owner": "identity",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "native_auth_codes": "identity",
+  "oauth_attempts": "identity",
+  "operator_profiles": "identity",
+  "organization_agent_templates": "marketplace",
+  "organization_member_invitations": "identity",
+  "organization_permission_policies": "identity",
+  "organizations": {
+    "owner": "identity",
+    "writers": [
+      "apps/api",
+      "runtime-link"
+    ]
+  },
+  "playbooks": "roster",
+  "product_features": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "profile_delete_jobs": "portability",
+  "profile_import_items": "portability",
+  "profile_import_jobs": "portability",
+  "push_deliveries": "notifications",
+  "push_outbox": "notifications",
+  "push_subscriptions": {
+    "owner": "notifications",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "routine_executions": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "routines": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "run_events": "execution",
+  "run_steering_attempts": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runs": "execution",
+  "runtime_a2a_audit": "runtimes",
+  "runtime_audit_anchors": "runtime-link",
+  "runtime_audit_keys": "runtime-link",
+  "runtime_audit_verifications": {
+    "owner": "runtime-link",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtime_connector_notices": {
+    "owner": "runtime-link",
+    "writers": [
+      "notifications"
+    ]
+  },
+  "runtime_connector_release_seen": "runtime-link",
+  "runtime_direct_exposures": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtime_enrollments": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtime_link_alerts": "runtime-link",
+  "runtime_model_selection_proofs": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api",
+      "apps/worker"
+    ]
+  },
+  "runtime_permission_settings": "runtimes",
+  "runtime_model_proven": "runtimes",
+  "runtime_review_profiles": {
+    "owner": "permissions",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Preuve du profil de revue du relecteur automatique (plug-in permissions, port approvalReviewer) : la table reste au schéma du cœur, migrations 0139, 0177 et 0178 comprises, car elle est appliquée en production. Le cœur ne la lit ni ne l'écrit plus."
+    }
+  },
+  "runtime_link_diagnostics": "runtime-link",
+  "runtime_link_dispatches": "runtime-link",
+  "runtime_link_events": "runtime-link",
+  "runtime_bot_settings_tools": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtime_read_snapshots": "runtimes",
+  "runtime_provider_incidents": {
+    "owner": "execution",
+    "writers": [
+      "apps/api",
+      "runtimes"
+    ]
+  },
+  "runtime_routine_tools": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "bot_routine_tools": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "runtimes": {
+    "owner": "runtimes",
+    "writers": [
+      "apps/api",
+      "runtime-link"
+    ]
+  },
+  "schema_migrations": "db",
+  "sections": "roster",
+  "service_instances": {
+    "owner": "runtime-link",
+    "writers": [
+      "apps/api",
+      "apps/worker"
+    ]
+  },
+  "sessions": "identity",
+  "staff_impersonation_claims": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_login_codes": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_sessions": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée."
+    }
+  },
+  "staff_users": {
+    "owner": "staff",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Backoffice (plug-in staff, devenu plug-in externe, @openedbot/pro-staff, à l'étape 8) : la table reste au schéma du cœur, migrations comprises, en dette datée. Le rôle openedbot_staff reste aussi au cœur."
+    }
+  },
+  "stripe_events": {
+    "owner": "billing",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Billing (plug-in billing externe, @openedbot/pro-billing, depuis l'étape 8d, seul à déclarer billing.enforced) : la table, ses migrations et sa RLS restent au cœur, en dette datée. Le domaine (SQL, port, webhook, appels Stripe) est parti dans le plug-in à l'étape 11.4 (modules/billing supprimé) ; le cœur n'y touche que par SubscriptionPort. Depuis l'étape 11.5, les variables STRIPE_* (manifest.env) et le chemin du webhook (billing.webhookPath) sont déclarés par le plug-in : hors ces tables et leurs migrations, le cœur ne nomme plus le fournisseur (tests/scripts/payment-provider-contract.ts)."
+    }
+  },
+  "subscriptions": {
+    "owner": "billing",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Billing (plug-in billing externe, @openedbot/pro-billing, depuis l'étape 8d, seul à déclarer billing.enforced) : la table, ses migrations et sa RLS restent au cœur, en dette datée. Le domaine (SQL, port, webhook, appels Stripe) est parti dans le plug-in à l'étape 11.4 (modules/billing supprimé) ; le cœur n'y touche que par SubscriptionPort. Depuis l'étape 11.5, les variables STRIPE_* (manifest.env) et le chemin du webhook (billing.webhookPath) sont déclarés par le plug-in : hors ces tables et leurs migrations, le cœur ne nomme plus le fournisseur (tests/scripts/payment-provider-contract.ts)."
+    }
+  },
+  "support_attachments": {
+    "owner": "support",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Guichet de support (desk), retiré du cœur ouvert : plus aucun code ne lit ni n'écrit ces tables, plus aucun module support. Elles restent au schéma, migrations 0076, 0078 et 0079 comprises, jusqu'à la migration qui les supprime."
+    }
+  },
+  "support_conversations": {
+    "owner": "support",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Guichet de support (desk), retiré du cœur ouvert : plus aucun code ne lit ni n'écrit ces tables, plus aucun module support. Elles restent au schéma, migrations 0076, 0078 et 0079 comprises, jusqu'à la migration qui les supprime."
+    }
+  },
+  "support_events": {
+    "owner": "support",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Guichet de support (desk), retiré du cœur ouvert : plus aucun code ne lit ni n'écrit ces tables, plus aucun module support. Elles restent au schéma, migrations 0076, 0078 et 0079 comprises, jusqu'à la migration qui les supprime."
+    }
+  },
+  "support_messages": {
+    "owner": "support",
+    "debt": {
+      "until": "2026-12-31",
+      "reason": "Guichet de support (desk), retiré du cœur ouvert : plus aucun code ne lit ni n'écrit ces tables, plus aucun module support. Elles restent au schéma, migrations 0076, 0078 et 0079 comprises, jusqu'à la migration qui les supprime."
+    }
+  },
+  "team_imports": {
+    "owner": "portability",
+    "writers": [
+      "roster"
+    ]
+  },
+  "tenant_blob_deletions": {
+    "owner": "identity",
+    "writers": [
+      "conversation",
+      "portability",
+      "roster"
+    ]
+  },
+  "tenant_deletions": "identity",
+  "thread_compactions": "conversation",
+  "thread_hides": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "thread_message_counters": "conversation",
+  "thread_reads": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "threads": {
+    "owner": "conversation",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "tool_errors": "execution",
+  "users": {
+    "owner": "identity",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "webhook_deliveries": "apps/api",
+  "webhook_endpoints": "apps/api",
+  "webhook_management_operations": "apps/api",
+  "workflows": {
+    "owner": "execution",
+    "writers": [
+      "apps/api"
+    ]
+  },
+  "user_workspace_preferences": "notifications",
+  "workspace_activation": "identity"
+}

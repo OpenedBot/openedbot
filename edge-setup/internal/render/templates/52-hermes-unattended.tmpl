@@ -1,0 +1,7 @@
+// Keep Debian's packaged Origins-Pattern. Never reboot or remove rollback
+// kernels automatically on a remote runtime host.
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "false";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "false";
+Unattended-Upgrade::SyslogEnable "true";

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-report-runs-in-progress"
+description = "Enables the report_runs_in_progress command without any pre-configured scope."
+commands.allow = ["report_runs_in_progress"]
+
+[[permission]]
+identifier = "deny-report-runs-in-progress"
+description = "Denies the report_runs_in_progress command without any pre-configured scope."
+commands.deny = ["report_runs_in_progress"]

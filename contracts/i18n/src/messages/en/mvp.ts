@@ -1,0 +1,42 @@
+export const mvp = {
+  emailTitle: "Email alerts",
+  emailHint:
+    "Disabled by default. These choices apply to your account in this workspace. Sign-in and security emails are independent.",
+  approval: "Approval needed",
+  completed: "Task completed",
+  failed: "Task failed or needs review",
+  saveError: "Could not save preferences. Try again.",
+  loadError: "Could not load this information.",
+  files: "Files",
+  searchFiles: "Search files by name",
+  emptyFiles: "No files in this conversation.",
+  preview: "Preview",
+  download: "Download",
+  source: "Original message",
+  received: "Received",
+  produced: "Produced",
+  more: "Load more",
+  exportThread: "Export conversation",
+  exportBot: "Export bot configuration",
+  exportHint: "Markdown with attachment references, without file binaries.",
+  exportError: "Download failed. Try again.",
+  firstPrompt:
+    "Suggest three concrete ways to help me with my mission, then ask for the information you need to start.",
+  firstPromptAction: "Prepare my first request",
+  diagnostic: "Diagnostics",
+  modelsAction: "Check provider and model",
+  runtimeAction: "Check machine",
+  permissionsAction: "Check permissions",
+  retry: "Refresh diagnostics",
+  unknownError:
+    "The cause is unknown. Refresh diagnostics; if the problem persists, send the reference to support.",
+  reference: "Reference",
+  noMachine: "Link a machine so this bot can reply.",
+  providerProblem:
+    "The provider or model prevented this response. Check its configuration before sending your request again.",
+  permissionsProblem: "This bot’s permissions are not active on the machine.",
+  recovery: "Data recovery",
+  recoveryHint:
+    "Exports do not replace a full backup. Read the backup and recovery guide.",
+  openGuide: "Recovery guide",
+} as const;

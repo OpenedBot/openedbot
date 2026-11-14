@@ -1,0 +1,21 @@
+{
+  "name": "@openedbot/browser-api-client",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/api-client.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openedbot/contracts-events": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,134 @@
+---
+/**
+ * The language switch: a two-segment control (EN | FR) whose thumb sits under
+ * the current language. Each segment is a real link, so it works without
+ * JavaScript; with it, the thumb slides to the chosen side before the page
+ * changes. Used by the landing (`landing/Home.astro`) and by the docs pages,
+ * where it replaces Starlight's select (`starlight/LanguageSelect.astro`).
+ *
+ * Colors come from `--ls-*` custom properties so each surface (light landing,
+ * light and dark docs) sets its own.
+ */
+type Props = {
+  lang: 'en' | 'fr';
+  /** The same page in each language. */
+  hrefs: { en: string; fr: string };
+};
+
+const { lang, hrefs } = Astro.props;
+const label = lang === 'en' ? 'Language' : 'Langue';
+const segments = [
+  { code: 'en', short: 'EN', name: 'English', href: hrefs.en },
+  { code: 'fr', short: 'FR', name: 'Français', href: hrefs.fr },
+] as const;
+---
+
+<lang-switch class="lang-switch" role="group" aria-label={label} data-current={lang}>
+  <span class="lang-switch-thumb" aria-hidden="true"></span>
+  {
+    segments.map((segment) => (
+      <a
+        href={segment.href}
+        hreflang={segment.code}
+        lang={segment.code}
+        aria-label={segment.name}
+        aria-current={segment.code === lang ? 'true' : undefined}
+        data-lang={segment.code}
+      >
+        {segment.short}
+      </a>
+    ))
+  }
+</lang-switch>
+
+<style>
+  .lang-switch {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    flex-shrink: 0;
+    /* Never stretched by a flex row (Starlight's mobile menu footer). */
+    align-self: center;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--ls-track, #e9edf2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    isolation: isolate;
+  }
+
+  .lang-switch-thumb {
+    position: absolute;
+    z-index: -1;
+    inset-block: 3px;
+    inset-inline-start: 3px;
+    width: calc(50% - 3px);
+    border-radius: 999px;
+    background: var(--ls-thumb, #ffffff);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 1px 1px rgb(0 0 0 / 0.04);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .lang-switch[data-current='fr'] .lang-switch-thumb {
+    transform: translateX(100%);
+  }
+
+  .lang-switch a {
+    display: inline-flex;
+    min-width: 2.6rem;
+    min-height: 1.9rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    color: var(--ls-muted, #6b7280);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .lang-switch a:hover {
+    color: var(--ls-ink, #1a1a1c);
+  }
+
+  .lang-switch[data-current='en'] a[data-lang='en'],
+  .lang-switch[data-current='fr'] a[data-lang='fr'] {
+    color: var(--ls-ink, #1a1a1c);
+  }
+
+  .lang-switch a:focus-visible {
+    outline: 2px solid var(--ls-focus, #007aff);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lang-switch-thumb {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  /** Slides the thumb to the chosen language, then follows the link. */
+  class LangSwitch extends HTMLElement {
+    connectedCallback() {
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      for (const link of this.querySelectorAll<HTMLAnchorElement>('a[data-lang]')) {
+        link.addEventListener('click', (event) => {
+          if (link.getAttribute('aria-current') === 'true' || reduced) return;
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+          event.preventDefault();
+          this.dataset.current = link.dataset.lang;
+          setTimeout(() => window.location.assign(link.href), 220);
+        });
+      }
+      // Back from the cache after a switch: put the thumb back under this page's language.
+      window.addEventListener('pageshow', (event) => {
+        const current = this.querySelector<HTMLAnchorElement>('a[aria-current="true"]');
+        if (event.persisted && current) this.dataset.current = current.dataset.lang;
+      });
+    }
+  }
+  if (!customElements.get('lang-switch')) customElements.define('lang-switch', LangSwitch);
+</script>

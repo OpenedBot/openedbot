@@ -1,0 +1,56 @@
+---
+title: Security
+description: What stays on your machine, what openedbot never does, and the risks that remain yours.
+icon: Shield
+---
+
+openedbot orchestrates your bots. It does not administer your server. This page states what is guaranteed to you, and what is not. The tool's commands are in [edge-setup](/docs/edge-setup).
+
+## What stays with you
+
+- The software that runs your bots (Hermes).
+- Your machine's own secrets: they never leave it.
+- The keys to your AI services. Keys you enter in the console are passed to your machine without being stored or logged by openedbot.
+- Your bots' files, memory and work history on the machine.
+
+You open no port on your router and you expose no address of your machine.
+
+## What openedbot never does
+
+- It never opens a session on your machine: no SSH, no terminal.
+- It runs no free-form command and does not read the contents of your disk.
+- It does not update your machine for you.
+- It restarts Hermes only when you ask for it in the console.
+
+It does only what the console needs: run your bots, show their status and configure their services and functions.
+
+## Link and remove a machine
+
+- The ticket works only once and expires after five minutes.
+- You can remove a linked machine from the console at any time: it then loses access to your workspace.
+- Traffic between your machine and openedbot is encrypted in transit.
+
+## What this page does not guarantee
+
+| Risk | Who handles it |
+|---|---|
+| Someone has root on your machine | You. Root sees everything on the machine, keys included. |
+| VPS provider snapshot or console | The provider. `edge-setup` does not encrypt the disk. |
+| A page or file read by the bot (injection) | Approvals in the console. The bot can reach the Internet freely. |
+| The model provider (Anthropic, etc.) | It receives the messages the bot sends to it. |
+| `up` without hardening options | No firewall, no hardened SSH, no fail2ban. See [edge-setup](/docs/edge-setup). |
+
+## Report a vulnerability
+
+Do not publish an exploitable vulnerability; report it privately through
+GitHub Security Advisories
+([Report a vulnerability](https://github.com/OpenedBot/openedbot/security/advisories/new)),
+with the version (`edge-setup version`) and the impact. Never send a ticket,
+a password or a key.
+
+Each `edge-setup` release is signed by openedbot's release workflow on
+GitHub, for the tag of its version, and the signature is logged in Sigstore's
+public transparency log. Installation and updates verify that signature, then
+the binary's SHA-256 checksum, before installing anything: nothing is installed
+if either check fails, and an unsigned release is refused. See
+[edge-setup](/docs/edge-setup).

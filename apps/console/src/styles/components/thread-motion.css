@@ -1,0 +1,101 @@
+/*
+ * The thread and composer motion, taken from the reference app 0.78.1 (frame-by-frame
+ * capture of a real send, on 30-10). Durations and curves are
+ * its own; `lib/thread/thread-motion.ts` carries the ones JS plays (row
+ * entry, composer spring).
+ */
+
+/*
+ * The indicator of a bot at work (`PendingThinking`): it enters at
+ * scale 0.92 and fade (180 ms), its dots bounce from 0.6 to 1
+ * (340 ms, a curve that overshoots), the label rises 220 ms later.
+ */
+@keyframes openedbot-typing-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+.openedbot-typing-enter {
+  transform-origin: left center;
+  animation: openedbot-typing-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes openedbot-typing-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.openedbot-typing-enter .openedbot-thinking-dots {
+  animation: openedbot-typing-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/*
+ * A status label that replaces another rises by 4 px (180 ms). The
+ * first one does not move, except under the mark that enters (`data-enter`): it
+ * then arrives 220 ms after it. The highlight (`agent-activity.css`) runs
+ * at the same time: the two animations are declared together.
+ */
+@keyframes openedbot-status-swap {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.openedbot-status-swap:not([data-first]),
+.openedbot-status-swap[data-first][data-enter] {
+  animation: openedbot-status-swap 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.openedbot-status-swap[data-first][data-enter] {
+  animation-delay: 220ms;
+}
+.openedbot-thinking-shimmer.openedbot-status-swap:not([data-first]),
+.openedbot-thinking-shimmer.openedbot-status-swap[data-first][data-enter] {
+  animation:
+    openedbot-status-swap 180ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    openedbot-thinking-shimmer 2.2s steps(60, end) infinite;
+}
+.openedbot-thinking-shimmer.openedbot-status-swap[data-first][data-enter] {
+  animation-delay: 220ms, 0s;
+}
+
+/* « Aller en bas » arrives from 6 px lower (150 ms). */
+@keyframes openedbot-scroll-bottom-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.openedbot-scroll-bottom-enter {
+  animation: openedbot-scroll-bottom-enter 150ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/*
+ * The composer's primary button changes icon (send, stop,
+ * mic): the new one goes from 0.5 to 1 in 200 ms. Set only on an
+ * icon mounted after the first render (the composer's `useState`): the page
+ * opening moves nothing.
+ */
+@keyframes openedbot-icon-swap {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+.openedbot-icon-swap {
+  animation: openedbot-icon-swap 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-typing-enter,
+  .openedbot-typing-enter .openedbot-thinking-dots,
+  .openedbot-status-swap:not([data-first]),
+  .openedbot-status-swap[data-first][data-enter],
+  .openedbot-thinking-shimmer.openedbot-status-swap:not([data-first]),
+  .openedbot-thinking-shimmer.openedbot-status-swap[data-first][data-enter],
+  .openedbot-scroll-bottom-enter,
+  .openedbot-icon-swap {
+    animation: none;
+  }
+}

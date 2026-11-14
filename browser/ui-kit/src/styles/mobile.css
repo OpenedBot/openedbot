@@ -1,0 +1,909 @@
+/*
+  La PWA comme une application mobile : ce que le moteur natif donne gratis
+  au template Expo et que le web doit demander explicitement.
+
+  Tout ce qui touche l'entrée tactile vit sous `pointer: coarse` : un bureau
+  étroit garde sa densité et ses survols. Tout ce qui touche la coque vit sous
+  `[data-mobile-shell]` (voir `mobile-drawer-shell.tsx`) : le bureau n'en
+  hérite rien.
+*/
+
+/*
+  Les quatre insets, une seule fois. `env(...)` ne peut pas être surchargé,
+  une variable, si : la passe Playwright iPhone 15 Pro Max leur donne les
+  valeurs réelles (59 / 34) alors que Chromium rend `env()` toujours nul.
+*/
+:root {
+  --openedbot-safe-top: env(safe-area-inset-top, 0px);
+  --openedbot-safe-right: env(safe-area-inset-right, 0px);
+  --openedbot-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --openedbot-safe-left: env(safe-area-inset-left, 0px);
+
+  /* Inset Grouped : voir apps/console/DESIGN.md. Sur :root : le Dialog porte
+     dans document.body, hors [data-mobile-shell]. */
+  --openedbot-grouped-canvas: #f2f2f7;
+  --openedbot-grouped-card: #ffffff;
+  --openedbot-grouped-separator: rgba(60, 60, 67, 0.12);
+  --openedbot-grouped-label: #000000;
+  --openedbot-grouped-caption: #6d6d72;
+  --openedbot-grouped-chevron: #c7c7cc;
+  --openedbot-grouped-close: rgba(120, 120, 128, 0.16);
+  --openedbot-grouped-press: rgba(0, 0, 0, 0.04);
+  --openedbot-grouped-back: #007aff;
+  --openedbot-nav-back: #007aff;
+}
+html:root.dark {
+  --openedbot-grouped-canvas: #000000;
+  --openedbot-grouped-card: #1c1c1e;
+  --openedbot-grouped-separator: rgba(84, 84, 88, 0.65);
+  --openedbot-grouped-label: #f5f5f7;
+  --openedbot-grouped-caption: #8e8e93;
+  --openedbot-grouped-chevron: #636366;
+  --openedbot-grouped-close: rgba(120, 120, 128, 0.24);
+  --openedbot-grouped-press: #2c2c2e;
+  --openedbot-grouped-back: #0a84ff;
+  --openedbot-nav-back: #0a84ff;
+}
+
+@media (pointer: coarse) {
+  html {
+    /* Pas de flash gris au tap : le retour visuel, c'est `:active` (voir
+       `.openedbot-press`), comme le `pressed` d'un `Pressable`. */
+    -webkit-tap-highlight-color: transparent;
+    /* Un appui long sur un lien ne doit pas ouvrir la fiche de prévisualisation. */
+    -webkit-touch-callout: none;
+  }
+  body {
+    /* Pas d'effet élastique sur le document : c'est la scène qui défile, pas la page. */
+    overscroll-behavior: none;
+  }
+  a,
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  input,
+  textarea,
+  select {
+    /* Le double-tap n'a plus rien à zoomer : un tap répond en 0 ms, pas 300. */
+    touch-action: manipulation;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    /* Safari iOS zoome sur tout champ sous 16 px au focus. Le rem divisé par
+       `--openedbot-text-scale` : la taille du texte d'Apparence réduit le rem
+       de la page, pas ce seuil. */
+    font-size: max(calc(1rem / var(--openedbot-text-scale, 1)), 1em);
+  }
+}
+
+/* Le retour de pression : l'équivalent de `pressed` d'un `Pressable`. */
+.openedbot-press {
+  transition: background-color 120ms ease-out, opacity 120ms ease-out, transform 120ms ease-out,
+    scale 120ms ease-out;
+}
+.openedbot-press:active {
+  background-color: var(--surface-hover);
+}
+@media (prefers-reduced-motion: reduce) {
+  .openedbot-press {
+    transition: none;
+  }
+}
+
+/*
+  La fenêtre ne défile jamais : chaque écran possède sa propre surface de
+  scroll. Cela empêche le rubber-band WebKit de révéler le fond du document.
+
+  `100dvh` sur html, pas `100%`. En standalone iOS, le bloc initial est
+  encore calculé comme un dvh (safe area déjà retirée, WebKit #254868). Un
+  enfant en `100vh` dans un parent trop court se faisait rogner pile sur
+  l'indicateur d'accueil : capsule collée, ou bande morte sous la coque.
+*/
+html[data-openedbot-shell="mobile"],
+html[data-openedbot-shell="mobile"] body,
+html[data-openedbot-shell="mobile"] #root {
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+/* Une app native ne se pince pas : Safari iOS ignore `user-scalable=no`
+   mais honore `touch-action` sans `pinch-zoom`. Dézoomée, la coque
+   flottait au milieu de l'écran avec le fond du manifeste autour. */
+html[data-openedbot-shell="mobile"] {
+  touch-action: pan-x pan-y;
+}
+/* iOS installé : `100vh` est le plein écran, y compris la zone de l'indicateur.
+   La coque se cale dessus (`height: 100%`), le composer pad lui-même. */
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone],
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone] body,
+html[data-openedbot-ios-device][data-openedbot-pwa-standalone] #root {
+  height: 100vh;
+}
+
+[data-shell="mobile"] {
+  height: 100%;
+}
+
+[data-mobile-shell] {
+  /* Les barres de défilement n'existent pas dans une app native. */
+  scrollbar-width: none;
+  /* Le swipe-back iOS ne doit pas chaîner hors de la coque. */
+  overscroll-behavior-x: none;
+}
+[data-mobile-shell] * {
+  scrollbar-width: none;
+}
+[data-mobile-shell] *::-webkit-scrollbar {
+  display: none;
+}
+[data-mobile-shell] .overflow-y-auto,
+[data-mobile-shell] .overflow-auto {
+  /* Inertie du défilement WebKit, et pas de chaînage vers le document. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/*
+  Toute surface de défilement d'une scène se termine AU-DESSUS de l'indicateur
+  d'accueil. Le rembourrage vit sur le conteneur qui défile : il devient de la
+  course de défilement, jamais une bande peinte, c'est cette nuance qui avait
+  produit la fausse tab bar signalée sur iPhone quand l'inset était posé sur un
+  parent fixe.
+*/
+[data-mobile-shell] [data-mobile-overview],
+[data-mobile-shell] [data-mobile-scroll] {
+  padding-bottom: calc(var(--openedbot-safe-bottom) + 1rem);
+}
+
+/*
+  La barre du bas : le composer.
+
+  Une seule capsule, une seule rangée : pièce jointe, champ, dictée, envoi,
+  comme iMessage et ChatGPT sur iOS. La grille à deux rangées d'avant plaçait
+  le champ seul en haut et trois pastilles de 44 px en bas : une barre de
+  110 px de haut, à moitié vide, que l'œil lisait comme une tab bar. Ici la
+  rangée fait 44 pt pile, et c'est la capsule entière qui grandit quand le
+  texte passe à la ligne.
+
+  Pas de filet supérieur : ChatGPT iOS n'en a pas : le fil se fond dans la
+  barre. Le fond descend jusqu'au bord (l'indicateur repose dessus), mais la
+  capsule flotte au-dessus de l'indicateur, pas posée dessus : on ne retire de
+  l'inset que la barre elle-même (~6 pt), soit ~28 pt d'air sur un iPhone.
+*/
+/* Fil ancré sur le composer (assistant-ui Viewport + justify-end). */
+[data-mobile-shell] [role="log"] {
+  padding-bottom: 0.5rem;
+}
+
+[data-mobile-shell] [data-thread-composer] {
+  padding-inline: max(0.75rem, var(--openedbot-safe-left)) max(0.75rem, var(--openedbot-safe-right));
+  padding-top: 0.375rem;
+  /* Clavier RENTRÉ : la capsule respire au-dessus de l'indicateur d'accueil.
+     À 21 px elle paraissait posée dessus ; on ne retire plus que la barre
+     elle-même (~6 px) de l'inset, soit ~28 px sur un iPhone à encoche et 12 px
+     sur un appareil sans inset. Le clavier déployé reprend ses 2 px plus bas. */
+  padding-bottom: max(0.75rem, calc(var(--openedbot-safe-bottom) - 6px));
+  border-top: none;
+  background-color: var(--background);
+}
+/* Clavier logiciel (focus dans le champ) : 2 px sous la capsule, comme
+   iMessage / ChatGPT. Ancré aussi sur le focus du champ : Android
+   `resizes-content` ne pose jamais `data-keyboard-open` (delta ≈ 0) et
+   gardait tout l'inset au-dessus du clavier. Le champ seulement, pas
+   `:focus-within` : Radix rend le focus à la pastille de permission en
+   fermant son menu, et la capsule perdait 26 px sans aucun clavier. */
+[data-mobile-shell] [data-thread-composer]:has([data-composer]:focus),
+[data-shell="mobile"][data-keyboard-open] [data-thread-composer] {
+  padding-bottom: 2px;
+}
+/* Pas de hover sur doigt : le retour, c'est `:active` (`.openedbot-press`). */
+[data-mobile-shell] [data-composer-attachment]:hover,
+[data-mobile-shell] [data-composer-voice]:hover,
+[data-mobile-shell] [data-composer-action]:hover {
+  background-color: transparent;
+  color: inherit;
+}
+
+/* Same card as the desktop (radius 22, edge, shadow and focus-within are the
+   composer's classes), as a one-row capsule. */
+[data-mobile-shell] [data-composer-shell] {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  transition:
+    border-radius 180ms ease,
+    padding 180ms ease,
+    background-color 180ms ease,
+    border-color 200ms,
+    box-shadow 200ms;
+}
+[data-mobile-shell] [data-composer-row] {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto auto;
+  align-items: end;
+  column-gap: 0.25rem;
+  row-gap: 0.25rem;
+  min-height: 2.25rem;
+}
+/* La pastille de permission (Auto, Manuel, Mode plan) est `hidden` sous `sm`.
+   Sur le téléphone elle occupe la première ligne de la grille, seule : la
+   rangée du dessous reste « + », champ, dictée, envoi. Un `flex-wrap` la
+   faisait passer, et le champ (`field-sizing: content`) poussait Envoyer
+   sous le texte. */
+[data-mobile-shell] [data-composer-permission] {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline: 0.25rem;
+}
+[data-mobile-shell] [data-composer-permission] button {
+  min-height: 2.75rem;
+}
+[data-mobile-shell] [data-composer-attachment] {
+  grid-column: 1;
+  grid-row: 2;
+}
+/* The status line gives its 26 px back to the thread while the soft keyboard
+   is up: the capsule sits 2 px above the keyboard, as in iMessage. */
+[data-mobile-shell] [data-thread-composer]:has([data-composer]:focus) [data-composer-statusline] {
+  display: none;
+}
+[data-mobile-shell] [data-composer-field] {
+  grid-column: 2;
+  grid-row: 2;
+}
+[data-mobile-shell] [data-composer-voice] {
+  grid-column: 3;
+  grid-row: 2;
+}
+[data-mobile-shell] [data-composer-action] {
+  grid-column: 4;
+  grid-row: 2;
+}
+/* Le picker de modèle du composer est `display: contents` sous `sm` : sans
+   ça, son bouton devenait une cellule de la grille et décalait Envoyer. Le
+   modèle vit dans le sous-titre de l'en-tête. */
+[data-mobile-shell] [data-composer-model] {
+  display: none;
+}
+/* L'ordre visuel de la rangée, quel que soit l'ordre du DOM : la dictée
+   rejoint l'envoi à droite au lieu de doubler le trombone à gauche. */
+[data-mobile-shell] [data-composer-attachment] {
+  order: 1;
+}
+/* Portée sur la capsule : `data-composer` marque AUSSI le champ du lanceur
+   `/cs` (`landing.tsx`), qui partage le contrat clavier mais pas la géométrie
+   de la barre du bas. */
+[data-mobile-shell] [data-composer-shell] :is([data-composer], [data-composer-field]) {
+  order: 2;
+}
+[data-mobile-shell] [data-composer-voice] {
+  order: 3;
+}
+[data-mobile-shell] [data-composer-action] {
+  order: 4;
+}
+/*
+  Au focus, la capsule ne change PAS de peau : une seule rangée, la même
+  carte, le même rembourrage de texte (décision opérateur, 2026-10-06). Le
+  layout assistant-ui d'avant (champ en haut, barre d'actions dessous, fond
+  `--muted`, bordure `--border`, texte rembourré 1.15rem) faisait sauter la
+  bordure et le texte à chaque entrée dans le champ sur iOS et Android. Seul
+  le rembourrage sous la capsule bouge au clavier (`data-thread-composer`).
+*/
+[data-mobile-shell] [data-composer-attachment],
+[data-mobile-shell] [data-composer-voice],
+[data-mobile-shell] [data-composer-action] {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  margin-bottom: 0;
+}
+/* 36 px à l'œil, 44 pt au doigt : le `hitSlop` d'un `Pressable`, sans
+   épaissir la capsule (HIG / WCAG 2.5.8). */
+[data-mobile-shell] [data-composer-attachment]::before,
+[data-mobile-shell] [data-composer-voice]::before,
+[data-mobile-shell] [data-composer-action]::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+}
+/* Lancer est un libellé, pas une pastille de 36. La cible fait 44 pt,
+   la largeur suit le mot. Le hit-slop des pastilles ne s'y ajoute pas. */
+[data-mobile-shell] [data-composer-action="launch"] {
+  width: auto;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  margin-bottom: 0;
+  padding-inline: 0.875rem;
+  border-radius: 9999px;
+}
+[data-mobile-shell] [data-composer-action="launch"]::before {
+  inset: 0;
+}
+[data-mobile-shell] [data-composer-shell] :is([data-composer], [data-composer-field]) {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.25rem;
+  /* Au-delà, le fil disparaîtrait derrière son propre composer. */
+  max-height: min(40vh, 200px);
+  /* Le conteneur porte un `my-1.5` utile au bureau : dans la capsule il
+     ajouterait 12 px de haut à une rangée calibrée à 44 pt. */
+  margin-block: 0;
+}
+[data-mobile-shell] [data-composer-shell] [data-composer] {
+  /* `field-sizing` grandit la HAUTEUR. La largeur reste celle de la cellule :
+     sinon le texte (et le soulignement du correcteur) déborde de la capsule. */
+  field-sizing: content;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+/* Le champ ET son calque miroir peignent le MÊME texte, au même endroit :
+   toute divergence de police, d'interligne, de rembourrage ou de césure se
+   voit comme un texte fantôme dès qu'un nom de plugin est écrit. */
+[data-mobile-shell] [data-composer-shell] :is([data-composer], [data-composer-mcp-highlight]) {
+  /* (36 − 22) / 2 : le texte s'aligne sur le centre des pastilles. */
+  padding: 0.4375rem 0.25rem;
+  /* 17 px : le corps de texte iOS, et au-dessus du seuil de zoom de Safari. */
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+  overflow-wrap: anywhere;
+  /* Pas de transition sur height / min-height : elle fige le premier palier. */
+  transition: padding 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mobile-shell] [data-composer-shell],
+  [data-mobile-shell] [data-composer-shell] :is([data-composer], [data-composer-mcp-highlight]) {
+    transition: none;
+  }
+}
+/* Réponse citée et pièces jointes vivent DANS la capsule : elles suivent son
+   rembourrage, sans double marge contre le bord arrondi. */
+[data-mobile-shell] [data-composer-reply] {
+  margin: 0;
+}
+
+/* Le modèle reste accessible via l'action Réglages de l'en-tête. Sur mobile,
+   cette seconde barre sous le composer ressemblait à tort à une tab bar. */
+[data-mobile-shell] [data-thread-model-indicator] {
+  display: none;
+}
+/* La chrome ne se sélectionne pas ; le contenu, si. */
+[data-mobile-shell] [data-mobile-header],
+[data-mobile-shell] [data-mobile-drawer] [data-slot="sidebar-menu-button"],
+[data-mobile-shell] [data-mobile-settings] a,
+[data-mobile-shell] [data-mobile-settings] button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Les lignes du panneau réagissent au doigt comme les lignes de la liste. */
+[data-mobile-shell] [data-slot="sidebar-menu-button"]:active {
+  background-color: var(--sidebar-accent);
+}
+/*
+  44 pt partout dans le panneau : la marque, le « + », la recherche : la barre
+  bureau les taille à 32 px (`h-8`, `size-8`), ce qu'un pouce rate une fois
+  sur trois (HIG / WCAG 2.5.8).
+*/
+[data-mobile-shell] [data-mobile-drawer] [data-slot="sidebar-menu-button"] {
+  min-height: 2.75rem;
+}
+[data-mobile-shell] [data-mobile-drawer] [data-slot="sidebar-header"] button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+[data-mobile-shell] [data-mobile-drawer] [data-slot="sidebar-input"] {
+  height: 2.75rem;
+  border-radius: 0.625rem;
+}
+/*
+  La recherche du panneau au doigt : hors coque mobile aussi.
+
+  `Input` porte `text-base md:text-sm` : au-delà de 768 px de LARGE le champ
+  retombe à 14 px, et une tablette passe ce seuil avec un pouce. Safari iOS
+  zoome sur tout champ sous 16 px au focus, et la barre latérale part alors
+  hors cadre. Le pointeur décide, pas le breakpoint. Hors layer Tailwind :
+  bat `.md\:text-sm` sans course à la spécificité.
+*/
+@media (pointer: coarse) {
+  [data-slot="sidebar-input"] {
+    height: 2.75rem;
+    font-size: 1.0625rem;
+    line-height: 1.375rem;
+  }
+  /* Le « + » de l'en-tête est une pastille de 32 px (`size="icon-sm"`) : une
+     cible de souris. Pas les tabs Bot / Chat, qui n'ont pas de `data-slot`,
+     44 pt de LARGE ne tiendrait pas dans le rail replié. */
+  [data-slot="sidebar-header"] [data-slot="button"] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+}
+/*
+  Les commandes logées DANS le titre de l'en-tête (sélecteur de tâche) gardent
+  leur taille de pilule mais reçoivent un `hitSlop` : la zone tactile s'étend
+  de 9 px autour, jusqu'à 44 pt, sans épaissir la barre.
+*/
+[data-mobile-shell] [data-mobile-header] h1 button,
+[data-mobile-shell] [data-mobile-header-subtitle] button {
+  position: relative;
+}
+[data-mobile-shell] [data-mobile-header] h1 button::before,
+[data-mobile-shell] [data-mobile-header-subtitle] button::before {
+  content: "";
+  position: absolute;
+  inset: -9px;
+}
+
+/*
+  Replis des blocs agent (plan, journal de tâches, sources d'une recherche,
+  détail des limites). Les rangées doivent rester fines : elles se lisent en
+  liste, pas en boutons. La cible tactile est donc élargie par un ::before,
+  comme le titre du header, plutôt qu'en gonflant la ligne.
+*/
+[data-mobile-shell] [data-agent-toggle] {
+  position: relative;
+}
+[data-mobile-shell] [data-agent-toggle]::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+}
+
+/*
+  Inset Grouped : feuille Dialog (portail body) et listes PWA.
+  Spécificité volontairement au-dessus de `bg-card` / `rounded-t-2xl`.
+
+  `alertdialog` aussi, pas seulement `dialog` : une confirmation destructive
+  est la MÊME feuille, et sans ce sélecteur elle s'affichait sans fond : le
+  titre et la phrase se lisaient par-dessus la feuille du dessous.
+*/
+[role="dialog"].openedbot-inset-sheet,
+[role="alertdialog"].openedbot-inset-sheet {
+  background-color: var(--openedbot-grouped-canvas);
+  border-color: transparent;
+  border-top-left-radius: 32px;
+  border-top-right-radius: 32px;
+  box-shadow: none;
+  padding-bottom: 0;
+  color: var(--openedbot-grouped-label);
+  /* Le pop in-sheet, pas le swipe-back d'historique. */
+  overscroll-behavior-x: none;
+}
+[data-sheet-stack] {
+  overscroll-behavior-x: none;
+}
+html.dark [role="dialog"].openedbot-inset-sheet,
+html.dark [role="alertdialog"].openedbot-inset-sheet {
+  background-color: #000000;
+}
+[data-inset-grouped] ul {
+  border: none;
+  box-shadow: none;
+}
+[data-inset-grouped] li + li [data-inset-grouped-row]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 3.375rem;
+  height: 1px;
+  background-color: var(--openedbot-grouped-separator);
+}
+[data-inset-grouped-row]:active {
+  background-color: var(--openedbot-grouped-press);
+}
+[data-inset-grouped-row]:disabled,
+[data-inset-grouped-row][aria-disabled="true"] {
+  pointer-events: none;
+}
+[data-inset-grouped-row]:disabled:active,
+[data-inset-grouped-row][aria-disabled="true"]:active {
+  background-color: transparent;
+}
+[data-inset-close] {
+  color: var(--openedbot-grouped-label);
+  background-color: var(--openedbot-grouped-close);
+}
+[data-inset-close]:active {
+  background-color: var(--openedbot-grouped-close);
+  opacity: 0.7;
+}
+[data-inset-close]::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+[data-inset-back] {
+  color: var(--openedbot-grouped-back);
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+[data-inset-back]:active {
+  background: none;
+  opacity: 0.55;
+}
+
+[data-mobile-settings],
+[data-operator-settings] {
+  --openedbot-grouped-inset: 1.25rem; /* 20px : cartes inset, jamais flush */
+}
+[data-mobile-settings] {
+  background-color: var(--openedbot-grouped-canvas);
+  color: var(--openedbot-grouped-label);
+}
+
+/* Inset Grouped : le canvas se voit sur les côtés. Pas le padding interne
+   de la carte. Header / ‹ Retour restent pleine largeur. */
+[data-mobile-settings] [data-inset-grouped],
+[data-operator-settings] [data-inset-grouped] {
+  padding-inline: var(--openedbot-grouped-inset);
+}
+[data-mobile-settings] [data-settings-card] {
+  margin-inline: var(--openedbot-grouped-inset);
+}
+[data-mobile-settings] [data-settings-caption] {
+  padding-inline: var(--openedbot-grouped-inset);
+}
+[data-mobile-settings] [data-mobile-action-footer] {
+  padding-inline: var(--openedbot-grouped-inset);
+}
+
+/*
+  Skin iOS des primitives BoardUI : Dialog / Toaster portent dans body,
+  hors [data-mobile-shell]. Ancré sur la coque (`data-shell=mobile`), pas
+  sur `pointer: coarse` : une fenêtre < 768 est déjà la coque, et
+  Playwright n'émet pas toujours coarse. `!important` bat gradient / h-8.
+*/
+  html[data-openedbot-shell="mobile"] [data-slot="button"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    border-radius: 12px;
+    box-shadow: none !important;
+    background-image: none !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"]:hover {
+    background-image: none !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="primary"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="default"] {
+    background-color: var(--openedbot-grouped-back) !important;
+    color: #ffffff !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="primary"]:active,
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="default"]:active {
+    opacity: 0.72;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="secondary"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="outline"] {
+    background-color: var(--openedbot-grouped-card) !important;
+    border-color: var(--openedbot-grouped-separator) !important;
+    color: var(--openedbot-grouped-label) !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="ghost"] {
+    background-color: transparent !important;
+    color: var(--openedbot-grouped-label) !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="ghost"]:active {
+    background-color: var(--openedbot-grouped-press) !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="danger"],
+  html[data-openedbot-shell="mobile"] [data-slot="button"][data-variant="destructive"] {
+    background-color: transparent !important;
+    background-image: none !important;
+    color: var(--destructive, #ff3b30) !important;
+    box-shadow: none !important;
+  }
+  html[data-openedbot-shell="mobile"] [data-slot="input"],
+  html[data-openedbot-shell="mobile"] [data-slot="select-trigger"],
+  html[data-openedbot-shell="mobile"] textarea:not([data-composer]) {
+    min-height: 2.75rem;
+    height: auto;
+    border-radius: 12px;
+    font-size: 1.0625rem;
+    line-height: 1.375rem;
+    box-shadow: none !important;
+    background-color: var(--openedbot-grouped-card);
+  }
+  html[data-openedbot-shell="mobile"] .openedbot-settings-action {
+    min-height: 2.75rem;
+    border-radius: 12px;
+    box-shadow: none;
+    justify-content: center;
+    text-align: center;
+  }
+  html[data-openedbot-shell="mobile"] .openedbot-settings-action-primary {
+    background-color: var(--openedbot-grouped-back);
+    color: #ffffff;
+  }
+  html[data-openedbot-shell="mobile"] .openedbot-settings-field {
+    min-height: 2.75rem;
+    border-radius: 12px;
+    font-size: 1.0625rem;
+    line-height: 1.375rem;
+    background-color: var(--openedbot-grouped-card);
+  }
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions {
+    width: 100%;
+  }
+  /*
+    Seules les COMMANDES s'étirent. Une pastille d'état (« aucun modèle
+    imposé », « runtime prêt ») partageait la rangée et se retrouvait étalée
+    sur toute la largeur, en pilule bleue de 430 pt : elle se lisait comme un
+    bouton qu'on ne peut pas appuyer.
+  */
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > [data-slot="button"],
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > .openedbot-settings-action,
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > button,
+  html[data-openedbot-shell="mobile"] .openedbot-settings-actions > a {
+    min-height: 2.75rem;
+    flex: 1 1 auto;
+  }
+
+/*
+  Barre d'actions : `.bottomBar` iOS. Dernier enfant de la colonne scène,
+  pas `position: fixed` (clavier Safari). Pilules 44 pt, label centré.
+  `justify-end` / `ml-auto` du desktop ne doivent rien laisser fuir.
+*/
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] {
+  justify-content: stretch;
+  align-items: stretch;
+}
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] [data-slot="button"],
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] .openedbot-settings-action,
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] a,
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] button {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+html[data-openedbot-shell="mobile"] [data-mobile-action-footer] [data-slot="button"] > span {
+  flex: 0 1 auto;
+  padding-inline: 0;
+  justify-content: center;
+  text-align: center;
+}
+/* Les CTA ont quitté le scroll : la rangée in-card ne doit plus s'afficher. */
+[data-mobile-settings][data-has-action-footer] .openedbot-settings-actions {
+  display: none;
+}
+
+/*
+  La pile : push / pop d'une rubrique de réglages, par l'API View Transitions.
+  `data-openedbot-vt` est posé sur <html> par le routeur (voir `route-tree.tsx`) le
+  temps de la transition ; le reste du temps la bascule de thème garde son
+  fondu (`::view-transition-*(root)` de `app.css`).
+*/
+@keyframes openedbot-vt-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes openedbot-vt-out-to-left {
+  to {
+    transform: translateX(-28%);
+    opacity: 0.55;
+  }
+}
+@keyframes openedbot-vt-in-from-left {
+  from {
+    transform: translateX(-28%);
+    opacity: 0.55;
+  }
+}
+@keyframes openedbot-vt-out-to-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+html[data-openedbot-vt="push"]::view-transition-old(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-out-to-left;
+}
+html[data-openedbot-vt="push"]::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-in-from-right;
+  box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+}
+html[data-openedbot-vt="pop"]::view-transition-old(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-out-to-right;
+  box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+  z-index: 1;
+}
+html[data-openedbot-vt="pop"]::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.32, 0.72, 0, 1) both openedbot-vt-in-from-left;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-openedbot-vt]::view-transition-old(root),
+  html[data-openedbot-vt]::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/*
+  Liste d'état (`StatusList` / `StatusGrid`) dans une carte de réglages.
+
+  Le filet iOS part du texte, pas du bord : 16 px à gauche, jusqu'au bord
+  droit. `divide-y` posait un trait pleine largeur, qui coupe la carte en deux
+  au lieu de séparer deux lignes.
+*/
+.openedbot-status-list > * + * {
+  position: relative;
+}
+.openedbot-status-list > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 1rem;
+  height: 1px;
+  background-color: var(--openedbot-grouped-separator);
+}
+
+/*
+  Le groupe de réglages (`SettingsCard` coiffé de son titre) porte l'inset ;
+  la carte qu'il contient ne doit plus poser le sien, sinon 40 px de marge.
+*/
+[data-mobile-settings] [data-settings-group] > [data-settings-card],
+[data-operator-settings] [data-settings-group] > [data-settings-card] {
+  margin-inline: 0;
+}
+
+/*
+  L'action d'un titre de groupe : le « Modifier » d'iOS : du texte bleu, pas
+  une pilule bordée. La cible garde ses 44 pt par un ::before, comme les
+  autres commandes fines de la coque.
+*/
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"],
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--openedbot-grouped-back) !important;
+  font-size: 13px;
+  line-height: 1rem;
+  font-weight: 400;
+}
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"]::before,
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action::before {
+  content: "";
+  position: absolute;
+  inset: -14px -8px;
+}
+html[data-openedbot-shell="mobile"] [data-settings-group-action] [data-slot="button"]:active,
+html[data-openedbot-shell="mobile"] [data-settings-group-action] .openedbot-settings-action:active {
+  opacity: 0.5;
+}
+
+/*
+  `Tabs` de BoardUI dans la coque : le contrôle segmenté iOS.
+
+  Les déclencheurs faisaient 37 px de haut, sous la cible minimale, et la
+  liste était `w-fit`, donc deux pilules serrées dans un coin. Ici la rangée
+  prend la largeur, chaque segment 44 pt, et l'actif remonte en blanc sur le
+  lit gris : la même géométrie que `MobileSegmented`, pour que deux commutateurs
+  de la même app ne se ressemblent pas de loin seulement.
+*/
+html[data-openedbot-shell="mobile"] [data-slot="tabs-list"] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  width: 100%;
+  height: auto;
+  gap: 0;
+  padding: 2px;
+  border-radius: 9px;
+  background-color: var(--openedbot-grouped-close);
+  box-shadow: none;
+}
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] {
+  min-height: 2.75rem;
+  height: auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 7px;
+  padding-inline: 0.5rem;
+  font-size: 13px;
+  line-height: 1rem;
+  font-weight: 500;
+  color: var(--openedbot-grouped-caption);
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] > span,
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-openedbot-shell="mobile"] [data-slot="tabs-trigger"][data-state="active"] {
+  background-color: var(--openedbot-grouped-card);
+  color: var(--openedbot-grouped-label);
+  background-image: none;
+  box-shadow: none;
+}
+
+/*
+  Un document (manuel, mentions légales) dans la coque.
+
+  Il n'a ni carte ni groupe : c'est du texte. Il lui faut donc ce que la coque
+  donne aux groupes, l'inset de 20 px, que rien ne lui posait : le corps
+  touchait le bord de l'écran à x = 0. Et l'échelle iOS, parce qu'un h1 de
+  1.5 rem au-dessus d'un corps de 14 px est une échelle d'écran large.
+*/
+[data-mobile-settings] .legal-markdown {
+  padding-inline: var(--openedbot-grouped-inset);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--openedbot-grouped-label);
+}
+[data-mobile-settings] .legal-markdown h1 {
+  margin-top: 1.5rem;
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.01em;
+}
+[data-mobile-settings] .legal-markdown h2 {
+  margin-top: 2rem;
+  font-size: 22px;
+  line-height: 28px;
+}
+[data-mobile-settings] .legal-markdown h3 {
+  margin-top: 1.5rem;
+  font-size: 18px;
+  line-height: 24px;
+}
+[data-mobile-settings] .legal-markdown a {
+  /* Un lien dans un paragraphe reste un lien : pas de cible de 44 pt à lui
+     donner, mais de quoi le viser sans agrandir la ligne. */
+  padding-block: 0.15rem;
+}
+[data-mobile-settings] .legal-markdown pre,
+[data-mobile-settings] .openedbot-md-scroll {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--openedbot-grouped-card);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+[data-mobile-settings] .legal-markdown pre::-webkit-scrollbar,
+[data-mobile-settings] .openedbot-md-scroll::-webkit-scrollbar {
+  display: none;
+}
+[data-mobile-settings] .openedbot-md-scroll > table {
+  width: max-content;
+  min-width: 100%;
+  margin-top: 0;
+}
+[data-mobile-settings] .legal-markdown th,
+[data-mobile-settings] .legal-markdown td {
+  white-space: nowrap;
+  border-color: var(--openedbot-grouped-separator);
+  font-size: 15px;
+}

@@ -1,0 +1,56 @@
+[Unit]
+Description=Hermes loopback guard: private ports reserved for the service user and root
+# After UFW, whose before-rules would otherwise accept every loopback packet
+# ahead of these rules; they are inserted at the head of OUTPUT for that reason.
+After=network-pre.target ufw.service
+Wants=network-pre.target
+DefaultDependencies=no
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+Group=root
+UMask=0077
+# Idempotent: delete a possible previous copy (failure ignored), then insert
+# at the head. The REJECT goes in first so every ACCEPT inserted afterwards
+# lands above it. A rule spec here is a fixed argument list, never a shell.
+{{- range .Rules }}
+ExecStart=-/usr/sbin/iptables -w -D OUTPUT {{ . }}
+ExecStart=/usr/sbin/iptables -w -I OUTPUT 1 {{ . }}
+{{- end }}
+{{- range .Rules }}
+ExecStop=-/usr/sbin/iptables -w -D OUTPUT {{ . }}
+{{- end }}
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+# iptables talks to the kernel over netlink (nft backend) or a raw socket
+# option (legacy backend) and sends no packet: no device, no IP traffic, no
+# namespace, no kernel tunable or module. No ProcSubset=pid: the legacy
+# backend reads /proc/net.
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+IPAddressDeny=any
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

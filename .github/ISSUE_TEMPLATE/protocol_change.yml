@@ -1,0 +1,53 @@
+name: Protocol change
+description: Propose a change to the wire protocol between openedbot and edge-setup (protocol/SPEC.md).
+labels: ["protocol"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The protocol has two implementations (edge-setup in Go, openedbot in
+        TypeScript) and shared test vectors. A change is agreed here before any
+        pull request, because both sides and the vectors move together.
+  - type: input
+    id: spec-version
+    attributes:
+      label: Current spec version
+      description: The version at the top of protocol/SPEC.md.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: The problem the current protocol cannot solve.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed change
+      description: The frames, routes or fields that change, with the SPEC.md sections concerned.
+    validations:
+      required: true
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Compatibility
+      options:
+        - Backward compatible (older peers keep working)
+        - Breaking (needs a version negotiation or a coordinated release)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security considerations
+      description: Authentication, replay, allowlists, and what a compromised peer could do with the change.
+    validations:
+      required: true
+  - type: textarea
+    id: vectors
+    attributes:
+      label: Test vectors
+      description: The vectors to add or update (edge-setup/test/golden, protocol/connector/fixtures).

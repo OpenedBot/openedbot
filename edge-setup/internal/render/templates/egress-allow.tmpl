@@ -1,0 +1,14 @@
+{{- define "egress-allow" -}}
+{{- if . }}
+# The IPAddressAllow= lines below are the one exception to the deny: this host
+# resolves names through addresses inside a denied range (GCE and OCI serve DNS
+# on the metadata address). Only those addresses are allowed, each as a single
+# host, so name resolution keeps working; the rest of each range stays refused.
+# Where such an address also serves metadata, the metadata stays reachable
+# through it: the systemd-resolved stub (127.0.0.53) as nameserver needs no
+# exception.
+{{- range . }}
+IPAddressAllow={{ . }}
+{{- end }}
+{{- end }}
+{{- end -}}

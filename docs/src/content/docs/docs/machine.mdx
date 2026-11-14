@@ -1,0 +1,40 @@
+---
+title: Link a machine
+description: Choose a Debian or Ubuntu server and follow the steps shown in the console.
+icon: Server
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A linked machine lets your bots answer. It must stay on whenever you want to use them. A single machine serves every bot in your workspace. In the console, it is also called a "runtime".
+
+<Aside type="caution" title="A dedicated machine, and an installation that hardens nothing">
+Dedicate to your bots a machine that hosts no other services: the `edge-setup` hardening options take over SSH, the firewall and Docker.
+
+The commands shown in the console install Hermes and link the machine. They configure neither the firewall, nor SSH, nor fail2ban, unless you add those options. The details and the recommended profile for an Internet-facing server are in [edge-setup](/docs/edge-setup).
+</Aside>
+
+## Choose a machine
+
+You need a Debian 12 or later, or Ubuntu 24.04 or later, server, rented or at home, on `amd64` or `arm64`. It must run Linux with systemd.
+
+You don't need to buy a domain name or open a port on your router.
+
+## Link the machine
+
+1. In the console, open **Settings > Edge** and choose **Add a runtime**. During the welcome tour, the same window opens from the **Setup** step.
+2. Keep the **openedbot link (recommended)** option and give the machine a name.
+3. Open a terminal on the machine. Copy the commands shown, one at a time and in order. They download `edge-setup`, check its checksum, install it, then prepare the machine. If the checksum check does not print OK, go no further.
+4. Choose **Appairer depuis le serveur** (pair from the server). The console shows an `edge-setup link` command and a ticket, with the time left.
+5. Run the `edge-setup link` command on the machine. When it asks for the ticket, paste it at the hidden prompt: it is not displayed. The ticket is valid for five minutes and works only once. Never add it to a command and do not share it.
+6. The console confirms when the machine is connected. You can then create a bot and talk to it.
+
+If the step 3 commands have already been run on this machine, go straight to pairing. If the ticket expires, see [Solve a problem](/docs/depannage#my-ticket-has-expired).
+
+## Replace the machine
+
+Your workspace has a single machine. To change it:
+
+1. In **Settings > Edge**, choose **Replace the runtime**, then follow the same steps on the new machine. It waits without serving your bots.
+2. Confirm the replacement with **Replace**. The new machine takes over, the old one is removed and its running tasks stop.
+3. Your bots do not exist on the new machine yet: import them with **Settings > Import agents**.

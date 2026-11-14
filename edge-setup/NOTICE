@@ -1,0 +1,12 @@
+edge-setup
+Copyright 2026 Kevin Aubrée
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product bundles or builds upon third-party components distributed under
+their own licenses, whose terms and notices are preserved and apply to those
+components:
+
+- hermes-agent, MIT License, Copyright (c) 2025 Nous Research.
+- Portions derived from vps-audit, MIT License, Copyright (c) 2024 Israel
+  Abebe Kokiso (see assets/NOTICE-vps-audit).

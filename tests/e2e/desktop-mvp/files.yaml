@@ -1,0 +1,14 @@
+name: MVP conversation files and exports
+---
+- tapOn: { role: button, text: "Fichiers" }
+- extendedWaitUntil: { visible: { css: '[role="dialog"] p.break-words.font-medium' }, timeout: 10000 }
+# The occluded WKWebView pauses CSS animation time. Settle its finite animations for final-state assertions.
+- evalJs: "await new Promise(r => setTimeout(r, 250)); document.getAnimations().forEach(a => { if(a.effect?.getTiming().iterations !== Infinity) a.finish(); })"
+- takeScreenshot: files
+- tapOn: { role: button, text: "Exporter la conversation" }
+- tapOn: { role: button, text: "Exporter la configuration du bot" }
+- tapOn: { role: button, text: "Télécharger" }
+- tapOn: { role: button, text: "Message d’origine" }
+- assertNotVisible: { role: dialog, text: "Fichiers" }
+- takeScreenshot: original-message
+- assertJs: "Array.from(document.querySelectorAll('[data-thread-find-target]')).some(x => x.textContent.includes('Rapport de recette disponible.'))"

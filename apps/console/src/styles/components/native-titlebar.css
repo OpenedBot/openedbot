@@ -1,0 +1,207 @@
+/*
+  The desktop app has no title bar on macOS (nor on Windows, D4):
+  the console goes up to the top edge of the window and the
+  frame's top bar (`board-chrome.tsx`, 46 px) becomes the window's,
+  in the manner of Codex, ChatGPT or the reference app. The app's top
+  row (top of the sidebar, top bar, agent editor header) becomes the window's
+  drag handle.
+
+  - macOS: the traffic lights float in the top-left corner.
+  - Windows (D4): minimize, maximize and close over the top-right corner
+    (46 px tall, in the frame's colors).
+
+  Everything lives under `:root[data-native-titlebar]` (`"mac"` or `"windows"`), set
+  before the first render by `lib/platform/native-titlebar.ts`: browser and PWA see
+  none of these rules. Rules shared by both shells take
+  the attribute alone, the others its value.
+
+  Geometry tied to `apps/desktop-tauri/src-tauri/src/macos/traffic_lights.rs`:
+  - macOS, the close button at x 16, the three buttons centered on the
+    frame's top bar (46 / 2 × zoom), sidebar open or
+    collapsed; the reserved slot ends at 76.
+  - Windows, 46 px tall: the buttons are the bar's height. Their
+    width comes from the Window Controls Overlay variables
+    (`env(titlebar-area-*)`).
+  Changing one without the other shifts the buttons.
+
+  Drag regions: Chromium applies them in order, a `no-drag` region
+  that comes later cuts the `drag` region it covers. A `drag`
+  zone swallows every click at the system level: every control of a
+  draggable row must therefore be `no-drag`, otherwise it no longer responds.
+*/
+
+:root[data-native-titlebar] {
+  /* The height of the top bar, therefore that of the system buttons'
+     band. */
+  --openedbot-titlebar-height: 46px;
+}
+
+:root[data-native-titlebar="mac"] {
+  /* Where the lights end, in page pixels. They do not zoom with the
+     text size (`lib/shell/text-size.ts`): the shell zooms the page and sets
+     `--openedbot-native-zoom`, and their 76 screen px are worth 76 / zoom page
+     pixels. The shell also recenters the lights on the zoomed top bar. */
+  --openedbot-traffic-lights-end: calc(76px / var(--openedbot-native-zoom, 1));
+  /* From the start of the row (x 12, sidebar or top bar
+     collapsed): the lights end at 76, then 8 px before the first control
+     (72 px without zoom). */
+  --openedbot-traffic-lights-width: calc(var(--openedbot-traffic-lights-end) - 4px);
+}
+
+:root[data-native-titlebar="windows"] {
+  /* The width of the system buttons, measured from the right edge of the
+     window: what the free title area leaves on the right. Without the
+     variables (a shell without `titleBarOverlay`), the three Windows 11
+     buttons at 46 px, rounded. */
+  --openedbot-caption-buttons-width: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))
+  );
+}
+
+/* The lights' slot in the sidebar's top row. Windows
+   has none: its buttons are on the right. */
+[data-titlebar-lights] {
+  display: none;
+}
+
+:root[data-native-titlebar="mac"] [data-titlebar-lights] {
+  display: block;
+  flex: none;
+  width: var(--openedbot-traffic-lights-width);
+}
+
+/* The top bar touches the right edge of the window: its actions
+   stop before the system buttons, with the same inset as its right
+   edge without them (12 px). */
+:root[data-native-titlebar="windows"] [data-board-topbar] {
+  padding-inline-end: calc(var(--openedbot-caption-buttons-width) + 12px);
+}
+
+/* The top of the window above the cards (frame margin and top of the
+   side card): on every screen, including those with no header. Nothing
+   interactive lives there. Behind everything (z-index -1) and transparent to web
+   clicks: only the native region counts. */
+[data-native-titlebar-band] {
+  display: none;
+}
+
+:root[data-native-titlebar] [data-native-titlebar-band] {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 20px;
+  pointer-events: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+:root[data-native-titlebar] [data-titlebar-drag] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+:root[data-native-titlebar] [data-titlebar-drag] :is(
+  a,
+  button,
+  input,
+  label,
+  select,
+  summary,
+  textarea,
+  [contenteditable="true"],
+  [role="button"],
+  [role="combobox"],
+  [role="link"],
+  [role="menuitem"],
+  [role="switch"],
+  [role="tab"],
+  [tabindex]:not([tabindex="-1"])
+) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* What opens over a draggable row (menus, popovers,
+   modals) stays clickable: mounted in a portal at the end of `<body>`, it comes
+   after and cuts the region. */
+:root[data-native-titlebar] :is(
+  [data-radix-popper-content-wrapper],
+  [role="alertdialog"],
+  [role="dialog"],
+  [role="listbox"],
+  [role="menu"]
+) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Rail shell (layout « c », `board-rails.tsx`): no icon rail, the cards
+   start 12 px from the top. The conversations card's head row (`RailHead`)
+   shows the openedbot logo on the web; in the macOS app the shell places the
+   lights in that row instead (`set_titlebar_anchor` « card »: x 26 × zoom,
+   54 points wide, centred on the row), the logo gives way to their room. The
+   row starts 20 page px from the window's left edge (card 12, border 1,
+   padding 7), the same when it moves into the main card's header while the
+   card is collapsed: 26 + 54 / zoom - 20, plus 6 px before the first button. */
+:root[data-native-titlebar="mac"] [data-rail-head] [data-titlebar-lights] {
+  width: calc(12px + 54px / var(--openedbot-native-zoom, 1));
+}
+
+:root[data-native-titlebar="mac"] [data-rail-logo] {
+  display: none;
+}
+
+[data-titlebar-logo] {
+  display: none;
+}
+
+/* The settings navigation in the rail shell (`settings-modal.tsx`): the
+   lights take the card's head row as in the conversations card, the way out
+   of settings comes under them. Elsewhere (web, Windows) there is no such row. */
+[data-settings-lights-row] {
+  display: none;
+}
+
+:root[data-native-titlebar="mac"] [data-settings-lights-row] {
+  display: block;
+}
+
+/*
+  Narrow window (the mobile shell of `useIsMobile`, under 768 px): no
+  side card to house the lights. The system buttons take the status
+  bar's band, like a notch: the mobile shell already reserves it through
+  `--openedbot-safe-top`. The shell's window does not go under 800 px; this
+  case remains for a zoom or a lowered minimum.
+*/
+@media (max-width: 767px) {
+  :root[data-native-titlebar] {
+    --openedbot-safe-top: var(--openedbot-titlebar-height);
+  }
+
+  :root[data-native-titlebar] [data-native-titlebar-band] {
+    height: var(--openedbot-titlebar-height);
+  }
+
+  :root[data-native-titlebar="mac"] [data-titlebar-lights] {
+    display: none;
+  }
+}
+
+/* The welcome flow (`onboarding/components/step-shell.tsx`) has no frame top
+   bar: without it, the macOS lights bit into the corner of the rail
+   card. An empty row the height of the bar receives them and serves as a
+   drag handle; the rail card loses its top margin, the row replaces it. */
+[data-onboarding-titlebar] {
+  display: none;
+}
+
+:root[data-native-titlebar] [data-onboarding-titlebar] {
+  display: block;
+  flex: none;
+  height: var(--openedbot-titlebar-height);
+}
+
+:root[data-native-titlebar] [data-onboarding-rail] {
+  padding-top: 0;
+}

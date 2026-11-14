@@ -1,0 +1,211 @@
+---
+import CopyButton from './CopyButton.astro';
+import Lines from './Lines.astro';
+import LangSwitch from '../LangSwitch.astro';
+import Motion from './Motion.astro';
+import PillLink from './PillLink.astro';
+
+/**
+ * The landing of the docs, in the console's identity (`.pw`, apps/console):
+ * its job is to get an operator from nothing to a first bot, not to sell.
+ * One strong element, the dark panel of the real commands, the ones the
+ * console shows when a machine is added (apps/console, `cloud-enrollment.tsx`
+ * and the `link` command of the enrollment ticket); the path
+ * as a true sequence; then where to look when something is stuck. English
+ * is the default (`/`), French lives at `/fr/`.
+ */
+type Props = { lang: 'en' | 'fr' };
+const { lang } = Astro.props;
+
+const CONSOLE = 'https://openedbot.app';
+/** The link origin the API announces in the enrollment command (RUNTIME_LINK_PUBLIC_URL). */
+const LINK = 'https://link.openedbot.app';
+/** In the console's order: install (signature, then SHA-256), `up`, then `link`. */
+const COMMANDS = [
+  "curl --proto '=https' --tlsv1.2 -fsSL https://docs.openedbot.app/install | sh",
+  'sudo edge-setup up --yes',
+  `edge-setup link --openedbot ${LINK} --yes`,
+] as const;
+/** The copy button takes the whole panel, one command per line. */
+const ALL_COMMANDS = COMMANDS.join('\n');
+const base = lang === 'en' ? '' : '/fr';
+
+const COPY = {
+  en: {
+    nav: [
+      { href: '/docs', label: 'Documentation' },
+      { href: '/docs/machine', label: 'Link a machine' },
+      { href: '/docs/depannage', label: 'Troubleshooting' },
+    ],
+    openConsole: 'Open the console',
+    title: 'From a server you own to your first bot.',
+    lede: 'Create an account, link your server with the commands the console shows you, then talk to your bots from the console. They run on your server, never on ours.',
+    readGuide: 'Read the guide',
+    panelTitle: 'On your server',
+    copy: 'Copy',
+    copied: 'Copied',
+    lines: [
+      { cmd: COMMANDS[0], note: 'checks the release signature, then installs edge-setup' },
+      { cmd: COMMANDS[1], note: 'installs Hermes, the software that runs your bots' },
+      { cmd: COMMANDS[2], note: 'paste the ticket the console shows you' },
+    ],
+    panelNote: 'Debian 12 or later, Ubuntu 24.04 or later, amd64 or arm64.',
+    pathTitle: 'The path',
+    pathLede: 'Four steps, in this order. Each one has its page.',
+    steps: [
+      { href: '/docs/compte', title: 'Create an account', body: 'Google or a password, then a workspace for your bots.' },
+      { href: '/docs/machine', title: 'Link your machine', body: 'The commands the console shows you, on a Debian or Ubuntu server.' },
+      { href: '/docs/bot', title: 'Create a bot', body: 'A name, a face, an AI provider, a mission.' },
+      { href: '/docs/conversation', title: 'Talk to it', body: 'Threads, groups, mentions, and decisions in the thread.' },
+    ],
+    stuckTitle: 'When something is stuck',
+    stuckLede: 'The common cases and what to do, in plain words.',
+    stuck: [
+      { href: '/docs/depannage', title: 'My bot does not answer' },
+      { href: '/docs/depannage', title: 'I cannot find my machine' },
+      { href: '/docs/depannage', title: 'My ticket expired' },
+      { href: '/docs/faq', title: 'Frequently asked questions' },
+      { href: '/docs/support', title: 'Contact support' },
+    ],
+    footerTag: 'The bot stays with you.',
+  },
+  fr: {
+    nav: [
+      { href: '/fr/docs', label: 'Documentation' },
+      { href: '/fr/docs/machine', label: 'Relier une machine' },
+      { href: '/fr/docs/depannage', label: 'Dépannage' },
+    ],
+    openConsole: 'Ouvrir la console',
+    title: 'D’un serveur à vous à votre premier bot.',
+    lede: 'Créez un compte, reliez votre serveur avec les commandes que la console vous donne, puis parlez à vos bots depuis la console. Ils tournent sur votre serveur, jamais chez nous.',
+    readGuide: 'Lire le guide',
+    panelTitle: 'Sur votre serveur',
+    copy: 'Copier',
+    copied: 'Copié',
+    lines: [
+      { cmd: COMMANDS[0], note: 'vérifie la signature de la release, puis installe edge-setup' },
+      { cmd: COMMANDS[1], note: 'installe Hermes, le logiciel qui fait tourner vos bots' },
+      { cmd: COMMANDS[2], note: 'collez le ticket affiché par la console' },
+    ],
+    panelNote: 'Debian 12 ou plus, Ubuntu 24.04 ou plus, amd64 ou arm64.',
+    pathTitle: 'Le parcours',
+    pathLede: 'Quatre étapes, dans cet ordre. Chacune a sa page.',
+    steps: [
+      { href: '/fr/docs/compte', title: 'Créer un compte', body: 'Google ou mot de passe, puis un espace pour vos bots.' },
+      { href: '/fr/docs/machine', title: 'Relier votre machine', body: 'Les commandes que la console vous donne, sur un serveur Debian ou Ubuntu.' },
+      { href: '/fr/docs/bot', title: 'Créer un bot', body: 'Un nom, un visage, un fournisseur d’IA, une mission.' },
+      { href: '/fr/docs/conversation', title: 'Lui parler', body: 'Fils, groupes, mentions, et les décisions dans le fil.' },
+    ],
+    stuckTitle: 'Quand ça bloque',
+    stuckLede: 'Les cas fréquents et quoi faire, en clair.',
+    stuck: [
+      { href: '/fr/docs/depannage', title: 'Mon bot ne répond pas' },
+      { href: '/fr/docs/depannage', title: 'Je ne trouve pas ma machine' },
+      { href: '/fr/docs/depannage', title: 'Mon ticket a expiré' },
+      { href: '/fr/docs/faq', title: 'Questions fréquentes' },
+      { href: '/fr/docs/support', title: 'Contacter le support' },
+    ],
+    footerTag: 'Le bot reste chez vous.',
+  },
+} as const;
+
+const t = COPY[lang];
+---
+
+<header class="site-header">
+  <nav class="site-nav" aria-label={lang === 'en' ? 'Main navigation' : 'Navigation principale'}>
+    <a href={`${base}/`} class="brand">
+      <img src="/brand/openedbot-icon.webp" alt="" width="24" height="24" />
+      <span>openedbot</span>
+    </a>
+    <div class="site-nav-links">
+      {t.nav.map((item) => <a href={item.href}>{item.label}</a>)}
+    </div>
+    <div class="site-nav-actions">
+      <LangSwitch lang={lang} hrefs={{ en: '/', fr: '/fr/' }} />
+      <PillLink href={CONSOLE} external>{t.openConsole}</PillLink>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="hero-wrap">
+    <div class="hero-bg" aria-hidden="true">
+      <span class="hero-orb hero-orb-a"></span>
+      <span class="hero-orb hero-orb-b"></span>
+      <span class="hero-orb hero-orb-c"></span>
+    </div>
+    <section class="hero shell">
+      <div class="hero-copy">
+        <Lines text={t.title} />
+        <p class="lede" data-reveal data-reveal-delay="0.25">{t.lede}</p>
+        <div class="actions" data-reveal data-reveal-delay="0.4">
+          <PillLink href={`${base}/docs`}>{t.readGuide}</PillLink>
+          <a href={CONSOLE} rel="noreferrer noopener" class="outline">{t.openConsole}</a>
+        </div>
+      </div>
+
+      <figure class="commands" aria-label={t.panelTitle} data-reveal data-reveal-delay="0.3" data-typing>
+        <figcaption class="commands-head">
+          <span>{t.panelTitle}</span>
+          <CopyButton text={ALL_COMMANDS} label={t.copy} done={t.copied} />
+        </figcaption>
+        <ol class="commands-lines">
+          {
+            t.lines.map((line) => (
+              <li data-type>
+                <code>
+                  <span class="prompt" aria-hidden="true">$</span> {line.cmd}
+                </code>
+                <span class="note">{line.note}</span>
+              </li>
+            ))
+          }
+        </ol>
+        <p class="commands-foot">{t.panelNote}</p>
+      </figure>
+    </section>
+  </div>
+
+  <section class="path shell" aria-labelledby="path-title">
+    <div class="section-head">
+      <Lines as="h2" id="path-title" text={t.pathTitle} />
+      <p data-reveal data-reveal-delay="0.15">{t.pathLede}</p>
+    </div>
+    <ol class="steps">
+      {
+        t.steps.map((step, index) => (
+          <li data-reveal data-reveal-delay={(0.1 + index * 0.08).toFixed(2)}>
+            <a href={step.href} class="step">
+              <span class="step-number" aria-hidden="true">{index + 1}</span>
+              <span class="step-title">{step.title}</span>
+              <span class="step-body">{step.body}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="stuck shell" aria-labelledby="stuck-title">
+    <div class="section-head">
+      <Lines as="h2" id="stuck-title" text={t.stuckTitle} />
+      <p data-reveal data-reveal-delay="0.15">{t.stuckLede}</p>
+    </div>
+    <ul class="stuck-list" data-reveal data-reveal-delay="0.2">
+      {t.stuck.map((item) => <li><a href={item.href}>{item.title}</a></li>)}
+    </ul>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="shell site-footer-inner">
+    <a href={`${base}/`} class="brand">
+      <img src="/brand/openedbot-icon.webp" alt="" width="20" height="20" />
+      <span>openedbot</span>
+    </a>
+    <span>© 2026 openedbot. {t.footerTag}</span>
+  </div>
+</footer>
+
+<Motion />

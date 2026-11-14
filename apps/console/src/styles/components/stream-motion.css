@@ -1,0 +1,97 @@
+/*
+ * The motion of the reference app's chat, verbatim from the streaming-ui template
+ * (MakFly/streaming-ui, its `CSS` string): same
+ * keyframes, durations and curves. Only the colours read the thread tokens
+ * (`--stream-*`, thread-theme.css), so the shimmer works in light too.
+ * `--stream-ease` is the template's `EASE`.
+ */
+:root {
+  --stream-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The template's `MONO`, for queries and URLs in the feed. */
+  --stream-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+@keyframes stream-blur-in { 0% { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+@keyframes stream-feed-in { 0% { opacity: 0; transform: translateY(5px) scale(0.9); filter: blur(4px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes stream-feed-out { 0% { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateY(-10px) scale(0.9); filter: blur(4px); } }
+@keyframes stream-enter { 0% { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes stream-pop { 0% { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes stream-row-in { 0% { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes stream-spring { 0% { opacity: 0; transform: scale(0.6); } 38% { opacity: 1; transform: scale(1.046); } 60% { transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+@keyframes stream-dot { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes stream-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes stream-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes stream-fade { 0% { opacity: 0; } to { opacity: 1; } }
+@keyframes stream-fade-out { 0% { opacity: 1; } to { opacity: 0; } }
+@keyframes stream-swap-out { 0% { opacity: 1; filter: blur(0); } to { opacity: 0; filter: blur(4px); } }
+@keyframes stream-swap-in { 0% { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+@keyframes stream-menu-in { 0% { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes shimmer-text-sweep { 0% { background-position: 200% 50%, 0 0; } to { background-position: -200% 50%, 0 0; } }
+
+/*
+ * `backwards`, not the template's `both`: the last keyframe IS the word's own
+ * style (opaque, no blur), so holding it changes no pixel, but a held
+ * animation stays in effect for good. One per streamed word, they piled up
+ * (1 200 at the end of a 9 000-character answer, D1c) and every frame
+ * restyled all of them.
+ */
+.stream-w { animation: stream-blur-in 0.2s var(--stream-ease) backwards; }
+.stream-feed-in { animation: stream-feed-in 0.45s var(--stream-ease) both; transform-origin: center top; }
+.stream-feed-out { animation: stream-feed-out 0.4s var(--stream-ease) both; transform-origin: center top; }
+.stream-enter { animation: stream-enter 0.2s var(--stream-ease) both; }
+.stream-pop { animation: stream-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.stream-row-in { animation: stream-row-in 0.15s ease-out both; }
+.stream-status-in { animation: stream-fade 0.2s ease-out both; }
+.stream-spring { animation: stream-spring 0.4s linear both; }
+.stream-dot { animation: stream-dot 1.2s ease-in-out infinite; }
+.stream-pulse { animation: stream-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.stream-twinkle { animation: stream-twinkle 1.6s ease-in-out infinite; transform-origin: center; }
+.stream-f100 { animation: stream-fade 0.1s ease-in-out both; }
+.stream-f120 { animation: stream-fade 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stream-f180 { animation: stream-fade 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stream-out120 { animation: stream-fade-out 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stream-swap-out { animation: stream-swap-out 0.2s cubic-bezier(0.32, 0, 0.67, 0) both; }
+.stream-swap-in { animation: stream-swap-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.stream-menu:not([data-state="closed"]) {
+  animation: stream-menu-in 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin, var(--radix-popover-content-transform-origin));
+}
+.stream-scroll { scrollbar-width: none; }
+.stream-scroll::-webkit-scrollbar { display: none; }
+
+/* The running label: the secondary ink, a band of the primary one sweeping it every 2.4 s. */
+.stream-shimmer {
+  color: transparent !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-repeat: no-repeat;
+  background-size: 200% 100%, 100% 100%;
+  background-image:
+    linear-gradient(90deg, transparent 35%, var(--stream-fg) 50%, transparent 65%),
+    linear-gradient(var(--stream-fg2), var(--stream-fg2));
+  animation: shimmer-text-sweep 2400ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-shimmer,
+  .stream-f100,
+  .stream-f120,
+  .stream-f180,
+  .stream-out120,
+  .stream-swap-out,
+  .stream-swap-in,
+  .stream-w,
+  .stream-feed-in,
+  .stream-feed-out,
+  .stream-enter,
+  .stream-pop,
+  .stream-menu,
+  .stream-row-in,
+  .stream-status-in,
+  .stream-spring,
+  .stream-dot,
+  .stream-pulse,
+  .stream-twinkle {
+    animation: none !important;
+  }
+}

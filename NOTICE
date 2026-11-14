@@ -1,0 +1,28 @@
+openedbot
+Copyright 2026 Kévin Aubrée and openedbot contributors
+
+Contributions are received by the project under the Apache License, Version
+2.0 (see CONTRIBUTING.md). The work as a whole is distributed under the GNU
+Affero General Public License v3.0 only (see LICENSE); edge-setup/ and
+protocol/ are distributed under the Apache License 2.0 (see their LICENSE
+files). The maintainer may also offer the work under a commercial license
+(see COMMERCIAL.md).
+
+This product bundles or builds upon third-party components distributed under
+their own licenses, whose terms and notices are preserved and apply to those
+components:
+
+- browser/face/src/bloub, MIT License, Copyright (c) 2026 Jérémy Perret (see
+  browser/face/src/bloub/LICENSE).
+- Fonts from the @fontsource and @fontsource-variable packages (Inter,
+  JetBrains Mono, Source Serif 4, Figtree), SIL Open Font License 1.1, with
+  the copyright of their respective authors.
+- caniuse-lite, Creative Commons Attribution 4.0 International, Copyright
+  Ben Briggs (build-time data pulled in by
+  browserslist; not shipped in the product).
+- hermes-agent, MIT License, Copyright (c) 2025 Nous Research, and portions
+  derived from vps-audit, MIT License, Copyright (c) 2024 Israel Abebe Kokiso:
+  see edge-setup/NOTICE.
+
+The licenses of every other third-party package are those declared in its own
+package manifest; `make license-check` verifies that none is GPL or AGPL.

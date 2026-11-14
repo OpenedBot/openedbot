@@ -1,0 +1,56 @@
+---
+title: Frequently asked questions
+description: Account, machine, security, and what edge-setup actually does.
+icon: CircleHelp
+---
+
+## Do I need to buy a domain name?
+
+No. With `edge-setup`, you open no port on your router, and you need neither a domain name nor a certificate on the machine.
+
+## Can I set up a bot before I have a machine?
+
+Yes. It will only answer once the machine is linked and shown as ready. See [Create a bot](/docs/bot).
+
+## Does the installation harden my server?
+
+No. `sudo edge-setup up --yes` installs Hermes and prepares the machine to be linked. It configures neither the firewall, nor SSH, nor fail2ban. Each protection is added with an option. The recommended profile for an Internet-facing server is in [edge-setup](/docs/edge-setup).
+
+## Can I use a server that already hosts other services?
+
+It is not recommended. Dedicate a machine to your bots: the `edge-setup` hardening options take over SSH, the firewall and Docker, and can break services that are already installed. See [edge-setup](/docs/edge-setup).
+
+## Is the download signed?
+
+Yes. Each release is signed by openedbot's release workflow on GitHub, with
+no key to guard (Sigstore), and the signature is logged in a public
+transparency log. The install script and `edge-setup upgrade` verify the
+signature, then the binary's SHA-256 checksum, before installing anything:
+nothing is installed if either check fails. A compromise of our release sites
+is therefore not enough to get another binary accepted.
+`edge-setup self-verify` runs these checks again on demand. See
+[edge-setup](/docs/edge-setup).
+
+## Can openedbot connect to my machine over SSH?
+
+No. openedbot never opens a session on your machine. The only action of that kind it can request is restarting Hermes, when you click to do so.
+
+## What happens if I lose SSH access after hardening?
+
+An option that closes access arms a 600-second rollback. Without `edge-setup verify-access` from a **new** session, the previous access is restored. The details are in [edge-setup](/docs/edge-setup).
+
+## Which machine for my bots?
+
+A Debian 12 or later, or Ubuntu 24.04 or later, server, rented or at home. Other systems are not supported. The steps are in [Link a machine](/docs/machine).
+
+## Does openedbot only work with Hermes?
+
+Hermes is the reference agent: `edge-setup` installs it for you. openedbot also accepts other agents or gateways that implement its public, versioned connector protocol.
+
+## Is openedbot open source?
+
+Yes. The openedbot core is licensed under AGPL-3.0; `edge-setup` and the connector protocol, which run on your server or in third-party agents, stay under Apache-2.0. Optional paid extensions can add features, and openedbot works fully without them. A commercial license is available for using the core without the AGPL obligations: write to [kaubree@devaubree.fr](mailto:kaubree@devaubree.fr).
+
+## Where do I write to support?
+
+See [Contact support](/docs/support). Never send a password, a ticket or a key.

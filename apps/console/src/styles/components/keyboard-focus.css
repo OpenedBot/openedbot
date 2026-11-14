@@ -1,0 +1,12 @@
+/*
+  No focus ring that appears on its own (see `lib/shell/keyboard-focus.ts`).
+
+  The Tailwind utilities `focus-visible:` and `focus-within:` already wait for
+  `data-keyboard-focus` (variants redefined in `browser/ui-kit`), like the
+  `:focus-visible` rules written by hand. What remains is the browser's default
+  outline on a link, a `tabindex` element or a field without
+  `outline-none`: it follows the same rule here.
+*/
+:root:not([data-keyboard-focus]) :focus-visible {
+  outline: none;
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-text-zoom"
+description = "Enables the set_text_zoom command without any pre-configured scope."
+commands.allow = ["set_text_zoom"]
+
+[[permission]]
+identifier = "deny-set-text-zoom"
+description = "Denies the set_text_zoom command without any pre-configured scope."
+commands.deny = ["set_text_zoom"]

@@ -1,0 +1,62 @@
+name: Connector request
+description: Ask for a one-click MCP connector in the "Connect" catalog.
+labels: ["connector"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The catalog (modules/runtimes/src/domain/mcp-connector-catalog.ts) only lists
+        remote MCP servers hosted and maintained by the vendor itself that accept a
+        generic client: OAuth discovery, dynamic client registration (DCR, RFC 7591)
+        and PKCE. Community or self-hosted servers, and vendors that require a
+        pre-registered application, are not eligible; any MCP server can still be
+        added by hand.
+  - type: input
+    id: vendor
+    attributes:
+      label: Vendor
+      placeholder: e.g. Linear
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: Official remote MCP URL
+      description: The vendor's own streamable HTTP endpoint (not a legacy /sse URL, not a third-party proxy).
+      placeholder: https://mcp.example.com/mcp
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Vendor documentation
+      description: The vendor page that documents this MCP server.
+    validations:
+      required: true
+  - type: dropdown
+    id: dcr
+    attributes:
+      label: Dynamic client registration (DCR)
+      description: Does the authorization server advertise a registration endpoint and accept an unregistered client?
+      options:
+        - Yes, documented or advertised in its OAuth metadata
+        - No, it requires a pre-registered application
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: pkce
+    attributes:
+      label: PKCE (S256)
+      options:
+        - "Yes"
+        - "No"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What would your bots do with it?
+    validations:
+      required: true
