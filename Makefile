@@ -140,7 +140,7 @@ env-prod-list: ## Prints the production template (no production file is versione
 	@bun scripts/env.ts --template --print-production
 
 # ─── Dev: database and services ──────────────────────────────────────────────
-.PHONY: db-up infra-up mailpit-up fake-hermes fake-apns db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
+.PHONY: db-up infra-up mailpit-up fake-hermes db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
 
 db-up: ## [DB] Checks the development PostgreSQL (restarted when stopped; created from compose.dev.yml only with OPENEDBOT_DEV_INFRA=compose); never Hermes.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --up
@@ -155,8 +155,6 @@ mailpit-up: ## [INFRA] Checks the development Mailpit (created from compose.dev.
 fake-hermes: ## [FAKE] Serves the fake Hermes gateway on 127.0.0.1:18642 in the foreground (fake profile).
 	$(LOAD_ENV_OPT) FAKE_HERMES_TOKEN="$${DEV_HERMES_TOKEN:-}" bun tests/fake-hermes/server.ts
 
-fake-apns: ## [FAKE] Serves the fake HTTP/2 (h2c) APNs on 127.0.0.1:18793 in the foreground; "bun tests/fake-apns/server.ts --dev-key" prints the APNS_* values to set.
-	bun tests/fake-apns/server.ts
 
 db-migrate: ## [DB] Applies the migrations; requires the infrastructure to be running already.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --migrate
@@ -377,7 +375,7 @@ license-check: ## Licenses of the third-party packages of bun.lock (transitive i
 UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Unit tests of API, worker, web, contracts, platform, modules and scripts, without network or PostgreSQL.
-	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes tests/fake-push tests/fake-apns
+	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes
 	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts tests/scripts/run-events-contract.test.ts tests/scripts/runtime-client-contract.test.ts tests/scripts/foreign-reads-contract.test.ts tests/scripts/release-workflows-contract.test.ts apps/desktop-tauri/scripts
 	python3 -B tests/scripts/provider-fault-cleanup.test.py
 	# Découverte automatique : tout *.test.ts(x) sous apps/console/tests joue,
@@ -429,7 +427,7 @@ test-unit: ## Unit tests of API, worker, web, contracts, platform, modules and s
 # Sans plugins/, le cœur ne nomme aucun chemin de plug-in et le solo n'en
 # demande aucun (listes de plug-ins vides). Les cibles avec plug-ins
 # (test-dual, pro-check…) exigent le checkout des plug-ins en ./plugins.
-PRO_PLUGIN_ENTRIES ?= packages/pro-audit/src/index.ts packages/pro-permissions/src/index.ts packages/pro-billing/src/index.ts
+PRO_PLUGIN_ENTRIES ?= packages/pro-audit/src/index.ts packages/pro-permissions/src/index.ts packages/pro-billing/src/index.ts packages/pro-cloud/src/index.ts
 pro_comma := ,
 pro_empty :=
 pro_space := $(pro_empty) $(pro_empty)
@@ -552,7 +550,6 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/runtime-link-device-key.ts
 	bun tests/integration/runtime-link-diagnostics.ts
 	bun tests/integration/runtime-read-snapshots-store.ts
-	bun tests/integration/apns-push.ts
 	bun tests/integration/text-array-binds.ts
 	bun tests/integration/provider-fallback-stream.ts
 	bun tests/integration/run-stop-cause.ts
@@ -702,7 +699,7 @@ contract-check: ## [contract] Identical copies of the wire fixtures, then the Go
 
 # ─── E2E and load ────────────────────────────────────────────────────────────
 .PHONY: e2e-api e2e-bot e2e-bot-p0 e2e-bot-p1 e2e-bot-keep e2e-bot-bench e2e-console e2e-fresh-setup e2e-onboarding e2e-hermes
-.PHONY: e2e-link e2e-link-load e2e-link-separation e2e-link-continuity e2e-push email-preview e2e-email load
+.PHONY: e2e-link e2e-link-load e2e-link-separation e2e-link-continuity email-preview e2e-email load
 
 e2e-api: ## Cloud HTTP journeys; requires the local stack to be running (make dev).
 	@$(REQUIRE_API)
@@ -757,9 +754,6 @@ e2e-link-continuity: ## Opt-in real acceptance run: explicit provider, bot lifec
 	@printf '$(C_WARN)[make]$(C_RESET) Inférence réelle : E2E_ALLOW_REAL_RUNS=1 et runtime/modèle explicites requis.\n'
 	@$(LOAD_ENV_OPT) bun tests/e2e/runtime-link-live-continuity.ts
 
-e2e-push: ## Web Push against a simulated server (never FCM/Mozilla); requires the local stack to be running, PUSH_VAPID_* and PUSH_ALLOW_LOOPBACK_ENDPOINTS=1.
-	@$(REQUIRE_API)
-	$(LOAD_ENV_OPT) bun tests/e2e/push.ts
 
 email-preview: ## Renders every e-mail template into tmp/email-preview/ (HTML + text, fr and en); sends nothing.
 	rm -rf tmp/email-preview

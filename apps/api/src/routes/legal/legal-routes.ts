@@ -29,9 +29,6 @@ export function legalRoutes(config: LegalConfig): Hono {
     return context.json(result);
   };
   routes.get("/", catalog);
-  // Keep an explicit noun available for API consumers that do not treat the
-  // collection URL as its catalogue endpoint.
-  routes.get("/catalog", catalog);
 
   routes.get("/:slug", async (context) => {
     const slug = context.req.param("slug");

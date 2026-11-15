@@ -2,12 +2,6 @@ import type { CreateGroupInput, GroupDto, SectionDto, SectionOrderInput, Section
 import { request } from "./http";
 
 export const groupsApi = {
-  /**
-   * Groups (bot mode « Groups »): the roster (`api.roster`) already carries
-   * `groups`, activity-ordered like the bots: these routes serve
-   * creation/editing, not the current list.
-   */
-  groups: () => request<{ groups: GroupDto[] }>("/api/groups"),
   group: (groupId: string) => request<GroupDto>(`/api/groups/${groupId}`),
   createGroup: (input: CreateGroupInput) =>
     request<GroupDto>("/api/groups", { method: "POST", body: JSON.stringify(input) }),

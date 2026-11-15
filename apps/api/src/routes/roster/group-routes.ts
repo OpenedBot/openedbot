@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { readCreateGroupInput, readGroupPatch } from "@openedbot/roster/domain/groups";
-import { createGroup, deleteGroup, listGroups, readGroup, updateGroup } from "@openedbot/roster/application/groups";
+import { createGroup, deleteGroup, readGroup, updateGroup } from "@openedbot/roster/application/groups";
 import type { AppVariables } from "../identity/auth";
 import { requireOperator } from "../identity/auth";
 import type { Db } from "@openedbot/platform-db";
@@ -8,10 +8,6 @@ import { jsonBody } from "../../interfaces/http/http-error";
 
 export function groupRoutes(db: Db): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
-  routes.get("/", async (context) => {
-    const auth = context.get("auth");
-    return context.json({ groups: await listGroups(db, auth.organizationId, auth.userId) });
-  });
   routes.get("/:groupId", async (context) => {
     const auth = context.get("auth");
     return context.json(await readGroup(db, auth.organizationId, auth.userId, context.req.param("groupId")));

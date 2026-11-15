@@ -1,3 +1,5 @@
+import { managedExposureOf } from "@openedbot/platform-plugins";
+import { installManagedExposure } from "@openedbot/runtimes/application/managed-exposure";
 import { SQL } from "bun";
 import { describeInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { createWorkerService } from "./application/worker-service";
@@ -35,6 +37,7 @@ installTenantDeletingListener(pro.tenantDeleting);
 // Subscriptions are read through the port of the plug-in billing (step 8d);
 // without it, none (solo: no limit, no paywall).
 installSubscriptionPort(pro.subscriptions);
+installManagedExposure(managedExposureOf(pro.plugins, process.env));
 // PERM2 v2: without the plug-in `permissions` (or for an organization without
 // `permissions.v2`) the gates read the core rules, as in solo.
 installPermissionRuleSelector(pro.permissionRules, (error) =>

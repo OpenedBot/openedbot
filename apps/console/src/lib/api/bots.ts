@@ -1,4 +1,4 @@
-import type { BotCapabilitiesDto, BotCapabilityMutationDto, BotComputerCaptureDto, BotComputerDto, BotComputerOpenDto, BotProfileCredentialDto, BotRuntimeMemoryDto, BotRuntimeMemoryWriteInput, BotToolPoliciesDto, BotToolPolicyWrite, PersonaDraftDto, ToolErrorPageDto } from "@openedbot/contracts-api";
+import type { BotCapabilitiesDto, BotCapabilityMutationDto, BotProfileCredentialDto, BotRuntimeMemoryDto, BotRuntimeMemoryWriteInput, BotToolPoliciesDto, BotToolPolicyWrite, PersonaDraftDto, ToolErrorPageDto } from "@openedbot/contracts-api";
 import { request } from "./http";
 
 export const botsApi = {
@@ -52,16 +52,6 @@ export const botsApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  botComputer: (botId: string) =>
-    request<BotComputerDto>(`/api/bots/${botId}/computer`),
-  startBotComputer: (botId: string) =>
-    request<BotComputerDto>(`/api/bots/${botId}/computer/start`, { method: "POST", body: "{}" }),
-  openBotComputer: (botId: string) =>
-    request<BotComputerOpenDto>(`/api/bots/${botId}/computer/open`, { method: "POST", body: "{}" }),
-  captureBotComputer: (botId: string) =>
-    request<BotComputerCaptureDto>(`/api/bots/${botId}/computer/capture`, { method: "POST", body: "{}" }),
-  stopBotComputer: (botId: string) =>
-    request<BotComputerDto>(`/api/bots/${botId}/computer/stop`, { method: "POST", body: "{}" }),
   /**
    * Persona draft for a bot that already exists
    * (`POST /api/bots/:botId/persona-drafts`).

@@ -19,7 +19,6 @@ import {
   pluginConfig,
   pluginDeployEnv,
   type ApiMount,
-  type BillingHooks,
   type LoadedPlugins,
   type LoadOptions,
   type OrganizationCreatingEvent,
@@ -212,75 +211,6 @@ function proClientIp(context: Context, trustProxy: boolean): string | null {
   const server = context.env as { requestIP?: (request: Request) => { address: string } | null } | undefined;
   const ip = requestClientIp(context.req.raw, server, trustProxy);
   return ip === "unknown" ? null : ip;
-}
-
-/** What the core route lends the webhook of the plug-in billing (`BillingHookContext.host`). */
-export type PaymentWebhookDelegate = (request: Request, host?: unknown) => Promise<Response>;
-
-/**
- * The payment webhook of the plug-in `billing` (the loader refuses `billing`
- * hooks from any other id), bound to its own configuration and declared
- * deployment variables; `host` is what the core route lends it
- * (`{ db, config }`). `null` without it: the core route answers 503
- * `PAYMENT_WEBHOOK_UNAVAILABLE`.
- */
-export function paymentWebhookOf(
-  plugins: readonly ProPlugin[],
-  env: Readonly<Record<string, string | undefined>> = {},
-): PaymentWebhookDelegate | null {
-  const billing = plugins.find((plugin) => plugin.manifest.id === BILLING_PLUGIN_ID);
-  const hooks: BillingHooks | undefined = billing?.billing;
-  if (!billing || !hooks) return null;
-  const context = hookContext(billing, env);
-  return (request, host) => hooks.webhook(request, host === undefined ? context : { ...context, host });
-}
-
-/** Where the core mounts the payment webhook, and who answers it there (`null`: 503). */
-export type PaymentWebhookMount = { readonly path: string; readonly delegate: PaymentWebhookDelegate | null };
-
-/**
- * The payment webhook mount (step 11.5): the path the plug-in `billing`
- * declares (`billing.webhookPath`), read on what the loader KEPT, so that a
- * billing refused by the role guard still answers 503
- * `PAYMENT_WEBHOOK_UNAVAILABLE` at its path, never a silent 404; the
- * delegate from what is INSTALLED. `null` without billing (solo): the core
- * mounts nothing, it knows no payment path of its own.
- */
-export function paymentWebhookMountOf(
-  loaded: readonly ProPlugin[],
-  installed: readonly ProPlugin[],
-  env: Readonly<Record<string, string | undefined>> = {},
-): PaymentWebhookMount | null {
-  const path = loaded.find((plugin) => plugin.manifest.id === BILLING_PLUGIN_ID)?.billing?.webhookPath;
-  if (!path) return null;
-  return { path, delegate: paymentWebhookOf(installed, env) };
-}
-
-/**
- * The routes, besides the webhook's own `POST`, that answer the webhook
- * path: the API refuses to start on any (`assertPaymentWebhookPathFree`).
- * Middlewares and mounts (`ALL`) are not routes.
- */
-export function paymentWebhookConflicts(path: string, routes: readonly { readonly method: string; readonly path: string }[]): string[] {
-  let own = false;
-  return routes.filter((route) => {
-    if (!own && route.method === "POST" && route.path === path) {
-      own = true;
-      return false;
-    }
-    return shadowsCoreRoute(path, [route]);
-  }).map((route) => `${route.method} ${route.path}`);
-}
-
-export function assertPaymentWebhookPathFree(
-  mount: PaymentWebhookMount | null,
-  routes: readonly { readonly method: string; readonly path: string }[],
-): void {
-  if (!mount) return;
-  const conflicts = paymentWebhookConflicts(mount.path, routes);
-  if (conflicts.length > 0) {
-    throw new Error(`billing.webhookPath ${mount.path} is also served by the core: ${conflicts.join(", ")}.`);
-  }
 }
 
 /**

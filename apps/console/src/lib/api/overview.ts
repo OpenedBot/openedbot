@@ -1,5 +1,5 @@
 import { activeOrganizationId } from "../session/cloud-session";
-import type { BotUsageDto, DecisionDto, ModelUsageDto, OverviewDto, UsageDto } from "@openedbot/contracts-api";
+import type { DecisionDto, ModelUsageDto, OverviewDto, UsageDto } from "@openedbot/contracts-api";
 import { API_ORIGIN, request } from "./http";
 
 export const overviewApi = {
@@ -8,8 +8,6 @@ export const overviewApi = {
   usage: () => request<UsageDto>("/api/usage"),
   /** Breakdown of finished runs by model, last 90 days. */
   usageModels: (days?: number) => request<ModelUsageDto>(days === undefined ? "/api/usage/models" : `/api/usage/models?days=${encodeURIComponent(String(days))}`),
-  /** Exact openedbot consumption per bot; the displayed provider is inferred on the client. */
-  usageBots: (days = 7) => request<BotUsageDto>(`/api/usage/bots?days=${encodeURIComponent(String(days))}`),
   decisions: (filters: { botId?: string; choice?: "once" | "deny"; origin?: "human" | "policy" } = {}) => {
     const query = new URLSearchParams();
     if (filters.botId) query.set("botId", filters.botId);

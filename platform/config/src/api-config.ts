@@ -13,11 +13,8 @@ import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/herm
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
 import { readApiInternalUrl, readApiPort } from "@openedbot/platform-config/api-address";
 import { deployEnvironment, readRuntimeEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
-import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
-import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrations/vapid";
-import { readApnsConfig } from "@openedbot/platform-integrations/apns";
 import { LEGAL_SLUGS, type LegalSlug, type RuntimeMode } from "@openedbot/contracts-api";
 import { fileBlobRoot, resolveBlobDriver } from "./blob-driver";
 import { readNativeClients, type NativeClients } from "./native-clients";
@@ -84,15 +81,6 @@ export type AuditVerdictSigningConfig = {
   ephemeral: boolean;
 };
 
-export type ComputerProviderConfig =
-  | { provider: "disabled" }
-  | {
-      provider: "box";
-      /** Provider origin is deployment-owned. It is never accepted from an HTTP client. */
-      apiUrl: string;
-      token: string;
-    };
-
 export type ApiConfig = {
   environment: ApiEnvironment;
   /**
@@ -123,15 +111,6 @@ export type ApiConfig = {
    * retours OAuth restent sur `publicUrl`.
    */
   linkPublicUrl: string;
-  /**
-   * `NATIVE_API_PUBLIC_URL` : l'origine de l'API que visent les clients natifs
-   * (app iOS, bureau, notch), `https://api.openedbot.app` en production, gravée
-   * dans leur build (`OPENEDBOT_API_ORIGIN`). Le lien du QR « Mobile Connect »
-   * (`openedbot://join?api=…`) la porte : l'app refuse une autre origine que la
-   * sienne (`foreignDeployment`). `publicUrl` par défaut, l'origine de la PWA,
-   * qui n'est pas celle de l'app dès que la console vit sur un autre nom.
-   */
-  nativeApiPublicUrl: string;
   /**
    * `RUNTIME_LINK_LEGACY_PUBLIC_URLS` : anciennes origines publiques sur
    * lesquelles des runtimes déjà appairés signent encore leur preuve de lien
@@ -181,8 +160,6 @@ export type ApiConfig = {
    * redémarrage de l'API avec un autre `.env`.
    */
   runtimeAdminChannels: RuntimeAdminChannels;
-  /** Optional persistent cloud desktop provider. Disabled is deliberately fail-closed. */
-  computer: ComputerProviderConfig;
   /**
    * Le compte de développement, tel que `/login` doit le pré-remplir. `null`
    * partout ailleurs qu'en développement : hors de cet environnement, publier
@@ -262,8 +239,6 @@ export type ApiConfig = {
    * solo il n'est jamais tenu, quelle que soit cette valeur.
    */
   billingEnforced: boolean;
-  /** Compte Cloudflare d'openedbot pour les tunnels gérés ; `null` cache cette voie. */
-  managedTunnel: ManagedTunnelConfig | null;
   /**
    * La publication Tailscale Funnel assistée. Fermée par défaut : le
    * parcours existe de bout en bout mais n'est pas ouvert aux organisations.
@@ -274,36 +249,9 @@ export type ApiConfig = {
     clientSecret: string | null;
     allowedEmails: ReadonlySet<string>;
   };
-  /**
-   * Prix mensuel AFFICHÉ (EUR, `BILLING_PRICE_EUR`), prêté au plug-in billing.
-   * Doit refléter le prix réel du fournisseur de paiement : personne ne l'y
-   * relit. Les clés du fournisseur ne sont pas ici : le plug-in les déclare
-   * et les lit lui-même (étape 11.5, `manifest.env`).
-   */
-  billingPriceEur: number;
-  /** Limites appliquées à un abonnement actif. Configurable par déploiement (fin du « 2 » en dur). */
-  plan: {
-    runtimeLimit: number;
-    memberLimit: number;
-    concurrentRunLimit: number;
-    attachmentQuotaBytes: number;
-  };
   /** Délai de grâce (jours) entre la résiliation et la purge définitive du tenant. */
   billingGraceDays: number;
   legal: LegalConfig;
-  /**
-   * Clés VAPID du Web Push. `null` hors production quand les trois variables
-   * sont absentes : l'écran le dit, l'API répond 404, le worker no-op.
-   */
-  vapid: VapidConfig | null;
-  /**
-   * iOS push (DEV-308): the bundle identifiers a device may register with.
-   * `null` when the four `APNS_*` variables are absent: the registration
-   * routes answer 404 `APNS_NOT_CONFIGURED` and `GET /api/push/apns/config`
-   * answers `enabled: false`. The API validates the signing key at boot but
-   * keeps no copy of it: only the worker signs.
-   */
-  apns: { bundleIds: readonly string[] } | null;
 };
 
 export function readApiConfig(env: Record<string, string | undefined> = process.env): ApiConfig {
@@ -363,7 +311,6 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     publicUrl: env.API_PUBLIC_URL?.trim() || `http://localhost:${readApiPort(env.API_PORT)}`,
     linkPublicUrl: (env.RUNTIME_LINK_PUBLIC_URL?.trim() || env.API_PUBLIC_URL?.trim() || `http://localhost:${readApiPort(env.API_PORT)}`).replace(/\/+$/, ""),
     linkLegacyPublicUrls: splitList(env.RUNTIME_LINK_LEGACY_PUBLIC_URLS ?? ""),
-    nativeApiPublicUrl: (env.NATIVE_API_PUBLIC_URL?.trim() || env.API_PUBLIC_URL?.trim() || `http://localhost:${readApiPort(env.API_PORT)}`).replace(/\/+$/, ""),
     apiInternalUrl: readApiInternalUrl(env.API_INTERNAL_URL, env.API_PORT),
     webUrl,
     webOrigins,
@@ -376,7 +323,6 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
     nativeRedirectUris: splitList("openedbot://auth/callback,http://127.0.0.1:47813/callback"),
     runtimeMode,
     runtimeAdminChannels,
-    computer: readComputerProvider(env, environment),
     devSignIn: environment === "development" && env.E2E_PASSWORD
       ? {
           email: env.E2E_EMAIL?.trim() || DEV_SEED_EMAIL,
@@ -402,19 +348,11 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
       (environment === "production" ? required(undefined, "METRICS_INTERNAL_TOKEN") : DEV_METRICS_INTERNAL_TOKEN),
     trustProxy: /^(1|true)$/i.test(env.API_TRUST_PROXY?.trim() ?? ""),
     billingEnforced: readBooleanDefault(env.BILLING_ENFORCED, environment === "production"),
-    managedTunnel: readManagedTunnelConfig(env),
     tailscaleFunnelEnabled: readBooleanDefault(env.OPENEDBOT_TAILSCALE_FUNNEL_ENABLED, false),
     google: {
       clientId: optional(env.GOOGLE_CLIENT_ID),
       clientSecret: optional(env.GOOGLE_CLIENT_SECRET),
       allowedEmails: new Set(splitList(env.GOOGLE_ALLOWED_EMAILS ?? "")),
-    },
-    billingPriceEur: positiveInteger(env.BILLING_PRICE_EUR, 19, "BILLING_PRICE_EUR"),
-    plan: {
-      runtimeLimit: positiveInteger(env.PLAN_RUNTIME_LIMIT, 1, "PLAN_RUNTIME_LIMIT"),
-      memberLimit: positiveInteger(env.PLAN_MEMBER_LIMIT, 2, "PLAN_MEMBER_LIMIT"),
-      concurrentRunLimit: positiveInteger(env.PLAN_CONCURRENT_RUN_LIMIT, 4, "PLAN_CONCURRENT_RUN_LIMIT"),
-      attachmentQuotaBytes: positiveInteger(env.PLAN_ATTACHMENT_QUOTA_BYTES, 1_073_741_824, "PLAN_ATTACHMENT_QUOTA_BYTES"),
     },
     billingGraceDays: positiveInteger(env.BILLING_GRACE_DAYS, 30, "BILLING_GRACE_DAYS"),
     runEventsRetentionDays: positiveInteger(
@@ -431,8 +369,6 @@ export function readApiConfig(env: Record<string, string | undefined> = process.
         terms: legalFilePath(env, "terms", legalDocumentsDirectory),
       },
     },
-    vapid: readVapidConfig(env, false, environment === "production"),
-    apns: readApiApnsConfig(env, environment === "production"),
   } satisfies Omit<ApiConfig, "blob">;
 
   if (blobDriver === "file") {
@@ -461,7 +397,6 @@ export function assertProductionConfig(config: ApiConfig): void {
   if (config.devSignIn) throw new Error("Development sign-in credentials must not be published in production.");
   if (!config.publicUrl.startsWith("https://")) throw new Error("API_PUBLIC_URL must use HTTPS in production.");
   if (!config.linkPublicUrl.startsWith("https://")) throw new Error("RUNTIME_LINK_PUBLIC_URL must use HTTPS in production.");
-  if (!config.nativeApiPublicUrl.startsWith("https://")) throw new Error("NATIVE_API_PUBLIC_URL must use HTTPS in production.");
   if (config.linkLegacyPublicUrls.some((url) => !url.startsWith("https://"))) {
     throw new Error("RUNTIME_LINK_LEGACY_PUBLIC_URLS must use HTTPS in production.");
   }
@@ -489,9 +424,7 @@ export function assertProductionConfig(config: ApiConfig): void {
   if (!config.trustProxy) {
     throw new Error("API_TRUST_PROXY=1 is required in production: the API runs behind the TLS proxy and rate limits key on the client IP.");
   }
-  if (!config.vapid) {
-    throw new Error("PUSH_VAPID_PUBLIC_KEY, PUSH_VAPID_PRIVATE_KEY and PUSH_VAPID_SUBJECT are required in production.");
-  }
+
   // Un jeton de lien volé ne doit pas suffire : la preuve de possession de la
   // machine enrôlée est la règle en production, pas une option.
   if (!config.linkSecurity.requirePop) {
@@ -555,34 +488,6 @@ export function assertLegalFile(filePath: string, maxBytes: number, slug = "docu
 
 const LEGAL_PLACEHOLDER_PATTERN = /(?:\b(?:TODO|TBD|FIXME|PLACEHOLDER|LOREM\s+IPSUM|REPLACE[_ -]?ME)\b|\{\{[^}\n]+\}\}|\[(?:YOUR|INSERT|REPLACE|TODO|TBD)[^\]\n]*\]|\bexample\.(?:com|org|net)\b)/i;
 
-const BOX_COMPUTER_API = "https://ascii.dev/api/box/v1";
-
-function readComputerProvider(
-  env: Record<string, string | undefined>,
-  environment: ApiEnvironment,
-): ComputerProviderConfig {
-  // One provider exists: its token enables it, its absence keeps the
-  // fail-closed default.
-  const token = optional(env.OPENEDBOT_COMPUTER_BOX_TOKEN);
-  if (!token) return { provider: "disabled" };
-  if (token.length > 4_096) throw new Error("OPENEDBOT_COMPUTER_BOX_TOKEN is too long.");
-
-  // A configurable provider origin would turn the API into an authenticated
-  // SSRF proxy. Only tests may point at a loopback fixture; real deployments
-  // always use the audited Box API origin.
-  const testApiUrl = environment === "test" ? optional(env.TEST_COMPUTER_BOX_API) : null;
-  if (testApiUrl) {
-    const parsed = new URL(testApiUrl);
-    if (parsed.protocol !== "http:" || !["127.0.0.1", "localhost", "::1"].includes(parsed.hostname)) {
-      throw new Error("TEST_COMPUTER_BOX_API must be a loopback HTTP URL.");
-    }
-  }
-  return {
-    provider: "box",
-    apiUrl: (testApiUrl ?? BOX_COMPUTER_API).replace(/\/+$/, ""),
-    token,
-  };
-}
 
 
 export function readEventsConfig(env: Record<string, string | undefined>): EventsConfig {
@@ -719,12 +624,4 @@ function required(value: string | undefined, name: string): string {
   const result = value?.trim();
   if (!result) throw new Error(`${name} is required.`);
   return result;
-}
-
-function readApiApnsConfig(
-  env: Record<string, string | undefined>,
-  production: boolean,
-): ApiConfig["apns"] {
-  const apns = readApnsConfig(env, production);
-  return apns ? { bundleIds: apns.bundleIds } : null;
 }

@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { AppVariables, AuthContext } from "../src/routes/identity/auth";
 import { HttpError } from "../src/interfaces/http/http-error";
 import { insertedRow } from "../../../tests/sql-insert-columns";
-import { readHistoryCursor, readHistoryFilter, readHistoryLimit, routinePublicFields, workflowRoutes } from "../src/routes/execution/workflow-routes";
+import { routinePublicFields, workflowRoutes } from "../src/routes/execution/workflow-routes";
 
 const owner: AuthContext = {
   sessionId: "session-1",
@@ -45,26 +45,6 @@ describe("workflow DTO routine fields", () => {
       trigger: "scheduled",
     });
     expect(JSON.stringify(body)).not.toContain("extra");
-  });
-
-  test("la liste pose les mêmes champs pour un workflow de routine", async () => {
-    const calls: SqlCall[] = [];
-    const routineId = "4e4a604d-b634-4105-a864-fe7d16d670ba";
-    const response = await mount(workflowHistoryDb(calls, {
-      kind: "routine",
-      status: "completed",
-      recoveryState: { routineId, trigger: "manual" },
-    })).request("/");
-
-    expect(response.status).toBe(200);
-    const body = await response.json() as { workflows: Array<Record<string, unknown>> };
-    expect(body.workflows[0]).toMatchObject({
-      kind: "routine",
-      recoveryState: null,
-      routineId,
-      trigger: "manual",
-    });
-    expect(calls.some(({ sql }) => sql.includes("w.recovery_state as \"recoveryState\""))).toBe(true);
   });
 });
 
@@ -593,42 +573,3 @@ function workflowHistoryDb(
     async (callback: (inner: SQL) => unknown) => callback(tx);
   return tx;
 }
-
-describe("history query parameters", () => {
-  // A URL parameter comes from a pasted link, a bookmark, or a previous
-  // page: it must never produce an error in front of the operator, nor
-  // let through a value that would reach SQL.
-  test("an unknown or missing filter falls back to the full view", () => {
-    expect(readHistoryFilter("active")).toBe("active");
-    expect(readHistoryFilter("attention")).toBe("attention");
-    expect(readHistoryFilter(null)).toBe("all");
-    expect(readHistoryFilter("' or 1=1 --")).toBe("all");
-  });
-
-  test("the page size stays between one and the hard ceiling", () => {
-    expect(readHistoryLimit(null)).toBe(25);
-    expect(readHistoryLimit("10")).toBe(10);
-    expect(readHistoryLimit("0")).toBe(25);
-    expect(readHistoryLimit("-5")).toBe(25);
-    expect(readHistoryLimit("2.5")).toBe(25);
-    expect(readHistoryLimit("100000")).toBe(100);
-  });
-
-  test("a cursor is read only when both halves are well formed", () => {
-    expect(readHistoryCursor("2026-08-25T21:55:29.286Z|ce429726-2526-4fe6-b2a9-3718b05d5b1a")).toEqual({
-      createdAt: "2026-08-25T21:55:29.286Z",
-      id: "ce429726-2526-4fe6-b2a9-3718b05d5b1a",
-    });
-    for (const malformed of [
-      null,
-      "",
-      "|",
-      "pas-une-date|ce429726-2526-4fe6-b2a9-3718b05d5b1a",
-      "2026-08-25T21:55:29.286Z|pas-un-uuid",
-      "2026-08-25T21:55:29.286Z",
-      "|ce429726-2526-4fe6-b2a9-3718b05d5b1a",
-    ]) {
-      expect(readHistoryCursor(malformed)).toBeNull();
-    }
-  });
-});

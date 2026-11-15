@@ -9,7 +9,6 @@ import {
   readDecisionFilters,
   toDecisionDto,
   usageByModel,
-  usageByBot,
   usageSeries,
 } from "../src/routes/overview/misc-routes";
 
@@ -87,35 +86,6 @@ describe("usageByModel", () => {
         { model: "gpt-5.6-luna", runs: 12, inputTokens: 40000, outputTokens: 8000, tokens: 48000, lastAt: "2026-08-31T12:00:00.000Z" },
         { model: null, runs: 3, inputTokens: 0, outputTokens: 0, tokens: 0, lastAt: "2026-08-31T12:00:00.000Z" },
         { model: null, runs: 1, inputTokens: 0, outputTokens: 0, tokens: 0, lastAt: "2026-08-20T10:00:00.000Z" },
-      ],
-    });
-  });
-});
-
-describe("usageByBot", () => {
-  test("part des bots, garde ceux à zéro et borne les runs à la fenêtre achevée", async () => {
-    const statements: string[] = [];
-    await usageByBot(fakeTx([], statements, []), "org-1", 7);
-    expect(statements[0]).toContain("from bots b");
-    expect(statements[0]).toContain("left join runs r");
-    expect(statements[0]).toContain("r.status in ('completed', 'failed')");
-    expect(statements[0]).toContain("coalesce(r.ended_at, r.created_at) >=");
-    expect(statements[0]).toContain("b.archived_at is null");
-  });
-
-  test("normalise bigint, modèle courant et bot sans activité", async () => {
-    const rows = [{
-      botId: "bot-1", name: "Atlas", slug: "atlas", model: "gpt-5", lastModel: "gpt-5",
-      runs: "2", inputTokens: "12", outputTokens: "34", tokens: "46", lastAt: new Date("2026-09-02T10:00:00Z"),
-    }, {
-      botId: "bot-2", name: "Béa", slug: "bea", model: null, lastModel: null,
-      runs: "0", inputTokens: "0", outputTokens: "0", tokens: "0", lastAt: null,
-    }];
-    await expect(usageByBot(fakeTx(rows, [], []), "org-1", 7)).resolves.toEqual({
-      windowDays: 7,
-      bots: [
-        { botId: "bot-1", name: "Atlas", slug: "atlas", model: "gpt-5", lastModel: "gpt-5", runs: 2, inputTokens: 12, outputTokens: 34, tokens: 46, lastAt: "2026-09-02T10:00:00.000Z" },
-        { botId: "bot-2", name: "Béa", slug: "bea", model: null, lastModel: null, runs: 0, inputTokens: 0, outputTokens: 0, tokens: 0, lastAt: null },
       ],
     });
   });
@@ -221,16 +191,6 @@ function mountUsageBots(role: AuthContext["role"]) {
   app.route("/", miscRoutes(fake.db, { environment: "test" }));
   return { app, statements: fake.statements };
 }
-
-describe("GET /usage/bots", () => {
-  test("refuse un membre avant d'ouvrir la transaction RLS", async () => {
-    const { app, statements } = mountUsageBots("member");
-    const response = await app.request("/usage/bots?days=7");
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: { code: "ROLE_REQUIRED" } });
-    expect(statements).toEqual([]);
-  });
-});
 
 describe("GET /usage/models", () => {
   test("sans `days`, garde la fenêtre historique de 90 jours", async () => {

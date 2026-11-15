@@ -14,8 +14,6 @@ import {
   type TransactionalEmailSender,
 } from "@openedbot/notifications/application/email";
 import { maintainMessageIngress } from "@openedbot/conversation/application/message-ingress-maintenance";
-import { processPushNotifications } from "@openedbot/notifications/application/push-notifications";
-import { processApnsDeliveries } from "@openedbot/notifications/application/apns-deliveries";
 import { processAlertDeliveries } from "@openedbot/notifications/application/alert-deliveries";
 import { processProfileImport, purgeOldProfileImports } from "../maintenance/profile-imports";
 import { processProfileDelete, purgeOldProfileDeletes } from "../maintenance/profile-deletes";
@@ -43,7 +41,6 @@ import {
 import { evaluateRuntimeLinkAlerts } from "@openedbot/runtime-link/application/link-alerts";
 import { DIRECT_PROBE_TICK_MS, probeDirectRuntimes, failRunsOnUnhealthyDirectRuntimes } from "@openedbot/execution/application/runtime-direct";
 import { failRunsOnDisconnectedRuntimes } from "@openedbot/execution/application/disconnected-runtime-runs";
-import { MANAGED_EXPOSURE_TICK_MS, cleanupRevokedManagedExposures, reconcileManagedExposures } from "@openedbot/runtimes/application/managed-exposure-reconciliation";
 import { logEvent } from "@openedbot/platform-observability";
 import { API_INSTANCE_DEAD_AFTER_MS } from "@openedbot/runtime-link/application/instances";
 
@@ -228,28 +225,6 @@ export function maintenanceJobs(
       },
     },
     {
-      name: "push-notifications",
-      everyMs: config.routineTickMs,
-      run: () => guardedPass("worker.push_notifications_failed", async () => {
-        const push = await processPushNotifications(db, config);
-        if (push.processed > 0) {
-          logEvent("worker.push_notifications", { ...push });
-        }
-      }, { withError: true }),
-    },
-    {
-      // DEV-308: the APNs half of the push outbox. Deliveries are reserved by
-      // the pass above and sent here, with their own lease and backoff.
-      name: "apns-deliveries",
-      everyMs: config.routineTickMs,
-      run: () => guardedPass("worker.apns_deliveries_failed", async () => {
-        const apns = await processApnsDeliveries(db, config);
-        if (apns.sent + apns.retried + apns.failed + apns.revoked > 0) {
-          logEvent("worker.apns_deliveries", { ...apns });
-        }
-      }, { withError: true }),
-    },
-    {
       // DEV-OPE2-7 : les alertes de lien vers Discord, déposées par la passe
       // « routines-and-links » et envoyées ici, avec leur bail et leur recul.
       name: "alert-deliveries",
@@ -273,17 +248,6 @@ export function maintenanceJobs(
         const reconciled = await reconcileRuntimeSessions(db, config);
         if (reconciled.unattributed > 0) logEvent("worker.unattributed_sessions", { ...reconciled }, "error");
       }, { withError: true }),
-    },
-    {
-      // Tunnels gérés par openedbot : l'état Cloudflare est relu toutes les cinq minutes.
-      name: "managed-exposures",
-      everyMs: MANAGED_EXPOSURE_TICK_MS,
-      run: (signal) => guardedPass("worker.managed_exposures_failed", async () => {
-        const reconciled = await reconcileManagedExposures(db, config.managedTunnel, undefined, signal);
-        if (reconciled > 0) logEvent("worker.managed_exposures_reconciled", { count: reconciled });
-        const cleaned = await cleanupRevokedManagedExposures(db, config.managedTunnel, undefined, signal);
-        if (cleaned > 0) logEvent("worker.managed_exposures_cleanup", { count: cleaned });
-      }),
     },
     {
       name: "event-retention",

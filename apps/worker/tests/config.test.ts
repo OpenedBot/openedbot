@@ -24,9 +24,6 @@ function productionEnvironment(overrides: Record<string, string> = {}): Record<s
     R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
     R2_ACCESS_KEY_ID: "key",
     R2_SECRET_ACCESS_KEY: "secret",
-    PUSH_VAPID_PUBLIC_KEY: publicKey.toString("base64url"),
-    PUSH_VAPID_PRIVATE_KEY: Buffer.alloc(32, 7).toString("base64url"),
-    PUSH_VAPID_SUBJECT: "mailto:ops@example.test",
     TRANSACTIONAL_EMAIL_FROM: "openedbot <ops@openedbot.example>",
     EVENTS_INTERNAL_TOKEN: "events-secret",
     RELAY_INTERNAL_TOKEN: "relay-secret",
@@ -168,44 +165,6 @@ describe("transactional email transports", () => {
     })();
     expect(failure?.message).toContain("TRANSACTIONAL_EMAIL_BREVO_API_KEY");
     expect(failure?.message).toContain("TRANSACTIONAL_EMAIL_RESEND_API_KEY");
-  });
-});
-
-describe("web push VAPID", () => {
-  test("absent hors production : fonctionnalité éteinte", () => {
-    expect(readWorkerConfig(testEnvironment()).vapid).toBeNull();
-  });
-
-  test("production sans clés : refus au démarrage", () => {
-    expect(() => readWorkerConfig(testEnvironment({
-      OPENEDBOT_ENV: "production",
-      BLOB_DRIVER: "r2",
-      R2_BUCKET: "private",
-      R2_ENDPOINT: "https://account.r2.cloudflarestorage.com",
-      R2_ACCESS_KEY_ID: "key",
-      R2_SECRET_ACCESS_KEY: "secret",
-      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.openedbot.example/send",
-      TRANSACTIONAL_EMAIL_TOKEN: "token",
-      TRANSACTIONAL_EMAIL_FROM: "openedbot <ops@openedbot.example>",
-      EVENTS_INTERNAL_TOKEN: "events-secret",
-      RELAY_INTERNAL_TOKEN: "relay-secret",
-      RUN_KEY_SECRET: "run-key-secret",
-    }))).toThrow(/PUSH_VAPID/);
-  });
-
-  test("production : l'opt-in boucle locale du Web Push est refusé", () => {
-    expect(() => readWorkerConfig(productionEnvironment({
-      TRANSACTIONAL_EMAIL_ENDPOINT: "https://mail.openedbot.example/send",
-      TRANSACTIONAL_EMAIL_TOKEN: "token",
-      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
-    })))
-      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
-    expect(readWorkerConfig(testEnvironment({
-      PUSH_VAPID_PUBLIC_KEY: productionEnvironment().PUSH_VAPID_PUBLIC_KEY!,
-      PUSH_VAPID_PRIVATE_KEY: productionEnvironment().PUSH_VAPID_PRIVATE_KEY!,
-      PUSH_VAPID_SUBJECT: "mailto:ops@example.test",
-      PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1",
-    })).vapid?.allowLoopbackEndpoints).toBe(true);
   });
 });
 

@@ -68,5 +68,5 @@ describe("cloud auth bootstrap", () => {
 
 test("retains structured import error details from HTTP responses", async () => {
   globalThis.fetch = (async () => Response.json({ error: { code: "PROFILE_IMPORT_UNCONFIRMED", message: "Verify profiles", details: { unconfirmedProfiles: ["scout"] } } }, { status: 409 })) as unknown as typeof fetch;
-  await expect(api.hermesImportJob("job-1")).rejects.toMatchObject({ code: "PROFILE_IMPORT_UNCONFIRMED", details: { unconfirmedProfiles: ["scout"] } });
+  await expect(api.hermesImportJobs()).rejects.toMatchObject({ code: "PROFILE_IMPORT_UNCONFIRMED", details: { unconfirmedProfiles: ["scout"] } });
 });

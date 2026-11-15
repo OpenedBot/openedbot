@@ -28,19 +28,3 @@ type ModelUsageRowDto = {
 };
 
 export type ModelUsageDto = { windowDays: number; models: ModelUsageRowDto[] };
-
-/** Exact openedbot consumption per bot, whatever provider attribution is displayed. */
-type BotUsageRowDto = {
-  botId: string;
-  name: string;
-  slug: string;
-  model: string | null;
-  lastModel: string | null;
-  runs: number;
-  inputTokens: number;
-  outputTokens: number;
-  tokens: number;
-  lastAt: string | null;
-};
-
-export type BotUsageDto = { windowDays: number; bots: BotUsageRowDto[] };

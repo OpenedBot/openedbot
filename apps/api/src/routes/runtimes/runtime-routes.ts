@@ -1,3 +1,4 @@
+import { managedExposure } from "@openedbot/runtimes/application/managed-exposure";
 import { Hono } from "hono";
 import { type HermesClientConfig } from "@openedbot/hermes";
 import type { ApiConfig } from "../../infrastructure/config";
@@ -217,16 +218,9 @@ export function runtimeRoutes(
       permissionContext,
       adminMode,
       devDefaults: null,
-      managedTunnelAvailable: config.managedTunnel !== null,
+      managedTunnelAvailable: managedExposure() !== null,
       tailscaleFunnelAvailable: config.tailscaleFunnelEnabled,
     });
-  });
-
-  /** The old organization-level mode is retired, including for old clients. */
-  routes.put("/mode", async (context) => {
-    const auth = context.get("auth");
-    requireOperator(auth);
-    throw new HttpError(410, "RUNTIME_MODE_RETIRED", "Le mode intégré/externe est retiré. Ajoutez un runtime par lien openedbot ou accès direct.");
   });
 
   routes.put("/", async (context) => {

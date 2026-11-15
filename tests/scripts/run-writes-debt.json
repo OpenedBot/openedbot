@@ -12,10 +12,10 @@
     "modules/execution/src/application/queue-sweeps.ts": {
       "workflows": 4
     },
-    "modules/execution/src/application/review-handoff.ts": {
+    "modules/execution/src/application/queue.ts": {
       "workflows": 1
     },
-    "modules/execution/src/application/queue.ts": {
+    "modules/execution/src/application/review-handoff.ts": {
       "workflows": 1
     },
     "modules/execution/src/application/run-cancellation.ts": {

@@ -1,22 +1,9 @@
-import type { BotComputerDto, MessageContent } from '@openedbot/contracts-api';
+import type { MessageContent } from '@openedbot/contracts-api';
 import type { Scenario, ScenarioContext } from '../kit/scenario';
 import { capabilities, invariant, noTools, poll, toolset } from '../kit/p1-evidence';
 import { LabBrowserFixture, executeBrowserCommand, browserSidecarDetail } from '../kit/lab-browser-fixture';
 import { ToolFixture, type BrowserFixturePage } from '../kit/tool-fixture';
 import { requireCompleted, successfulTool, toolBot, toolEvents, type ToolEvent } from '../kit/tool-proof';
-
-/**
- * This is deliberately a hard acceptance gate. The current public Computer
- * contract only has `unavailable`; a native gateway browser, viewer screenshot
- * or compatible transport cannot attest an action on this bot's Box.
- * Replace this gate with an action/receipt test when the product exposes an
- * attested run-scoped controller binding, never with an upstream browser call.
- */
-export function requireBrowserBinding(computer: BotComputerDto, botId: string): never {
-  if (computer.botId !== botId) throw new Error('Computer evidence belongs to another bot.');
-  if (computer.agentControl?.status !== 'unavailable') throw new Error('Computer agent-control contract changed: implement and verify run-scoped action receipts before accepting browser-action.');
-  throw new Error(`BROWSER_ACTION_UNPROVEN: ${computer.agentControl.reason}. The bot's Box has no attested run-scoped browser controller; a gateway-host browser is not an acceptable substitute.`);
-}
 
 /** Runtime browsing proves this fixture's effect, never control of the bot's Box. */
 export function proveRuntimeBrowserAction(events: readonly ToolEvent[], output: string, page: BrowserFixturePage, botId: string, runId: string): number {
@@ -61,12 +48,7 @@ export const browserAction: Scenario = {
     const target = ('browserTarget' in config ? config.browserTarget : undefined) ?? 'runtime';
     invariant(target === 'runtime' || target === 'computer', 'Unknown browser acceptance target.');
     const bot = await toolBot(context, 'E2E Navigateur', ['browser', 'terminal']);
-    if (target === 'computer') {
-      await rec.step('Le Computer du bot atteste son contrôleur d’action', async () => {
-        requireBrowserBinding(await session.api<BotComputerDto>('GET', `/api/bots/${bot.id}/computer`), bot.id);
-      });
-      return;
-    }
+    if (target === 'computer') throw new Error('BROWSER_ACTION_UNAVAILABLE: the retired Computer provider is not part of this release.');
     let fixture: ToolFixture | undefined;
     let labFixture: LabBrowserFixture | undefined;
     try {

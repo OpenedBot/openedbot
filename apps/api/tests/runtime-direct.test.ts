@@ -139,14 +139,6 @@ describe("direct HTTP contract", () => {
     expect((await response.json()).ok).toBe(true);
     expect(probed()).toBe(1);
   });
-  test("activation is retired: it answers 410 without probing or touching a row", async () => {
-    const { app, calls, probed } = mount([stored()]);
-    const response = await app.request("/direct-1/activate", { method: "POST" });
-    expect(response.status).toBe(410);
-    expect((await response.json()).error.code).toBe("RUNTIME_ACTIVATE_RETIRED");
-    expect(probed()).toBe(0);
-    expect(calls).toHaveLength(0);
-  });
   test("replacement probes the inactive direct row, revokes the serving one, and keeps the historical response envelope", async () => {
     const serving = { ...base, id: "direct-0", endpoint: "https://old-hermes.example.com", isActive: true } satisfies RuntimeRow;
     const { app, probed, rows, revoked } = mount([serving, stored()]);
@@ -172,8 +164,7 @@ describe("direct HTTP contract", () => {
     expect((await connector.app.request("/direct-1/access", body({ token: "x" }, "PUT"))).status).toBe(409);
     expect((await mount([stored()], "member").app.request("/direct-1/access", body({ token: "x" }, "PUT"))).status).toBe(403);
     const retired = await connector.app.request("/mode", body({ runtimeMode: "legacy" }, "PUT"));
-    expect(retired.status).toBe(410);
-    expect((await retired.json()).error.code).toBe("RUNTIME_MODE_RETIRED");
+    expect(retired.status).toBe(404);
   });
 });
 

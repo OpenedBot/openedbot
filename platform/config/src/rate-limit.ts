@@ -140,7 +140,6 @@ export const API_RATE_RULES: Record<string, RateRule> = {
   // iOS registration (DEV-308): an app re-registers at launch and on token
   // change. The bucket is per IP, and a carrier NAT puts many phones behind
   // one address: the ceiling bounds a loop, not a crowd.
-  "PUT /api/push/apns/devices/*": { windowMs: 60_000, max: 60 },
   // Retour OAuth d'un serveur MCP : une navigation non authentifiée, relayée
   // à l'hôte qui valide `state`. Un fournisseur renvoie une fois, pas vingt.
   "GET /api/mcp-oauth/*": { windowMs: 60_000, max: 20 },

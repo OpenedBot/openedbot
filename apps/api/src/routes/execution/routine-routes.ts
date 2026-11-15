@@ -1,3 +1,4 @@
+import type { WorkflowStatus } from "@openedbot/contracts-api";
 import { UUID_LOOSE_RE, isUuid, isoOrNull } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
@@ -14,10 +15,8 @@ import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { isUniqueViolation } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
-import type { WorkflowStatus } from "@openedbot/contracts-api";
 import type {
   RoutineExecutionDto,
-  RoutineExecutionReceiptDto,
   RoutineRunAcceptedDto,
 } from "@openedbot/contracts-api";
 import { assertEntitled } from "@openedbot/identity/domain/entitlement";
@@ -73,21 +72,6 @@ type RoutineExecutionRow = {
   createdAt: Date | string;
 };
 
-type RoutineReceiptRow = {
-  routineId: string;
-  workflowId: string;
-  runId: string;
-  threadId: string;
-  botId: string | null;
-  status: WorkflowStatus;
-  trigger: string | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  createdAt: Date | string;
-  startedAt: Date | string | null;
-  endedAt: Date | string | null;
-};
-
 type RunnableRoutineRow = {
   id: string;
   botId: string | null;
@@ -117,20 +101,6 @@ type RoutineRunIngressRow = {
   responseStatus: number | null;
   responseBody: unknown;
 };
-
-const ROUTINE_RECEIPT_STATUSES: readonly WorkflowStatus[] = [
-  "queued",
-  "running",
-  "awaiting_approval",
-  "reconciling",
-  "completed",
-  "failed",
-  "cancelled",
-  "expired",
-  "unknown",
-];
-const ROUTINE_RECEIPT_LIMIT_DEFAULT = 25;
-const ROUTINE_RECEIPT_LIMIT_MAX = 100;
 
 /**
  * A bot's routines: Hermes Bot Mode's « Routines pane », carried by our
@@ -260,69 +230,12 @@ export async function lockRoutineQuota(
 export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
 
-  /**
-   * Receipts of routine firings. The routine → workflow link is frozen by the
-   * worker in `workflows.recovery_state.routineId`. For firings from before
-   * that marker, the association is admitted only if ONE current routine of the
-   * same bot reproduces the root input exactly; zero or several candidates
-   * are omitted rather than attributed at random.
-   */
-  routes.get("/receipts", async (context) => {
-    const auth = context.get("auth");
-    const url = new URL(context.req.url);
-    const routineId = readRoutineReceiptRoutineId(url.searchParams.get("routineId"));
-    const status = readRoutineReceiptStatus(url.searchParams.get("status"));
-    const limit = readRoutineReceiptLimit(url.searchParams.get("limit"));
-    const cursor = readRoutineReceiptCursor(url.searchParams.get("cursor"));
-
-    const rows = await withTenant(db, auth.organizationId, (tx) => tx<RoutineReceiptRow[]>`
-      with linked as (
-        select case
-                 when (w.recovery_state->>'routineId') ~* ${UUID_LOOSE_RE.source}
-                   then w.recovery_state->>'routineId'
-                 else inferred.id
-               end as "routineId",
-               w.id as "workflowId", w.root_run_id as "runId",
-               w.thread_id as "threadId", w.root_bot_id as "botId", w.status,
-               w.recovery_state->>'trigger' as "trigger",
-               w.error_code as "errorCode", w.error_message as "errorMessage",
-               w.created_at as "createdAt", w.started_at as "startedAt", w.ended_at as "endedAt"
-          from workflows w
-          left join runs root
-            on root.organization_id = w.organization_id and root.id = w.root_run_id
-          left join lateral (
-            select min(r.id::text) as id
-              from routines r
-             where r.organization_id = w.organization_id and r.bot_id = w.root_bot_id
-               and root.input = concat('[Routine « ', r.name, ' »] ', r.message)
-            having count(*) = 1
-          ) inferred on true
-         where w.organization_id = ${auth.organizationId} and w.kind = 'routine'
-      )
-      select * from linked
-       where "routineId" is not null
-         and (${routineId === null} or "routineId" = ${routineId})
-         and (${status === null} or status = ${status})
-         and (${cursor === null} or
-              ("createdAt", "workflowId") < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.id ?? null}::uuid))
-       order by "createdAt" desc, "workflowId" desc
-       limit ${limit + 1}
-    `);
-
-    const page = rows.slice(0, limit);
-    const last = page[page.length - 1];
-    return context.json({
-      receipts: page.map(routineReceiptDto),
-      nextCursor: rows.length > limit && last ? `${isoOrNull(last.createdAt)}|${last.workflowId}` : null,
-    });
-  });
-
   routes.get("/:routineId/executions", async (context) => {
     const auth = context.get("auth");
     const routineId = readRoutineRunRoutineId(context.req.param("routineId"));
     const url = new URL(context.req.url);
-    const limit = readRoutineReceiptLimit(url.searchParams.get("limit"));
-    const cursor = readRoutineReceiptCursor(url.searchParams.get("cursor"));
+    const limit = readExecutionPageLimit(url.searchParams.get("limit"));
+    const cursor = readExecutionPageCursor(url.searchParams.get("cursor"));
 
     const result = await withTenant(db, auth.organizationId, async (tx) => {
       const found = await tx<Array<{ id: string }>>`
@@ -613,14 +526,6 @@ export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variable
   return routes;
 }
 
-export function readRoutineReceiptStatus(value: string | null): WorkflowStatus | null {
-  if (value === null || value === "") return null;
-  if (!ROUTINE_RECEIPT_STATUSES.includes(value as WorkflowStatus)) {
-    throw new HttpError(400, "ROUTINE_RECEIPT_STATUS_INVALID", "Le statut du reçu est invalide.");
-  }
-  return value as WorkflowStatus;
-}
-
 export function canonicalRoutineRunHash(routineId: string): string {
   return createHash("sha256")
     .update(JSON.stringify({ operation: "routine.run.create", routineId }))
@@ -696,59 +601,6 @@ function isRoutineRunAccepted(value: unknown): value is RoutineRunAcceptedDto {
     typeof body.runId === "string" && typeof body.threadId === "string" &&
     body.status === "queued" && typeof body.notificationEligible === "boolean" &&
     typeof body.workflowUpdatedAt === "string";
-}
-
-export function readRoutineReceiptRoutineId(value: string | null): string | null {
-  if (value === null || value === "") return null;
-  if (!isUuid(value)) {
-    throw new HttpError(400, "ROUTINE_RECEIPT_ROUTINE_INVALID", "L’identifiant de routine est invalide.");
-  }
-  return value.toLowerCase();
-}
-
-export function readRoutineReceiptLimit(value: string | null): number {
-  if (value === null || value === "") return ROUTINE_RECEIPT_LIMIT_DEFAULT;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > ROUTINE_RECEIPT_LIMIT_MAX) {
-    throw new HttpError(400, "ROUTINE_RECEIPT_LIMIT_INVALID", "La taille de page est invalide.");
-  }
-  return parsed;
-}
-
-export function readRoutineReceiptCursor(
-  value: string | null,
-): { createdAt: string; id: string } | null {
-  if (value === null || value === "") return null;
-  const separator = value.lastIndexOf("|");
-  if (separator <= 0) {
-    throw new HttpError(400, "ROUTINE_RECEIPT_CURSOR_INVALID", "Le curseur du reçu est invalide.");
-  }
-  const createdAt = value.slice(0, separator);
-  const id = value.slice(separator + 1);
-  if (Number.isNaN(Date.parse(createdAt)) || !isUuid(id)) {
-    throw new HttpError(400, "ROUTINE_RECEIPT_CURSOR_INVALID", "Le curseur du reçu est invalide.");
-  }
-  return { createdAt: new Date(createdAt).toISOString(), id: id.toLowerCase() };
-}
-
-function routineReceiptDto(row: RoutineReceiptRow): RoutineExecutionReceiptDto {
-  const startedAt = isoOrNull(row.startedAt);
-  const endedAt = isoOrNull(row.endedAt);
-  return {
-    routineId: row.routineId,
-    workflowId: row.workflowId,
-    runId: row.runId,
-    threadId: row.threadId,
-    botId: row.botId,
-    status: row.status,
-    trigger: row.trigger === "manual" || row.trigger === "scheduled" ? row.trigger : null,
-    errorCode: row.errorCode,
-    errorMessage: row.errorMessage,
-    createdAt: isoOrNull(row.createdAt)!,
-    startedAt,
-    endedAt,
-    durationMs: startedAt && endedAt ? Date.parse(endedAt) - Date.parse(startedAt) : null,
-  };
 }
 
 /** `archived`: its routines are held by the tick whatever the host. */
@@ -864,4 +716,29 @@ async function assertGroup(tx: Bun.TransactionSQL, organizationId: string, group
     select id from bot_groups where organization_id = ${organizationId} and id = ${groupId}
   `;
   if (!rows[0]) throw new HttpError(404, "GROUP_NOT_FOUND", "Groupe introuvable.");
+}
+
+export function readExecutionPageLimit(value: string | null): number {
+  if (value === null || value === "") return 25;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > 100) {
+    throw new HttpError(400, "ROUTINE_RECEIPT_LIMIT_INVALID", "La taille de page est invalide.");
+  }
+  return parsed;
+}
+
+export function readExecutionPageCursor(
+  value: string | null,
+): { createdAt: string; id: string } | null {
+  if (value === null || value === "") return null;
+  const separator = value.lastIndexOf("|");
+  if (separator <= 0) {
+    throw new HttpError(400, "ROUTINE_RECEIPT_CURSOR_INVALID", "Le curseur du reçu est invalide.");
+  }
+  const createdAt = value.slice(0, separator);
+  const id = value.slice(separator + 1);
+  if (Number.isNaN(Date.parse(createdAt)) || !isUuid(id)) {
+    throw new HttpError(400, "ROUTINE_RECEIPT_CURSOR_INVALID", "Le curseur du reçu est invalide.");
+  }
+  return { createdAt: new Date(createdAt).toISOString(), id: id.toLowerCase() };
 }

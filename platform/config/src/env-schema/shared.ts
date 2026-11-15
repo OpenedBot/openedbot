@@ -95,13 +95,6 @@ export const SHARED_ENV: readonly EnvVar[] = [
     productionExample: "https://console.openedbot.example",
   },
   {
-    name: "NATIVE_API_PUBLIC_URL",
-    scope: "api",
-    tier: "default_only",
-    doc: "Public HTTPS origin of the API for the native clients (iOS app, desktop, notch), the one their build names. The Mobile Connect QR link (openedbot://join?api=...) carries it, and the iOS app refuses any other origin. Default: API_PUBLIC_URL; set it when the console's API is served on another name.",
-    productionExample: "https://api.openedbot.example",
-  },
-  {
     name: "RUNTIME_LINK_REQUIRE_POP",
     scope: "api",
     tier: "default_only",

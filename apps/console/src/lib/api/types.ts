@@ -44,5 +44,3 @@ export type CreateBotInput = Omit<PortableBotCreationDraft, "instructions" | "re
  * `@openedbot/contracts-api` publishes it.
  */
 export type OnboardingResetScope = "flag" | "full";
-
-export type MobileConnectTicketDto = { ticketId: string; url: string; expiresAt: string };

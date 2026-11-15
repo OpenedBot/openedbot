@@ -276,20 +276,15 @@ export type ApprovalReviewerPort = {
   readonly passes: readonly ReviewerPass[];
 };
 
-/** A payment webhook path: `/api/<segment>/<segment>[/…]`, lower case, no parameter. */
-export const PAYMENT_WEBHOOK_PATH_RE = /^\/api(\/[a-z0-9][a-z0-9_-]*){2,}$/;
-/** Roots a payment webhook path may not enter: the plug-in mounts, the session routes, the hook ingress. */
-export const PAYMENT_WEBHOOK_RESERVED_ROOTS = ["/api/pro", "/api/auth", "/api/hooks"] as const;
+/** An exact public endpoint path: `/api/<segment>/<segment>[/…]`, lower case, no parameter. */
+export const PUBLIC_ENDPOINT_PATH_RE = /^\/api(\/[a-z0-9][a-z0-9_-]*){2,}$/;
+/** Roots an external endpoint may not enter: the plug-in mounts, the session routes, the hook ingress. */
+export const PUBLIC_ENDPOINT_RESERVED_ROOTS = [
+  "/api/pro", "/api/auth", "/api/hooks", "/api/runtime-links", "/api/support", "/api/waitlist",
+] as const;
 
 /** The only plug-in id whose `billing` hooks the core reads. */
 export const BILLING_PLUGIN_ID = "billing" as const;
-
-/**
- * What the core lends the plug-in `billing` on its webhook call (step 8d):
- * the hook context plus `host`, the API's `{ db, config }` (the plug-in
- * types it structurally; the core never reads it back).
- */
-export type BillingHookContext = HookContext & { readonly host?: unknown };
 
 /**
  * The members the core calls on a subscription port (`SubscriptionPort` of
@@ -297,32 +292,6 @@ export type BillingHookContext = HookContext & { readonly host?: unknown };
  * the database). The loader checks they are functions.
  */
 export const SUBSCRIPTION_PORT_MEMBERS = ["status", "read", "readForUpdate", "admission"] as const;
-
-/**
- * Billing (only from the plug-in `billing`, steps 8c-8d, 11.4, 11.5).
- *
- * - `webhookPath` and `webhook`: the plug-in names the path of its payment
- *   webhook (the deployed contract with its provider, which the core never
- *   names); the core mounts `POST <webhookPath>` before the session check
- *   and exempts it from the session (the provider signs the request, it
- *   carries no session), hands the raw request over and returns the
- *   plug-in's response unchanged, checking no signature itself. A throw is
- *   the core's 500. Billing loaded but refused (role guard): 503
- *   `PAYMENT_WEBHOOK_UNAVAILABLE` at that path. Solo: the core mounts
- *   nothing there, the path is unknown like any other.
- * - `subscriptions`: the `SubscriptionPort` identity, the run queue and the
- *   routines read; without it, `NO_SUBSCRIPTIONS` (no limit, no paywall).
- */
-export type BillingHooks = {
-  /**
-   * Absolute, static, under `/api/` with at least two more segments
-   * (`PAYMENT_WEBHOOK_PATH_RE`), outside `PAYMENT_WEBHOOK_RESERVED_ROOTS`;
-   * the API refuses to start when a core route answers it too.
-   */
-  readonly webhookPath: string;
-  readonly webhook: (request: Request, context?: BillingHookContext) => Promise<Response>;
-  readonly subscriptions?: { readonly [member in (typeof SUBSCRIPTION_PORT_MEMBERS)[number]]: (...args: never[]) => unknown };
-};
 
 /** The only plug-in id whose `auditArchive` the core reads. */
 export const AUDIT_PLUGIN_ID = "audit" as const;
@@ -388,6 +357,8 @@ export type AuditArchivePort = {
 export type ProPlugin<Router = unknown, Context = unknown> = {
   readonly manifest: ProPluginManifest;
   readonly api?: readonly ApiMount<Router, Context>[];
+  readonly publicEndpoints?: readonly PublicEndpoint<Context>[];
+  readonly managedExposure?: (context: HookContext) => ManagedExposurePort | null;
   readonly migrations?: MigrationSet;
   /** Module specifier of the console bundle exposing lazy routes; resolved by the console build. */
   readonly console?: { readonly module: string };
@@ -408,4 +379,34 @@ export type ProPlugin<Router = unknown, Context = unknown> = {
   readonly auditArchive?: AuditArchivePort;
   /** Old names this plug-in keeps answering (`CompatAliases`). */
   readonly aliases?: CompatAliases;
+};
+
+/** Exact anonymous endpoints owned by a plug-in (signed callbacks, for example).
+ * The host preserves the request bytes and rejects collisions with core routes.
+ * Building a handler happens at startup; invalid plug-in configuration fails startup.
+ */
+export type PublicEndpoint<Context = unknown> = {
+  readonly method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  readonly path: string;
+  readonly unavailable?: { readonly code: string; readonly message: string };
+  readonly build: (context: Context) => (request: Request) => Response | Promise<Response>;
+};
+
+/** Optional subscription data source; payment HTTP endpoints belong to the plug-in. */
+export type BillingHooks = {
+  readonly subscriptions?: { readonly [member in (typeof SUBSCRIPTION_PORT_MEMBERS)[number]]: (...args: never[]) => unknown };
+};
+
+/** Operator-owned publication. Account credentials never enter the core config. */
+export type ManagedExposureResources = {
+  accountId: string; zoneId: string; tunnelId: string | null; dnsRecordId: string | null;
+  accessAppId: string | null; serviceTokenId: string | null;
+};
+export type ManagedExposureDraft = ManagedExposureResources & {
+  hostname: string; endpoint: string; tailscaleAuthKeyId: null; installToken: string;
+  installCommand: string; edgeAuth: { clientId: string; clientSecret: string };
+};
+export type ManagedExposurePort = {
+  create(input: { slug?: string }): Promise<ManagedExposureDraft>;
+  cleanup(resources: ManagedExposureResources): Promise<void>;
 };

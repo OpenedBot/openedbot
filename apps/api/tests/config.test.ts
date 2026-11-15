@@ -12,17 +12,9 @@ import {
 import { LEGAL_SLUGS } from "@openedbot/contracts-api";
 import { PLUGIN_API_VERSION, type ProPlugin } from "@openedbot/platform-plugins";
 import { assertProPluginProductionEnv, loadApiProPlugins } from "../src/application/pro-plugins";
-import { mobileConnectJoinUrl } from "../src/routes/identity/mobile-connect-routes";
 
 /** A neutral payment webhook path a fixture billing plug-in declares (step 11.5). */
 const PAY_PATH = "/api/pay/webhook";
-
-const vapidPublic = (() => {
-  const bytes = Buffer.alloc(65, 7);
-  bytes[0] = 0x04;
-  return bytes.toString("base64url");
-})();
-const vapidPrivate = Buffer.alloc(32, 9).toString("base64url");
 
 const production = {
   OPENEDBOT_ENV: "production",
@@ -43,9 +35,6 @@ const production = {
   FILES_CDN_URL: "https://files.openedbot.example",
   FILES_CDN_SIGNING_KEY: "signing-secret",
   API_TRUST_PROXY: "1",
-  PUSH_VAPID_PUBLIC_KEY: vapidPublic,
-  PUSH_VAPID_PRIVATE_KEY: vapidPrivate,
-  PUSH_VAPID_SUBJECT: "mailto:ops@openedbot.example",
   // The link's proof of possession and the verdict key are
   // production guards; the fixture satisfies them so the later guards
   // (legal documents…) stay reachable.
@@ -70,11 +59,6 @@ describe("sécurité du lien et clé de verdict", () => {
   test("en production, RUNTIME_LINK_REQUIRE_POP=1 est obligatoire et vaut par défaut", () => {
     expect(() => assertProductionConfig(readApiConfig({ ...production, RUNTIME_LINK_REQUIRE_POP: "0" }))).toThrow(/RUNTIME_LINK_REQUIRE_POP=1 is required/);
     expect(readApiConfig({ ...production, RUNTIME_LINK_REQUIRE_POP: undefined }).linkSecurity.requirePop).toBe(true);
-  });
-
-  test("en production, NATIVE_API_PUBLIC_URL (origine du QR mobile) est en HTTPS", () => {
-    expect(() => assertProductionConfig(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "http://api.openedbot.example" }))).toThrow(/NATIVE_API_PUBLIC_URL must use HTTPS/);
-    expect(readApiConfig({ ...production, NATIVE_API_PUBLIC_URL: "https://native.openedbot.example/" }).nativeApiPublicUrl).toBe("https://native.openedbot.example");
   });
 
   test("en production, une clé de verdict éphémère est refusée ; une graine mal formée aussi", () => {
@@ -198,29 +182,6 @@ describe("production configuration", () => {
       METRICS_INTERNAL_TOKEN: production.RUN_KEY_SECRET,
     })).toThrow(/METRICS_INTERNAL_TOKEN/);
   });
-
-  test("requires VAPID keys in production", () => {
-    expect(() => assertProductionConfig(readApiConfig({
-      ...production,
-      PUSH_VAPID_PUBLIC_KEY: "",
-      PUSH_VAPID_PRIVATE_KEY: "",
-      PUSH_VAPID_SUBJECT: "",
-    }))).toThrow(/PUSH_VAPID/);
-  });
-
-  test("development without VAPID leaves push disabled", () => {
-    expect(readApiConfig(development).vapid).toBeNull();
-  });
-
-  test("the loopback Web Push opt-in is refused in production", () => {
-    expect(() => readApiConfig({ ...production, PUSH_ALLOW_LOOPBACK_ENDPOINTS: "1" }))
-      .toThrow(/PUSH_ALLOW_LOOPBACK_ENDPOINTS/);
-  });
-
-  test("the displayed price defaults to 19 € and reads BILLING_PRICE_EUR", () => {
-    expect(readApiConfig(production).billingPriceEur).toBe(19);
-    expect(readApiConfig({ ...production, BILLING_PRICE_EUR: "29" }).billingPriceEur).toBe(29);
-  });
 });
 
 describe("canaux d’administration du déploiement", () => {
@@ -281,40 +242,6 @@ describe("development sign-in", () => {
 
   test("publishes no back-office account: that sign-in left the core", () => {
     expect(Object.hasOwn(readApiConfig({ ...development, DEV_STAFF_PASSWORD: "ignored" }), "staffDevSignIn")).toBe(false);
-  });
-});
-
-describe("Computer provider configuration", () => {
-  test("is fail-closed by default", () => {
-    expect(readApiConfig(development).computer).toEqual({ provider: "disabled" });
-  });
-
-  test("the environment-owned Box token alone enables the provider", () => {
-    expect(readApiConfig({ ...development, OPENEDBOT_COMPUTER_BOX_TOKEN: " " }).computer).toEqual({ provider: "disabled" });
-    expect(readApiConfig({
-      ...development,
-      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
-    }).computer).toEqual({
-      provider: "box",
-      apiUrl: "https://ascii.dev/api/box/v1",
-      token: "box_secret",
-    });
-  });
-
-  test("only lets tests override Box with a loopback fixture", () => {
-    const configured = readApiConfig({
-      ...development,
-      OPENEDBOT_ENV: "test",
-      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
-      TEST_COMPUTER_BOX_API: "http://127.0.0.1:18799/provider/",
-    });
-    expect(configured.computer).toMatchObject({ apiUrl: "http://127.0.0.1:18799/provider" });
-    expect(() => readApiConfig({
-      ...development,
-      OPENEDBOT_ENV: "test",
-      OPENEDBOT_COMPUTER_BOX_TOKEN: "box_secret",
-      TEST_COMPUTER_BOX_API: "https://attacker.example/provider",
-    })).toThrow(/loopback/);
   });
 });
 
@@ -422,7 +349,7 @@ describe("production start: payment keys only with the billing plug-in (step 11.
       id: "billing", version: "1.0.0", pluginApi: PLUGIN_API_VERSION, entitlements: [],
       env: PROVIDER_KEYS.map((name) => ({ name, requiredInProduction: true })),
     },
-    billing: { webhookPath: PAY_PATH, webhook: async () => new Response(null, { status: 204 }) },
+    billing: {},
   };
 
   test("the production fixture carries no payment key", () => {
@@ -483,7 +410,7 @@ describe("production start: payment keys only with the billing plug-in (step 11.
     const directory = mkdtempSync(join(tmpdir(), "openedbot-plugin-env-"));
     try {
       // Written before any import: the module resolver caches the directory.
-      const names = ["API_DATABASE_URL", "BILLING_PRICE_EUR", "WEB_ORIGINS"];
+      const names = ["API_DATABASE_URL", "BILLING_GRACE_DAYS", "WEB_ORIGINS"];
       const entry = (name: string) => join(directory, `${name}.ts`);
       for (const name of names) {
         writeFileSync(entry(name), `export default { manifest: { id: "fixture", version: "1.0.0", pluginApi: ${PLUGIN_API_VERSION}, entitlements: [], env: [{ name: ${JSON.stringify(name)} }] } };\n`);
@@ -495,30 +422,6 @@ describe("production start: payment keys only with the billing plug-in (step 11.
       }
     } finally {
       rmSync(directory, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("QR Mobile Connect en production (NATIVE_API_PUBLIC_URL)", () => {
-  // Prod: console on console.openedbot.app, iOS build on api.openedbot.app
-  // (Release.xcconfig OPENEDBOT_API_ORIGIN). The QR must name the latter.
-  const split = { ...production, API_PUBLIC_URL: "https://console.openedbot.example", NATIVE_API_PUBLIC_URL: "https://api.openedbot.example/" };
-  const qrApi = (env: Record<string, string | undefined>) =>
-    new URL(mobileConnectJoinUrl(readApiConfig(env).nativeApiPublicUrl, "a.b")).searchParams.get("api");
-
-  test("set, it is the origin the QR carries, not API_PUBLIC_URL", () => {
-    expect(qrApi(split)).toBe("https://api.openedbot.example");
-    expect(() => assertProductionConfig(readApiConfig(split))).not.toThrow(/NATIVE_API_PUBLIC_URL/);
-  });
-
-  test("unset, the QR carries API_PUBLIC_URL (single-name deployment)", () => {
-    expect(qrApi({ ...production, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://api.openedbot.example");
-    expect(qrApi({ ...split, NATIVE_API_PUBLIC_URL: undefined })).toBe("https://console.openedbot.example");
-  });
-
-  test("a non-HTTPS value is refused at production startup", () => {
-    for (const value of ["http://api.openedbot.example", "openedbot://api.openedbot.example"]) {
-      expect(() => assertProductionConfig(readApiConfig({ ...split, NATIVE_API_PUBLIC_URL: value }))).toThrow(/NATIVE_API_PUBLIC_URL must use HTTPS in production/);
     }
   });
 });

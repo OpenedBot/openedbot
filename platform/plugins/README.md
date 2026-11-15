@@ -42,16 +42,21 @@ transaction) and the worker schedules its `passes` as
 `pro:permissions:<name>` (at least 250 ms apart), lending them
 `host: { config }` and its drain (`track`).
 
-`billing.webhook(request, context)` (`BillingHooks`) answers the payment
-webhook at the path the plug-in declares, `billing.webhookPath` (step 11.5:
-the core names no provider path). Only the plug-in `billing` may provide it.
-The API mounts `POST <webhookPath>` before the session check, exempts it from
-the session, hands the raw request over and returns the plug-in's response
-as is (a throw is the core's 500); it refuses to start when a core route
-answers that path too. The core checks no signature and holds no payment
-logic: billing loaded but refused by the role guard answers
-`503 PAYMENT_WEBHOOK_UNAVAILABLE` at its path; solo mounts nothing there
-(`apps/api/tests/payment-webhook-route.test.ts`).
+`publicEndpoints` declares exact anonymous HTTP callbacks owned by a plug-in.
+Each entry names its method and absolute path, and builds a request handler
+from the plug-in context. The API preserves raw request bytes, rejects
+collisions with core routes and other plug-ins, and keeps a declared endpoint
+at 503 if the database role guard refuses its implementation. Invalid handler
+configuration fails startup. No plug-in: no endpoint or session exemption.
+The billing plug-in owns its payment endpoint through this generic contract;
+the core has no payment-specific route or webhook hook.
+
+`managedExposure` is the optional publication provider of the `cloud` plug-in.
+It creates and cleans up operator-owned resources. The core keeps publication
+records and the commit/rollback boundary; the private provider keeps account
+credentials, provider calls and reconciliation jobs. Missing provider: new
+managed publication is unavailable, existing records remain readable, and
+pending cleanup is never marked done.
 
 `auditArchive` (`AuditArchivePort`) is the external archive of the creation
 audit. Only the plug-in `audit` may provide it. The core's default, without

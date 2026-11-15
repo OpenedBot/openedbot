@@ -80,19 +80,6 @@ export function miscRoutes(db: Db, options: MiscRoutesOptions): Hono<{ Variables
     return context.json(usage);
   });
 
-  /**
-   * Openedbot consumption per bot. Provider limits are reserved to the same
-   * roles, and this breakdown can reveal a bot's activity: do not let it
-   * become an indirect read path for a member.
-   */
-  routes.get("/usage/bots", async (context) => {
-    const auth = context.get("auth");
-    requireOperator(auth);
-    const days = usageWindowDays(context.req.query("days") ?? "7");
-    const usage = await withTenant(db, auth.organizationId, (tx) => usageByBot(tx, auth.organizationId, days));
-    return context.json(usage);
-  });
-
   routes.get("/operator", async (context) => {
     const auth = context.get("auth");
     const operator = await withTenant(db, auth.organizationId, (tx) =>
@@ -224,8 +211,8 @@ export async function usageSeries(
   return readUsageSeries(tx, organizationId, unit, buckets);
 }
 
-export { USAGE_MODELS_WINDOW_DAYS, usageByBot, usageByModel, usageWindowDays } from "./usage-queries";
-import { USAGE_MODELS_WINDOW_DAYS, usageByBot, usageByModel, usageWindowDays } from "./usage-queries";
+export { USAGE_MODELS_WINDOW_DAYS, usageByModel, usageWindowDays } from "./usage-queries";
+import { USAGE_MODELS_WINDOW_DAYS, usageByModel, usageWindowDays } from "./usage-queries";
 
 /**
  * `OnboardingStateDto`: the workspace's state (answers, name, exit date,

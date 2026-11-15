@@ -48,61 +48,6 @@ type WorkflowRow = {
 export function workflowRoutes(db: Db): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
 
-  /**
-   * The execution history: what the bots did, outside the thread.
-   *
-   * The conversation panel shows ONLY what is in flight or to be settled:
-   * a finished workflow leaves nothing there, because the thread already carries its
-   * reply. Without this list, the platform's durable work was
-   * visible nowhere once finished.
-   *
-   * Pagination by KEY (`created_at`, `id`) and not by OFFSET: an execution
-   * that starts during the read would shift every following page.
-   */
-  routes.get("/", async (context) => {
-    const auth = context.get("auth");
-    const url = new URL(context.req.url);
-    const filter = readHistoryFilter(url.searchParams.get("status"));
-    const limit = readHistoryLimit(url.searchParams.get("limit"));
-    const cursor = readHistoryCursor(url.searchParams.get("cursor"));
-
-    const rows = await withTenant(db, auth.organizationId, (tx) => tx<HistoryRow[]>`
-      select w.id, w.thread_id as "threadId", w.kind, w.status,
-             w.used_steps as "usedSteps", w.max_steps as "maxSteps",
-             w.used_handoffs as "usedHandoffs", w.max_handoffs as "maxHandoffs",
-             w.used_tokens as "usedTokens", w.token_budget as "tokenBudget",
-             w.error_code as "errorCode", w.error_message as "errorMessage",
-             w.final_output as "finalOutput",
-             w.recovery_state as "recoveryState",
-             w.created_at as "createdAt", w.started_at as "startedAt", w.ended_at as "endedAt",
-             b.name as "botName", b.slug as "botSlug", b.face as "botFace",
-             g.id as "groupId", g.name as "groupName",
-             u.display_name as "initiatorName", u.email as "initiatorEmail"
-        from workflows w
-        left join bots b on b.organization_id = w.organization_id and b.id = w.root_bot_id
-        left join threads t on t.organization_id = w.organization_id and t.id = w.thread_id
-        left join bot_groups g on g.organization_id = w.organization_id and g.id = t.group_id
-        left join users u on u.id = w.initiator_user_id
-       where w.organization_id = ${auth.organizationId}
-         and (${filter === "all"} or
-              (${filter === "active"} and w.status in ('queued','running','awaiting_approval','reconciling')) or
-              (${filter === "attention"} and (w.status = 'unknown' or w.status = 'failed' or w.status = 'expired')))
-         and (${cursor === null} or
-              (w.created_at, w.id) < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.id ?? null}::uuid))
-       order by w.created_at desc, w.id desc
-       limit ${limit + 1}
-    `);
-
-    const page = rows.slice(0, limit);
-    const last = page[page.length - 1];
-    return context.json({
-      workflows: page.map(historyDto),
-      // A full page + one extra row: that is how one knows something remains
-      // without counting the whole table.
-      nextCursor: rows.length > limit && last ? `${isoInstant(last.createdAt)}|${last.id}` : null,
-    });
-  });
-
   routes.get("/:workflowId", async (context) => {
     const auth = context.get("auth");
     const rows = await withTenant(db, auth.organizationId, (tx) =>
@@ -480,40 +425,6 @@ function workflowResolution(value: unknown): "abandoned" | "retried" | null {
   return resolution === "abandoned" || resolution === "retried" ? resolution : null;
 }
 
-// ── Execution history ───────────────────────────────────────────────────────
-
-export type HistoryFilter = "all" | "active" | "attention";
-const HISTORY_FILTERS: readonly HistoryFilter[] = ["all", "active", "attention"];
-const HISTORY_LIMIT_DEFAULT = 25;
-const HISTORY_LIMIT_MAX = 100;
-
-type HistoryRow = {
-  id: string;
-  threadId: string;
-  kind: "dm" | "group" | "routine";
-  status: string;
-  usedSteps: number;
-  maxSteps: number;
-  usedHandoffs: number;
-  maxHandoffs: number;
-  usedTokens: string | number;
-  tokenBudget: string | number;
-  errorCode: string | null;
-  errorMessage: string | null;
-  finalOutput: string | null;
-  recoveryState: unknown;
-  createdAt: Date | string;
-  startedAt: Date | string | null;
-  endedAt: Date | string | null;
-  botName: string | null;
-  botSlug: string | null;
-  botFace: unknown;
-  groupId: string | null;
-  groupName: string | null;
-  initiatorName: string | null;
-  initiatorEmail: string | null;
-};
-
 export function routinePublicFields(
   kind: string,
   recoveryState: unknown,
@@ -528,68 +439,4 @@ export function routinePublicFields(
     : null;
   const trigger = state.trigger === "manual" || state.trigger === "scheduled" ? state.trigger : null;
   return { routineId, trigger };
-}
-
-/** An unknown filter is not worth an error: it falls back to the full view. */
-export function readHistoryFilter(value: string | null): HistoryFilter {
-  return HISTORY_FILTERS.includes(value as HistoryFilter) ? (value as HistoryFilter) : "all";
-}
-
-export function readHistoryLimit(value: string | null): number {
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) return HISTORY_LIMIT_DEFAULT;
-  return Math.min(HISTORY_LIMIT_MAX, parsed);
-}
-
-/**
- * `<iso>|<uuid>`: the two halves of the sort key. An unreadable cursor is
- * ignored rather than refused: it only ever comes from a previous page, and
- * starting over from the beginning is better than an error in front of the operator.
- */
-export function readHistoryCursor(value: string | null): { createdAt: string; id: string } | null {
-  if (!value) return null;
-  const separator = value.lastIndexOf("|");
-  if (separator <= 0) return null;
-  const createdAt = value.slice(0, separator);
-  const id = value.slice(separator + 1);
-  if (Number.isNaN(Date.parse(createdAt))) return null;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  return { createdAt, id };
-}
-
-function historyDto(row: HistoryRow): Record<string, unknown> {
-  const startedAt = row.startedAt ? isoInstant(row.startedAt) : null;
-  const endedAt = row.endedAt ? isoInstant(row.endedAt) : null;
-  return {
-    id: row.id,
-    threadId: row.threadId,
-    kind: row.kind,
-    status: row.status,
-    recoveryState: row.status === "unknown" ? "needs_review" : null,
-    ...routinePublicFields(row.kind, row.recoveryState),
-    usedSteps: row.usedSteps,
-    maxSteps: row.maxSteps,
-    usedHandoffs: row.usedHandoffs,
-    maxHandoffs: row.maxHandoffs,
-    usedTokens: Number(row.usedTokens),
-    tokenBudget: Number(row.tokenBudget),
-    errorCode: row.errorCode,
-    errorMessage: row.errorMessage,
-    finalOutput: row.finalOutput,
-    createdAt: isoInstant(row.createdAt),
-    startedAt,
-    endedAt,
-    // Duration only makes sense once the execution is closed; in flight, the screen
-    // counts itself from `startedAt`.
-    durationMs: startedAt && endedAt ? Date.parse(endedAt) - Date.parse(startedAt) : null,
-    botName: row.botName,
-    botSlug: row.botSlug,
-    botFace: row.botFace ?? null,
-    groupId: row.groupId,
-    groupName: row.groupName,
-    // The email does not leave the history API: the display name is enough to
-    // say WHO launched, and the screen has no reason to carry one more
-    // nominative identifier.
-    initiatorName: row.initiatorName ?? (row.initiatorEmail ? row.initiatorEmail.split("@")[0]! : null),
-  };
 }

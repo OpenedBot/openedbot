@@ -2,10 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BotComputerDto } from '@openedbot/contracts-api';
 import { ToolFixture, pdfWriterScript } from './tool-fixture';
 import { assertIsolatedMemory, assertPdf, removalScript, successfulTool, type ToolEvent } from './tool-proof';
-import { requireBrowserBinding } from '../scenarios/browser-action';
 
 const call = (id: string, tool = 'read_file'): ToolEvent => ({ type: 'tool.call', payload: { toolCallId: id, tool } });
 const result = (id: string, error: unknown = false, tool = 'read_file', excerpt = 'hidden-nonce'): ToolEvent => ({ type: 'tool.result', payload: { toolCallId: id, tool, error, resultExcerpt: excerpt } });
@@ -85,14 +83,5 @@ describe('controlled HTTP fixture', () => {
       expect(await response.text()).toBe(`${source.value}\n`);
       expect(source.reads).toBe(1);
     } finally { await fixture.stop(); }
-  });
-});
-
-describe('browser target evidence', () => {
-  const computer: BotComputerDto = { botId: 'bot', canManage: true, provider: 'box', providerState: 'running', observation: { capability: { supported: true, canOpen: true, canCapture: true }, status: { status: 'ready' } }, agentControl: { status: 'unavailable', reason: 'COMPUTER_AGENT_CONTROL_NOT_BOUND' } };
-  test('a ready viewer does not prove agent control on the bot computer', () => {
-    expect(() => requireBrowserBinding(computer, 'bot')).toThrow('COMPUTER_AGENT_CONTROL_NOT_BOUND');
-    expect(() => requireBrowserBinding(computer, 'other')).toThrow('another bot');
-    expect(() => requireBrowserBinding({ ...computer, provider: null, agentControl: { status: 'unavailable', reason: 'COMPUTER_PROVIDER_DISABLED' } }, 'bot')).toThrow('COMPUTER_PROVIDER_DISABLED');
   });
 });
