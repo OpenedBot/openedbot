@@ -1,3 +1,4 @@
+import { pluginPublicEndpoints } from "../src/application/public-endpoints";
 /**
  * Pro mode: the plug-ins listed in `OPENEDBOT_PLUGINS` (absolute paths into a
  * local plug-in checkout, see `make test-dual`) load and mount like in
@@ -17,8 +18,7 @@ import { inboxRoutes } from "../src/routes/inbox/inbox-routes";
 import { memberRoutes } from "../src/routes/identity/member-routes";
 import { createEntitlementSource, PRO_ENTITLEMENTS } from "@openedbot/identity/application/entitlements";
 import { removedApiRoutes } from "../src/routes/platform/removed-routes";
-import { hookEntitlementCheck, loadApiProPlugins, organizationCreatingHookOf, proPluginContext, proPublicPathMatcher, proPublicRoutes, proSessionRoutes, paymentWebhookMountOf, paymentWebhookOf, subscriptionPortOf, type ProCaller } from "../src/application/pro-plugins";
-import { paymentWebhookRoute } from "../src/routes/payments/payment-webhook-route";
+import { hookEntitlementCheck, loadApiProPlugins, organizationCreatingHookOf, proPluginContext, proPublicPathMatcher, proPublicRoutes, proSessionRoutes, subscriptionPortOf, type ProCaller } from "../src/application/pro-plugins";
 import type { ApiConfig } from "../src/infrastructure/config";
 import { HttpError } from "../src/interfaces/http/http-error";
 
@@ -230,12 +230,8 @@ describe.skipIf(listed.length === 0)("pro mode (OPENEDBOT_PLUGINS)", () => {
         ? context.json({ error: { code: error.code } }, error.status as 400)
         : context.json({ error: { code: "INTERNAL_ERROR" } }, 500));
       const config = { billingPriceEur: 19 } as unknown as ApiConfig;
-      const mount = paymentWebhookMountOf(billing, billing, {});
-      expect(mount?.delegate).toBeFunction();
-      expect(paymentWebhookOf(billing)).toBeFunction();
-      expect(mount!.path).toMatch(/^\/api\//);
-      app.route(mount!.path, paymentWebhookRoute(db, config, mount!.delegate));
-      const response = await app.request(mount!.path, { method: "POST", body: "{}" });
+      app.route("/", pluginPublicEndpoints(billing, billing, (plugin) => proPluginContext(plugin, db, {}, { billing: { config } })));
+      const response = await app.request(billing[0]!.publicEndpoints![0]!.path, { method: "POST", body: "{}" });
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: { code: "STRIPE_NOT_CONFIGURED" } });
     });

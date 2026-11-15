@@ -124,19 +124,6 @@ export const settingsNotifications = {
   notificationOutcomeBody: "Open the app to review its status.",
 } as const;
 
-export const pushNotifications = {
-  approvalRequested: "Approval requested",
-  runCompleted: "Workflow completed",
-  runError: "Workflow failed",
-  apnsApprovalPending: "Approval pending",
-  apnsRoutineCompleted: "Routine finished",
-  apnsRoutineFailed: "Routine failed",
-  apnsGroupCompleted: "Room finished",
-  apnsGroupFailed: "Room failed",
-  connectorOutdatedTitle: "{runtime}: connector update needed",
-  connectorOutdated: "Version {installed}, minimum {target}. Run \"sudo edge-setup upgrade --yes\" on the machine: openedbot cannot update it itself.",
-} as const;
-
 export const settingsAccount = {
   closureTitle: "Close my account",
   closureDescription: "Closing your account erases your identity and sign-in methods after the stated delay. Your contributions and shared workspace history are preserved.",
@@ -201,21 +188,6 @@ export const settingsAccount = {
   removeCancel: "Cancel",
   errorOwnerProtected: "The owner role cannot be changed from this screen.",
   errorMemberBusy: "This member still has a message in flight: try again in a moment.",
-  mobileTitle: "Mobile app",
-  mobileDescription: "Sign the iPhone app in by scanning a QR code: no password to retype on the phone.",
-  mobileShow: "Show QR code",
-  mobileDialogTitle: "Connect a phone",
-  mobileDialogDescription: "In the openedbot app, tap “Scan a code” and point it at this QR code. It works once.",
-  mobileLinkLabel: "Equivalent link",
-  mobileLinkHint: "Paste it in the app when the phone has no camera available.",
-  mobileCopy: "Copy link",
-  mobileCopied: "Link copied.",
-  mobileExpires: "Valid until {time}.",
-  mobileExpired: "This QR code has expired.",
-  mobileRenew: "New QR code",
-  mobileCreating: "Preparing…",
-  mobileError: "The QR code could not be prepared.",
-  mobileClose: "Close",
   connectionTitle: "Sign-in",
   googleHint: "Sign in with the Google account of this address.",
   googleConnect: "Connect",

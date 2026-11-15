@@ -83,9 +83,6 @@ const ALLOWED_PLATFORM = [
   "platform/db/src/role-guard.ts",
   "platform/db/src/text-array.ts",
   // Read by api-config.ts like vapid.ts: the APNs env reader (DEV-308), no transport.
-  "platform/integrations/src/apns.ts",
-  "platform/integrations/src/managed-tunnel.ts",
-  "platform/integrations/src/vapid.ts",
   "platform/observability/src/internal-auth.ts",
   "platform/observability/src/log/channels.ts",
   "platform/observability/src/log/context.ts",
@@ -100,6 +97,7 @@ const ALLOWED_PLATFORM = [
   "platform/plugins/src/contract.ts",
   "platform/plugins/src/index.ts",
   "platform/plugins/src/loader.ts",
+  "platform/plugins/src/managed-exposure.ts",
   "platform/plugins/src/required.ts",
 ];
 

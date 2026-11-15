@@ -109,9 +109,6 @@ const SCANNED: ReadonlyArray<{ path: string; pattern: RegExp; strip: (source: st
   { path: "apps/api/scripts/dev-reset-data.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/config/src/hermes-timeouts.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "platform/hermes/src/mtls.ts", pattern: TS_ENV_READ, strip: stripComments },
-  { path: "platform/integrations/src/managed-tunnel.ts", pattern: TS_ENV_READ, strip: stripComments },
-  { path: "platform/integrations/src/vapid.ts", pattern: TS_ENV_READ, strip: stripComments },
-  { path: "platform/integrations/src/apns.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/lib/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/link-dev.ts", pattern: TS_ENV_READ, strip: stripComments },
   { path: "scripts/db.sh", pattern: SHELL_ENV_READ, strip: stripShellComments },
@@ -232,7 +229,6 @@ describe("ENV_SCHEMA: single source of truth for the environment", () => {
       "ALERT_WEBHOOK_URL", "API_DATABASE_URL", "API_PUBLIC_URL", "AUDIT_VERDICT_SIGNING_KEY",
       "BLOB_DRIVER", "FILES_CDN_SIGNING_KEY",
       "FILES_CDN_URL", "METRICS_INTERNAL_TOKEN",
-      "PUSH_VAPID_PRIVATE_KEY", "PUSH_VAPID_PUBLIC_KEY", "PUSH_VAPID_SUBJECT",
       "R2_ACCESS_KEY_ID", "R2_BUCKET", "R2_ENDPOINT", "R2_SECRET_ACCESS_KEY", "RUNTIME_TOKEN_ENCRYPTION_KEY",
       "TRANSACTIONAL_EMAIL_FROM", "WEB_APP_URL", "WORKER_DATABASE_URL",
       // The internal secrets are required per role, not by name (S1b): readInternalSecrets.
@@ -269,7 +265,7 @@ describe("ENV_SCHEMA: single source of truth for the environment", () => {
 describe("ENV_SCHEMA_PATTERNS: plug-in variables", () => {
   test("isCoreEnvName: a declared, family or retired name is the core's; a plug-in's own deploy name is not (step 11.5)", async () => {
     const { isCoreEnvName } = await import("../src/env-schema");
-    for (const name of ["API_DATABASE_URL", "BILLING_PRICE_EUR", "OPENEDBOT_PLUGINS", "OPENEDBOT_PLUGIN_BILLING__API_KEY", "WEB_ORIGINS"]) {
+    for (const name of ["API_DATABASE_URL", "BILLING_GRACE_DAYS", "OPENEDBOT_PLUGINS", "OPENEDBOT_PLUGIN_BILLING__API_KEY", "WEB_ORIGINS"]) {
       expect(isCoreEnvName(name), name).toBe(true);
     }
     for (const name of ["PAY_SECRET_KEY", "PROVIDER_WEBHOOK_SECRET"]) expect(isCoreEnvName(name), name).toBe(false);

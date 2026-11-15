@@ -6,7 +6,6 @@ import { clearOnboardingDraft } from "../session/onboarding-draft";
 import { workspaceInPath } from "../workspace/workspace-location";
 import type { AccountSecurityDto, AuthMeDto, AuthStartDto, ChangePasswordDto, ChangePasswordInput, GoogleLinkClaimDto, GoogleUnlinkDto, MemberRoleChangedDto, OrganizationMemberDto, OrganizationPermissionPolicyInput, OrganizationPermissionPolicyView, RevokeSessionsDto } from "@openedbot/contracts-api";
 import { isUnauthorized, request } from "./http";
-import type { MobileConnectTicketDto } from "./types";
 import { apiSelf } from "./self";
 
 export const accountApi = {
@@ -106,12 +105,6 @@ export const accountApi = {
     request<void>(`/api/account/security/sessions/${sessionId}`, { method: "DELETE" }),
   revokeOtherSessions: () =>
     request<RevokeSessionsDto>("/api/account/security/sessions/revoke-others", {
-      method: "POST",
-      body: JSON.stringify({}),
-    }),
-  /** Mobile Connect: a disposable ticket (10 min) and the link to show as a QR code to the iPhone app. */
-  mobileConnectTicket: () =>
-    request<MobileConnectTicketDto>("/api/auth/mobile-connect/tickets", {
       method: "POST",
       body: JSON.stringify({}),
     }),

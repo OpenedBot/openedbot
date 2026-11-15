@@ -437,12 +437,12 @@ describe("subscriptionPortOf (step 8d)", () => {
   const port = { status: async () => null, read: async () => null, readForUpdate: async () => null, admission: () => null };
   const billingPlugin = (id: string): ProPlugin => ({
     manifest: { id, version: "1.0.0", pluginApi: PLUGIN_API_VERSION, entitlements: [] },
-    billing: { webhookPath: PAY_PATH, webhook: async () => new Response(null), subscriptions: port },
+    billing: { subscriptions: port },
   });
 
   test("solo, or billing without a port: null (the core installs NO_SUBSCRIPTIONS)", () => {
     expect(subscriptionPortOf([])).toBeNull();
-    expect(subscriptionPortOf([{ ...billingPlugin("billing"), billing: { webhookPath: PAY_PATH, webhook: async () => new Response(null) } }])).toBeNull();
+    expect(subscriptionPortOf([{ ...billingPlugin("billing"), billing: {  } }])).toBeNull();
   });
 
   test("the port of the plug-in billing, and of no other id", () => {

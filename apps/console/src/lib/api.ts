@@ -24,7 +24,7 @@ import { bindApi } from "./api/self";
 
 export { API_ORIGIN, ApiError, errorMessage, isAlphaClosed, isApiUnavailable, isUnauthorized, isWorkspaceChanged, request, userFacingError } from "./api/http";
 export { queryKeys, workspaceQueryKey } from "./api/query-keys";
-export type { CreateBotInput, MobileConnectTicketDto, OnboardingResetScope, SendMessageResult, ThreadView, WorkflowRecoveryResult } from "./api/types";
+export type { CreateBotInput, OnboardingResetScope, SendMessageResult, ThreadView, WorkflowRecoveryResult } from "./api/types";
 
 /**
  * The console's HTTP client, one object assembled from its domain parts

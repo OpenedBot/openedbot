@@ -9,14 +9,11 @@ import type { HermesClientTimeouts } from "@openedbot/hermes";
 import { readHermesMtlsIdentity, type HermesMtlsIdentity } from "@openedbot/hermes/mtls";
 import { readApiInternalUrl } from "@openedbot/platform-config/api-address";
 import { readHermesTimeouts } from "@openedbot/platform-config/hermes-timeouts";
-import { readManagedTunnelConfig, type ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import { RUNTIME_MODE } from "@openedbot/platform-config/runtime-mode";
 import { deployEnvironment, readRuntimeEnvironment, type DeployEnvironment } from "@openedbot/platform-config/deploy-environment";
 import { fileBlobRoot, otherBlobBackend, resolveBlobDriver, type BlobOtherBackend } from "@openedbot/platform-config/blob-driver";
 import type { RuntimeMode } from "@openedbot/contracts-api";
 import { secretEncryptionKey, type SecretKeyring } from "@openedbot/hermes/secrets";
-import { readVapidConfig, type VapidConfig } from "@openedbot/platform-integrations/vapid";
-import { readApnsConfig, type ApnsConfig } from "@openedbot/platform-integrations/apns";
 import type { TransactionalEmailConfig } from "@openedbot/notifications/application/email";
 import { BOT_HOST_CLEANUP_VERIFY_DELAY_SECONDS } from "@openedbot/roster/application/bot-host-cleanups";
 
@@ -42,8 +39,6 @@ export type WorkerConfig = {
   testHermesUrl: string | null;
   /** Même politique d'endpoint que l'API : une seule construction, aucun oubli. */
   hermesEndpointPolicy: EndpointPolicy;
-  /** Compte Cloudflare d'openedbot, pour relire l'état des tunnels gérés ; `null` sans compte. */
-  managedTunnel: ManagedTunnelConfig | null;
   leaseSeconds: number;
   pollMs: number;
   /** Un run en streaming sans aucune frame depuis ce délai est avorté (retryable). */
@@ -105,16 +100,6 @@ export type WorkerConfig = {
     | { driver: "r2"; bucket: string; endpoint: string; accessKeyId: string; secretAccessKey: string };
   /** Le magasin qui n'écrit plus, pour les objets écrits avant une bascule de driver (`blob-driver.ts`). */
   blobOther?: BlobOtherBackend;
-  /**
-   * Clés VAPID du Web Push. `null` hors production quand elles sont absentes :
-   * la passe de maintenance est un no-op.
-   */
-  vapid: VapidConfig | null;
-  /**
-   * iOS push (DEV-308), second transport of the push outbox. `null` when the
-   * four `APNS_*` variables are absent: no APNs delivery is created or sent.
-   */
-  apns: ApnsConfig | null;
 };
 
 export function readWorkerConfig(env: Record<string, string | undefined> = process.env): WorkerConfig {
@@ -225,7 +210,6 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
       ? normalizeHermesEndpoint(env.DEV_HERMES_URL.trim(), hermesEndpointPolicy) : "",
     testHermesUrl: environment === "test" ? env.TEST_HERMES_URL?.trim() || null : null,
     hermesEndpointPolicy,
-    managedTunnel: readManagedTunnelConfig(env),
     leaseSeconds: positiveInteger(env.WORKER_LEASE_SECONDS, 30),
     pollMs: positiveInteger(env.WORKER_POLL_MS, 100),
     runInactivityMs: positiveInteger(env.WORKER_RUN_INACTIVITY_MS, 120_000),
@@ -260,8 +244,6 @@ export function readWorkerConfig(env: Record<string, string | undefined> = proce
     },
     webAppUrl: (env.WEB_APP_URL?.trim() || "http://localhost:1420").replace(/\/+$/, ""),
     deployEnvironment: deployEnvironment(env.OPENEDBOT_ENV),
-    vapid: readVapidConfig(env, environment === "production", environment === "production"),
-    apns: readApnsConfig(env, environment === "production"),
   } satisfies Omit<WorkerConfig, "blob">;
   const fileRoot = sharedFileBlobRoot(fileBlobRoot(env, environment === "production"));
   if (blobDriver === "file") {

@@ -1,6 +1,6 @@
 import { nativeBridge } from "../platform";
 import { normalizeWorkflowCounters } from "@/lib/run/workflow-display";
-import type { CreateMessageVersionInput, InboxDto, MessageVersionCreatedDto, MessageVersionFamilyListDto, ThreadCompactResult, WorkflowHistoryPageDto } from "@openedbot/contracts-api";
+import type { CreateMessageVersionInput, InboxDto, MessageVersionCreatedDto, MessageVersionFamilyListDto, ThreadCompactResult } from "@openedbot/contracts-api";
 import type { MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
 import { API_ORIGIN, ApiError, rawApiFetch, authHeadersFor, cloudHeaders, request } from "./http";
 import type { SendMessageResult, ThreadView, WorkflowRecoveryResult } from "./types";
@@ -85,15 +85,6 @@ export const threadsApi = {
   // a little longer, so it reads the response rather than giving up before it.
   compactThread: (threadId: string) =>
     request<ThreadCompactResult>(`/api/threads/${threadId}/compact`, { method: "POST" }, { timeoutMs: 270_000 }),
-  /** The execution history, page by page (opaque cursor `<iso>|<uuid>`). */
-  workflowHistory: (input: { status?: "all" | "active" | "attention"; cursor?: string | null; limit?: number } = {}) => {
-    const query = new URLSearchParams();
-    if (input.status && input.status !== "all") query.set("status", input.status);
-    if (input.cursor) query.set("cursor", input.cursor);
-    if (input.limit) query.set("limit", String(input.limit));
-    const suffix = query.size ? `?${query.toString()}` : "";
-    return request<WorkflowHistoryPageDto>(`/api/workflows${suffix}`);
-  },
   inbox: () => request<InboxDto>("/api/inbox"),
   reconcileWorkflow: (workflowId: string) =>
     request<WorkflowRecoveryResult>(`/api/workflows/${workflowId}/reconcile`, { method: "POST" }),
@@ -121,5 +112,4 @@ export const threadsApi = {
     if (!response.ok) throw new ApiError(response.status, "Pièce jointe illisible.", "ATTACHMENT_UNREADABLE");
     return response.blob();
   },
-  eventsUrl: (_threadId: string, cursor: number) => `${API_ORIGIN}/api/events?cursor=${cursor}`,
 };

@@ -21,16 +21,3 @@ export async function selectBotConfigurationExport(
     from bots where organization_id=${organizationId} and id=${botId} and deleted_at is null`;
   return rows[0] ?? null;
 }
-export async function readBotActivation(
-  tx: TransactionDb,
-  organizationId: string,
-) {
-  const rows = await tx<
-    Array<{ bot: boolean; firstBotId: string | null }>
-  >`select
-    exists(select 1 from bots b left join bot_profile_provisions p on p.organization_id=b.organization_id and p.bot_id=b.id
-      where b.organization_id=${organizationId} and b.deleted_at is null and (p.status is null or p.status='succeeded')) as bot,
-    (select b.id from bots b left join bot_profile_provisions p on p.organization_id=b.organization_id and p.bot_id=b.id
-      where b.organization_id=${organizationId} and b.deleted_at is null and b.archived_at is null and (p.status is null or p.status='succeeded') order by b.created_at limit 1) as "firstBotId"`;
-  return rows[0]!;
-}

@@ -1,4 +1,4 @@
-import type { BotRoutineToolDto, BotSettingProposalDecisionInput, BotSettingProposalDto, BotSettingsToolDto, CreateRoutineInput, RoutineDto, RoutineExecutionPageDto, RoutineExecutionReceiptPageDto, RoutineRunAcceptedDto, UpdateRoutineInput, WorkflowStatus } from "@openedbot/contracts-api";
+import type { BotRoutineToolDto, BotSettingProposalDecisionInput, BotSettingProposalDto, BotSettingsToolDto, CreateRoutineInput, RoutineDto, RoutineExecutionPageDto, RoutineRunAcceptedDto, UpdateRoutineInput, WorkflowStatus } from "@openedbot/contracts-api";
 import { request } from "./http";
 
 export const routinesApi = {
@@ -35,21 +35,6 @@ export const routinesApi = {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
     }),
-  /** Firing receipts, paginated by the opaque key the API returns. */
-  routineReceipts: (input: {
-    routineId?: string | null;
-    status?: WorkflowStatus | null;
-    cursor?: string | null;
-    limit?: number;
-  } = {}) => {
-    const query = new URLSearchParams();
-    if (input.routineId) query.set("routineId", input.routineId);
-    if (input.status) query.set("status", input.status);
-    if (input.cursor) query.set("cursor", input.cursor);
-    if (input.limit) query.set("limit", String(input.limit));
-    const suffix = query.size ? `?${query.toString()}` : "";
-    return request<RoutineExecutionReceiptPageDto>(`/api/routines/receipts${suffix}`);
-  },
   routineExecutions: (routineId: string, input: { cursor?: string | null; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (input.cursor) query.set("cursor", input.cursor);

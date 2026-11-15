@@ -9,8 +9,6 @@ import {
   groupRoutineRoutes,
   lockRoutineQuota,
   publicRoutine,
-  readRoutineReceiptCursor,
-  readRoutineReceiptStatus,
   routineRoutes,
   validatedRoutineInput,
 } from "../src/routes/execution/routine-routes";
@@ -366,79 +364,6 @@ describe("lancement manuel durable d'une routine", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: { code: "ROUTINE_NOT_FOUND" } });
     expect(calls.some((call) => call.sql.includes("insert into message_ingress"))).toBe(false);
-  });
-});
-
-describe("reçus d'exécution des routines", () => {
-  test("retourne une page filtrée et un curseur stable", async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = [];
-    const db = receiptDb(calls, [
-      receiptRow(WORKFLOW_1, "2026-08-26T10:00:00.000Z"),
-      receiptRow(WORKFLOW_2, "2026-08-25T10:00:00.000Z"),
-    ]);
-    const response = await mount(db).request(
-      `/receipts?routineId=${ROUTINE_ID}&status=completed&limit=1`,
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      receipts: [{
-        routineId: ROUTINE_ID,
-        workflowId: WORKFLOW_1,
-        runId: "run-1",
-        threadId: "thread-1",
-        botId: "bot-1",
-        status: "completed",
-        trigger: null,
-        errorCode: null,
-        errorMessage: null,
-        createdAt: "2026-08-26T10:00:00.000Z",
-        startedAt: "2026-08-26T10:00:01.000Z",
-        endedAt: "2026-08-26T10:00:03.000Z",
-        durationMs: 2_000,
-      }],
-      nextCursor: `2026-08-26T10:00:00.000Z|${WORKFLOW_1}`,
-    });
-    const query = calls.find((call) => call.sql.includes("from workflows w"));
-    expect(query?.sql).toContain("w.kind = 'routine'");
-    expect(query?.sql).toContain("w.recovery_state->>'routineId'");
-    expect(query?.sql).toContain("w.recovery_state->>'trigger'");
-    expect(query?.sql).toContain("having count(*) = 1");
-    expect(query?.sql).toContain('order by "createdAt" desc, "workflowId" desc');
-    expect(query?.values).toContain(ROUTINE_ID);
-    expect(query?.values).toContain("completed");
-  });
-
-  test("refuse statut et curseur inconnus avant toute lecture SQL", async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = [];
-    const app = mount(receiptDb(calls, []));
-    const invalidStatus = await app.request("/receipts?status=done");
-    const invalidCursor = await app.request("/receipts?cursor=not-a-cursor");
-
-    expect(invalidStatus.status).toBe(400);
-    expect(await invalidStatus.json()).toEqual({ error: { code: "ROUTINE_RECEIPT_STATUS_INVALID" } });
-    expect(invalidCursor.status).toBe(400);
-    expect(await invalidCursor.json()).toEqual({ error: { code: "ROUTINE_RECEIPT_CURSOR_INVALID" } });
-    expect(calls).toHaveLength(0);
-  });
-
-  test("expose trigger depuis recovery_state sans le reste de l'objet", async () => {
-    const calls: Array<{ sql: string; values: unknown[] }> = [];
-    const response = await mount(receiptDb(calls, [
-      receiptRow(WORKFLOW_1, "2026-08-26T10:00:00.000Z", "manual"),
-    ])).request("/receipts");
-
-    expect(response.status).toBe(200);
-    const body = await response.json() as { receipts: Array<{ trigger: string | null }> };
-    expect(body.receipts[0]?.trigger).toBe("manual");
-  });
-
-  test("le parseur de curseur canonicalise ISO et UUID, sans repli permissif", () => {
-    expect(readRoutineReceiptStatus("unknown")).toBe("unknown");
-    expect(
-      readRoutineReceiptCursor(`2026-08-26T12:00:00+02:00|${WORKFLOW_1.toUpperCase()}`),
-    ).toEqual({ createdAt: "2026-08-26T10:00:00.000Z", id: WORKFLOW_1 });
-    expect(() => readRoutineReceiptCursor("2026-08-26|bad")).toThrow(HttpError);
   });
 });
 

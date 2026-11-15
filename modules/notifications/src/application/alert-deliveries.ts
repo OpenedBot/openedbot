@@ -31,7 +31,7 @@ export type AlertDeliveryPassResult = { sent: number; retried: number; failed: n
 let sharedTransport: DiscordTransport | null = null;
 
 /**
- * Envoie les livraisons d'alerte dues (worker). Sémantique, comme APNs (0108) :
+ * Envoie les livraisons d'alerte dues (worker). Les baux et les reprises garantissent que :
  *
  * - une ligne `sent` ne repart jamais (statut et bail la gardent) ;
  * - un worker mort en plein envoi laisse une ligne `sending` dont le bail

@@ -4,7 +4,6 @@ import { ProfileImportError } from "@openedbot/roster/domain/profile-errors";
 import { parseHermesBundleInput } from "@openedbot/portability/domain/validation";
 import {
   acknowledgeImportJob, enqueueProfileImport, findIdempotentImport, listImportJobs,
-  readImportJob,
 } from "@openedbot/portability/application/jobs";
 import type { Db } from "@openedbot/platform-db";
 import type { ApiConfig } from "../../infrastructure/config";
@@ -46,7 +45,6 @@ export function hermesBundleImportRoutes(db: Db, config: ApiConfig, readRuntime 
     const cursor = context.req.query("cursor");
     return context.json(await listImportJobs(db, context.get("auth").organizationId, cursor ? id(cursor) : null));
   });
-  routes.get("/jobs/:id", async (context) => context.json(await readImportJob(db, context.get("auth").organizationId, id(context.req.param("id")))));
   routes.post("/jobs/:id/acknowledge", async (context) => {
     const body = await jsonBody(context.req.raw);
     if (Object.keys(body).some((key) => key !== "verifiedOnHost") || body.verifiedOnHost !== true) {

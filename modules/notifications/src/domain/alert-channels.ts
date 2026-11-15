@@ -218,7 +218,7 @@ export function discordRetryAfterSeconds(body: unknown, header: string | null): 
   return Math.min(Math.max(1, Math.ceil(raw)), 1_800);
 }
 
-/** 30 s, 2 min, 8 min, 30 min, 30 min : le recul des livraisons APNs. */
+/** 30 s, 2 min, 8 min, 30 min, 30 min : le recul des livraisons Discord. */
 export function alertRetryDelaySeconds(attempts: number): number {
   const exponent = Math.max(0, attempts - 1);
   return Math.min(30 * 4 ** exponent, 1_800);

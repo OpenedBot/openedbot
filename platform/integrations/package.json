@@ -9,11 +9,7 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "exports": {
-    "./apns": "./src/apns.ts",
-    "./cloudflare-api": "./src/cloudflare-api.ts",
-    "./managed-tunnel": "./src/managed-tunnel.ts",
-    "./tailscale-api": "./src/tailscale-api.ts",
-    "./vapid": "./src/vapid.ts"
+    "./tailscale-api": "./src/tailscale-api.ts"
   },
   "scripts": {
     "test": "bun test tests",

@@ -2,8 +2,8 @@
  * The core routes the session middleware lets through: they authenticate
  * otherwise (signed hook deliveries, a bearer, an invitation token) or are
  * public. The API adds the public plug-in mounts (`proPublicPathMatcher`)
- * and the payment webhook path the plug-in billing declares
- * (`paymentWebhookMountOf`, step 11.5). Kept here, out of `index.ts`, so
+ * and the exact public endpoints declared by loaded plug-ins.
+ * Kept here, out of `index.ts`, so
  * that a test can pin it.
  */
 

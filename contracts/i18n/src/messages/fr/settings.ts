@@ -126,19 +126,6 @@ export const settingsNotifications = {
   notificationOutcomeBody: "Ouvrez l’application pour consulter son état.",
 } as const;
 
-export const pushNotifications = {
-  approvalRequested: "Approbation demandée",
-  runCompleted: "Workflow terminé",
-  runError: "Échec du workflow",
-  apnsApprovalPending: "Approbation en attente",
-  apnsRoutineCompleted: "Routine terminée",
-  apnsRoutineFailed: "Routine en échec",
-  apnsGroupCompleted: "Salon terminé",
-  apnsGroupFailed: "Échec dans le salon",
-  connectorOutdatedTitle: "{runtime} : connector à mettre à jour",
-  connectorOutdated: "Version {installed}, minimum {target}. Lancez « sudo edge-setup upgrade --yes » sur la machine : openedbot ne peut pas la mettre à jour lui-même.",
-} as const;
-
 export const settingsAccount = {
   closureTitle: "Fermer mon compte",
   closureDescription: "La fermeture efface votre identité et vos moyens de connexion après le délai indiqué. Vos contributions et les historiques des espaces partagés sont conservés.",
@@ -203,21 +190,6 @@ export const settingsAccount = {
   removeCancel: "Annuler",
   errorOwnerProtected: "Le rôle owner ne se modifie pas depuis cet écran.",
   errorMemberBusy: "Ce membre a encore un message en cours : réessayez dans un instant.",
-  mobileTitle: "Application mobile",
-  mobileDescription: "Connectez l’application iPhone en scannant un QR : aucun mot de passe à retaper sur le téléphone.",
-  mobileShow: "Afficher le QR",
-  mobileDialogTitle: "Connecter un téléphone",
-  mobileDialogDescription: "Dans l’app openedbot, touchez « Scanner un code » et visez ce QR. Il ne sert qu’une fois.",
-  mobileLinkLabel: "Lien équivalent",
-  mobileLinkHint: "À coller dans l’application si le téléphone n’a pas de caméra disponible.",
-  mobileCopy: "Copier le lien",
-  mobileCopied: "Lien copié.",
-  mobileExpires: "Valable jusqu’à {time}.",
-  mobileExpired: "Ce QR a expiré.",
-  mobileRenew: "Nouveau QR",
-  mobileCreating: "Préparation…",
-  mobileError: "Le QR n’a pas pu être préparé.",
-  mobileClose: "Fermer",
   connectionTitle: "Connexion",
   googleHint: "Se connecter avec le compte Google de cette adresse.",
   googleConnect: "Connecter",

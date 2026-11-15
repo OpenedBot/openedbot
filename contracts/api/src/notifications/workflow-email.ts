@@ -5,14 +5,6 @@ export type WorkflowEmailPreferences = {
   locale: "fr" | "en";
   checklistHidden: boolean;
 };
-export type ActivationDto = {
-  machine: boolean;
-  model: boolean;
-  bot: boolean;
-  result: boolean;
-  machineOnline: boolean;
-  firstBotId: string | null;
-};
 export type ConversationFileDto = {
   id: string;
   messageId: string;

@@ -82,7 +82,7 @@ describe("worker claim loop", () => {
     logger.level = level;
   });
 
-  for (const jobName of ["email-outbox", "push-notifications"]) test(`a held ${jobName} never delays the next claim, and shutdown still waits for it`, async () => {
+  for (const jobName of ["email-outbox", "fixture-background-job"]) test(`a held ${jobName} never delays the next claim, and shutdown still waits for it`, async () => {
     const order: string[] = [];
     const sending = deferred();
     const release = deferred();
@@ -247,7 +247,7 @@ describe("worker claim loop", () => {
 
   test("a failing maintenance pass is logged and the loop keeps claiming", async () => {
     const failing: BackgroundJob = {
-      name: "push-notifications",
+      name: "fixture-background-job",
       everyMs: 1,
       run: async () => { throw new Error("push provider down"); },
     };
@@ -262,7 +262,7 @@ describe("worker claim loop", () => {
     });
 
     expect(queue.claimed[0]!.queuedMs!).toBeLessThan(250);
-    expect(records).toContainEqual(expect.objectContaining({ level: 50, event: "worker.job_failed", job: "push-notifications" }));
+    expect(records).toContainEqual(expect.objectContaining({ level: 50, event: "worker.job_failed", job: "fixture-background-job" }));
   });
 
   test("a rejected tracked execution does not create an unhandled cleanup promise", async () => {
@@ -377,13 +377,13 @@ describe("worker claim loop", () => {
     expect(order).toEqual(["heartbeat_finished", "leases_released"]);
   }, 10_000);
 
-  test("e-mail and push each run on their own job, apart from the database passes", () => {
+  test("e-mail runs independently, and retired transports have no maintenance job", () => {
     const sender = { send: async () => undefined } as unknown as TransactionalEmailSender;
     const names = maintenanceJobs(db, config, sender).map((job) => job.name);
 
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain("email-outbox");
-    expect(names).toContain("push-notifications");
+    for (const retired of ["push-notifications", "apns-deliveries", "managed-exposures"]) expect(names).not.toContain(retired);
     expect(names).toContain("poison-reaper");
     expect(maintenanceJobs(db, config, null).map((job) => job.name)).not.toContain("email-outbox");
   });

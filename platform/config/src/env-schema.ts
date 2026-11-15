@@ -150,12 +150,8 @@ export function isMalformedPluginEnvName(name: string): boolean {
   return name.startsWith(PLUGIN_ENV_PREFIX) && !envSchemaEntry(name);
 }
 
-/**
- * Prefixes treated as deprecated in `.env.local` whatever the suffix. Empty
- * since DEV-308: `APNS_*` used to be listed here while no APNs dispatcher
- * existed; those names are read again and declared in ENV_SCHEMA.
- */
-export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
+/** Retired mobile and PWA transports; the env audit can remove their old settings. */
+export const DEPRECATED_ENV_PREFIXES: readonly string[] = ["APNS_", "PUSH_VAPID_"];
 
 /**
  * Noms retirés du schéma parce que plus AUCUNE source ne les lit : vérifié nom
@@ -199,6 +195,10 @@ export const DEPRECATED_ENV_PREFIXES: readonly string[] = [];
  *   support, retiré du cœur ouvert ; aucune source ne les lit plus.
  */
 export const DEPRECATED_ENV_NAMES: readonly string[] = [
+  "NATIVE_API_PUBLIC_URL",
+  "OPENEDBOT_COMPUTER_BOX_TOKEN",
+  "TEST_COMPUTER_BOX_API",
+  "PUSH_ALLOW_LOOPBACK_ENDPOINTS",
   "API_SUPPORT_POLL_MS",
   "BUNDLED_HERMES_URL",
   "BOX_TOKEN",

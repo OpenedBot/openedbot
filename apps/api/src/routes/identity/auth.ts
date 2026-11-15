@@ -9,7 +9,7 @@ import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { withCredential } from "@openedbot/platform-db";
 import { hashCredential } from "../../infrastructure/crypto";
-import { assertPassword, assertString, boundedTextBody, HttpError, jsonBody } from "../../interfaces/http/http-error";
+import { assertPassword, assertString, HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { sessionDevice } from "./session-device";
 export { sessionDevice } from "./session-device";
 import { authFailureCode } from "@openedbot/identity/domain/signup";
@@ -29,8 +29,6 @@ import {
 import { exchangeNativeAuthCode, issueNativeAuthCode, refreshNativeSession } from "@openedbot/identity/application/native-auth";
 import { readAccountIdentityView, resolveSessionIdentity } from "@openedbot/identity/application/session-identity";
 import { logger } from "@openedbot/platform-observability";
-import { removeApnsDevice } from "@openedbot/notifications/application/apns-devices";
-import { readApnsInstallationId } from "@openedbot/notifications/domain/apns";
 import { readResolvedProductFeatures, sessionEntitlements } from "../../application/product-features";
 import { SOLO_ENTITLEMENTS, type EntitlementSource } from "@openedbot/identity/application/entitlements";
 
@@ -412,42 +410,12 @@ export function protectedAuthRoutes(
 
   routes.post("/logout", async (context) => {
     const auth = context.get("auth");
-    const installationId = await readLogoutInstallationId(context.req.raw);
-    // iOS (DEV-308): the native client names its installation, and its APNs
-    // registration in this organization goes before the session does, so a
-    // signed-out phone stops ringing. A failure here fails the logout: the
-    // client retries rather than keep a device that still receives pushes.
-    // An assistance session never touches the member's devices.
-    if (installationId && !auth.assistedBy) {
-      await removeApnsDevice(db, { organizationId: auth.organizationId, userId: auth.userId, installationId });
-    }
     await revokeSessionOnLogout(db, auth.credentialHash, auth.sessionId);
     deleteCookie(context, SESSION_COOKIE, { path: "/" });
     deleteCookie(context, CSRF_COOKIE, { path: "/" });
     return context.body(null, 204);
   });
   return routes;
-}
-
-/**
- * The optional logout body: none, `{}`, or `{ "installationId": "<id>" }`.
- * A body that is present but unreadable is refused, never ignored.
- */
-async function readLogoutInstallationId(request: Request): Promise<string | null> {
-  const text = (await boundedTextBody(request, 4_096)).trim();
-  if (!text) return null;
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new HttpError(400, "INVALID_JSON", "Le corps JSON est invalide.");
-  }
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new HttpError(400, "INVALID_JSON", "Le corps JSON est invalide.");
-  }
-  const value = (body as Record<string, unknown>).installationId;
-  if (value === undefined || value === null) return null;
-  return readApnsInstallationId(value);
 }
 
 /** Operational rights, deliberately separate from membership and billing administration. */

@@ -38,7 +38,7 @@ describe("loadWorkerPro", () => {
 
   test("the subscription port is the plug-in billing's (step 8d), never another id's", async () => {
     const port = { status: async () => null, read: async () => null, readForUpdate: async () => null, admission: () => null };
-    const billing = { webhookPath: "/api/pay/webhook", webhook: async () => new Response(null), subscriptions: port };
+    const billing = { subscriptions: port };
     const withBilling = await loadWorkerPro({ OPENEDBOT_PLUGINS: "billing" }, roleDb([]), { billingEnforced: true }, silent, {
       importer: importerFor({ billing: plugin("billing", { billing }, ["billing.enforced"]) }),
     });

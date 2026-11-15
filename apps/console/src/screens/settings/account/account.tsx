@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { SettingsCardGrid } from "../../../components/settings/settings-card-grid";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconCheck, IconX } from "@tabler/icons-react";
-import QRCode from "qrcode";
 import { passwordChecks, passwordProblem } from "@openedbot/identity/domain/password";
 import type { AssignableRole, OrganizationMemberDto } from "@openedbot/contracts-api";
 import { MemberInvitations } from "../../../components/settings/member-invitations";
@@ -81,7 +80,6 @@ export function AccountSettings() {
       <SettingsCardGrid>
         <ProfileSection />
         <ConnectionSection />
-        {isNativeShell() ? null : <MobileSection />}
         <WorkspaceSection />
       </SettingsCardGrid>
       <MembersCard canManage={canManage} viewerEmail={session?.user.email ?? null} />
@@ -468,136 +466,6 @@ function googleUnlinkErrorMessage(error: unknown, t: T): string {
     }
   }
   return error instanceof Error ? error.message : t("settingsSecurity.errorGeneric");
-}
-
-/**
- * Mobile application (Mobile Connect): a QR that opens a session on the iPhone without
- * retyping the password. The ticket (`POST /api/auth/mobile-connect/tickets`) is worth ten
- * minutes and serves only once; the app trades it for a native code bound to its PKCE.
- * Hidden in the native shell: one does not scan a QR with the phone that displays it.
- */
-function MobileSection() {
-  const { t } = useT();
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <ListSection title={t("settingsAccount.mobileTitle")}>
-        <ListRow label={t("settingsAccount.mobileTitle")} description={t("settingsAccount.mobileDescription")}>
-          <button type="button" className={BUTTON.soft} onClick={() => setOpen(true)}>
-            {t("settingsAccount.mobileShow")}
-          </button>
-        </ListRow>
-      </ListSection>
-      {/* Outside the section's `<ul>`: the dialog is not a line. */}
-      <MobileConnectDialog open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
-function MobileConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t, locale } = useT();
-  const [qr, setQr] = useState<string | null>(null);
-  const [expired, setExpired] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const ticket = useMutation({ mutationFn: api.mobileConnectTicket });
-  const create = ticket.mutate;
-  const link = ticket.data?.url ?? null;
-  const expiresAt = ticket.data?.expiresAt ?? null;
-
-  // Opening asks for a ticket; closing forgets it (it stays valid on the API side until its
-  // expiry, but nothing here replays it).
-  useEffect(() => {
-    if (open) {
-      create();
-    } else {
-      ticket.reset();
-      setQr(null);
-      setExpired(false);
-      setCopied(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ticket.reset` is stable
-  }, [open, create]);
-
-  useEffect(() => {
-    if (!link) return;
-    let cancelled = false;
-    QRCode.toDataURL(link, { margin: 1, width: 240, errorCorrectionLevel: "M" })
-      .then((dataUrl) => { if (!cancelled) setQr(dataUrl); })
-      .catch(() => { if (!cancelled) setQr(null); });
-    return () => { cancelled = true; };
-  }, [link]);
-
-  useEffect(() => {
-    if (!expiresAt) return;
-    setExpired(false);
-    const remaining = new Date(expiresAt).getTime() - Date.now();
-    if (remaining <= 0) { setExpired(true); return; }
-    const timer = window.setTimeout(() => setExpired(true), remaining);
-    return () => window.clearTimeout(timer);
-  }, [expiresAt]);
-
-  const copy = async () => {
-    if (!link) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-    } catch {
-      // Clipboard refused (insecure context): the link stays selectable.
-      setCopied(false);
-    }
-  };
-
-  const expiresLabel = expiresAt
-    ? new Date(expiresAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
-    : "";
-
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={t("settingsAccount.mobileDialogTitle")}
-      description={t("settingsAccount.mobileDialogDescription")}
-      closeLabel={t("settingsAccount.mobileClose")}
-      className="max-w-md"
-      footer={
-        <div className={ACTIONS}>
-          <button type="button" className={BUTTON.secondary} onClick={onClose}>
-            {t("settingsAccount.mobileClose")}
-          </button>
-          <button type="button" className={BUTTON.soft} disabled={ticket.isPending} onClick={() => create()}>
-            {ticket.isPending ? t("settingsAccount.mobileCreating") : t("settingsAccount.mobileRenew")}
-          </button>
-        </div>
-      }
-    >
-      <div className="flex flex-col items-center gap-3">
-        {ticket.isError ? (
-          <Note tone="danger" role="alert">{t("settingsAccount.mobileError")}</Note>
-        ) : qr && !expired ? (
-          <img src={qr} alt={t("settingsAccount.mobileDialogTitle")} width={240} height={240} className="rounded-md bg-white p-2" />
-        ) : (
-          <div className="flex h-60 w-60 items-center justify-center rounded-md bg-muted text-sm text-muted-foreground" role="status">
-            {expired ? t("settingsAccount.mobileExpired") : t("settingsAccount.mobileCreating")}
-          </div>
-        )}
-        {link && !expired ? (
-          <>
-            <p className="text-xs text-muted-foreground">{t("settingsAccount.mobileExpires", { time: expiresLabel })}</p>
-            <div className="w-full">
-              <p className="text-sm font-medium">{t("settingsAccount.mobileLinkLabel")}</p>
-              <p className="text-xs text-muted-foreground">{t("settingsAccount.mobileLinkHint")}</p>
-              <code className="mt-1 block w-full select-all overflow-x-auto rounded-md border border-border bg-muted px-2 py-1 text-xs">{link}</code>
-              <div className={cn(ACTIONS, "mt-2")}>
-                <button type="button" className={BUTTON.secondary} onClick={() => void copy()}>
-                  {copied ? t("settingsAccount.mobileCopied") : t("settingsAccount.mobileCopy")}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
-    </Dialog>
-  );
 }
 
 /** The space where the session writes, and what it can do there: read, never editable here. */

@@ -1,6 +1,3 @@
-// TODO(notifications): the Web Push subscription depended on the PWA service worker, removed.
-// Push notifications must move to the desktop app / APNs;
-// the API-side send (/api/push-subscriptions, @openedbot/notifications) stays in place.
 import { WorkflowEmailSettings } from "../../../components/workflow-email-settings";
 import { useEffect, useState } from "react";
 import { useIsMobile } from "@openedbot/browser-ui-kit";

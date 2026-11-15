@@ -38,6 +38,13 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
   const worker = await connect("openedbot_worker");
   await owner`insert into organizations (id, slug, name, permission_pipeline)
     values (${ORG_V2}, 'acme-unattended', 'Acme', 'v2'), (${ORG_LEGACY}, 'acme-legacy', 'Acme Legacy', 'legacy')`;
+  const users = new Map([[ORG_V2, id(10)], [ORG_LEGACY, id(11)]]);
+  for (const [org, user] of users) {
+    await owner`insert into users (id, email) values (${user}, ${`${user}@example.test`})`;
+    await owner`insert into memberships (organization_id, user_id, role) values (${org}, ${user}, 'owner')`;
+    await owner`insert into user_workspace_preferences (organization_id, user_id, approval_enabled_at)
+      values (${org}, ${user}, now())`;
+  }
   const bots = new Map<string, string>();
   let next = 100;
   for (const [org, mode] of [[ORG_V2, "manual"], [ORG_V2, "bypass"], [ORG_LEGACY, "manual"]] as const) {
@@ -56,8 +63,8 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
     await owner.begin(async (tx) => {
       await tx`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
         values (${thread}, ${org}, ${botId}, 'Routine', ${`unattended:${thread}`}, false)`;
-      await tx`insert into workflows (id, organization_id, thread_id, root_run_id, root_bot_id, kind, status, autonomy_enabled, never_wait)
-        values (${workflow}, ${org}, ${thread}, ${run}, ${botId}, 'routine', 'running', false, ${neverWait})`;
+      await tx`insert into workflows (id, organization_id, thread_id, root_run_id, root_bot_id, initiator_user_id, kind, status, autonomy_enabled, never_wait)
+        values (${workflow}, ${org}, ${thread}, ${run}, ${botId}, ${users.get(org)!}, 'routine', 'running', false, ${neverWait})`;
       await tx`insert into runs (id, organization_id, thread_id, bot_id, input, status, workflow_id, step_index, step_kind,
           lease_owner, lease_expires_at, lease_generation, external_state)
         values (${run}, ${org}, ${thread}, ${botId}, '[Routine « Revue »] Fais le point.', 'running', ${workflow}, 0, 'root',
@@ -81,9 +88,12 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
               decided_by_kind as kind, resolved_by_policy as policy, forward_state as forward, decision_detail as detail
          from approval_requests where id = ${approval}`)[0];
     assert(row, "persistEvents wrote no gate");
-    const flow = (await owner<Array<{ status: string; pushes: number }>>`
-      select w.status, (select count(*)::int from push_outbox p where p.workflow_id = w.id) as pushes
+    const flow = (await owner<Array<{ status: string; emails: number; pushes: number }>>`
+      select w.status, (select count(*)::int from email_outbox e
+        where e.kind = 'workflow_approval' and e.payload->>'workflowId' = w.id::text) as emails,
+        (select count(*)::int from push_outbox p where p.workflow_id = w.id) as pushes
         from workflows w where w.id = ${workflow}`)[0]!;
+    assert(flow.pushes === 0, `retired push producer created a notification: ${JSON.stringify(flow)}`);
     return { row, flow };
   }
 
@@ -94,7 +104,7 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
       && row.kind === "policy" && row.policy === "manual" && row.forward === "ready", `v2 never wait: ${JSON.stringify(row)}`);
     assert(row.detail?.reason === "never_wait" && row.detail.heldStage === "human" && row.detail.heldReason === "manual_mode",
       `v2 never wait detail: ${JSON.stringify(row.detail)}`);
-    assert(flow.status === "running" && flow.pushes === 0, `v2 never wait notified: ${JSON.stringify(flow)}`);
+    assert(flow.status === "running" && flow.emails === 0, `v2 never wait notified: ${JSON.stringify(flow)}`);
   }
 
   // 2. An interdiction keeps its stage; a policy once is unchanged.
@@ -117,14 +127,14 @@ await withDisposablePostgres("openedbot260_unattended_gates", async ({ owner, co
     const { row, flow } = await gate(ORG_LEGACY, "manual", true, WRITE_GATE);
     assert(row.status === "denied" && row.choice === "deny" && row.policy === "manual" && row.forward === "ready"
       && row.detail?.reason === "never_wait" && row.state === null, `legacy never wait: ${JSON.stringify(row)}`);
-    assert(flow.pushes === 0, "legacy never wait notified");
+    assert(flow.emails === 0, "legacy never wait notified");
   }
 
   // 5. An attended routine still waits for a person, and notifies once.
   for (const org of [ORG_V2, ORG_LEGACY]) {
     const { row, flow } = await gate(org, "manual", false, WRITE_GATE);
     assert(row.status === "pending" && row.choice === null && row.forward === "pending", `attended: ${JSON.stringify(row)}`);
-    assert(flow.status === "awaiting_approval" && flow.pushes === 1, `attended was not notified: ${JSON.stringify(flow)}`);
+    assert(flow.status === "awaiting_approval" && flow.emails === 1, `attended was not notified: ${JSON.stringify(flow)}`);
   }
 
   // 6. An expired gate whose stop Hermes confirmed names the run and its

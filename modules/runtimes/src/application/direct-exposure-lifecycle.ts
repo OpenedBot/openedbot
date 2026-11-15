@@ -1,20 +1,16 @@
-import { createCloudflareApiClient, type CloudflareApiClient } from "@openedbot/platform-integrations/cloudflare-api";
+import { managedExposure } from "./managed-exposure";
 import { createTailscaleApiClient, type TailscaleApiClient, type TailscaleCredentials } from "@openedbot/platform-integrations/tailscale-api";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import { withTenant } from "@openedbot/platform-db";
 import { readExposureByRuntime, type RuntimeExposureRow } from "../sql/runtime-exposures";
-import { deprovisionDirectExposure } from "./direct-exposure-provisioning";
 import { deprovisionTailscaleExposure } from "./tailscale-exposure-provisioning";
 
-export type CloudflareClientFactory = (apiToken: string) => CloudflareApiClient;
 export type TailscaleClientFactory = (credentials: TailscaleCredentials) => TailscaleApiClient;
 
-export const defaultCloudflareClientFactory: CloudflareClientFactory = (apiToken) => createCloudflareApiClient(apiToken);
 export const defaultTailscaleClientFactory: TailscaleClientFactory = (credentials) => createTailscaleApiClient(credentials);
 
 /** Les fabriques que la révocation utilise ; des faux dans les tests. */
 export type ExposureClientFactories = {
-  cloudflare?: CloudflareClientFactory;
   tailscale?: TailscaleClientFactory;
 };
 
@@ -61,8 +57,7 @@ function exposureCleanupStatus(
     if (tailscaleCredentials) return "pending";
     return row.tailscaleAuthKeyId ? "manual" : "none";
   }
-  const apiToken = row.kind === "managed_cloudflare" ? config.managedTunnel?.apiToken ?? null : null;
-  return apiToken && row.cloudflareAccountId && row.zoneId ? "pending" : "manual";
+  return row.kind === "managed_cloudflare" && row.cloudflareAccountId && row.zoneId ? "pending" : "manual";
 }
 
 /**
@@ -85,9 +80,9 @@ export async function cleanupRevokedExposure(
     const client = (factories.tailscale ?? defaultTailscaleClientFactory)(tailscaleCredentials);
     await deprovisionTailscaleExposure(client, { hostname: row.hostname, authKeyId: row.tailscaleAuthKeyId });
   } else {
-    const apiToken = row.kind === "managed_cloudflare" ? config.managedTunnel?.apiToken ?? null : null;
-    if (!apiToken || !row.cloudflareAccountId || !row.zoneId) return "manual";
-    await deprovisionDirectExposure((factories.cloudflare ?? defaultCloudflareClientFactory)(apiToken), {
+    const provider = managedExposure();
+    if (row.kind !== "managed_cloudflare" || !provider || !row.cloudflareAccountId || !row.zoneId) return "manual";
+    await provider.cleanup({
       accountId: row.cloudflareAccountId,
       zoneId: row.zoneId,
       tunnelId: row.tunnelId,
@@ -134,7 +129,15 @@ export async function cleanupRevokedExposuresAfterCommit(
 ): Promise<void> {
   for (const row of rows) {
     try {
-      await cleanupRevokedExposure(db, config, row, null, factories);
+      const result = await cleanupRevokedExposure(db, config, row, null, factories);
+      if (result === "manual") {
+        console.warn(JSON.stringify({
+          event: "api.exposure_cleanup_deferred",
+          organizationId: row.organizationId,
+          exposureId: row.id,
+          reason: managedExposure() ? "resources_unavailable" : "provider_unavailable",
+        }));
+      }
     } catch (error) {
       console.warn(JSON.stringify({
         event: "api.exposure_cleanup_deferred",

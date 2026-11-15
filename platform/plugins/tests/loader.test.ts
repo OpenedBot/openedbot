@@ -257,20 +257,6 @@ describe("auditArchive: the external audit archive (open-core boundary)", () => 
   });
 });
 
-describe("billing hooks (step 8c)", () => {
-  const webhook = async () => new Response(null, { status: 204 });
-
-  test("accepts the payment webhook from the plug-in billing only", () => {
-    expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook } }))).toBeNull();
-    expect(invalidPluginReason(plugin("staff", { billing: { webhookPath: PAY_PATH, webhook } }))).toBe('billing needs the plug-in "billing"');
-  });
-
-  test("refuses billing hooks without a webhook function", () => {
-    expect(invalidPluginReason(plugin("billing", { billing: {} } as unknown as Partial<ProPlugin>))).toBe("invalid billing");
-    expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook: "nope" } } as unknown as Partial<ProPlugin>))).toBe("invalid billing");
-  });
-});
-
 describe("onOrganizationCreating (step 8d)", () => {
   const onOrganizationCreating = async () => undefined;
 
@@ -291,18 +277,18 @@ describe("billing.subscriptions (step 8d)", () => {
   const port = { status: async () => null, read: async () => null, readForUpdate: async () => null, admission: () => null };
 
   test("a whole port is accepted from the plug-in billing, and the webhook alone still is", () => {
-    expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook, subscriptions: port } }))).toBeNull();
-    expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook } }))).toBeNull();
-    expect(invalidPluginReason(plugin("reports", { billing: { webhookPath: PAY_PATH, webhook, subscriptions: port } }))).toBe('billing needs the plug-in "billing"');
+    expect(invalidPluginReason(plugin("billing", { billing: { subscriptions: port } }))).toBeNull();
+    expect(invalidPluginReason(plugin("billing", { billing: {  } }))).toBeNull();
+    expect(invalidPluginReason(plugin("reports", { billing: { subscriptions: port } }))).toBe('billing needs the plug-in "billing"');
   });
 
   test("a port missing a member, or with one that is not a function, is refused", () => {
     for (const member of ["status", "read", "readForUpdate", "admission"] as const) {
       const { [member]: _dropped, ...partial } = port;
-      expect([member, invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook, subscriptions: partial } } as unknown as Partial<ProPlugin>))]).toEqual([member, "invalid billing.subscriptions"]);
-      expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook, subscriptions: { ...port, [member]: 1 } } } as unknown as Partial<ProPlugin>))).toBe("invalid billing.subscriptions");
+      expect([member, invalidPluginReason(plugin("billing", { billing: { subscriptions: partial } } as unknown as Partial<ProPlugin>))]).toEqual([member, "invalid billing.subscriptions"]);
+      expect(invalidPluginReason(plugin("billing", { billing: { subscriptions: { ...port, [member]: 1 } } } as unknown as Partial<ProPlugin>))).toBe("invalid billing.subscriptions");
     }
-    expect(invalidPluginReason(plugin("billing", { billing: { webhookPath: PAY_PATH, webhook, subscriptions: "nope" } } as unknown as Partial<ProPlugin>))).toBe("invalid billing.subscriptions");
+    expect(invalidPluginReason(plugin("billing", { billing: { subscriptions: "nope" } } as unknown as Partial<ProPlugin>))).toBe("invalid billing.subscriptions");
   });
 });
 
@@ -414,26 +400,5 @@ describe("manifest.env: deployment variables a plug-in declares (step 11.5)", ()
     expect(() => assertDistinctPluginEnv([billing, rival])).toThrow(
       "Deployment variable declared by more than one loaded plug-in: PAY_KEY (billing, payments).",
     );
-  });
-});
-
-describe("billing.webhookPath: the plug-in names its webhook path (step 11.5)", () => {
-  const webhook = async () => new Response(null, { status: 204 });
-  const withPath = (webhookPath: unknown) => plugin("billing", { billing: { webhookPath, webhook } } as unknown as Partial<ProPlugin>);
-
-  test("accepts a static path under /api with two more segments", () => {
-    for (const path of ["/api/pay/webhook", "/api/provider/v2/events", "/api/a_b/c-d"]) expect([path, invalidPluginReason(withPath(path))]).toEqual([path, null]);
-  });
-
-  test("refuses a missing, malformed, parameterised or too broad path", () => {
-    for (const path of [undefined, 42, "", "api/pay/webhook", "/api/pay", "/api", "/pay/webhook", "/internal/pay/webhook", "/api/pay/:id", "/api/pay/*", "/api/Pay/webhook", "/api/pay/webhook/", "/api//webhook", "/api/pay/webhook?x=1"]) {
-      expect([path, invalidPluginReason(withPath(path))]).toEqual([path, "invalid billing.webhookPath"]);
-    }
-  });
-
-  test("refuses the plug-in mounts, the session routes and the hook ingress", () => {
-    for (const path of ["/api/pro/billing", "/api/pro/billing/webhook", "/api/auth/webhook", "/api/hooks/pay"]) {
-      expect([path, invalidPluginReason(withPath(path))]).toEqual([path, `billing.webhookPath ${JSON.stringify(path)} is reserved`]);
-    }
   });
 });

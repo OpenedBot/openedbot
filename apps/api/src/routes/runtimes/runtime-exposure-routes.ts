@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { CloudflareApiError } from "@openedbot/platform-integrations/cloudflare-api";
+import { managedExposure } from "@openedbot/runtimes/application/managed-exposure";
 import { TailscaleApiError, type TailscaleCredentials } from "@openedbot/platform-integrations/tailscale-api";
 import type {
   RuntimeExposureCreatedDto,
@@ -8,7 +8,6 @@ import type {
   RuntimeExposureRevokedDto,
   RuntimeProbeDiagnosticCode,
 } from "@openedbot/contracts-api";
-import type { ManagedTunnelConfig } from "@openedbot/platform-integrations/managed-tunnel";
 import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
@@ -22,14 +21,11 @@ import {
   type RuntimeExposureRow,
 } from "@openedbot/runtimes/application/runtime-exposures";
 import {
-  defaultCloudflareClientFactory,
   defaultTailscaleClientFactory,
   cleanupRevokedExposure,
   markExposureRevoked,
-  type CloudflareClientFactory,
   type TailscaleClientFactory,
 } from "@openedbot/runtimes/application/direct-exposure-lifecycle";
-import { deprovisionDirectExposure, provisionDirectExposure } from "@openedbot/runtimes/application/direct-exposure-provisioning";
 import {
   deprovisionTailscaleExposure,
   provisionTailscaleExposure,
@@ -55,16 +51,12 @@ import {
 export type RuntimeExposureRouteDeps = {
   /** Hermes probe of the published hostname; a fake in tests. */
   clientFactory?: (clientConfig: HermesClientConfig) => RuntimeProbeClient;
-  /** Cloudflare API client for a given token; a fake in tests. */
-  cloudflareFactory?: CloudflareClientFactory;
   /** Tailscale API client for a given OAuth client; a fake in tests. */
   tailscaleFactory?: TailscaleClientFactory;
   now?: () => Date;
 };
 
 const SLUG = /^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$/;
-/** Successive draws before giving up on a free managed subdomain. */
-const MANAGED_SLUG_ATTEMPTS = 5;
 /** Two reads of the same hostname spaced by less than this return the cached state. */
 export const EXPOSURE_CHECK_CACHE_MS = 10_000;
 
@@ -84,7 +76,6 @@ export const EXPOSURE_CHECK_CACHE_MS = 10_000;
 export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeExposureRouteDeps = {}): Hono<{ Variables: AppVariables }> {
   const routes = new Hono<{ Variables: AppVariables }>();
   const createClient = deps.clientFactory ?? runtimeAdminClient;
-  const cloudflare = deps.cloudflareFactory ?? defaultCloudflareClientFactory;
   const tailscale = deps.tailscaleFactory ?? defaultTailscaleClientFactory;
   const now = deps.now ?? (() => new Date());
 
@@ -97,7 +88,7 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
 
     const draft = kind === "tailscale_funnel"
       ? await funnelDraft(body, config, tailscale)
-      : await managedDraft(body, config, cloudflare);
+      : await managedDraft(body);
 
     const keyId = config.tokenEncryption.current.id;
     const install = draft.installToken ? encryptSecret(draft.installToken, config.tokenEncryption.current.value) : null;
@@ -134,7 +125,7 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
       commitSent = true;
       return inserted;
     }).catch(async (error: unknown) => {
-      await releaseUnrecordedExposure(kind, draft, body, config, { cloudflare, tailscale }, commitSent, auth.organizationId);
+      await releaseUnrecordedExposure(kind, draft, body, config, { tailscale }, commitSent, auth.organizationId);
       throw error;
     });
     const response: RuntimeExposureCreatedDto = {
@@ -293,7 +284,7 @@ export function runtimeExposureRoutes(db: Db, config: ApiConfig, deps: RuntimeEx
     }
     let cloudflareCleanup: "done" | "manual";
     try {
-      cloudflareCleanup = await cleanupRevokedExposure(db, config, revoked.row, credentials, { cloudflare, tailscale });
+      cloudflareCleanup = await cleanupRevokedExposure(db, config, revoked.row, credentials, { tailscale });
     } catch (error) {
       throw mapProviderError(error);
     }
@@ -379,58 +370,6 @@ async function funnelDraft(body: Record<string, unknown>, config: ApiConfig, tai
 }
 
 /**
- * A subdomain nobody chose: `openedbot-<hex>` on the managed zone.
- *
- * Nothing to enter on the client side, so nothing to validate or dispute. The draw is
- * reread against the zone's DNS before it is kept: a collision is
- * improbable (2^32) but a hostname already published belongs to someone.
- */
-async function pickManagedSlug(client: ReturnType<CloudflareClientFactory>, managed: ManagedTunnelConfig): Promise<string> {
-  for (let attempt = 0; attempt < MANAGED_SLUG_ATTEMPTS; attempt++) {
-    const slug = `openedbot-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
-    if (!(await client.findDnsRecord(managed.zoneId, `${slug}.${managed.hostSuffix}`))) return slug;
-  }
-  throw new HttpError(503, "EXPOSURE_HOSTNAME_TAKEN", "Aucun sous-domaine libre n’a été tiré ; réessayez.");
-}
-
-/**
- * The managed tunnel: everything happens on openedbot's Cloudflare account.
- *
- * Without a `slug`, openedbot draws the subdomain itself and the client has nothing to
- * enter before publishing. An explicit `slug` stays accepted for an API
- * call that wants a readable name; the assistant itself does not send one.
- */
-async function managedDraft(body: Record<string, unknown>, config: ApiConfig, cloudflare: CloudflareClientFactory): Promise<ExposureDraft> {
-  const managed = config.managedTunnel;
-  if (!managed) throw new HttpError(404, "MANAGED_TUNNEL_UNAVAILABLE", "Ce déploiement ne publie pas de tunnel géré.");
-  const chosen = body.slug === undefined || body.slug === null || body.slug === ""
-    ? null
-    : readSlug(body.slug, "Le nom du runtime géré");
-  const client = cloudflare(managed.apiToken);
-  try {
-    const slug = chosen ?? await pickManagedSlug(client, managed);
-    const hostname = `${slug}.${managed.hostSuffix}`;
-    // A hostname already published on the managed zone belongs to someone: never overwrite it.
-    if (chosen && await client.findDnsRecord(managed.zoneId, hostname)) {
-      throw new HttpError(409, "EXPOSURE_HOSTNAME_TAKEN", "Ce nom est déjà pris ; choisissez-en un autre.");
-    }
-    const result = await provisionDirectExposure(client, {
-      accountId: managed.accountId, zoneId: managed.zoneId, hostname,
-      tunnelName: `openedbot-managed-${slug}`, accessName: `openedbot managed ${slug}`,
-    });
-    return {
-      hostname, endpoint: `https://${hostname}`,
-      accountId: managed.accountId, zoneId: managed.zoneId, tunnelId: result.tunnelId,
-      dnsRecordId: result.dnsRecordId, accessAppId: result.accessAppId, serviceTokenId: result.serviceTokenId,
-      tailscaleAuthKeyId: null, installToken: result.installToken,
-      installCommand: `sudo cloudflared service install ${result.installToken}`, edgeAuth: result.edgeAuth,
-    };
-  } catch (error) {
-    throw mapProviderError(error);
-  }
-}
-
-/**
  * A publication provisioned at the provider whose row was not
  * written. Certain rollback: its resources are removed (idempotent
  * deletions). COMMIT outcome unknown: nothing is destroyed, the row may
@@ -442,7 +381,7 @@ async function releaseUnrecordedExposure(
   draft: ExposureDraft,
   body: Record<string, unknown>,
   config: ApiConfig,
-  factories: { cloudflare: CloudflareClientFactory; tailscale: TailscaleClientFactory },
+  factories: { tailscale: TailscaleClientFactory },
   commitSent: boolean,
   organizationId: string,
 ): Promise<void> {
@@ -459,8 +398,10 @@ async function releaseUnrecordedExposure(
       await deprovisionTailscaleExposure(factories.tailscale(readTailscaleCredentials(body)), {
         hostname: draft.hostname, authKeyId: draft.tailscaleAuthKeyId,
       });
-    } else if (config.managedTunnel && draft.accountId && draft.zoneId) {
-      await deprovisionDirectExposure(factories.cloudflare(config.managedTunnel.apiToken), {
+    } else if (draft.accountId && draft.zoneId) {
+      const provider = managedExposure();
+      if (!provider) throw new Error("Managed exposure provider unavailable during rollback");
+      await provider.cleanup({
         accountId: draft.accountId, zoneId: draft.zoneId, tunnelId: draft.tunnelId, dnsRecordId: draft.dnsRecordId,
         accessAppId: draft.accessAppId, serviceTokenId: draft.serviceTokenId,
       });
@@ -495,10 +436,7 @@ export function reachabilityVerdict(edgeOk: boolean | null, code: RuntimeProbeDi
 /** Translates a provider failure into an HTTP error, never letting its response body leak. */
 function mapProviderError(error: unknown): HttpError {
   if (error instanceof HttpError) return error;
-  if (error instanceof CloudflareApiError) {
-    const status = error.code === "CLOUDFLARE_TOKEN_REJECTED" ? 400 : error.code === "CLOUDFLARE_CONFLICT" ? 409 : error.code === "CLOUDFLARE_NOT_FOUND" ? 404 : 502;
-    return new HttpError(status, error.code, error.message);
-  }
+
   if (error instanceof TailscaleApiError) {
     const status = error.code === "TAILSCALE_CREDENTIALS_REJECTED" || error.code === "TAILSCALE_TAILNET_UNKNOWN" ? 400
       : error.code === "TAILSCALE_CONFLICT" ? 409
@@ -506,5 +444,12 @@ function mapProviderError(error: unknown): HttpError {
           : error.code === "TAILSCALE_RATE_LIMITED" ? 429 : 502;
     return new HttpError(status, error.code, error.message);
   }
-  return new HttpError(502, "CLOUDFLARE_UNAVAILABLE", "L’API du fournisseur n’a pas répondu.");
+  return new HttpError(502, "EXPOSURE_PROVIDER_UNAVAILABLE", "L’API du fournisseur n’a pas répondu.");
+}
+
+async function managedDraft(body: Record<string, unknown>): Promise<ExposureDraft> {
+  const provider = managedExposure();
+  if (!provider) throw new HttpError(404, "MANAGED_TUNNEL_UNAVAILABLE", "Ce déploiement ne publie pas de tunnel géré.");
+  const slug = body.slug === undefined || body.slug === null || body.slug === "" ? undefined : readSlug(body.slug, "Le nom du runtime géré");
+  return provider.create({ slug });
 }

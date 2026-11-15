@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { strict as assert } from "node:assert";
 import type { AppVariables } from "../../apps/api/src/routes/identity/auth";
 import { workspacePreferencesRoutes } from "../../apps/api/src/routes/notifications/workspace-preferences-routes";
-import { workspaceActivationRoutes } from "../../apps/api/src/routes/identity/workspace-activation-routes";
 import { conversationFilesRoutes } from "../../apps/api/src/routes/conversation/conversation-files-routes";
 import { productExportRoutes } from "../../apps/api/src/routes/conversation/product-export-routes";
 import { HttpError } from "../../apps/api/src/interfaces/http/http-error";
@@ -81,7 +80,6 @@ if (import.meta.main)
         throw error;
       });
       app.route("/preferences", workspacePreferencesRoutes(api));
-      app.route("/activation", workspaceActivationRoutes(api));
       app.route("/threads", conversationFilesRoutes(api));
       app.route("/exports", productExportRoutes(api));
       const request = (path: string, body?: unknown) =>
@@ -124,8 +122,7 @@ if (import.meta.main)
         false,
       );
       currentUser = userId;
-      const initial = await (await request("/activation")).json();
-      assert.equal(initial.result, false);
+      assert.equal((await owner`select count(*)::int as count from pg_trigger where tgname = 'workflows_push_notification'`)[0].count, 0);
       const makeWorkflow = async (origin: string | null = null) => {
         const workflowId = crypto.randomUUID(),
           runId = crypto.randomUUID();
@@ -139,9 +136,7 @@ if (import.meta.main)
         return { workflowId, runId };
       };
       await makeWorkflow("bot_greeting");
-      assert.equal((await (await request("/activation")).json()).result, false);
       const { workflowId, runId } = await makeWorkflow();
-      assert.equal((await (await request("/activation")).json()).result, true);
       const rows =
         await owner`select * from email_outbox where kind='workflow_completed'`;
       assert.equal(rows.length, 1);
@@ -273,9 +268,8 @@ if (import.meta.main)
       assert.equal((await request(`/exports/bots/${botId}`)).status, 403);
       currentRole = "owner";
       await owner`update workflows set status='failed',updated_at=clock_timestamp() where id=${workflowId}`;
-      assert.equal((await (await request("/activation")).json()).result, true);
       console.info(
-        "MVP integration PASS: migration, defaults, validation, personal preferences, greeting exclusion, activation, durable email, revocation, dedupe, files, exports",
+        "MVP integration PASS: migration, defaults, validation, personal preferences, greeting exclusion, retired push producer, durable email, revocation, dedupe, files, exports",
       );
     },
   );

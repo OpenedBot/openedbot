@@ -50,15 +50,12 @@ export const queryKeys = {
   get usage() { return workspaceQueryKey(activeOrganizationId(), "usage"); },
   get usageModels() { return workspaceQueryKey(activeOrganizationId(), "usage-models"); },
   usageModelsWindow: (days: number) => workspaceQueryKey(activeOrganizationId(), "usage-models", days),
-  usageBots: (days: number) => workspaceQueryKey(activeOrganizationId(), "usage-bots", days),
   routines: (botId: string) => workspaceQueryKey(activeOrganizationId(), "routines", botId),
   groupRoutines: (groupId: string) => workspaceQueryKey(activeOrganizationId(), "group-routines", groupId),
   botRoutineTool: (botId: string) => workspaceQueryKey(activeOrganizationId(), "routine-tool", botId),
   botSettingsTool: (botId: string) => workspaceQueryKey(activeOrganizationId(), "settings-tool", botId),
   routineExecutions: (routineId: string) =>
     workspaceQueryKey(activeOrganizationId(), "routine-executions", routineId),
-  workflowHistory: (status: string) =>
-    workspaceQueryKey(activeOrganizationId(), "workflow-history", status),
   get inbox() { return workspaceQueryKey(activeOrganizationId(), "inbox"); },
   globalSearch: (query: string) => workspaceQueryKey(activeOrganizationId(), "global-search", query),
   get authProviders() { return ["auth", "providers"] as const; },
@@ -89,8 +86,6 @@ export const queryKeys = {
     workspaceQueryKey(activeOrganizationId(), "bot-runtime-memory", botId),
   personaDraft: (botId: string) =>
     workspaceQueryKey(activeOrganizationId(), "persona-draft", botId),
-  botComputer: (botId: string) =>
-    workspaceQueryKey(activeOrganizationId(), "bot-computer", botId),
   webhooks: (threadId: string) =>
     workspaceQueryKey(activeOrganizationId(), "webhooks", threadId),
   runtimeModels: (runtimeId: string) =>

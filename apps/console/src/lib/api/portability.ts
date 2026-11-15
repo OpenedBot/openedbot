@@ -26,7 +26,6 @@ export const portabilityApi = {
   runtimeProfileDeleteJobs: () => request<RuntimeProfileDeleteJobListDto>("/api/runtime/profiles/delete-jobs"),
   importHermesBundle: (input: HermesBundleImportInput) => request<HermesBundleImportJobDto>("/api/team-imports/hermes-bundle", { method: "POST", body: JSON.stringify(input) }),
   hermesImportJobs: (cursor?: string) => request<HermesBundleImportJobListDto>(`/api/team-imports/hermes-bundle/jobs${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
-  hermesImportJob: (id: string) => request<HermesBundleImportJobDto>(`/api/team-imports/hermes-bundle/jobs/${encodeURIComponent(id)}`),
   acknowledgeHermesImport: (id: string) => request<HermesBundleImportJobDto>(`/api/team-imports/hermes-bundle/jobs/${encodeURIComponent(id)}/acknowledge`, { method: "POST", body: JSON.stringify({ verifiedOnHost: true }) }),
   importRuntimeProfiles: (input: { profiles: string[]; sectionId?: string }) =>
     request<RuntimeProfileImportDto>("/api/team-imports/runtime", {

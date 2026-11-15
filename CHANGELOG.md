@@ -8,6 +8,34 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Supprimé
+
+- Retrait des anciennes API Mobile Connect, APNs, Web Push PWA et Computer/Box,
+  avec leurs contrôles console, transports, tâches worker et configuration.
+- Retrait du suivi MVP `/api/activation`, des statistiques `/api/usage/bots`,
+  des anciens reçus `/api/routines/receipts`, de la liste `/api/workflows`,
+  de la lecture individuelle des jobs d’import et de la liste redondante des
+  groupes. Les parcours actifs et les API de récupération restent disponibles.
+- Retrait des actions runtime déjà abandonnées (`mode`, `activate`), du second
+  montage de `runtimeRoutes()` sous `/api/runtimes` et de l’alias juridique
+  `/api/legal/catalog`. Les routeurs pluriels de modèles, fournisseurs,
+  permissions, audit et releases restent disponibles.
+- Retrait du chargeur legacy vide et des helpers sans consommateurs de
+  production. Les contrats et la politique commerciale de billing, ainsi que
+  le provisionnement Cloudflare géré et sa réconciliation, quittent le cœur.
+
+### Modifié
+
+- Les callbacks HTTP privés utilisent le contrat générique `publicEndpoints`.
+  Un plug-in refusé répond explicitement 503 ; une configuration invalide et
+  une collision de routes empêchent le démarrage. Le plug-in billing conserve
+  son URL de webhook et ses réponses existantes.
+- Le plug-in privé `cloud` fournit la publication gérée par un port optionnel.
+  Tailscale et la lecture des publications existantes restent dans le cœur ;
+  un nettoyage privé indisponible reste enregistré et peut être repris.
+- Migration `0192_retire_mobile_push` : arrêt du producteur de l’ancienne
+  outbox push, sans effacement des données historiques.
+
 ## 0.1.1 - 2026-11-14
 
 ### Ajouté

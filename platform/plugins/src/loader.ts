@@ -4,8 +4,8 @@ import {
   BILLING_PLUGIN_ID,
   SUBSCRIPTION_PORT_MEMBERS,
   ALIAS_PATH_RE,
-  PAYMENT_WEBHOOK_PATH_RE,
-  PAYMENT_WEBHOOK_RESERVED_ROOTS,
+  PUBLIC_ENDPOINT_PATH_RE,
+  PUBLIC_ENDPOINT_RESERVED_ROOTS,
   SESSION_ALIAS_ROOT,
   ENTITLEMENT_RE,
   PERMISSIONS_PLUGIN_ID,
@@ -95,6 +95,20 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
       }
     }
   }
+  if (value.publicEndpoints !== undefined) {
+    if (!Array.isArray(value.publicEndpoints)) return "invalid publicEndpoints";
+    const seen = new Set<string>();
+    for (const endpoint of value.publicEndpoints) {
+      if (!isRecord(endpoint) || !["GET", "POST", "PUT", "PATCH", "DELETE"].includes(String(endpoint.method))) return "invalid public endpoint method";
+      if (typeof endpoint.path !== "string" || !PUBLIC_ENDPOINT_PATH_RE.test(endpoint.path)) return "invalid public endpoint path";
+      if (PUBLIC_ENDPOINT_RESERVED_ROOTS.some((root) => endpoint.path === root || String(endpoint.path).startsWith(root + "/"))) return "reserved public endpoint path";
+      const key = endpoint.method + " " + endpoint.path;
+      if (seen.has(key)) return "duplicate public endpoint";
+      seen.add(key);
+      if (typeof endpoint.build !== "function") return "public endpoint without build()";
+      if (endpoint.unavailable !== undefined && (!isRecord(endpoint.unavailable) || typeof endpoint.unavailable.code !== "string" || typeof endpoint.unavailable.message !== "string")) return "invalid public endpoint unavailable response";
+    }
+  }
   if (value.migrations !== undefined && (!isRecord(value.migrations) || typeof value.migrations.directory !== "string")) {
     return "invalid migrations";
   }
@@ -146,12 +160,8 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
     if (manifest.id !== BILLING_PLUGIN_ID) return `onOrganizationCreating needs the plug-in ${JSON.stringify(BILLING_PLUGIN_ID)}`;
   }
   if (value.billing !== undefined) {
-    if (!isRecord(value.billing) || typeof value.billing.webhook !== "function") return "invalid billing";
-    const webhookPath = value.billing.webhookPath;
-    if (typeof webhookPath !== "string" || !PAYMENT_WEBHOOK_PATH_RE.test(webhookPath)) return "invalid billing.webhookPath";
-    if (PAYMENT_WEBHOOK_RESERVED_ROOTS.some((root) => webhookPath === root || webhookPath.startsWith(`${root}/`))) {
-      return `billing.webhookPath ${JSON.stringify(webhookPath)} is reserved`;
-    }
+    if (!isRecord(value.billing)) return "invalid billing";
+    if ("webhook" in value.billing || "webhookPath" in value.billing) return "billing HTTP endpoints must use publicEndpoints";
     const subscriptions = value.billing.subscriptions;
     if (subscriptions !== undefined
       && (!isRecord(subscriptions) || SUBSCRIPTION_PORT_MEMBERS.some((member) => typeof subscriptions[member] !== "function"))) {
@@ -159,6 +169,7 @@ export function invalidPluginReason(value: unknown, options: Pick<LoadOptions, "
     }
     if (manifest.id !== BILLING_PLUGIN_ID) return `billing needs the plug-in ${JSON.stringify(BILLING_PLUGIN_ID)}`;
   }
+  if (value.managedExposure !== undefined && (manifest.id !== "cloud" || typeof value.managedExposure !== "function")) return "managedExposure needs the cloud plug-in factory";
   if (value.auditArchive !== undefined) {
     const archive = value.auditArchive;
     if (!isRecord(archive) || typeof archive.put !== "function" || typeof archive.get !== "function") return "invalid auditArchive";

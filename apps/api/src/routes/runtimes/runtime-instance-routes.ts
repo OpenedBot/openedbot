@@ -67,18 +67,6 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
   });
 
   /**
-   * Free toggling between runtimes is removed: a bot is attached to
-   * no runtime, and its Hermes profile exists only on the host where it was
-   * created. Activating another runtime ran every bot on a host
-   * where their profiles did not exist. The only remaining gesture is
-   * replacement, which revokes the old one (`POST /:runtimeId/replace`).
-   */
-  routes.post("/:runtimeId/activate", async (context) => {
-    requireOperator(context.get("auth"));
-    throw new HttpError(410, "RUNTIME_ACTIVATE_RETIRED", "La bascule entre runtimes est retirée : remplacez le runtime.");
-  });
-
-  /**
    * Replaces the runtime that serves runs with a runtime already declared and
    * still inactive: an organization has only ONE runtime.
    *

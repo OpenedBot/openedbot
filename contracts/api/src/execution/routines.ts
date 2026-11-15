@@ -91,26 +91,3 @@ export type RoutineRunAcceptedDto = {
   notificationEligible: boolean;
   workflowUpdatedAt: string;
 };
-
-/** Durable receipt of a routine firing materialized as a workflow. */
-export type RoutineExecutionReceiptDto = {
-  routineId: string;
-  workflowId: string;
-  runId: string;
-  threadId: string;
-  botId: string | null;
-  status: WorkflowStatus;
-  /** Origin of the firing, read from `recovery_state.trigger`. `null` if absent or unknown. */
-  trigger: "manual" | "scheduled" | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  endedAt: string | null;
-  durationMs: number | null;
-};
-
-export type RoutineExecutionReceiptPageDto = {
-  receipts: RoutineExecutionReceiptDto[];
-  nextCursor: string | null;
-};
