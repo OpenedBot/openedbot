@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/sys/unix"
 )
@@ -22,22 +24,55 @@ import (
 // 2026-11-03). This route lets the worker fetch the file to attach it.
 //
 // It is a READ of one bounded name, never a path: no directory, no dot
-// segment, no hidden file, a fixed list of extensions. The bytes must also
-// BE an image or a PDF (magic number), whatever the name says. The bot owns
-// the workspace and may plant a symlink or a FIFO there: os.Root refuses any
-// resolution that leaves the root, O_NONBLOCK keeps a FIFO from hanging the
-// open, and anything but a regular file is refused.
+// segment, no hidden file, a fixed list of extensions, no name that reads as
+// a secret. An image or a PDF must BE one (magic number), whatever the name
+// says. A text file (.md, .txt, .csv, .json, .html) must be non-empty UTF-8
+// without a NUL byte; its type comes from the extension, and it is always
+// sent as a download, never as a page to render. The bot owns the workspace
+// and may plant a symlink or a FIFO there: os.Root refuses any resolution
+// that leaves the root, O_NONBLOCK keeps a FIFO from hanging the open, and
+// anything but a regular file is refused.
 
 // maxWorkspaceFileBytes is openedbot's per-attachment bound
-// (ATTACHMENT_LIMITS.maxBytesEach); the relay's response bound is 4 MiB.
+// (ATTACHMENT_LIMITS.maxBytesEach), text included; the relay's response
+// bound is 4 MiB.
 const maxWorkspaceFileBytes = 1 << 20
 
-var workspaceFileRe = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(png|jpg|jpeg|webp|pdf)$`)
+var workspaceFileRe = regexp.MustCompile(`^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(png|jpg|jpeg|webp|pdf|md|markdown|txt|csv|json|html|htm)$`)
 
-var errWorkspaceFileType = errors.New("not an image or a PDF")
+// workspaceTextTypes maps a text extension to the type it is served with.
+var workspaceTextTypes = map[string]string{
+	"md":       "text/markdown; charset=utf-8",
+	"markdown": "text/markdown; charset=utf-8",
+	"txt":      "text/plain; charset=utf-8",
+	"csv":      "text/csv; charset=utf-8",
+	"json":     "application/json; charset=utf-8",
+	"html":     "text/html; charset=utf-8",
+	"htm":      "text/html; charset=utf-8",
+}
 
-// sniffWorkspaceFile names the content type from the bytes alone.
-func sniffWorkspaceFile(data []byte) (string, error) {
+// sensitiveWorkspaceStemRe names files that hold credentials whatever their
+// extension (`secrets.json`, `credentials.txt`, `id_rsa.txt`, `prod.env.txt`).
+// A leading dot (`.env`) is already refused by workspaceFileRe.
+var sensitiveWorkspaceStemRe = regexp.MustCompile(`(?i)^(secrets?|credentials?|id_(rsa|dsa|ecdsa|ed25519))(\.|$)|(^|\.)env(\.|$)`)
+
+// workspaceFileNameAllowed is the full name check of both file routes.
+func workspaceFileNameAllowed(name string) bool {
+	return workspaceFileRe.MatchString(name) && !sensitiveWorkspaceStemRe.MatchString(name)
+}
+
+var errWorkspaceFileType = errors.New("not an image, a PDF or a UTF-8 text file")
+
+// sniffWorkspaceFile names the content type: from the bytes alone for an
+// image or a PDF, from the extension for text the bytes prove to be text.
+func sniffWorkspaceFile(name string, data []byte) (string, error) {
+	extension := strings.ToLower(name[strings.LastIndexByte(name, '.')+1:])
+	if textType, ok := workspaceTextTypes[extension]; ok {
+		if len(data) == 0 || bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
+			return "", errWorkspaceFileType
+		}
+		return textType, nil
+	}
 	switch {
 	case bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")):
 		return "image/png", nil
@@ -57,7 +92,7 @@ func (s *Server) workspaceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.PathValue("file")
-	if !workspaceFileRe.MatchString(name) {
+	if !workspaceFileNameAllowed(name) {
 		writeError(w, http.StatusBadRequest, "WORKSPACE_FILE_INVALID", "the file name is invalid")
 		return
 	}
@@ -73,7 +108,7 @@ func (s *Server) workspaceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	writeWorkspaceFile(w, file)
+	writeWorkspaceFile(w, name, file)
 }
 
 // The named route reads the profile's own workspace when the profile is
@@ -87,7 +122,7 @@ func (s *Server) workspaceFile(w http.ResponseWriter, r *http.Request) {
 // no-follow FDs.
 func (s *Server) profileWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 	profile, name := r.PathValue("slug"), r.PathValue("file")
-	if !profileSlugRe.MatchString(profile) || profile == "default" || !workspaceFileRe.MatchString(name) {
+	if !profileSlugRe.MatchString(profile) || profile == "default" || !workspaceFileNameAllowed(name) {
 		writeError(w, http.StatusBadRequest, "WORKSPACE_FILE_INVALID", "the profile or file name is invalid")
 		return
 	}
@@ -136,7 +171,7 @@ func (s *Server) profileWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "WORKSPACE_FILE_NOT_FOUND", "this file does not exist")
 		return
 	}
-	writeWorkspaceFile(w, file)
+	writeWorkspaceFile(w, name, file)
 }
 
 // sharedWorkspaceRecentWindow is Hermes' default delivery trust window.
@@ -187,7 +222,7 @@ func openProfileWorkspace(runtimeRoot, profile string) (*os.File, error) {
 	return os.NewFile(uintptr(fd), "profile-workspace"), nil
 }
 
-func writeWorkspaceFile(w http.ResponseWriter, file *os.File) {
+func writeWorkspaceFile(w http.ResponseWriter, name string, file *os.File) {
 	info, err := file.Stat()
 	if err != nil || !info.Mode().IsRegular() {
 		writeError(w, http.StatusNotFound, "WORKSPACE_FILE_NOT_FOUND", "this file does not exist")
@@ -207,14 +242,18 @@ func writeWorkspaceFile(w http.ResponseWriter, file *os.File) {
 		writeError(w, http.StatusRequestEntityTooLarge, "WORKSPACE_FILE_TOO_LARGE", "the file exceeds its bound")
 		return
 	}
-	contentType, err := sniffWorkspaceFile(data)
+	contentType, err := sniffWorkspaceFile(name, data)
 	if err != nil {
-		writeError(w, http.StatusUnsupportedMediaType, "WORKSPACE_FILE_TYPE", "the file is not an image or a PDF")
+		writeError(w, http.StatusUnsupportedMediaType, "WORKSPACE_FILE_TYPE", "the file is not an image, a PDF or a UTF-8 text file")
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// A bot-written file is never a page of this origin: a download, and
+	// sandboxed with no source should anything render it anyway (HTML).
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
 }

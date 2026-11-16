@@ -10,19 +10,39 @@ import type { HermesClientContext } from "./context";
  * routes de chat : le worker le lit ici pour le joindre au message.
  *
  * Un NOM à la racine, jamais un chemin : même grammaire que l'allowlist du
- * relais, vérifiée ici avant l'aller réseau.
+ * relais, vérifiée ici avant l'aller réseau. Une image ou un PDF prend le
+ * type que l'hôte lit dans ses octets ; un fichier texte (Markdown, texte,
+ * CSV, JSON, HTML) doit revenir avec le type de son extension.
  */
-export const WORKSPACE_FILE_NAME_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(png|jpg|jpeg|webp|pdf)$/;
+export const WORKSPACE_FILE_NAME_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(png|jpg|jpeg|webp|pdf|md|markdown|txt|csv|json|html|htm)$/;
 
 export const MAX_WORKSPACE_FILE_BYTES = 1024 * 1024;
 const WORKSPACE_FILE_TIMEOUT_MS = 20_000;
 
-const WORKSPACE_FILE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf"]);
+const BINARY_TYPES = ["image/png", "image/jpeg", "image/webp", "application/pdf"] as const;
+
+const TEXT_TYPE_BY_EXTENSION = {
+  md: "text/markdown",
+  markdown: "text/markdown",
+  txt: "text/plain",
+  csv: "text/csv",
+  json: "application/json",
+  html: "text/html",
+  htm: "text/html",
+} as const;
+
+type TextType = (typeof TEXT_TYPE_BY_EXTENSION)[keyof typeof TEXT_TYPE_BY_EXTENSION];
 
 export type HermesWorkspaceFile = {
-  contentType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
+  contentType: (typeof BINARY_TYPES)[number] | TextType;
   bytes: Uint8Array;
 };
+
+/** `notes.md` → `text/markdown` ; une image ou un PDF → `null`. */
+function expectedTextType(name: string): TextType | null {
+  const extension = name.slice(name.lastIndexOf(".") + 1) as keyof typeof TEXT_TYPE_BY_EXTENSION;
+  return TEXT_TYPE_BY_EXTENSION[extension] ?? null;
+}
 
 export async function hostWorkspaceFile(ctx: HermesClientContext, name: string): Promise<HermesWorkspaceFile> {
   if (!WORKSPACE_FILE_NAME_PATTERN.test(name)) {
@@ -45,7 +65,11 @@ export async function hostWorkspaceFile(ctx: HermesClientContext, name: string):
   if (!response.ok) await ctx.throwProviderResponse(response);
   const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (!WORKSPACE_FILE_TYPES.has(contentType) || bytes.byteLength === 0 || bytes.byteLength > MAX_WORKSPACE_FILE_BYTES) {
+  const textType = expectedTextType(name);
+  const typed = textType
+    ? contentType === textType
+    : (BINARY_TYPES as readonly string[]).includes(contentType);
+  if (!typed || bytes.byteLength === 0 || bytes.byteLength > MAX_WORKSPACE_FILE_BYTES) {
     throw invalidProviderResponse();
   }
   return { contentType: contentType as HermesWorkspaceFile["contentType"], bytes };

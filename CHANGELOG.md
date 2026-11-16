@@ -8,6 +8,20 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 0.1.4 - 2026-11-16
+
+### Ajouté
+
+- **Un bot livre aussi un fichier texte.** Un fichier Markdown, texte, CSV,
+  JSON ou HTML que le bot enregistre à la racine de son dossier de travail
+  arrive en pièce jointe, qu’il le désigne par une ligne `MEDIA:` ou qu’il
+  cite simplement son chemin, et même s’il l’a écrit depuis son terminal : le
+  worker le lit sur la machine (edge-setup v1.5.12 ou plus récent). Sur une
+  machine plus ancienne, le fichier reste repris de ce que l’outil
+  d’écriture du tour lui a donné, comme en 0.1.3, et une ligne `MEDIA:` vers
+  un fichier texte profite désormais de ce même repli. La consigne de
+  livraison des bots nomme ces types.
+
 ## 0.1.3 - 2026-11-16
 
 ### Corrigé

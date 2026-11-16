@@ -16,6 +16,10 @@ v1.5.6 (première étiquette du nouvel historique : v1.5.7).
 
 ## Non publié
 
+### Ajouté
+
+- Un bot peut livrer un fichier texte, plus seulement une image ou un PDF : un fichier Markdown, texte, CSV, JSON ou HTML qu'il enregistre à la racine de son dossier de travail, y compris depuis son terminal, arrive en pièce jointe sous sa réponse. Les garde-fous restent ceux des images : un nom de fichier simple, jamais un chemin, ni un fichier caché, ni un nom qui ressemble à un secret ; 1 Mo au plus ; le contenu doit être du texte (encodage Unicode standard). Un fichier HTML part en téléchargement, jamais affiché comme une page par la machine.
+
 ### Corrigé
 
 - Un bot ne reçoit plus de la machine la consigne d'écrire en texte brut et de citer un fichier par son chemin au lieu de le joindre : cette consigne contredisait celles d'openedbot, qui affiche le Markdown et les schémas et joint un fichier livré dans l'espace de travail. Les autres clients de la machine gardent une réponse en texte brut. La correction vaut pour chaque nouvelle conversation, et pour une conversation en cours dès que ses réglages changent ; aucun redémarrage n'est nécessaire.

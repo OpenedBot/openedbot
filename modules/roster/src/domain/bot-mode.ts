@@ -114,9 +114,11 @@ export function buildBotModeInstructions(input: {
  * hôte ne sert qu'un nom simple à la racine, d'où la consigne. Le 03-11 :
  * un schéma 800x450 agrandi dans la fenêtre modale (≈ 4x sur Retina) était
  * flou, et le bot avait retiré les accents : d'où le 2x et DejaVu Sans.
+ * Depuis edge-setup v1.5.12, la route hôte sert aussi un fichier texte
+ * (Markdown, texte, CSV, JSON, HTML), écrit par n'importe quel outil.
  */
 export const FILE_DELIVERY_RULE =
-  "- Deliver images/PDFs from `/workspace/<name>` only (letters, digits, `-`, `_`, extension; no subfolder); other sandbox paths are invisible. Write the file this turn, just before replying: a file older than ten minutes is not delivered. Put `MEDIA:/workspace/<name>` alone on a line; never paste bytes/base64. Render images at least 2x (800x450 -> 1600x900; scale fonts/strokes), preserving accents with DejaVu Sans (`/usr/share/fonts/truetype/dejavu/`).";
+  "- Deliver a file (image, PDF, .md/.txt/.csv/.json/.html) from `/workspace/<name>` only (letters, digits, `-`, `_`, extension; no subfolder); other sandbox paths are invisible. Write the file this turn, just before replying: a file older than ten minutes is not delivered. Put `MEDIA:/workspace/<name>` alone on a line; never paste bytes/base64. Render images at least 2x (800x450 -> 1600x900; scale fonts/strokes), preserving accents with DejaVu Sans (`/usr/share/fonts/truetype/dejavu/`).";
 
 /**
  * Un diagramme se répond en Mermaid. Mesuré le 11-11 (TC-DIAG-001 de
