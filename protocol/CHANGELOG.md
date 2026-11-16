@@ -7,6 +7,18 @@ uses [semantic versioning](https://semver.org/) as described in
 
 ## [Unreleased]
 
+### Changed
+- `GET /hermes-setup/workspace/files/{file}` and
+  `GET /hermes-setup/profiles/{slug}/workspace/files/{file}` (and the relay
+  allowlist segment) also accept a text extension: `.md`, `.markdown`,
+  `.txt`, `.csv`, `.json`, `.html`, `.htm`. A text file must be non-empty
+  UTF-8 without a NUL byte; its `Content-Type` comes from the extension with
+  `charset=utf-8`. A name whose stem reads as a secret is refused whatever
+  its extension. Every response is a sandboxed download
+  (`Content-Disposition: attachment`, `Content-Security-Policy: default-src
+  'none'; sandbox`). Still no feature flag: an older host refuses a text name,
+  and openedbot falls back to the turn's write call.
+
 ### Added
 - `GET /hermes-setup/profiles`: an MCP server described by a mapping entry of
   the profile's `mcp_servers` also carries `endpoint` (or nothing), `auth`

@@ -286,7 +286,12 @@ describe("relay allowlist: identical to internal/connector/allowlist.go", () => 
   });
 
   test("reads one bounded workspace file name at the root, never a path", () => {
-    for (const path of ["/hermes-setup/workspace/files/chart.png", "/hermes-setup/workspace/files/rapport_2026-11.pdf"]) {
+    for (const path of [
+      "/hermes-setup/workspace/files/chart.png", "/hermes-setup/workspace/files/rapport_2026-11.pdf",
+      "/hermes-setup/workspace/files/notes.md", "/hermes-setup/workspace/files/notes.txt",
+      "/hermes-setup/workspace/files/table.csv", "/hermes-setup/workspace/files/data.json",
+      "/hermes-setup/profiles/alpha/workspace/files/page.html",
+    ]) {
       expect(matchRelayRoute("GET", path)?.host).toBe(true);
       expect(matchRelayRoute("GET", `${path}?`)).toBeNull();
       expect(matchRelayRoute("GET", `${path}?path=/etc/passwd`)).toBeNull();
@@ -296,7 +301,8 @@ describe("relay allowlist: identical to internal/connector/allowlist.go", () => 
     for (const path of [
       "/hermes-setup/workspace/files/sub/chart.png", "/hermes-setup/workspace/files/../runtime.env",
       "/hermes-setup/workspace/files/.env.png", "/hermes-setup/workspace/files/a%2Fb.png",
-      "/hermes-setup/workspace/files/notes.txt", "/hermes-setup/workspace/files/",
+      "/hermes-setup/workspace/files/run.sh", "/hermes-setup/workspace/files/.env",
+      "/hermes-setup/workspace/files/notes.MD", "/hermes-setup/workspace/files/",
     ]) expect(matchRelayRoute("GET", path)).toBeNull();
   });
 

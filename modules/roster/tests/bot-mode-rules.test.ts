@@ -55,6 +55,7 @@ describe("bot mode rules for diagrams and files", () => {
     expect(buildBotModeInstructions(shared)).toContain(FILE_DELIVERY_RULE);
     expect(FILE_DELIVERY_RULE).toContain("a file older than ten minutes is not delivered");
     expect(FILE_DELIVERY_RULE).toContain("`MEDIA:/workspace/<name>`");
+    expect(FILE_DELIVERY_RULE).toContain(".md/.txt/.csv/.json/.html");
   });
 
   test("packages a script needs are installed in the same command, never discovered by a failure", () => {

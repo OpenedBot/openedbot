@@ -28,7 +28,7 @@ Réservez à `edge-setup` une machine qui n’héberge pas d’autres services. 
 - Relie la machine à votre espace openedbot (`link`) avec un ticket à usage unique.
 - Peut poser, **si vous le demandez**, sandbox rootless, UFW, fail2ban, durcissement SSH, journal persistant, unattended-upgrades, politique de mot de passe, journal sudo, coupure LLMNR.
 - Met à jour le binaire (`upgrade`) après avoir vérifié la signature de la release, puis le SHA-256 du binaire contre `SHA256SUMS`.
-- Laisse openedbot lire, sur demande, **une** image ou **un** PDF qu’un bot a enregistré à la racine de son dossier de travail (`/workspace`), pour le joindre à sa réponse. Un nom de fichier simple, jamais un chemin ; 1 Mo au plus ; le contenu doit vraiment être une image (PNG, JPEG, WebP) ou un PDF. Rien d’autre de la machine n’est lisible ainsi.
+- Laisse openedbot lire, sur demande, **un** fichier qu’un bot a enregistré à la racine de son dossier de travail (`/workspace`), pour le joindre à sa réponse : une image (PNG, JPEG, WebP), un PDF, ou un fichier texte (Markdown, texte, CSV, JSON, HTML). Un nom de fichier simple, jamais un chemin, ni un fichier caché, ni un nom qui ressemble à un secret ; 1 Mo au plus ; une image ou un PDF doit vraiment en être un, et un fichier texte doit être du texte UTF-8. Un fichier HTML part en téléchargement, jamais affiché comme une page. Rien d’autre de la machine n’est lisible ainsi.
 
 ## Ce que l’outil ne fait pas
 

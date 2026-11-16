@@ -3,7 +3,7 @@ package connector
 import "testing"
 
 func TestWorkspaceFileIsOneBoundedNameAtTheRoot(t *testing.T) {
-	for _, path := range []string{"/hermes-setup/workspace/files/chart.png", "/hermes-setup/workspace/files/rapport_2026-11.pdf", "/hermes-setup/workspace/files/a.jpeg", "/hermes-setup/profiles/alpha/workspace/files/chart.png", "/hermes-setup/profiles/beta/workspace/files/report.pdf"} {
+	for _, path := range []string{"/hermes-setup/workspace/files/chart.png", "/hermes-setup/workspace/files/rapport_2026-11.pdf", "/hermes-setup/workspace/files/a.jpeg", "/hermes-setup/profiles/alpha/workspace/files/chart.png", "/hermes-setup/profiles/beta/workspace/files/report.pdf", "/hermes-setup/workspace/files/notes.txt", "/hermes-setup/profiles/alpha/workspace/files/notes.md", "/hermes-setup/profiles/alpha/workspace/files/table.csv", "/hermes-setup/profiles/alpha/workspace/files/data.json", "/hermes-setup/profiles/alpha/workspace/files/page.html"} {
 		if route := Match("GET", path); route == nil || !route.Host || route.Events {
 			t.Fatalf("%s was not accepted", path)
 		}
@@ -21,7 +21,9 @@ func TestWorkspaceFileIsOneBoundedNameAtTheRoot(t *testing.T) {
 		"/hermes-setup/workspace/files/../runtime.env",
 		"/hermes-setup/workspace/files/.env.png",
 		"/hermes-setup/workspace/files/a%2Fb.png",
-		"/hermes-setup/workspace/files/notes.txt",
+		"/hermes-setup/workspace/files/run.sh",
+		"/hermes-setup/workspace/files/.env",
+		"/hermes-setup/workspace/files/notes.MD",
 		"/hermes-setup/workspace/files/chart.PNG",
 		"/hermes-setup/workspace/files/",
 		"/hermes-setup/profiles/a%2Fb/workspace/files/chart.png",

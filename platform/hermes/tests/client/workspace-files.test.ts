@@ -49,4 +49,18 @@ describe("workspace artifacts stay on their owning profile", () => {
     expect(new TextDecoder().decode(alpha.bytes)).toBe("%PDF-alpha");
     expect(new TextDecoder().decode(beta.bytes)).toBe("%PDF-beta");
   });
+  test("a text file comes back with the type of its extension", async () => {
+    const { transport, paths } = transportWith(() => new Response("# Notes\n", { headers: { "content-type": "text/markdown; charset=utf-8" } }));
+    const file = await new HermesClient({ transport, profile: "alpha" }).hostWorkspaceFile("notes.md");
+    expect(paths).toEqual(["/hermes-setup/profiles/alpha/workspace/files/notes.md"]);
+    expect(file.contentType).toBe("text/markdown");
+    expect(new TextDecoder().decode(file.bytes)).toBe("# Notes\n");
+  });
+  test("a text file served with another type, or an image typed as text, is refused", async () => {
+    const cases: Array<[string, string]> = [["notes.md", "text/html"], ["page.html", "text/plain"], ["chart.png", "text/plain"], ["data.json", "image/png"]];
+    for (const [name, type] of cases) {
+      const { transport } = transportWith(() => new Response("x", { headers: { "content-type": type } }));
+      await expect(new HermesClient({ transport, profile: "alpha" }).hostWorkspaceFile(name)).rejects.toBeInstanceOf(HermesClientError);
+    }
+  });
 });

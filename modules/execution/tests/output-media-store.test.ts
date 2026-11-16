@@ -64,9 +64,31 @@ test("a file the reply cites as a plain path becomes an attachment; a missing on
     { name: "notes.md", contentType: "text/markdown", kind: "document" },
     { name: "chart.png", contentType: "image/png", kind: "image" },
   ]);
-  // Only a root image or PDF name is asked of the host; a text file comes from the turn.
-  expect(asked.sort()).toEqual(["chart.png", "gone.png"]);
+  // Every root name is asked of the host first; a text file it does not serve
+  // (an older host) comes from the turn.
+  expect(asked.sort()).toEqual(["absent.md", "chart.png", "gone.png", "notes.md"]);
   expect(await readFile(join(root, stored[0]!.objectKey), "utf8")).toBe("# Notes\n\n- un\n");
+});
+
+test("a text file written through the terminal is read from the host, ahead of the transcript", async () => {
+  const root = await mkdtemp(join(tmpdir(), "openedbot-output-media-"));
+  roots.push(root);
+  const config = { blob: { driver: "file", root } } as unknown as WorkerConfig;
+  const context = { id: "run-3", organizationId: "00000000-0000-4000-8000-000000000201", sessionId: "s", workflowId: null };
+  const output = "J'ai créé `/workspace/notes.md`.";
+  const turnMessages = [{
+    role: "assistant",
+    tool_calls: [{ function: { name: "write_file", arguments: JSON.stringify({ path: "/workspace/notes.md", content: "stale" }) } }],
+  }];
+  const event = { type: "run.completed", payload: { output, turnMessages } } as unknown as RunEvent;
+  const client = {
+    hostWorkspaceFile: async () => ({ contentType: "text/markdown" as const, bytes: new TextEncoder().encode("# Notes\n\n1\n2\n3\n") }),
+  } as unknown as HermesClient;
+  const stored = await storeRuntimeArtifacts(config, context, event, client, [], citedWorkspacePaths(output));
+  expect(stored.map(({ name, contentType, kind }) => ({ name, contentType, kind }))).toEqual([
+    { name: "notes.md", contentType: "text/markdown", kind: "document" },
+  ]);
+  expect(await readFile(join(root, stored[0]!.objectKey), "utf8")).toBe("# Notes\n\n1\n2\n3\n");
 });
 
 test("a cited file already delivered by MEDIA: is attached once", async () => {

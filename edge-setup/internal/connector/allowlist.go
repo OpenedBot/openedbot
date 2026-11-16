@@ -49,8 +49,9 @@ const a2aPeerSeg = `[a-z0-9][a-z0-9._-]{0,63}`
 const skillSeg = `[a-z0-9][a-z0-9_-]{0,63}`
 
 // workspaceFileSeg is one file name at the root of the bots' `/workspace`:
-// no slash, no leading dot, a fixed list of viewable extensions.
-const workspaceFileSeg = `(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(?:png|jpg|jpeg|webp|pdf))`
+// no slash, no leading dot, a fixed list of deliverable extensions (images,
+// PDF, and text: Markdown, plain text, CSV, JSON, HTML).
+const workspaceFileSeg = `(?:[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.(?:png|jpg|jpeg|webp|pdf|md|markdown|txt|csv|json|html|htm))`
 const uuidSeg = `[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`
 
 // HostPrefix is the path prefix of the routes served on the host.

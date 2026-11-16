@@ -62,10 +62,19 @@ describe("extractOutputMedia", () => {
   });
 
   test("only a plain name at the root of /workspace is asked of the host", () => {
-    expect(workspaceMediaNames("MEDIA:/tmp/a.png MEDIA:/workspace/sub/b.png MEDIA:/workspace/.env.png MEDIA:/workspace/c.txt")).toEqual([]);
+    expect(workspaceMediaNames("MEDIA:/tmp/a.png MEDIA:/workspace/sub/b.png MEDIA:/workspace/.env.png MEDIA:/workspace/c.sh")).toEqual([]);
+    expect(workspaceMediaNames("MEDIA:/workspace/notes.md MEDIA:/workspace/c.txt")).toEqual(["notes.md", "c.txt"]);
     expect(workspaceMediaNames("MEDIA:/workspace/a.png\nMEDIA:/workspace/a.png")).toEqual(["a.png"]);
     const many = Array.from({ length: 9 }, (_, index) => `MEDIA:/workspace/f${index}.png`).join("\n");
     expect(workspaceMediaNames(many)).toHaveLength(5);
+  });
+
+  test("a MEDIA: text file read from the host is attached as a document", () => {
+    const media = extractOutputMedia("Le fichier :\n\nMEDIA:/workspace/notes.md", new Map([
+      ["notes.md", { contentType: "text/markdown" as const, bytes: new TextEncoder().encode("# Notes\n") }],
+    ]));
+    expect(media.text).toBe("Le fichier :");
+    expect(media.images.map((file) => [file.name, file.kind, file.contentType])).toEqual([["notes.md", "document", "text/markdown"]]);
   });
 
   test("a file the host could not serve keeps its name, and one named twice is attached once", () => {

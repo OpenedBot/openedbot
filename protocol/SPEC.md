@@ -988,14 +988,25 @@ chat, pas sur `/v1/runs` (mesuré sur un hôte de test, 2026-11-03) : le worker 
 fichier ici pour le joindre au message.
 
 C'est un nom, jamais un chemin : `[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}` suivi de
-`.png`, `.jpg`, `.jpeg`, `.webp` ou `.pdf`, sans dossier, sans point initial,
-sans préfixe `/p/<slug>` ni query. Le bot possède ce dossier et peut y poser
-un lien symbolique ou une FIFO : la lecture passe par `os.Root` (aucune
-résolution hors de la racine), s'ouvre en `O_NONBLOCK`, n'accepte qu'un
-fichier ordinaire de 1 Mio au plus, et les octets doivent être une image ou un
-PDF (nombre magique), quoi que dise l'extension. Le `Content-Type` vient des
-octets. Aucune feature n'est annoncée : un hôte plus ancien refuse la route,
-et openedbot garde alors le nom du fichier dans le texte.
+`.png`, `.jpg`, `.jpeg`, `.webp`, `.pdf`, ou, depuis edge-setup v1.5.12, d'une
+extension texte `.md`, `.markdown`, `.txt`, `.csv`, `.json`, `.html`, `.htm` ;
+sans dossier, sans point initial, sans préfixe `/p/<slug>` ni query. Un nom
+qui désigne un secret (`secret(s)`, `credential(s)`, `id_rsa`… comme radical,
+ou un segment `env`) est refusé quelle que soit son extension. Le bot possède
+ce dossier et peut y poser un lien symbolique ou une FIFO : la lecture passe
+par `os.Root` (aucune résolution hors de la racine), s'ouvre en `O_NONBLOCK`,
+n'accepte qu'un fichier ordinaire de 1 Mio au plus. Une image ou un PDF doit
+l'être par ses octets (nombre magique), quoi que dise l'extension, et son
+`Content-Type` vient des octets. Un fichier texte doit être de l'UTF-8 non
+vide sans octet NUL ; son `Content-Type` vient de l'extension, avec
+`charset=utf-8` (`text/markdown`, `text/plain`, `text/csv`,
+`application/json`, `text/html`). Toute réponse porte
+`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` et
+`Content-Security-Policy: default-src 'none'; sandbox` : l'opérateur ne rend
+jamais une page HTML. Aucune feature n'est annoncée : un hôte plus ancien
+refuse la route (ou un nom texte), et openedbot garde alors le nom du fichier
+dans le texte, ou reprend un fichier texte du contenu qu'un `write_file` du
+tour lui a donné.
 
 Pour un profil nommé, le worker appelle exclusivement
 `GET /hermes-setup/profiles/{slug}/workspace/files/{file}`. Les nouveaux profils

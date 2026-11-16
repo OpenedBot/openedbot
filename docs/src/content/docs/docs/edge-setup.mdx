@@ -28,7 +28,7 @@ Dedicate to `edge-setup` a machine that hosts no other services. The hardened pr
 - Links the machine to your openedbot workspace (`link`) with a single-use ticket.
 - Can set up, **if you ask for it**, a rootless sandbox, UFW, fail2ban, SSH hardening, a persistent journal, unattended-upgrades, a password policy, a sudo log, and LLMNR shutdown.
 - Updates the binary (`upgrade`) after verifying the release signature, then the binary's SHA-256 against `SHA256SUMS`.
-- Lets openedbot read, on request, **one** image or **one** PDF a bot saved at the root of its work folder (`/workspace`), to attach it to its answer. A plain file name, never a path; 1 MB at most; the content must really be an image (PNG, JPEG, WebP) or a PDF. Nothing else on the machine can be read this way.
+- Lets openedbot read, on request, **one** file a bot saved at the root of its work folder (`/workspace`), to attach it to its answer: an image (PNG, JPEG, WebP), a PDF, or a text file (Markdown, plain text, CSV, JSON, HTML). A plain file name, never a path, never a hidden file or a name that looks like a secret; 1 MB at most; an image or a PDF must really be one, and a text file must be UTF-8 text. An HTML file is sent as a download, never displayed as a page. Nothing else on the machine can be read this way.
 
 ## What the tool does not do
 

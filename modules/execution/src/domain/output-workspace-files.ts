@@ -65,6 +65,12 @@ export function deliverableType(path: string): DeliverableType | null {
   return DELIVERABLE_BY_EXTENSION[extensionOf(mediaBasename(path))] ?? null;
 }
 
+/** A text deliverable (Markdown, plain text, CSV, JSON, HTML), not an image or a PDF. */
+export function isTextDeliverable(path: string): boolean {
+  const type = deliverableType(path);
+  return type !== null && type.kind === "document" && type.contentType !== "application/pdf";
+}
+
 /** A workspace-relative file path, or `null` when it may not be delivered. */
 function workspaceRelative(raw: string): string | null {
   const path = raw.replace(TRAILING, "");

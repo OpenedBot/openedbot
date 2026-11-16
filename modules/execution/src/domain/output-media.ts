@@ -8,7 +8,8 @@
  * `/v1/runs`, celle qu'openedbot pilote, la rend telle quelle (mesuré sur un
  * hôte de test, 2026-11-03) : le worker lit alors le fichier par la route hôte
  * `workspace/files` quand il est à la racine de `/workspace`
- * (`workspaceMediaNames`, puis `extractOutputMedia(output, fetched)`).
+ * (`workspaceMediaNames`, puis `extractOutputMedia(output, fetched)`) : une
+ * image, un PDF, ou un fichier texte (Markdown, texte, CSV, JSON, HTML).
  *
  * Le fil ne peut afficher ni l'image intégrée ni la ligne brute : son
  * Markdown retire les adresses `data:`, et une ligne `MEDIA:` est un chemin du
@@ -125,7 +126,7 @@ export function extractOutputMedia(output: unknown, fetched: ReadonlyMap<string,
     if (key && file && fits(file.bytes.byteLength)) {
       attached.add(key);
       total += file.bytes.byteLength;
-      const kind = file.contentType === "application/pdf" ? "document" : "image";
+      const kind = file.contentType.startsWith("image/") ? "image" : "document";
       images.push({ path: name, name, contentType: file.contentType, kind, data: file.bytes });
       return lead;
     }
