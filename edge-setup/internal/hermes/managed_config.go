@@ -34,12 +34,27 @@ import (
 // back as a head+tail window with the full text saved for read_file. An
 // explicit `char_limit` from the model still wins (web_tools.py). Hermes
 // reads it on every extract, so it needs no gateway restart either.
+//
+// platform_hints.api_server.replace: Hermes's built-in hint for the API
+// server tells the model the rendering layer is unknown, to write no
+// Markdown and to give a file path in plain text instead of a MEDIA: tag
+// (agent/prompt_builder.py, PLATFORM_HINTS["api_server"]). openedbot renders
+// Markdown and mermaid, and turns a `MEDIA:/workspace/<name>` line into an
+// attachment; that default contradicted openedbot's own rules on every run.
+// The replacement defers to the client's instructions and keeps the plain
+// text default for any other API client. It must stay non-empty: a blank
+// `replace` restores the built-in hint (agent/system_prompt.py). Hermes
+// freezes the system prompt per session, so it reaches a conversation from
+// its next session.
 const ManagedConfig = `# Written by edge-setup: Hermes managed scope, merged over every profile.
 # Edits here are replaced on the next "edge-setup up" or "upgrade".
 prompt_caching:
   cache_ttl: auto
 web:
   extract_char_limit: 10000
+platform_hints:
+  api_server:
+    replace: "You're responding through an API client. Follow the client's own instructions on formatting and file delivery. When openedbot rules are present, Markdown and fenced mermaid render, and a line ` + "`MEDIA:/workspace/<name>`" + ` becomes an attachment. Otherwise reply in concise plain text and give file paths in plain text."
 `
 
 // ManagedConfigPath and ManagedConfigOwner are variables only so that tests
@@ -71,7 +86,7 @@ func applyManagedDefaultsAt(path string, owner fsx.Owner, log func(string, ...an
 		return false, fmt.Errorf("managed config: %w", err)
 	}
 	if log != nil {
-		log("Hermes managed scope: %s (prompt cache TTL auto, web extract 10000 chars)", path)
+		log("Hermes managed scope: %s (prompt cache TTL auto, web extract 10000 chars, API server hint)", path)
 	}
 	return true, nil
 }

@@ -67,3 +67,33 @@ func TestManagedDefaultsRefuseASymlinkedTarget(t *testing.T) {
 		t.Fatalf("the symlink target was overwritten: %q", got)
 	}
 }
+
+func TestManagedConfigReplacesTheAPIServerHint(t *testing.T) {
+	// Hermes's own api_server hint says "assume plain text" and "state the
+	// plain file path instead of a MEDIA: tag", which contradicts openedbot's
+	// Markdown rendering and `MEDIA:/workspace/<name>` attachments. `replace`
+	// must stay non-empty: a blank value restores the built-in hint
+	// (agent/system_prompt.py, _resolve_platform_hint).
+	const prefix = "platform_hints:\n  api_server:\n    replace: \""
+	start := strings.Index(ManagedConfig, prefix)
+	if start < 0 {
+		t.Fatalf("managed config lost the api_server hint: %q", ManagedConfig)
+	}
+	rest := ManagedConfig[start+len(prefix):]
+	end := strings.Index(rest, "\"\n")
+	if end <= 0 {
+		t.Fatalf("the api_server hint is not one non-empty double-quoted line: %q", rest)
+	}
+	hint := rest[:end]
+	if strings.ContainsAny(hint, "\"\\\n") {
+		t.Fatalf("the api_server hint must need no YAML escape: %q", hint)
+	}
+	for _, want := range []string{"MEDIA:/workspace/<name>", "Markdown", "plain text"} {
+		if !strings.Contains(hint, want) {
+			t.Fatalf("the api_server hint lost %q: %q", want, hint)
+		}
+	}
+	if strings.Contains(hint, "instead of a MEDIA") {
+		t.Fatalf("the api_server hint must not forbid MEDIA tags: %q", hint)
+	}
+}

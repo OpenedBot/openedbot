@@ -16,6 +16,10 @@ v1.5.6 (première étiquette du nouvel historique : v1.5.7).
 
 ## Non publié
 
+### Corrigé
+
+- Un bot ne reçoit plus de la machine la consigne d'écrire en texte brut et de citer un fichier par son chemin au lieu de le joindre : cette consigne contredisait celles d'openedbot, qui affiche le Markdown et les schémas et joint un fichier livré dans l'espace de travail. Les autres clients de la machine gardent une réponse en texte brut. La correction vaut pour chaque nouvelle conversation, et pour une conversation en cours dès que ses réglages changent ; aucun redémarrage n'est nécessaire.
+
 ## v1.5.11 - 2026-11-16
 
 ### Changé
