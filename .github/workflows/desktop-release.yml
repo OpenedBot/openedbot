@@ -60,7 +60,7 @@ concurrency:
 jobs:
   version:
     name: Resolve the version
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -89,7 +89,7 @@ jobs:
     # (.app.tar.gz, AppImage) is signed by the update key for this version.
     name: Fetch and verify the files on R2
     needs: version
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     outputs:
       sums: ${{ steps.verify.outputs.sums }}
@@ -128,7 +128,7 @@ jobs:
     # was skipped.
     name: Resolve the release to update from
     needs: version
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       from: ${{ steps.f.outputs.from }}
@@ -216,11 +216,11 @@ jobs:
           - arch: x86_64
             deb-arch: amd64
             elf: x86-64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
           - arch: aarch64
             deb-arch: arm64
             elf: ARM aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
@@ -272,7 +272,7 @@ jobs:
   release:
     name: Publish the GitHub release
     needs: [version, fetch, mac, linux, update-canary]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: write
