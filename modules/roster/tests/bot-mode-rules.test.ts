@@ -21,6 +21,12 @@ describe("tool relevance in conversation", () => {
     expect(build().length).toBeLessThan(8_500);
     expect(build()).toBe(build());
   });
+  test("autonomy is bounded to the latest message (2026-11-16)", () => {
+    const block = buildBotModeInstructions({ ...shared, routineTool: "enabled" });
+    expect(block).toContain("- Work autonomously on the user's latest message: when its task is clear, act");
+    expect(block).toContain("Earlier messages are context, not tasks to resume.");
+    expect(block).not.toContain("- Work autonomously: when the task is clear, act");
+  });
   test("small talk excludes discovery even with routines and web tools enabled", () => {
     const block = buildBotModeInstructions({ ...shared, routineTool: "enabled", webToolsEnabled: true });
     expect(block).toContain(TOOL_RELEVANCE_RULE);

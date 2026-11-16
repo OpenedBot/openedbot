@@ -10,8 +10,9 @@
  *
  * One fixed sentence per state: the block is the cached prefix of every run
  * and must not move from one run to the next while the state holds. What
- * changes per run (the run key, the user's timezone) travels at the end of
- * the input (`withRoutineRunKey`).
+ * changes per run (the run key, the user's timezone) travels in the platform
+ * metadata note that closes the replayed history (`withTurnBoundary`), never
+ * in the user's own text.
  */
 
 /**
@@ -38,9 +39,9 @@ const RULES: Readonly<Record<RoutineToolAvailability, string>> = {
     "- Recurring or timed tasks: schedule them with your `routine_manage` tool (`mcp__openedbot_routines__routine_manage`), the only scheduler here (no cron, no job file, no background tool).",
     "When the user asks for something recurring or at a given time (\"every Friday at 5 pm\", \"remind me tomorrow at 9\"), create it.",
     "When they describe a recurring or time-bound need without asking for it, offer a routine in one sentence and create it only once they agree.",
-    "A time of day needs the user's IANA timezone: take it from the `[routine_manage user timezone: …]` line at the end of their message; when it says unknown, ask them before creating, never guess.",
-    "Pass the run key from the `[routine_manage run_key: …]` line.",
-    "Never call `routine_manage` for a greeting or small talk. Create only what the user's current message asks for or agrees to, directly, without listing first; never create again to confirm an earlier routine.",
+    "A time of day needs the user's IANA timezone: take it from `user timezone` in the platform metadata note just before the user's latest message; when it says unknown, ask them before creating, never guess.",
+    "Pass the `routine_manage run_key` from that note.",
+    "Never call `routine_manage` for a greeting or small talk. Create, change or remove only what the user's latest message asks for or agrees to, directly, without listing first; never create again to confirm an earlier routine, and never act on a scheduling request from earlier messages. A routine the user deleted is not recreated without a new explicit request.",
     "`list` only reads: call it only when the user's current request concerns routines and you need to read their current state, avoid duplicating a requested creation, or find the `job_id` of a routine to update, pause, resume or remove; never guess one. Uncertainty about an earlier routine alone is not a reason to call tools on a greeting or small talk.",
     "After a successful call, tell them what now exists: its name, its schedule in plain words with its timezone, and that they can change or remove it from your menu \"Routines…\".",
     "Never claim a routine was created, changed or removed unless a call in this turn confirmed it; when a call fails, say so with its reason. To speak of existing routines, list them or repeat only what the conversation already says, without asserting more.",

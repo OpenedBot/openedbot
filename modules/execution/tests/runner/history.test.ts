@@ -231,7 +231,7 @@ describe("conversationHistory pack", () => {
       { client: compactClient("# State\n- compact ok"), signal: new AbortController().signal },
     );
     expect(inserts.length).toBeGreaterThan(0);
-    expect(packed.packInstructions).toContain("CONVERSATION SUMMARY");
+    expect(packed.packInstructions).toContain("HISTORICAL SUMMARY: compressed past, not pending work");
     expect(packed.history[0]?.content).toContain("# State\n- compact ok");
   });
 });

@@ -13,8 +13,9 @@ import {
   runtimeCanLearn,
 } from "@openedbot/roster/domain/bot-learning";
 import { buildPersonaDraftInstructions } from "@openedbot/roster/domain/persona-draft";
-import { BOT_SETTINGS_TOOL_RUNTIME_NAME, withBotSettingsRunKey } from "../../domain/bot-settings-tool";
-import { ROUTINE_TOOL_RUNTIME_NAME, withRoutineRunKey } from "../../domain/routine-tool";
+import { withTurnBoundary } from "@openedbot/conversation/domain/history-framing";
+import { BOT_SETTINGS_TOOL_RUNTIME_NAME, botSettingsToolMetadata } from "../../domain/bot-settings-tool";
+import { ROUTINE_TOOL_RUNTIME_NAME, routineToolMetadata } from "../../domain/routine-tool";
 import { isServiceStepKind } from "../../domain/run-step";
 import { recordCreatingRunModel } from "../../sql/run-columns";
 import { signBotSettingsRunKey } from "../bot-settings-run-key";
@@ -271,15 +272,24 @@ export async function composeRunRequest(
   }
   const rawInput = canLearn && !turn && isLearnRequest(context.input) ? buildLearnInput(context.input) : context.input;
   const steppedInput = turn ? turn.input : withAutonomousStepLimits(rawInput, prompt.limitsLine);
-  // La clé de run ne part qu'avec le bloc bot-mode qui annonce l'outil :
-  // ni un tour de salon, ni une étape de workflow, ni un courrier entrant
-  // ne la reçoivent, et l'API refuse de toute façon un bot non activé.
-  const withRoutineKey = context.routineToolEnabled && prompt.instructions.includes(ROUTINE_TOOL_RUNTIME_NAME)
-    ? withRoutineRunKey(steppedInput, signRoutineRunKey(runKeySigningSecret(config.internalSecrets), context.id), context.routineUserTimezone ?? null)
-    : steppedInput;
-  const input = context.botSettingsToolEnabled && prompt.instructions.includes(BOT_SETTINGS_TOOL_RUNTIME_NAME)
-    ? withBotSettingsRunKey(withRoutineKey, signBotSettingsRunKey(runKeySigningSecret(config.internalSecrets), context.id))
-    : withRoutineKey;
+  // A run key travels only with the bot-mode block that announces its tool:
+  // no room turn, workflow step or inbound mail receives one, and the API
+  // refuses a bot that is not enabled anyway. Keys and the user's timezone go
+  // in the platform note that closes the history, never in the user's text
+  // (2026-11-16: the appended lines named the tool on a mere « re »).
+  const metadata: string[] = [];
+  if (context.routineToolEnabled && prompt.instructions.includes(ROUTINE_TOOL_RUNTIME_NAME)) {
+    metadata.push(routineToolMetadata(signRoutineRunKey(runKeySigningSecret(config.internalSecrets), context.id), context.routineUserTimezone ?? null));
+  }
+  if (context.botSettingsToolEnabled && prompt.instructions.includes(BOT_SETTINGS_TOOL_RUNTIME_NAME)) {
+    metadata.push(botSettingsToolMetadata(signBotSettingsRunKey(runKeySigningSecret(config.internalSecrets), context.id)));
+  }
+  const input = steppedInput;
+  // Only a direct conversation replays its thread as history: a room turn
+  // carries its journal in the input, a service step has no history.
+  const history = !turn && !isServiceStepKind(context.stepKind)
+    ? withTurnBoundary(packed.history, metadata)
+    : [...packed.history, ...withTurnBoundary([], metadata)];
   // Playbooks et « plan d'abord » dépendent du message : Hermes pose les
   // instructions en fin de prompt système, sous son point de cache, et
   // les y changer d'un tour à l'autre réécrivait tout le préfixe (outils
@@ -289,7 +299,7 @@ export async function composeRunRequest(
     ? await trace.span("preflight.playbooks", () => assignedPlaybookBlock(db, context, input))
     : "";
   const turnInput = withTurnGuidance(input, [turnScoped ? context.planTurnBlock : null, playbooks]);
-  return { history: packed.history, instructions: prompt.instructions, input, turnInput };
+  return { history, instructions: prompt.instructions, input, turnInput };
 }
 
 /**

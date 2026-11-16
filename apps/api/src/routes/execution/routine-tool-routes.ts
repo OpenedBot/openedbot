@@ -14,6 +14,7 @@ import {
   ROUTINE_TOOL_SERVER,
   RoutineToolInputError,
   normalizeRoutineSchedule,
+  routineCreateConflict,
   routineCreateTwin,
   readRoutineToolArgs,
   routineScheduleNeedsTimezone,
@@ -21,12 +22,16 @@ import {
   scheduleRespectsMinimumInterval,
   type RoutineToolArgs,
 } from "@openedbot/execution/domain/routine-tool";
+import { ROUTINE_INTENT_REFUSAL, routineChangeIntent } from "@openedbot/execution/domain/routine-intent";
+import { readRunIntentInput } from "@openedbot/execution/application/run-intent-input";
+import { readPreviousAssistantText } from "@openedbot/conversation/application/previous-assistant-message";
 import { readRoutineRunKeyWith } from "@openedbot/execution/application/routine-run-key";
 import { routineToolCallerState } from "@openedbot/execution/application/routine-tool-state";
 import type { Db, TransactionDb } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import type { AppVariables } from "../identity/auth";
 import { runKeyCohortAllows, runKeyVerifiers, type InternalSecretsWith } from "@openedbot/platform-config/internal-secrets";
+import { logEvent } from "@openedbot/platform-observability";
 import { internalAuthMetrics } from "@openedbot/platform-observability/internal-auth";
 import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 import { readBearer } from "../../interfaces/http/request-readers";
@@ -59,6 +64,11 @@ import { editedClock } from "./routine-input";
  *   - any other mode: like `manual` (`routineToolWriteRight`, PERM2-9).
  * A run triggered by a routine neither creates nor modifies a routine. A
  * routine created by the bot is born with « Ne jamais attendre » (PERM2-9).
+ *
+ * Every write (create, update, pause, resume, remove) must be asked for by
+ * the message that started the run (`routineChangeIntent`): a greeting never
+ * changes a routine, whatever the history says (2026-11-16). `list` only
+ * reads and stays free.
  */
 const PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
 const LIVE_RUN_STATUSES = ["starting", "running", "awaiting_approval"];
@@ -198,7 +208,7 @@ export async function callRoutineTool(
   const read = readRoutineRunKeyWith(runKeyVerifiers(internal), args.runKey);
   if (!read) {
     internalAuthMetrics.recordRunKey("routine", "refused");
-    return fail("run_key is not valid: copy it exactly from your instructions.");
+    return fail("run_key is not valid: copy it exactly from the platform metadata note.");
   }
   const runId = read.runId;
 
@@ -225,7 +235,7 @@ export async function callRoutineTool(
       // A key read through the previous secret is valid only for the runs created before its bound.
       if (!runKeyCohortAllows(read.verifier, new Date(caller.createdAt))) {
         internalAuthMetrics.recordRunKey("routine", "refused");
-        return fail("run_key is not valid: copy it exactly from your instructions.");
+        return fail("run_key is not valid: copy it exactly from the platform metadata note.");
       }
       internalAuthMetrics.recordRunKey("routine", read.verifier.via);
       const tool = await routineToolCallerState(tx, organizationId, caller.botId, scope.runtimeId);
@@ -247,6 +257,15 @@ export async function callRoutineTool(
       }
       if (right === "refused") {
         return fail("Plan mode: no routine is written. Describe the routine in your plan and wait for the user to confirm.");
+      }
+      const asked = await readRunIntentInput(tx, organizationId, runId);
+      const intent = routineChangeIntent({
+        message: asked?.message ?? "",
+        previousAssistant: asked ? await readPreviousAssistantText(tx, organizationId, { ...asked, runId }) : null,
+      });
+      if (!intent.allowed) {
+        logEvent("routine_tool.intent_refused", { organizationId, runId, action: args.action });
+        return fail(ROUTINE_INTENT_REFUSAL);
       }
 
       if (args.action === "create") {
@@ -282,6 +301,13 @@ export async function callRoutineTool(
               ? "A routine with this name, schedule and timezone already exists: nothing was created and its prompt is unchanged. Do not create it again; use update to change its prompt."
               : "A routine with this name, schedule and timezone already exists but is PAUSED: nothing was created and its prompt is unchanged. Do not create it again; tell the user it is paused.",
           });
+        }
+        const conflict = routineCreateConflict(input, existing, now());
+        if (conflict) {
+          const why = conflict.reason === "same_name"
+            ? "A routine with this name already exists"
+            : "A routine with the same schedule, timezone and prompt already exists";
+          return fail(`${why}: nothing was created. Do not create another one; to change it, call update with its job_id. Existing routine: ${JSON.stringify(toolView(conflict.routine))}`);
         }
         if (existing.length >= ROUTINE_LIMITS.maxPerBot) {
           return fail(`You already have ${ROUTINE_LIMITS.maxPerBot} routines, the maximum. Update or remove one first.`);
@@ -370,7 +396,7 @@ export async function callRoutineTool(
 }
 
 const LOCAL_ONE_SHOT_FORM = /^at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
-const TIMEZONE_REQUIRED = "timezone is required for a time of day: pass the user's IANA timezone (from the [routine_manage user timezone: …] line). If it says unknown, ask the user for their timezone; never guess.";
+const TIMEZONE_REQUIRED = "timezone is required for a time of day: pass the user's IANA timezone (the user timezone in the platform metadata note). If it says unknown, ask the user for their timezone; never guess.";
 
 function readSchedule(raw: string, timezone: string, now: Date): string | ToolOutcome {
   const schedule = normalizeRoutineSchedule(raw, now, timezone);

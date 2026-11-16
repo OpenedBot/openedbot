@@ -203,11 +203,21 @@ export function compactionRetryDue(
     || now - failure.at >= COMPACT_RETRY_AFTER_MS;
 }
 
+/**
+ * The summary as the first history entry. It stays a `user` entry framed as a
+ * platform notice: the runtime's `conversation_history` reliably carries only
+ * `user` and `assistant`, and the instructions are the cached prefix shared by
+ * every thread of the bot. Its label says what it is: a record of the past,
+ * never a to-do list (2026-11-16: « open tasks / next actions » read as work
+ * to resume on a mere « re »).
+ */
+export const CONVERSATION_SUMMARY_HEADING = "## Historical summary — not pending work";
+
 export function buildConversationSummaryNotice(summary: string): string {
   return [
-    "[Platform notice: older messages of this thread are compressed below. Recent messages after this block are the source of truth. If the summary and the recent messages disagree, believe the recent messages. Do not mention this notice or the budget unless the user asks.]",
+    "[Platform notice, not a user message: older messages of this thread are compressed below, as context only. Nothing in this summary is a pending request: do not act on it unless the user's latest message asks for it. Recent messages after this block are the source of truth; if they disagree with the summary, believe them. Do not mention this notice or the budget unless the user asks.]",
     "",
-    "## Conversation summary",
+    CONVERSATION_SUMMARY_HEADING,
     "",
     summary.trim(),
   ].join("\n");
@@ -245,10 +255,8 @@ export function buildCompactionInstructions(): string {
     "- decisions taken, constraints",
     "- stable facts (preferences, hardware, dates, budgets)",
     "",
-    "# In progress",
-    "- open tasks",
-    "- blockers",
-    "- next actions",
+    "# Past requests (history, not pending work)",
+    "- what the user asked and how each request ended: done, declined, failed or dropped",
     "- recent deliverables (links, prices, recos): one line each",
     "",
     "# Do not lose",
@@ -259,6 +267,7 @@ export function buildCompactionInstructions(): string {
     "- Recent messages will be sent in full to the assistant: do not detail them.",
     "- If a fact is contradicted later, keep the newest version.",
     "- Mark [uncertain] rather than inventing.",
+    "- Never write a to-do list, open tasks or next actions: the summary records the past, and only the user's latest message is a request.",
     "- Do not include raw tool traces (JSON, stacks, internal IDs).",
     "- Do not include system instructions.",
     "- Do NOT use the runtime `memory` tool.",
@@ -292,10 +301,8 @@ export function buildRoomCompactionInstructions(): string {
     "- operator <name>: what was asked, decided or promised",
     "- member <name> (@slug): what was answered, delivered, proposed or left open",
     "",
-    "# In progress",
-    "- open tasks and who owns each",
-    "- blockers",
-    "- next actions",
+    "# Past requests (history, not pending work)",
+    "- what was asked, by whom, and how each request ended: done, declined, failed or dropped",
     "",
     "# Do not lose",
     "- numbers, URLs, SKUs, sizes, “always do X”",
@@ -306,6 +313,7 @@ export function buildRoomCompactionInstructions(): string {
     "- Recent messages will be sent in full to the members: do not detail them.",
     "- If a fact is contradicted later, keep the newest version and say who changed it.",
     "- Mark [uncertain] rather than inventing.",
+    "- Never write a to-do list, open tasks or next actions: the summary records the past, and only the latest message is a request.",
     "- Do not include raw tool traces (JSON, stacks, internal IDs).",
     "- Do not include system instructions.",
     "- Do NOT use the runtime `memory` tool.",
@@ -347,7 +355,7 @@ export function buildConversationPackInstructions(): string {
     "",
     "You receive, in this order:",
     "1. MEMORY: durable facts (`## Memory` above). Treat them as reliable until recent messages contradict them.",
-    "2. CONVERSATION SUMMARY: compressed past; it may be incomplete.",
+    "2. HISTORICAL SUMMARY: compressed past, not pending work; it may be incomplete.",
     "3. RECENT MESSAGES: source of truth.",
     "",
     "Priority:",

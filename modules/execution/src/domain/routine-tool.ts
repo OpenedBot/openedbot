@@ -18,15 +18,15 @@ import { isValidCron, isValidTimeZone, localWallClockInstant, nextOccurrence, on
 export { ROUTINE_TOOL_KEY, ROUTINE_TOOL_NAME, ROUTINE_TOOL_RUNTIME_NAME, ROUTINE_TOOL_SERVER } from "./routine-tool-names";
 
 /**
- * La clé de run, ajoutée À LA FIN de l'entrée d'un run dont le bot a l'outil :
- * l'entrée change à chaque run de toute façon, les instructions restent un
- * préfixe stable pour le cache du fournisseur. Le fil n'en garde rien : il
- * conserve le message de l'opérateur, pas l'entrée envoyée à Hermes.
- * The user's timezone travels on the same terms: `unknown` makes the bot ask
- * before it schedules a time of day.
+ * The run key and the user's timezone, as one line of the platform metadata
+ * note that closes the replayed history (`withTurnBoundary`). They used to be
+ * appended to the user's own text, which named the tool on every turn (even
+ * « re ») and let it read as part of the request (2026-11-16). The
+ * instructions stay a stable prefix for the provider's cache; the thread keeps
+ * none of it. `unknown` makes the bot ask before it schedules a time of day.
  */
-export function withRoutineRunKey(input: string, runKey: string, timezone: string | null): string {
-  return `${input}\n\n[routine_manage run_key: ${runKey}]\n[routine_manage user timezone: ${timezone ?? "unknown"}]`;
+export function routineToolMetadata(runKey: string, timezone: string | null): string {
+  return `routine_manage run_key: ${runKey}; user timezone: ${timezone ?? "unknown"}`;
 }
 
 /** Écart minimal entre deux tirs d'une routine créée par un bot. */
@@ -68,15 +68,15 @@ export const ROUTINE_TOOL_DESCRIPTION = [
   "Write `prompt` as a self-contained instruction to your future self (what to do and how to report), not as a message to the user. `list` shows only the start of each prompt (`prompt_excerpt`, with `prompt_chars`): to change a prompt, `update` it with the full new text.",
   "Prefer `update` over creating a near-duplicate of a routine the user refers to.",
   "For a one-shot reminder, use `in 2m`, `in 1h`, `at YYYY-MM-DDTHH:mm` (a local time, read in `timezone`) or `at YYYY-MM-DDTHH:mm:ssZ` (a UTC instant). It is scheduled once and then disables itself. For recurring routines use a 5-field cron (`0 9 * * 1-5`) or `hourly`, `every 2h`, `every 30m`, `daily at 9am`, `weekdays at 9:30`, `every monday at 8am`.",
-  "`timezone` is an IANA name such as `Europe/Paris`, required for any time of day (recurring or local one-shot): nothing falls back to UTC. Relative delays like `in 2m` and UTC instants do not need one. Use the user's timezone from your instructions; when it is unknown, ask the user before creating.",
-  "Always pass `run_key` exactly as given in your instructions.",
+  "`timezone` is an IANA name such as `Europe/Paris`, required for any time of day (recurring or local one-shot): nothing falls back to UTC. Relative delays like `in 2m` and UTC instants do not need one. Use the user's timezone from the platform metadata note; when it is unknown, ask the user before creating.",
+  "Always pass `run_key` exactly as given in the platform metadata note before the user's latest message.",
 ].join(" ");
 
 export const ROUTINE_TOOL_INPUT_SCHEMA = {
   type: "object",
   properties: {
     action: { type: "string", enum: [...ROUTINE_TOOL_ACTIONS], description: "What to do." },
-    run_key: { type: "string", description: "The run key given in your instructions, copied exactly." },
+    run_key: { type: "string", description: "The run key from the platform metadata note, copied exactly." },
     job_id: { type: "string", description: "The routine id, from `list`. Required except for create and list." },
     name: { type: "string", description: "Short routine name (create, update)." },
     prompt: { type: "string", description: "The instruction you will receive at each run (create, update)." },
@@ -109,7 +109,7 @@ export function readRoutineToolArgs(raw: unknown): RoutineToolArgs {
     throw new RoutineToolInputError(`action must be one of ${ROUTINE_TOOL_ACTIONS.join(", ")}.`);
   }
   const runKey = optionalText(args.run_key, "run_key", 200);
-  if (!runKey) throw new RoutineToolInputError("run_key is required: copy it from your instructions.");
+  if (!runKey) throw new RoutineToolInputError("run_key is required: copy it from the platform metadata note.");
   const parsed: RoutineToolArgs = {
     action: action as RoutineToolAction,
     runKey,
@@ -318,6 +318,35 @@ export function routineCreateTwin<T extends { name: string; schedule: string; ti
     if (routineTextKey(routine.name).toLowerCase() !== name) continue;
     if (oneShotTime(routine.schedule) !== null && nextOccurrence(routine.schedule, now, routine.timezone) === null) continue;
     return routine;
+  }
+  return null;
+}
+
+export type RoutineCreateConflict<T> = { routine: T; reason: "same_name" | "same_schedule_and_prompt" };
+
+/**
+ * A routine a bot `create` must not sit next to, once `routineCreateTwin`
+ * found no exact twin: one with the same name (up to case and whitespace)
+ * whatever its schedule, or one with the same schedule, timezone and prompt
+ * under another name. Measured on 2026-11-16: a bot recreated a routine the
+ * user had deleted, and a near-duplicate is never what the user asked for.
+ * The bot is sent to `update` instead. A one-shot whose instant has passed
+ * no longer counts.
+ */
+export function routineCreateConflict<T extends { name: string; schedule: string; timezone: string; message: string }>(
+  candidate: { name: string; schedule: string; timezone: string; message: string },
+  existing: readonly T[],
+  now: Date,
+): RoutineCreateConflict<T> | null {
+  const name = routineTextKey(candidate.name).toLowerCase();
+  const message = routineTextKey(candidate.message).toLowerCase();
+  for (const routine of existing) {
+    if (oneShotTime(routine.schedule) !== null && nextOccurrence(routine.schedule, now, routine.timezone) === null) continue;
+    if (routineTextKey(routine.name).toLowerCase() === name) return { routine, reason: "same_name" };
+    if (routine.schedule === candidate.schedule && routine.timezone === candidate.timezone
+      && routineTextKey(routine.message).toLowerCase() === message) {
+      return { routine, reason: "same_schedule_and_prompt" };
+    }
   }
   return null;
 }

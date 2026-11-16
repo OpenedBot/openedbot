@@ -7,7 +7,10 @@
  * needs an explicit zone, never UTC by default), each permission mode
  * (bypass writes, manual creates active and refuses resume/remove, plan writes
  * nothing), the routine-run guard, the schedule forms and minimum interval,
- * and that a tenant's bearer never reaches another tenant's run.
+ * that a write needs the run's own message to ask for it (a greeting run is
+ * refused, an agreement to the bot's proposal passes), that a name or a
+ * schedule-and-prompt already taken is refused, and that a tenant's bearer
+ * never reaches another tenant's run.
  */
 import { testInternalSecrets } from "@openedbot/platform-config/internal-secrets";
 import { Hono } from "hono";
@@ -50,7 +53,7 @@ await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connec
     await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
       values (${thread}, ${org}, ${bot}, 'DM', ${`dev209-${n}`}, true)`;
     await owner`insert into runs (id, organization_id, thread_id, bot_id, input, status, external_state)
-      values (${run}, ${org}, ${thread}, ${bot}, 'fixture', 'running', 'streaming')`;
+      values (${run}, ${org}, ${thread}, ${bot}, 'Programme une routine', 'running', 'streaming')`;
     runs.set(bot, run);
   }
   await owner`insert into runtime_routine_tools (organization_id, runtime_id, secret_hash, installed_at)
@@ -162,15 +165,26 @@ await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connec
   assert((await owner<Array<{ message: string }>>`select message from routines where id = ${jobId.job_id}`)[0]?.message === "Cherche les news IA",
     "a twin create must leave the existing message as it was");
   for (const differing of [
-    { name: "News IA", prompt: "Cherche les news IA", schedule: "weekdays at 9:30", timezone: "Europe/Paris" },
-    { name: "News crypto", prompt: "Cherche les news IA", schedule: "weekdays at 8:30", timezone: "Europe/Paris" },
-    { name: "News IA", prompt: "Cherche les news IA", schedule: "weekdays at 8:30", timezone: "Europe/London" },
+    { name: "News crypto", prompt: "Cherche les news crypto", schedule: "weekdays at 8:30", timezone: "Europe/Paris" },
+    { name: "News crypto", prompt: "Cherche les news IA", schedule: "weekdays at 9:30", timezone: "Europe/Paris" },
+    { name: "News crypto", prompt: "Cherche les news IA", schedule: "weekdays at 8:30", timezone: "Europe/London" },
   ]) {
     const other = await call(BYPASS, { action: "create", ...differing });
     const otherJob = (JSON.parse(other.text) as { created?: { job_id: string } }).created;
     assert(!other.error && otherJob && otherJob.job_id !== jobId.job_id, `a differing routine must be created: ${other.text}`);
     assert(!(await call(BYPASS, { action: "remove", job_id: otherJob.job_id })).error, "fixture removal");
   }
+  // 2026-11-16: the same name on another schedule, or the same schedule and
+  // prompt under another name, is refused and points to update.
+  for (const [conflicting, why] of [
+    [{ name: "NEWS IA", prompt: "Autre chose", schedule: "daily at 6am", timezone: "Europe/Paris" }, "this name"],
+    [{ name: "Veille", prompt: "cherche les  news IA", schedule: "weekdays at 8:30", timezone: "Europe/Paris" }, "same schedule, timezone and prompt"],
+  ] as const) {
+    const refused = await call(BYPASS, { action: "create", ...conflicting });
+    assert(refused.error && refused.text.includes(why) && refused.text.includes("call update") && refused.text.includes(jobId.job_id),
+      `a conflicting create must be refused and point to the existing routine: ${refused.text}`);
+  }
+  assert(await routineCount() === countBefore, "a conflicting create must insert nothing");
   // Two identical creates racing: the per-bot lock lets one insert, the other finds it.
   const race = { action: "create", name: "Course", prompt: "Une seule", schedule: "daily at 7am", timezone: "Europe/Paris" };
   const raced = await Promise.all([call(BYPASS, race), call(BYPASS, race), call(BYPASS, race)]);
@@ -215,6 +229,51 @@ await withDisposablePostgres("openedbot209_routine_tool", async ({ owner, connec
   assert(new Date(reminderRow.next).getTime() >= beforeReminder + 120_000
     && new Date(reminderRow.next).getTime() <= Date.now() + 120_000, "two minutes must be measured from creation");
   assert(!(await call(BYPASS, { action: "remove", job_id: reminderId })).error, "fixture reminder removal must pass");
+
+  // 2026-11-16: a write must be asked for by the message that started the run.
+  // Its own thread: one live run per thread, and BYPASS's first run stays live below.
+  const thread = id(n++);
+  await owner`insert into threads (id, organization_id, bot_id, title, hermes_session_id, is_default)
+    values (${thread}, ${ORG_A}, ${BYPASS}, 'Intent', 'dev209-intent', false)`;
+  let previousTurn: string | null = null;
+  const message = (text: string, role: "user" | "assistant", run: string | null) => owner`
+    insert into messages (id, organization_id, thread_id, run_id, role, content)
+    values (${crypto.randomUUID()}, ${ORG_A}, ${thread}, ${run}, ${role}, jsonb_build_array(jsonb_build_object('type', 'text', 'text', ${text}::text)))`;
+  const turn = async (input: string, previousAssistant: string | null) => {
+    const run = id(n++);
+    if (previousTurn) await owner`update runs set status = 'completed' where id = ${previousTurn}`;
+    previousTurn = run;
+    if (previousAssistant) await message(previousAssistant, "assistant", null);
+    await owner`insert into runs (id, organization_id, thread_id, bot_id, input, status, external_state)
+      values (${run}, ${ORG_A}, ${thread}, ${BYPASS}, ${input}, 'running', 'streaming')`;
+    await message(input.split("\n\n[")[0]!, "user", run);
+    return signRoutineRunKey(SECRET, run);
+  };
+  const intentCreate = { action: "create", name: "News du matin", prompt: "Cherche les news IA", schedule: "daily at 8am", timezone: "Europe/Paris" };
+  const countIntent = async () => Number((await owner<Array<{ n: string }>>`select count(*) as n from routines where bot_id = ${BYPASS} and name = 'News du matin'`)[0]?.n);
+  for (const greeting of ["re", "Hey", "re\n\n[routine_manage run_key: x.y]\n[routine_manage user timezone: Europe/Paris]"]) {
+    const refused = await call(BYPASS, intentCreate, { runKey: await turn(greeting, "Je ne peux pas programmer de routine ici.") });
+    assert(refused.error && refused.text.startsWith("The current user message does not ask for a routine change"),
+      `a greeting run must not create a routine: ${refused.text}`);
+  }
+  assert(await countIntent() === 0, "a greeting run must insert nothing");
+  const noProposal = await call(BYPASS, intentCreate, { runKey: await turn("oui", "Voici les news du jour.") });
+  assert(noProposal.error && noProposal.text.includes("does not ask for a routine change"), `« oui » without a proposal must be refused: ${noProposal.text}`);
+  // A greeting cannot remove or pause either; list stays free.
+  const greetingKey = await turn("Hey", null);
+  assert(!(await call(BYPASS, { action: "list" }, { runKey: greetingKey })).error, "a greeting run may still list");
+  assert((await call(BYPASS, { action: "remove", job_id: id(999) }, { runKey: greetingKey })).error, "a greeting run must not remove");
+  const agreed = await call(BYPASS, intentCreate, {
+    runKey: await turn("oui", "Je peux créer une routine qui t'envoie les news IA chaque matin à 8h. Tu veux ?"),
+  });
+  assert(!agreed.error && (JSON.parse(agreed.text) as { created?: unknown }).created, `« oui » after a proposal must create: ${agreed.text}`);
+  const explicitKey = await turn("Ok créer toi une routine pour que tt les matin à 8h j'ai les news AI", null);
+  const explicit = await call(BYPASS, intentCreate, { runKey: explicitKey });
+  assert(!explicit.error && (JSON.parse(explicit.text) as { already_existed?: boolean }).already_existed, `an explicit request finds the twin: ${explicit.text}`);
+  const agreedJob = (JSON.parse(agreed.text) as { created: { job_id: string } }).created.job_id;
+  assert(!(await call(BYPASS, { action: "remove", job_id: agreedJob }, { runKey: await turn("supprime là", null) })).error, "« supprime là » must remove");
+  assert(await countIntent() === 0, "the removed routine must be gone");
+  await owner`update runs set status = 'completed' where id = ${previousTurn!}`;
 
   // Plan writes nothing; a switched-off bot, a bad key and an ended run are refused.
   assert((await call(PLAN, { action: "create", name: "P", prompt: "x", schedule: "hourly" })).error, "plan create must be refused");

@@ -8,6 +8,40 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 0.1.3 - 2026-11-16
+
+### Corrigé
+
+- **Un « re » ne recrée plus une routine.** Mesuré en production le
+  2026-11-16 : un bot répondait à « re » par `routine_manage create`, d’après
+  une ancienne demande restée dans l’historique. L’API refuse désormais toute
+  écriture de routine (créer, modifier, mettre en pause, reprendre,
+  supprimer) quand le message qui a lancé le run ne la demande pas : il faut
+  un indice de planification ou de gestion de routine (FR ou EN : « routine »,
+  « rappelle-moi », « tous les matins », « à 8h », « demain », « supprime »…),
+  ou un « oui » court en réponse à une proposition de routine du bot juste
+  avant. Le modèle reçoit une erreur qu’il peut lire ; `list` reste libre, et
+  un run lancé par une routine garde ce qu’il pouvait faire.
+- **Pas de doublon de routine par le bot.** Une création dont le nom existe
+  déjà (casse ignorée), ou dont la planification, le fuseau et le prompt sont
+  ceux d’une routine existante, est refusée et renvoie au `update` de
+  l’existante.
+- **Les notes d’outil sortent du message de l’utilisateur.** La clé de run
+  de `routine_manage` et de `bot_settings_propose` et le fuseau de
+  l’utilisateur ne sont plus collés au texte du tour : ils voyagent dans une
+  note « Platform metadata for tools; not a user request » placée en dernier
+  dans l’historique, juste avant le message. Les instructions (préfixe en
+  cache) ne bougent pas d’un tour à l’autre et `runs.input` ne garde que le
+  texte de l’utilisateur.
+- **L’historique rejoué est clos avant le message courant.** Une note fixe
+  (sans horodatage) dit que les messages précédents sont du contexte, que
+  seul le dernier message est une demande et qu’une demande refusée, échouée
+  ou traitée est close. Le résumé de compaction s’intitule « Historical
+  summary — not pending work » et ne produit plus de tâches ouvertes ni de
+  prochaines actions. La règle « Work autonomously » ne vaut que pour le
+  dernier message, et une routine supprimée par l’utilisateur n’est pas
+  recréée sans nouvelle demande explicite.
+
 ## 0.1.2 - 2026-11-16
 
 ### Ajouté

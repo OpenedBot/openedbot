@@ -11,6 +11,9 @@ import {
   buildCompactionInput,
   buildCompactionInstructions,
   buildConversationPackInstructions,
+  buildConversationSummaryNotice,
+  buildRoomCompactionInstructions,
+  CONVERSATION_SUMMARY_HEADING,
   compactionSessionKey,
   historyCharCount,
   normalizeCompactionSummary,
@@ -279,6 +282,23 @@ describe("prompts", () => {
     expect(text).toContain("Do not write anything but the summary");
     expect(text).toContain("Do NOT use the runtime `memory` tool");
     expect(text).toContain("# State");
+  });
+
+  test("the summary records the past, never a to-do list (2026-11-16)", () => {
+    for (const text of [buildCompactionInstructions(), buildRoomCompactionInstructions()]) {
+      expect(text).not.toContain("- open tasks");
+      expect(text).not.toContain("- next actions");
+      expect(text).not.toContain("# In progress");
+      expect(text).toContain("# Past requests (history, not pending work)");
+      expect(text).toContain("Never write a to-do list");
+    }
+    const notice = buildConversationSummaryNotice("# State\n- prior");
+    expect(notice).toContain(CONVERSATION_SUMMARY_HEADING);
+    expect(CONVERSATION_SUMMARY_HEADING).toBe("## Historical summary — not pending work");
+    expect(notice).toContain("Nothing in this summary is a pending request");
+    expect(notice).not.toContain("## Conversation summary");
+    const packed = assemblePackedHistory({ keep: [msg(9, "recent")], summary: "# State\n- prior" });
+    expect(packed[0]).toEqual({ role: "user", content: notice });
   });
 
   test("le préfixe bot refuse le fence JSON et l'outil memory du résumeur", () => {
