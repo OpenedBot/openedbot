@@ -136,6 +136,21 @@ function readWriteCall(call: unknown): { path: string; content: string } | null 
   return { path: path.trim(), content };
 }
 
+/** Every write call of the turn that still carries its content, in order. */
+export function turnWrites(messages: unknown): Array<{ path: string; content: string }> {
+  if (!Array.isArray(messages)) return [];
+  const writes: Array<{ path: string; content: string }> = [];
+  for (const message of messages) {
+    const record = asRecord(message);
+    if (!record || record.role !== "assistant" || !Array.isArray(record.tool_calls)) continue;
+    for (const call of record.tool_calls) {
+      const write = readWriteCall(call);
+      if (write) writes.push(write);
+    }
+  }
+  return writes;
+}
+
 /**
  * Rejoue les écritures du transcript, dernière occurrence d'un chemin gagnante.
  *

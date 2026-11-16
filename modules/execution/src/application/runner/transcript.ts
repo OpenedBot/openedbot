@@ -5,7 +5,9 @@ import { projectWebSearches, type WebSearchTrail } from "@openedbot/execution/do
 import { currentTurnMessages } from "@openedbot/execution/domain/agent-transcript";
 import { projectRuntimeArtifacts, type RuntimeArtifact } from "@openedbot/execution/domain/runtime-artifacts";
 import { ATTACHMENT_LIMITS } from "@openedbot/conversation/domain/attachments";
+import { mediaBasename } from "@openedbot/execution/domain/output-media-text";
 import { artifactObjectKey, putArtifactBlob } from "../artifact-store";
+import { citedWorkspaceArtifacts } from "./cited-workspace-files";
 import type { MessageContent } from "@openedbot/contracts-api";
 import type { WorkerConfig } from "../worker-config";
 import type { RunContext } from "./types";
@@ -78,7 +80,9 @@ export function assistantContent(
  *
  * Le contenu vient des arguments d'écriture du transcript (le connecteur
  * n'a pas de lecture de fichier) et des images que la réponse finale livrait
- * intégrées (`extractOutputMedia`), dans les limites d'un message.
+ * intégrées (`extractOutputMedia`), dans les limites d'un message. `cited`:
+ * the files the reply names as plain `/workspace/<path>` references
+ * (`citedWorkspacePaths`), attached when the host or the transcript has them.
  * Best-effort : un blob refusé n'échoue pas le run.
  */
 export async function storeRuntimeArtifacts(
@@ -87,6 +91,7 @@ export async function storeRuntimeArtifacts(
   event: Pick<RunEvent, "payload">,
   client: HermesClient | undefined,
   delivered: readonly RuntimeArtifact[] = [],
+  cited: readonly string[] = [],
 ): Promise<StoredRuntimeArtifact[]> {
   if (!config.blob) {
     if (delivered.length) log("worker.output_media_dropped", { runId: context.id, organizationId: context.organizationId, reason: "no_blob_store", count: delivered.length });
@@ -97,7 +102,12 @@ export async function storeRuntimeArtifacts(
     const transcript = await readAgentTranscript(context, client);
     messages = transcript.turn;
   }
-  const projected = withinMessageLimits([...(messages?.length ? projectRuntimeArtifacts(messages) : []), ...delivered]);
+  const attached = [...(messages?.length ? projectRuntimeArtifacts(messages) : []), ...delivered];
+  // A file cited as a plain path that is already attached is not read again.
+  const taken = new Set(attached.map((artifact) => artifact.name));
+  const pending = cited.filter((path) => !taken.has(mediaBasename(path)));
+  const citedFiles = pending.length ? await citedWorkspaceArtifacts(context, client, pending, messages ?? []) : [];
+  const projected = withinMessageLimits([...attached, ...citedFiles]);
   if (projected.length === 0) return [];
   const stored: StoredRuntimeArtifact[] = [];
   for (const artifact of projected) {

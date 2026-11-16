@@ -41,6 +41,19 @@ connecteur hôte et le protocole tiennent le leur :
   prochaines actions. La règle « Work autonomously » ne vaut que pour le
   dernier message, et une routine supprimée par l’utilisateur n’est pas
   recréée sans nouvelle demande explicite.
+- **Un fichier cité en clair dans `/workspace` arrive dans le fil.** Mesuré
+  en local le 2026-11-16 : un bot créait `notes.md` puis répondait
+  « Le fichier `/workspace/notes.md` contient … » sans ligne `MEDIA:`, et
+  rien n’était joint. À la fin du run, le worker lit aussi les chemins
+  `/workspace/<chemin>` écrits en clair (en code ou non) et les joint comme
+  une livraison `MEDIA:` : le texte reste tel que le modèle l’a écrit. Les
+  octets viennent de l’hôte (image ou PDF à la racine), sinon de l’écriture
+  du tour dans le transcript (un `.md` est rangé en `text/markdown`, aussi
+  `.txt`, `.csv`, `.json`, `.html`). Pas de `..`, de chemin hors
+  `/workspace`, de motif, de dossier ni de fichier caché ; un chemin d’un
+  bloc de commandes (```bash…) est ignoré ; cinq fichiers au plus, sans
+  doublon avec `MEDIA:`. Un fichier introuvable est sauté en silence (log
+  `debug`).
 
 ## 0.1.2 - 2026-11-16
 
