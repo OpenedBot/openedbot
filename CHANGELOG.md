@@ -54,6 +54,16 @@ connecteur hôte et le protocole tiennent le leur :
   bloc de commandes (```bash…) est ignoré ; cinq fichiers au plus, sans
   doublon avec `MEDIA:`. Un fichier introuvable est sauté en silence (log
   `debug`).
+- **Une mise à jour de l’hôte renouvelle les sessions Hermes des fils.**
+  Mesuré en production le 2026-11-16 : le bot « Testeur » gardait la session
+  `…:gen2` ouverte le 2026-11-12, avec le pont `tool_search` qu’edge-setup
+  ≥ v1.5.9 a retiré au démarrage de l’opérateur, sans que l’API le sache.
+  Quand le connecteur annonce un agent différent de celui déjà enregistré
+  (`edge-setup/vX.Y.Z`), l’API marque désormais les capacités de tout le
+  runtime dans la même écriture : chaque fil de chaque bot passe à une
+  session neuve à son prochain run, une seule fois par mise à jour (un défaut
+  de cache par fil). Une reconnexion avec le même agent et la toute première
+  déclaration ne changent rien.
 
 ## 0.1.2 - 2026-11-16
 

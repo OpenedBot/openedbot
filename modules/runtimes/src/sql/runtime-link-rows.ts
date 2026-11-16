@@ -14,20 +14,40 @@ export type LinkRuntimeScope = { runtimeId: string; organizationId: string; toke
 /**
  * L'agent et la version Hermes de `hello` (0055, 0162) ne sont retenus
  * qu'après admission ; la génération doit encore être celle du lien.
+ *
+ * Host upgrade: when the declared agent (`edge-setup/vX.Y.Z`) differs from
+ * the one already recorded, the operator has just restarted on new code and
+ * may have converged every profile's Hermes config at start-up (e.g.
+ * edge-setup >= v1.5.9 turning `tools.tool_search` off) without relaying any
+ * capability write. The root `capabilities_changed_at` (0163) is then marked
+ * in the same statement, so every bot of this runtime moves its threads to a
+ * fresh Hermes session at their next run: one prompt-cache miss per thread
+ * per upgrade, instead of sessions frozen on the old prompt and tools.
+ * A reconnect with the same agent changes nothing. The first declaration
+ * (`link_agent` still null) does not mark either: no run can have opened a
+ * session through this link before its first `hello` was recorded.
+ * Returns `true` when the marker was set.
  */
 export async function writeLinkAgent(
   tx: Db,
   scope: LinkRuntimeScope,
   input: { agent: string; hermesVersion: string | null; generation: string | null },
-): Promise<void> {
-  await tx`
-    update runtimes set link_agent = ${input.agent}, link_hermes_version = ${input.hermesVersion}, link_agent_seen_at = now()
+): Promise<boolean> {
+  // `link_agent` on the right-hand side is the value before this update.
+  // `now()` is fixed for the transaction, so the returned comparison is true
+  // exactly when this statement set the marker.
+  const rows = await tx`
+    update runtimes set link_agent = ${input.agent}, link_hermes_version = ${input.hermesVersion}, link_agent_seen_at = now(),
+           capabilities_changed_at = case when link_agent is not null and link_agent <> ${input.agent}
+                                          then now() else capabilities_changed_at end
      where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}
        and revoked_at is null and link_connected_at is not null
        and link_generation = ${input.generation}::bigint
        and (link_token_hash = ${scope.tokenHash}
          or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
+    returning capabilities_changed_at is not distinct from now() as "capabilitiesMarked"
   `;
+  return rows[0]?.capabilitiesMarked === true;
 }
 
 /**

@@ -38,9 +38,11 @@ export async function recordLinkAgent(
     log("runtime_link.agent_outdated", { runtimeId: identity.runtimeId, ...meta });
   }
   try {
-    await withCredential(db, identity.tokenHash, async (tx) => {
-      await writeLinkAgent(tx, identity, { agent, hermesVersion, generation: connection.link?.generation ?? null });
-    });
+    const capabilitiesMarked = await withCredential(db, identity.tokenHash, (tx) =>
+      writeLinkAgent(tx, identity, { agent, hermesVersion, generation: connection.link?.generation ?? null }));
+    // A new agent version: every thread of this runtime opens a fresh Hermes
+    // session at its next run (see writeLinkAgent).
+    if (capabilitiesMarked) log("runtime_link.agent_changed_sessions_rotate", { runtimeId: identity.runtimeId, agent });
   } catch (error) {
     log("runtime_link.agent_write_failed", { runtimeId: identity.runtimeId, error: String(error) });
   }

@@ -549,6 +549,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/worker-queue-lease.ts
 	bun tests/integration/runtime-link-generation.ts
 	bun tests/integration/runtime-link-device-key.ts
+	bun tests/integration/link-agent-session-rotation.ts
 	bun tests/integration/runtime-link-diagnostics.ts
 	bun tests/integration/runtime-read-snapshots-store.ts
 	bun tests/integration/text-array-binds.ts

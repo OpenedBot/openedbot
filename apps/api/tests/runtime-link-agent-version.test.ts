@@ -78,7 +78,7 @@ describe("versions du connecteur", () => {
 });
 
 /** Direct call of the handlers with in-memory transport and SQL: no server. */
-async function hello(agent?: string, env: Record<string, string> = {}, failWrite = false) {
+async function hello(agent?: string, env: Record<string, string> = {}, failWrite = false, capabilitiesMarked = false) {
   const statements: Array<{ sql: string; values: unknown[] }> = [];
   const events: Array<{ kind: LinkEventKind; meta: LinkEventMeta }> = [];
   const logs: Array<{ event: string; fields: Record<string, unknown> }> = [];
@@ -88,6 +88,7 @@ async function hello(agent?: string, env: Record<string, string> = {}, failWrite
     const sql = strings.join(" ? ");
     statements.push({ sql, values });
     if (failWrite && sql.includes("set link_agent =")) throw new Error("écriture indisponible");
+    if (sql.includes("set link_agent =")) return [{ capabilitiesMarked }];
     return [];
   }) as unknown as Bun.TransactionSQL;
   const db = { begin: async (callback: (tx: Bun.TransactionSQL) => Promise<unknown>) => callback(tx) } as unknown as SQL;
@@ -126,7 +127,7 @@ describe("déclaration hello et migration", () => {
     const write = session.statements.find(({ sql }) => sql.includes("set link_agent ="));
     expect(write?.sql).toContain("link_agent_seen_at = now()");
     expect(write?.sql).toContain("link_generation =");
-    expect(write?.values).toEqual(["hermes-setup/v0.1.0", null, "rt", "org", "42", "hash", "hash"]);
+    expect(write?.values).toEqual(["hermes-setup/v0.1.0", null, "hermes-setup/v0.1.0", "rt", "org", "42", "hash", "hash"]);
     const meta = { ip: "203.0.113.7", agent: "hermes-setup/v0.1.0", minimum: "v0.2.0" };
     expect(session.events.filter(({ kind }) => kind === "agent_outdated")).toEqual([{ kind: "agent_outdated", meta: { ...meta, instanceId: "agent-version-test", generation: "42" } }]);
     expect(session.logs).toContainEqual({ event: "runtime_link.agent_outdated", fields: { runtimeId: "rt", ...meta } });
@@ -155,6 +156,17 @@ describe("déclaration hello et migration", () => {
     expect(session.statements.find(({ sql }) => sql.includes("set link_agent ="))?.values[0]).toBe("x".repeat(256));
     const absent = await hello();
     expect(absent.statements.some(({ sql }) => sql.includes("set link_agent ="))).toBe(false);
+  });
+
+  test("a changed agent marks the runtime's capabilities in the same statement, once, and logs it", async () => {
+    const changed = await hello("edge-setup/v1.5.11", {}, false, true);
+    const write = changed.statements.find(({ sql }) => sql.includes("set link_agent ="));
+    // Only an actual change from a recorded agent marks: same agent or first declaration keep the marker.
+    expect(write?.sql.replace(/\s+/g, " ")).toContain("capabilities_changed_at = case when link_agent is not null and link_agent <> ? then now() else capabilities_changed_at end");
+    expect(write?.values[2]).toBe("edge-setup/v1.5.11");
+    expect(changed.logs).toContainEqual({ event: "runtime_link.agent_changed_sessions_rotate", fields: { runtimeId: "rt", agent: "edge-setup/v1.5.11" } });
+    const same = await hello("edge-setup/v1.5.11");
+    expect(same.logs.some(({ event }) => event === "runtime_link.agent_changed_sessions_rotate")).toBe(false);
   });
 
   test("une panne de persistance reste informative et laisse le lien admis", async () => {
