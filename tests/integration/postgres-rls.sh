@@ -224,6 +224,13 @@ SQL
     exit 1
   fi
 
+  audit_log_view="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
+    -f "$root/tests/integration/audit-log-view.sql")"
+  if [[ "$audit_log_view" != "security_invoker=true/occurred_at,organization_id,source,action,actor_kind,actor_id,subject_kind,subject_id,details/clean" ]]; then
+    printf 'Audit log view proof failed; expected security_invoker, the nine contract columns and no sensitive field, got:\n%s\n' "$audit_log_view" >&2
+    exit 1
+  fi
+
   runtime_reachability="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
     -f "$root/tests/integration/runtime-reachability.sql")"
   if [[ "$runtime_reachability" != "refused/refused/refused/refused/1/0/visible/1" ]]; then
@@ -659,6 +666,14 @@ ssh_columns_dropped="$(docker exec -i "$container" sh -ceu \
   < "$root/tests/integration/runtime-ssh-columns-dropped.sql")"
 if [[ "$ssh_columns_dropped" != "3/0/0/idempotent" ]]; then
   printf 'SSH columns schema proof failed; expected the three SSH columns to exist, disappear with their constraints and survive a replay, got:\n%s\n' "$ssh_columns_dropped" >&2
+  exit 1
+fi
+
+audit_log_view="$(docker exec -i "$container" sh -ceu \
+  'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
+  < "$root/tests/integration/audit-log-view.sql")"
+if [[ "$audit_log_view" != "security_invoker=true/occurred_at,organization_id,source,action,actor_kind,actor_id,subject_kind,subject_id,details/clean" ]]; then
+  printf 'Audit log view proof failed; expected security_invoker, the nine contract columns and no sensitive field, got:\n%s\n' "$audit_log_view" >&2
   exit 1
 fi
 
