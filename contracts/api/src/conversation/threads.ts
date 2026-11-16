@@ -165,9 +165,10 @@ export type ThreadCompactResult = {
 /**
  * Minimum threshold of « Compacter l'historique du salon », in characters of text
  * not yet summarized: the recent queue (KEEP) that compaction never folds,
- * that is 35% of `HISTORY_CHAR_BUDGET` (48 000). Below that, everything fits in the
- * queue and there is nothing to fold. The server stays the authority (422); the console
+ * that is half of `HISTORY_CHAR_BUDGET` (32 000), the same tail an automatic
+ * compaction leaves verbatim. Below that, everything fits in the queue and there
+ * is nothing to fold. The server stays the authority (422); the console
  * uses it only to disable the button with the reason. A test in
  * `modules/conversation` keeps this value equal to the domain's.
  */
-export const ROOM_COMPACT_MIN_CHARS = 16_800;
+export const ROOM_COMPACT_MIN_CHARS = 16_000;

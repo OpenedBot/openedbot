@@ -91,8 +91,8 @@ export type PersistCompaction = (compaction: ThreadCompaction) => Promise<boolea
 
 /**
  * Messages OLD à plier : après le watermark, avant KEEP. Le plus vieux
- * préfixe qui tient dans `COMPACT_INPUT_MAX_CHARS`, le tour suivant
- * avancera le watermark s'il en reste.
+ * préfixe qui tient dans `COMPACT_INPUT_MAX_CHARS` ; if more remains, the
+ * remainder is still over budget and the next run folds the next chunk.
  */
 export async function loadCompactInput(
   db: SQL,

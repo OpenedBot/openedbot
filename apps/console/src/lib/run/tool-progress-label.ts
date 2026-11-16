@@ -27,6 +27,15 @@ export function searchQuery(preview: string): string | null {
 }
 
 /**
+ * The task a delegation names (its preview is the delegate's goal or name),
+ * held to the search rule: no JSON payload, URL or `name=value` pair.
+ */
+function delegateTask(preview: string): string | null {
+  if (/^\s*[{[]/.test(preview)) return null;
+  return searchQuery(preview.replace(/\s+/g, " "));
+}
+
+/**
  * The site of the first URL (or bare domain) of a preview: the host only,
  * never the path or the query string, which is where tokens hide.
  */
@@ -54,7 +63,8 @@ function fileNameOf(preview: string): string | null {
  * What a running tool is doing, as one short line for the live status:
  * « Recherche : cours du bitcoin » for `web_search` (the query), « Lecture :
  * lemonde.fr » for `web_extract` (the host), « Écrit note.txt » for
- * `write_file` (the file name). Every other tool, and every tool whose
+ * `write_file` (the file name), « Délègue : Chercheur web » for a delegation
+ * (its task, under the search rule). Every other tool, and every tool whose
  * preview does not hold a safe field, gets the translated family verb
  * (« Exécute des commandes… »): a command line, a payload or a URL path is
  * never shown. The preview is what Hermes sent with `tool.started`
@@ -69,6 +79,9 @@ export function toolProgressLabel(t: Translate, tool: string, preview?: string |
     if (kind === "search") {
       const query = searchQuery(text);
       if (query) return t("agentActivity.progressSearch", { query });
+    } else if (kind === "delegate") {
+      const task = delegateTask(text);
+      if (task) return t("agentActivity.progressDelegate", { task });
     } else if (bare === "web_extract" || bare === "http" || bare.startsWith("browser_")) {
       const site = siteOf(text);
       if (site) return t("agentActivity.progressWeb", { site });

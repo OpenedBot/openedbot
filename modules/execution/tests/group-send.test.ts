@@ -118,7 +118,7 @@ describe("buildGroupInstructions", () => {
   test("la consigne web n'apparait que si le toolset web est actif", () => {
     expect(buildGroupInstructions({ ...input, addressed: true })).not.toContain("`web_extract` on the best");
     expect(buildGroupInstructions({ ...input, addressed: true, webToolsEnabled: true })).toContain(
-      "`web_search`, then `web_extract` on the best one or two pages",
+      "call `web_search` right away, with no tool or skill lookup first (`limit: 3`), then `web_extract` on the best one or two pages",
     );
   });
 });

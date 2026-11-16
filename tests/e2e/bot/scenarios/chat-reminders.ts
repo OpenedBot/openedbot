@@ -1,6 +1,6 @@
 import type { BotDto, BotRoutineToolDto, RoutineDto, RoutineExecutionPageDto } from "@openedbot/contracts-api";
 import type { Scenario } from "../kit/scenario";
-import { completed, invariant, matchingToolResult, noTools, poll, readyBot, toolEvents } from "../kit/p1-evidence";
+import { completed, invariant, matchingToolResult, noTools, poll, readyBot, toolEvents, toolset } from "../kit/p1-evidence";
 
 export const chatReminders: Scenario = {
   id: "chat-reminders",
@@ -16,6 +16,7 @@ export const chatReminders: Scenario = {
       await rec.step("Outil de routines actif sur un profil Manuel isolé", async () => {
         bot = await readyBot(context, "E2E chat reminder");
         await noTools(session, bot);
+        await toolset(session, bot, "skills", true);
         await session.api("PATCH", `/api/bots/${bot.id}`, { permissionMode: "manual" });
         const state = await session.api<BotRoutineToolDto>("PUT", `/api/bots/${bot.id}/routine-tool`, { enabled: true });
         enabled = state.enabled;
@@ -83,6 +84,20 @@ export const chatReminders: Scenario = {
           return Date.now() >= deadline;
         }, Boolean, deadline - Date.now() + 2_000, "No repeated reminder");
         return { runId, scheduledOccurrences: 1, disabledAfterFire: true };
+      });
+      await rec.step("Une salutation après le rappel ne déclenche aucun outil", async () => {
+        // Keep skills and the routine tool enabled, with scheduling in history.
+        // Discovery with a third-party MCP is covered by skills-mcp.
+        // Do not tell the model to avoid tools in the user's message.
+        const turn = await lab.send(bot!.threadId, "ça va ti ?");
+        completed(turn);
+        const events = await toolEvents(context, turn.runId);
+        invariant(!events.some((event) => event.type === "tool.call"),
+          "Small talk called a tool (including discovery) after a scheduling exchange.");
+        const { routines: rows } = await session.api<{ routines: RoutineDto[] }>("GET", `/api/bots/${bot!.id}/routines`);
+        invariant(rows.length === 1 && rows[0]!.id === routine!.id && !rows[0]!.enabled,
+          "Small talk changed the earlier reminder or created another routine.");
+        return { runId: turn.runId, toolCalls: 0 };
       });
     } finally {
       if (bot) {

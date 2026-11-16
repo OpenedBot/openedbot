@@ -27,6 +27,11 @@ type Named = Pick<BotIdentity, "name" | "slug" | "description">;
 const label = (bot: Named) =>
   `🤖 ${bot.name} (@${bot.slug})${bot.description?.trim() ? `: ${bot.description.trim()}` : ""}`;
 
+// Discovery is tool use too: the routine-only guard does not cover
+// tool_search/tool_describe after an earlier scheduling exchange.
+export const TOOL_RELEVANCE_RULE =
+  "- Use tools only when needed for the current request. For a greeting, small talk (including \"ça va ti ?\"), thanks, or a conversational acknowledgement alone, reply briefly without any tool call, including `tool_search` or `tool_describe`. An answer to an active question, choice or proposal (e.g. \"oui\", \"OK\") continues that request: use its needed tools. Likewise, fulfill an action or information request mixed with a greeting. Never discover tools, inspect capabilities, check routines or resume a task merely because it appears in history.";
+
 /**
  * Le bloc ajouté aux instructions du bot pour CHAQUE run. En anglais, comme
  * le protocole Hermes : c'est un texte système, pas une phrase pour
@@ -57,9 +62,10 @@ export function buildBotModeInstructions(input: {
     ...others,
     "",
     "Rules:",
-    "- To hand a message to another bot, write `@slug <message>` at the START of a line, at the END of your reply. At most one bot per reply. Do it only when the user asks for it or when the task clearly needs that bot; otherwise answer yourself.",
-    "- A bot you mention replies ONCE, synchronously: its final reply is the only thing that comes back. Never ask it for long-running or background work: ask for something it can do and report in a single reply.",
-    "- A message that starts with `Message from 🤖 <name> (@<slug>):` comes from another bot and was relayed by the platform. Reply to it briefly and directly, or answer just `pass` if you have nothing to add. Never mention (@) any bot when replying to such a message.",
+    TOOL_RELEVANCE_RULE,
+    "- Reach another bot only if requested or needed: end your reply with one line `@slug <message>`, at most one bot. Otherwise answer yourself.",
+    "- A mentioned bot replies ONCE, synchronously; only its final reply returns. Request work it can finish and report in that reply, never background work.",
+    "- `Message from 🤖 <name> (@<slug>):` is a relayed bot message. Reply briefly, or `pass` if nothing to add; never mention (@) a bot in that reply.",
     askUserRule(operatorHandle(input.operator)),
     // La même règle vit déjà dans le bloc « ## Memory » (bot-memory.ts). Elle
     // est répétée ICI parce que c'est cette liste-là que le modèle suit
@@ -76,8 +82,8 @@ export function buildBotModeInstructions(input: {
     input.botSettingsToolEnabled
       ? "- When the operator asks you to change your persona, label, reply language or finish notice, call `bot_settings_propose` with the full new value and a one-line reason. The change applies only after the operator approves the proposal card in this thread. Never claim it is done before approval."
       : "- You cannot change your own persona or settings. Tell the operator they can edit them in the agent editor (Persona / General), or enable \"self-edit proposals\" there.",
-    "- Mentions (`@slug`) are the only way to reach another bot. Your own tools stay available in this run, including web_search and web_extract. Never claim you looked something up unless a tool result in this run shows it. Memory is not a source for a recipe, a current fact, or a citation.",
-    "- NEVER use delegation or background tools (delegate_task, async delegation, subagents): the platform does not track them, so their results are lost. Do the work NOW, inside this run, and never promise to \"come back later\" or to follow up: no follow-up of yours can reach this conversation.",
+    "- Your own tools remain available. Claim a lookup only with a tool result from this run; memory cannot source recipes, current facts or citations.",
+    "- NEVER use delegate_task, async delegation, subagents or background tools: results are lost. Work NOW in this run; never promise to return or follow up, because no follow-up reaches this thread.",
     DIAGRAM_RULE,
     FILE_DELIVERY_RULE,
     SANDBOX_PACKAGES_RULE,
@@ -110,7 +116,7 @@ export function buildBotModeInstructions(input: {
  * flou, et le bot avait retiré les accents : d'où le 2x et DejaVu Sans.
  */
 export const FILE_DELIVERY_RULE =
-  "- To show the operator an image or a PDF you made, save it directly in `/workspace/` under a plain name (letters, digits, `-`, `_`; e.g. `/workspace/chart.png`; no subfolder), because paths elsewhere in a terminal sandbox are invisible outside it. Write it in this same turn, just before you reply: a file older than ten minutes is not delivered. Then put `MEDIA:/workspace/<name>` alone on its own line in your reply. The platform attaches the file to your message; never paste its bytes or base64. Draw images at 2x at least (asked 800x450: render 1600x900, fonts and strokes scaled too) so text stays sharp when enlarged, and keep accents with a font that has them (DejaVu Sans: `/usr/share/fonts/truetype/dejavu/`).";
+  "- Deliver images/PDFs from `/workspace/<name>` only (letters, digits, `-`, `_`, extension; no subfolder); other sandbox paths are invisible. Write the file this turn, just before replying: a file older than ten minutes is not delivered. Put `MEDIA:/workspace/<name>` alone on a line; never paste bytes/base64. Render images at least 2x (800x450 -> 1600x900; scale fonts/strokes), preserving accents with DejaVu Sans (`/usr/share/fonts/truetype/dejavu/`).";
 
 /**
  * Un diagramme se répond en Mermaid. Mesuré le 11-11 (TC-DIAG-001 de
@@ -134,10 +140,22 @@ export const DIAGRAM_RULE =
  * chaque graphique. Installer dans la même commande évite l'échec.
  */
 export const SANDBOX_PACKAGES_RULE =
-  "- Your terminal sandbox starts fresh and has no matplotlib, Pillow, numpy or pandas; what you installed in an earlier conversation is gone. When a script needs them, install them in the SAME command, before running it: `pip install -q matplotlib && python3 chart.py`. Never run the script first to see whether a package is there.";
+  "- Each terminal sandbox starts without matplotlib, Pillow, numpy or pandas. Install needed packages in the SAME command before running the script: `pip install -q matplotlib && python3 chart.py`. Never probe by running the script first.";
 
+/**
+ * Mesuré le 16-11 (« météo à Lille », gpt-6-luna) : 5 appels au modèle et
+ * 137 780 jetons d'entrée pour une réponse de deux lignes. Deux appels ne
+ * servaient à rien (`skills_list`, puis `tool_search` pour trouver
+ * `web_search`, déjà dans la liste d'outils) et chacun renvoie tout le
+ * contexte (~22 000 jetons). Les résultats pèsent ensuite sur chaque appel
+ * suivant : 5 résultats de recherche font 13 000 à 32 000 caractères, une
+ * page extraite jusqu'à 15 000. `limit: 3` et `char_limit: 8000` les bornent
+ * sans changer la marche à suivre ; le modèle peut les relever quand la tâche
+ * demande plus de sources. Aucun nom d'outil de skills ici : la règle reste
+ * vraie quand le toolset `skills` est coupé.
+ */
 export const WEB_ANSWER_RULE =
-  "- For anything in the world (a price, the weather, news, a score): `web_search`, then `web_extract` on the best one or two pages, then answer. Do not ask permission to search. Name the pages you read, never a home page. Keep `execute_code` and the terminal for calculations or processing a search cannot do.";
+  "- For anything in the world (a price, the weather, news, a score): call `web_search` right away, with no tool or skill lookup first (`limit: 3`), then `web_extract` on the best one or two pages (`char_limit: 8000`), then answer. Raise those limits only when the task needs more sources. Do not ask permission to search. Name the pages you read, never a home page. Keep `execute_code` and the terminal for calculations or processing a search cannot do.";
 
 export function withBotModeInstructions(base: string, block: string): string {
   const trimmed = base.trimEnd();
@@ -158,6 +176,7 @@ export function buildInboundReplyInstructions(origin: { name: string; slug: stri
     `You are replying to a message relayed by the platform from another bot, 🤖 ${origin.name} (@${origin.slug}). Your FINAL reply is the ONLY thing delivered back to the origin conversation; this exchange then closes.`,
     "",
     "Rules:",
+    TOOL_RELEVANCE_RULE,
     "- Do the work NOW, inside this run, and put the complete result in your reply.",
     "- NEVER use delegation or background tools (delegate_task, async delegation, subagents): the platform does not track them, so their results are lost.",
     "- Never promise to \"come back later\" or to follow up: no follow-up of yours can ever reach the origin conversation. Reply once, with everything you have.",
@@ -539,6 +558,7 @@ export function buildGroupInstructions(input: {
     "",
     ...(sharedInstructions ? ["Shared room instructions:", sharedInstructions, ""] : []),
     "Rules:",
+    TOOL_RELEVANCE_RULE,
     `- Every message you receive is attributed: \`Message from 🤖 <name> (@<slug>):\` for a member, \`Message from ${operatorLabel(input.operator)}:\` for the operator. Reply to the room, not to one person.`,
     input.synthesis
       ? "- This room answers as a team. Your teammates' contributions to the operator's last message are in this conversation. Write now the team's ONE final answer to the operator: merge what is useful from every contribution, yours included, drop repetition, and state a real disagreement in one line if there is one. Do not list who said what, do not greet the team, do not mention anyone, and do not answer `(pass)`."

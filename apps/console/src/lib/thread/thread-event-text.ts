@@ -48,3 +48,9 @@ export function rendersNothing(event: StoredProductEvent): boolean {
     ))
   );
 }
+
+/** Prefixes hidden until they can no longer form the runtime pass directive. */
+export function isPassLikeText(text: string): boolean {
+  const compact = text.trim().toLowerCase().replace(/[\s*_`"'.!]/g, "");
+  return compact.length > 0 && ("(pass)".startsWith(compact) || "pass".startsWith(compact));
+}

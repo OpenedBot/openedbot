@@ -8,7 +8,8 @@ import {
   LIVE_TEXT_COMMIT_MS,
   lastRunSequence,
 } from "../../../src/lib/stream/live-run-text";
-import { LIVE_NARRATION_MAX } from "../../../src/lib/stream/live-answer";
+
+const LONG_TEXT_FIXTURE_SIZE = 280;
 
 const runId = "run-live";
 let cursor = 100;
@@ -27,7 +28,7 @@ function event(type: string, sequence: number, payload: Record<string, unknown> 
 }
 
 const text = (sequence: number, value: string, run = runId) => event("agent.message", sequence, { text: value }, run);
-const LONG = "x".repeat(LIVE_NARRATION_MAX + 1);
+const LONG = "x".repeat(LONG_TEXT_FIXTURE_SIZE + 1);
 
 describe("createLiveRunText", () => {
   test("gives the run's text after a sequence, up to the first break", () => {
@@ -83,18 +84,25 @@ describe("canStartLiveText", () => {
     const snapshot = [text(1, LONG)];
     expect(canStartLiveText(snapshot, text(2, "suite"))).toBe(true);
     // A narration line: the timeline may still move it into the work block.
-    expect(canStartLiveText([text(1, "Je cherche.")], text(2, "suite"))).toBe(false);
+    expect(canStartLiveText([text(1, "Je cherche.")], text(2, "suite"))).toBe(true);
     // The thread ends with another run, or with something else than text.
     expect(canStartLiveText([text(1, LONG), text(1, "autre", "run-other")], text(2, "suite"))).toBe(false);
     expect(canStartLiveText([text(1, LONG), event("tool.call", 2)], text(3, "suite"))).toBe(false);
   });
 
   test("reads the bubble's text across renderless events and other runs, and stops at its boundary", () => {
-    const half = "y".repeat(Math.ceil(LIVE_NARRATION_MAX / 2) + 1);
+    const half = "y".repeat(Math.ceil(LONG_TEXT_FIXTURE_SIZE / 2) + 1);
     const across = [text(1, half), event("tool.result", 2), text(1, "z", "run-other"), text(3, half)];
     expect(canStartLiveText(across, text(4, "suite"))).toBe(true);
     const cut = [text(1, half), event("tool.call", 2), text(3, half)];
-    expect(canStartLiveText(cut, text(4, "suite"))).toBe(false);
+    expect(canStartLiveText(cut, text(4, "suite"))).toBe(true);
+  });
+
+  test("short passages stream directly, but incomplete pass and routing directives stay in the snapshot", () => {
+    expect(canStartLiveText([text(1, "Ça va")], text(2, " bien"))).toBe(true);
+    expect(canStartLiveText([text(1, "P")], text(2, "our répondre"))).toBe(false);
+    expect(canStartLiveText([text(1, "(pas")], text(2, "s)"))).toBe(false);
+    expect(canStartLiveText([text(1, "Question :")], text(2, " @user"))).toBe(false);
   });
 
   test("refuses a notice, an approval or a MEDIA tag in the bubble", () => {

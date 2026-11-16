@@ -157,9 +157,10 @@ habituel.
 Les deux cartes restent visibles dans la console, mais désactivées tant que
 le déploiement ne les ouvre pas :
 
-- **Tunnel géré par openedbot** : `OPENEDBOT_MANAGED_TUNNEL_URL`
-  (`cloudflare://<jeton-api>@<id-compte>/<id-zone>`) renseignée côté API et worker ;
-  un `?suffix=` facultatif change le suffixe des noms d'hôte, `rt.openedbot.app` par défaut ;
+- **Tunnel géré par openedbot** : fourni par le plug-in privé `cloud`
+  (port `managedExposure`), qui ne fait pas partie du cœur open source. Sans
+  ce plug-in, la carte reste désactivée ; les publications existantes restent
+  lisibles et révocables. `OPENEDBOT_MANAGED_TUNNEL_URL` n'est plus lue ;
 - **Tailscale Funnel** : `OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`.
 
 Sinon, l'API répond `MANAGED_TUNNEL_UNAVAILABLE` ou

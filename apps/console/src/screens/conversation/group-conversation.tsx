@@ -8,7 +8,8 @@ import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
-import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
+import { replyPreviewSnippet, replyQuoteText } from "@openedbot/conversation/domain/message-reply";
+import { useMessageReactionToggle } from "../../lib/thread/use-message-reaction-toggle";
 import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
@@ -136,19 +137,6 @@ export function GroupConversationScreen() {
     send.reset();
   }, [group?.threadId]);
 
-  const reaction = useMutation({
-    mutationFn: ({ messageId, emoji, active }: {
-      messageId: string;
-      emoji: MessageReactionEmoji;
-      active: boolean;
-    }) => active
-      ? api.removeMessageReaction(group!.threadId, messageId, emoji)
-      : api.addMessageReaction(group!.threadId, messageId, emoji),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.thread(group!.threadId) });
-    },
-  });
-
   const replyMessage = thread.data?.messages.find((message) => message.id === replyToId) ?? null;
   const replyAuthor = replyMessage
     ? replyMessage.authorBot?.name ?? replyMessage.authorBot?.slug ??
@@ -172,11 +160,7 @@ export function GroupConversationScreen() {
       document.querySelector<HTMLTextAreaElement>("textarea[data-composer]")?.focus();
     });
   }, []);
-  const onReaction = useCallback(
-    (messageId: string, emoji: MessageReactionEmoji, active: boolean) =>
-      reaction.mutateAsync({ messageId, emoji, active }),
-    [reaction.mutateAsync],
-  );
+  const onReaction = useMessageReactionToggle(group?.threadId);
 
   const stopRoom = useMutation({
     mutationFn: () => api.stopRoom(group!.threadId),

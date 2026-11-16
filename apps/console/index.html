@@ -569,7 +569,9 @@
         align-self: flex-end;
         max-width: min(560px, 100%);
         height: 2.25rem;
-        margin-bottom: 2.75rem;
+        /* The row gap only: the loaded bubble's copy/edit actions are an
+           overlay beside it, they reserve no height under it. */
+        margin-bottom: 0.75rem;
         border-radius: 18px;
       }
       #openedbot-boot .answer {
@@ -578,8 +580,8 @@
         align-items: flex-start;
       }
       #openedbot-boot .answer .bubble {
-        max-width: min(80%, 560px);
-        border-radius: 18px;
+        max-width: 100%;
+        border-radius: 4px;
       }
       #openedbot-boot .answer .acts4 {
         display: flex;

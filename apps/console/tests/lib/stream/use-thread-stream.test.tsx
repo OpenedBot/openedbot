@@ -9,7 +9,8 @@ import { clearCloudSession, saveCloudSession } from "../../../src/lib/session/cl
 import { queryClient } from "../../../src/lib/query-client";
 import { stopOrganizationStream, useThreadStream } from "../../../src/lib/stream/use-thread-stream";
 import { LIVE_TEXT_COMMIT_MS } from "../../../src/lib/stream/live-run-text";
-import { LIVE_NARRATION_MAX } from "../../../src/lib/stream/live-answer";
+
+const LONG_TEXT_FIXTURE_SIZE = 280;
 
 const organizationId = "org-stream-test";
 const threadId = "thread-stream-test";
@@ -299,7 +300,7 @@ test("fresh receipts refresh the thread, ambiguous steering wakes inbox, and rec
 });
 
 test("a confirmed answer's fragments wait outside the cache, then reach it in stream order", async () => {
-  const answer = "x".repeat(LIVE_NARRATION_MAX + 1);
+  const answer = "x".repeat(LONG_TEXT_FIXTURE_SIZE + 1);
   const fragment = (sequence: number, type: string, payload: Record<string, unknown>) => ({
     // Text fragments are fanned out before their commit: no cursor.
     ...(type === "agent.message" ? {} : { cursor: 10 + sequence }),

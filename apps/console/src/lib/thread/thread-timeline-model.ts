@@ -10,7 +10,7 @@ import type {
 } from "@openedbot/contracts-api";
 import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { isAbsorbedRun } from "@openedbot/conversation/domain/followup";
-import { eventText, rendersNothing } from "./thread-event-text";
+import { eventText, rendersNothing, isPassLikeText } from "./thread-event-text";
 import { bucketEventsByRun, isMetadataReceipt, withoutReceipts, type EventsByRun } from "./timeline-run-events";
 import { eventsAppendedFrom } from "@openedbot/conversation/domain/thread-snapshot-mutations";
 import {
@@ -569,7 +569,7 @@ function mergeTimelineEntries(entries: readonly Entry[], ctx: MergeContext): Ent
         ...(outcome && outcome.durationMs !== null ? { durationMs: outcome.durationMs } : {}),
         ...(errorMessage ? { errorMessage } : {}),
         ...(typeof preview === "string" && preview !== "" ? { preview } : {}),
-        ...(outcome?.resultExcerpt ? { resultExcerpt: outcome.resultExcerpt } : {}),
+        ...(outcome?.resultExcerpt ? { resultExcerpt: outcome.resultExcerpt } : {}), ...(outcome?.cards ? { cards: outcome.cards } : {}),
         ...(attachment ? { attachment } : {}),
       };
       const last = merged[merged.length - 1];
@@ -638,10 +638,6 @@ function mergeTimelineEntries(entries: readonly Entry[], ctx: MergeContext): Ent
 }
 
 /** `(pass)`, `pass`, or one of their prefixes, as the stream delivers it. */
-function isPassLikeText(text: string): boolean {
-  const compact = text.trim().toLowerCase().replace(/[\s*_`"'.!]/g, "");
-  return compact.length > 0 && ("(pass)".startsWith(compact) || "pass".startsWith(compact));
-}
 
 type RunTrail<T> = { value: T; first: StoredProductEvent };
 

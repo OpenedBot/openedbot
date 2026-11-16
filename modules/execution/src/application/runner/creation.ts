@@ -37,7 +37,8 @@ import {
   recoverProviderFailure,
   resolveSelectionForNewRun,
 } from "./provider-recovery";
-import { type GroupTurn, groupSendState, packRoomHistory, prepareGroupTurn } from "./rooms";
+import { type GroupTurn, groupSendState, prepareGroupTurn } from "./rooms";
+import { packRoomHistory } from "./room-pack";
 import type { RunCreateArgs, RunState } from "./run-state";
 import { readWorkflowSessionCounters } from "./workflows";
 import type { RunContext } from "./types";
@@ -209,7 +210,7 @@ async function postCreateRun(
  * par l'entrée, jamais par elles. Reads only (history, instructions,
  * playbooks), in this order; writes nothing.
  */
-async function composeRunRequest(
+export async function composeRunRequest(
   db: SQL,
   config: WorkerConfig,
   context: RunContext,
@@ -262,7 +263,7 @@ async function composeRunRequest(
   // l'hôte annonce le toolset `skills` actif (bot-learning.ts).
   // Le routeur n'a pas d'outils : on ne lui annonce ni skills ni playbooks.
   const canLearn = !routing && !isServiceStepKind(context.stepKind) && runtimeCanLearn(inputs.toolsetInventory);
-  if (!routing && (canLearn || (memoryToolEnabled && !isServiceStepKind(context.stepKind)))) {
+  if (canLearn) {
     prompt.instructions = withBotModeInstructions(
       prompt.instructions,
       buildLearningBlock({ memoryToolEnabled }),

@@ -53,14 +53,15 @@ const context = {
   reasoningEffort: null,
 };
 
-const OLD = "o".repeat(40_000);
-const KEEP_A = "k".repeat(8_000);
-const KEEP_B = "k".repeat(8_000);
+// Each message stays under the per-message clamp (8 000): only their sum is over budget.
+const OLD = "o".repeat(7_000);
+const KEEP_A = "k".repeat(5_000);
+const KEEP_B = "k".repeat(5_000);
 
 const LONG_THREAD: MessageRow[] = [
-  { role: "user", content: text(OLD), sequence: 1 },
-  { role: "user", content: text(KEEP_A), sequence: 2 },
-  { role: "assistant", content: text(KEEP_B), sequence: 3 },
+  ...[1, 2, 3, 4, 5].map((sequence) => ({ role: "user", content: text(OLD), sequence })),
+  { role: "user", content: text(KEEP_A), sequence: 6 },
+  { role: "assistant", content: text(KEEP_B), sequence: 7 },
 ];
 
 function compactClient(output: string | null, status: "completed" | "failed" = "completed"): CompactHermes {
@@ -148,7 +149,7 @@ describe("conversationHistory pack", () => {
     const packed = await conversationHistory(
       fakeDb({
         messages: LONG_THREAD,
-        compaction: { summary: "# State\n- prior", compactedThroughSequence: 1, sourceMessageCount: 1 },
+        compaction: { summary: "# State\n- prior", compactedThroughSequence: 5, sourceMessageCount: 5 },
       }),
       { ...context },
       { client, signal: new AbortController().signal },
@@ -162,19 +163,71 @@ describe("conversationHistory pack", () => {
   test("compact échoué : aveu droppedHistoryNotice, pas de résumé inventé", async () => {
     const packed = await conversationHistory(
       fakeDb({ messages: LONG_THREAD }),
-      context,
+      { ...context, threadId: "thread-failed" },
       { client: compactClient(null, "failed"), signal: new AbortController().signal },
     );
     expect(packed.packInstructions).toBeNull();
-    expect(packed.history[0]?.content).toBe(droppedHistoryNotice(1));
+    expect(packed.history[0]?.content).toBe(droppedHistoryNotice(2));
     expect(packed.history[0]?.content).not.toContain("Conversation summary");
+  });
+
+  test("a failed compaction is not retried on every turn", async () => {
+    let created = 0;
+    const failing: CompactHermes = {
+      ...compactClient(null, "failed"),
+      createRun: async () => {
+        created += 1;
+        return "hermes-compact-1";
+      },
+    };
+    const backoff = { ...context, threadId: "thread-backoff" };
+    const signal = new AbortController().signal;
+    await conversationHistory(fakeDb({ messages: LONG_THREAD }), backoff, { client: failing, signal });
+    const next = [...LONG_THREAD, { role: "user", content: text("q".repeat(120)), sequence: 8 }];
+    const packed = await conversationHistory(fakeDb({ messages: next }), backoff, { client: failing, signal });
+    expect(created).toBe(1);
+    expect(packed.packInstructions).toBeNull();
+    // Once the thread grew by a quarter of the budget, one more attempt is allowed.
+    const grown = [...next, { role: "assistant", content: text("g".repeat(7_900)), sequence: 9 }];
+    await conversationHistory(fakeDb({ messages: grown }), backoff, { client: failing, signal });
+    expect(created).toBe(2);
+  });
+
+  test("over budget only because of one huge older message: clamped, no summarizer call", async () => {
+    let created = 0;
+    const client: CompactHermes = {
+      ...compactClient("# unused"),
+      createRun: async () => {
+        created += 1;
+        return "unused";
+      },
+    };
+    const huge = `START${"h".repeat(40_000)}END`;
+    const packed = await conversationHistory(
+      fakeDb({
+        messages: [
+          { role: "user", content: text(huge), sequence: 1 },
+          { role: "assistant", content: text("noted"), sequence: 2 },
+        ],
+      }),
+      { ...context, threadId: "thread-huge" },
+      { client, signal: new AbortController().signal },
+    );
+    expect(created).toBe(0);
+    expect(packed.packInstructions).toBeNull();
+    expect(packed.history).toHaveLength(2);
+    expect(packed.history[0]!.content.length).toBeLessThanOrEqual(8_000);
+    expect(packed.history[0]!.content.startsWith("START")).toBe(true);
+    expect(packed.history[0]!.content.endsWith("END")).toBe(true);
+    expect(packed.history[0]!.content).toContain("characters omitted from the middle of this message");
+    expect(packed.history[1]!.content).toBe("noted");
   });
 
   test("compact réussi : persist + résumé en tête", async () => {
     const inserts: string[] = [];
     const packed = await conversationHistory(
       fakeDb({ messages: LONG_THREAD, inserts }),
-      context,
+      { ...context, threadId: "thread-compacted" },
       { client: compactClient("# State\n- compact ok"), signal: new AbortController().signal },
     );
     expect(inserts.length).toBeGreaterThan(0);

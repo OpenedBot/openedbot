@@ -9,6 +9,8 @@ describe("buildRuntimeMemoryBlock", () => {
     expect(on).toContain("`target: user`");
     expect(on).toContain("Never write `remember:` or `forget:` lines");
     expect(on).not.toContain("Facts you previously recorded");
+    expect(on).toContain("Never clear the store");
+    expect(on).toContain("Report merges/removals and any failed call");
     const off = buildRuntimeMemoryBlock({ toolEnabled: false });
     expect(off).toContain("Memory is switched off on this profile");
     expect(off).toContain("Never write `remember:` or `forget:` lines");

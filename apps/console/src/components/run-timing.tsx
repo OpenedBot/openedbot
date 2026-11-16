@@ -1,31 +1,15 @@
-import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@openedbot/browser-ui-kit";
 import { useT } from "../lib/i18n";
 import { formatSeconds, type RunTiming } from "../lib/run/run-timing";
 
 /**
- * A reply's real duration, under its bubble, in place of the face and the name
- * of the bot (a DM thread has only one speaker). Hover or focus: the detail,
- * like assistant-ui (first token, total, speed, chunks).
- *
- * While it is writing, the counter advances from the run's creation: it stands
- * in as the activity indicator.
+ * A reply's real duration (dev builds), on its action row after « … ».
+ * Hover or focus: the detail, like assistant-ui (first token, total, speed,
+ * chunks). The row appears once the run ends, so there is no live counter.
  */
-export function RunTimingBadge({ timing, liveSince }: { timing?: RunTiming | null; liveSince?: string | null }) {
+export function RunTimingBadge({ timing }: { timing?: RunTiming | null }) {
   const { t, formatNumber } = useT();
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!liveSince) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 100);
-    return () => window.clearInterval(timer);
-  }, [liveSince]);
-
-  const badge = "mt-1 rounded-md px-1 font-mono text-[11px] leading-4 tabular-nums text-text-tertiary";
-  if (liveSince && !timing) {
-    const elapsed = Math.max(0, now - new Date(liveSince).getTime());
-    return <span aria-live="off" className={badge}>{formatSeconds(elapsed)}</span>;
-  }
+  const badge = "rounded-md px-1 font-mono text-[11px] leading-4 tabular-nums text-text-tertiary";
   if (!timing) return null;
 
   const rows: Array<[string, string]> = [

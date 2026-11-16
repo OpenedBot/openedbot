@@ -6,6 +6,8 @@
  */
 import { StepFailed, Skip, since, type SampleRow } from "../kit/report";
 import type { Scenario } from "../kit/scenario";
+import { hasCurrentWorkerTimings, workerLatencyBreakdown } from "../kit/fast-path-measurements";
+import { poll } from "../kit/p1-evidence";
 
 const PROMPT = "Réponds seulement : ok.";
 
@@ -23,23 +25,30 @@ export const fastPath: Scenario = {
       await lab.setModel(bot, model);
       const provision = await lab.waitProvision(bot.id);
       if (provision.status !== "succeeded" && provision.status !== null) throw new Error(`The profile provision ended ${provision.status}.`);
-      return { provision: provision.status, model: model.model };
+      return { botId, provision: provision.status, model: model.model };
     });
     const rows: SampleRow[] = [];
     for (let index = 1; index <= config.messages; index += 1) {
       await rec.step(`Message ${index}`, async () => {
         const turn = await lab.send(threadId, PROMPT);
+        const succeeded = turn.marks?.terminalType === "run.completed";
         const row: SampleRow = {
           message: index,
           acceptedMs: turn.acceptedMs,
-          queuedMs: turn.run?.startedAt ? turn.run.startedAt.getTime() - turn.run.createdAt.getTime() : null,
+          ...workerLatencyBreakdown(null),
           firstEventMs: since(turn.t0, turn.marks?.firstEvent),
           firstTextMs: since(turn.t0, turn.marks?.firstText),
           completeMs: since(turn.t0, turn.marks?.terminal),
           status: turn.run?.status ?? "timeout",
         };
         rows.push(row);
-        if (turn.marks?.terminalType !== "run.completed") throw new Error(`Run ${turn.runId} ended ${String(turn.marks?.terminalType ?? "without a terminal event")}.`);
+        if (!succeeded) throw new Error(`Run ${turn.runId} ended ${String(turn.marks?.terminalType ?? "without a terminal event")}.`);
+        // Keep client evidence even if the asynchronous trace never arrives.
+        // Missing worker stages must count as missing in the report statistics.
+        const traced = await poll(() => lab.run(turn.runId), hasCurrentWorkerTimings, 5_000, "Current worker latency trace persisted");
+        const breakdown = workerLatencyBreakdown(traced?.timings);
+        Object.assign(row, breakdown);
+        if (Object.values(breakdown).some((value) => value === null)) throw new Error("The worker trace has incomplete or invalid latency stages.");
         if (!(await lab.answered(threadId, turn.runId))) throw new Error("No non-empty assistant reply reads back in the thread.");
         return { completeMs: row.completeMs as number | null };
       }).catch((error: unknown) => {
@@ -51,13 +60,16 @@ export const fastPath: Scenario = {
         { key: "message", label: "#" },
         { key: "acceptedMs", label: "202" },
         { key: "queuedMs", label: "En file (serveur)" },
+        { key: "beforeRuntimeMs", label: "Worker avant appel" },
+        { key: "runtimeFirstTextMs", label: "Runtime → premier texte" },
+        { key: "publishTextMs", label: "Publication du texte" },
         { key: "firstEventMs", label: "Premier événement" },
         { key: "firstTextMs", label: "Premier texte" },
         { key: "completeMs", label: "Fin" },
         { key: "status", label: "Statut" },
       ],
       rows,
-      ["acceptedMs", "queuedMs", "firstEventMs", "firstTextMs", "completeMs"],
+      ["acceptedMs", "queuedMs", "beforeRuntimeMs", "runtimeFirstTextMs", "publishTextMs", "firstEventMs", "firstTextMs", "completeMs"],
       { keys: [
         { key: "acceptedMs", label: "202" },
         { key: "firstEventMs", label: "premier événement" },

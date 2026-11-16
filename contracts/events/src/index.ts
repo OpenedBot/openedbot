@@ -213,6 +213,8 @@ export type ToolResultEventPayload = {
   hasResultPayload?: boolean;
   agentPlan?: unknown;
   webSearch?: unknown;
+  /** Rich cards the result carries (`run-card.ts`); a reader keeps only what `readRunCards` accepts. */
+  cards?: unknown;
 };
 
 export type ProductEventInput = {
@@ -226,3 +228,5 @@ export type StoredProductEvent = ProductEventInput & {
   cursor: number;
   runId: string;
 };
+
+export * from "./run-card";

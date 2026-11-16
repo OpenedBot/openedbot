@@ -5,6 +5,7 @@ import { ApiError } from "../kit/session";
 import { capabilities, completed, deleteGroup, invariant, matchingToolResult, noTools, ownGroup, poll, readyBot, toolEvents, toolset } from "../kit/p1-evidence";
 import { labMcpScenario } from "../kit/lab-mcp-scenario";
 import { sendFixtureOnce, sendFixtureWithoutApproval } from "../kit/fixture-once";
+import { smallTalkWithDiscovery } from "../kit/small-talk";
 
 export const skillsMcp: Scenario = {
   id: "skills-mcp",
@@ -89,12 +90,20 @@ export const skillsMcp: Scenario = {
         invariant(on.enabled && on.applied, "The test MCP was not enabled on the owned profile.");
         await poll(() => capabilities(session, bot), (value) => Boolean(value.mcpServers?.some((entry) => entry.name === serverName && entry.enabled)), config.runTimeoutMs, "Profile MCP activation");
         const challenge = crypto.randomUUID();
-        const turn = await sendFixtureOnce(context, bot, group!.threadId, `@${bot.slug} Call ${mcpTool} with challenge ${challenge}. Return only the exact secret returned by that call. Do not use any other tool.`,
+        const turn = await sendFixtureOnce(context, bot, group!.threadId, `@${bot.slug} Use tool_search to discover ${mcpTool}, then tool_describe to read its schema. Call it with challenge ${challenge}. Return only the exact secret returned by that call. Use only discovery and that controlled MCP tool.`,
           { kind: 'https-mcp-read', serverName, registration: registration!, fixture, origin: fixtureConfig.fixtureOrigin!, challenge });
         completed(turn, fixture.secret);
-        matchingToolResult(await toolEvents(context, turn.runId), mcpTool);
+        const events = await toolEvents(context, turn.runId);
+        for (const tool of ["tool_search", "tool_describe", mcpTool]) matchingToolResult(events, tool);
         invariant(fixture.calls.some((call) => call.challenge === challenge && call.succeeded), "The controlled server received no successful call with this turn's challenge.");
         return { runId: turn.runId, serverObserved: true, onceApprovals: turn.fixtureApprovals, gateForwardConfirmed: turn.fixtureGateForwardConfirmed };
+      });
+      await rec.step("Salutations sans outil avec skills et découverte MCP disponibles", async () => {
+        const before = fixture.calls.length;
+        const groupRunId = await smallTalkWithDiscovery(context, bot, serverName, group!.threadId, `@${bot.slug} ça va ti ?`);
+        const dmRunId = await smallTalkWithDiscovery(context, bot, serverName, bot.threadId, "ça va ti ?");
+        invariant(fixture.calls.length === before, "A greeting reached the controlled MCP fixture.");
+        return { groupRunId, dmRunId, toolCalls: 0, skillsEnabled: true, discoveryProvenByPreviousTurn: true };
       });
       await rec.step("Indisponibilité visible, sans secret inventé", async () => {
         fixture.online = false;

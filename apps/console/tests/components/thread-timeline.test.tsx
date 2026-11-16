@@ -6,8 +6,11 @@ import type { StoredProductEvent } from "@openedbot/contracts-events";
 import { I18nProvider } from "../../src/lib/i18n";
 import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
+import { AttachmentCanvas, AttachmentCanvasProvider } from "../../src/components/attachment-canvas";
 import { createLiveRunText, type ThreadLiveText } from "../../src/lib/stream/live-run-text";
-import { LIVE_NARRATION_MAX } from "../../src/lib/stream/live-answer";
+import { weatherCard } from "../lib/cards/weather-fixture";
+
+const LONG_TEXT_FIXTURE_SIZE = 280;
 
 const speechAdapter: SpeechSynthesisAdapter = {
   supported: false,
@@ -186,10 +189,12 @@ describe("ThreadTimeline", () => {
   test("dans le fil d'un bot, la bulle envoyée amène sa ligne « Réflexion » dans la même peinture", () => {
     const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
     const sent = renderTimeline({ defaultAuthor: author, outgoing: { id: "out-1", text: "salut" } });
-    // Under the bubble, in its box: one push of the thread, not a second one when the run is acknowledged.
+    // Under the bubble, in its box: the pending « Réflexion » is the run's
+    // host block (author line included), no longer a separate status line
+    // that the run's block replaced on acknowledgement.
     const box = sent.container.querySelector("[data-thread-outgoing]");
     expect(box?.querySelector("[data-user-bubble]")).not.toBeNull();
-    expect(box?.lastElementChild?.hasAttribute("data-thread-thinking")).toBe(true);
+    expect(box?.querySelector("[data-turn-activity][data-thread-thinking]")).not.toBeNull();
     expect(sent.container.querySelectorAll("[data-thread-thinking]")).toHaveLength(1);
     sent.unmount();
     // A failed send thinks nothing; neither does a room, where no bot may answer.
@@ -267,6 +272,171 @@ describe("ThreadTimeline", () => {
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
     }
+  });
+
+  describe("épinglage à l'envoi", () => {
+    const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
+    const VIEWPORT = 500;
+    // Content above the sent turn, and what follows a turn (gap, scroll anchor).
+    const ABOVE = 1_000;
+    const TAIL = 13;
+    const earlier = [
+      { id: "m1", text: "Premier", runId: "run-1" },
+      { id: "m2", text: "Deuxième", runId: "run-2" },
+    ];
+    const settled = [
+      { id: "run-1", status: "completed" as const, completionKind: null, stepKind: null },
+      { id: "run-2", status: "completed" as const, completionKind: null, stepKind: null },
+    ];
+    type Input = { id: string; text: string; runId: string | null; clientSubmissionId?: string | null };
+    type Outgoing = { id: string; text: string; clientSubmissionId?: string };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (props: {
+      userInputs: Input[];
+      runs?: Array<Pick<RunDto, "id" | "status" | "completionKind" | "stepKind"> & Partial<Pick<RunDto, "createdAt">>>;
+      running?: boolean;
+      outgoing?: Outgoing | null;
+    }) => (
+      <QueryClientProvider client={client}><I18nProvider>
+        <ThreadTimeline
+          events={[]}
+          userInputs={props.userInputs}
+          runs={props.runs ?? settled}
+          approvals={[]}
+          running={props.running ?? false}
+          speechAdapter={speechAdapter}
+          defaultAuthor={author}
+          scrollToBottomOnThreadKey="thread-anchor"
+          outgoing={props.outgoing ?? null}
+        />
+      </I18nProvider></QueryClientProvider>
+    );
+
+    // The layout jsdom lacks: the sent turn sits after ABOVE px of thread, at
+    // its natural height (`natural`); a min-height would be a top reserve.
+    let natural = 60;
+    let turnSelector = "[data-thread-outgoing]";
+    const turn = () => document.querySelector<HTMLElement>(turnSelector);
+    const reserveOf = (node: HTMLElement | null) => Number.parseFloat(node?.style.minHeight ?? "") || 0;
+    const scrollHeight = () => ABOVE + (turn() ? Math.max(natural, reserveOf(turn())) : 0) + TAIL;
+    const observers: Array<{ callback: ResizeObserverCallback; observed: Element[] }> = [];
+    const frames: FrameRequestCallback[] = [];
+    let restore: () => void = () => {};
+
+    beforeEach(() => {
+      natural = 60;
+      turnSelector = "[data-thread-outgoing]";
+      observers.length = 0;
+      frames.length = 0;
+      const originalResizeObserver = globalThis.ResizeObserver;
+      const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+      const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+      const originalRect = HTMLElement.prototype.getBoundingClientRect;
+      class FakeResizeObserver {
+        private readonly record: { callback: ResizeObserverCallback; observed: Element[] };
+        constructor(next: ResizeObserverCallback) {
+          this.record = { callback: next, observed: [] };
+          observers.push(this.record);
+        }
+        observe(target: Element) { this.record.observed.push(target); }
+        unobserve() {}
+        disconnect() {}
+      }
+      globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+      globalThis.requestAnimationFrame = ((next: FrameRequestCallback) => frames.push(next)) as typeof requestAnimationFrame;
+      globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
+      HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+        const scroller = this.closest('[role="log"]') as HTMLElement | null;
+        const offset = scroller ? -scroller.scrollTop : 0;
+        const at = (top: number, height: number) => ({ top: top + offset, bottom: top + height + offset, height, left: 0, right: 0, width: 0, x: 0, y: top + offset, toJSON() {} }) as DOMRect;
+        if (this === turn()) return at(ABOVE, Math.max(natural, reserveOf(this)));
+        if (this.hasAttribute("data-thread-scroll-anchor")) return at(scrollHeight() - 1, 1);
+        return originalRect.call(this);
+      };
+      const restoreMetrics = mockThreadScrollMetrics(scrollHeight, VIEWPORT, true);
+      restore = () => {
+        restoreMetrics();
+        HTMLElement.prototype.getBoundingClientRect = originalRect;
+        globalThis.ResizeObserver = originalResizeObserver;
+        globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+        globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+      };
+    });
+    afterEach(() => restore());
+
+    const scroller = (container: HTMLElement) => container.querySelector<HTMLElement>('[role="log"]')!;
+    const contentResized = (container: HTMLElement) => {
+      const content = container.querySelector("[data-thread-messages]")!;
+      const pin = observers.find((observer) => observer.observed.includes(content));
+      act(() => pin?.callback([{ target: content } as unknown as ResizeObserverEntry], {} as ResizeObserver));
+    };
+    const flushFrames = () => act(() => frames.splice(0).forEach((frame) => frame(0)));
+
+    const bottom = () => ABOVE + natural + TAIL - VIEWPORT;
+
+    test("la bulle envoyée arrive avec sa ligne d'état ; le fil descend une fois, en bas, sans réserve en haut", () => {
+      const rendered = render(view({ userInputs: earlier }));
+      const log = scroller(rendered.container);
+      flushFrames();
+      expect(log.scrollTop).toBe(ABOVE + TAIL - VIEWPORT);
+
+      const sent = { id: "pending:s3", text: "Troisième", clientSubmissionId: "s3" };
+      rendered.rerender(view({ userInputs: earlier, outgoing: sent }));
+      const box = turn()!;
+      // Bubble and status row in the same commit, then the thread at the bottom before paint.
+      expect(box.querySelector("[data-user-bubble]")).not.toBeNull();
+      const row = box.querySelector<HTMLElement>("[data-run-status='pending']");
+      expect(row).not.toBeNull();
+      expect(rendered.container.querySelector("[style*='min-height']")).toBeNull();
+      expect(log.scrollTop).toBe(bottom());
+      expect(screen.queryByRole("button", { name: "Aller en bas de la conversation" })).toBeNull();
+      // No deferred motion on top of it.
+      flushFrames();
+      expect(log.scrollTop).toBe(bottom());
+
+      // Acknowledged: the saved row takes over the box, the pending row stays the same node.
+      turnSelector = '[data-thread-turn="m3"]';
+      rendered.rerender(view({
+        userInputs: [...earlier, { id: "m3", text: "Troisième", runId: "run-3", clientSubmissionId: "s3" }],
+        runs: [...settled, { id: "run-3", status: "queued", completionKind: null, stepKind: null, createdAt: new Date().toISOString() }],
+        running: true,
+      }));
+      // Compared by identity: a failed `toBe` on DOM nodes would print the whole tree.
+      expect(turn() === box).toBe(true);
+      expect(box.querySelector("[data-run-status]") === row).toBe(true);
+
+      // The reply grows at the bottom: the pinned thread follows it.
+      natural = 300;
+      contentResized(rendered.container);
+      expect(log.scrollTop).toBe(bottom());
+    });
+
+    test("un message de l'opérateur arrivé sans bulle optimiste (labo, autre appareil) descend aussi en bas", () => {
+      const rendered = render(view({ userInputs: earlier }));
+      const log = scroller(rendered.container);
+      flushFrames();
+      turnSelector = '[data-thread-turn="m3"]';
+      rendered.rerender(view({
+        userInputs: [...earlier, { id: "m3", text: "Troisième", runId: "run-3" }],
+        runs: [...settled, { id: "run-3", status: "running", completionKind: null, stepKind: null }],
+        running: true,
+      }));
+      expect(rendered.container.querySelector("[style*='min-height']")).toBeNull();
+      expect(log.scrollTop).toBe(bottom());
+    });
+
+    test("un lecteur remonté redescend à l'envoi, dans le commit de la bulle", () => {
+      const rendered = render(view({ userInputs: earlier }));
+      const log = scroller(rendered.container);
+      flushFrames();
+      // The reader scrolls up: a gesture (scrollTop down, stable box) releases the pin.
+      log.scrollTop = 100;
+      fireEvent.scroll(log);
+      expect(screen.queryByRole("button", { name: "Aller en bas de la conversation" })).not.toBeNull();
+      rendered.rerender(view({ userInputs: earlier, outgoing: { id: "pending:s6", text: "Encore", clientSubmissionId: "s6" } }));
+      expect(log.scrollTop).toBe(bottom());
+      expect(screen.queryByRole("button", { name: "Aller en bas de la conversation" })).toBeNull();
+    });
   });
 
   // `memory` stays in the `stepKind` union for runs FROM BEFORE 07-09,
@@ -374,7 +544,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
     // the reference app's bubble: a single surface, at most 560 px, whose veil
     // comes from the stylesheet (no `bg-` class).
     expect(surface?.getAttribute("data-assistant-layout")).toBe("stream");
-    expect(surface?.className).toContain("max-w-[min(80%,560px,calc(100%-82px))]");
+    expect(surface?.className).toContain("w-full");
     expect(surface?.className).not.toContain("bg-");
     expect(surface?.closest("article")?.className).toContain("w-full");
     expect(container.querySelectorAll("[data-assistant-layout]").length).toBe(1);
@@ -421,14 +591,15 @@ En résumé : monolithe modulaire, domaines isolés.`,
       defaultAuthor: { id: "bot-1", name: "Cahier2", slug: "cahier2", face: null },
     });
 
+    // The run's head line (the bot, then its summary) opens the turn; the log folds under it.
     const turn = container.querySelector<HTMLElement>('[data-turn-of="bot-1"]');
-    const author = turn?.querySelector<HTMLElement>("[data-tool-author]");
-    const response = turn?.querySelector<HTMLElement>("[data-tool-response]");
-    const activity = response?.querySelector<HTMLElement>("[data-tool-activity]");
+    const head = turn?.querySelector<HTMLElement>("[data-run-head]");
+    const author = head?.querySelector<HTMLElement>("[data-tool-author]");
+    const activity = turn?.querySelector<HTMLElement>("[data-tool-activity]");
     expect(turn?.className).toContain("flex-col");
-    expect(author?.parentElement).toBe(turn);
-    expect(response?.parentElement).toBe(turn);
-    expect(response?.className).toContain("w-full");
+    expect(head?.parentElement).toBe(turn);
+    expect(author?.textContent).toContain("Cahier2");
+    expect(head?.querySelector("[data-run-status='done']")).not.toBeNull();
     expect(activity?.className).toContain("max-w-full");
     // The tool log is no longer a bubble: it reads as a tree,
     // flat on the reply's axis. What still matters is that it starts at
@@ -437,7 +608,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(activity?.className).not.toContain("ml-8");
   });
 
-  test("un tour entrecoupé de narration ne rend qu'un seul résumé d'outils", () => {
+  test("un tour entrecoupé de narration : les phrases sont des bulles, son résumé au-dessus d'elles", () => {
     const at = new Date("2026-09-03T00:00:00.000Z");
     const { container } = renderTimeline({
       events: [
@@ -448,54 +619,344 @@ En résumé : monolithe modulaire, domaines isolés.`,
       runs: [run("run-activity", "completed")],
     });
 
-    // One header for the whole turn, grok's « Réflexion » line; the Tool
-    // Result rows inside the log never repeat it.
-    const heads = container.querySelectorAll("[data-turn-activity] > [data-activity-head]");
+    const heads = container.querySelectorAll("[data-turn-activity] [data-activity-head]");
     expect(heads).toHaveLength(1);
+    expect(heads[0]!.getAttribute("data-run-status")).toBe("done");
     expect(heads[0]!.textContent).toContain("Réflexion");
-    // The sentence between the two calls is a « thinking » row of the feed,
-    // between the two Tool Result rows, in the runtime's order.
+    // The sentence is an assistant bubble, under the done summary; the log holds the tools only.
+    const bubble = container.querySelector("[data-assistant-response]");
+    expect(bubble?.textContent).toContain("Je vérifie.");
+    expect(heads[0]!.compareDocumentPosition(bubble!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const rows = [...container.querySelectorAll("[data-turn-activity] [data-activity-row]")]
       .map((row) => row.getAttribute("data-activity-row"));
-    expect(rows).toEqual(["tool", "thinking", "tool"]);
+    expect(rows).toEqual(["tool", "tool"]);
   });
 
-  test("une première phrase en direct reste dans l'activité : elle ne commence pas la réponse avant l'outil", () => {
-    const at = new Date("2026-10-24T10:00:00.000Z");
-    const sentence = { cursor: 1, sequence: 1, runId: "run-live", type: "agent.message" as const, payload: { text: "Je cherche d'abord le test." }, occurredAt: at };
-    const live = renderTimeline({ events: [sentence], runs: [run("run-live", "running")], running: true });
-    // Nothing has yet said whether a tool follows: the sentence waits in the work block.
-    expect(live.container.querySelector("[data-turn-activity] [data-activity-narration]")?.textContent).toContain("Je cherche d'abord le test.");
-    expect(live.container.querySelector("[data-assistant-response]")).toBeNull();
-    live.unmount();
+  describe("la ligne d'état d'un run en direct", () => {
+    const at = new Date();
+    const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
+    const event = (sequence: number, type: StoredProductEvent["type"], payload: StoredProductEvent["payload"]): StoredProductEvent =>
+      ({ cursor: sequence, sequence, runId: "run-live", type, payload, occurredAt: at });
+    const tool = (sequence: number, name = "terminal", preview?: string, done = false) => [
+      event(sequence, "tool.call", { toolCallId: `tc-${sequence}`, tool: name, ...(preview ? { preview } : {}) }),
+      ...(done ? [event(sequence + 0.5, "tool.result", { toolCallId: `tc-${sequence}`, tool: name, error: false })] : []),
+    ];
+    const say = (sequence: number, text: string) => event(sequence, "agent.message", { text });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (events: StoredProductEvent[], status: RunDto["status"] = "running", extra: { outgoing?: { id: string; text: string } | null; approvals?: ApprovalRequestDto[]; salon?: boolean } = {}) => (
+      <QueryClientProvider client={client}><I18nProvider>
+        <ThreadTimeline
+          events={events}
+          runs={[{
+            ...run("run-live", status),
+            createdAt: new Date(at.getTime() - 2000).toISOString(),
+            ...(status === "completed" ? { endedAt: at.toISOString() } : {}),
+          }]}
+          userInputs={[{ id: "m1", text: "Fais-le", runId: "run-live" }]}
+          approvals={extra.approvals ?? []}
+          running={status === "running" || status === "queued"}
+          speechAdapter={speechAdapter}
+          defaultAuthor={extra.salon ? null : author}
+          outgoing={extra.outgoing ?? null}
+        />
+      </I18nProvider></QueryClientProvider>
+    );
+    const rows = (container: HTMLElement) => container.querySelectorAll<HTMLElement>("[data-run-status]");
+    const label = (container: HTMLElement) => container.querySelector("[data-run-status] [data-activity-summary]")?.textContent;
+    const after = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const lastOfTurn = (container: HTMLElement, node: Element) => {
+      const turnRow = container.querySelector('[data-thread-turn="m1"]')!;
+      return turnRow.lastElementChild!.contains(node);
+    };
+    // The bottom row's collapse lasts 200 ms (`RUN_LINE_MOTION_MS`).
+    const collapse = () => act(async () => { await Bun.sleep(260); });
 
-    // The tool arrives: the sentence is already in its place, nothing jumps.
-    const withTool = renderTimeline({
-      events: [sentence, { cursor: 2, sequence: 2, runId: "run-live", type: "tool.call", payload: { toolCallId: "tc-1", tool: "terminal" }, occurredAt: at }],
-      runs: [run("run-live", "running")],
-      running: true,
+    test("une ligne en bas, un seul nœud de l'attente à la fin ; le résumé passe sur la ligne du nom, au-dessus des bulles", async () => {
+      const rendered = render(view([], "queued"));
+      const row = rows(rendered.container)[0]!;
+      expect(row.dataset.runStatus).toBe("pending");
+      expect(lastOfTurn(rendered.container, row)).toBe(true);
+
+      rendered.rerender(view([...tool(1, "web_search", "météo Rennes")]));
+      expect(rows(rendered.container)).toHaveLength(1);
+      expect(rows(rendered.container)[0]).toBe(row);
+      expect(row.dataset.runStatus).toBe("working");
+      // The first step shows at once (masked label, never the raw arguments).
+      expect(label(rendered.container)).toBe("Recherche : météo Rennes");
+
+      // Live, the head line names the bot above everything of the run.
+      const headLine = rendered.container.querySelector<HTMLElement>('[data-thread-turn="m1"] [data-run-head]')!;
+      expect(headLine.textContent).toContain("Atlas");
+      expect(after(headLine, row)).toBe(true);
+
+      rendered.rerender(view([...tool(1, "web_search", "météo Rennes", true), say(2, "Je regarde la météo de Rennes.")]));
+      expect(rows(rendered.container)[0]).toBe(row);
+      // The live text smooths in from empty (`useSmoothText`): its PLACE is what counts here.
+      const narration = rendered.container.querySelector("[data-assistant-response]")!;
+      expect(after(headLine, narration)).toBe(true);
+      expect(after(narration, row)).toBe(true);
+      expect(lastOfTurn(rendered.container, row)).toBe(true);
+
+      rendered.rerender(view([...tool(1, "web_search", "météo Rennes", true), say(2, "Je regarde la météo de Rennes."), ...tool(3, "web_extract", "https://meteo.example.com/rennes?token=x", true), say(4, "Il fait beau.")], "completed"));
+      // Done: the bottom row collapses in place, the summary takes the head line.
+      expect(rows(rendered.container)).toHaveLength(2);
+      expect(row.isConnected).toBe(true);
+      expect(row.dataset.runStatus).toBe("gone");
+      const closing = row.closest<HTMLElement>("[data-turn-activity]")!;
+      expect(closing.hasAttribute("data-run-collapsing")).toBe(true);
+      expect(closing.className).toContain("openedbot-run-status-collapse");
+      expect(lastOfTurn(rendered.container, row)).toBe(true);
+      const summary = rendered.container.querySelector<HTMLElement>("[data-run-head] [data-run-status='done']")!;
+      expect(summary.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 2s");
+      expect(summary.closest("[data-run-head]")!.textContent).toContain("Atlas");
+      // The name was already on screen: the summary replaces it in place, it does not open.
+      expect(summary.closest("[data-run-reveal]")).toBeNull();
+      const bubbles = [...rendered.container.querySelectorAll("[data-assistant-response]")];
+      // Narration and answer: two bubbles, in order, under the summary (the narration still smoothing in here).
+      expect(bubbles).toHaveLength(2);
+      expect(bubbles[1]!.textContent).toContain("Il fait beau.");
+      expect(after(summary, bubbles[0]!)).toBe(true);
+      expect(after(bubbles.at(-1)!, row)).toBe(true);
+      // Collapsed: no row left under the reply, the summary stays.
+      await collapse();
+      expect(row.isConnected).toBe(false);
+      expect(rows(rendered.container)).toHaveLength(1);
+      expect(rendered.container.querySelector("[data-run-collapsing]")).toBeNull();
+      expect(rendered.container.querySelector("[data-run-head] [data-run-status='done']")).not.toBeNull();
     });
-    const rows = [...withTool.container.querySelectorAll("[data-turn-activity] [data-activity-row]")].map((row) => row.getAttribute("data-activity-row"));
-    expect(rows).toEqual(["thinking", "tool"]);
-    expect(withTool.container.querySelector("[data-assistant-response]")).toBeNull();
-    withTool.unmount();
 
-    // With no tool, the finished run makes this sentence the reply.
-    const done = renderTimeline({ events: [sentence], runs: [run("run-live", "completed")] });
-    expect(done.container.querySelector("[data-turn-activity]")).toBeNull();
-    expect(done.container.querySelector("[data-assistant-response]")?.textContent).toContain("Je cherche d'abord le test.");
-  });
-
-  test("une réponse en direct qui a déjà la forme d'un document s'écrit à sa place de réponse", () => {
-    const at = new Date("2026-10-24T10:00:00.000Z");
-    const { container } = renderTimeline({
-      events: [{ cursor: 1, sequence: 1, runId: "run-live", type: "agent.message", payload: { text: "Voici le plan.\n\n1. Lire le test" }, occurredAt: at }],
-      runs: [run("run-live", "running")],
-      running: true,
+    test("le libellé suit l'outil en cours, tenu au moins 800 ms ; « En train d'écrire… » quand le texte arrive", async () => {
+      const rendered = render(view([...tool(1, "web_search", "météo Rennes")]));
+      expect(label(rendered.container)).toBe("Recherche : météo Rennes");
+      rendered.rerender(view([...tool(1, "web_search", "météo Rennes", true), ...tool(2, "web_extract", "https://meteo.example.com/rennes?token=secret")]));
+      // Held: the previous step stays readable.
+      expect(label(rendered.container)).toBe("Recherche : météo Rennes");
+      await act(async () => { await Bun.sleep(850); });
+      expect(label(rendered.container)).toBe("Lecture : meteo.example.com");
+      expect(rows(rendered.container)[0]!.textContent).not.toContain("secret");
+      rendered.rerender(view([...tool(1, "web_search", "météo Rennes", true), ...tool(2, "web_extract", "https://meteo.example.com/rennes", true), say(3, "Il fait")]));
+      await act(async () => { await Bun.sleep(850); });
+      expect(label(rendered.container)).toBe("En train d’écrire…");
     });
-    expect(container.querySelector("[data-turn-activity]")).toBeNull();
-    // Its text then smooths in from empty (`useSmoothText`): its PLACE is what counts here.
-    expect(container.querySelector("[data-assistant-response]")).not.toBeNull();
+
+    test("une réponse sans outil : ni nom ni résumé, la ligne se replie puis disparaît ; seule la gouttière sépare la bulle de la réponse", async () => {
+      const rendered = render(view([say(1, "Quel test veux-tu effectuer ?")]));
+      const row = rows(rendered.container)[0]!;
+      expect(row.dataset.runStatus).toBe("working");
+      // A 1:1 reply without work carries no name line, live or done.
+      expect(rendered.container.querySelector("[data-run-head]")).toBeNull();
+      rendered.rerender(view([say(1, "Quel test veux-tu effectuer ?")], "completed"));
+      // The same node collapses (height and opacity), out of reach meanwhile.
+      expect(rows(rendered.container)[0]).toBe(row);
+      expect(row.dataset.runStatus).toBe("gone");
+      expect(row.querySelector("[data-activity-summary]")).toBeNull();
+      const closing = row.closest<HTMLElement>("[data-turn-activity]")!;
+      expect(closing.hasAttribute("data-run-collapsing")).toBe(true);
+      expect(closing.className).toContain("openedbot-run-status-collapse");
+      expect(closing.getAttribute("aria-hidden")).toBe("true");
+      await collapse();
+      // Exactly the bubbles: the user's, then the reply, 12 px apart (the turn's `gap-3`).
+      expect(row.isConnected).toBe(false);
+      expect(rendered.container.querySelector("[data-run-status], [data-run-head], [data-run-author], [data-turn-activity]")).toBeNull();
+      const turnRow = rendered.container.querySelector<HTMLElement>('[data-thread-turn="m1"]')!;
+      expect(turnRow.className.split(" ")).toContain("gap-3");
+      // (The fixture's undated message opens the reply's day with a chip; a real same-day turn has none.)
+      const children = [...turnRow.children].filter((child) => !child.hasAttribute("data-thread-date"));
+      expect(children).toHaveLength(2);
+      expect(children[0]!.querySelector("[data-user-bubble]")).not.toBeNull();
+      expect(children[1]!.querySelector("[data-assistant-response]")?.textContent).toContain("Quel test veux-tu effectuer ?");
+      // The next bubble brings its own pending row.
+      rendered.rerender(view([say(1, "Quel test veux-tu effectuer ?")], "completed", { outgoing: { id: "out-2", text: "Et toi ?" } }));
+      const fresh = rows(rendered.container);
+      expect(fresh).toHaveLength(1);
+      expect(fresh[0]!.dataset.runStatus).toBe("pending");
+      expect(rendered.container.querySelector("[data-thread-outgoing]")!.contains(fresh[0]!)).toBe(true);
+      expect(rendered.container.querySelector("[data-thread-outgoing] [data-run-head]")).toBeNull();
+    });
+
+    test("sous mouvement réduit, la ligne d'un run fini disparaît aussitôt, sans repli", () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        const rendered = render(view([say(1, "Ça va bien, merci.")]));
+        expect(rows(rendered.container)[0]!.dataset.runStatus).toBe("working");
+        rendered.rerender(view([say(1, "Ça va bien, merci.")], "completed"));
+        expect(rendered.container.querySelector("[data-run-status], [data-run-collapsing]")).toBeNull();
+        expect(rendered.container.querySelector(".openedbot-run-status-collapse")).toBeNull();
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
+    test("sans nom (salon), le résumé d'un run avec outils s'ouvre au-dessus de la réponse à la fin, la ligne du bas se replie", async () => {
+      const rendered = render(view([...tool(1, "terminal", undefined, true), say(2, "Fait.")], "running", { salon: true }));
+      const row = rows(rendered.container)[0]!;
+      expect(row.dataset.runStatus).toBe("working");
+      expect(rendered.container.querySelector("[data-run-status='done']")).toBeNull();
+      rendered.rerender(view([...tool(1, "terminal", undefined, true), say(2, "Fait.")], "completed", { salon: true }));
+      const summary = rendered.container.querySelector<HTMLElement>("[data-run-status='done']")!;
+      const head = summary.closest<HTMLElement>("[data-turn-activity]")!;
+      expect(head.hasAttribute("data-run-reveal")).toBe(true);
+      expect(after(head, rendered.container.querySelector("[data-assistant-response]")!)).toBe(true);
+      expect(row.dataset.runStatus).toBe("gone");
+      await collapse();
+      expect(row.isConnected).toBe(false);
+      expect([...rows(rendered.container)].map((node) => node.dataset.runStatus)).toEqual(["done"]);
+    });
+
+    test("un ancien tour sans outil n'a pas de ligne ; avec outils, « Nom  Réflexion : Ns » au-dessus de sa réponse", () => {
+      const history = render(
+        <QueryClientProvider client={client}><I18nProvider>
+          <ThreadTimeline
+            events={[
+              { cursor: 1, sequence: 1, runId: "run-a", type: "agent.message", payload: { text: "Bonjour." }, occurredAt: at },
+              { cursor: 2, sequence: 2, runId: "run-b", type: "tool.call", payload: { toolCallId: "tc-b", tool: "terminal" }, occurredAt: at },
+              { cursor: 3, sequence: 3, runId: "run-b", type: "agent.message", payload: { text: "Fait." }, occurredAt: at },
+            ]}
+            runs={[run("run-a", "completed"), run("run-b", "completed")]}
+            userInputs={[{ id: "m1", text: "Salut", runId: "run-a" }, { id: "m2", text: "Fais-le", runId: "run-b" }]}
+            approvals={[]}
+            running={false}
+            speechAdapter={speechAdapter}
+            defaultAuthor={author}
+          />
+        </I18nProvider></QueryClientProvider>,
+      );
+      // Never seen live here: no bottom row at all, nothing collapses.
+      const all = [...rows(history.container)];
+      expect(all).toHaveLength(1);
+      expect(all[0]!.dataset.runStatus).toBe("done");
+      expect(history.container.querySelector('[data-thread-turn="m1"] [data-run-status]')).toBeNull();
+      // The summary is on the head line, after the bot's name, above the reply.
+      const turnB = history.container.querySelector('[data-thread-turn="m2"]')!;
+      const head = turnB.querySelector<HTMLElement>("[data-run-head]")!;
+      expect(head.contains(all[0]!)).toBe(true);
+      expect(head.querySelector("[data-tool-author]")?.textContent).toContain("Atlas");
+      expect(after(head.querySelector("[data-tool-author]")!, all[0]!)).toBe(true);
+      expect(after(all[0]!, turnB.querySelector("[data-assistant-response]")!)).toBe(true);
+      expect(history.container.querySelector("[data-agent-feed]")).toBeNull();
+      expect(history.container.querySelector("[data-run-reveal]")).toBeNull();
+    });
+
+    test("sans ligne d'auteur (salon), le résumé prend sa propre ligne au-dessus de la première bulle", () => {
+      const { container } = renderTimeline({
+        events: [
+          { cursor: 1, sequence: 1, runId: "run-room", type: "tool.call", payload: { toolCallId: "tc-r", tool: "terminal" }, occurredAt: at },
+          { cursor: 2, sequence: 2, runId: "run-room", type: "agent.message", payload: { text: "Fait." }, occurredAt: at },
+        ],
+        runs: [run("run-room", "completed")],
+        userInputs: [{ id: "m1", text: "Fais-le", runId: "run-room" }],
+      });
+      const summary = container.querySelector<HTMLElement>("[data-run-status='done']")!;
+      expect(summary).not.toBeNull();
+      expect(summary.closest("[data-run-head]")).toBeNull();
+      expect(container.querySelector("[data-tool-author]")).toBeNull();
+      expect(after(summary, container.querySelector("[data-assistant-response]")!)).toBe(true);
+    });
+
+    test("une carte d'outil reste dans le fil, à la place de l'appel, sans déplacer la ligne d'état ni le résumé", async () => {
+      const card = weatherCard();
+      const weather = (sequence: number, cards: unknown) => [
+        event(sequence, "tool.call", { toolCallId: `tc-${sequence}`, tool: "weather_forecast", preview: "Rennes" }),
+        event(sequence + 0.5, "tool.result", { toolCallId: `tc-${sequence}`, tool: "weather_forecast", error: false, cards }),
+      ];
+      const live = [say(1, "Je regarde la météo de Rennes."), ...weather(2, [card])];
+      const rendered = render(view(live));
+      const block = rendered.container.querySelector<HTMLElement>("[data-run-cards]")!;
+      expect(block).not.toBeNull();
+      expect(block.className).toContain("not-prose");
+      const narration = rendered.container.querySelector("[data-assistant-response]")!;
+      const headLine = rendered.container.querySelector('[data-thread-turn="m1"] [data-run-head]')!;
+      expect(after(headLine, block)).toBe(true);
+      expect(after(narration, block)).toBe(true);
+      // Live: still one status row, after the run's last entry.
+      expect(rows(rendered.container)).toHaveLength(1);
+      expect(after(block, rows(rendered.container)[0]!)).toBe(true);
+      expect(lastOfTurn(rendered.container, rows(rendered.container)[0]!)).toBe(true);
+      expect(await screen.findByRole("article", { name: "Météo à Rennes" })).toBeTruthy();
+
+      rendered.rerender(view([...live, say(3, "Une semaine humide.")], "completed"));
+      const answer = [...rendered.container.querySelectorAll("[data-assistant-response]")].at(-1)!;
+      const summary = rendered.container.querySelector<HTMLElement>("[data-run-head] [data-run-status='done']")!;
+      expect(summary).not.toBeNull();
+      expect(after(summary, narration)).toBe(true);
+      expect(after(rendered.container.querySelector("[data-run-cards]")!, answer)).toBe(true);
+      expect(rendered.container.querySelectorAll("[data-run-cards]")).toHaveLength(1);
+    });
+
+    test("un résultat dont la carte est invalide, ou d'un genre inconnu, n'affiche aucune carte", () => {
+      const invalid = { kind: "weather", weather: { ...weatherCard().weather, days: [] } };
+      const { container } = render(view([
+        event(1, "tool.call", { toolCallId: "tc-1", tool: "weather_forecast" }),
+        event(1.5, "tool.result", { toolCallId: "tc-1", tool: "weather_forecast", error: false, cards: [invalid, { kind: "stocks" }] }),
+        say(2, "Je n'ai pas pu lire la météo."),
+      ], "completed"));
+      expect(container.querySelector("[data-run-cards]")).toBeNull();
+      expect(container.querySelector("[data-run-status='done']")).not.toBeNull();
+    });
+
+    test("les délégués rejoignent la ligne un à un, sans remonter ceux déjà là, puis « +N »", () => {
+      const avatars = (container: HTMLElement) => [...container.querySelectorAll<HTMLElement>("[data-run-status] [data-stream-agent]")];
+      const delegate = (sequence: number, preview: string) => tool(sequence, "delegate_task", preview);
+      const rendered = render(view([...tool(1), ...delegate(2, "Cherch")]));
+      const [lead, first] = avatars(rendered.container);
+      expect(avatars(rendered.container).map((node) => node.dataset.streamAgent)).toEqual(["bot-1", "bot-1:delegate:1"]);
+      rendered.rerender(view([...tool(1), ...delegate(2, "Chercheur web")]));
+      expect(avatars(rendered.container)[0]).toBe(lead!);
+      expect(avatars(rendered.container)[1]).toBe(first!);
+      rendered.rerender(view([...tool(1), ...delegate(2, "Chercheur web"), ...delegate(3, "Rédacteur"), ...delegate(4, "Relecteur"), ...delegate(5, "Traducteur")]));
+      const joined = avatars(rendered.container);
+      expect(joined.map((node) => node.dataset.streamAgent)).toEqual(["bot-1", "bot-1:delegate:1", "bot-1:delegate:2", "bot-1:delegate:3", "overflow"]);
+      expect(joined[0]).toBe(lead!);
+      expect(joined[1]).toBe(first!);
+      expect(joined.every((node) => node.classList.contains("stream-spring"))).toBe(true);
+      expect(joined.at(-1)!.textContent).toBe("+1");
+    });
+
+    test("une décision en attente s'ouvre dans la ligne, jamais cachée", () => {
+      const approval: ApprovalRequestDto = {
+        id: "approval-1", runId: "run-live", threadId: "thread-1", botId: "bot-1", kind: "code", action: "execute_code",
+        detail: null, choices: ["once"], status: "pending", requestedAt: at.toISOString(), respondedAt: null,
+      };
+      const { container } = render(view([
+        ...tool(1, "execute_code", "print(1)"),
+        event(2, "approval.requested", { approvalRequestId: "approval-1", action: "execute_code" }),
+      ], "running", { approvals: [approval] }));
+      expect(container.querySelector("[data-run-status]")?.getAttribute("data-run-status")).toBe("waiting");
+      expect(label(container)).toBe("Attend votre décision…");
+      expect(container.querySelector("[data-turn-activity] [data-open]")?.getAttribute("data-open")).toBe("true");
+    });
+
+    test("la ligne terminée ouvre le panneau « Réflexions », phrases comprises", () => {
+      const { container } = render(
+        <QueryClientProvider client={client}><I18nProvider><AttachmentCanvasProvider>
+          <ThreadTimeline
+            events={[...tool(1, "terminal", undefined, true), say(2, "Je vérifie."), ...tool(3, "terminal", undefined, true), say(4, "Voilà.")]}
+            runs={[{ ...run("run-live", "completed"), createdAt: at.toISOString() }]}
+            userInputs={[{ id: "m1", text: "Fais-le", runId: "run-live" }]}
+            approvals={[]}
+            running={false}
+            speechAdapter={speechAdapter}
+            defaultAuthor={author}
+          />
+          <AttachmentCanvas />
+        </AttachmentCanvasProvider></I18nProvider></QueryClientProvider>,
+      );
+      fireEvent.click(container.querySelector<HTMLElement>("[data-run-status='done']")!);
+      const panel = container.querySelector<HTMLElement>("[data-thoughts-panel]")!;
+      expect(panel.dataset.runId).toBe("run-live");
+      expect([...panel.querySelectorAll("[data-thoughts-row]")].map((node) => node.getAttribute("data-thoughts-row"))).toEqual(["tool", "msg", "tool"]);
+      expect(panel.textContent).not.toContain("Voilà.");
+    });
   });
 
   test("la réponse en direct lit le texte retenu hors du snapshot, et lui seul, sans doublon une fois patché", () => {
@@ -516,7 +977,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
       const fragment = (sequence: number, text: string, runId = "run-live") =>
         ({ sequence, runId, type: "agent.message", payload: { text }, occurredAt: at }) as unknown as StoredProductEvent;
       const old = [fragment(1, "Ancienne réponse.", "run-old")];
-      const committed = [...old, fragment(1, "a".repeat(LIVE_NARRATION_MAX + 1))];
+      const committed = [...old, fragment(1, "a".repeat(LONG_TEXT_FIXTURE_SIZE + 1))];
       const store = createLiveRunText();
       for (const event of committed) store.record(event);
       store.record(fragment(2, " SUITE"));
@@ -542,7 +1003,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
       expect(answers().at(-1)).toContain(" SUITE ENCORE");
       view.unmount();
       // A MEDIA: tag split across the snapshot and the suffix is never shown raw.
-      const tagged = [fragment(1, `${"b".repeat(LIVE_NARRATION_MAX + 1)}\nMED`, "run-media")];
+      const tagged = [fragment(1, `${"b".repeat(LONG_TEXT_FIXTURE_SIZE + 1)}\nMED`, "run-media")];
       // Thread opened mid-reply: the store did not see the start of the tag.
       const mediaStore = createLiveRunText();
       mediaStore.record(fragment(2, "IA:/workspace/x.png", "run-media"));
@@ -898,7 +1359,7 @@ En résumé : monolithe modulaire, domaines isolés.`,
 
   // A finished trace is a path already walked: unfolded, three queries and their
   // sources pushed the reply off screen.
-  test("la trace de recherche se replie quand le tour est conclu, et roule dans le flux pendant", () => {
+  test("la trace de recherche reste repliée sous la ligne d'état, pendant et après le tour", () => {
     const trace = (runId: string) => ({
       cursor: 1,
       sequence: 1,
@@ -919,14 +1380,14 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(teteConclue?.getAttribute("aria-expanded")).toBe("false");
     cleanup();
 
-    // While in progress, the search rolls in the reference app stream, under the header.
+    // While in progress, the row says the run works; the trace stays folded in its log.
     const enCours = renderTimeline({
       events: [trace("run-live")],
       runs: [run("run-live", "running")],
       running: true,
     });
-    expect(enCours.container.querySelector("[data-turn-activity][data-thinking]")).not.toBeNull();
-    expect(enCours.container.querySelector('[data-agent-feed-item] [data-feed-row="search"]')?.textContent).toContain("météo Lille");
+    expect(enCours.container.querySelector("[data-turn-activity][data-live] [data-run-status='working']")).not.toBeNull();
+    expect(enCours.container.querySelector("[data-turn-activity] [data-open='false'] [data-activity-row='search']")?.textContent).toContain("météo Lille");
   });
 
   // The turn opened on an orphan block: « N recherches sur le web » sat
@@ -954,10 +1415,60 @@ En résumé : monolithe modulaire, domaines isolés.`,
 
     const entete = container.querySelector("[data-turn-of='bot-1']");
     expect(entete).toBeTruthy();
-    // The label is IN the header, and the trace is in the body that follows:
-    // nesting proves the visual order better than an index comparison.
-    expect(entete?.querySelector("[data-tool-author]")?.textContent).toContain("First bot prod");
-    expect(entete?.querySelector("[data-tool-response]")?.textContent).toContain("météo Lille aujourd’hui");
+    // The name opens the head line, the summary follows it, the trace folds under both.
+    const nom = entete!.querySelector("[data-run-head] [data-tool-author]")!;
+    expect(nom.textContent).toContain("First bot prod");
+    const trace = entete!.querySelector("[data-activity-row='search']")!;
+    expect(trace.textContent).toContain("météo Lille aujourd’hui");
+    expect(nom.compareDocumentPosition(trace) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // Measured in a real thread: the hidden copy/edit row sat in flow under every
+  // sent message and reserved 34 px. It is now an overlay beside the bubble.
+  test("the user's hidden actions take no layout space and show on hover or focus", () => {
+    const { container } = renderTimeline({
+      userInputs: [
+        { id: "message-1", text: "et au havre ?", runId: "run-1", createdAt: "2026-09-03T00:00:00.000Z" },
+        { id: "message-2", text: "test", runId: "run-1", createdAt: "2026-09-03T00:00:01.000Z" },
+      ],
+      runs: [run("run-1", "completed")],
+    });
+    const rows = [...container.querySelectorAll<HTMLElement>("[data-user-bubble-row]")];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      const actions = row.querySelector<HTMLElement>("[data-user-turn-actions]")!;
+      // The row's only in-flow child is the bubble: its height is the bubble's.
+      expect(row.className).toContain("relative");
+      expect(actions.className.split(" ")).toContain("absolute");
+      expect([...row.children].filter((child) => !child.className.split(" ").includes("absolute")))
+        .toEqual([row.querySelector("[data-user-bubble]")!]);
+      // Hidden and inert until the pointer is on the message or focus is inside.
+      expect(actions.className.split(" ")).toEqual(expect.arrayContaining([
+        "opacity-0", "pointer-events-none",
+        "group-hover/message:opacity-100", "group-hover/message:pointer-events-auto",
+        "focus-within:opacity-100", "focus-within:pointer-events-auto",
+      ]));
+      expect(actions.closest(".group\\/message")).not.toBeNull();
+      const copy = actions.querySelector<HTMLButtonElement>('button[aria-label="Copier"]')!;
+      copy.focus();
+      expect(document.activeElement).toBe(copy);
+    }
+  });
+
+  test("a superseded run reserves no status or author slot while its replacement runs", () => {
+    const { container } = renderTimeline({
+      userInputs: [
+        { id: "message-1", text: "et au havre ?", runId: "old-run", createdAt: "2026-09-11T00:00:00.000Z" },
+        { id: "message-2", text: "test", runId: "new-run", createdAt: "2026-09-11T00:00:02.000Z" },
+      ],
+      runs: [run("old-run", "cancelled", "superseded_by_followup"), run("new-run", "running")],
+      running: true,
+      defaultAuthor: { id: "bot-1", name: "Atlas", slug: "atlas", face: null },
+    });
+    const replacedTurn = container.querySelector<HTMLElement>('[data-thread-turn="message-1"]')!;
+    expect(replacedTurn.querySelector("[data-user-bubble]")?.textContent).toBe("et au havre ?");
+    expect(replacedTurn.querySelector("[data-run-status], [data-run-head], [data-turn-of], [data-turn-activity]")).toBeNull();
+    expect(container.querySelector('[data-run-id="old-run"]')).toBeNull();
   });
 
   test("la bulle de l'utilisateur n'affiche aucune infobulle d'heure au survol", () => {
@@ -997,8 +1508,8 @@ En résumé : monolithe modulaire, domaines isolés.`,
     });
 
     expect(screen.queryByText("En attente…")).toBeNull();
-    // The live turn carries the thinking header itself, once.
-    expect(document.querySelectorAll("[data-turn-activity][data-thinking] [data-thinking-elapsed]")).toHaveLength(1);
+    // The live turn carries its status row itself, once.
+    expect(document.querySelectorAll("[data-turn-activity][data-live] [data-run-status='working']")).toHaveLength(1);
   });
 
   // Writing while the bot replies: the second message is ABSORBED by the run
@@ -1032,6 +1543,11 @@ En résumé : monolithe modulaire, domaines isolés.`,
     expect(screen.queryByText("Remplacé par le message suivant.")).toBeNull();
     expect(screen.getByText("capitale du Japon ?")).toBeTruthy();
     expect(screen.getByText("Tokyo pour le Japon, Mexico pour le Mexique.")).toBeTruthy();
+    // The replaced turn keeps its bubble alone: no status, author or activity
+    // slot reserves height under it, live or settled.
+    const replacedTurn = container.querySelector<HTMLElement>('[data-thread-turn="message-1"]')!;
+    expect(replacedTurn.querySelector("[data-run-status], [data-run-head], [data-turn-of], [data-turn-activity]")).toBeNull();
+    expect(container.querySelector('[data-run-id="old-run"]')).toBeNull();
     expect(container.querySelector(".bg-destructive")).toBeNull();
   });
 

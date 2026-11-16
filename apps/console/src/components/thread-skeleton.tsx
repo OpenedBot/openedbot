@@ -12,7 +12,8 @@ import { useAccountLayout } from "../lib/shell/account-layout";
  * `index.html` (`#openedbot-boot .thread`):
  *
  * - the reading lane (`data-thread-messages`, 60rem, thread-timeline.css);
- * - the operator's turn is a 36 px bubble on the right (radius 18), the
+ * - the operator's turn is a 36 px bubble on the right (radius 18), 12 px
+ *   above the answer (its copy/edit actions are an overlay, no reserved row), the
  *   answer a bubble on the left (radius 18, at most min(80 %, 560 px)), then
  *   its row of four 32 px actions and its duration;
  * - rows are anchored on the composer (`justify-end`): the lane has the
@@ -38,9 +39,9 @@ function ThreadRows() {
     <div data-thread-messages="" className="flex h-full w-full flex-col justify-end gap-12 overflow-hidden pb-[13px]">
       {TURNS.map((turn, index) => (
         <div key={index} className="flex shrink-0 flex-col">
-          <Skeleton className={`${turn.ask} mb-11 h-9 max-w-[min(560px,100%)] self-end rounded-[18px] ${PULSE}`} />
+          <Skeleton className={`${turn.ask} mb-3 h-9 max-w-[min(560px,100%)] self-end rounded-[18px] ${PULSE}`} />
           <div className="flex flex-col items-start">
-            <Skeleton className={`${turn.answer} ${turn.lines} max-w-[min(80%,560px)] rounded-[18px] ${PULSE}`} />
+            <Skeleton className={`${turn.answer} ${turn.lines} max-w-full rounded ${PULSE}`} />
             <span className="flex h-8 items-center gap-4 px-2">
               {[0, 1, 2, 3].map((action) => <Skeleton key={action} className={`size-4 rounded ${PULSE}`} />)}
             </span>

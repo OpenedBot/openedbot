@@ -99,7 +99,6 @@
  * `text/on-primary`. Radius 18, padding 7 / 12, at most min(80 %, 560 px,
  * 100 % − 82 px): the geometry is in the markup (thread-messages.tsx).
  */
-[data-assistant-layout="stream"],
 [data-user-bubble] {
   box-shadow:
     inset 0 0.5px 0 var(--openedbot-bubble-specular),
@@ -108,8 +107,8 @@
 }
 
 [data-assistant-layout="stream"] {
-  background-color: var(--openedbot-bubble-agent);
-  background-image: linear-gradient(to bottom, var(--openedbot-bubble-specular), transparent);
+  background: none;
+  box-shadow: none;
 }
 
 /* ── Answer (`Answer`): the reference app's typography inside the bubble ────────── */

@@ -84,20 +84,17 @@ export type LearningBlockOptions = {
 
 export function buildLearningBlock(options: LearningBlockOptions = {}): string {
   const facts = options.memoryToolEnabled
-    ? "Facts about the operator go through your runtime `memory` tool (they live on this profile). Procedures, frameworks, methods and domain knowledge go in a skill, never the other way round."
-    : "Memory is off on this profile, so nothing you learn about the operator persists; procedures, frameworks, methods and domain knowledge still go in a skill.";
+    ? "Operator facts belong in the runtime `memory` tool; procedures, frameworks, methods and domain knowledge belong in skills."
+    : "Memory is off on this profile; operator facts do not persist. Procedures, frameworks, methods and domain knowledge still belong in skills.";
   return [
     "## Learning",
     "",
-    "Your durable know-how lives in SKILLS on your runtime (`skills_list`, `skill_view`, `skill_manage`). The operator sees them in this app, under your capabilities. " + facts,
+    "Runtime skills (`skills_list`, `skill_view`, `skill_manage`) hold durable know-how, visible under your capabilities. " + facts,
     "",
     "Rules:",
-    "- Before replying, scan your skills. If one matches the task, load it with `skill_view` and follow it.",
-    "- When the user asks you to learn, study, master or become expert at something, in any language, do NOT just acknowledge. Research it with your tools, then write or extend a skill with `skill_manage`, verify it with `skill_view`, and report what the skill now contains. Replying \"understood\" records nothing.",
+    "- For a task needing a skill, load a matching one with `skill_view` and follow it. Do not check skills for a greeting, thanks or small talk alone.",
+    "- When asked to learn, study, master or become expert (any language), do NOT just acknowledge: research, write/extend with `skill_manage`, verify with `skill_view`, then report its content.",
     "- When a skill you loaded was missing steps or was wrong, patch it before finishing.",
     "- After a difficult or iterative task, offer to save the procedure as a skill.",
-    ...(options.memoryToolEnabled
-      ? ["- Durable facts (preferences, decisions, constraints, names) belong in the runtime `memory` tool; if the call fails, say so plainly rather than claiming the fact is kept. Do not put procedures there."]
-      : []),
   ].join("\n");
 }

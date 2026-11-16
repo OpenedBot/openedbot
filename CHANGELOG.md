@@ -8,6 +8,24 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 0.1.2 - 2026-11-16
+
+### Ajouté
+
+- **Cartes riches d’un résultat d’outil, d’abord la météo.** Le contrat
+  `RunCard` (`@openedbot/contracts-events`, union discriminée par `kind`)
+  voyage dans `tool.result.cards` ; `isRunCard` vérifie chaque champ, borne et
+  intervalle, et une carte invalide ou d’un genre inconnu n’est pas affichée.
+  La console montre les cartes d’un appel dans le fil, à sa place, alignées à
+  gauche des bulles du bot et plafonnées à 37,5 rem (600 px), sans toucher la
+  ligne d’état du run ; sous 26 rem de large le bloc des conditions s’empile
+  à hauteur fixe, comme son emplacement réservé. La carte météo
+  (chunk chargé à la demande, emplacement réservé à sa hauteur) affiche les
+  conditions actuelles, une bande horaire avec lever et coucher du soleil,
+  les jours avec leur barre de températures, et le crédit du fournisseur ;
+  le choix °C / °F est une préférence de l’appareil. Les données réelles
+  viendront plus tard ; le laboratoire du fil a un scénario « Météo ».
+
 ### Supprimé
 
 - Retrait des anciennes API Mobile Connect, APNs, Web Push PWA et Computer/Box,
@@ -26,6 +44,14 @@ connecteur hôte et le protocole tiennent le leur :
 
 ### Modifié
 
+- **Contexte par appel au modèle allégé.** L’historique d’un fil rejoué à
+  chaque appel passe de 48 000 à 32 000 caractères avant résumé (seuil de
+  « Compacter l’historique du salon » : 16 000) : un DM de 147 messages
+  renvoyait ~10 000 jetons d’historique, la moitié des ~22 000 jetons d’un
+  simple « hello ». La consigne web fait appeler `web_search` directement,
+  sans recherche d’outil ni de skill préalable, avec `limit: 3` puis
+  `web_extract` à `char_limit: 8000` : la question météo mesurée faisait
+  5 appels et 137 780 jetons d’entrée, dont deux appels inutiles.
 - Les callbacks HTTP privés utilisent le contrat générique `publicEndpoints`.
   Un plug-in refusé répond explicitement 503 ; une configuration invalide et
   une collision de routes empêchent le démarrage. Le plug-in billing conserve
@@ -35,6 +61,60 @@ connecteur hôte et le protocole tiennent le leur :
   un nettoyage privé indisponible reste enregistré et peut être repris.
 - Migration `0192_retire_mobile_push` : arrêt du producteur de l’ancienne
   outbox push, sans effacement des données historiques.
+- Console : l’activité d’un run tient en une seule ligne d’état sous ses
+  bulles, le même élément de l’envoi à la fin : l’avatar du bot, puis les
+  points, puis l’étape en cours (« Recherche : … », « En train d’écrire… »),
+  et, une fois le run fini, « Réflexion : Ns » à côté du nom du bot, au-dessus
+  de sa réponse, qui ouvre le panneau « Réflexions ». Les phrases du bot,
+  narration comme réponse, sont des bulles normales, dans l’ordre. À l’envoi,
+  la bulle arrive avec cette ligne et le fil descend une seule fois, en bas.
+  À la fin du run, la ligne se replie (hauteur et opacité, 200 ms) puis
+  disparaît, et le résumé d’un run avec outils s’ouvre au-dessus de la
+  réponse au lieu d’apparaître d’un coup. Un run fini ne garde aucune place
+  invisible : une réponse sans outil n’a ni nom ni résumé, seule la gouttière
+  de 12 px la sépare du message de l’utilisateur. En développement, la durée
+  du run passe sur la rangée d’actions de la réponse, après « … ».
+
+### Corrigé
+
+- **Plus de résumé de l’historique avant chaque tour d’un long fil.** Au-delà
+  de 32 000 caractères, la fenêtre récente gardée telle quelle glissait à
+  chaque tour et laissait sortir un message que le résumé ne couvrait pas
+  encore : chaque run d’un fil long appelait d’abord le résumeur (simulation
+  sur 60 tours : 41 résumés sur 41 tours au-dessus du budget) et réécrivait le
+  bloc d’historique, que le cache du fournisseur ne couvrait donc plus. Le
+  rejeu est désormais le dernier résumé suivi de tous les messages
+  postérieurs à sa coupe ; un résumé n’est refait que lorsque ce reste
+  dépasse 32 000 caractères, et il garde la moitié du budget (16 000) telle
+  quelle : 5 résumés sur ces 60 tours, et un historique identique d’un tour à
+  l’autre entre deux résumés. Un message ancien de plus de 8 000 caractères
+  est rejoué début et fin autour d’un marqueur, le dernier jamais ; un
+  résumeur en échec n’est retenté qu’après 8 000 caractères de plus ou
+  10 minutes. Même règle pour les salons : le seuil de « Compacter
+  l’historique du salon » passe à 16 000 caractères.
+- La page « Accès direct » de la documentation (français et anglais) ne
+  présente plus `OPENEDBOT_MANAGED_TUNNEL_URL` comme le réglage du tunnel
+  géré : la variable n'est plus lue, le tunnel géré vient du plug-in privé
+  `cloud`.
+- Console : les actions d’un message envoyé (copier, modifier) ne réservent
+  plus 34 px sous la bulle. Elles apparaissent au survol ou au focus clavier,
+  à gauche de la bulle, sans couvrir le message suivant ; au toucher, l’appui
+  long garde les mêmes gestes. Deux messages envoyés à la suite sont séparés
+  de 12 px, et le squelette de chargement suit cette géométrie.
+- Console : les réactions sous une réponse de bot affichent toutes celles
+  enregistrées. 👍 et 👎 n’y apparaissaient plus (reliquat des boutons
+  « utile / inutile » retirés) alors que le sélecteur les montrait cochées.
+  Chaque emoji est une bascule indépendante par membre, appliquée tout de
+  suite, envoyée dans l’ordre (un double clic ne laisse pas la mauvaise
+  ligne) et annulée avec un message en cas d’échec ; cliquer une pastille
+  retire ou ajoute sa propre réaction. Le sélecteur s’ouvre sous la barre
+  d’actions, sinon à côté du bouton, et ne couvre plus le texte de la
+  réponse ; il se parcourt aux flèches et se ferme avec Échap.
+- Une rafale de messages n’est plus fondue en un seul texte séparé par une
+  ligne vide, où le modèle ne répondait qu’à la dernière ligne : l’entrée du
+  tour fusionné (remplacement, repli dans un run en file, rejeu des steers non
+  lus) numérote chaque message, mot pour mot, sous un en-tête qui demande de
+  répondre à l’ensemble. Un message seul reste inchangé.
 
 ## 0.1.1 - 2026-11-14
 

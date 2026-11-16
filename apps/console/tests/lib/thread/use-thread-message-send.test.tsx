@@ -9,6 +9,7 @@ import { useThreadMessageSend } from "../../../src/lib/thread/use-thread-message
 import { pendingMessageStore, type PendingMessageRequest } from "../../../src/lib/thread/pending-message-store";
 import { I18nProvider } from "../../../src/lib/i18n";
 import { saveCloudSession } from "../../../src/lib/session/cloud-session";
+import { installThreadPerfProbe } from "../../../src/lib/dev/thread-perf-probe";
 
 type Draft = { input: string; attachments: MessageAttachmentInput[]; replyToId?: string | null };
 const empty: Draft = { input: "", attachments: [] };
@@ -53,6 +54,31 @@ function harness(initial = "thread-a") {
 }
 
 describe("thread send owns only its submitted draft", () => {
+  test("the perf probe binds interleaved acknowledgements to the original submission", async () => {
+    const h = harness();
+    const probe = installThreadPerfProbe();
+    const composer = document.createElement("textarea"); composer.dataset.composer = ""; document.body.append(composer);
+    const send = (text: string) => {
+      composer.value = text;
+      composer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      act(() => h.result.current.send.mutate({ input: text, attachments: [] }));
+      composer.value = "";
+    };
+    try {
+      send("Hello"); await waitFor(() => expect(h.call).toHaveBeenCalledTimes(1));
+      let resolveSecond!: (value: SendMessageAccepted) => void;
+      h.call.mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+      h.rerender({ threadId: "thread-b" });
+      send("For B"); await waitFor(() => expect(h.call).toHaveBeenCalledTimes(2));
+      const samples = probe.getSnapshot().samples;
+      expect(samples.map((sample) => sample.submissionId)).toEqual(h.call.mock.calls.map((call) => call[3]));
+      await act(async () => h.resolve({ ...accepted, runId: "run-a" }));
+      expect(samples[0]!.run.runId).toBe("run-a");
+      expect(samples[1]!.run.runId).toBeNull();
+      await act(async () => resolveSecond({ ...accepted, runId: "run-b" }));
+      expect(samples[1]!.run.runId).toBe("run-b");
+    } finally { probe.stop(); probe.reset(); delete window.__openedbotThreadPerf; composer.remove(); }
+  });
   test("clears after saving the recovery copy, then preserves the next text, attachment and reply after 202", async () => {
     const h = harness();
     act(() => h.result.current.send.mutate(h.result.current.draft));

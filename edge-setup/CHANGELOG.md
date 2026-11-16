@@ -16,6 +16,12 @@ v1.5.6 (première étiquette du nouvel historique : v1.5.7).
 
 ## Non publié
 
+## v1.5.11 - 2026-11-16
+
+### Changé
+
+- Une page lue sur le web par un bot renvoie au plus 10 000 caractères au modèle quand le bot ne fixe pas lui-même la limite (15 000 auparavant) : le texte d’une page est renvoyé à chaque étape suivante de la réponse, et la limite plus basse allège ces étapes sans perdre le corps d’un article. Une page plus longue reste lisible en entier par le bot. Aucun redémarrage n’est nécessaire.
+
 ## v1.5.10 - 2026-11-14
 
 ### Changé

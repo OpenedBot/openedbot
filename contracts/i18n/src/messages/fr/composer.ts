@@ -83,6 +83,7 @@ export const agentActivity = {
   progressRead: "Lit {file}",
   progressWrite: "Écrit {file}",
   progressEdit: "Modifie {file}",
+  progressDelegate: "Délègue : {task}",
   planTitle: "Plan d’exécution",
   planRemaining_one: "{count} étape restante",
   planRemaining_other: "{count} étapes restantes",

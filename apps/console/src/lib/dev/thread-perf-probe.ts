@@ -5,49 +5,49 @@
  * bookkeeping this file owns. `thread-perf-hud.tsx` is the only consumer
  * that renders anything. Everything here is driven by observers
  * (MutationObserver, PerformanceObserver, capture-phase event listeners)
- * so the probe never itself reads layout in a hot path: node counts are
- * computed only through `refreshContext()`, called lazily by the HUD.
+ * so node counts are read only through `refreshContext()`. Reply-paint
+ * samples check clipping after two animation frames, outside React commits.
  *
  * Chromium's Long Animation Frames API (`long-animation-frame`) is what
  * proved the send regression: a `forcedStyleAndLayoutDuration` of
  * 308 ms attributed to a specific script inside the Enter handler, which
  * a plain `longtask` entry cannot name. `PerformanceLongAnimationFrameTiming`
- * is not yet in TypeScript's `lib.dom.d.ts`, hence the local types below
+ * is not yet in TypeScript's `lib.dom.d.ts`, hence the local types in `thread-perf-helpers.ts`
  * instead of `any`. Browsers without the API (or without PerformanceObserver
  * long-animation-frame support at all) fall back to `longtask`, which only
  * gives `duration`.
  */
 
-// ---------------------------------------------------------------------------
-// Budgets
-// ---------------------------------------------------------------------------
+import { replyTextVisible, visibleReplyText, type ReplyText } from "./thread-reply-paint";
+export { intersectPaintBounds } from "./thread-reply-paint";
+import {
+  applyRunEventReceipt,
+  emptyRunLatency,
+  framesOverlapping,
+  linkAcceptedRun,
+  percentile,
+  recordPaintedRunText,
+  rendersOverlapping,
+  RUN_LINK_WINDOW_MS,
+  toLongFrame,
+  worstLongFrame,
+} from "./thread-perf-helpers";
+import {
+  THREAD_PERF_BUDGETS,
+  type LongFrame,
+  type RenderSample,
+  type RunEventReceipts,
+  type SendSample,
+  type StreamingWindow,
+  type ThreadPerfBudgets,
+  type ThreadPerfContext,
+  type ThreadPerfGlobal,
+  type ThreadPerfSnapshot,
+  type TypingSample,
+} from "./thread-perf-types";
 
-export type ThreadPerfBudgets = {
-  /** Enter/send -> composer emptied + user bubble painted. */
-  sendLatencyMs: number;
-  /** Any long animation frame (or long task) during send, typing or streaming. */
-  longFrameMs: number;
-  /** DOM mutations inside [data-thread-messages] while only typing. */
-  typingMutations: number;
-  /** Worst long-frame duration per 10 s streaming window. */
-  streamingFrameMs: number;
-  /** Send -> 202 (local admission, network included). */
-  acceptedMs: number;
-  /** Send -> first SSE event of the accepted run. */
-  firstEventMs: number;
-  /** Send -> first `agent.message` of the accepted run. */
-  firstTextMs: number;
-};
-
-export const THREAD_PERF_BUDGETS: ThreadPerfBudgets = {
-  sendLatencyMs: 100,
-  longFrameMs: 50,
-  typingMutations: 0,
-  streamingFrameMs: 50,
-  acceptedMs: 300,
-  firstEventMs: 3_000,
-  firstTextMs: 4_500,
-};
+export * from "./thread-perf-helpers";
+export * from "./thread-perf-types";
 
 const SEND_WINDOW_MS = 2_000;
 const SEND_TIMEOUT_MS = 5_000;
@@ -59,294 +59,18 @@ const MAX_TYPING_SAMPLES = 10;
 const MAX_STREAMING_WINDOWS = 12;
 const MAX_LONG_FRAMES = 200;
 const MAX_RENDERS = 500;
-const TOP_RENDERS_PER_WINDOW = 5;
-const RUN_LINK_WINDOW_MS = 10_000;
 const MAX_EARLY_RUNS = 50;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type ScriptAttribution = {
-  invoker: string | null;
-  invokerType: string | null;
-  sourceFunctionName: string | null;
-  /** File name only (`sourceURL` truncated), kept short for the HUD. */
-  sourceFile: string | null;
-  duration: number;
-  forcedStyleAndLayoutDuration: number;
-};
-
-export type LongFrame = {
-  startTime: number;
-  duration: number;
-  blockingDuration: number;
-  scripts: ScriptAttribution[];
-  /** `startTime + duration - styleAndLayoutStart`; 0 when the browser didn't report it. */
-  styleAndLayoutMs: number;
-  /** `duration` minus every script's own duration and `styleAndLayoutMs`, floored at 0.
-   *  Attributes frames with no script entry (seen: ~140 ms paint-only frames while streaming). */
-  paintMs: number;
-};
-
-/** One React `Profiler.onRender` commit, forwarded by `DevRenderProfiler`. */
-export type RenderSample = {
-  id: string;
-  phase: string;
-  actualMs: number;
-  commitTime: number;
-};
-
-export type SendSample = {
-  id: string;
-  triggeredAt: number;
-  /** ms from trigger to the composer textarea reading `""` (polled, since React's
-   *  programmatic clear fires no `input` event). Null while unresolved. */
-  composerEmptiedMs: number | null;
-  /** ms from trigger to the sent bubble's insertion being painted (double rAF). */
-  bubblePaintedMs: number | null;
-  /** `max(composerEmptiedMs, bubblePaintedMs)`; null until both resolve. */
-  latencyMs: number | null;
-  pass: boolean | null;
-  longFrames: LongFrame[];
-  worstLongFrameMs: number;
-  longFramesPass: boolean;
-  /** Renders committed during the send's 2 s window, worst `actualMs` first. */
-  renders: RenderSample[];
-  /** Run latency marks, all ms from the same trigger. Null until observed. */
-  run: SendRunLatency;
-};
-
-export type SendRunLatency = {
-  /** Linked by the 202; null until the API accepts the send. */
-  runId: string | null;
-  acceptedMs: number | null;
-  firstEventMs: number | null;
-  firstTextMs: number | null;
-  completedMs: number | null;
-};
-
-/** Absolute `performance.now()` receipts for a run whose 202 isn't processed yet. */
-export type RunEventReceipts = {
-  firstEventAt: number | null;
-  firstTextAt: number | null;
-  completedAt: number | null;
-};
-
-export type TypingSample = {
-  windowStart: number;
-  windowEnd: number;
-  longFrames: LongFrame[];
-  worstLongFrameMs: number;
-  mutations: number;
-  pass: boolean;
-};
-
-export type StreamingWindow = {
-  windowStart: number;
-  windowEnd: number;
-  sampleCount: number;
-  worstMs: number;
-  p95Ms: number;
-  pass: boolean;
-  /** Renders committed during this window, worst `actualMs` first. */
-  renders: RenderSample[];
-};
-
-export type ThreadPerfContext = {
-  threadNodeCount: number | null;
-  documentNodeCount: number | null;
-  turnsMounted: number | null;
-  measuredAt: number | null;
-};
-
-export type ThreadPerfSnapshot = {
-  enabled: boolean;
-  supportsLongAnimationFrame: boolean;
-  budgets: ThreadPerfBudgets;
-  samples: SendSample[];
-  typing: TypingSample[];
-  streaming: StreamingWindow[];
-  context: ThreadPerfContext;
-};
-
-/**
- * Shape published on `window.__openedbotThreadPerf`: the snapshot, `reset()`, and
- * `recordRender` - the registry `DevRenderProfiler` writes to without ever
- * importing this module. `undefined` (optional chained away) whenever the
- * HUD isn't mounted, so wrapping a component in `DevRenderProfiler` costs
- * nothing unless `?perf=1` is on.
- */
-export type ThreadPerfGlobal = ThreadPerfSnapshot & {
-  reset: () => void;
-  recordRender: (id: string, phase: string, actualDuration: number, commitTime: number) => void;
-  /** Forwarded by `applySendAcceptedToCaches`. */
-  recordRunAccepted: (runId: string) => void;
-  /** Forwarded by the organization SSE stream on every received event. */
-  recordRunEvent: (runId: string, type: string) => void;
-};
-
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
-
-export function percentile(values: readonly number[], p: number): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
-  return sorted[index] ?? 0;
-}
-
-export function worstLongFrame(frames: readonly LongFrame[]): number {
-  return frames.reduce((worst, frame) => Math.max(worst, frame.duration), 0);
-}
-
-/**
- * Frames whose `[startTime, startTime + duration]` overlaps
- * `[windowStart, windowEnd]`, not frames that *started* inside it: the
- * frame containing the Enter keydown routinely starts a few ms before the
- * trigger timestamp and must not be dropped.
- */
-export function framesOverlapping(
-  frames: readonly LongFrame[],
-  windowStart: number,
-  windowEnd: number,
-): LongFrame[] {
-  return frames.filter((frame) => frame.startTime + frame.duration > windowStart && frame.startTime < windowEnd);
-}
-
-export function rendersOverlapping(
-  renders: readonly RenderSample[],
-  windowStart: number,
-  windowEnd: number,
-  limit = TOP_RENDERS_PER_WINDOW,
-): RenderSample[] {
-  return renders
-    .filter((render) => render.commitTime >= windowStart && render.commitTime <= windowEnd)
-    .sort((a, b) => b.actualMs - a.actualMs)
-    .slice(0, limit);
-}
-
-export function emptyRunLatency(): SendRunLatency {
-  return { runId: null, acceptedMs: null, firstEventMs: null, firstTextMs: null, completedMs: null };
-}
-
-/**
- * Applies one SSE receipt to a run's marks, first occurrence wins. Returns
- * whether anything changed. `agent.message` is the first text the thread can
- * render; a terminal event is the full reply.
- */
-export function applyRunEventReceipt(receipts: RunEventReceipts, type: string, at: number): boolean {
-  let changed = false;
-  if (receipts.firstEventAt === null) {
-    receipts.firstEventAt = at;
-    changed = true;
-  }
-  if (type === "agent.message" && receipts.firstTextAt === null) {
-    receipts.firstTextAt = at;
-    changed = true;
-  }
-  if ((type === "run.completed" || type === "run.error") && receipts.completedAt === null) {
-    receipts.completedAt = at;
-    changed = true;
-  }
-  return changed;
-}
-
-/**
- * Links a 202 to the newest send not linked yet (within 10 s of its
- * trigger), folding in receipts that raced ahead of it. Null when no send is
- * waiting: a 202 from another tab or a retry is not this probe's sample.
- */
-export function linkAcceptedRun(
-  samples: SendSample[],
-  runId: string,
-  at: number,
-  early: RunEventReceipts | undefined,
-): SendSample | null {
-  if (samples.some((sample) => sample.run.runId === runId)) return null;
-  const sample = [...samples]
-    .reverse()
-    .find((candidate) => candidate.run.runId === null && at - candidate.triggeredAt <= RUN_LINK_WINDOW_MS);
-  if (!sample) return null;
-  const since = (value: number | null) => (value === null ? null : value - sample.triggeredAt);
-  sample.run = {
-    runId,
-    acceptedMs: at - sample.triggeredAt,
-    firstEventMs: since(early?.firstEventAt ?? null),
-    firstTextMs: since(early?.firstTextAt ?? null),
-    completedMs: since(early?.completedAt ?? null),
-  };
-  return sample;
-}
-
-function frameKey(frame: Pick<LongFrame, "startTime" | "duration">): string {
-  return `${frame.startTime.toFixed(3)}:${frame.duration.toFixed(3)}`;
-}
-
-function fileNameOf(sourceUrl: string | undefined | null): string | null {
-  if (!sourceUrl) return null;
-  try {
-    const url = new URL(sourceUrl, typeof location !== "undefined" ? location.href : undefined);
-    const segments = url.pathname.split("/");
-    return segments.at(-1) || sourceUrl;
-  } catch {
-    return sourceUrl;
-  }
-}
-
-/** Minimal shape of a `long-animation-frame` script entry, not yet in lib.dom.d.ts. */
-type RawScriptTiming = {
-  invoker?: string;
-  invokerType?: string;
-  sourceFunctionName?: string;
-  sourceURL?: string;
-  duration?: number;
-  forcedStyleAndLayoutDuration?: number;
-};
-
-type RawLongAnimationFrameEntry = PerformanceEntry & {
-  blockingDuration?: number;
-  scripts?: RawScriptTiming[];
-  styleAndLayoutStart?: number;
-};
-
-function readScripts(entry: RawLongAnimationFrameEntry): ScriptAttribution[] {
-  if (!Array.isArray(entry.scripts)) return [];
-  return entry.scripts.map((script) => ({
-    invoker: script.invoker ?? null,
-    invokerType: script.invokerType ?? null,
-    sourceFunctionName: script.sourceFunctionName ?? null,
-    sourceFile: fileNameOf(script.sourceURL),
-    duration: script.duration ?? 0,
-    forcedStyleAndLayoutDuration: script.forcedStyleAndLayoutDuration ?? 0,
-  }));
-}
-
-export function toLongFrame(entry: PerformanceEntry): LongFrame {
-  const raw = entry as RawLongAnimationFrameEntry;
-  const scripts = readScripts(raw);
-  const styleAndLayoutMs =
-    raw.styleAndLayoutStart && raw.styleAndLayoutStart > 0
-      ? Math.max(0, entry.startTime + entry.duration - raw.styleAndLayoutStart)
-      : 0;
-  const scriptsDuration = scripts.reduce((sum, script) => sum + script.duration, 0);
-  const paintMs = Math.max(0, entry.duration - scriptsDuration - styleAndLayoutMs);
-  return {
-    startTime: entry.startTime,
-    duration: entry.duration,
-    blockingDuration: raw.blockingDuration ?? entry.duration,
-    scripts,
-    styleAndLayoutMs,
-    paintMs,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Probe
 // ---------------------------------------------------------------------------
 
+function frameKey(frame: Pick<LongFrame, "startTime" | "duration">): string {
+  return `${frame.startTime.toFixed(3)}:${frame.duration.toFixed(3)}`;
+}
+
 type Listener = () => void;
+type PendingReplyPaint = { runId: string; kind: "activity" | "answer"; text: ReplyText; frame: number };
 
 /**
  * Owns the observers and the rolling history. One instance per app root
@@ -356,7 +80,11 @@ export class ThreadPerfProbe {
   private readonly budgets: ThreadPerfBudgets;
   private perfObserver: PerformanceObserver | null = null;
   private threadObserver: MutationObserver | null = null;
+  private threadHostObserver: MutationObserver | null = null;
+  private replyStyleObserver: MutationObserver | null = null;
+  private replyResizeObserver: ResizeObserver | null = null;
   private threadTarget: Element | null = null;
+  private replyPanelTarget: HTMLElement | null = null;
   private supportsLongAnimationFrame = false;
   private started = false;
 
@@ -389,6 +117,9 @@ export class ThreadPerfProbe {
   private streamingIdleTimer: ReturnType<typeof setTimeout> | null = null;
 
   private earlyRuns = new Map<string, RunEventReceipts>();
+  private replyScanFrame: number | null = null;
+  private pendingReplyPaints = new Map<HTMLElement, PendingReplyPaint>();
+  private paintedRuns = new Map<string, { firstAt: number | null; answerAt: number | null }>();
 
   private listeners = new Set<Listener>();
 
@@ -404,6 +135,12 @@ export class ThreadPerfProbe {
     document.addEventListener("keydown", this.onKeyDown, true);
     document.addEventListener("pointerdown", this.onSendPointerDown, true);
     document.addEventListener("input", this.onComposerInput, true);
+    document.addEventListener("scroll", this.onReplyVisibilityChange, true);
+    document.addEventListener("visibilitychange", this.onReplyVisibilityChange);
+    document.addEventListener("load", this.onReplyVisibilityChange, true);
+    document.addEventListener("transitionend", this.onReplyVisibilityChange, true);
+    document.addEventListener("animationend", this.onReplyVisibilityChange, true);
+    window.addEventListener("resize", this.onReplyVisibilityChange);
   }
 
   stop(): void {
@@ -411,14 +148,28 @@ export class ThreadPerfProbe {
     this.started = false;
     this.perfObserver?.disconnect();
     this.threadObserver?.disconnect();
+    this.threadHostObserver?.disconnect();
+    this.replyStyleObserver?.disconnect();
+    this.replyResizeObserver?.disconnect();
+    this.threadTarget = null;
+    this.replyPanelTarget = null;
+    this.cancelReplyPaints();
     document.removeEventListener("keydown", this.onKeyDown, true);
     document.removeEventListener("pointerdown", this.onSendPointerDown, true);
     document.removeEventListener("input", this.onComposerInput, true);
+    document.removeEventListener("scroll", this.onReplyVisibilityChange, true);
+    document.removeEventListener("visibilitychange", this.onReplyVisibilityChange);
+    document.removeEventListener("load", this.onReplyVisibilityChange, true);
+    document.removeEventListener("transitionend", this.onReplyVisibilityChange, true);
+    document.removeEventListener("animationend", this.onReplyVisibilityChange, true);
+    window.removeEventListener("resize", this.onReplyVisibilityChange);
     if (this.typingIdleTimer) clearTimeout(this.typingIdleTimer);
     if (this.streamingIdleTimer) clearTimeout(this.streamingIdleTimer);
   }
 
   reset(): void {
+    this.cancelReplyPaints();
+    this.paintedRuns.clear();
     this.samples = [];
     this.typing = [];
     this.streaming = [];
@@ -550,7 +301,7 @@ export class ThreadPerfProbe {
    */
   private pollComposerEmptied(pending: NonNullable<ThreadPerfProbe["pendingSend"]>): void {
     const step = () => {
-      if (pending.resolved || pending.composerEmptiedAt !== null) return;
+      if (!this.started || this.pendingSend !== pending || pending.resolved || pending.composerEmptiedAt !== null) return;
       const textarea = document.querySelector<HTMLTextAreaElement>("[data-composer]");
       if (textarea && textarea.value === "") {
         pending.composerEmptiedAt = performance.now();
@@ -609,14 +360,26 @@ export class ThreadPerfProbe {
 
   // -- Run latency -------------------------------------------------
 
-  recordRunAccepted(runId: string): void {
+  recordSendSubmission(submissionId: string): void {
+    // A retry keeps the logical request's original trigger. Exact keys can
+    // link beyond the legacy 10 s window; the user waited through the retry.
+    if (!this.started || !this.pendingSend || this.samples.some((sample) => sample.submissionId === submissionId)) return;
+    const sample = this.findSample(this.pendingSend.id);
+    if (sample && sample.run.runId === null && sample.submissionId === undefined) sample.submissionId = submissionId;
+  }
+
+  recordRunAccepted(runId: string, submissionId?: string): void {
+    if (!this.started) return;
     const early = this.earlyRuns.get(runId);
     this.earlyRuns.delete(runId);
-    if (linkAcceptedRun(this.samples, runId, performance.now(), early)) this.notify();
+    if (linkAcceptedRun(this.samples, runId, performance.now(), early, submissionId)) this.notify();
+    this.syncReplyPaints();
+    this.observeReplyPaint();
   }
 
   /** Called for every organization event: only a first receipt notifies. */
   recordRunEvent(runId: string, type: string): void {
+    if (!this.started) return;
     const at = performance.now();
     const sample = this.samples.find((candidate) => candidate.run.runId === runId);
     if (sample) {
@@ -633,14 +396,14 @@ export class ThreadPerfProbe {
         completedMs: receipts.completedAt,
       };
       this.notify();
+      this.syncReplyPaints();
+      this.observeReplyPaint();
       return;
     }
     // An event can beat its own 202 to the client; keep it only while a send
     // is waiting to be linked, so the rest of the organization's traffic
     // never accumulates here.
-    const waiting = this.samples.some(
-      (candidate) => candidate.run.runId === null && at - candidate.triggeredAt <= RUN_LINK_WINDOW_MS,
-    );
+    const waiting = this.hasUnlinkedSend(at);
     if (!waiting) return;
     const early = this.earlyRuns.get(runId) ?? { firstEventAt: null, firstTextAt: null, completedAt: null };
     applyRunEventReceipt(early, type, at);
@@ -649,6 +412,7 @@ export class ThreadPerfProbe {
       const oldest = this.earlyRuns.keys().next().value;
       if (oldest !== undefined) this.earlyRuns.delete(oldest);
     }
+    this.observeReplyPaint();
   }
 
   // -- Thread DOM observation (send bubble, typing mutations, streaming) ----
@@ -656,22 +420,48 @@ export class ThreadPerfProbe {
   private installThreadObserver(): void {
     if (typeof MutationObserver === "undefined") return;
     this.threadObserver = new MutationObserver((mutations) => this.onThreadMutations(mutations));
+    // Rebind when navigation replaces the thread. The normal path is only a
+    // connectivity check, including mutations made by the HUD itself.
+    this.threadHostObserver = new MutationObserver((mutations) => {
+      const panelChanged = this.replyPanelTarget ? !this.replyPanelTarget.isConnected : mutations.some((mutation) =>
+        Array.from(mutation.addedNodes).some((node) => node instanceof Element
+          && (node.matches("[data-thoughts-panel]") || node.querySelector("[data-thoughts-panel]"))));
+      if (!this.threadTarget?.isConnected || panelChanged) {
+        this.attachThreadObserverTarget();
+        this.observeReplyPaint();
+      }
+    });
+    this.threadHostObserver.observe(document.body, { childList: true, subtree: true });
+    this.replyStyleObserver = new MutationObserver(this.onReplyVisibilityChange);
+    if (typeof ResizeObserver !== "undefined") this.replyResizeObserver = new ResizeObserver(this.onReplyVisibilityChange);
     this.attachThreadObserverTarget();
   }
 
   private attachThreadObserverTarget(): void {
     const thread = document.querySelector("[data-thread-messages]");
-    if (thread && this.threadObserver) {
-      this.threadObserver.disconnect();
-      this.threadObserver.observe(thread, { childList: true, subtree: true });
-      this.threadTarget = thread;
-      return;
+    const panel = document.querySelector<HTMLElement>("[data-thoughts-panel]");
+    if (thread === this.threadTarget && panel === this.replyPanelTarget) return;
+    this.threadObserver?.disconnect();
+    this.replyStyleObserver?.disconnect();
+    this.replyResizeObserver?.disconnect();
+    this.threadTarget = thread;
+    this.replyPanelTarget = panel;
+    for (const surface of [thread, panel]) {
+      if (!surface || !this.threadObserver) continue;
+      this.threadObserver.observe(surface, { childList: true, characterData: true, attributes: true,
+        attributeFilter: ["class", "style", "hidden", "open", "data-run-id"], subtree: true });
+      this.replyResizeObserver?.observe(surface);
+      for (let ancestor = surface.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        this.replyStyleObserver?.observe(ancestor, { attributes: true, attributeFilter: ["class", "style", "hidden", "open"] });
+        this.replyResizeObserver?.observe(ancestor);
+      }
     }
-    // The thread screen mounts after navigation: retry until it exists.
-    if (this.started) setTimeout(() => this.attachThreadObserverTarget(), 500);
   }
 
-  private onThreadMutations(mutations: MutationRecord[]): void {
+  private onThreadMutations(records: MutationRecord[]): void {
+    this.observeReplyPaint();
+    // The portalled panel is a reply surface, not thread typing/streaming noise.
+    const mutations = records.filter((record) => this.threadTarget?.contains(record.target));
     const now = performance.now();
     const addedNodes = mutations.reduce((count, mutation) => count + mutation.addedNodes.length, 0);
     if (addedNodes === 0) return;
@@ -699,6 +489,101 @@ export class ThreadPerfProbe {
     }
 
     this.trackStreaming(now);
+  }
+
+  private onReplyVisibilityChange = (): void => { this.observeReplyPaint(); };
+
+  private replyPaintRunIds(): Set<string> {
+    const ids = new Set(this.samples.filter((sample) => sample.run.runId && sample.run.firstTextMs !== null
+      && sample.run.answerPaintedMs === null).map((sample) => sample.run.runId!));
+    if (this.hasUnlinkedSend(performance.now())) {
+      for (const [runId, receipts] of this.earlyRuns) if (receipts.firstTextAt !== null && !this.paintedRuns.get(runId)?.answerAt) ids.add(runId);
+    }
+    return ids;
+  }
+
+  private hasUnlinkedSend(at: number): boolean {
+    return this.samples.some((sample) => sample.run.runId === null
+      && (sample.submissionId !== undefined || at - sample.triggeredAt <= RUN_LINK_WINDOW_MS));
+  }
+
+  private observeReplyPaint(): void {
+    if (!this.started || this.replyScanFrame !== null || document.visibilityState === "hidden" || this.replyPaintRunIds().size === 0) return;
+    // Layout reads are coalesced outside mutation/scroll handlers. Crucially,
+    // the two-frame wait starts AFTER finding actual visible DOM text.
+    this.replyScanFrame = requestAnimationFrame(() => {
+      this.replyScanFrame = null;
+      if (!this.started || document.visibilityState === "hidden") return;
+      this.scanReplyText();
+    });
+  }
+
+  private scanReplyText(): void {
+    if (!this.threadTarget?.isConnected) this.attachThreadObserverTarget();
+    const runIds = this.replyPaintRunIds();
+    for (const [container, pending] of this.pendingReplyPaints) {
+      if (!runIds.has(pending.runId) || !this.replyCandidateValid(container, pending)) {
+        cancelAnimationFrame(pending.frame);
+        this.pendingReplyPaints.delete(container);
+      }
+    }
+    for (const runId of runIds) {
+      const roots = [...this.threadTarget?.querySelectorAll<HTMLElement>(`[data-run-id="${CSS.escape(runId)}"]`) ?? []];
+      if (this.replyPanelTarget?.dataset.runId === runId) roots.push(this.replyPanelTarget);
+      for (const root of roots) {
+        const kind = root.matches("[data-assistant-response]") ? "answer" : "activity";
+        const marks = this.paintedRuns.get(runId);
+        const recordedAt = kind === "answer" ? marks?.answerAt : marks?.firstAt;
+        if (recordedAt !== null && recordedAt !== undefined) continue;
+        // Both authored and authorless feed rows, and the expanded narration.
+        for (const container of root.querySelectorAll<HTMLElement>("[data-assistant-text]")) {
+          if (this.pendingReplyPaints.has(container)) continue;
+          const text = visibleReplyText(container);
+          if (!text) continue;
+          const pending: PendingReplyPaint = { runId, kind, text, frame: 0 };
+          this.pendingReplyPaints.set(container, pending);
+          pending.frame = requestAnimationFrame(() => {
+            if (this.pendingReplyPaints.get(container) !== pending) return;
+            pending.frame = requestAnimationFrame(() => {
+              if (this.pendingReplyPaints.get(container) !== pending) return;
+              this.pendingReplyPaints.delete(container);
+              if (!this.replyCandidateValid(container, pending)) {
+                this.observeReplyPaint();
+                return;
+              }
+              const at = performance.now();
+              const receipts = this.paintedRuns.get(runId) ?? { firstAt: null, answerAt: null };
+              receipts.firstAt ??= at;
+              if (kind === "answer") receipts.answerAt ??= at;
+              this.paintedRuns.set(runId, receipts);
+              if (this.paintedRuns.size > MAX_EARLY_RUNS) this.paintedRuns.delete(this.paintedRuns.keys().next().value!);
+              this.syncReplyPaints();
+            });
+          });
+        }
+      }
+    }
+  }
+
+  private replyCandidateValid(container: HTMLElement, pending: PendingReplyPaint): boolean {
+    return this.started && document.visibilityState !== "hidden" && container.contains(pending.text.node) && replyTextVisible(pending.text);
+  }
+
+  private syncReplyPaints(): void {
+    let changed = false;
+    for (const sample of this.samples) {
+      const receipts = sample.run.runId ? this.paintedRuns.get(sample.run.runId) : undefined;
+      if (receipts?.firstAt !== null && receipts?.firstAt !== undefined) changed = recordPaintedRunText(sample.run, "activity", receipts.firstAt - sample.triggeredAt) || changed;
+      if (receipts?.answerAt !== null && receipts?.answerAt !== undefined) changed = recordPaintedRunText(sample.run, "answer", receipts.answerAt - sample.triggeredAt) || changed;
+    }
+    if (changed) this.notify();
+  }
+
+  private cancelReplyPaints(): void {
+    if (this.replyScanFrame !== null) cancelAnimationFrame(this.replyScanFrame);
+    this.replyScanFrame = null;
+    for (const pending of this.pendingReplyPaints.values()) cancelAnimationFrame(pending.frame);
+    this.pendingReplyPaints.clear();
   }
 
   // -- Typing tracking ---------------------------------------------------
@@ -796,7 +681,8 @@ export function installThreadPerfProbe(win: Window = window): ThreadPerfProbe {
       ...probe.getSnapshot(),
       reset: () => probe.reset(),
       recordRender: (id, phase, actualDuration, commitTime) => probe.recordRender(id, phase, actualDuration, commitTime),
-      recordRunAccepted: (runId) => probe.recordRunAccepted(runId),
+      recordSendSubmission: (submissionId) => probe.recordSendSubmission(submissionId),
+      recordRunAccepted: (runId, submissionId) => probe.recordRunAccepted(runId, submissionId),
       recordRunEvent: (runId, type) => probe.recordRunEvent(runId, type),
     };
   };

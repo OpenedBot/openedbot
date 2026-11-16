@@ -317,7 +317,9 @@ function ThreadPerfPanel({ probe }: { probe: ThreadPerfProbe }) {
                   value={lastSend.run.firstEventMs}
                   budget={snapshot.budgets.firstEventMs}
                 />
-                <RunMarkRow label="first text" value={lastSend.run.firstTextMs} budget={snapshot.budgets.firstTextMs} />
+                <RunMarkRow label="text received (SSE)" value={lastSend.run.firstTextMs} budget={snapshot.budgets.firstTextMs} />
+                <RunMarkRow label="first text painted" value={lastSend.run.firstPaintedTextMs} budget={snapshot.budgets.firstPaintedTextMs} />
+                <RunMarkRow label="answer bubble painted" value={lastSend.run.answerPaintedMs} budget={null} />
                 <RunMarkRow label="full reply" value={lastSend.run.completedMs} budget={null} />
               </>
             ) : (

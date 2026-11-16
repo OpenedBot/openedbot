@@ -15,6 +15,7 @@
 @import "./components/interactive-cursor.css";
 @import "./components/brand.css";
 @import "./components/text-size.css";
+@import "./components/run-cards.css";
 @import "./screens/auth/login.css";
 @import "./screens/auth/signin.css";
 @import "./screens/home/overview.css";

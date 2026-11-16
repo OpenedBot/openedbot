@@ -88,6 +88,7 @@ export function useThreadMessageSend(options: Options) {
       const removed = forgetPersisted(request);
       // A workspace switch must not patch another tenant's cache.
       if (request.owner === readCloudSession()?.userId && request.rosterKey === JSON.stringify(queryKeys.roster)) {
+        globalThis.window?.__openedbotThreadPerf?.recordRunAccepted(accepted.runId, request.submission.idempotencyKey);
         if (accepted.message) {
           applySendAcceptedToCaches(queryClient, request.threadId, accepted);
         } else {
@@ -182,6 +183,7 @@ export function useThreadMessageSend(options: Options) {
     if (!threadId) throw new Error("No active thread");
     const previous = pending.current?.scope === scope ? pending.current.submission : null;
     const submission = prepareMessageSubmission(previous, draft, randomId);
+    globalThis.window?.__openedbotThreadPerf?.recordSendSubmission(submission.idempotencyKey);
     const request: Request = { threadId, scope, owner, generation: pendingMessageStore.generation,
       rosterKey: JSON.stringify(queryKeys.roster), submission, draft: current.current.draft };
     pending.current = request;
