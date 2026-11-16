@@ -99,7 +99,7 @@ function PanelBubble({ text }: { text: string }) {
   const long = text.length > LONG_MESSAGE;
   return (
     <div data-thoughts-row="msg" className="my-1 ms-7 rounded-[4px_16px_16px_16px] bg-[var(--stream-raised)] px-[10px] py-[7px]">
-      <p className={cn("text-[14px] leading-[19.25px] whitespace-pre-line text-[var(--stream-fg)]", long && !more && "line-clamp-6")}>{text}</p>
+      <p data-assistant-text="" className={cn("text-[14px] leading-[19.25px] whitespace-pre-line text-[var(--stream-fg)]", long && !more && "line-clamp-6")}>{text}</p>
       {long ? (
         <button type="button" onClick={() => setMore((value) => !value)} className="mt-1 text-[13px] font-medium text-[var(--stream-fg2)] hover:text-[var(--stream-fg)]">
           {more ? t("threadTimeline.streamShowLess") : t("threadTimeline.streamShowMore")}
@@ -154,7 +154,7 @@ function PanelItem({ item }: { item: StreamFeedItem }) {
       <span className={ROW_ICON}>
         <StreamIcon name="bulb" className="size-3.5" />
       </span>
-      {item.text}
+      <span data-assistant-text={item.assistantText ? "" : undefined}>{item.text}</span>
     </div>
   );
 }
@@ -176,7 +176,8 @@ function PanelGroup({ group }: { group: Group }) {
 }
 
 /** The panel itself: a 64 px header (the bot's face, « Réflexions », close), then the groups. */
-export function StreamThoughtsPanel({ items, speaker, onClose, calls = [] }: {
+export function StreamThoughtsPanel({ runId, items, speaker, onClose, calls = [] }: {
+  runId?: string;
   items: readonly StreamFeedItem[];
   speaker: StreamSpeaker | null;
   onClose: () => void;
@@ -185,7 +186,7 @@ export function StreamThoughtsPanel({ items, speaker, onClose, calls = [] }: {
 }) {
   const { t } = useT();
   return (
-    <div data-thoughts-panel="" className="flex h-full min-h-0 w-full flex-col bg-[var(--stream-base)] text-[var(--stream-fg)]">
+    <div data-thoughts-panel="" data-run-id={runId} className="flex h-full min-h-0 w-full flex-col bg-[var(--stream-base)] text-[var(--stream-fg)]">
       <div className="flex h-16 shrink-0 items-center gap-2 ps-4 pe-3">
         {speaker ? (
           <span className="grid size-[22px] place-items-center rounded-full bg-[var(--stream-base)]">

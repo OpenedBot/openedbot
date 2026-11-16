@@ -454,7 +454,9 @@ describe("rejeu des steers non lus", () => {
     const requeues = queries.filter((query) => query.sql.includes("update runs set status = 'queued'"));
     expect(requeues).toHaveLength(1);
     expect(requeues[0]!.values).toContain("source-8");
-    expect(requeues[0]!.values).toContain("message 8\n\nmessage 9");
+    expect(requeues[0]!.values).toContain(
+      "[2 messages sent in a row by the user — answer all of them together]\n1. message 8\n2. message 9",
+    );
     expect(queries.some((query) => query.sql.includes("update workflows set status = 'queued'")
       && query.values.includes("wf-8"))).toBe(true);
     const folded = queries.find((query) => query.sql.includes("completion_kind = ") && query.sql.includes("update runs set completion_kind"));

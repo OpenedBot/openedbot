@@ -20,6 +20,9 @@
 export const THREAD_MESSAGES_CLASS =
   "flex min-h-full w-full flex-col justify-end gap-3 md:justify-start [overflow-anchor:none]";
 
+/** A turn's row, and the optimistic bubble's box that becomes that row (same key). */
+export const THREAD_TURN_CLASS = "flex w-full min-w-0 flex-col gap-3";
+
 /** The `gap-3` spacing of `THREAD_MESSAGES_CLASS` (12 px, the BoardUI template's `mt-3`), which a trace's trunk crosses. */
 export const THREAD_ENTRY_GAP_PX = 12;
 

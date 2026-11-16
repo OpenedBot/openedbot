@@ -156,9 +156,10 @@ user.
 Both cards stay visible in the console, but disabled until
 the deployment enables them:
 
-- **openedbot-managed tunnel**: `OPENEDBOT_MANAGED_TUNNEL_URL`
-  (`cloudflare://<api-token>@<account-id>/<zone-id>`) set on the API and worker side;
-  an optional `?suffix=` changes the hostname suffix, `rt.openedbot.app` by default;
+- **openedbot-managed tunnel**: provided by the private `cloud` plug-in
+  (`managedExposure` port), which is not part of the open-source core. Without
+  that plug-in, the card stays disabled; existing publications remain
+  readable and revocable. `OPENEDBOT_MANAGED_TUNNEL_URL` is no longer read;
 - **Tailscale Funnel**: `OPENEDBOT_TAILSCALE_FUNNEL_ENABLED`.
 
 Otherwise, the API answers `MANAGED_TUNNEL_UNAVAILABLE` or

@@ -6,6 +6,37 @@ export type LatencyMarks = {
   queuedMs: number | null;
 };
 
+type WorkerTimings = { queuedMs: number | null; marks: Record<string, number> };
+
+export function hasCurrentWorkerTimings(run: { leaseGeneration?: number | string; timings?: (WorkerTimings & { attributes?: Record<string, unknown> }) | null } | null): boolean {
+  // PostgreSQL bigint values read as strings with Bun's default SQL options.
+  const generation = Number(run?.leaseGeneration);
+  return Number.isSafeInteger(generation) && generation > 0 && run?.timings?.attributes?.lease_generation === generation
+    && Object.values(workerLatencyBreakdown(run.timings)).every((value) => value !== null);
+}
+
+/**
+ * Queue age ends inside the claim query; preparation starts after that claim
+ * returns. The trace origin precedes the query, so its absolute POST offset
+ * would overlap the queue. The remaining claim transaction is not attributed.
+ */
+export function workerLatencyBreakdown(timings: WorkerTimings | null | undefined): {
+  queuedMs: number | null; beforeRuntimeMs: number | null; runtimeFirstTextMs: number | null; publishTextMs: number | null;
+} {
+  const valid = (value: number | null | undefined): number | null => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  const marks = timings?.marks ?? {};
+  const delta = (end: string, start: string): number | null => {
+    const last = valid(marks[end]), first = valid(marks[start]);
+    return last !== null && first !== null ? valid(last - first) : null;
+  };
+  return {
+    queuedMs: valid(timings?.queuedMs),
+    beforeRuntimeMs: delta("hermes.post_sent", "worker.claimed"),
+    runtimeFirstTextMs: delta("hermes.first_text_delta", "hermes.post_sent"),
+    publishTextMs: delta("openedbot.first_text_published", "hermes.first_text_delta"),
+  };
+}
+
 const MARKS = ["acceptedMs", "firstEventMs", "firstTextMs", "completeMs", "queuedMs"] as const;
 const validMark = (value: number | null): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;

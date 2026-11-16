@@ -7,7 +7,7 @@
  * copies de la réponse avaient déjà divergé : l'écran empilait les chips que
  * l'autre savait replier.
  */
-import type { StoredProductEvent, ToolResultEventPayload } from "@openedbot/contracts-events";
+import { readRunCards, type RunCard, type StoredProductEvent, type ToolResultEventPayload } from "@openedbot/contracts-events";
 import type { ApprovalRequestDto } from "@openedbot/contracts-api";
 import type { Locale } from "@openedbot/contracts-locale";
 import { t } from "@openedbot/contracts-i18n";
@@ -57,6 +57,8 @@ export type ToolCall = {
    */
   resultExcerpt?: string;
   attachment?: ToolAttachment;
+  /** `tool.result.cards` that passed `isRunCard`: the rich cards the thread shows at the call. */
+  cards?: readonly RunCard[];
 };
 
 /** Des appels consécutifs de MÊME outil, comptés : voir `groupToolCalls`. */
@@ -68,11 +70,7 @@ export type ToolGroup = {
   calls: ToolCall[];
   /** Vrai dès qu'UN appel du groupe a échoué. */
   failed?: boolean;
-  /**
-   * Nombre d'appels du groupe en échec : présent dès qu'il y en a un. Avec
-   * `count`, il dit « 1 échec sur 2 » là où `failed` seul peindrait les deux
-   * appels en rouge.
-   */
+  /** Appels en échec, présent dès qu'il y en a un : « 1 échec sur 2 » là où `failed` seul peindrait tout en rouge. */
   failures?: number;
   /** Les messages d'erreur connus des appels en échec, dans l'ordre ; absent sans message. */
   errorMessages?: string[];
@@ -80,11 +78,7 @@ export type ToolGroup = {
   durationMs?: number;
   /** Extrait du seul appel : absent dès que `count > 1` (voir `previews`). */
   preview?: string;
-  /**
-   * Les extraits de chaque appel, dans l'ordre. Pour `skill_view`, c'est le
-   * nom de la skill (`build_tool_preview` amont). Présent dès qu'au moins
-   * un appel en a un, y compris après un repli `×N`.
-   */
+  /** Les extraits de chaque appel, dans l'ordre (`skill_view` : le nom de la skill) ; présent dès qu'un appel en a un, même replié `×N`. */
   previews?: string[];
   /** Toujours absent dès que `count > 1` : un résultat appartient à UN appel. */
   attachment?: ToolAttachment;
@@ -197,6 +191,8 @@ export type ToolOutcome = {
   errorMessage: string | null;
   /** `tool.result.resultExcerpt`, absent when the runtime sent no preview. */
   resultExcerpt?: string;
+  /** `tool.result.cards`, absent when none is valid. */
+  cards?: readonly RunCard[];
 };
 
 /**
@@ -256,11 +252,13 @@ export function readToolOutcome(payload: Record<string, unknown>): ToolOutcome {
   const excerpt = typeof result.resultExcerpt === "string" && result.resultExcerpt.trim() !== ""
     ? result.resultExcerpt
     : null;
+  const cards = readRunCards(result.cards);
   return {
     failed: result.error === true,
     durationMs: typeof result.durationMs === "number" ? result.durationMs : null,
     errorMessage: typeof result.errorMessage === "string" && result.errorMessage !== "" ? result.errorMessage : null,
     ...(excerpt !== null ? { resultExcerpt: excerpt } : {}),
+    ...(cards.length > 0 ? { cards } : {}),
   };
 }
 

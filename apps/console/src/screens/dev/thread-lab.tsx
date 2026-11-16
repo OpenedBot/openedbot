@@ -213,7 +213,7 @@ export function ThreadLabScreen() {
 
 function LabPane({ label, detail, children }: { label: string; detail: string; children: ReactNode }) {
   return (
-    <section aria-label={label} className="flex min-h-0 min-w-0 flex-1 flex-col border-separator-border not-first:border-l">
+    <section aria-label={label} data-thread-column={label === "Actuel" ? "" : undefined} className="flex min-h-0 min-w-0 flex-1 flex-col border-separator-border not-first:border-l">
       <p className="shrink-0 px-4 pt-2 text-caption-1-regular text-text-tertiary sm:px-6">
         <span className="text-text-secondary">{label}</span> · {detail}
       </p>

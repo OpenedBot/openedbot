@@ -1,6 +1,5 @@
 import type { StoredProductEvent } from "@openedbot/contracts-events";
-import { eventText, rendersNothing } from "@/lib/thread/thread-event-text";
-import { LIVE_NARRATION_MAX } from "./live-answer";
+import { eventText, rendersNothing, isPassLikeText } from "@/lib/thread/thread-event-text";
 
 /**
  * The text of an answer being written, held OUTSIDE the thread cache
@@ -143,26 +142,16 @@ export function lastRunSequence(events: readonly StoredProductEvent[], runId: st
   return -1;
 }
 
-/**
- * Can the `event` fragment OPEN a hold, given the thread snapshot?
- *
- * Only when the end of the thread is already this run's confirmed answer: the
- * last event is an `agent.message` of the same run, and the text the
- * timeline model merges with it (`mergeTimelineEntries`: its
- * fragments, over the events with no render) exceeds
- * `LIVE_NARRATION_MAX`. The suffix is then added to a bubble that stays the
- * answer: nothing the timeline decides about this text (narration or
- * answer, activity block, empty bubble) can change with it. Only the
- * length counts, not the shape (`isConfirmedLiveAnswer`): the text
- * walked here can be shorter than the model's, never longer,
- * and a shape read on a suffix could lie.
- *
- * Refused when in doubt: a notice of the run (a room « pass » hides all of
- * its text), an approval request (it cuts the bubble when it is
- * open), a `MEDIA:` tag in the text.
- */
+/** Open a hold only on an existing text passage of this run. Structural events
+ * and MEDIA tags still release it before the snapshot changes topology. */
 export function canStartLiveText(events: readonly StoredProductEvent[], event: StoredProductEvent): boolean {
   return liveTextBubble(events, event) !== null;
+}
+
+// Routing/pass directives can change presentation with their next fragment.
+// Keep incomplete prefixes in the snapshot path rather than the live suffix.
+function mayBeControlText(text: string): boolean {
+  return text.includes("@") || isPassLikeText(text);
 }
 
 /** The text of the bubble `event` would extend, or `null` if it cannot open a hold. */
@@ -181,8 +170,8 @@ function liveTextBubble(events: readonly StoredProductEvent[], event: StoredProd
     if (!rendersNothing(candidate)) break;
   }
   const text = parts.reverse().join("");
-  if (`${text}${eventText(event)}`.includes(MEDIA_TAG)) return null;
-  return text.trim().length > LIVE_NARRATION_MAX ? text : null;
+  if (`${text}${eventText(event)}`.includes(MEDIA_TAG) || mayBeControlText(text) || mayBeControlText(text + eventText(event))) return null;
+  return text.trim().length > 0 ? text : null;
 }
 
 /**
@@ -220,6 +209,7 @@ export function createLiveTextHold(clock: () => number): LiveTextHold {
     offer(event, snapshot) {
       if (event.type !== "agent.message" || !snapshot || !Number.isSafeInteger(event.sequence)) return false;
       const text = eventText(event);
+      if (mayBeControlText(text)) return false;
       const first = held[0];
       if (first) {
         // A reread snapshot that already covers the hold: it releases (the

@@ -12,6 +12,7 @@ import { hasNonEmptyAssistantText } from "./fast-path-measurements";
 import type { E2eConfig } from "./config";
 import type { EventStream, RunMarks } from "./events";
 import type { ModelChoice, Session } from "./session";
+import type { RunTraceSummary } from "../../../../platform/observability/src/run-trace";
 
 export type CreateBotInput = {
   name: string;
@@ -36,13 +37,16 @@ export type RunRow = {
   startedAt: Date | null;
   endedAt: Date | null;
   executionSessionKey: string | null;
+  leaseGeneration?: number | string;
+  timings?: (RunTraceSummary & { queuedMs: number | null }) | null;
 };
 
 /** Generation zero uses the thread's key; later generations pin it on the run. */
 export async function readRunEvidence(db: SQL, runId: string): Promise<RunRow | null> {
   const rows = await db<RunRow[]>`
     select r.id, r.status, r.origin, r.output, r.created_at as "createdAt", r.started_at as "startedAt",
-           r.ended_at as "endedAt", coalesce(r.execution_session_key, t.hermes_session_id) as "executionSessionKey"
+           r.ended_at as "endedAt", coalesce(r.execution_session_key, t.hermes_session_id) as "executionSessionKey",
+           r.lease_generation as "leaseGeneration", r.timings
       from runs r left join threads t on t.id = r.thread_id and t.organization_id = r.organization_id
      where r.id = ${runId}`;
   return rows[0] ?? null;

@@ -40,7 +40,10 @@ describe("scheduling from the chat in the bot mode block (0187)", () => {
     expect(rule).not.toContain("Never claim a routine exists");
     expect(rule).not.toContain("earlier in this conversation can be mentioned");
     // One approval per creation on any host: `list` is for finding a job_id or settling a doubt, not a step before creating.
-    expect(rule).toContain("`list` only reads: call it when the user asks about their routines, when you are unsure whether a routine already exists, or to find the `job_id` of a routine to update, pause, resume or remove; never guess one.");
+    expect(rule).toContain("call it only when the user's current request concerns routines");
+    expect(rule).toContain("avoid duplicating a requested creation");
+    expect(rule).toContain("find the `job_id` of a routine to update, pause, resume or remove; never guess one.");
+    expect(rule).toContain("Uncertainty about an earlier routine alone is not a reason to call tools on a greeting or small talk.");
     expect(rule).not.toContain("Call `list` before changing a routine");
   });
 

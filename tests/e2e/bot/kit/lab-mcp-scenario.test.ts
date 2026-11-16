@@ -8,7 +8,7 @@ import { labMcpNames, type LabMcpAction, type LabMcpCall, type LabMcpEvidence, t
 import { ScenarioRecorder } from './report';
 import type { ScenarioContext } from './scenario';
 
-type Failure = 'missing-host-call' | 'missing-native-error' | 'process-not-stopped' | 'revoked-process-restarted' | 'unknown-setup' | 'bridge-only' | 'text-invocation' | 'never-ready' | 'revoked-old-marker' | 'revoked-preamble';
+type Failure = 'missing-host-call' | 'missing-native-error' | 'process-not-stopped' | 'revoked-process-restarted' | 'unknown-setup' | 'bridge-only' | 'text-invocation' | 'never-ready' | 'revoked-old-marker' | 'revoked-preamble' | 'missing-discovery' | 'greeting-tool' | 'skills-missing';
 function harness(failure?: Failure) {
   const runtimeId = '750b6e7c-6fb3-4fbd-8d79-b4bb8451b69a';
   const bot = { id: 'bot', threadId: 'bot-thread', slug: 'e2e-owned', hermesProfile: 'e2e-owned', hermesProfileManaged: true } as BotDto;
@@ -22,6 +22,7 @@ function harness(failure?: Failure) {
   let readinessReads = 0;
   let target!: LabMcpTarget;
   let online = true, removed = false, installed = false, apiEnabled = false, turns = 0;
+  let skillsEnabled = false;
   const outputs = new Map<string, boolean>();
   const admitted = new Map<string, { threadId: string; output: string }>();
   const send = async (threadId: string, input: string) => {
@@ -29,7 +30,10 @@ function harness(failure?: Failure) {
     turns++;
     const runId = `run-${turns}`;
     let output: string;
-    if (apiEnabled) {
+    if (input.endsWith('ça va ti ?')) {
+      output = 'Ça va !';
+      if (failure === 'greeting-tool') outputs.set(runId, false);
+    } else if (apiEnabled) {
       if (!processes.length) processes.push({ pid: 123, startTicks: '100', running: true });
       const challenge = /challenge ([a-f0-9-]{36})/.exec(input)![1]!;
       if (failure !== 'missing-host-call') calls.push({ challenge, succeeded: online });
@@ -52,7 +56,12 @@ function harness(failure?: Failure) {
         const message = /^\/api\/threads\/([^/]+)\/messages$/.exec(path);
         if (message && method === 'POST') return { runId: (await send(message[1]!, body!.input!)).runId };
         if (path.endsWith('/capabilities')) return { botId: bot.id, hermesProfile: bot.hermesProfile, scope: 'profile', inventoryError: null,
-          toolsets: [], mcpServers: installed && !removed ? [{ name: labMcpNames(target).serverName, enabled: apiEnabled }] : [] };
+          toolsets: [{ name: 'skills', enabled: skillsEnabled && failure !== 'skills-missing', tools: ['skill_view'] }],
+          mcpServers: installed && !removed ? [{ name: labMcpNames(target).serverName, enabled: apiEnabled }] : [] };
+        if (path.endsWith('/capabilities/toolsets/skills')) {
+          skillsEnabled = body!.enabled === true;
+          return { applied: true, enabled: skillsEnabled };
+        }
         if (path.includes('/capabilities/mcp/')) {
           apiEnabled = body!.enabled === true;
           if (!apiEnabled) timeline.push('revoke');
@@ -76,7 +85,11 @@ function harness(failure?: Failure) {
         }
         if (!outputs.has(runId)) return [];
         const tool = failure === 'bridge-only' ? 'tool_call' : labMcpNames(target).toolName;
-        return [{ type: 'tool.call', payload: { tool, toolCallId: runId } },
+        const discovery = failure === 'missing-discovery' ? [] : ['tool_search', 'tool_describe'].flatMap((name) => [
+          { type: 'tool.call', payload: { tool: name, toolCallId: `${runId}-${name}` } },
+          { type: 'tool.result', payload: { tool: name, toolCallId: `${runId}-${name}`, error: false } },
+        ]);
+        return [...discovery, { type: 'tool.call', payload: { tool, toolCallId: runId } },
           { type: 'tool.result', payload: { tool, toolCallId: runId, error: outputs.get(runId) } }];
       },
     },
@@ -114,8 +127,9 @@ describe('profile-only native MCP acceptance', () => {
       .toEqual(['/api/threads/group-thread/stop', '/api/threads/bot-thread/stop']);
     expect(fixture.actions.at(-1)).toBe('remove');
     expect(fixture.readinessReads()).toBe(2);
-    expect(fixture.prompts).toHaveLength(3);
-    for (const prompt of fixture.prompts.slice(0, 2)) {
+    expect(fixture.prompts).toHaveLength(5);
+    expect(fixture.prompts.slice(1, 3)).toEqual(['@e2e-owned ça va ti ?', 'ça va ti ?']);
+    for (const prompt of [fixture.prompts[0]!, fixture.prompts[3]!]) {
       expect(prompt).toContain('use tool_describe for that exact name, then tool_call');
       expect(prompt).toContain('tool_search only to discover that exact owned MCP tool');
       expect(prompt).toContain('never an XML/text invocation');
@@ -131,7 +145,7 @@ describe('profile-only native MCP acceptance', () => {
       expect(invocation.calls[0].arguments).toEqual({ challenge });
       expect(prompt).toContain(`If ${invocation.calls[0].name} is deferred`);
     }
-    const revokedPrompt = fixture.prompts[2]!;
+    const revokedPrompt = fixture.prompts[4]!;
     expect(revokedPrompt).toContain('First inspect whether the exact tool');
     expect(revokedPrompt).toContain('Only if that exact tool is currently advertised, call it natively with challenge');
     expect(revokedPrompt).toContain('entire reply must be the single word REVOKED');
@@ -140,6 +154,15 @@ describe('profile-only native MCP acceptance', () => {
     expect(revokedPrompt).toContain('Do not return any previous test marker or result, and do not invent a result');
     expect(revokedPrompt).not.toContain('tool_call');
     expect(revokedPrompt).not.toContain('Use native tool calls');
+  });
+
+  test('small talk cannot pass with missing discovery proof, disabled skills or any tool call', async () => {
+    for (const failure of ['missing-discovery', 'skills-missing', 'greeting-tool'] as const) {
+      const fixture = harness(failure);
+      await expect(fixture.run()).rejects.toThrow();
+      expect(fixture.removed()).toBe(true);
+      expect(fixture.context.rec.steps.some((step) => step.status === 'fail')).toBe(true);
+    }
   });
 
   test('neither model text nor API config flags can replace host/native evidence', async () => {
@@ -156,7 +179,7 @@ describe('profile-only native MCP acceptance', () => {
     for (const failure of ['revoked-old-marker', 'revoked-preamble'] as const) {
       const fixture = harness(failure);
       await expect(fixture.run()).rejects.toThrow();
-      expect(fixture.turns()).toBe(3);
+      expect(fixture.turns()).toBe(5);
       expect(fixture.context.rec.steps.some((step) => step.status === 'fail'
         && step.name === 'Révocation par API et aucun appel natif au tour suivant'
         && step.note?.includes('did not return the exact fixture result'))).toBe(true);

@@ -42,6 +42,14 @@ func TestManagedConfigPinsTheAutoPromptCacheTier(t *testing.T) {
 	}
 }
 
+func TestManagedConfigCapsWebExtractPages(t *testing.T) {
+	// Hermes clamps web.extract_char_limit to [2000, 500000] and falls back to
+	// 15000 on anything non-numeric (web_tools_truncate.py).
+	if !strings.Contains(ManagedConfig, "web:\n  extract_char_limit: 10000\n") {
+		t.Fatalf("managed config lost the web extract cap: %q", ManagedConfig)
+	}
+}
+
 func TestManagedDefaultsRefuseASymlinkedTarget(t *testing.T) {
 	dir := t.TempDir()
 	elsewhere := filepath.Join(dir, "elsewhere.yaml")

@@ -1,9 +1,10 @@
 import { ThreadInitialLayout } from "./thread-initial-layout";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { CircleHelp, ListChecks } from "lucide-react";
 import { AgentProgress, TrailItem, type AgentStep } from "@openedbot/browser-ui-kit";
 import type { BotSettingProposalDto, MessageAuthorBot } from "@openedbot/contracts-api";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
+import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import { isServiceStepKind } from "@openedbot/execution/domain/run-step";
 import {
   HANDOFF_NOTICE_KIND,
@@ -27,20 +28,15 @@ import {
   THREAD_ENTRY_GAP_PX,
   THREAD_MESSAGES_CLASS,
   THREAD_SCROLL_ANCHOR_CLASS,
+  THREAD_TURN_CLASS,
 } from "../lib/thread/thread-anchor";
 import { THREAD_REVEAL_EVENT, type ThreadRevealDetail } from "../lib/thread/thread-reveal";
 import { isTimelineTurnStart, THREAD_HISTORY_PAGE_TURNS } from "../lib/thread/thread-virtual";
 import { THREAD_ROW_ATTRIBUTE, useThreadVirtualRows } from "../lib/thread/use-thread-virtual-rows";
+import { useThreadScrollFollow } from "../lib/thread/use-thread-scroll-follow";
 import { useT } from "../lib/i18n";
 import { runClockStart, runTimings } from "../lib/run/run-timing";
-import { speechRateFor } from "../lib/voice/speech-rates";
-import { markdownToSpeechText } from "../lib/voice/speech-text";
-import {
-  createBrowserSpeechSynthesisAdapter,
-  readSpeechOutputSettings,
-  SPEECH_SETTINGS_EVENT,
-  type SpeechOutputSettings,
-} from "../lib/voice/web-speech-synthesis";
+import { useThreadSpeech } from "../lib/voice/use-thread-speech";
 import {
   assistantTextParts,
   createTimelineModelBuilder,
@@ -56,16 +52,16 @@ import { AssistantMessage, BotInboundMessage, ModelUnavailableNotice, ProviderAu
 import { isModelUnavailableCode } from "../lib/run/model-unavailable";
 import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/runtime/provider-auth";
 import { ToolActivity } from "./thread-tool-activity";
+import { callsHaveCards, ToolCallCards } from "./cards/run-card-view";
 import { PendingThinking } from "./thread-thinking-status";
-import { ActivityNarration, ActivityRow, ActivitySearch, TurnActivity } from "./thread-turn-activity";
+import { createRunLineTracker, runRows, workRunId, type RunLineTracker, type RunRow } from "../lib/thread/run-thinking-model";
+import { ActivityRow, ActivitySearch, RunAuthorLine, TurnActivity } from "./thread-turn-activity";
 import { AskUserDismissedMark, DateChip, Divider } from "./thread-timeline-chrome";
 import { LiveTimelineEntry } from "./thread-live-entry";
-import { useThreadRowEnter } from "../lib/thread/thread-motion";
 import type { ThreadTimelineProps } from "./thread-timeline-props";
 import { AskUserCard } from "./ask-user-card";
 import { dismissAskUser } from "../lib/run/ask-user-dismissals";
 import { openSecondaryReads, THREAD_FIRST_PAINT_MARK } from "../lib/shell/after-first-paint";
-import { isConfirmedLiveAnswer } from "../lib/stream/live-answer";
 import { streamSpeaker, turnFeed } from "./stream/turn-feed";
 import { StreamScrollDown } from "./stream/stream-scroll-down";
 
@@ -73,8 +69,7 @@ import { StreamScrollDown } from "./stream/stream-scroll-down";
  * `memo` of the user bubbles (the mentions `Set` depends on it). */
 const EMPTY_MENTIONABLES: MentionableBot[] = [];
 const EMPTY_SETTING_PROPOSALS: readonly BotSettingProposalDto[] = [];
-
-
+const NO_CALLS: readonly ToolCall[] = [];
 
 /**
  * The thread, memoized.
@@ -93,7 +88,6 @@ const EMPTY_SETTING_PROPOSALS: readonly BotSettingProposalDto[] = [];
  * read as the immediate continuation of the previous message.
  */
 export const THREAD_GAP_MS = 60 * 60 * 1000;
-
 
 function ThreadTimelineView({
   events: allEvents,
@@ -151,49 +145,18 @@ function ThreadTimelineView({
   const { t, locale, formatNumber, plural } = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  useThreadRowEnter(content, scrollToBottomOnThreadKey);
-  const speechAdapter = useMemo(
-    () => injectedSpeechAdapter ?? createBrowserSpeechSynthesisAdapter(),
-    [injectedSpeechAdapter],
-  );
-  const [speechSettings, setSpeechSettings] = useState<SpeechOutputSettings>(
-    () => readSpeechOutputSettings(),
-  );
-  const [speechState, setSpeechState] = useState<{
-    id: string | null;
-    status: "idle" | "speaking" | "error";
-  }>({ id: null, status: "idle" });
-  const speechGeneration = useRef(0);
-  // Pinning (the same rule as assistant-ui's viewport): the thread follows the
-  // stream only if the reader is ALREADY at the bottom. Before, the forced scroll on every
-  // event stuck the thread back at the bottom every 500 ms during a stream,
-  // even when scrolled up to reread (measured).
-  const pinned = useRef(true);
-  const lastUserInputId = userInputs[userInputs.length - 1]?.id ?? null;
-  // Last box seen: `onScroll` compares in order to tell a gesture
-  // (scrollTop ↓, stable heights: assistant-ui #4141) from an image that
-  // decodes (scrollHeight ↑, the browser fires `scroll` and one let go).
-  const scrollBox = useRef(readThreadScrollBox({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 }));
-  // Reactive reflection of `pinned`: the ref drives the scroll (every frame,
-  // no re-render), the state drives only the « aller en bas » button
-  // (like assistant-ui's `ThreadPrimitive.ScrollToBottom`): the two must
-  // never be confused.
-  const [atBottom, setAtBottom] = useState(true);
-  const pinFrame = useRef<number | null>(null);
-  const schedulePin = useCallback(() => {
-    if (pinFrame.current !== null) return;
-    pinFrame.current = requestAnimationFrame(() => {
-      pinFrame.current = null;
-      const node = scroller.current;
-      if (node && pinned.current) node.scrollTop = node.scrollHeight;
-    });
-  }, []);
-  useEffect(() => () => {
-    // The ref survives remounting (StrictMode in dev): a cancelled frame id
-    // left in place blocked `schedulePin` for the whole life of the thread.
-    if (pinFrame.current !== null) cancelAnimationFrame(pinFrame.current);
-    pinFrame.current = null;
-  }, []);
+  const { speechAdapter, speechSettings, speechState, playSpeech } = useThreadSpeech({
+    injectedAdapter: injectedSpeechAdapter, speechScope, speechDisabled, locale,
+  });
+  const { pinned, scrollBox, atBottom, setAtBottom, submissionKeys, outgoingKey } = useThreadScrollFollow({
+    scroller,
+    content,
+    threadKey: scrollToBottomOnThreadKey,
+    userInputs,
+    outgoing,
+    approvalCount: approvals.length,
+    resnap,
+  });
   /**
    * Cache of React nodes per turn: the key is that of the `nodes` array
    * (`entry.key`, or `activity:${entry.key}` for an activity block). An
@@ -209,6 +172,8 @@ function ThreadTimelineView({
    * reconciliation on it (comparison by reference, even before `memo`).
    */
   const turnNodeCache = useRef(new Map<string, { sig: string; node: React.ReactNode }>());
+  // The runs seen live here: their lines animate at their end instead of keeping room.
+  const runLines = useRef<RunLineTracker | null>(null);
   // Edit availability goes through the store (`thread-edit-availability`),
   // outside the turn signatures: its switch re-renders only the message shells.
   const setCanEdit = useThreadEditAvailability((state) => state.setCanEdit);
@@ -229,6 +194,7 @@ function ThreadTimelineView({
     reply: t("threadTimeline.reply"),
     react: t("threadTimeline.react"),
     removeReaction: t("threadTimeline.removeReaction"),
+    reactionFailed: t("threadTimeline.reactionFailed"),
     more: t("threadTimeline.moreActions"),
     quoteFrom: (author: string) => t("threadTimeline.quoteFrom", { name: author }),
     operator: t("threadTimeline.operator"),
@@ -247,95 +213,8 @@ function ThreadTimelineView({
     versionCount: (current: number, total: number) => t("threadTimeline.versionCount", { current, total }),
   }), [t]);
 
-  useEffect(() => {
-    const sync = (event: Event) => {
-      const detail = (event as CustomEvent<SpeechOutputSettings>).detail;
-      setSpeechSettings(detail ?? readSpeechOutputSettings());
-    };
-    window.addEventListener(SPEECH_SETTINGS_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(SPEECH_SETTINGS_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
-  useEffect(() => {
-    speechGeneration.current += 1;
-    speechAdapter.cancel();
-    setSpeechState({ id: null, status: "idle" });
-    return () => {
-      speechGeneration.current += 1;
-      speechAdapter.cancel();
-    };
-  }, [speechAdapter, speechScope]);
-
-  useEffect(() => {
-    if (!speechDisabled) return;
-    speechGeneration.current += 1;
-    speechAdapter.cancel();
-    setSpeechState({ id: null, status: "idle" });
-  }, [speechAdapter, speechDisabled]);
-
-  const playSpeech = useCallback((id: string, markdown: string, botVoiceId?: string | null, botId?: string | null) => {
-    if (!speechAdapter.supported) return;
-    if (speechState.id === id && speechState.status === "speaking") {
-      speechGeneration.current += 1;
-      speechAdapter.cancel();
-      setSpeechState({ id: null, status: "idle" });
-      return;
-    }
-    const text = markdownToSpeechText(markdown, locale);
-    if (!text) return;
-    const generation = ++speechGeneration.current;
-    setSpeechState({ id, status: "speaking" });
-    speechAdapter.speak({
-      text,
-      lang: locale,
-      voiceURI: botVoiceId ?? speechSettings.voiceURI,
-      rate: speechRateFor(botId),
-      onStart: () => {
-        if (speechGeneration.current === generation) setSpeechState({ id, status: "speaking" });
-      },
-      onEnd: () => {
-        if (speechGeneration.current === generation) setSpeechState({ id: null, status: "idle" });
-      },
-      onError: () => {
-        if (speechGeneration.current === generation) setSpeechState({ id, status: "error" });
-      },
-    });
-  }, [locale, speechAdapter, speechSettings.voiceURI, speechState]);
-
-  useLayoutEffect(() => {
-    const node = scroller.current;
-    if (!node) return;
-    pinned.current = true;
-    setAtBottom(true);
-    node.scrollTop = node.scrollHeight;
-    scrollBox.current = readThreadScrollBox(node);
-  }, [scrollToBottomOnThreadKey]);
-
   // A bot's thread: the sent message brings its « Réflexion » line in the same paint, not 70 ms later.
   const outgoingThinks = Boolean(outgoing && !outgoing.failed && defaultAuthor);
-  useEffect(() => {
-    pinned.current = true;
-    setAtBottom(true);
-    schedulePin();
-  }, [approvals.length, lastUserInputId, outgoing?.id, resnap, schedulePin]);
-
-  useEffect(() => {
-    // The ResizeObserver follows the bottom (pinned reader) IN its callback, before paint: deferred to rAF,
-    // the thread painted one frame too high then jumped (the send's « bump »). `onScroll` rereads `scrollBox`.
-    const contentNode = content.current;
-    if (!contentNode || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      if (!entries.some((entry) => entry.target === contentNode)) return;
-      const node = scroller.current;
-      if (node && pinned.current) node.scrollTop = node.scrollHeight;
-    });
-    observer.observe(contentNode);
-    return () => observer.disconnect();
-  }, []);
 
   const timelineInput = useMemo(() => ({
     events,
@@ -604,7 +483,7 @@ function ThreadTimelineView({
           </button>
         ) : null}
         {olderError ? <p role="alert" className="py-2 text-center text-xs text-destructive-text">{t("threadTimeline.earlierLoadFailed")}</p> : null}
-        {useMemo(() => {
+        {[...useMemo(() => {
         const renderEntry = (
           entry: Entry,
           inActivity = false,
@@ -667,15 +546,6 @@ function ThreadTimelineView({
             // would double the reply under the dock.
             if (hiddenAssistantRunIds.length > 0 && hiddenAssistantRunIds.split(",").includes(entry.runId)) {
               return null;
-            }
-            if (inActivity) {
-              return (
-                <ActivityNarration
-                  key={entry.key}
-                  text={entry.text}
-                  streaming={entry.runId === streamingRunId}
-                />
-              );
             }
             // The bubble keeps the prose; the terminal question belongs to the
             // panel (the active run) or folds into one line (the history).
@@ -756,12 +626,12 @@ function ThreadTimelineView({
                     speaker={turnEnd ? cardHover.speakerFor?.("response", turnText) : undefined}
                   >
                     <AssistantMessage
+                      runId={entry.runId}
                       text={publicText}
                       attachments={entry.attachments}
                       author={entry.author ?? defaultAuthor}
                       streaming={entry.runId === streamingRunId}
                       timing={turnEnd ? timingsByRun.get(entry.runId) ?? null : null}
-                      liveSince={turnLive && (!turn || turn.lastKey === entry.key) ? turnRun.createdAt ?? null : null}
                       findTargetId={entry.messageId ? `message:${entry.messageId}` : entry.targetId}
                       findActive={(entry.messageId ? `message:${entry.messageId}` : entry.targetId) === activeFindTargetId}
                       hover={turnEnd ? cardHover : undefined}
@@ -1016,20 +886,7 @@ function ThreadTimelineView({
               return null;
           }
         };
-        // A turn's activity block: the CONSECUTIVE entries of one run
-        // that belong to the work (plan, searches, tools, decisions) and the
-        // narration sentences written before the last tool. The reply is
-        // the text that follows that last tool: it stays outside the block.
-        const workRunId = (entry: Entry): string | null => {
-          if (entry.kind === "plan" || entry.kind === "search") return entry.runId;
-          if (entry.kind === "tools") {
-            return entry.calls.some((call) => !isTodoTool(call.tool)) || entry.approvals.length > 0
-              ? entry.runId
-              : null;
-          }
-          if (entry.kind === "gate") return entry.approval.runId ?? null;
-          return null;
-        };
+        // Each run's last entry, its user message included: proposals and the live tail read it.
         const lastEntryIndex = new Map<string, number>();
         visible.forEach((entry, index) => {
           const runId = entryRunId(entry);
@@ -1038,30 +895,28 @@ function ThreadTimelineView({
         // The reply the live run is still writing: only its bubble reads the text in progress (`LiveTimelineEntry`).
         const liveTail = streamingRunId === null ? undefined : visible[lastEntryIndex.get(streamingRunId) ?? -1];
         const liveTailKey = liveTail?.kind === "assistant" ? liveTail.key : null;
-        const lastWorkIndex = new Map<string, number>();
-        visible.forEach((entry, index) => {
-          const runId = workRunId(entry);
-          if (runId) lastWorkIndex.set(runId, index);
-        });
-        const activityRunId = (entry: Entry, index: number): string | null => {
-          const work = workRunId(entry);
-          if (work) return work;
-          if (entry.kind !== "assistant") return null;
-          // An ask_user question or a transmission directive has its own
-          // render: it does not go into the activity.
-          if (entryAskSplit(entry, operatorUsername).prompt) return null;
-          if (handoffNoticeByRun.has(entry.runId)) return null;
-          const last = lastWorkIndex.get(entry.runId);
-          if (last !== undefined && index < last) return entry.runId;
-          // Run in progress: a text not yet confirmed as the reply
-          // (`isConfirmedLiveAnswer`) is a likely narration, BEFORE the
-          // first tool as after the last. It is written in the block
-          // instead of starting the reply and then jumping into it when the tool arrives.
-          // The concluded run makes it the reply.
-          return entry.runId === streamingRunId && !isConfirmedLiveAnswer(entry.text)
-            ? entry.runId
-            : null;
-        };
+        // Before its first event, the live run is the latest one still active
+        // (a sent bubble hosts its own pending row meanwhile).
+        let activeRunId: string | null = null;
+        let activeSince: number | null = null;
+        if (running) {
+          for (const candidate of runsById.values()) {
+            if (candidate.status === "completed" || candidate.status === "failed" || candidate.status === "cancelled") continue;
+            const created = runClockStart(candidate);
+            if (Number.isFinite(created) && (activeSince === null || created > activeSince)) {
+              activeSince = created;
+              activeRunId = candidate.id;
+            }
+          }
+        }
+        const liveRunId = streamingRunId ?? (running && !outgoingThinks ? activeRunId : null);
+        // One status row per run (`runRows`): its work folds into it, its texts stay bubbles.
+        // A run that just ended keeps its bottom row for its collapse, then nothing.
+        runLines.current ??= createRunLineTracker();
+        const lines = runLines.current;
+        const linesNow = Date.now();
+        const closing = lines.observe(liveRunId, linesNow);
+        const rowsByRun = runRows(visible, { liveRunId, closing });
         // The transmitted token count (the « relayed » block) rereads `events`/`runs`
         // in full: including them in the cache signature would empty the
         // cache on EVERY SSE tick. This case stays rare (a hand-off directive
@@ -1246,14 +1101,107 @@ function ThreadTimelineView({
           if (!endRunId || lastEntryIndex.get(endRunId) !== endIndex) return;
           for (const proposal of proposalsByRun.get(endRunId) ?? []) pushNode(proposalNode(proposal));
         };
-        let liveGroupRendered = false;
-        const answeredRunIds = new Set<string>();
-        for (const candidate of visible) {
-          if (candidate.kind === "assistant" && candidate.text.trim() !== "") answeredRunIds.add(candidate.runId);
-        }
+        const decisionPending = (member: Entry) =>
+          (member.kind === "gate" && member.approval.status === "pending")
+          || (member.kind === "tools" && member.approvals.some((approval) => approval.status === "pending"));
+        // A 1:1 thread names the bot on the head line of a run with work; a salon's room cards name their members.
+        const headAuthor = (runId: string) => (defaultAuthor ? runAuthors?.get(runId) ?? defaultAuthor : null);
+        // A run's status: live, the row at the bottom of its turn (`activity:<turn key>`, the
+        // optimistic bubble's pending row, from the send to the end); done with work, the
+        // summary on its head line above the reply (`head:…`). At the end, the bottom row
+        // collapses then unmounts: a finished run keeps no room of its own.
+        const runStatusNode = (runId: string, row: RunRow, place: "row" | "head", reveal = false) => {
+          const live = runId === liveRunId;
+          const members = place === "row" && !live ? [] : row.members;
+          const pending = live && runId !== streamingRunId;
+          const waiting = live && members.some(decisionPending);
+          const forceOpen = members.some((member) =>
+            decisionPending(member)
+            || (activeFindTargetId != null && "targetId" in member && member.targetId === activeFindTargetId));
+          const author = runAuthors?.get(runId) ?? defaultAuthor ?? null;
+          const named = place === "head" && headAuthor(runId) !== null;
+          const rowRun = runsById.get(runId);
+          const runStart = rowRun ? runClockStart(rowRun) : Number.NaN;
+          const since = Number.isFinite(runStart) ? runStart : pending ? activeSince : null;
+          const workedMs = !live && rowRun?.createdAt && rowRun.endedAt
+            ? Math.max(0, Date.parse(rowRun.endedAt) - runStart)
+            : null;
+          const reactKey = place === "head" ? submissionKeys.head(runId) : submissionKeys.host(runId);
+          const log = members.length > 0 ? row.log : [];
+          const sig = [
+            reactKey,
+            live,
+            pending,
+            row.writing,
+            waiting,
+            since ?? "",
+            workedMs ?? "",
+            forceOpen,
+            named,
+            reveal,
+            authorRenderKey(author),
+            log.map((member) => entryRenderSig(member)).join(""),
+          ].join("\u0001");
+          return cached(`${place}:${runId}`, sig, () => (
+            <TurnActivity
+              key={reactKey}
+              runId={runId}
+              calls={members.flatMap((member) => (member.kind === "tools" ? member.calls : []))}
+              feed={turnFeed(log, t, streamSpeaker(author))}
+              live={live}
+              pending={pending}
+              hasWork={members.length > 0}
+              writing={row.writing}
+              waiting={waiting}
+              workedMs={workedMs !== null && Number.isFinite(workedMs) ? workedMs : null}
+              since={since}
+              forceOpen={forceOpen}
+              author={author}
+              showAuthorLabel={named}
+              reveal={reveal}
+            >
+              {members.length > 0 ? members.map((member) => {
+                // The folded log, in the runtime's order. Tool passages and web
+                // searches render their own rows; every other step is one row.
+                if (member.kind === "tools" || member.kind === "search") {
+                  return <Fragment key={member.key}>{renderEntry(member, true)}</Fragment>;
+                }
+                const node = renderEntry(member, true);
+                if (node === null) return null;
+                return <ActivityRow key={member.key} kind={member.kind} className="px-1.5 py-1">{node}</ActivityRow>;
+              }) : null}
+            </TurnActivity>
+          ));
+        };
+        // The head line opens a run with work, above its first bubble: the bot's name while
+        // it works (1:1), then the summary in the same place once done. A run without work
+        // has none, live or done. Appearing above a reply on screen, the line opens.
+        const runHeadNode = (runId: string, row: RunRow): React.ReactNode => {
+          const live = runId === liveRunId;
+          if (row.members.length === 0) {
+            if (live) lines.headless(runId);
+            return null;
+          }
+          if (!live) return runStatusNode(runId, row, "head", lines.reveal(runId, linesNow, { summary: true }));
+          const author = headAuthor(runId);
+          if (!author) {
+            lines.headless(runId);
+            return null;
+          }
+          lines.named(runId);
+          const reveal = lines.reveal(runId, linesNow, { summary: false });
+          const key = submissionKeys.head(runId);
+          return cached(`head:${runId}`, `${key}\u0001${reveal}\u0001${authorRenderKey(author)}`, () => <RunAuthorLine key={key} author={author} reveal={reveal} />);
+        };
+        const headsPushed = new Set<string>();
+        const pushHead = (runId: string, row: RunRow) => {
+          if (headsPushed.has(runId)) return;
+          headsPushed.add(runId);
+          const node = runHeadNode(runId, row);
+          if (node) pushNode(node);
+        };
         for (let index = 0; index < visible.length; index += 1) {
-          // `index` has already moved on: the previous entry (or the end of its
-          // activity group) is the last one handled.
+          // The previous entry (and the row that may follow it) is the last one handled.
           pushProposalsAfter(index - 1);
           const entry = visible[index]!;
           if (isTimelineTurnStart(entry, index)) {
@@ -1262,95 +1210,17 @@ function ThreadTimelineView({
             rows.push({ key: entry.key, nodes });
           }
           pushDay(entry);
-          const runId = activityRunId(entry, index);
-          if (!runId) {
-            pushNode(renderCached(entry), entry);
-            continue;
+          const runId = entryRunId(entry);
+          const row = runId ? rowsByRun.get(runId) : undefined;
+          // A tool passage's cards stay in the transcript at its place, between the bubbles.
+          const toolCards = entry.kind === "tools" && callsHaveCards(entry.calls) ? entry.calls : null;
+          if (workRunId(entry) === null || toolCards) {
+            if (runId && row && entry.kind !== "user" && entry.kind !== "routine") pushHead(runId, row);
+            pushNode(toolCards ? <ToolCallCards key={`cards:${entry.key}`} calls={toolCards} /> : renderCached(entry), entry);
           }
-          const members: Entry[] = [entry];
-          while (index + 1 < visible.length && activityRunId(visible[index + 1]!, index + 1) === runId) {
-            index += 1;
-            members.push(visible[index]!);
-          }
-          // Sentences alone, with no work between them, do not make an activity,
-          // except live: the sentence in progress waits there to know whether a tool
-          // follows it. Every turn with work, even a single tool call, gets the
-          // same Agent Activity block: one way to read a turn's work.
-          if (runId !== streamingRunId && !members.some((member) => workRunId(member) !== null)) {
-            members.forEach((member) => pushNode(renderCached(member), member));
-            continue;
-          }
-          const live = runId === streamingRunId;
-          if (live) liveGroupRendered = true;
-          // The answer has started below the block (text already confirmed as
-          // the answer, outside the group): the live status folds to its
-          // summary line, "Thought for ...".
-          const answering = live && visible.some((candidate, candidateIndex) =>
-            candidate.kind === "assistant" && candidate.runId === runId && candidate.text.trim() !== ""
-            && activityRunId(candidate, candidateIndex) === null);
-          const waiting = live && members.some((member) =>
-            (member.kind === "gate" && member.approval.status === "pending")
-            || (member.kind === "tools" && member.approvals.some((approval) => approval.status === "pending")));
-          const forceOpen = members.some((member) =>
-            (member.kind === "gate" && member.approval.status === "pending")
-            || (member.kind === "tools" && member.approvals.some((approval) => approval.status === "pending"))
-            || (activeFindTargetId != null && "targetId" in member && member.targetId === activeFindTargetId)
-            || (member.kind === "assistant" && member.messageId != null && `message:${member.messageId}` === activeFindTargetId),
-          );
-          const showAuthorLabel = members.some((member) => authorLabelEntryKeys.has(member.key));
-          const groupRun = runsById.get(runId);
-          const runStart = groupRun ? runClockStart(groupRun) : Number.NaN;
-          const workedMs = !live && groupRun?.createdAt && groupRun.endedAt
-            ? Math.max(0, Date.parse(groupRun.endedAt) - runStart)
-            : null;
-          const activitySig = [
-            live,
-            answering,
-            waiting,
-            runStart,
-            workedMs ?? "",
-            forceOpen,
-            showAuthorLabel,
-            authorRenderKey(runAuthors?.get(runId) ?? defaultAuthor),
-            members.map((member) => entryRenderSig(member)).join(""),
-          ].join("");
-          pushNode(
-            cached(`activity:${entry.key}`, activitySig, () => (
-              <TurnActivity
-                key={`activity:${entry.key}`}
-                calls={members.flatMap((member) => (member.kind === "tools" ? member.calls : []))}
-                feed={turnFeed(members, t, streamSpeaker(runAuthors?.get(runId) ?? defaultAuthor))}
-                live={live}
-                workedMs={workedMs !== null && Number.isFinite(workedMs) ? workedMs : null}
-                since={Number.isFinite(runStart) ? runStart : null}
-                answering={answering}
-                waiting={waiting}
-                forceOpen={forceOpen}
-                author={runAuthors?.get(runId) ?? defaultAuthor ?? null}
-                showAuthorLabel={showAuthorLabel}
-              >
-                {members.map((member) => {
-                  // The feed, in the runtime's order. Tool passages and web
-                  // searches render their own rows (one per group, one per
-                  // query); every other step is one row.
-                  if (member.kind === "tools" || member.kind === "search") {
-                    return <Fragment key={member.key}>{renderEntry(member, true)}</Fragment>;
-                  }
-                  const node = renderEntry(member, true);
-                  if (node === null) return null;
-                  return (
-                    <ActivityRow
-                      key={member.key}
-                      kind={member.kind === "assistant" ? "thinking" : member.kind}
-                      className={member.kind === "assistant" ? undefined : "px-1.5 py-1"}
-                    >
-                      {node}
-                    </ActivityRow>
-                  );
-                })}
-              </TurnActivity>
-            )),
-          );
+          if (!runId || !row || row.after !== index) continue;
+          pushHead(runId, row);
+          if (runId === liveRunId || closing.has(runId)) pushNode(runStatusNode(runId, row, "row"));
         }
         pushProposalsAfter(visible.length - 1);
         flushRoom();
@@ -1359,41 +1229,46 @@ function ThreadTimelineView({
           if (!runsById.has(runId)) for (const proposal of proposals) pushNode(proposalNode(proposal));
         }
         flushRoom();
-        // A run is working and no block of its own exists yet (queued, or
-        // thinking before the first step): the thinking status stands in. Once
-        // an answer has text, the status gives way to it.
-        if (running && !outgoingThinks && !liveGroupRendered && !answeredRunIds.has(streamingRunId ?? "")) {
-          let since: number | null = null;
-          let activeRunId: string | null = null;
-          for (const candidate of runsById.values()) {
-            if (candidate.status === "completed" || candidate.status === "failed" || candidate.status === "cancelled") continue;
-            const created = runClockStart(candidate);
-            if (Number.isFinite(created) && (since === null || created > since)) {
-              since = created;
-              activeRunId = candidate.id;
-            }
+        // A live run with no entry in the window (a routine, or its turn not
+        // mounted): its row joins the last turn, or the thinking status stands in.
+        if (running && !outgoingThinks && !(liveRunId && rowsByRun.has(liveRunId))) {
+          const pendingRow = spacerBottom > 0 ? undefined : rows.at(-1);
+          if (liveRunId && pendingRow) {
+            const empty: RunRow = { members: [], log: [], after: -1, writing: false };
+            const head = runHeadNode(liveRunId, empty);
+            if (head) pendingRow.nodes.push(head);
+            pendingRow.nodes.push(runStatusNode(liveRunId, empty, "row"));
+          } else {
+            // A salon has no default author (a 1:1 thread does): the status then
+            // names the member whose turn it is, since several bots can answer.
+            const activeAuthor = defaultAuthor == null && activeRunId ? runAuthors?.get(activeRunId) ?? null : null;
+            nodes.push(<PendingThinking key="pending-thinking" since={activeSince} author={activeAuthor} />);
           }
-          // A salon has no default author (a 1:1 thread does): the status then
-          // names the member whose turn it is, since several bots can answer.
-          const activeAuthor = defaultAuthor == null && activeRunId ? runAuthors?.get(activeRunId) ?? null : null;
-          nodes.push(<PendingThinking key="pending-thinking" since={since} author={activeAuthor} />);
         }
         for (const key of nodeCache.keys()) {
           if (!liveCacheKeys.has(key)) nodeCache.delete(key);
         }
         // The unmounted turns are two spacers, at their measured or estimated height.
-        return (
-          <>
-            {spacerTop > 0 ? <div aria-hidden="true" data-thread-spacer="top" className="shrink-0" style={{ height: spacerTop }} /> : null}
-            {rows.map((row) => (
-              <div key={row.key} ref={rowRef(row.key)} {...{ [THREAD_ROW_ATTRIBUTE]: row.key }} className="flex w-full min-w-0 flex-col gap-3">
+        // One flat keyed list, the optimistic bubble appended after it: the
+        // saved row that replaces that bubble is the same element.
+        return [
+          spacerTop > 0 ? <div key="spacer:top" aria-hidden="true" data-thread-spacer="top" className="shrink-0" style={{ height: spacerTop }} /> : null,
+          ...rows.map((row) => {
+            const rowKey = submissionKeys.row(row.key);
+            return (
+              <div
+                key={rowKey}
+                ref={rowRef(row.key)}
+                {...{ [THREAD_ROW_ATTRIBUTE]: row.key }}
+                className={THREAD_TURN_CLASS}
+              >
                 {row.nodes}
               </div>
-            ))}
-            {spacerBottom > 0 ? <div aria-hidden="true" data-thread-spacer="bottom" className="shrink-0" style={{ height: spacerBottom }} /> : null}
-            {trailing}
-          </>
-        );
+            );
+          }),
+          spacerBottom > 0 ? <div key="spacer:bottom" aria-hidden="true" data-thread-spacer="bottom" className="shrink-0" style={{ height: spacerBottom }} /> : null,
+          ...trailing,
+        ];
         }, [
           visible,
           spacerTop,
@@ -1436,25 +1311,34 @@ function ThreadTimelineView({
           outgoingThinks,
           hiddenAssistantRunIds,
           liveText,
-        ])}
-        {outgoing ? (
-          // A real box (not a Fragment): `useThreadRowEnter` makes it
-          // rise, then recognizes the registered row that replaces it.
-          <div data-thread-outgoing="" className="flex flex-col gap-3">
+          submissionKeys,
+        ]),
+        outgoing && outgoingKey ? (
+          // Keyed as the saved row that will replace it (`sentTurnKey`): the
+          // row, and the pending block keyed as the run's host, stay mounted.
+          <div
+            key={outgoingKey}
+            data-thread-outgoing=""
+            className={THREAD_TURN_CLASS}
+          >
           <UserMessage
             text={outgoing.text}
             attachments={outgoing.attachments}
             mentionSlugs={mentionSlugs}
             findTargetId={`message:${outgoing.id}`}
           />
-          {outgoingThinks ? <PendingThinking key="pending-thinking" since={null} /> : null}
+          {outgoingThinks && defaultAuthor ? (
+            <TurnActivity key={`activity:${outgoingKey}`} calls={NO_CALLS} live pending forceOpen={false} author={defaultAuthor} showAuthorLabel={false}>
+              {null}
+            </TurnActivity>
+          ) : null}
           {outgoing.failed && onRetryOutgoing ? (
             <button type="button" onClick={onRetryOutgoing} className={`${BUTTON.small} self-end`}>
               {t("common.retry")}
             </button>
           ) : null}
           </div>
-        ) : null}
+        ) : null]}
         <div data-thread-scroll-anchor="" aria-hidden className={THREAD_SCROLL_ANCHOR_CLASS} />
       </div>
     </div>

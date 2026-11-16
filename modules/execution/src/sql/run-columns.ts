@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import { appendFollowupInput } from "@openedbot/conversation/domain/followup";
 import { ACTIVE_RUN_STATUSES } from "../domain/run-transitions";
 import { appendLeaseFence, SqlStatement, type LeaseFence } from "./run-transitions";
 
@@ -116,10 +117,22 @@ export async function pinRunSessionKey(db: SQL, run: RunKey, fence: LeaseFence, 
   return rows.length > 0;
 }
 
-/** A message folded into the input of a queued run nobody claimed yet. */
+/**
+ * A message folded into the input of a queued run nobody claimed yet. The
+ * input is rewritten as a numbered burst (`appendFollowupInput`), never glued
+ * with a blank line: the model would answer the last message only. The row is
+ * read under lock, so two folds in a row number their messages in order.
+ */
 export async function foldQueuedRunInputTx(tx: SQL, run: RunKey, input: string): Promise<void> {
+  const rows = await tx<Array<{ input: string }>>`
+    select input from runs
+     where organization_id = ${run.organizationId} and id = ${run.id}
+       and status in ('queued') and hermes_run_id is null and lease_owner is null
+     for update
+  `;
+  if (!rows[0]) return;
   await tx`
-    update runs set input = case when input = '' then ${input} else input || E'\n\n' || ${input} end,
+    update runs set input = ${appendFollowupInput(rows[0].input ?? "", input)},
       updated_at = now()
      where organization_id = ${run.organizationId} and id = ${run.id}
        and status in ('queued') and hermes_run_id is null and lease_owner is null

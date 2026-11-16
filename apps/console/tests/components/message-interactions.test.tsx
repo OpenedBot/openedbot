@@ -12,6 +12,7 @@ const labels: MessageInteractionLabels = {
   reply: "Répondre",
   react: "Réagir",
   removeReaction: "Retirer la réaction",
+  reactionFailed: "La réaction n’a pas pu être enregistrée.",
   more: "Plus d’actions sur le message",
   quoteFrom: (author) => `Voir le message de ${author}`,
   operator: "Vous",
@@ -120,7 +121,7 @@ describe("MessageInteractionShell", () => {
     const calls: unknown[][] = [];
     render(below({ onReaction: async (...args: unknown[]) => { calls.push(args); } }));
     fireEvent.click(screen.getByRole("button", { name: labels.react }));
-    const picker = await screen.findByRole("group", { name: labels.react });
+    const picker = await screen.findByRole("toolbar", { name: labels.react });
     fireEvent.click(picker.querySelector("button")!);
     await act(async () => {});
     expect(calls).toHaveLength(1);
@@ -352,17 +353,37 @@ describe("MessageInteractionShell", () => {
     }
   });
 
-  test("opens the reaction picker above the composer instead of extending the thread", () => {
-    expect(reactionPickerPosition(
-      { top: 700, bottom: 728, left: 40, right: 68 },
-      { width: 800, height: 800 },
-      "start",
-    )).toEqual({ top: 652, left: 40, side: "top" });
-    expect(reactionPickerPosition(
-      { top: 80, bottom: 108, left: 40, right: 68 },
-      { width: 800, height: 800 },
-      "start",
-    )).toEqual({ top: 116, left: 40, side: "bottom" });
+  describe("reaction picker placement", () => {
+    const bounds = { top: 12, bottom: 818, left: 284, right: 1428 };
+    const size = { width: 218, height: 34 };
+    const trigger = (top: number) => ({ top, bottom: top + 32, left: 378, right: 410 });
+
+    test("opens below the action row when the thread has room", () => {
+      expect(reactionPickerPosition(trigger(300), bounds, "start", size))
+        .toEqual({ top: 338, left: 378, side: "bottom" });
+    });
+
+    test("opens beside the trigger on the action row, never over the reply above it", () => {
+      const anchor = trigger(770);
+      const placed = reactionPickerPosition(anchor, bounds, "start", size);
+      expect(placed.side).toBe("inline");
+      expect(placed.left).toBeGreaterThanOrEqual(anchor.right);
+      // Entirely below the reply's last line, which ends where the row starts.
+      expect(placed.top).toBeGreaterThanOrEqual(anchor.top - 1);
+      expect(placed.top + size.height).toBeLessThanOrEqual(bounds.bottom - 8);
+    });
+
+    test("an operator bubble opens it beside, towards the bubble side", () => {
+      const anchor = { top: 770, bottom: 802, left: 1300, right: 1332 };
+      const placed = reactionPickerPosition(anchor, bounds, "end", size);
+      expect(placed).toMatchObject({ side: "inline", left: 1300 - 6 - 218 });
+    });
+
+    test("flips above only when neither below nor beside fits", () => {
+      const narrow = { top: 0, bottom: 400, left: 0, right: 260 };
+      const placed = reactionPickerPosition({ top: 360, bottom: 392, left: 16, right: 48 }, narrow, "start", size);
+      expect(placed).toEqual({ top: 360 - 6 - 34, left: 16, side: "top" });
+    });
   });
 
   test("portals the emoji picker to the document so a last-card click stays in view", async () => {
@@ -379,7 +400,7 @@ describe("MessageInteractionShell", () => {
       </MessageInteractionShell>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Réagir" }));
-    const picker = await screen.findByRole("group", { name: "Réagir" });
+    const picker = await screen.findByRole("toolbar", { name: "Réagir" });
     expect(picker.parentElement).toBe(document.body);
     expect(picker.style.position).toBe("fixed");
   });
@@ -421,3 +442,98 @@ describe("clic droit sur un message", () => {
   });
 });
 
+
+describe("reactions of a member", () => {
+  const both = [
+    { emoji: "❤️", count: 1, reactedByMe: true },
+    { emoji: "👍", count: 1, reactedByMe: true },
+  ];
+  const chrome = (props: Partial<Parameters<typeof MessageInteractionShell>[0]> = {}) => (
+    <MessageInteractionShell surface="chrome" messageId="msg-1" align="start" labels={labels}
+      reactions={both} onReaction={() => {}} {...props}><p>reply</p></MessageInteractionShell>
+  );
+  const card = (props: Partial<Parameters<typeof MessageInteractionShell>[0]> = {}) => (
+    <MessageInteractionShell surface="card" messageId="msg-1" align="start" width="fill" actions="below"
+      persistentActions labels={labels} reactions={both} onReaction={() => {}} {...props}><p>reply</p></MessageInteractionShell>
+  );
+  const chipsOf = (container: HTMLElement) => [...container.querySelectorAll("[data-message-reactions] button")]
+    .map((chip) => `${chip.textContent}:${chip.getAttribute("aria-pressed")}`);
+
+  test("a bot reply shows every stored reaction, 👍 included, in palette order", () => {
+    const { container } = render(chrome());
+    expect(chipsOf(container)).toEqual(["👍 1:true", "❤️ 1:true"]);
+  });
+
+  test("the picker's pressed emojis are exactly the member's chips", async () => {
+    const { container } = render(<>{chrome()}{card()}</>);
+    fireEvent.click(screen.getByRole("button", { name: labels.react }));
+    const picker = await screen.findByRole("toolbar", { name: labels.react });
+    const pressed = [...picker.querySelectorAll("button[aria-pressed='true']")].map((button) => button.textContent ?? "");
+    const mine = [...container.querySelectorAll("[data-message-reactions] button[aria-pressed='true']")]
+      .map((chip) => chip.textContent?.split(" ")[0] ?? "");
+    expect(pressed).toEqual(mine);
+    expect(pressed).toEqual(["👍", "❤️"]);
+  });
+
+  test("clicking a chip toggles the member's reaction for that emoji", async () => {
+    const calls: unknown[][] = [];
+    render(chrome({
+      reactions: [{ emoji: "🎉", count: 2, reactedByMe: false }, ...both],
+      onReaction: async (...args: unknown[]) => { calls.push(args); },
+    }));
+    fireEvent.click(screen.getByRole("button", { name: `${labels.removeReaction} 👍` }));
+    fireEvent.click(screen.getByRole("button", { name: `${labels.react} 🎉` }));
+    await act(async () => {});
+    expect(calls).toEqual([["msg-1", "👍", true], ["msg-1", "🎉", false]]);
+  });
+
+  test("a pressed emoji in the picker removes it and closes the picker", async () => {
+    const calls: unknown[][] = [];
+    render(card({ onReaction: async (...args: unknown[]) => { calls.push(args); } }));
+    fireEvent.click(screen.getByRole("button", { name: labels.react }));
+    const picker = await screen.findByRole("toolbar", { name: labels.react });
+    fireEvent.click(picker.querySelector("button")!);
+    await act(async () => {});
+    expect(calls).toEqual([["msg-1", "👍", true]]);
+    expect(screen.queryByRole("toolbar", { name: labels.react })).toBeNull();
+  });
+
+  test("a failed reaction is announced", async () => {
+    render(chrome({ onReaction: async () => { throw new Error("offline"); } }));
+    fireEvent.click(screen.getByRole("button", { name: `${labels.removeReaction} ❤️` }));
+    expect((await screen.findByRole("alert")).textContent).toBe(labels.reactionFailed);
+  });
+
+  test("the picker is a keyboard toolbar: arrows move, Escape closes back on the trigger", async () => {
+    render(card({ reactions: [] }));
+    const trigger = screen.getByRole("button", { name: labels.react });
+    fireEvent.click(trigger);
+    const picker = await screen.findByRole("toolbar", { name: labels.react });
+    const buttons = [...picker.querySelectorAll("button")];
+    await act(async () => {});
+    expect(document.activeElement).toBe(buttons[0]!);
+    fireEvent.keyDown(picker, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(buttons[1]!);
+    fireEvent.keyDown(picker, { key: "ArrowLeft" });
+    fireEvent.keyDown(picker, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(buttons.at(-1)!);
+    fireEvent.keyDown(picker, { key: "Escape" });
+    expect(screen.queryByRole("toolbar", { name: labels.react })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  test("the picker exposes the side it opened on", async () => {
+    render(card());
+    fireEvent.click(screen.getByRole("button", { name: labels.react }));
+    const picker = await screen.findByRole("toolbar", { name: labels.react });
+    expect(["bottom", "inline", "top"]).toContain(picker.getAttribute("data-side")!);
+  });
+
+  test("an outside click closes the picker", async () => {
+    render(card());
+    fireEvent.click(screen.getByRole("button", { name: labels.react }));
+    await screen.findByRole("toolbar", { name: labels.react });
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("toolbar", { name: labels.react })).toBeNull();
+  });
+});

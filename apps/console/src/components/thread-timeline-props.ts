@@ -28,6 +28,8 @@ export type ThreadTimelineProps = {
     authorBot?: MessageAuthorBot | null;
     /** ISO. Used to interleave by time with the runs that have no message (salons). */
     createdAt?: string;
+    /** The send's idempotency key: the saved turn keeps the element its optimistic bubble mounted. */
+    clientSubmissionId?: string | null;
   }>;
   /**
    * Send in flight, rendered after the memoized entries so `isPending` does

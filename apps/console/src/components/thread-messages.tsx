@@ -103,7 +103,7 @@ export function ModelUnavailableNotice({
   );
 }
 
-/** Dev only: the real duration under the reply (the reference app shows nothing). */
+/** Dev only: the real duration on the reply's action row (the reference app shows nothing). */
 const SHOW_RUN_TIMING = import.meta.env.DEV === true;
 
 /**
@@ -116,16 +116,18 @@ const SHOW_RUN_TIMING = import.meta.env.DEV === true;
  */
 export const AssistantMessage = memo(function AssistantMessage({
   text: targetText,
+  runId,
   attachments,
   author,
   streaming = false,
   timing = null,
-  liveSince = null,
+  showTiming = SHOW_RUN_TIMING,
   findTargetId,
   findActive = false,
   hover,
 }: {
   text: string;
+  runId?: string;
   attachments?: readonly MessageAttachmentChip[];
   /** The bubble's author: face + name, like a message relayed from another bot. */
   author?: MessageAuthorBot | null;
@@ -134,10 +136,10 @@ export const AssistantMessage = memo(function AssistantMessage({
    * character (`useSmoothText`) instead of jumping in 500 ms SSE bursts.
    */
   streaming?: boolean;
-  /** The run's real duration, once finished: in the tooltip, and under the bubble in dev. */
+  /** The run's real duration, once finished: after the action row's « … », in dev. */
   timing?: RunTiming | null;
-  /** ISO: creation of the run in progress, where the counter (dev) starts while it is writing. */
-  liveSince?: string | null;
+  /** Dev builds only (`SHOW_RUN_TIMING`); a prop so tests can reach both layouts. */
+  showTiming?: boolean;
   findTargetId: string;
   findActive?: boolean;
   hover?: MessageCardHover;
@@ -159,11 +161,11 @@ export const AssistantMessage = memo(function AssistantMessage({
       data-thread-find-target={author || hover ? undefined : findTargetId}
       data-assistant-layout="stream"
       tabIndex={-1}
-      className={`w-fit max-w-[min(80%,560px,calc(100%-82px))] min-w-0 self-start rounded-[18px] px-3 py-[7px] ${findActive ? "ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
+      className={`w-full min-w-0 self-start ${findActive ? "ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
       {/* `wrap-anywhere`: an endless URL (Google News RSS links…) must
           break inside the reply, never widen the thread into a horizontal scroll. */}
-      <div className="prose max-w-none wrap-anywhere text-[15px] leading-[22.5px] prose-code:before:content-none prose-code:after:content-none">
+      <div data-assistant-text="" className="prose max-w-none wrap-anywhere text-[15px] leading-[22.5px] prose-code:before:content-none prose-code:after:content-none">
         <ThreadMarkdown streaming={streaming}>{markdown}</ThreadMarkdown>
       </div>
     </div>
@@ -183,6 +185,8 @@ export const AssistantMessage = memo(function AssistantMessage({
       onReply={hover.onReply}
       onReaction={hover.onReaction}
       speaker={hover.speakerFor?.("body", hover.copyText ?? markdown)}
+      // On the action row, never a line of its own: dev and prod keep the same height.
+      footerEnd={showTiming && timing ? <span data-run-timing=""><RunTimingBadge timing={timing} /></span> : undefined}
     >
       {surface}
     </MessageInteractionShell>
@@ -194,13 +198,8 @@ export const AssistantMessage = memo(function AssistantMessage({
       data-thread-find-target={author || hover ? findTargetId : undefined}
       className={`group/reply flex w-full max-w-full flex-col items-start self-start text-body-regular ${findActive ? "rounded-[var(--radius-2-5xl)] ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
-      <div data-assistant-response="" className="flex w-full min-w-0 flex-col items-start">
+      <div data-assistant-response="" data-run-id={runId} className="flex w-full min-w-0 flex-col items-start">
         {body}
-        {SHOW_RUN_TIMING && (timing || liveSince) ? (
-          <div data-run-timing="" className="px-1">
-            <RunTimingBadge timing={timing} liveSince={liveSince} />
-          </div>
-        ) : null}
       </div>
       {attachments?.length ? (
         <ul className="mt-1.5 flex flex-wrap gap-1.5">
@@ -250,7 +249,7 @@ export function RoomAnswerCard({
     <section
       data-room-answer=""
       aria-label={t("threadTimeline.roomAnswer", { names: names.join(", ") })}
-      className="flex w-fit max-w-[min(560px,100%)] flex-col self-start"
+      className="flex w-full min-w-0 flex-col self-start"
     >
       {synthesis ? (
         <>
@@ -331,29 +330,33 @@ export const UserMessage = memo(function UserMessage({
       {/* the reference app's bubble: radius 18, 7 × 12, 15/22, 560 px at most;
           the fill (neutral or the bot's colour) in `thread-theme.css`. */}
       {text ? (
-    <div
-      data-user-bubble=""
-      className="w-fit max-w-[min(560px,100%)] whitespace-pre-wrap break-words rounded-[18px] px-3 py-[7px] text-start text-[15px] leading-[22px]"
-    >
-      {segments.map((segment, index) =>
-        segment.kind === "mention" ? (
-          // A TEXT accent, never a fill: the bubble already carries a background.
-          // On the fill (the bot's colour or ink), the mention keeps the colour
-          // of the text, underlined and semi-bold (`thread-theme.css`).
-          <span
-            key={index}
-            data-mention={segment.slug}
-            className="font-semibold"
+        // The actions hang beside the bubble without taking a line of their own:
+        // in flow they reserved 34 px under every sent message.
+        <div data-user-bubble-row="" className="relative flex max-w-full flex-col items-end">
+          <div
+            data-user-bubble=""
+            className="w-fit max-w-[min(560px,100%)] whitespace-pre-wrap break-words rounded-[18px] px-3 py-[7px] text-start text-[15px] leading-[22px]"
           >
-            {segment.raw}
-          </span>
-        ) : (
-          segment.text
-        ),
-      )}
-    </div>
+            {segments.map((segment, index) =>
+              segment.kind === "mention" ? (
+                // A TEXT accent, never a fill: the bubble already carries a background.
+                // On the fill (the bot's colour or ink), the mention keeps the colour
+                // of the text, underlined and semi-bold (`thread-theme.css`).
+                <span
+                  key={index}
+                  data-mention={segment.slug}
+                  className="font-semibold"
+                >
+                  {segment.raw}
+                </span>
+              ) : (
+                segment.text
+              ),
+            )}
+          </div>
+          <UserTurnActions text={text} onEdit={editAllowed ? onEdit : undefined} />
+        </div>
       ) : null}
-      {text ? <UserTurnActions text={text} onEdit={editAllowed ? onEdit : undefined} /> : null}
       {steeredIntoActive || steeredIntoSettled ? (
         <p className="px-1 text-xs text-muted-foreground">
           {t(steeredIntoActive ? "threadTimeline.steeredIntoActive" : "threadTimeline.steeredIntoSettled")}
@@ -377,8 +380,15 @@ function UserTurnActions({ text, onEdit }: { text: string; onEdit?: () => void }
     }
   };
   const button = "grid size-8 place-items-center rounded-full text-[var(--stream-fg2)] outline-none transition-colors hover:bg-[var(--stream-hover)] hover:text-[var(--stream-fg)] focus-visible:ring-2 focus-visible:ring-border-focus-ring";
+  // Left of the bubble, on its last line: an overlay over the empty side of the
+  // lane, so it never covers the next turn. Hidden, it is not clickable either;
+  // the keyboard still reaches it (`focus-within`). Touch has no hover: the
+  // long-press sheet of `MessageInteractionShell` carries copy and edit.
   return (
-    <div data-user-turn-actions="" className="-mt-1 flex h-8 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+    <div
+      data-user-turn-actions=""
+      className="pointer-events-none absolute bottom-0.5 right-full z-[1] flex h-8 pe-1 opacity-0 transition-opacity group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 pointer-coarse:hidden"
+    >
       {onEdit ? (
         <button type="button" aria-label={t("threadTimeline.streamEdit")} title={t("threadTimeline.streamEdit")} onClick={onEdit} className={button}>
           <StreamIcon name="edit" className="size-4" />

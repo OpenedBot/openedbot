@@ -41,7 +41,7 @@ const RULES: Readonly<Record<RoutineToolAvailability, string>> = {
     "A time of day needs the user's IANA timezone: take it from the `[routine_manage user timezone: …]` line at the end of their message; when it says unknown, ask them before creating, never guess.",
     "Pass the run key from the `[routine_manage run_key: …]` line.",
     "Never call `routine_manage` for a greeting or small talk. Create only what the user's current message asks for or agrees to, directly, without listing first; never create again to confirm an earlier routine.",
-    "`list` only reads: call it when the user asks about their routines, when you are unsure whether a routine already exists, or to find the `job_id` of a routine to update, pause, resume or remove; never guess one.",
+    "`list` only reads: call it only when the user's current request concerns routines and you need to read their current state, avoid duplicating a requested creation, or find the `job_id` of a routine to update, pause, resume or remove; never guess one. Uncertainty about an earlier routine alone is not a reason to call tools on a greeting or small talk.",
     "After a successful call, tell them what now exists: its name, its schedule in plain words with its timezone, and that they can change or remove it from your menu \"Routines…\".",
     "Never claim a routine was created, changed or removed unless a call in this turn confirmed it; when a call fails, say so with its reason. To speak of existing routines, list them or repeat only what the conversation already says, without asserting more.",
   ].join(" "),

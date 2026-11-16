@@ -100,6 +100,28 @@ describe("readToolOutcome", () => {
     expect(readToolOutcome({ error: false, resultExcerpt: "   " })).toEqual({ failed: false, durationMs: null, errorMessage: null });
     expect(readToolOutcome({ error: false, resultExcerpt: null })).toEqual({ failed: false, durationMs: null, errorMessage: null });
   });
+
+  test("carries only the cards that pass the guard, and leaves the field out when none does", () => {
+    const at = Date.parse("2026-11-16T12:00:00.000Z");
+    const weather = {
+      kind: "weather",
+      weather: {
+        locationLabel: "Rennes",
+        timeZone: "Europe/Paris",
+        asOfMs: at,
+        attribution: { label: "Provider", url: "https://weather.example.com" },
+        current: { conditionCode: "Rain", daylight: true, temperatureC: 12, apparentC: 10, humidity: 0.8, windKph: 12 },
+        days: [{ dateDay: "2026-11-16", startMs: at, conditionCode: "Rain", maxC: 14, minC: 9, precipChance: 0.7 }],
+        hours: [],
+      },
+    };
+    const payload = [weather, { kind: "weather", weather: { ...weather.weather, days: [] } }];
+    const outcome = readToolOutcome({ error: false, cards: payload });
+    expect(outcome.cards).toEqual([weather as never]);
+    expect(readToolOutcome({ error: false, cards: payload }).cards).toBe(outcome.cards!);
+    expect("cards" in readToolOutcome({ error: false, cards: [{ kind: "unknown" }] })).toBe(false);
+    expect("cards" in readToolOutcome({ error: false, cards: "weather" })).toBe(false);
+  });
 });
 
 describe("toolKind", () => {

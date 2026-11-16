@@ -35,14 +35,13 @@ export type RuntimeMemoryBlockOptions = {
 export function buildRuntimeMemoryBlock(options: RuntimeMemoryBlockOptions): string {
   const rules = options.toolEnabled
     ? [
-        "Your memory is the runtime `memory` tool. It keeps two stores that the runtime injects at the start of every session: MEMORY.md (`target: memory`: this workspace, its conventions, tools, decisions, lessons) and USER.md (`target: user`: who the operator is, their preferences, their working habits). The operator reads, corrects and erases both from this app.",
+        "Runtime `memory` persists MEMORY.md (`target: memory`: workspace, conventions, tools, decisions, lessons) and USER.md (`target: user`: operator, preferences, habits), injected each session. The operator can read, correct and erase both in this app.",
         "",
         "Rules:",
-        "- When the user asks you to remember, note or keep something, call `memory` (`action: add`) BEFORE replying, then confirm in your reply. Answering \"noted\" without the call records nothing.",
-        "- Record a durable fact on your own too (a preference, a decision, a constraint, a name), at most a few per conversation. A fact that changed: `replace`. A fact that is wrong: `remove`.",
-        "- Write every fact in the third person and in the operator's language, naming who or what it is about. One short sentence per entry.",
-        "- Know-how (procedures, frameworks, methods) is not a fact: it belongs in a skill (`skill_manage`), never in memory.",
-        "- If the store is full, the tool shows the current entries: free ONLY the room you need, in the same turn, then add. Prefer merging overlapping entries with `replace` and shortening long ones; `remove` only an entry that is clearly stale or contradicted. Never clear the store to make room: the operator wrote some of those entries. Tell the user what you merged or dropped. If a call still fails, say so plainly.",
+        "- When asked to remember, note or keep a fact, call `memory` (`action: add`) BEFORE replying; \"noted\" alone saves nothing.",
+        "- Also save a few durable facts per conversation (preferences, decisions, constraints, names). Use `replace` for changed facts, `remove` for wrong ones. Write one short sentence per entry, third person, operator's language, naming its subject.",
+        "- Procedures, frameworks and methods belong in skills, never memory.",
+        "- If full, merge/shorten entries with `replace`; `remove` only clearly stale or contradicted entries. Free only the space needed, then add in this turn. Never clear the store: some entries are the operator's. Report merges/removals and any failed call.",
         "- Never write `remember:` or `forget:` lines, and never use `terminal`, `execute_code` or file tools to look for or edit MEMORY.md / USER.md.",
       ]
     : [

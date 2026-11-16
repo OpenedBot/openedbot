@@ -121,7 +121,7 @@ export function turnFeed(members: readonly Entry[], t: Translate, speaker: Strea
   for (const member of members) {
     if (member.kind === "assistant") {
       const text = statusText(member.text);
-      if (text) items.push(speaker ? { id: member.key, kind: "msg", agent: speaker, text } : { id: member.key, kind: "status", text });
+      if (text) items.push(speaker ? { id: member.key, kind: "msg", agent: speaker, text } : { id: member.key, kind: "status", text, assistantText: true });
       continue;
     }
     if (member.kind === "search") {

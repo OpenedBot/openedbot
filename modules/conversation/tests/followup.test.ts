@@ -1,13 +1,30 @@
 import { describe, expect, test } from "bun:test";
-import { isAbsorbedRun, mergeFollowupInputs, SUPERSEDED_NOTICE_KIND } from "../src/domain/followup";
+import { appendFollowupInput, isAbsorbedRun, mergeFollowupInputs, SUPERSEDED_NOTICE_KIND } from "../src/domain/followup";
 import { statusFromEvent } from "../src/domain/thread-snapshot-mutations";
 import { runToolTerminalStates } from "../src/domain/thread-tools";
 
 describe("rafale de messages", () => {
-  test("les messages fusionnent en une seule chaîne, une ligne vide entre deux", () => {
-    expect(mergeFollowupInputs(["capitale du Japon ?", "  ", "\ncapitale du Mexique ?\n"]))
-      .toBe("capitale du Japon ?\n\ncapitale du Mexique ?");
+  test("a burst merges into one numbered string the model answers as a whole", () => {
+    expect(mergeFollowupInputs(["et au havre ?", "  ", "\ntest\n"])).toBe(
+      "[2 messages sent in a row by the user — answer all of them together]\n1. et au havre ?\n2. test",
+    );
+    expect(mergeFollowupInputs(["a", "b\nsuite", "c"])).toBe(
+      "[3 messages sent in a row by the user — answer all of them together]\n1. a\n2. b\nsuite\n3. c",
+    );
+  });
+
+  test("a single message stays verbatim, with no header", () => {
+    expect(mergeFollowupInputs(["  capitale du Japon ?\n"])).toBe("capitale du Japon ?");
+    expect(mergeFollowupInputs(["", "capitale du Japon ?"])).toBe("capitale du Japon ?");
     expect(mergeFollowupInputs([])).toBe("");
+  });
+
+  test("a fold renumbers an already merged burst instead of nesting it", () => {
+    const two = appendFollowupInput("et au havre ?", "test");
+    expect(two).toBe(mergeFollowupInputs(["et au havre ?", "test"]));
+    expect(appendFollowupInput(two, " et à Rouen ? ")).toBe(mergeFollowupInputs(["et au havre ?", "test", "et à Rouen ?"]));
+    expect(appendFollowupInput(two, "  ")).toBe(two);
+    expect(appendFollowupInput("", "test")).toBe("test");
   });
 
   test("un run absorbé est un run annulé sans réponse propre", () => {

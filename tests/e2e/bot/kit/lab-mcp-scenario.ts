@@ -1,6 +1,7 @@
 import type { BotDto, GroupDto } from '@openedbot/contracts-api';
 import type { ScenarioContext } from './scenario';
-import { capabilities, completed, invariant, matchingToolResult, noTools, poll, toolEvents } from './p1-evidence';
+import { capabilities, completed, invariant, matchingToolResult, noTools, poll, toolEvents, toolset } from './p1-evidence';
+import { smallTalkWithDiscovery } from './small-talk';
 import { executeLabMcpCommand, type LabMcpCommand } from './lab-mcp-command';
 import type { LabMcpTarget } from './lab-mcp-contract';
 import { LabMcpFixture } from './lab-mcp-fixture';
@@ -37,6 +38,7 @@ export async function labMcpScenario(context: ScenarioContext, bot: BotDto, grou
         invariant(session.hasFeature(feature), `The runtime does not advertise ${feature}.`);
       }
       await noTools(session, bot);
+      await toolset(session, bot, 'skills', true);
       setupAttempted = true;
       await fixture.setup();
       const on = await session.api<{ enabled: boolean; applied: boolean }>('POST',
@@ -56,14 +58,23 @@ export async function labMcpScenario(context: ScenarioContext, bot: BotDto, grou
     await rec.step('Appel MCP natif et reçu hôte indépendant', async () => {
       const challenge = crypto.randomUUID();
       const receipt = await fixture.snapshot();
-      const turn = await sendFixtureOnce(context, bot, group.threadId, `@${bot.slug} Call ${fixture.toolName} with challenge ${challenge}. Return only the exact synthetic test marker returned by that call. ${nativeInvocation(challenge)} Do not invent a value.`,
+      const turn = await sendFixtureOnce(context, bot, group.threadId, `@${bot.slug} First use tool_search to discover ${fixture.toolName}, then tool_describe to read its schema. Call ${fixture.toolName} with challenge ${challenge}. Return only the exact synthetic test marker returned by that call. ${nativeInvocation(challenge)} Do not invent a value.`,
         { kind: 'lab-mcp-read', target, receipt, challenge });
       completed(turn, fixture.secret);
-      matchingToolResult(await toolEvents(context, turn.runId), fixture.toolName);
+      const events = await toolEvents(context, turn.runId);
+      for (const tool of ['tool_search', 'tool_describe', fixture.toolName]) matchingToolResult(events, tool);
       const calls = (await fixture.receipts()).filter((call) => call.challenge === challenge);
       invariant(calls.length === 1 && calls[0]?.succeeded, 'The host did not record exactly one successful native probe for this turn.');
       return { runId: turn.runId, nativeTool: fixture.toolName, exactSecret: true, hostReceipts: calls.length,
         onceApprovals: turn.fixtureApprovals, gateForwardConfirmed: turn.fixtureGateForwardConfirmed };
+    });
+    await rec.step('Salutations sans outil avec skills et découverte MCP disponibles', async () => {
+      const before = await fixture.snapshot();
+      const groupRunId = await smallTalkWithDiscovery(context, bot, fixture.serverName, group.threadId, `@${bot.slug} ça va ti ?`);
+      const dmRunId = await smallTalkWithDiscovery(context, bot, fixture.serverName, bot.threadId, 'ça va ti ?');
+      const after = await fixture.snapshot();
+      invariant(JSON.stringify(after.calls) === JSON.stringify(before.calls), 'A greeting reached the native MCP fixture.');
+      return { groupRunId, dmRunId, toolCalls: 0, skillsEnabled: true, discoveryProvenByPreviousTurn: true };
     });
     await rec.step('Indisponibilité réelle du MCP et erreur explicite', async () => {
       await fixture.setOnline(false);

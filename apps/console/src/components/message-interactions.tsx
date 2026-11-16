@@ -3,14 +3,11 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
 import {
   Check,
@@ -29,14 +26,11 @@ import {
 import { ContextMenu } from "radix-ui";
 import {
   MESSAGE_REACTION_EMOJIS,
+  isMessageReactionEmoji,
   replyQuoteText,
   type MessageReactionEmoji,
 } from "@openedbot/conversation/domain/message-reply";
-import type {
-  MessageReactionDto,
-  MessageReplyPreview,
-} from "@openedbot/contracts-api";
-import type { MessageVersionFamilyDto, MessageVersionLinkDto } from "@openedbot/contracts-api";
+import type { MessageReactionDto, MessageReplyPreview, MessageVersionFamilyDto, MessageVersionLinkDto } from "@openedbot/contracts-api";
 import { currentMessageVersionIndex } from "@openedbot/conversation/domain/message-version";
 import {
   cn,
@@ -48,13 +42,19 @@ import {
   useCoarsePointer,
 } from "@openedbot/browser-ui-kit";
 import { haptics } from "../lib/platform/haptics";
+import { reactedByMe, sortReactions } from "../lib/thread/message-reactions";
 import { RiFileCopyLine, RiMoreFill } from "@remixicon/react";
 import { BUI_MENU_ITEM, BUI_POPOVER, BuiContextMenu, BuiContextMenuContent, BuiContextMenuItem, BuiContextMenuTrigger } from "./boardui/menu";
+import { ReactionPicker } from "./message-reaction-picker";
+
+export { reactionPickerPosition, type ReactionPickerPlacement } from "./message-reaction-picker";
 
 export type MessageInteractionLabels = {
   reply: string;
   react: string;
   removeReaction: string;
+  /** Said when a reaction could not be saved (the toggle is reverted). */
+  reactionFailed: string;
   more: string;
   quoteFrom: (author: string) => string;
   operator: string;
@@ -103,10 +103,6 @@ const ACTION =
  */
 const BELOW_ACTION =
   "grid size-8 shrink-0 place-items-center rounded-full text-[var(--stream-fg2)] outline-none transition-colors hover:bg-[var(--stream-hover)] hover:text-[var(--stream-fg)] data-[state=open]:bg-[var(--stream-hover)] data-[state=open]:text-[var(--stream-fg)] focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50 aria-pressed:text-[var(--stream-fg)] motion-reduce:transition-none";
-
-/** The two ratings of the BoardUI template: useful, not useful. Exclusive. */
-const HELPFUL: MessageReactionEmoji = "👍";
-const UNHELPFUL: MessageReactionEmoji = "👎";
 
 /** Duration of a long press: that of `Pressable` / the iOS context menu. */
 const LONG_PRESS_MS = 450;
@@ -173,27 +169,6 @@ function useLongPress(onLongPress: () => void, enabled: boolean): Partial<DOMAtt
   };
 }
 
-const PICKER_H = 40;
-const PICKER_W = 232;
-/** Composer + model label: the in-flow picker fell behind / below the fold. */
-const COMPOSER_RESERVE = 96;
-
-export function reactionPickerPosition(
-  anchor: { top: number; bottom: number; left: number; right: number },
-  viewport: { width: number; height: number },
-  align: "start" | "end",
-): { top: number; left: number; side: "top" | "bottom" } {
-  const spaceBelow = viewport.height - anchor.bottom;
-  const side: "top" | "bottom" = spaceBelow < PICKER_H + COMPOSER_RESERVE ? "top" : "bottom";
-  const top = side === "top"
-    ? Math.max(8, anchor.top - PICKER_H - 8)
-    : anchor.bottom + 8;
-  const left = align === "end"
-    ? Math.max(8, anchor.right - PICKER_W)
-    : Math.max(8, Math.min(anchor.left, viewport.width - PICKER_W - 8));
-  return { top, left, side };
-}
-
 /**
  * The right click keeps the browser menu where it is useful: a text
  * selection (copy, search), a link, an image, a field. Stopped in capture,
@@ -233,10 +208,13 @@ export function MessageInteractionShell({
   onRegenerate,
   onSelectVersion,
   footerStart,
+  footerEnd,
 }: {
   children: ReactNode;
   /** `below` bar: what precedes the actions on the same line (the author). */
   footerStart?: ReactNode;
+  /** `below` bar: meta after the actions on the same line, centred on them (the dev run timing). */
+  footerEnd?: ReactNode;
   /** Visual context placed above the message, outside the zone that anchors
    * the hover actions. An answered question must not widen the bubble. */
   context?: ReactNode;
@@ -278,7 +256,7 @@ export function MessageInteractionShell({
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pendingEmoji, setPendingEmoji] = useState<MessageReactionEmoji | null>(null);
+  const [reactionFailed, setReactionFailed] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -321,6 +299,12 @@ export function MessageInteractionShell({
   }, [copyState]);
 
   useEffect(() => {
+    if (!reactionFailed) return;
+    const timer = window.setTimeout(() => setReactionFailed(false), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [reactionFailed]);
+
+  useEffect(() => {
     if (!pickerOpen) return;
     const onDoc = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -350,30 +334,22 @@ export function MessageInteractionShell({
   };
   const copy = () => copyValue(copyText);
 
-  const reacted = (emoji: MessageReactionEmoji) =>
-    reactions.some((reaction) => reaction.emoji === emoji && reaction.reactedByMe);
-  /** « utile » and « inutile » exclude each other: setting one removes the other. */
-  const toggleVerdict = async (emoji: MessageReactionEmoji) => {
-    if (!messageId || !onReaction || pendingEmoji) return;
-    const other = emoji === HELPFUL ? UNHELPFUL : HELPFUL;
-    const active = reacted(emoji);
-    setPendingEmoji(emoji);
-    try {
-      if (!active && reacted(other)) await onReaction(messageId, other, true);
-      await onReaction(messageId, emoji, active);
-    } finally {
-      setPendingEmoji(null);
-    }
-  };
+  const reacted = (emoji: MessageReactionEmoji) => reactedByMe(reactions, emoji);
+  const chips = sortReactions(reactions);
 
+  /**
+   * Every emoji is its own toggle for the current member (one row per
+   * member, message and emoji). The screen applies it optimistically and
+   * reverts it on failure; the rejection only feeds the alert here.
+   */
   const toggle = async (emoji: MessageReactionEmoji, active: boolean) => {
-    if (!messageId || !onReaction || pendingEmoji) return;
-    setPendingEmoji(emoji);
+    if (!messageId || !onReaction) return;
+    setPickerOpen(false);
+    setReactionFailed(false);
     try {
       await onReaction(messageId, emoji, active);
-      setPickerOpen(false);
-    } finally {
-      setPendingEmoji(null);
+    } catch {
+      setReactionFailed(true);
     }
   };
 
@@ -428,8 +404,7 @@ export function MessageInteractionShell({
                       <ContextMenu.Item
                         key={emoji}
                         aria-label={active ? `${labels.removeReaction} ${emoji}` : `${labels.react} ${emoji}`}
-                        disabled={pendingEmoji !== null}
-                        onSelect={() => void (emoji === HELPFUL || emoji === UNHELPFUL ? toggleVerdict(emoji) : toggle(emoji, active))}
+                        onSelect={() => void toggle(emoji, active)}
                         className={cn("flex size-8 cursor-pointer items-center justify-center rounded-2lg p-0 text-base outline-none data-[highlighted]:bg-dropdown-item-hover-background", active && "bg-background-tertiary-default")}
                       >
                         {emoji}
@@ -516,8 +491,8 @@ export function MessageInteractionShell({
                       align={align}
                       labels={labels}
                       reactions={reactions}
-                      pendingEmoji={pendingEmoji}
                       onToggle={toggle}
+                      onClose={() => setPickerOpen(false)}
                     />
                   ) : null}
                 </div>
@@ -578,6 +553,7 @@ export function MessageInteractionShell({
                 </DropdownMenu>
               ) : null}
             </div>
+            {footerEnd ? <div data-message-actions-trailing="" className="mt-0.5 flex h-8 shrink-0 items-center">{footerEnd}</div> : null}
           </div>
         ) : null}
         {side ? (
@@ -614,8 +590,8 @@ export function MessageInteractionShell({
                     align={align}
                     labels={labels}
                     reactions={reactions}
-                    pendingEmoji={pendingEmoji}
                     onToggle={toggle}
+                    onClose={() => setPickerOpen(false)}
                   />
                 ) : null}
               </div>
@@ -713,16 +689,18 @@ export function MessageInteractionShell({
           </button>
         </div>
       ) : null}
-      {showChrome && messageId && reactions.some((reaction) => align === "end" || (reaction.emoji !== HELPFUL && reaction.emoji !== UNHELPFUL)) ? (
-        <div className={`flex flex-wrap items-center gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}>
-          {reactions.filter((reaction) => align === "end" || (reaction.emoji !== HELPFUL && reaction.emoji !== UNHELPFUL)).map((reaction) => (
+      {showChrome && messageId && chips.length > 0 ? (
+        <div data-message-reactions="" className={`flex flex-wrap items-center gap-1 ${align === "end" ? "justify-end" : "justify-start"}`}>
+          {chips.map((reaction) => (
             <button
               key={reaction.emoji}
               type="button"
               aria-pressed={reaction.reactedByMe}
-              aria-label={reaction.reactedByMe ? labels.removeReaction : labels.react}
-              disabled={!onReaction || pendingEmoji !== null}
-              onClick={() => void toggle(reaction.emoji as MessageReactionEmoji, reaction.reactedByMe)}
+              aria-label={`${reaction.reactedByMe ? labels.removeReaction : labels.react} ${reaction.emoji}`}
+              disabled={!onReaction || !isMessageReactionEmoji(reaction.emoji)}
+              onClick={() => {
+                if (isMessageReactionEmoji(reaction.emoji)) void toggle(reaction.emoji, reaction.reactedByMe);
+              }}
               className={`rounded-full border px-2 py-0.5 text-xs tabular-nums transition-colors ${
                 reaction.reactedByMe
                   ? "border-primary/40 bg-primary/10 text-foreground"
@@ -743,7 +721,6 @@ export function MessageInteractionShell({
           onClose={() => setSheetOpen(false)}
           labels={labels}
           reactions={canReact ? reactions : null}
-          pendingEmoji={pendingEmoji}
           onToggleReaction={toggle}
           actions={[
             canReply && messageId
@@ -773,6 +750,7 @@ export function MessageInteractionShell({
       ) : null}
       {speaker?.status === "error" ? <span role="alert" className="sr-only">{labels.speechFailed}</span> : null}
       {copyState === "error" ? <span role="alert" className="sr-only">{labels.copyFailed}</span> : null}
+      {reactionFailed ? <span role="alert" className="px-1 text-xs text-destructive-text">{labels.reactionFailed}</span> : null}
     </div>
   );
 }
@@ -798,7 +776,6 @@ function MessageActionSheet({
   onClose,
   labels,
   reactions,
-  pendingEmoji,
   onToggleReaction,
   actions,
 }: {
@@ -807,7 +784,6 @@ function MessageActionSheet({
   labels: MessageInteractionLabels;
   /** `null` when this message does not accept a reaction: no empty row. */
   reactions: readonly MessageReactionDto[] | null;
-  pendingEmoji: MessageReactionEmoji | null;
   onToggleReaction: (emoji: MessageReactionEmoji, active: boolean) => void | Promise<void>;
   actions: readonly (SheetAction | null)[];
 }) {
@@ -831,14 +807,13 @@ function MessageActionSheet({
           className="mb-3 flex items-center justify-between gap-1 rounded-2xl bg-muted/50 p-1"
         >
           {MESSAGE_REACTION_EMOJIS.map((emoji) => {
-            const active = reactions.some((reaction) => reaction.emoji === emoji && reaction.reactedByMe);
+            const active = reactedByMe(reactions, emoji);
             return (
               <button
                 key={emoji}
                 type="button"
                 aria-label={`${labels.react} ${emoji}`}
                 aria-pressed={active}
-                disabled={pendingEmoji !== null}
                 onClick={() => {
                   void onToggleReaction(emoji, active);
                   onClose();
@@ -875,75 +850,6 @@ function MessageActionSheet({
         </ul>
       ) : null}
     </Dialog>
-  );
-}
-
-function ReactionPicker({
-  panelRef,
-  anchorRef,
-  align,
-  labels,
-  reactions,
-  pendingEmoji,
-  onToggle,
-}: {
-  panelRef: RefObject<HTMLDivElement | null>;
-  anchorRef: RefObject<HTMLDivElement | null>;
-  align: "start" | "end";
-  labels: MessageInteractionLabels;
-  reactions: readonly MessageReactionDto[];
-  pendingEmoji: MessageReactionEmoji | null;
-  onToggle: (emoji: MessageReactionEmoji, active: boolean) => void | Promise<void>;
-}) {
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useLayoutEffect(() => {
-    const anchor = anchorRef.current?.querySelector("button") ?? anchorRef.current;
-    if (!anchor) return;
-    const place = () => {
-      const next = reactionPickerPosition(
-        anchor.getBoundingClientRect(),
-        { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight },
-        align,
-      );
-      setPos({ top: next.top, left: next.left });
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [align, anchorRef]);
-
-  return createPortal(
-    <div
-      ref={panelRef}
-      role="group"
-      aria-label={labels.react}
-      data-reaction-picker=""
-      style={{ position: "fixed", top: pos.top, left: pos.left }}
-      className="z-[120] flex items-center gap-0.5 rounded-full border bg-popover p-1 shadow-md"
-    >
-      {MESSAGE_REACTION_EMOJIS.map((emoji) => {
-        const active = reactions.some((reaction) => reaction.emoji === emoji && reaction.reactedByMe);
-        return (
-          <button
-            key={emoji}
-            type="button"
-            aria-label={`${labels.react} ${emoji}`}
-            aria-pressed={active}
-            disabled={pendingEmoji !== null}
-            onClick={() => void onToggle(emoji, active)}
-            className="rounded-full p-1 text-base leading-none outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {emoji}
-          </button>
-        );
-      })}
-    </div>,
-    document.body,
   );
 }
 

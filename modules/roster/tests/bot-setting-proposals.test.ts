@@ -34,8 +34,10 @@ describe("bot setting proposal hashes", () => {
       operator: { username: "operator" },
     };
     const on = buildBotModeInstructions({ ...shared, webToolsEnabled: true });
-    expect(on).toContain("`web_search`, then `web_extract` on the best one or two pages");
+    expect(on).toContain("call `web_search` right away, with no tool or skill lookup first (`limit: 3`), then `web_extract` on the best one or two pages (`char_limit: 8000`)");
     expect(on).toContain("Keep `execute_code` and the terminal for calculations");
+    // The rule must hold when the skills toolset is off: it names no skills tool.
+    expect(on).not.toContain("skills_list");
     expect(buildBotModeInstructions({ ...shared })).not.toContain("`web_extract` on the best");
   });
 });

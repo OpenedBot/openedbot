@@ -7,7 +7,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { botAccentColor, botBubbleColor, botTintStyle, botUserBubbleFill } from "../../lib/bots/bot-tint";
 import { useBotAccentMode } from "../../lib/bots/bot-accent-preference";
 import type { MessageAuthorBot, CreateMessageVersionInput, MessageVersionLinkDto } from "@openedbot/contracts-api";
-import { replyPreviewSnippet, replyQuoteText, type MessageReactionEmoji } from "@openedbot/conversation/domain/message-reply";
+import { replyPreviewSnippet, replyQuoteText } from "@openedbot/conversation/domain/message-reply";
+import { useMessageReactionToggle } from "../../lib/thread/use-message-reaction-toggle";
 import type { MentionableBot } from "@openedbot/roster/domain/mentions";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { conversationHref } from "../../lib/thread/conversation-href";
@@ -434,19 +435,6 @@ export function ConversationScreen() {
     });
   }, [navigate]);
 
-  const reaction = useMutation({
-    mutationFn: ({ messageId, emoji, active }: {
-      messageId: string;
-      emoji: MessageReactionEmoji;
-      active: boolean;
-    }) => active
-      ? api.removeMessageReaction(activeThreadId!, messageId, emoji)
-      : api.addMessageReaction(activeThreadId!, messageId, emoji),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.thread(activeThreadId!) });
-    },
-  });
-
   const replyMessage = thread.data?.messages.find((message) => message.id === replyToId) ?? null;
   const replyAuthor = replyMessage
     ? replyMessage.authorBot?.name ?? replyMessage.authorBot?.slug ??
@@ -533,11 +521,7 @@ export function ConversationScreen() {
   useEffect(() => {
     if (outgoingUser && !timelineOutgoing) send.clearOutgoing();
   }, [outgoingUser, timelineOutgoing]);
-  const onReaction = useCallback(
-    (messageId: string, emoji: MessageReactionEmoji, active: boolean) =>
-      reaction.mutateAsync({ messageId, emoji, active }),
-    [reaction.mutateAsync],
-  );
+  const onReaction = useMessageReactionToggle(activeThreadId);
 
   // A snapshot read back from IndexedDB paints the messages, never a live run:
   // its run may have ended hours ago, and a stop control on it would cancel a
