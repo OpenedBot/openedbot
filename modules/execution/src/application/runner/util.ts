@@ -1,4 +1,4 @@
-import { logEvent } from "@openedbot/platform-observability";
+import { logEvent, type LogEventLevel } from "@openedbot/platform-observability";
 
 export function pollWait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -26,8 +26,8 @@ export function messageText(value: unknown): string {
  * nivelée, rédigée, et portant `traceId` / `spanId` quand le worker l'écrit
  * dans le contexte de trace du run.
  */
-export function log(event: string, fields: Record<string, unknown>): void {
-  logEvent(event, fields);
+export function log(event: string, fields: Record<string, unknown>, level?: LogEventLevel): void {
+  logEvent(event, fields, level);
 }
 /**
  * Le texte d'une panne, qu'elle arrive en `Error` ou en trame SSE brute.

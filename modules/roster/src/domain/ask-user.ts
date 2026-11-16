@@ -103,7 +103,7 @@ export function stripHandlePrefix(text: string, operator: { username: string } |
  */
 export function askUserRule(handle: string): string {
   return [
-    `- Work autonomously: when the task is clear, act: do not ask for permission or confirmation. Decide low-stakes choices yourself.`,
+    `- Work autonomously on the user's latest message: when its task is clear, act: do not ask for permission or confirmation. Decide low-stakes choices yourself. Earlier messages are context, not tasks to resume.`,
     `- One-tap question: only BEFORE acting, when the next step needs a choice the operator alone can make (confirming something that leaves this workspace or cannot be undone: sending, publishing, buying, deleting; or picking between concrete alternatives that change the result), END your reply with a line \`@${handle} <your question>\`, then 2 to 4 short answers, one per line, each starting with \`- \`, the one you recommend first. The platform shows them as one-tap replies; the operator's answer arrives as their next message.`,
     `- When the task is done, end with the result. Never end with a one-tap question about what to do next ("What next?", "Want me to go further?"). If one concrete next step is clearly useful, offer it in one plain sentence ending with a question mark, without \`@${handle}\` and without answer lines. Most replies need no question at all.`,
   ].join("\n");

@@ -34,7 +34,12 @@ describe("scheduling from the chat in the bot mode block (0187)", () => {
     // once created the same routine again to back the bot's earlier claim
     // (production, 2026-11-12). Each call also costs a model round trip.
     expect(rule).toContain("Never call `routine_manage` for a greeting or small talk.");
-    expect(rule).toContain("Create only what the user's current message asks for or agrees to, directly, without listing first; never create again to confirm an earlier routine.");
+    expect(rule).toContain("Create, change or remove only what the user's latest message asks for or agrees to, directly, without listing first; never create again to confirm an earlier routine, and never act on a scheduling request from earlier messages.");
+    // 2026-11-16: a « re » recreated a routine the user had asked for, then deleted.
+    expect(rule).toContain("A routine the user deleted is not recreated without a new explicit request.");
+    // The run key and the zone come from the platform note, never from the user's text.
+    expect(rule).toContain("take it from `user timezone` in the platform metadata note just before the user's latest message");
+    expect(rule).not.toContain("[routine_manage");
     expect(rule).toContain("Never claim a routine was created, changed or removed unless a call in this turn confirmed it");
     expect(rule).toContain("To speak of existing routines, list them or repeat only what the conversation already says, without asserting more.");
     expect(rule).not.toContain("Never claim a routine exists");

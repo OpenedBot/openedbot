@@ -46,7 +46,7 @@ async function helloWrite(hello: Record<string, unknown>): Promise<unknown[] | u
 describe("hello.hermesVersion", () => {
   test("is written with the agent, under the same lease", async () => {
     expect(await helloWrite({ agent: "edge-setup/v0.6.0", hermesVersion: "0.22.2" }))
-      .toEqual(["edge-setup/v0.6.0", "0.22.2", "rt", "org", "7", "hash", "hash"]);
+      .toEqual(["edge-setup/v0.6.0", "0.22.2", "edge-setup/v0.6.0", "rt", "org", "7", "hash", "hash"]);
   });
 
   test("is bounded to 64 characters, and cleared when hello carries none", async () => {

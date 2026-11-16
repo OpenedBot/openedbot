@@ -10,7 +10,8 @@ import {
   routineToolAvailability,
   routineToolWriteRight,
   scheduleRespectsMinimumInterval,
-  withRoutineRunKey,
+  routineCreateConflict,
+  routineToolMetadata,
 } from "../src/domain/routine-tool";
 import { readRoutineRunKey, signRoutineRunKey } from "../src/application/routine-run-key";
 
@@ -66,10 +67,10 @@ describe("routine_manage (DEV-209)", () => {
     expect(readRoutineRunKey("other", key)).toBeNull();
     expect(readRoutineRunKey("secret", `${RUN}.forged`)).toBeNull();
     expect(readRoutineRunKey("secret", "not-a-run.abc")).toBeNull();
-    expect(withRoutineRunKey("bonjour", key, "Europe/Paris"))
-      .toBe(`bonjour\n\n[routine_manage run_key: ${key}]\n[routine_manage user timezone: Europe/Paris]`);
+    // A metadata line for the platform note, never appended to the user's text.
+    expect(routineToolMetadata(key, "Europe/Paris")).toBe(`routine_manage run_key: ${key}; user timezone: Europe/Paris`);
     // No zone known: the bot is told so, and asks rather than assume UTC.
-    expect(withRoutineRunKey("bonjour", key, null)).toBe(`bonjour\n\n[routine_manage run_key: ${key}]\n[routine_manage user timezone: unknown]`);
+    expect(routineToolMetadata(key, null)).toBe(`routine_manage run_key: ${key}; user timezone: unknown`);
   });
 });
 
@@ -176,5 +177,32 @@ describe("routine_manage create twin (2026-11-13)", () => {
     expect(routineCreateTwin(past, [past], now)).toBeNull();
     const future = { ...base, schedule: "at 2026-11-14T08:00:00.000Z" };
     expect(routineCreateTwin(future, [future], now)).toBe(future);
+  });
+});
+
+describe("routine_manage create conflict (2026-11-16)", () => {
+  const now = new Date("2026-11-16T00:00:00.000Z");
+  const base = { id: "a", name: "News IA", schedule: "0 8 * * *", timezone: "Europe/Paris", message: "Cherche les news IA", enabled: true };
+
+  test("the same name, whatever its schedule or case, is a conflict", () => {
+    const conflict = routineCreateConflict({ name: "  news   ia ", schedule: "0 9 * * 1", timezone: "UTC", message: "autre" }, [base], now);
+    expect(conflict).toEqual({ routine: base, reason: "same_name" });
+  });
+
+  test("the same schedule, zone and prompt under another name is a conflict", () => {
+    const conflict = routineCreateConflict({ name: "Veille IA", schedule: "0 8 * * *", timezone: "Europe/Paris", message: " cherche les  NEWS IA" }, [base], now);
+    expect(conflict).toEqual({ routine: base, reason: "same_schedule_and_prompt" });
+  });
+
+  test("a different name with a different schedule, zone or prompt is new", () => {
+    for (const change of [{ schedule: "0 9 * * *" }, { timezone: "Europe/London" }, { message: "Cherche les news crypto" }]) {
+      expect(routineCreateConflict({ ...base, name: "Autre", ...change }, [base], now)).toBeNull();
+    }
+    expect(routineCreateConflict(base, [], now)).toBeNull();
+  });
+
+  test("a one-shot whose instant has passed does not block its name", () => {
+    const past = { ...base, schedule: "at 2026-11-15T08:00:00.000Z" };
+    expect(routineCreateConflict(base, [past], now)).toBeNull();
   });
 });

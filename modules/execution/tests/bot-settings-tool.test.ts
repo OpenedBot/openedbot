@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   BotSettingsToolInputError,
   readBotSettingsToolArgs,
-  withBotSettingsRunKey,
+  botSettingsToolMetadata,
 } from "../src/domain/bot-settings-tool";
 import { readBotSettingsRunKey, signBotSettingsRunKey } from "../src/application/bot-settings-run-key";
 import { readRoutineRunKey, signRoutineRunKey } from "../src/application/routine-run-key";
@@ -59,6 +59,6 @@ describe("bot settings proposal tool", () => {
     expect(readBotSettingsRunKey("shared secret", settingsKey)).toBe(RUN);
     expect(readRoutineRunKey("shared secret", settingsKey)).toBeNull();
     expect(readBotSettingsRunKey("shared secret", routineKey)).toBeNull();
-    expect(withBotSettingsRunKey("input", settingsKey)).toBe(`input\n\n[bot_settings_propose run_key: ${settingsKey}]`);
+    expect(botSettingsToolMetadata(settingsKey)).toBe(`bot_settings_propose run_key: ${settingsKey}`);
   });
 });

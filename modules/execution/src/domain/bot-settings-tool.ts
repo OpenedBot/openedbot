@@ -11,8 +11,9 @@ export const BOT_SETTINGS_TOOL_SERVER = "openedbot_bot_settings";
 export const BOT_SETTINGS_TOOL_NAME = "bot_settings_propose";
 export const BOT_SETTINGS_TOOL_RUNTIME_NAME = `mcp_${BOT_SETTINGS_TOOL_SERVER}_${BOT_SETTINGS_TOOL_NAME}`;
 
-export function withBotSettingsRunKey(input: string, key: string): string {
-  return `${input}\n\n[bot_settings_propose run_key: ${key}]`;
+/** The run key as one line of the platform metadata note (`withTurnBoundary`), never in the user's text. */
+export function botSettingsToolMetadata(key: string): string {
+  return `bot_settings_propose run_key: ${key}`;
 }
 
 export const BOT_SETTINGS_TOOL_DESCRIPTION = [
@@ -20,7 +21,7 @@ export const BOT_SETTINGS_TOOL_DESCRIPTION = [
   "Nothing is applied until the operator approves the proposal card shown in this thread.",
   "Never say the change is done. Tell the operator that your proposal is waiting for approval.",
   "To edit your persona, send the FULL new persona text in `instructions`.",
-  "Give a one-line reason and copy `run_key` exactly from your instructions.",
+  "Give a one-line reason and copy `run_key` exactly from the platform metadata note before the user's latest message.",
 ].join(" ");
 
 export const BOT_SETTINGS_TOOL_INPUT_SCHEMA = {
@@ -64,7 +65,7 @@ export function readBotSettingsToolArgs(value: unknown): BotSettingsToolArgs {
   }
   const runKey = boundedText(input.run_key, "run_key", 200);
   const reason = boundedText(input.reason, "reason", 500);
-  if (!runKey) throw new BotSettingsToolInputError("run_key is required: copy it from your instructions.");
+  if (!runKey) throw new BotSettingsToolInputError("run_key is required: copy it from the platform metadata note.");
   if (!reason) throw new BotSettingsToolInputError("reason is required and must be 1 to 500 characters.");
 
   const proposed: BotSettingProposalFields = {};

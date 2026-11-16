@@ -130,7 +130,7 @@ export async function callBotSettingsTool(
   const read = readBotSettingsRunKeyWith(runKeyVerifiers(internal), args.runKey);
   if (!read) {
     internalAuthMetrics.recordRunKey("bot-settings", "refused");
-    return fail("run_key is not valid: copy it exactly from your instructions.");
+    return fail("run_key is not valid: copy it exactly from the platform metadata note.");
   }
   const runId = read.runId;
 
@@ -152,7 +152,7 @@ export async function callBotSettingsTool(
       // A key read through the previous secret is valid only for the runs created before its bound.
       if (!runKeyCohortAllows(read.verifier, new Date(caller.createdAt))) {
         internalAuthMetrics.recordRunKey("bot-settings", "refused");
-        return fail("run_key is not valid: copy it exactly from your instructions.");
+        return fail("run_key is not valid: copy it exactly from the platform metadata note.");
       }
       internalAuthMetrics.recordRunKey("bot-settings", read.verifier.via);
       if (!scope.enabledBotIds.includes(caller.botId)) {

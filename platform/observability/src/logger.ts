@@ -102,7 +102,7 @@ export function channel(name: LogChannel): pino.Logger {
  */
 const WARN_EVENT_SUFFIX = /(failed|expired|suspected|unexpected|dropped_overrun|ignored|unreadable|refused)$/;
 
-export type LogEventLevel = "info" | "warn" | "error";
+export type LogEventLevel = "debug" | "info" | "warn" | "error";
 
 /**
  * `level` force le niveau quand le nom ne le dit pas (une panne inattendue du

@@ -70,6 +70,27 @@ describe("pinThreadSession (0163)", () => {
     expect(session).toBe("openedbot:org-1:thread-1:gen3");
   });
 
+  test("host upgrade: the root marker set by a new link agent rotates the thread once, then it stays", async () => {
+    // Session opened before the upgrade; writeLinkAgent marked the root when the agent changed.
+    const upgradedAt = new Date("2026-11-16T09:00:00Z");
+    const state = { generation: 2 };
+    const first = await pinThreadSession(fakeDb(state, []), claimed, "worker-1", row({
+      threadSessionGeneration: 2,
+      threadSessionOpenedAt: new Date("2026-11-12T23:22:00Z"),
+      rootCapabilitiesChangedAt: upgradedAt,
+    }));
+    expect(first).toBe("openedbot:org-1:thread-1:gen3");
+    // The next run reads the new generation, opened after the marker: no second rotation.
+    const calls: Call[] = [];
+    const next = await pinThreadSession(fakeDb(state, calls), claimed, "worker-1", row({
+      threadSessionGeneration: state.generation,
+      threadSessionOpenedAt: new Date("2026-11-16T09:01:00Z"),
+      rootCapabilitiesChangedAt: upgradedAt,
+    }));
+    expect(next).toBe("openedbot:org-1:thread-1:gen3");
+    expect(calls.some((call) => call.sql.includes("hermes_session_generation + 1"))).toBe(false);
+  });
+
   test("un autre run a déjà fait avancer le fil : on prend sa génération, sans avancer deux fois", async () => {
     const calls: Call[] = [];
     const state = { generation: 0, rotatedByOther: true };
