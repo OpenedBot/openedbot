@@ -157,7 +157,7 @@ describe("email delivery metrics", () => {
   const zero = { pendingLoginCodes: 0, oldestLoginCodeAgeSeconds: 0, recentLoginCodeFailures: 0 };
   test("reports explicit zeros, rejects absent or malformed aggregates", () => {
     expect(normalizeEmailDeliveryMetrics(zero)).toEqual(zero);
-    expect(() => normalizeEmailDeliveryMetrics(undefined)).toThrow(/0184/);
+    expect(() => normalizeEmailDeliveryMetrics(undefined)).toThrow(/apply the database migrations/);
     for (const field of Object.keys(zero)) {
       for (const value of [undefined, null, true, "", " ", -1, NaN, Infinity, "invalid"]) {
         expect(() => normalizeEmailDeliveryMetrics({ ...zero, [field]: value })).toThrow(field);

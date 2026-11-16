@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   appendLocalChain,
   backfillLocalChain,
@@ -68,14 +66,6 @@ describe("chaîne locale : ajout puis vérification", () => {
     expect(verifyChainLinks([links[0]!, links[2]!])).toMatchObject({ valid: false, brokenAt: 3, reason: "seq_gap" });
     const relinked = links.map((link, index) => index === 2 ? { ...link, prevHash: "0".repeat(64) } : link);
     expect(verifyChainLinks(relinked)).toMatchObject({ valid: false, brokenAt: 3, reason: "prev_mismatch" });
-  });
-
-  test("la migration 0152 : append-only (trigger, aucune grant update/delete), RLS forcée, enregistrée", () => {
-    const sql = readFileSync(join(import.meta.dir, "../../../db/migrations/0152_audit_local_chain.sql"), "utf8");
-    expect(sql).toContain("create trigger audit_chain_no_update");
-    expect(sql).toContain("force row level security");
-    expect(sql).not.toMatch(/grant[^;]*(update|delete)[^;]*audit_chain/i);
-    expect(sql).toContain("insert into schema_migrations(version) values ('0152_audit_local_chain')");
   });
 });
 

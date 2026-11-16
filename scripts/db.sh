@@ -124,12 +124,17 @@ SQL
     migration_options="-c role=openedbot_migrator"
   fi
 
-  # The applied set is read ONCE. Asking the database file by file cost one
-  # `docker exec` and one psql handshake per migration — around 50 ms each,
-  # paid on every `make db-migrate` even when nothing is pending, and growing
-  # linearly with the number of files. A missing `schema_migrations` (fresh
-  # database) reads as the empty set, so everything is pending.
-  applied="$(docker exec "$container" sh -ceu 'psql -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations" 2>/dev/null || true' -- "$database")"
+  # The applied set is read once, then again after each applied file only:
+  # 0001_schema_migrations records the whole baseline on a database migrated by
+  # the former files, and the next files must then be skipped. Asking the
+  # database file by file would cost one `docker exec` and one psql handshake
+  # per migration on every `make db-migrate`, even when nothing is pending. A
+  # missing `schema_migrations` (fresh database) reads as the empty set, so
+  # everything is pending.
+  read_applied() {
+    docker exec "$container" sh -ceu 'psql -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations" 2>/dev/null || true' -- "$database"
+  }
+  applied="$(read_applied)"
 
   # A literal newline, so a version is matched delimited on both sides:
   # `0055_x` must not answer for `0055_x_bis`. Command substitution would eat
@@ -147,6 +152,7 @@ SQL
     esac
     docker exec -i -e PGOPTIONS="$migration_options" "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' -- "$database" < "$migration"
     printf 'Migration %s applied to %s.\n' "$version" "$database"
+    applied="$(read_applied)"
   done
 
   # Pro plug-in migrations, after every core one. Solo mode

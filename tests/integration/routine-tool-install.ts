@@ -7,7 +7,7 @@
  * the host, and a profile created after the root entry inheriting the entry,
  * enabled, without the token (seen on the lab host, 2026-11-12).
  *
- * Proves: the migration keeps every existing choice; a new bot gets the tool
+ * Proves: a new bot gets the tool
  * without anyone touching a switch, an inherited entry proving nothing; a
  * switched-off bot gets the server written off its profile, inherited entry
  * included; two replicas at once mint ONE secret, and a new secret reaches
@@ -91,7 +91,7 @@ function fakeHost(features: string[]) {
   return { state, client, createProfile };
 }
 
-await withDisposablePostgres("openedbot187_routine_tool_install", async ({ owner, connect, migrateRest }) => {
+await withDisposablePostgres("openedbot187_routine_tool_install", async ({ owner, connect }) => {
   await owner`insert into users (id, email) values (${USER}, 'r187@example.test')`;
   await owner`insert into organizations (id, slug, name) values (${ORG}, 'r187', 'R187')`;
   await owner`insert into memberships (organization_id, user_id, role) values (${ORG}, ${USER}, 'owner')`;
@@ -104,14 +104,12 @@ await withDisposablePostgres("openedbot187_routine_tool_install", async ({ owner
     await owner`insert into bots (id, organization_id, section_id, name, slug, position, hermes_profile, hermes_profile_managed, permission_mode)
       values (${bot}, ${ORG}, ${SECTION}, ${profile}, ${profile}, ${position++}, ${profile}, true, 'auto')`;
   }
-  // 0105 state: one bot switched on, an id of a deleted bot, one never chosen.
+  // An installed root entry: one bot switched on with its proof, an id of a
+  // deleted bot, one never chosen.
   await owner`insert into runtime_routine_tools (organization_id, runtime_id, secret_hash, installed_at, enabled_bot_ids)
     values (${ORG}, ${RUNTIME}, ${routineToolSecretHash("legacy-secret")}, now() - interval '3 days', ${`{${LEGACY_ON},${id(99)}}`}::uuid[])`;
-  await migrateRest();
-  const migrated = await owner<Array<{ bot: string; enabled: boolean; ready: boolean; off: boolean }>>`
-    select bot_id as bot, enabled_at is not null as enabled, ready_at <= now() as ready, switched_off as off from bot_routine_tools`;
-  assert(migrated.length === 1 && migrated[0]!.bot === LEGACY_ON && migrated[0]!.enabled && migrated[0]!.ready && !migrated[0]!.off,
-    `0187 must keep the listed bot on with its proof and nothing else: ${JSON.stringify(migrated)}`);
+  await owner`insert into bot_routine_tools (organization_id, bot_id, runtime_id, enabled_at, ready_at)
+    values (${ORG}, ${LEGACY_ON}, ${RUNTIME}, now() - interval '3 days', now() - interval '3 days')`;
 
   const addBot = async (bot: string, profile: string | null, provision: string | null = "succeeded") => {
     await owner`insert into bots (id, organization_id, section_id, name, slug, position, hermes_profile, hermes_profile_managed, permission_mode)
@@ -341,5 +339,5 @@ await withDisposablePostgres("openedbot187_routine_tool_install", async ({ owner
 
   for (const connection of [a.db, b.db, api, holder]) await connection.close();
   await worker.close();
-  console.log("routine-tool-install: migration choices, default-on with inherited entries, opt-out written off the profile, one secret reaching every bot, no wait on the profile lock, archived/offline/unsupported/unreachable with root pause, restart pending on the host's word, drift, sweep, truthful run context proven");
-}, { stopBefore: "0187_" });
+  console.log("routine-tool-install: default-on with inherited entries, opt-out written off the profile, one secret reaching every bot, no wait on the profile lock, archived/offline/unsupported/unreachable with root pause, restart pending on the host's word, drift, sweep, truthful run context proven");
+});

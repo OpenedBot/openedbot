@@ -131,11 +131,9 @@ describe("global search route", () => {
   });
 
   test("schema keeps one immutable normalized allow-list for index and query", async () => {
-    const sql = await Bun.file(
-      new URL("../../../db/migrations/0006_messaging_search.sql", import.meta.url),
-    ).text();
-    expect(sql).toContain("create or replace function public.openedbot_global_search_normalize(input text)");
-    expect(sql).toContain("immutable");
+    const read = (file: string) => Bun.file(new URL(`../../../db/migrations/${file}`, import.meta.url)).text();
+    const sql = `${await read("0002_functions.sql")}\n${await read("0005_indexes.sql")}`;
+    expect(sql).toMatch(/CREATE FUNCTION public\.openedbot_global_search_normalize\(input text\) RETURNS text\s+LANGUAGE sql IMMUTABLE/u);
     expect(sql).toContain("NFKD");
     expect(sql).toContain("U&'[\\0300-\\036f]' collate \"C\"");
     expect(sql).toContain("replace(replace(input, 'Œ', 'oe'), 'œ', 'oe')");
@@ -150,9 +148,7 @@ describe("global search route", () => {
     expect(sql).toContain("public.openedbot_global_search_normalize(coalesce(string_agg(");
     // The GIN indexes carry their final names and index the normalized
     // projection: messages via the allow-list, threads via the normalized title.
-    expect(sql).toContain("create index messages_global_search_idx");
-    expect(sql).toContain("create index threads_global_search_idx");
-    expect(sql).toMatch(/create index messages_global_search_idx\s+on messages using gin \(\s*to_tsvector\('simple'::regconfig, public\.openedbot_visible_message_search_text\(content\)\)/u);
-    expect(sql).toMatch(/create index threads_global_search_idx\s+on threads using gin \(\s*to_tsvector\(\s*'simple'::regconfig,\s*public\.openedbot_global_search_normalize\(coalesce\(title, ''\)\)/u);
+    expect(sql).toContain("CREATE INDEX messages_global_search_idx ON public.messages USING gin (to_tsvector('simple'::regconfig, public.openedbot_visible_message_search_text(content)));");
+    expect(sql).toContain("CREATE INDEX threads_global_search_idx ON public.threads USING gin (to_tsvector('simple'::regconfig, public.openedbot_global_search_normalize(COALESCE(title, ''::text))));");
   });
 });

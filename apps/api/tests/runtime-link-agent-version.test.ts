@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
-import { readFileSync } from "node:fs";
 import { decodeTextFrame, RELAY_MAX_FEATURES, type RelayTextFrame } from "@openedbot/contracts-connector";
 import { readApiConfig } from "../src/infrastructure/config";
 import { connectorVersionBelow, parseConnectorVersion, runtimeConnector } from "@openedbot/platform-config/connector-version";
@@ -173,19 +172,5 @@ describe("déclaration hello et migration", () => {
     const session = await hello("hermes-setup/v0.1.0", {}, true);
     expect(session.bound).toBe(true);
     expect(session.logs.some(({ event }) => event === "runtime_link.agent_write_failed")).toBe(true);
-  });
-
-  test("0055 est transactionnelle, ajoute les colonnes nullables commentées et conserve les kinds de 0053", () => {
-    const sql = readFileSync(new URL("../../../db/migrations/0055_runtime_link_agent.sql", import.meta.url), "utf8");
-    expect(sql.trimStart().startsWith("begin;")).toBe(true);
-    expect(sql.trimEnd().endsWith("commit;")).toBe(true);
-    expect(sql).toContain("insert into schema_migrations(version) values ('0055_runtime_link_agent')");
-    expect(sql).toContain("add column link_agent text null");
-    expect(sql).toContain("add column link_agent_seen_at timestamptz null");
-    for (const column of ["link_agent", "link_agent_seen_at"]) expect(sql).toContain(`comment on column runtimes.${column} is`);
-    const previous = readFileSync(new URL("../../../db/migrations/0053_audit_worm.sql", import.meta.url), "utf8");
-    const kinds = previous.match(/check \(kind in \(([\s\S]*?)\)\)/)![1]!.match(/'[^']+'/g)!;
-    for (const kind of [...kinds, "'device_key_registered'", "'agent_outdated'"]) expect(sql).toContain(kind);
-    expect(sql).not.toMatch(/drop table|disable row level security|grant .*public/i);
   });
 });

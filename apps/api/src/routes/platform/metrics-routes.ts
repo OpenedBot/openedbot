@@ -212,7 +212,7 @@ export type EmailDeliveryMetrics = {
 };
 
 export function normalizeEmailDeliveryMetrics(row: EmailDeliveryMetricsRow | undefined): EmailDeliveryMetrics {
-  if (!row) throw new Error("Email delivery metrics query returned no row; apply migration 0184.");
+  if (!row) throw new Error("Email delivery metrics query returned no row; apply the database migrations.");
   return {
     pendingLoginCodes: metricCount(row.pendingLoginCodes, "pendingLoginCodes"),
     oldestLoginCodeAgeSeconds: metricDuration(row.oldestLoginCodeAgeSeconds, "oldestLoginCodeAgeSeconds"),
