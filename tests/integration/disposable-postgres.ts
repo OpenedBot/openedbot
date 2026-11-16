@@ -30,20 +30,12 @@ export type DisposablePostgres = {
   /** Private in-memory URL, never log it or put it in process arguments. */
   url: string;
   connect(role?: "openedbot_api" | "openedbot_worker" | "openedbot_staff"): Promise<SQL>;
-  /** Applies the migrations held back by `stopBefore`, in order; once it succeeds, again it does nothing. */
-  migrateRest(): Promise<void>;
-};
-
-export type DisposablePostgresOptions = {
-  /** Migrate only the files sorting before this one (e.g. `0180_`), to seed data a later migration must transform. */
-  stopBefore?: string;
 };
 
 /** Owns only its unique created database and connections. Never resets shared data or roles. */
 export async function withDisposablePostgres<T>(
   label: string,
   callback: (database: DisposablePostgres) => Promise<T>,
-  options: DisposablePostgresOptions = {},
 ): Promise<T> {
   if (!/^openedbot[0-9]+_[a-z0-9_]+$/.test(label)) throw new Error("Invalid disposable database label.");
   const source = await adminUrl();
@@ -60,16 +52,7 @@ export async function withDisposablePostgres<T>(
     const owner = new SQL({ url: destination.toString(), max: 1 }); clients.push(owner);
     const migrations = resolve(import.meta.dir, "../../db/migrations");
     const files = (await readdir(migrations)).filter((file) => file.endsWith(".sql")).sort();
-    const { stopBefore } = options;
-    if (stopBefore !== undefined && !files.some((file) => file.startsWith(stopBefore))) {
-      throw new Error(`No migration starts with ${stopBefore}.`);
-    }
-    const held = stopBefore === undefined ? [] : files.filter((file) => file >= stopBefore);
-    const apply = async (batch: string[]) => {
-      for (const file of batch) await owner.unsafe(await Bun.file(resolve(migrations, file)).text());
-    };
-    await apply(files.filter((file) => !held.includes(file)));
-    let rest: Promise<void> | null = null;
+    for (const file of files) await owner.unsafe(await Bun.file(resolve(migrations, file)).text());
     return await callback({
       owner,
       url: destination.toString(),
@@ -78,13 +61,6 @@ export async function withDisposablePostgres<T>(
         if (role) await connection.unsafe(`set role ${role}`);
         return connection;
       },
-      // A migration that raises leaves its explicit transaction aborted on the
-      // owner connection: roll it back, and let a later call try again.
-      migrateRest: () => (rest ??= apply(held).catch(async (error: unknown) => {
-        rest = null;
-        await owner.unsafe("rollback");
-        throw error;
-      })),
     });
   } finally {
     await Promise.allSettled(clients.map((connection) => connection.close()));

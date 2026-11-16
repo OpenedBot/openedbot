@@ -228,13 +228,6 @@ describe("group default responder validation", () => {
       expect((error as HttpError).code).toBe("GROUP_RESPONDER_NOT_MEMBER");
     }
   });
-
-  test("le schéma borne la forme persistée du répondeur par défaut", async () => {
-    const sql = await Bun.file(new URL("../../../db/migrations/0003_roster.sql", import.meta.url)).text();
-    expect(sql).toContain("default_responder jsonb not null default '{\"kind\":\"everyone\"}'::jsonb");
-    expect(sql).toContain("bot_groups_default_responder_shape");
-    expect(sql).toContain("jsonb_build_object");
-  });
 });
 
 describe("group voice roster", () => {

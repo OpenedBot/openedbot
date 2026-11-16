@@ -100,16 +100,3 @@ describe("Un runtime externe n'a plus de canal d'administration", () => {
   });
 
 });
-
-describe("La cible SSH quitte le schéma", () => {
-  test("la migration retire les trois colonnes et s'enregistre", () => {
-    const sql = readFileSync(
-      new URL("../../../db/migrations/0022_drop_runtime_ssh.sql", import.meta.url),
-      "utf8",
-    );
-    for (const column of ["ssh_host", "ssh_port", "ssh_user"]) {
-      expect(sql).toContain(`drop column if exists ${column}`);
-    }
-    expect(sql).toContain("insert into schema_migrations(version) values ('0022_drop_runtime_ssh')");
-  });
-});

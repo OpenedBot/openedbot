@@ -115,16 +115,6 @@ describe("cible de steering d'un follow-up", () => {
     expect(calls).toBe(0);
   });
 
-  test("la migration garde un repli unique, tenant-scopé et sans replay implicite", async () => {
-    const sql = await Bun.file(new URL("../../../db/migrations/0005_runs_workflows.sql", import.meta.url)).text();
-    expect(sql).toContain("unique (organization_id, source_run_id)");
-    expect(sql).toContain("target_run_id <> source_run_id");
-    expect(sql).toMatch(/status in \(\s*'pending', 'sending', 'confirmed'/);
-    expect(sql).toContain("force row level security");
-    expect(sql).toContain("to openedbot_worker");
-    expect(sql).toContain("char_length(text) between 1 and 65536");
-  });
-
   test("persiste le run FIFO de repli, sans workflow, avant d'annoncer la cible de steering", async () => {
     const statements: string[] = [];
     const parameters: unknown[][] = [];

@@ -12,8 +12,8 @@
  *     row lock and the cursor lock, in a statement after them, nowhere else;
  *  3. names the cursor lock key (`openedbot-run-events-cursor`).
  *
- * In `db/migrations`, no SQL inserts into `run_events`, and only the identity
- * backfill of 0092 updates it. `delete from run_events` (retention purge)
+ * In `db/migrations`, no SQL inserts into or updates `run_events`.
+ * `delete from run_events` (retention purge)
  * stays allowed: a deletion numbers nothing. Comments are blanked before
  * matching. Out of reach: SQL built from a dynamic table name, and a maximum
  * read another way (`order by sequence desc limit 1`), which the primitive's
@@ -29,7 +29,6 @@ const rootFlag = args.indexOf("--root");
 const root = rootFlag >= 0 ? resolve(args[rootFlag + 1] ?? ".") : resolve(import.meta.dir, "../..");
 
 const PRIMITIVE = "modules/execution/src/sql/run-events.ts";
-const IDENTITY_BACKFILL = "0092_run_events_identity.sql";
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
@@ -102,8 +101,7 @@ if (existsSync(migrations)) {
   for (const name of readdirSync(migrations).filter((entry) => entry.endsWith(".sql")).sort()) {
     const text = readFileSync(join(migrations, name), "utf8").replace(/--[^\n]*/gu, (comment) => " ".repeat(comment.length));
     for (const match of text.matchAll(WRITE)) {
-      if (name === IDENTITY_BACKFILL && /^update/iu.test(match[0])) continue;
-      errors.push(`db/migrations/${name}:${line(text, match.index)} : « ${match[0]} » ; aucune migration n'écrit run_events (seul le rattrapage d'identité ${IDENTITY_BACKFILL} le met à jour).`);
+      errors.push(`db/migrations/${name}:${line(text, match.index)} : « ${match[0]} » ; aucune migration n'écrit run_events.`);
     }
   }
 }

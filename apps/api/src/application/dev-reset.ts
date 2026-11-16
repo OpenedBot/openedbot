@@ -44,10 +44,10 @@ import type { SQL } from "bun";
  *   the cascade guard below checks it. The bots, profiles, routines and
  *   runs that reference them, for their part, are wiped.
  * - `api_instances`, `service_instances`: registries of the live PROCESSES
- *   (heartbeat, `runtimes.link_instance_id`), declared « tables
- *   d'exploitation, hors RLS tenant, aucun identifiant de client » by
- *   `migrations/0040_api_instances.sql`. Emptying them while `make dev`
- *   is running breaks connector-link routing until the next heartbeat.
+ *   (heartbeat, `runtimes.link_instance_id`), operational tables outside
+ *   tenant RLS (their comments in `db/migrations/0003_tables.sql`).
+ *   Emptying them while `make dev` is running breaks connector-link routing
+ *   until the next heartbeat.
  */
 export const DEV_RESET_PRESERVED_TABLES: readonly string[] = [
   "users",

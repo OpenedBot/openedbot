@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 const SCRIPT = resolve(import.meta.dir, "run-events-contract.ts");
 const roots: string[] = [];
 
-/** A minimal tree the contract accepts: the primitive, a `max` over messages, a retention purge, the 0092 backfill. */
+/** A minimal tree the contract accepts: the primitive, a `max` over messages, a retention purge. */
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "run-events-contract-"));
   roots.push(root);
@@ -22,7 +22,6 @@ function fixture(): string {
       "// insert into run_events is named here, in a comment only",
       "export const purge = (tx: any) => tx`delete from run_events e where e.created_at < ${1}`;",
     ].join("\n"),
-    "db/migrations/0092_run_events_identity.sql": "update run_events event set bot_id = run.bot_id from runs run;\n",
   };
   for (const [path, content] of Object.entries(files)) write(root, path, content);
   return root;

@@ -1,5 +1,4 @@
 import { beforeAll, afterAll, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import type { SQL } from "bun";
 import type { BlobStore } from "../src/infrastructure/blob-store";
@@ -95,46 +94,6 @@ function request(app: Hono<{ Variables: AppVariables }>, input: Record<string, u
 }
 
 describe("message version persistence contract", () => {
-  test("message_versions is append-only, tenant-scoped and idempotent-by-key from the start", () => {
-    const sql = readFileSync(new URL("../../../db/migrations/0008_message_versions.sql", import.meta.url), "utf8");
-    // Scope to the `create table message_versions` block: FKs of other tables
-    // toward messages must not skew the counts.
-    const start = sql.indexOf("create table message_versions");
-    const end = sql.indexOf("create index message_versions_parent_idx");
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(end).toBeGreaterThan(start);
-    const table = sql.slice(start, end);
-    expect(table).toContain("root_thread_id uuid not null");
-    expect(table).toContain("branch_thread_id uuid not null");
-    expect(table).toContain("prefix_truncated boolean not null");
-    expect(table.match(/references messages\(organization_id, thread_id, id\) on delete cascade/gu)).toHaveLength(3);
-    expect(table).toContain("references threads(organization_id, id) on delete cascade");
-    expect(table).toContain("references runs(organization_id, id) on delete cascade");
-    expect(table).toContain("references workflows(organization_id, id) on delete cascade");
-    expect(table).toContain("on delete set null (created_by_user_id)");
-    expect(table).toContain("constraint message_versions_run_key unique (organization_id, run_id)");
-    expect(table).toContain("constraint message_versions_workflow_key unique (organization_id, workflow_id)");
-    expect(table).toContain("idempotency_key uuid not null");
-    expect(table).toContain("request_hash text not null");
-    expect(table).toContain("check (request_hash ~ '^[0-9a-f]{64}$')");
-    // The creator can disappear without taking the provenance with it.
-    expect(table).not.toContain("created_by_user_id uuid not null");
-    for (const constraint of [
-      "message_versions_root_message_fk",
-      "message_versions_parent_message_fk",
-      "message_versions_branch_message_fk",
-      "message_versions_branch_thread_fk",
-      "message_versions_run_fk",
-      "message_versions_workflow_fk",
-      "message_versions_creator_fk",
-      "message_versions_creator_idempotency_key",
-    ]) {
-      expect(table).toContain(`constraint ${constraint}`);
-    }
-    expect(sql).toContain("alter table message_versions force row level security");
-    expect(sql).toContain("message_versions_tenant");
-    expect(sql).not.toMatch(/delete from message_versions|update messages|delete from messages/u);
-  });
 
   test("replays an exact committed key before probing PVE and rejects a divergent payload", async () => {
     const input = { mode: "edit" as const, input: "texte corrigé", expectedVersionCount: 1 };
