@@ -16,6 +16,8 @@ v1.5.6 (première étiquette du nouvel historique : v1.5.7).
 
 ## Non publié
 
+## v1.5.12 - 2026-11-16
+
 ### Ajouté
 
 - Un bot peut livrer un fichier texte, plus seulement une image ou un PDF : un fichier Markdown, texte, CSV, JSON ou HTML qu'il enregistre à la racine de son dossier de travail, y compris depuis son terminal, arrive en pièce jointe sous sa réponse. Les garde-fous restent ceux des images : un nom de fichier simple, jamais un chemin, ni un fichier caché, ni un nom qui ressemble à un secret ; 1 Mo au plus ; le contenu doit être du texte (encodage Unicode standard). Un fichier HTML part en téléchargement, jamais affiché comme une page par la machine.
