@@ -48,9 +48,9 @@ anchors=(
   "secretsValue|modules/roster/src/application/bot-profiles.ts|client.hostSetProfileCredential(profile, credential.provider, credential.apiKey, credential.label)"
   "isolationValue|platform/db/src/db.ts|export async function withTenant<T>("
   "transportValue|platform/config/src/api-config.ts|HERMES_ALLOW_INSECURE_ORIGINS must be empty in production; Hermes requires HTTPS."
-  "journalValue|db/migrations/0007_approvals_decisions.sql|previous_hash text,"
-  "journalValue|db/migrations/0080_worker_least_privilege.sql|drop policy if exists decisions_worker on decisions;"
-  "journalValue|db/migrations/0100_approval_policy_resolution.sql|resolved_by_policy"
+  "journalValue|db/migrations/0003_tables.sql|    previous_hash text,"
+  "journalValue|db/migrations/0009_grants.sql|GRANT SELECT,INSERT ON TABLE public.decisions TO openedbot_api;"
+  "journalValue|db/migrations/0003_tables.sql|    resolved_by_policy text,"
 )
 
 # (b) the page's claim keys: every *Value plus approvalsDescription.

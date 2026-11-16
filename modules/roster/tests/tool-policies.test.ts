@@ -72,7 +72,7 @@ describe("PERM2-5: the blocked list proof", () => {
     const go = readFileSync(edgeSetupPath("internal/operator/approval_policy.go"), "utf8");
     expect(go).toContain(`regexp.MustCompile(\`${BOT_TOOL_POLICY_KEY.source}\`)`);
     expect(go).toContain(`const approvalPolicyMaxBlockedTools = ${BOT_TOOL_POLICY_MAX_BLOCKED}`);
-    expect(read("db/migrations/0141_permission_tool_policies.sql")).toContain(`check (tool_key ~ '${BOT_TOOL_POLICY_KEY.source}')`);
+    expect(read("db/migrations/0003_tables.sql")).toContain(`CONSTRAINT bot_permission_tool_policies_tool_key_check CHECK ((tool_key ~ '${BOT_TOOL_POLICY_KEY.source}'::text))`);
   });
 });
 

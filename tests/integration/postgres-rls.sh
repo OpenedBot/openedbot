@@ -224,10 +224,10 @@ SQL
     exit 1
   fi
 
-  organization_slugs="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
-    -f "$root/tests/integration/organization-slugs.sql" | tail -n 1)"
-  if [[ "$organization_slugs" != "acme-sas-000000000001/client-emilie/acme-sas/bad/slug-ok/refused/refused/stable" ]]; then
-    printf 'Organization slug proof failed; expected legacy slugs normalized without touching valid ones, malformed and UUID-shaped slugs refused and a stable replay, got:\n%s\n' "$organization_slugs" >&2
+  audit_log_view="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" \
+    -f "$root/tests/integration/audit-log-view.sql")"
+  if [[ "$audit_log_view" != "security_invoker=true/occurred_at,organization_id,source,action,actor_kind,actor_id,subject_kind,subject_id,details/clean" ]]; then
+    printf 'Audit log view proof failed; expected security_invoker, the nine contract columns and no sensitive field, got:\n%s\n' "$audit_log_view" >&2
     exit 1
   fi
 
@@ -315,32 +315,20 @@ SQL
     exit 1
   fi
 
-  # Onboarding par personne (0025) : la colonne vaut false par defaut, et le
-  # backfill pose true au membre d un espace deja onboarde, false a l autre.
-  # Le rejeu retire la colonne et sa ligne schema_migrations puis applique le
-  # fichier livre tel quel : la preuve porte sur le SQL de la migration, pas
-  # sur une copie. openedbot_api (sans GUC, users n est pas sous RLS) peut ensuite
-  # remettre le flag a false : le chemin du reset de developpement.
-  psql -v ON_ERROR_STOP=1 -q "$database_url" <<'SQL' >/dev/null
-update organizations set onboarded_at = now() where id = '10000000-0000-4000-8000-000000000001';
-alter table users drop column onboarding_completed;
-delete from schema_migrations where version = '0025_user_onboarding_completed';
-SQL
-  psql -v ON_ERROR_STOP=1 "$database_url" -f "$root/db/migrations/0025_user_onboarding_completed.sql" >/dev/null
+  # Onboarding par personne : la colonne vaut false par defaut, et openedbot_api
+  # (sans GUC, users n est pas sous RLS) peut remettre le flag a false : le
+  # chemin du reset de developpement.
   user_onboarding="$(psql -v ON_ERROR_STOP=1 -qAt "$database_url" <<'SQL'
-update organizations set onboarded_at = null where id = '10000000-0000-4000-8000-000000000001';
-select (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000031')::text
-  || '/' || (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000032')::text
-  || '/' || (select column_default from information_schema.columns
-              where table_name = 'users' and column_name = 'onboarding_completed');
+select (select column_default from information_schema.columns
+         where table_name = 'users' and column_name = 'onboarding_completed');
 set role openedbot_api;
 update users set onboarding_completed = false where id = '30000000-0000-4000-8000-000000000031';
 select onboarding_completed::text from users where id = '30000000-0000-4000-8000-000000000031';
 reset role;
 SQL
 )"
-  if [[ "$user_onboarding" != $'true/false/false\nfalse' ]]; then
-    printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
+  if [[ "$user_onboarding" != $'false\nfalse' ]]; then
+    printf 'User onboarding flag proof failed; expected default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
     exit 1
   fi
 
@@ -681,6 +669,14 @@ if [[ "$ssh_columns_dropped" != "3/0/0/idempotent" ]]; then
   exit 1
 fi
 
+audit_log_view="$(docker exec -i "$container" sh -ceu \
+  'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
+  < "$root/tests/integration/audit-log-view.sql")"
+if [[ "$audit_log_view" != "security_invoker=true/occurred_at,organization_id,source,action,actor_kind,actor_id,subject_kind,subject_id,details/clean" ]]; then
+  printf 'Audit log view proof failed; expected security_invoker, the nine contract columns and no sensitive field, got:\n%s\n' "$audit_log_view" >&2
+  exit 1
+fi
+
 runtime_reachability="$(docker exec -i "$container" sh -ceu \
   'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" \
   < "$root/tests/integration/runtime-reachability.sql")"
@@ -774,29 +770,18 @@ if [[ "$permission_pipeline" != "$permission_pipeline_expected" ]]; then
   exit 1
 fi
 
-# Onboarding par personne (0025) : meme preuve que le mode URL ci-dessus, avec
-# le rejeu du fichier de migration livre tel quel.
-docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$1"' -- "$database" <<'SQL' >/dev/null
-update organizations set onboarded_at = now() where id = '10000000-0000-4000-8000-000000000001';
-alter table users drop column onboarding_completed;
-delete from schema_migrations where version = '0025_user_onboarding_completed';
-SQL
-docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' -- "$database" \
-  < "$root/db/migrations/0025_user_onboarding_completed.sql" >/dev/null
+# Onboarding par personne : meme preuve que le mode URL ci-dessus.
 user_onboarding="$(docker exec -i "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$1"' -- "$database" <<'SQL'
-update organizations set onboarded_at = null where id = '10000000-0000-4000-8000-000000000001';
-select (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000031')::text
-  || '/' || (select onboarding_completed from users where id = '30000000-0000-4000-8000-000000000032')::text
-  || '/' || (select column_default from information_schema.columns
-              where table_name = 'users' and column_name = 'onboarding_completed');
+select (select column_default from information_schema.columns
+         where table_name = 'users' and column_name = 'onboarding_completed');
 set role openedbot_api;
 update users set onboarding_completed = false where id = '30000000-0000-4000-8000-000000000031';
 select onboarding_completed::text from users where id = '30000000-0000-4000-8000-000000000031';
 reset role;
 SQL
 )"
-if [[ "$user_onboarding" != $'true/false/false\nfalse' ]]; then
-  printf 'User onboarding flag proof failed; expected backfill true/false with default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
+if [[ "$user_onboarding" != $'false\nfalse' ]]; then
+  printf 'User onboarding flag proof failed; expected default false, then false after the openedbot_api reset, got:\n%s\n' "$user_onboarding" >&2
   exit 1
 fi
 

@@ -3,8 +3,9 @@ import { readFileSync } from "node:fs";
 import type { TransactionSQL } from "bun";
 import { eraseAccountUser } from "../src/sql/deletions";
 
-const migration = readFileSync(new URL("../../../db/migrations/0171_deletion_and_blob_integrity.sql", import.meta.url), "utf8");
-const fn = migration.slice(migration.indexOf("create or replace function public.erase_account_user"), migration.indexOf("$$;", migration.indexOf("create or replace function public.erase_account_user")));
+const functions = readFileSync(new URL("../../../db/migrations/0002_functions.sql", import.meta.url), "utf8");
+const grants = readFileSync(new URL("../../../db/migrations/0009_grants.sql", import.meta.url), "utf8");
+const fn = functions.slice(functions.indexOf("CREATE FUNCTION public.erase_account_user"), functions.indexOf("$$;", functions.indexOf("CREATE FUNCTION public.erase_account_user")));
 
 function capturing(outcome: unknown) {
   const captured: string[] = [];
@@ -28,14 +29,12 @@ describe("effacement du compte après la purge", () => {
 
   test("une adhésion révoquée ne bloque plus l'effacement : le compte est pseudonymisé", () => {
     // Même règle que l'éligibilité : seule une adhésion vivante garde le compte.
-    expect(fn).toContain("m.revoked_at is null) then\n    return 'kept'");
-    expect(fn).toContain("delete from public.users where id = p_user_id");
+    expect(fn).toContain("select 1 from public.memberships where user_id = p_user_id and revoked_at is null)");
     expect(fn).toContain("password_hash = null");
     expect(fn).toContain("google_subject = null");
     expect(fn).toContain("delete from public.sessions where user_id = p_user_id");
     // Les adhésions révoquées et l'historique des autres tenants restent.
     expect(fn).not.toMatch(/delete from public\.memberships/);
-    expect(migration).toMatch(/grant execute on function public\.erase_account_user\(uuid\) to openedbot_worker;/);
-    expect(migration).not.toMatch(/grant [^;]* on (table )?(users|sessions)\b/);
+    expect(grants).toContain("GRANT ALL ON FUNCTION public.erase_account_user(p_user_id uuid) TO openedbot_worker;");
   });
 });

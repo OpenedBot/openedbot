@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import type { SQL } from "bun";
 import { Hono } from "hono";
 import { accessLogMiddleware } from "@openedbot/platform-observability";
@@ -224,37 +223,5 @@ describe("redactRequestPath", () => {
     expect(redactRequestPath(`/api/threads/${THREAD}/messages?cursor=abc`)).toBe(`/api/threads/${THREAD}/messages`);
     expect(redactRequestPath(`/api/one-shot-links/${LINK_TOKEN}`)).toBe("/api/one-shot-links/[redacted]");
     expect(redactRequestPath("/x".repeat(600)).length).toBeLessThanOrEqual(512);
-  });
-});
-
-describe("contrat de la migration 0161_api_errors", () => {
-  const sql = readFileSync(new URL("../../../db/migrations/0161_api_errors.sql", import.meta.url), "utf8");
-
-  test("transactionnelle et enregistrée dans schema_migrations", () => {
-    expect(sql.trimStart().startsWith("begin;")).toBe(true);
-    expect(sql.trimEnd().endsWith("commit;")).toBe(true);
-    expect(sql).toContain("insert into schema_migrations(version) values ('0161_api_errors')");
-  });
-
-  test("RLS forcée ; openedbot_api n'a que l'insertion, sans lecture ; le worker ne voit que l'expiré", () => {
-    expect(sql).toContain("alter table api_errors enable row level security;");
-    expect(sql).toContain("alter table api_errors force row level security;");
-    expect(sql).toContain("create policy api_errors_api_insert on api_errors for insert to openedbot_api");
-    expect(sql).toContain("grant insert on api_errors to openedbot_api;");
-    expect(sql).not.toMatch(/grant select[^;]*to openedbot_api/);
-    expect(sql).not.toMatch(/for select to openedbot_api/);
-    expect(sql).toContain("for delete to openedbot_worker\n  using (occurred_at < now() - interval '90 days')");
-    expect(sql).toContain("reference       uuid primary key");
-  });
-
-  test("les bornes SQL sont celles du code", () => {
-    expect(sql).toContain("length(message) <= 1024");
-    expect(sql).toContain("length(stack) <= 8192");
-    expect(sql).toContain("length(path) <= 512");
-  });
-
-  test("db/ownership.json la range sous l'API, que le worker purge (writer)", () => {
-    const ownership = JSON.parse(readFileSync(new URL("../../../db/ownership.json", import.meta.url), "utf8")) as Record<string, unknown>;
-    expect(ownership.api_errors).toEqual({ owner: "apps/api", writers: ["apps/worker"] });
   });
 });

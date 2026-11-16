@@ -8,6 +8,15 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Modifié
+
+- **Les migrations SQL tiennent en dix fichiers.** Les 186 fichiers
+  `0001` à `0192` laissent place à une base de référence (`0001_schema_migrations`
+  à `0010_reference_data`) qui produit le même schéma. Une base déjà migrée
+  jusqu’à `0192_retire_mobile_push` enregistre cette base de référence sans
+  la rejouer. Une base arrêtée avant `0192` est refusée : la migrer d’abord
+  avec la 0.1.4. Les prochaines migrations reprennent à `0193`.
+
 ## 0.1.4 - 2026-11-16
 
 ### Ajouté

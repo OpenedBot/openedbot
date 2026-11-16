@@ -31,7 +31,7 @@ function fixture(): string {
       until: "2999-12-31", step: "workflows", reason: "fixture",
       files: { "modules/execution/src/application/queue.ts": { workflows: 1 } },
     }),
-    "db/migrations/0091_run_admission_envelope.sql": "insert into public.workflows (id) values (gen_random_uuid());\n",
+    "db/migrations/0002_functions.sql": "CREATE FUNCTION public.open_unknown_run_review_workflow() RETURNS trigger AS $$ begin\n  insert into public.workflows (id) values (gen_random_uuid());\nend $$;\n",
   };
   for (const [path, content] of Object.entries(files)) write(root, path, content);
   return root;
@@ -130,6 +130,32 @@ describe("run-writes-contract", () => {
     expect(result.output).toContain("2 « update workflows » pour un plafond de 1");
     expect(result.output).toContain("plafond « runs » dans le cliquet");
     expect(result.output).toContain("db/migrations/0176_backfill.sql:1");
+  });
+
+  test("refuses an insert outside the review trigger's body, in its file too", () => {
+    const root = fixture();
+    write(root, "db/migrations/0002_functions.sql",
+      "CREATE FUNCTION public.open_unknown_run_review_workflow() RETURNS trigger AS $$ begin\n  insert into public.workflows (id) values (gen_random_uuid());\nend $$;\n"
+      + "insert into public.runs (id) values (gen_random_uuid());\n"
+      + "CREATE FUNCTION public.\"2_other\"() RETURNS void AS $$ begin\n  insert into public.runs (id) values (gen_random_uuid());\nend $$;\n");
+    const result = run(root);
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("db/migrations/0002_functions.sql:4 ");
+    expect(result.output).toContain("db/migrations/0002_functions.sql:6 ");
+    expect(result.output).not.toContain("db/migrations/0002_functions.sql:2 ");
+  });
+
+  test("bounds the review trigger's body by its own dollar tag, digits included, never by the next function", () => {
+    const root = fixture();
+    write(root, "db/migrations/0002_functions.sql",
+      "CREATE FUNCTION public.open_unknown_run_review_workflow() RETURNS trigger AS $body1$ begin\n  insert into public.workflows (id) values (gen_random_uuid());\nend $body1$;\n");
+    expect(run(root).code).toBe(0);
+    write(root, "db/migrations/0002_functions.sql",
+      "CREATE FUNCTION public.open_unknown_run_review_workflow() RETURNS trigger AS 'select 1;';\n"
+      + "CREATE FUNCTION public.other_function() RETURNS void AS $$ begin\n  insert into public.runs (id) values (gen_random_uuid());\nend $$;\n");
+    const result = run(root);
+    expect(result.code).toBe(1);
+    expect(result.output).toContain("db/migrations/0002_functions.sql:3 ");
   });
 
   test("a workflow write that disappears must be recorded, and --record only lowers", () => {
