@@ -750,6 +750,14 @@ describe("attribution des messages du snapshot", () => {
       authorBot: { id: "bot-neo", name: "Neo", slug: "neo", face: null },
     });
     expect(dto.reactions).toEqual([{ emoji: "👍", count: 2, reactedByMe: true }]);
+    // One member may hold several emojis on one message: every one is kept.
+    expect(messageDto({ ...row, authorBotId: null, authorBotName: null, authorBotSlug: null, authorBotFace: null, reactions: [
+      { emoji: "❤️", count: 1, reactedByMe: true },
+      { emoji: "👍", count: 1, reactedByMe: true },
+    ] }).reactions).toEqual([
+      { emoji: "❤️", count: 1, reactedByMe: true },
+      { emoji: "👍", count: 1, reactedByMe: true },
+    ]);
     expect(dto).not.toHaveProperty("replyToId");
     expect(dto).not.toHaveProperty("replyAuthorBotName");
   });
@@ -794,6 +802,10 @@ describe("contrat réponse et réactions", () => {
     expect(statements.filter((sql) => sql.includes("on conflict (organization_id, user_id, message_id, emoji)")).length)
       .toBe(2);
     expect(statements.some((sql) => sql.includes("reaction.user_id"))).toBe(true);
+    // Toggle off deletes this member's row for this emoji only, never the other emojis.
+    const removal = statements.find((sql) => sql.includes("delete from message_reactions"))!;
+    expect(removal).toContain("reaction.emoji =");
+    expect(removal).toContain("reaction.user_id =");
     expect(values).toContain(owner.organizationId);
     expect(values).toContain(owner.userId);
     expect(values).toContain("thread-1");

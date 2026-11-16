@@ -1,0 +1,83 @@
+/*
+ * Rich cards of a tool result (`components/cards`). The weather glyphs read
+ * their colors here, one set per theme, so a single drawing holds its
+ * contrast on the light and the dark surface.
+ */
+.openedbot-weather-card {
+  --wx-sun: #f2a900;
+  --wx-hot: #f0712c;
+  --wx-moon: #7d88b0;
+  --wx-cloud: #9ea8b8;
+  --wx-rain: #2f7de1;
+  --wx-snow: #5aaee8;
+}
+
+.dark .openedbot-weather-card {
+  --wx-sun: #ffc533;
+  --wx-hot: #ff8a4c;
+  --wx-moon: #c3cbe6;
+  --wx-cloud: #c2c9d4;
+  --wx-rain: #5ea5ff;
+  --wx-snow: #9ad6ff;
+}
+
+/*
+ * The frame caps a card at the reference width (600 px at a 16 px root, in
+ * rem so it follows the text size), left-aligned with the bot's bubbles. It
+ * is the size container of its card and of the card's placeholder: both read
+ * the same `--wx-block-h`, so the reserved height equals the rendered one at
+ * every width. Keep 26rem / 9rem / 7rem equal to WEATHER_* in weather-model.ts.
+ */
+.openedbot-run-card {
+  container-type: inline-size;
+  width: 100%;
+  max-width: min(100%, 37.5rem);
+}
+
+.openedbot-run-card > * {
+  --wx-block-h: 7rem;
+}
+
+.openedbot-run-card-placeholder {
+  height: calc(var(--wx-rest) + var(--wx-block-h, 7rem));
+}
+
+.openedbot-weather-block {
+  height: var(--wx-block-h);
+  overflow: hidden;
+}
+
+@container (max-width: 26rem) {
+  .openedbot-run-card > * {
+    --wx-block-h: 9rem;
+  }
+
+  .openedbot-run-card-placeholder {
+  height: calc(var(--wx-rest) + var(--wx-block-h, 7rem));
+}
+
+.openedbot-weather-block {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .openedbot-weather-block > .openedbot-weather-text {
+    flex: none;
+    width: 100%;
+  }
+}
+
+/* The hourly strip fades at both edges instead of cutting a column in half. */
+.openedbot-weather-strip {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 1rem, #000 calc(100% - 1rem), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 1rem, #000 calc(100% - 1rem), transparent);
+  scroll-padding-inline: 0.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .openedbot-weather-strip {
+    scroll-behavior: smooth;
+  }
+}

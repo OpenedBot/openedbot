@@ -12,7 +12,7 @@
  */
 import type { ProductRunStatus } from "@openedbot/contracts-api";
 import type { ProductEventType, StoredProductEvent } from "@openedbot/contracts-events";
-import { isConfirmedLiveAnswer } from "../stream/live-answer";
+import { labWeatherCard } from "./thread-lab-weather";
 
 export type LabStep =
   /** Text streamed as `agent.message` fragments. Before a tool it reads as narration. */
@@ -27,6 +27,8 @@ export type LabStep =
       result?: string;
       durationMs: number;
       errorMessage?: string;
+      /** `tool.result.cards`, built when the reply is planned so its times are fresh. */
+      cards?: () => readonly unknown[];
     }
   /** The run ends on `run.error` instead of `run.completed`. */
   | { kind: "fail"; message: string };
@@ -148,6 +150,135 @@ export const LAB_SCENARIOS: readonly LabScenario[] = [
       { kind: "fail", message: "Le fournisseur a refusé la requête (quota dépassé)." },
     ],
   },
+  {
+    // A text long and shaped like an answer, then a tool call: it stays a
+    // bubble where it is, the status row below it picks up the tool.
+    id: "backflow",
+    label: "Réponse provisoire puis outil",
+    prompt: "Combien de requêtes lentes cette semaine ?",
+    followUps: ["Montre les dix plus lentes", "Compare avec la semaine dernière"],
+    steps: [
+      {
+        kind: "say",
+        text: [
+          "D'après le tableau de bord, la semaine compte environ 1 200 requêtes au-delà de 500 ms, surtout sur `/api/search`.",
+          "",
+          "Ce chiffre date d'hier soir : je vérifie dans les journaux d'aujourd'hui avant de conclure.",
+        ].join("\n"),
+      },
+      {
+        kind: "tool",
+        tool: "terminal",
+        preview: "rg -c 'duration_ms=[5-9][0-9]{2}' logs/api-2026-11-16.log",
+        excerpt: "1342",
+        result: "logs/api-2026-11-16.log:1342",
+        durationMs: 1400,
+      },
+      { kind: "say", text: "Le chiffre a bougé depuis hier, je regarde la répartition par route." },
+      {
+        kind: "tool",
+        tool: "terminal",
+        preview: "rg -o 'route=\\S+' logs/api-2026-11-16.log | sort | uniq -c",
+        excerpt: "918 route=/api/search\n301 route=/api/export\n123 route=/api/me",
+        durationMs: 1100,
+      },
+      {
+        kind: "say",
+        text: [
+          "**1 342 requêtes lentes** cette semaine, pas 1 200 : le tableau de bord n'avait pas encore les journaux d'aujourd'hui.",
+          "",
+          "- `/api/search` : 918 (68 %)",
+          "- `/api/export` : 301",
+          "- `/api/me` : 123",
+        ].join("\n"),
+      },
+    ],
+  },
+  {
+    // Delegations spaced in time: each one adds an agent to the header, the
+    // fifth agent shows as « +N ».
+    id: "delegation",
+    label: "Délégation multi-agents",
+    prompt: "Prépare une note de veille sur les bases vectorielles",
+    followUps: ["Ajoute un tableau des prix", "Traduis-la en anglais"],
+    steps: [
+      { kind: "say", text: "Je répartis le travail entre plusieurs agents." },
+      {
+        kind: "tool",
+        tool: "delegate_task",
+        preview: "Chercheur web",
+        excerpt: "12 sources : pgvector, Qdrant, Weaviate, Milvus.",
+        durationMs: 1800,
+      },
+      {
+        kind: "tool",
+        tool: "delegate_task",
+        preview: "Analyste des coûts",
+        excerpt: "Coût mensuel estimé pour 10 M de vecteurs.",
+        durationMs: 1600,
+      },
+      { kind: "say", text: "Les deux premières notes sont rentrées, je lance la rédaction." },
+      {
+        kind: "tool",
+        tool: "delegate_task",
+        preview: "Rédacteur",
+        excerpt: "Brouillon de 600 mots.",
+        durationMs: 1500,
+      },
+      {
+        kind: "tool",
+        tool: "delegate_task",
+        preview: "Relecteur",
+        excerpt: "Trois corrections factuelles.",
+        durationMs: 1200,
+      },
+      {
+        kind: "tool",
+        tool: "delegate_task",
+        preview: "Vérificateur des sources",
+        excerpt: "Toutes les sources répondent.",
+        durationMs: 1200,
+      },
+      {
+        kind: "say",
+        text: [
+          "## Bases vectorielles : la note",
+          "",
+          "- **pgvector** : le plus simple si Postgres est déjà là, jusqu'à quelques millions de vecteurs.",
+          "- **Qdrant** : le meilleur rapport performance / coût au-delà.",
+          "- **Weaviate** et **Milvus** : pertinents pour de très gros volumes, au prix d'une exploitation plus lourde.",
+        ].join("\n"),
+      },
+    ],
+  },
+  {
+    id: "weather",
+    label: "Météo",
+    prompt: "Quel temps fait-il à Rennes cette semaine ?",
+    followUps: ["Et ce week-end ?", "Faut-il un parapluie demain ?"],
+    steps: [
+      { kind: "say", text: "Je regarde la météo de Rennes." },
+      {
+        kind: "tool",
+        tool: "weather_forecast",
+        preview: "Rennes",
+        excerpt: "Rennes : bruine, 13 °C, 7 jours de prévisions.",
+        durationMs: 900,
+        cards: () => [labWeatherCard(Date.now())],
+      },
+      {
+        kind: "say",
+        text: "Une semaine humide à Rennes : de la bruine aujourd'hui, de la pluie demain, puis une éclaircie en fin de semaine. Prévoyez un parapluie jusqu'à mercredi.",
+      },
+    ],
+  },
+  {
+    id: "short-answer",
+    label: "Réponse courte",
+    prompt: "ça va ti ?",
+    followUps: ["Merci !"],
+    steps: [{ kind: "say", text: "Ça va bien, merci. Et toi ?" }],
+  },
 ];
 
 export function labScenario(id: string): LabScenario {
@@ -217,6 +348,7 @@ export function planLabReply(scenario: LabScenario): LabScheduledEvent[] {
         errorMessage: step.errorMessage ?? null,
         resultExcerpt: step.excerpt ?? null,
         hasResultPayload: step.result !== undefined,
+        ...(step.cards ? { cards: step.cards() } : {}),
       },
     });
     if (step.result !== undefined) {
@@ -353,10 +485,9 @@ function deriveAssistantTurn(run: LabRun, events: readonly StoredProductEvent[])
     }
   }
 
-  const live = isLabRunLive(run.status);
   const last = segments[segments.length - 1];
   const trailing = last?.kind === "text" ? last.text : null;
-  const trailingIsAnswer = trailing !== null && (!live || isConfirmedLiveAnswer(trailing));
+  const trailingIsAnswer = trailing !== null;
   const body = trailing !== null ? segments.slice(0, -1) : segments;
   const activity: LabActivityPart[] = body.map((segment) =>
     segment.kind === "text" ? { kind: "narration", id: segment.id, text: segment.text.trim() } : segment,
@@ -367,7 +498,7 @@ function deriveAssistantTurn(run: LabRun, events: readonly StoredProductEvent[])
     model: run.model,
     activity,
     answer: trailingIsAnswer ? trailing : "",
-    liveNote: trailing !== null && !trailingIsAnswer ? trailing.trim() : "",
+    liveNote: "",
     errorMessage,
     cancelled,
     startedAt: run.createdAt,

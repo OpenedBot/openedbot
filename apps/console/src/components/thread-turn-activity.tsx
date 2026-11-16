@@ -1,25 +1,24 @@
-import { memo, useEffect, useId, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Search, Sparkles } from "lucide-react";
+import { Search } from "lucide-react";
 import { cn } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import type { WebSearchQuery, WebSearchTrail } from "@openedbot/execution/domain/agent-web-search";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
 import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import { useT } from "../lib/i18n";
-import { TurnAuthorHeader } from "./thread-author";
-import { ThreadMarkdown } from "./thread-markdown";
+import { toolProgressLabel } from "../lib/run/tool-progress-label";
 import { SearchSources } from "./thread-search-sources";
 import { partialFailureLabel } from "./thread-tool-labels";
 import { BotFace } from "./bot-face";
-import { AgentFeed } from "./stream/agent-feed";
-import { StreamAgentsHeader, StreamFeedRow, type StreamFeedItem } from "./stream/stream-feed";
+import type { StreamFeedItem } from "./stream/stream-feed";
+import { streamDuration } from "./stream/stream-duration";
+import { RunStatusLine, type StreamAgent } from "./stream/run-status-line";
 import { StreamThoughtsPanel } from "./stream/stream-thoughts-panel";
 import { streamSpeaker } from "./stream/turn-feed";
 import { useAttachmentCanvas } from "./attachment-canvas";
-
-/** the reference app's first beat: the bulb before the agents are called. */
-const PRE_BEAT_MS = 400;
+import { runStatusPhase, runStatusStep, thinkingAgents } from "../lib/thread/run-thinking-model";
+import { prefersReducedMotion, RUN_LINE_MOTION_MS, useRevealOnMount } from "../lib/thread/thread-motion";
 
 /** One row of the feed. Rows enter with a fade and a short rise while the turn is live. */
 export function ActivityRow({ kind, className, children }: {
@@ -30,26 +29,6 @@ export function ActivityRow({ kind, className, children }: {
   return (
     <div role="listitem" data-activity-row={kind} className={cn("min-w-0", className)}>
       {children}
-    </div>
-  );
-}
-
-/**
- * A sentence the model wrote between two tools: its thinking out loud, read
- * as a « Thinking » trace row of the feed, not as the answer.
- */
-export function ActivityNarration({ text, streaming }: { text: string; streaming: boolean }) {
-  return (
-    <div className="grid min-h-8 grid-cols-[1rem_minmax(0,1fr)] items-start gap-2.5 rounded-md px-1.5 py-1">
-      <span aria-hidden className="grid h-6 w-4 place-items-center text-text-tertiary">
-        <Sparkles className="size-4" />
-      </span>
-      <div
-        data-activity-narration=""
-        className="prose prose-sm max-w-none wrap-anywhere py-0.5 text-sm leading-5 dark:prose-invert prose-p:my-1 prose-p:text-text-secondary [&>:first-child]:mt-0 [&>:last-child]:mb-0"
-      >
-        <ThreadMarkdown streaming={streaming}>{text}</ThreadMarkdown>
-      </div>
     </div>
   );
 }
@@ -90,75 +69,85 @@ export function ActivitySearch({ trail }: { trail: WebSearchTrail }) {
 }
 
 /**
- * A turn's activity, as the reference app's chat (the streaming-ui template, Heavy
- * mode): `AgentsHeader` over `AgentFeed`. While the run works, the header
- * reads « Réflexion • Ns » (the bot's face springs in at its first step) and
- * the feed rolls its last three steps, blurring in below and out above. Once
- * the answer streams the feed empties and the header reads « Réflexions »,
- * then « Réflexion : Ns ». A click on it opens grok's « Réflexions » panel in
- * the thread's canvas (`StreamThoughtsPanel`), the turn's whole log; a second
- * click, or its close button, folds it.
- *
- * The detailed rows (Tool Results, sources, decisions) stay in the thread,
- * folded: a pending decision or a find target opens them in place, so a
- * question for the operator never hides. A screen without a canvas (tests,
- * embeds) keeps that fold as its log, opened on a failed turn.
+ * A run's status (`RunStatusLine`) and its folded log. Live, it is the row
+ * at the bottom of the turn, under the bot's bubbles, ONE mounted element
+ * from the send to the end; a decision to make opens the log under it.
+ * Done with work, it is the summary « Réflexion : Ns » on the run's head
+ * line, above the reply, which opens the « Réflexions » panel (or, without
+ * a canvas, the log folded under it; a failed tool opens it there). At the
+ * end of a run seen live, the bottom row collapses (height and opacity,
+ * 200 ms) then renders nothing: it never keeps room under the reply. Under
+ * `prefers-reduced-motion`, or mounted already finished, it is gone at once.
  */
 export const TurnActivity = memo(function TurnActivity({
+  runId,
   calls,
   feed = [],
   live,
+  pending = false,
+  hasWork = true,
+  writing = false,
+  waiting = false,
   forceOpen,
   author,
   showAuthorLabel,
   children,
   workedMs = null,
   since = null,
-  answering = false,
-  waiting = false,
+  reveal = false,
 }: {
+  runId?: string;
   calls: readonly ToolCall[];
-  /** The turn's steps as the reference app's feed rows (`turnFeed`). */
+  /** The run's steps as the panel's rows (`turnFeed`). */
   feed?: readonly StreamFeedItem[];
   live: boolean;
-  /** The run's own duration (created to ended), once it has one. */
-  workedMs?: number | null;
-  /** A decision is waiting, or the thread's search targets an entry of the block. */
-  forceOpen: boolean;
-  author: MessageAuthorBot | null;
-  showAuthorLabel: boolean;
-  children: React.ReactNode;
-  /** The run's real start (epoch ms): where the thinking timer counts from. */
-  since?: number | null;
-  /** The answer has started streaming below: the feed empties, « Réflexions ». */
-  answering?: boolean;
+  /** No event yet: the avatar, then the typing dots. */
+  pending?: boolean;
+  /** The run has work to summarise; without, a finished row collapses and unmounts. */
+  hasWork?: boolean;
+  /** The run's last entry is a text it is writing. */
+  writing?: boolean;
   /** The agent waits for the operator (a pending decision). */
   waiting?: boolean;
+  /** A decision is waiting, or the thread's search targets an entry of the log. */
+  forceOpen: boolean;
+  author: MessageAuthorBot | null;
+  /** Done: the bot's name opens the summary line (a 1:1 thread's head line). */
+  showAuthorLabel: boolean;
+  children?: React.ReactNode;
+  /** The run's own duration (created to ended), once it has one. */
+  workedMs?: number | null;
+  /** The run's real start (epoch ms), for a duration measured here when the run gives none. */
+  since?: number | null;
+  /** Mounted above a reply already on screen (a summary at the run's end): it opens instead of jumping in. */
+  reveal?: boolean;
 }) {
   const { t, plural } = useT();
   const [userOpen, setUserOpen] = useState<boolean | null>(null);
   const bodyId = useId();
   const visibleCalls = calls.filter((call) => !isTodoTool(call.tool));
-  const failedCalls = visibleCalls.filter((call) => call.failed);
-  const failedCount = failedCalls.length;
+  const failedCount = visibleCalls.filter((call) => call.failed).length;
   const partial = failedCount > 0 && failedCount < visibleCalls.length;
-  const [mountedAt] = useState(() => Date.now());
-  const start = since ?? mountedAt;
-  // grok's first beat: the bulb and « Réflexion pendant Ns » for 400 ms.
-  const [pre, setPre] = useState(() => live && Date.now() - start < PRE_BEAT_MS);
-  useEffect(() => {
-    if (!pre) return;
-    const timer = window.setTimeout(() => setPre(false), Math.max(0, PRE_BEAT_MS - (Date.now() - start)));
-    return () => window.clearTimeout(timer);
-  }, [pre, start]);
-  // « Réflexion : 23s » freezes where the answer started.
-  const [frozenMs, setFrozenMs] = useState<number | null>(null);
-  if (live && answering && frozenMs === null) setFrozenMs(Math.max(0, Date.now() - start));
+  // Seen ending here from a known start, before the run reports its duration: the row times it.
+  const [endedLive, setEndedLive] = useState<{ seen: boolean; ms: number | null }>({ seen: live, ms: null });
+  if (live && !endedLive.seen) setEndedLive({ seen: true, ms: null });
+  if (!live && endedLive.seen && endedLive.ms === null && since != null) setEndedLive({ seen: true, ms: Math.max(0, Date.now() - since) });
   const durations = visibleCalls.map((call) => call.durationMs).filter((value): value is number => typeof value === "number");
   const totalDuration = durations.length ? durations.reduce((sum, value) => sum + value, 0) : null;
-  const worked = workedMs ?? (live ? frozenMs : null) ?? totalDuration;
-  const running = live && !answering;
-  const rolling = running && !waiting && !forceOpen;
+  const worked = workedMs ?? endedLive.ms ?? totalDuration;
+  const phase = runStatusPhase({ pending, live, waiting, hasWork });
+  const gone = phase === "gone";
+  // A row that never ran here (history, a remount) has nothing to collapse.
+  const collapseAtOnce = gone && (!endedLive.seen || prefersReducedMotion());
+  const [collapsed, setCollapsed] = useState(false);
+  if (!gone && collapsed) setCollapsed(false);
+  useEffect(() => {
+    if (!gone || collapseAtOnce) return;
+    const timer = window.setTimeout(() => setCollapsed(true), RUN_LINE_MOTION_MS);
+    return () => window.clearTimeout(timer);
+  }, [gone, collapseAtOnce]);
+  const sectionRef = useRef<HTMLElement>(null);
+  useRevealOnMount(sectionRef, reveal);
   const canvas = useAttachmentCanvas();
   const panelId = useId();
   const panelOpen = canvas?.panel?.id === panelId;
@@ -170,56 +159,130 @@ export const TurnActivity = memo(function TurnActivity({
     if (panelOpen) canvas.close();
     else canvas.openPanel({ id: panelId, label: t("threadTimeline.streamThoughts") });
   };
-  const agents = author && (feed.length > 0 || answering || !live)
-    ? [{ id: author.id, avatar: <BotFace name={author.name ?? author.slug ?? ""} seed={author.id} face={author.face} className="size-[18px]" /> }]
-    : [];
+  const step = runStatusStep(calls, { waiting, writing });
+  const label = step.kind === "tool"
+    ? toolProgressLabel(t, step.call.tool, step.call.preview)
+    : step.kind === "waiting"
+      ? t("threadTimeline.streamWaiting")
+      : step.kind === "writing" ? t("threadTimeline.streamWriting") : t("agentActivity.thinking");
+  // No duration to tell (an old turn without one): « Réflexions », never a made-up « 1s ».
+  const summary = worked === null
+    ? t("threadTimeline.streamThoughts")
+    : t("threadTimeline.streamThoughtFor", { duration: streamDuration(Math.max(1, Math.round(worked / 1000))) });
+  const { agents, overflow } = rowAgents(author, calls);
+  const statusLine = (
+    <RunStatusLine
+      phase={phase}
+      agents={agents}
+      overflow={overflow}
+      label={label}
+      summary={summary}
+      open={canvas ? panelOpen : logOpen}
+      onOpen={!canvas || feed.length > 0 ? togglePanel : undefined}
+      controls={canvas ? undefined : bodyId}
+      // The count only, on the row's line: the error itself reads in the
+      // panel, never as raw output squeezed after « Réflexion : Ns ».
+      trailing={failedCount > 0 ? (
+        <span
+          className={cn("ms-1 min-w-0 truncate", partial ? "text-warn-700" : "text-destructive-text")}
+          data-tool-partial-failure={partial ? "" : undefined}
+        >
+          {`• ${partialFailureLabel(t, plural, failedCount, visibleCalls.length)}`}
+        </span>
+      ) : null}
+    />
+  );
+  // Done, the summary joins the bot's name on the run's head line, above its reply.
+  const named = phase === "done" && showAuthorLabel ? author : null;
+  if (gone && (collapseAtOnce || collapsed)) return null;
   const block = (
     <section
+      ref={sectionRef}
+      data-turn-of={named?.id}
       data-turn-activity=""
+      data-run-id={runId}
+      // Pending, the row is the thread's thinking status.
+      role={pending ? "status" : undefined}
+      data-thread-thinking={pending ? "" : undefined}
+      data-thinking-status={pending ? "" : undefined}
+      data-author={pending ? author?.id : undefined}
       data-live={live ? "" : undefined}
-      data-thinking={rolling ? "" : undefined}
       aria-label={t("threadTimeline.activityFeed")}
       aria-busy={live}
-      className={"flex w-full min-w-0 max-w-full flex-col self-start"}
+      data-run-reveal={reveal ? "" : undefined}
+      data-run-collapsing={gone ? "" : undefined}
+      aria-hidden={gone ? true : undefined}
+      className={cn("flex w-full min-w-0 max-w-full flex-col self-start", gone && "openedbot-run-status-collapse")}
     >
-      <StreamAgentsHeader
-        agents={agents}
-        started={start}
-        running={running}
-        streaming={live && answering}
-        seconds={worked !== null ? Math.max(1, Math.round(worked / 1000)) : null}
-        pre={pre && feed.length === 0}
-        open={canvas ? panelOpen : logOpen}
-        onOpen={!canvas || feed.length > 0 ? togglePanel : undefined}
-        controls={canvas ? undefined : bodyId}
-        // The count only, on the header's line: the error itself reads in the
-        // panel, never as raw output squeezed after « Réflexion : Ns ».
-        trailing={failedCount > 0 ? (
-          <span
-            className={cn("ms-1 min-w-0 truncate", partial ? "text-warn-700" : "text-destructive-text")}
-            data-tool-partial-failure={partial ? "" : undefined}
-          >
-            {`• ${partialFailureLabel(t, plural, failedCount, visibleCalls.length)}`}
-          </span>
-        ) : null}
-      />
-      <AgentFeed items={feed} running={rolling} renderItem={(item) => <StreamFeedRow item={item} />} />
-      <div
-        id={bodyId}
-        data-open={logOpen ? "true" : "false"}
-        className={cn("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", logOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
-        style={{ transitionTimingFunction: "var(--stream-ease)" }}
-      >
-        <div className="min-h-0 overflow-hidden" inert={!logOpen} aria-hidden={!logOpen}>
-          <div role="list" data-activity-list="" className="openedbot-activity-list flex flex-col gap-0.5 py-1">
-            {children}
+      {named ? (
+        <div data-run-head="" className="flex min-h-6 w-full min-w-0 items-center gap-2">
+          <RunAuthorName author={named} />
+          <div className="min-w-0 flex-1">{statusLine}</div>
+        </div>
+      ) : statusLine}
+      {children ? (
+        <div
+          id={bodyId}
+          data-open={logOpen ? "true" : "false"}
+          className={cn("grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none", logOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
+          style={{ transitionTimingFunction: "var(--stream-ease)" }}
+        >
+          <div className="min-h-0 overflow-hidden" inert={!logOpen} aria-hidden={!logOpen}>
+            <div role="list" data-activity-list="" className="openedbot-activity-list flex flex-col gap-0.5 py-1">
+              {children}
+            </div>
           </div>
         </div>
-      </div>
-      {panelSlot && canvas ? createPortal(<StreamThoughtsPanel items={feed} speaker={speaker} onClose={canvas.close} calls={calls} />, panelSlot) : null}
+      ) : null}
+      {panelSlot && canvas ? createPortal(<StreamThoughtsPanel runId={runId} items={feed} speaker={speaker} onClose={canvas.close} calls={calls} />, panelSlot) : null}
     </section>
   );
-  if (!author || !showAuthorLabel) return block;
-  const label = author.name ?? author.slug ?? t("threadTimeline.unknownBot");
-  return <TurnAuthorHeader author={author} label={label}>{block}</TurnAuthorHeader>;
+  return block;
 });
+
+function RunAuthorName({ author }: { author: MessageAuthorBot }) {
+  const { t } = useT();
+  const label = author.name ?? author.slug ?? t("threadTimeline.unknownBot");
+  return (
+    <span data-tool-author="" className="flex min-w-0 shrink-0 items-center gap-2 text-body-2-medium text-text-secondary">
+      <span className="flex size-4 shrink-0 items-center justify-center">
+        <BotFace name={label} seed={author.id} face={author.face} className="size-5 shrink-0" />
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * The run's head line while it works with tools, above its first bubble:
+ * the bot's name alone (a 1:1 thread names the bot on a turn with work,
+ * never on a plain reply). Once the run is done, its summary takes this
+ * place (`TurnActivity`, same height), so « Réflexion : Ns » lands without a
+ * shift. Mounted when the first tool starts under a reply already on
+ * screen, it opens (`reveal`) instead of jumping in.
+ */
+export function RunAuthorLine({ author, reveal = false }: { author: MessageAuthorBot; reveal?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useRevealOnMount(ref, reveal);
+  return (
+    <div
+      ref={ref}
+      data-run-head=""
+      data-turn-of={author.id}
+      data-run-reveal={reveal ? "" : undefined}
+      className="flex min-h-6 w-full min-w-0 items-center self-start"
+    >
+      <RunAuthorName author={author} />
+    </div>
+  );
+}
+
+/** The row's avatars: the run's bot and its delegations; the rest is counted as « +N ». */
+function rowAgents(author: MessageAuthorBot | null, calls: readonly ToolCall[]): { agents: StreamAgent[]; overflow: number } {
+  const { visible, overflow } = thinkingAgents(author, calls);
+  const agents: StreamAgent[] = visible.map((agent) => ({
+    id: agent.id,
+    avatar: <BotFace name={agent.name} seed={agent.seed} face={agent.face} className="size-[1.125rem]" />,
+  }));
+  return { agents, overflow };
+}

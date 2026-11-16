@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import type { WebSearchTrail } from "@openedbot/execution/domain/agent-web-search";
 import { I18nProvider } from "../../src/lib/i18n";
-import { ActivityNarration, ActivityRow, ActivitySearch, TurnActivity } from "../../src/components/thread-turn-activity";
+import { ActivityRow, ActivitySearch, TurnActivity } from "../../src/components/thread-turn-activity";
+import { PendingThinking } from "../../src/components/thread-thinking-status";
 import { toolKindIcon } from "../../src/components/thread-tool-state-icon";
 import { ToolActivity } from "../../src/components/thread-tool-activity";
 import type { StreamFeedItem } from "../../src/components/stream/stream-feed";
@@ -38,9 +39,6 @@ function view({ live, forceOpen = false, feed = calls, rows = [] }: { live: bool
   return (
     <I18nProvider>
       <TurnActivity calls={feed} feed={rows} live={live} forceOpen={forceOpen} author={null} showAuthorLabel={false}>
-        <ActivityRow kind="thinking">
-          <ActivityNarration text="Je regarde le dépôt." streaming={false} />
-        </ActivityRow>
         <ToolActivity entryKey="erun-1:4" calls={feed} approvals={[]} findTargetId="run-1:tools" />
       </TurnActivity>
     </I18nProvider>
@@ -76,39 +74,38 @@ describe("ToolActivity identity", () => {
   });
 });
 
-describe("TurnActivity (the reference app's agents header and rolling feed)", () => {
+describe("TurnActivity (a run's status row and its folded log)", () => {
   const rows: StreamFeedItem[] = [
     { id: "s1", kind: "status", text: "Je regarde le dépôt." },
     { id: "q1", kind: "search", query: "acme pricing", results: 4, sites: [] },
     { id: "t1", kind: "tool", label: "Lecture : app.ts" },
     { id: "t2", kind: "tool", label: "Commande : bun test", pending: true },
   ];
-  const fold = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-turn-activity] > [data-open]")!;
+  const fold = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-turn-activity] [data-open]")!;
 
-  test("a live turn rolls its last three steps under grok's solo « Réflexion • Ns »; the full log waits, folded", () => {
+  test("a live turn reads one status line, no rolling window; the full log waits, folded", () => {
     const { container } = render(view({ live: true, rows }));
     const block = container.querySelector<HTMLElement>("[data-turn-activity]")!;
     expect(block.hasAttribute("data-live")).toBe(true);
     expect(block.getAttribute("aria-busy")).toBe("true");
     const head = block.querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    // Running, the header opens nothing: grok's is a plain status line.
     expect(head.hasAttribute("aria-expanded")).toBe(false);
-    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion");
-    expect(head.querySelector("[data-thinking-elapsed]")?.textContent).toMatch(/^\d+s$/);
-    const feed = [...block.querySelectorAll("[data-agent-feed-item] [data-feed-row]")].map((row) => row.getAttribute("data-feed-row"));
-    expect(feed).toEqual(["search", "tool", "tool"]);
+    // Every call done, no text: the generic thinking line.
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réfléchit…");
+    expect(block.querySelector("[data-agent-feed]")).toBeNull();
+    expect(block.querySelector("[data-feed-row]")).toBeNull();
     expect(fold(container).getAttribute("data-open")).toBe("false");
     // The log keeps every row, in order, never capped.
     const list = block.querySelector<HTMLElement>("[data-activity-list]")!;
     expect(list.getAttribute("role")).toBe("list");
     expect([...list.querySelectorAll("[data-activity-row]")].map((row) => row.getAttribute("data-activity-row")))
-      .toEqual(["thinking", "tool", "tool", "tool"]);
+      .toEqual(["tool", "tool", "tool"]);
     // The two consecutive commands share one Tool Result: `terminal ×2`.
     expect(list.querySelectorAll("[data-tool-result]")).toHaveLength(3);
     expect(list.textContent).toContain("×2");
   });
 
-  test("the turn concluding empties the feed and folds into « Réflexion : Ns », which opens the log", () => {
+  test("the turn concluding turns the row into « Réflexion : Ns », which opens the log", () => {
     const { container, rerender } = render(view({ live: true, rows }));
     rerender(view({ live: false, rows }));
     const block = container.querySelector<HTMLElement>("[data-turn-activity]")!;
@@ -137,10 +134,10 @@ describe("TurnActivity (the reference app's agents header and rolling feed)", ()
     expect(container.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 6s");
   });
 
-  test("a pending decision opens the log and stops the feed, whatever the run does", () => {
+  test("a pending decision opens the log inline, whatever the run does", () => {
     const { container } = render(view({ live: true, forceOpen: true, rows }));
     expect(fold(container).getAttribute("data-open")).toBe("true");
-    expect(container.querySelectorAll("[data-agent-feed-item]")).toHaveLength(0);
+    expect(fold(container).querySelector("[data-tool-result]")).not.toBeNull();
   });
 
   test("a turn that ended on a failed tool stays open on it; the operator's click still folds it", () => {
@@ -261,7 +258,7 @@ describe("grok's « Réflexions » panel in the canvas", () => {
     return render(
       <I18nProvider>
         <AttachmentCanvasProvider>
-          <TurnActivity calls={[{ tool: "terminal", done: true, failed: true }]} feed={log} live={false} forceOpen={false} author={author} showAuthorLabel={false} workedMs={20_000}>
+          <TurnActivity runId="run-panel" calls={[{ tool: "terminal", done: true, failed: true }]} feed={log} live={false} forceOpen={false} author={author} showAuthorLabel={false} workedMs={20_000}>
             <ActivityRow kind="thinking"><span>detail row</span></ActivityRow>
           </TurnActivity>
           <AttachmentCanvas />
@@ -280,6 +277,8 @@ describe("grok's « Réflexions » panel in the canvas", () => {
     fireEvent.click(head);
     const panel = container.querySelector<HTMLElement>("[data-thoughts-panel]");
     expect(panel).not.toBeNull();
+    expect(panel!.dataset.runId).toBe("run-panel");
+    expect(panel!.querySelector("[data-assistant-text]")?.textContent).toBe("Je lance le calcul.");
     expect(head.getAttribute("aria-expanded")).toBe("true");
     // The thread's own fold stays shut: the log reads in the canvas.
     expect(container.querySelector("[data-turn-activity] [data-open]")?.getAttribute("data-open")).toBe("false");
@@ -301,5 +300,26 @@ describe("grok's « Réflexions » panel in the canvas", () => {
     expect(search.querySelector("a")?.getAttribute("href")).toBe("https://example.org/p");
     fireEvent.click(panel.querySelector<HTMLElement>('button[aria-label="Fermer"]')!);
     expect(container.querySelector("[data-activity-head]")?.getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+
+describe("single waiting indicator", () => {
+  test("the pending row is one status line that keeps its node, then leaves without a ghost", async () => {
+    const author = { id: "bot-1", name: "Atlas", slug: "atlas", face: null };
+    const { container, rerender } = render(<I18nProvider><PendingThinking since={Date.now()} author={author} /></I18nProvider>);
+    const head = container.querySelector<HTMLElement>("[data-activity-head]")!;
+    expect(head.dataset.runStatus).toBe("pending");
+    // The avatar fades in, then gives way to the dots, in place (CSS): both are mounted from the start.
+    expect(head.querySelector("[data-run-status-agents].openedbot-run-status-avatar [data-stream-agent='bot-1']")).not.toBeNull();
+    expect(head.querySelector("[data-run-status-dots].openedbot-run-status-dots [data-thinking-dots]")).not.toBeNull();
+    expect(head.querySelector("[data-activity-summary]")).toBeNull();
+    await act(async () => { await Bun.sleep(450); });
+    expect(container.querySelector("[data-activity-head]")).toBe(head);
+    rerender(<I18nProvider><div data-answer="">Bonjour</div></I18nProvider>);
+    await act(async () => { await Promise.resolve(); });
+    expect(container.querySelector("[data-thread-exit-ghost]")).toBeNull();
+    expect(container.querySelector("[data-activity-head]")).toBeNull();
+    expect(container.textContent).toBe("Bonjour");
   });
 });

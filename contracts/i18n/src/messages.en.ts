@@ -20,6 +20,7 @@ import { mobileSettingsHints, mobileSettingsRuntimes, settings, settingsAccount,
 import { appSidebar, boardui, clientUpdate, commandPalette, compactShell, desktopNotch, desktopUpdate, featureLab, mobileShell, modeLanding, navUser, overviewPlaceholder } from "./messages/en/shell";
 import { conversation, threadActivity, threadContext, threadFind, threadScreen, threadTimeline, threadTurnRail } from "./messages/en/thread";
 import { chartArea, chartTokens, dashboardMetrics, sectionCards } from "./messages/en/workspace";
+import { weatherCard } from "./messages/en/cards";
 
 import { mvp } from "./messages/en/mvp";
 
@@ -116,4 +117,5 @@ export const en = {
   clientUpdate,
   desktopUpdate,
   desktopNotch,
+  weatherCard,
 } as const;

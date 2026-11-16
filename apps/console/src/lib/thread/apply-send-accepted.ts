@@ -23,7 +23,6 @@ export function applySendAcceptedToCaches(
   threadId: string,
   accepted: SendMessageAccepted,
 ): void {
-  globalThis.window?.__openedbotThreadPerf?.recordRunAccepted(accepted.runId);
   if (!accepted.message) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.thread(threadId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.roster });

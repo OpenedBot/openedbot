@@ -68,8 +68,8 @@
  * Reading column of a bot's thread (`data-thread-column`, conversation.tsx).
  *
  * The thread, the docks and the composer center (`mx-auto`) in one
- * width instead of stretching across the whole screen: 60rem (960 px), the reference app's `maxContentWidthPx` (0.79.3: its composer is `max-width: 960px` and
- * the bubbles start and end on the composer's edges, measured on screen). Prose does not spread there: each
+ * width instead of stretching across the whole screen: 60rem (960 px at the default root size, it scales with the text size), measured on the reference app (its composer and its messages share one 960 px lane,
+ * the bubbles start and end on the composer's edges). Prose does not spread there: each
  * reply is a bubble of 560 px at most (`thread-messages.tsx`). The scrolling row stays full width, so
  * the scrollbar and the wheel work across the whole window. Below
  * the column (phone, narrow window), nothing changes.
@@ -78,7 +78,7 @@
  * the CONTENT of each row lands on the same edges as the messages.
  */
 [data-thread-column] {
-  /* The reference app: one 960 px lane for the bubbles and the composer. */
+  /* One 60rem (960 px) lane for the bubbles and the composer. */
   --openedbot-thread-column: 60rem;
 }
 
@@ -115,7 +115,7 @@
  * top bar's sidebar toggle sits in too: while it shows, the gutter is 4rem
  * on both sides, so a narrowed thread (a side panel open) and its composer
  * shrink together and keep 30 px clear of the longest tick instead of
- * touching it. A wide window keeps its 960 px lane, centered on the composer
+ * touching it. A wide window keeps its 60rem lane, centered on the composer
  * either way.
  */
 @media (min-width: 40rem) {
@@ -145,7 +145,7 @@
     max-width: calc(var(--openedbot-thread-column) + 2 * var(--openedbot-thread-gutter));
   }
 
-  /* The dock: `px-4 pb-5`, the pill at 960 px. */
+  /* The dock: `px-4 pb-5`, the pill at 60rem. */
   [data-thread-column] [data-thread-composer] {
     padding-inline: var(--openedbot-thread-gutter);
     padding-bottom: 20px;
@@ -249,5 +249,12 @@
   .openedbot-reveal,
   .openedbot-fade-up {
     animation: none;
+  }
+}
+
+/* Match the composer and reading gutters on narrow screens as well. */
+@media (max-width: 39.999rem) {
+  [data-thread-column] :is([role="log"], [data-thread-composer]) {
+    padding-inline: 1rem;
   }
 }

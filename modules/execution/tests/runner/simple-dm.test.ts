@@ -3,6 +3,7 @@ import type { SQL } from "bun";
 import { simpleDmStep } from "../../src/application/runner/handoff";
 import { dmInstructions } from "../../src/application/runner/instructions";
 import { workflowAutonomyAllowsDelegation } from "../../src/application/runner/workflows";
+import { TOOL_RELEVANCE_RULE } from "@openedbot/roster/domain/bot-mode";
 
 const base = {
   organizationId: "org-1",
@@ -43,6 +44,7 @@ describe("tour de DM simple sans workflow", () => {
     expect(prompt.instructions.startsWith("Tu es Neo.")).toBe(true);
     expect(prompt.instructions).toContain("## Bot mode");
     expect(prompt.instructions).toContain("No other bot is reachable right now.");
+    expect(prompt.instructions).toContain(TOOL_RELEVANCE_RULE);
     expect(prompt.instructions).not.toContain("Durable bot workflow");
     expect(prompt.instructions).toContain("Scheduling from the chat is not ready on this bot yet");
     expect(prompt.instructions).toContain("\"Routines…\"");
@@ -74,7 +76,16 @@ describe("tour de DM simple sans workflow", () => {
     });
     expect(queries.some((sql) => sql.includes("from workflows"))).toBe(true);
     expect(prompt.instructions).toContain("Durable bot workflow");
+    expect(prompt.instructions).toContain(TOOL_RELEVANCE_RULE);
     expect(prompt.limitsLine).toContain("step 1 of at most 8");
+  });
+
+  test("un courrier entrant reçoit aussi la règle sans autoriser de nouvelle délégation", async () => {
+    const db = (() => Promise.resolve([{ name: "Origin", slug: "origin" }])) as unknown as SQL;
+    const prompt = await dmInstructions(db, { ...base, originRunId: "courier-1" });
+    expect(prompt.instructions).toContain(TOOL_RELEVANCE_RULE);
+    expect(prompt.instructions).toContain("NEVER use delegation or background tools");
+    expect(prompt.instructions).not.toContain("Reachable bots:");
   });
 
   test.each([false, true])("the prompt uses the current flag (%s), not the stale run context", async (enabled) => {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CompactHermes } from "@openedbot/conversation/application/compact-thread";
 import { droppedHistoryNotice } from "../../src/application/runner/history";
-import { packRoomHistory } from "../../src/application/runner/rooms";
+import { packRoomHistory } from "../../src/application/runner/room-pack";
 
 type Row = {
   role: string;
@@ -67,22 +67,27 @@ const context = {
   reasoningEffort: null,
 };
 
-const BIG = "o".repeat(40_000);
-const KEEP = "k".repeat(8_000);
+// Each line stays under the per-message clamp (8 000): only their sum is over budget.
+const BIG = "o".repeat(7_000);
+const KEEP = "k".repeat(5_000);
+const bob = { authorName: "Bob", authorSlug: "bob" };
 
 // Le salon vu par le membre Ada : le message opérateur et le tour d'un autre
 // membre arrivent attribués en `user`, ses propres tours en `assistant`.
 const dbRows: Row[] = [
   { role: "user", content: text("Decide the budget"), sequence: 1, ...noAuthor },
-  { role: "assistant", content: text(BIG), sequence: 2, authorName: "Bob", authorSlug: "bob" },
-  { role: "user", content: text(KEEP), sequence: 3, ...noAuthor },
-  { role: "assistant", content: text(KEEP), sequence: 4, ...ada },
+  { role: "assistant", content: text(BIG), sequence: 2, ...bob },
+  { role: "assistant", content: text(BIG), sequence: 3, ...bob },
+  { role: "assistant", content: text(BIG), sequence: 4, ...bob },
+  { role: "assistant", content: text(BIG), sequence: 5, ...bob },
+  { role: "user", content: text(KEEP), sequence: 6, ...noAuthor },
+  { role: "assistant", content: text(KEEP), sequence: 7, ...ada },
 ];
 const replayRows = [
   { role: "user", content: "Message from 👤 Camille (@Camille): Decide the budget", sequence: 1 },
-  { role: "user", content: `Message from 🤖 Bob (@bob): ${BIG}`, sequence: 2 },
-  { role: "user", content: `Message from 👤 Camille (@Camille): ${KEEP}`, sequence: 3 },
-  { role: "assistant", content: KEEP, sequence: 4 },
+  ...[2, 3, 4, 5].map((sequence) => ({ role: "user", content: `Message from 🤖 Bob (@bob): ${BIG}`, sequence })),
+  { role: "user", content: `Message from 👤 Camille (@Camille): ${KEEP}`, sequence: 6 },
+  { role: "assistant", content: KEEP, sequence: 7 },
 ];
 const truncation = replayRows.slice(-2).map(({ role, content }) => ({ role, content }));
 const turn = {
@@ -145,7 +150,7 @@ describe("packRoomHistory", () => {
     const packed = await packRoomHistory(
       fakeDb({
         messages: dbRows,
-        compaction: { summary: "# Room state\n- shared", compactedThroughSequence: 2, sourceMessageCount: 2 },
+        compaction: { summary: "# Room state\n- shared", compactedThroughSequence: 5, sourceMessageCount: 5 },
       }),
       context,
       turn,
@@ -157,12 +162,27 @@ describe("packRoomHistory", () => {
 
   test("échec du résumeur : la troncature d'avant, rien de persisté", async () => {
     const inserts: unknown[][] = [];
-    const packed = await packRoomHistory(fakeDb({ messages: dbRows, inserts }), context, turn, {
+    const packed = await packRoomHistory(fakeDb({ messages: dbRows, inserts }), { ...context, threadId: "thread-room-failed" }, turn, {
       client: client(null, []),
       signal: new AbortController().signal,
     });
     expect(packed).toEqual({ history: turn.history, packInstructions: null });
     expect(inserts).toHaveLength(0);
+  });
+
+  test("a failed summarizer is not retried on the next turn until the room has grown", async () => {
+    const calls: Call[] = [];
+    const roomContext = { ...context, threadId: "thread-room-backoff" };
+    await packRoomHistory(fakeDb({ messages: dbRows }), roomContext, turn, {
+      client: client(null, calls),
+      signal: new AbortController().signal,
+    });
+    const again = await packRoomHistory(fakeDb({ messages: dbRows }), roomContext, turn, {
+      client: client(null, calls),
+      signal: new AbortController().signal,
+    });
+    expect(calls).toHaveLength(1);
+    expect(again).toEqual({ history: turn.history, packInstructions: null });
   });
 
   test("sans client de compaction : la troncature", async () => {

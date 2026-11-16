@@ -25,10 +25,21 @@ import (
 // "1h" would bill those twice for a prefix nobody reads again. A run that
 // openedbot knows to be machine-paced (a routine, a delegated step, a
 // greeting) asks for 5m itself (hook openedbot_prompt_cache_ttl).
+//
+// web.extract_char_limit: Hermes returns up to 15 000 characters per page
+// from web_extract when the model passes no `char_limit`, and that text is
+// re-sent on every later model call of the run (three pages measured at
+// 46 600 characters, ~11 500 tokens per call). 10 000 keeps a whole article
+// and drops the long tail of navigation and footers; a larger page comes
+// back as a head+tail window with the full text saved for read_file. An
+// explicit `char_limit` from the model still wins (web_tools.py). Hermes
+// reads it on every extract, so it needs no gateway restart either.
 const ManagedConfig = `# Written by edge-setup: Hermes managed scope, merged over every profile.
 # Edits here are replaced on the next "edge-setup up" or "upgrade".
 prompt_caching:
   cache_ttl: auto
+web:
+  extract_char_limit: 10000
 `
 
 // ManagedConfigPath and ManagedConfigOwner are variables only so that tests
@@ -60,7 +71,7 @@ func applyManagedDefaultsAt(path string, owner fsx.Owner, log func(string, ...an
 		return false, fmt.Errorf("managed config: %w", err)
 	}
 	if log != nil {
-		log("Hermes managed scope: %s (prompt cache TTL auto)", path)
+		log("Hermes managed scope: %s (prompt cache TTL auto, web extract 10000 chars)", path)
 	}
 	return true, nil
 }

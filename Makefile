@@ -375,7 +375,7 @@ license-check: ## Licenses of the third-party packages of bun.lock (transitive i
 UNIT_CONSOLE_BATCH_SIZE ?= 1
 
 test-unit: ## Unit tests of API, worker, web, contracts, platform, modules and scripts, without network or PostgreSQL.
-	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes
+	bun test $$(find apps/api/tests -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) ! -name '*.e2e.test.ts' | sort) apps/worker/tests apps/link-gateway/tests contracts/api/tests contracts/events/tests contracts/i18n/tests contracts/primitives/tests protocol/connector/tests browser/api-client/src browser/face/src browser/ui-kit/src platform/hermes/tests platform/config/tests platform/db/tests platform/integrations/tests platform/observability/tests platform/plugins/tests $(wildcard modules/*/tests) tests/fake-hermes
 	bun test scripts/lib tests/e2e/bot/kit tests/scripts/run-writes-contract.test.ts tests/scripts/run-events-contract.test.ts tests/scripts/runtime-client-contract.test.ts tests/scripts/foreign-reads-contract.test.ts tests/scripts/release-workflows-contract.test.ts apps/desktop-tauri/scripts
 	python3 -B tests/scripts/provider-fault-cleanup.test.py
 	# Découverte automatique : tout *.test.ts(x) sous apps/console/tests joue,
@@ -509,6 +509,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/worker-tenant-scope.ts
 	bun tests/integration/worker-queue-probe.ts
 	bun tests/integration/thread-history.ts
+	bun tests/integration/message-reactions.ts
 	bun tests/integration/runtime-link-alerts.ts
 	bun tests/integration/alert-channels.ts
 	bun tests/integration/dm-without-workflow.ts

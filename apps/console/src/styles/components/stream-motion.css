@@ -1,7 +1,8 @@
 /*
  * The motion of the reference app's chat, verbatim from the streaming-ui template
  * (MakFly/streaming-ui, its `CSS` string): same
- * keyframes, durations and curves. Only the colours read the thread tokens
+ * keyframes, durations and curves, verified against the reference template's
+ * source. Only the colours read the thread tokens
  * (`--stream-*`, thread-theme.css), so the shimmer works in light too.
  * `--stream-ease` is the template's `EASE`.
  */
@@ -26,6 +27,7 @@
 @keyframes stream-swap-out { 0% { opacity: 1; filter: blur(0); } to { opacity: 0; filter: blur(4px); } }
 @keyframes stream-swap-in { 0% { opacity: 0; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
 @keyframes stream-menu-in { 0% { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes stream-reveal { 0% { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
 @keyframes shimmer-text-sweep { 0% { background-position: 200% 50%, 0 0; } to { background-position: -200% 50%, 0 0; } }
 
 /*
@@ -52,6 +54,64 @@
 .stream-out120 { animation: stream-fade-out 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .stream-swap-out { animation: stream-swap-out 0.2s cubic-bezier(0.32, 0, 0.67, 0) both; }
 .stream-swap-in { animation: stream-swap-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* A first label uncovered left to right: a hard-edged gradient mask slides across it (400 ms). */
+.stream-reveal {
+  -webkit-mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
+  -webkit-mask-size: 220% 100%;
+  mask-size: 220% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: stream-reveal 0.4s var(--stream-ease) both;
+}
+
+/*
+ * A status label replaced in place, in sequence: the old one blurs out in
+ * 120 ms, the new one waits those 120 ms (`backwards`: hidden meanwhile)
+ * then blurs in over 200 ms. Never both legible at once.
+ */
+.stream-label-out { animation: stream-swap-out 0.12s cubic-bezier(0.32, 0, 0.67, 0) both; }
+.stream-label-in { animation: stream-swap-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+
+/*
+ * The run's status row (`run-status-line.tsx`). Pending: the bot's avatar
+ * fades in 500 ms after the send (200 ms), then gives way at 1 s to the
+ * typing dots, in place. Then the dots give way to the agents and the step.
+ */
+@keyframes run-status-avatar {
+  0%, 50% { opacity: 0; }
+  70%, 80% { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.8); }
+}
+@keyframes run-status-dots {
+  0%, 80% { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes run-status-dot { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.openedbot-run-status-avatar { animation: run-status-avatar 1.2s linear both; }
+.openedbot-run-status-dots { animation: run-status-dots 1.2s var(--stream-ease) both; }
+.openedbot-run-status-mark-in { animation: stream-swap-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.openedbot-run-status-mark-out { animation: stream-fade-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.openedbot-run-status .openedbot-thinking-dots > i { animation: run-status-dot 1.2s ease-in-out infinite; }
+.openedbot-run-status .openedbot-thinking-dots > i:nth-child(2) { animation-delay: 0.2s; }
+.openedbot-run-status .openedbot-thinking-dots > i:nth-child(3) { animation-delay: 0.4s; }
+
+/*
+ * The bottom row of a finished run collapses before it unmounts
+ * (`TurnActivity`, 200 ms): its height (one status line,
+ * `RUN_STATUS_LINE_CLASS`) and the turn's row gap above it (`gap-3`) go
+ * to zero together, so its removal moves nothing. Never a reserved room.
+ */
+@keyframes run-status-collapse {
+  0% { height: 1.4375rem; margin-top: 0; opacity: 1; }
+  to { height: 0; margin-top: -0.75rem; opacity: 0; }
+}
+.openedbot-run-status-collapse {
+  overflow: clip;
+  pointer-events: none;
+  animation: run-status-collapse 0.2s var(--stream-ease) both;
+}
+
 .stream-menu:not([data-state="closed"]) {
   animation: stream-menu-in 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
   transform-origin: var(--radix-dropdown-menu-content-transform-origin, var(--radix-popover-content-transform-origin));
@@ -91,7 +151,26 @@
   .stream-spring,
   .stream-dot,
   .stream-pulse,
-  .stream-twinkle {
+  .stream-twinkle,
+  .stream-reveal,
+  .stream-label-in,
+  .openedbot-run-status-avatar,
+  .openedbot-run-status-dots,
+  .openedbot-run-status-mark-in,
+  .openedbot-run-status-mark-out,
+  .openedbot-run-status-collapse,
+  .openedbot-run-status .openedbot-thinking-dots > i {
     animation: none !important;
   }
+  .stream-reveal {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  /* A replaced label swaps instantly. */
+  .stream-label-out { display: none; }
+  /* Pending goes straight to the dots, no morph. */
+  .openedbot-run-status-avatar { opacity: 0; }
+  .openedbot-run-status-mark-out { opacity: 0; }
+  /* `TurnActivity` unmounts the finished row at once; never shown meanwhile. */
+  .openedbot-run-status-collapse { display: none; }
 }

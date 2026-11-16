@@ -54,6 +54,14 @@ describe("toolProgressLabel", () => {
     expect(fr("skill_manage", "x")).toBe("Utilise skill_manage…");
   });
 
+  test("names a delegation's task, never a payload or a URL", () => {
+    expect(fr("delegate_task", "Chercheur web")).toBe("Délègue : Chercheur web");
+    expect(en("delegate_task", "Cost analyst")).toBe("Delegating: Cost analyst");
+    expect(fr("delegate_task", '{"goal": "x"}')).toBe("Délègue une tâche…");
+    expect(fr("delegate_task", "lis https://x.example/a?token=abc")).toBe("Délègue une tâche…");
+    expect(fr("delegate_task")).toBe("Délègue une tâche…");
+  });
+
   test("a secret in a query is redacted", () => {
     expect(fr("web_search", "token=abcdefghijkl1234")).not.toContain("abcdefghijkl1234");
   });

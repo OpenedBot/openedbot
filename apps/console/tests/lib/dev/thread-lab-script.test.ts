@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { StoredProductEvent } from "@openedbot/contracts-events";
+import { readRunCards, type StoredProductEvent } from "@openedbot/contracts-events";
 import {
   deriveLabTurns,
   LAB_SCENARIOS,
@@ -9,6 +9,7 @@ import {
   type LabRun,
   type LabUserInput,
 } from "../../../src/lib/dev/thread-lab-script";
+import { THINKING_AGENTS_MAX } from "../../../src/lib/thread/run-thinking-model";
 
 const at = new Date("2026-10-24T10:00:00.000Z");
 
@@ -63,8 +64,55 @@ describe("planLabReply", () => {
     expect(types).not.toContain("run.completed");
   });
 
+  test("backflow: a text shaped like an answer streams fully before a tool call follows it", () => {
+    const plan = planLabReply(labScenario("backflow"));
+    const firstCall = plan.findIndex((step) => step.type === "tool.call");
+    const before = plan.slice(0, firstCall).map((step) => String(step.payload.text ?? "")).join("");
+    // Two paragraphs: it reads as the answer until the tool call follows it.
+    expect(before).toMatch(/\n\s*\n/);
+    const { assistant } = turnFor("backflow", "completed");
+    expect(assistant.activity.map((part) => part.kind)).toEqual(["narration", "tool", "narration", "tool"]);
+    expect(assistant.answer.startsWith("**1 342 requêtes lentes**")).toBe(true);
+  });
+
+  test("delegation: more delegations than header slots, each call spaced from the previous one", () => {
+    const plan = planLabReply(labScenario("delegation"));
+    const delegations = plan.filter((step) => step.type === "tool.call" && step.payload.tool === "delegate_task");
+    // The lead plus its delegates overflow the header: « +N » shows.
+    expect(delegations.length + 1).toBeGreaterThan(THINKING_AGENTS_MAX);
+    expect(new Set(delegations.map((step) => step.payload.preview)).size).toBe(delegations.length);
+    for (const step of delegations) expect(step.delayMs).toBeGreaterThan(0);
+    expect(plan[0]).toMatchObject({ type: "agent.message" });
+  });
+
   test("an unknown scenario id falls back to the first one", () => {
     expect(labScenario("nope").id).toBe(LAB_SCENARIOS[0]!.id);
+  });
+
+  test("weather: narration, a weather_forecast call whose result carries a valid card, then the answer", () => {
+    const plan = planLabReply(labScenario("weather"));
+    const call = plan.find((step) => step.type === "tool.call")!;
+    expect(call.payload).toMatchObject({ tool: "weather_forecast", preview: "Rennes" });
+    const result = plan.find((step) => step.type === "tool.result")!;
+    const cards = readRunCards(result.payload.cards);
+    expect(cards).toHaveLength(1);
+    const { weather } = cards[0]!;
+    expect(weather).toMatchObject({ locationLabel: "Rennes", timeZone: "Europe/Paris" });
+    expect(weather.days).toHaveLength(7);
+    expect(weather.hours).toHaveLength(48);
+    expect(weather.days.every((day) => day.sunriseMs !== undefined && day.sunsetMs !== undefined)).toBe(true);
+    expect(weather.hours.map((hour) => hour.conditionCode)).toEqual(expect.arrayContaining(["Drizzle", "Rain"]));
+    // The answer follows the tool.
+    const types = plan.map((step) => step.type);
+    expect(types.lastIndexOf("agent.message")).toBeGreaterThan(types.indexOf("tool.result"));
+  });
+
+  test("the weather card is stamped when the reply is planned, so its « now » is fresh", () => {
+    const before = Date.now();
+    const result = planLabReply(labScenario("weather")).find((step) => step.type === "tool.result")!;
+    const asOf = readRunCards(result.payload.cards)[0]!.weather.asOfMs;
+    expect(asOf).toBeGreaterThan(before - 60_000);
+    expect(asOf).toBeLessThanOrEqual(Date.now());
   });
 });
 
@@ -78,32 +126,32 @@ describe("deriveLabTurns", () => {
     expect(terminal?.kind === "tool" ? terminal.result : null).toContain("8 pass");
   });
 
-  test("while live, a short text after a tool stays narration", () => {
+  test("a short text after a tool is readable immediately", () => {
     const plan = planLabReply(labScenario("tools"));
     const firstTextAfterTool = plan.findIndex((step, index) =>
       step.type === "agent.message" && plan.slice(0, index).some((previous) => previous.type === "tool.result"));
     const { assistant } = turnFor("tools", "running", firstTextAfterTool + 1);
-    expect(assistant.answer).toBe("");
-    expect(assistant.liveNote.length).toBeGreaterThan(0);
+    expect(assistant.answer.length).toBeGreaterThan(0);
+    expect(assistant.liveNote).toBe("");
     expect(assistant.activity[assistant.activity.length - 1]?.kind).toBe("tool");
   });
 
-  test("the first live sentence never takes the answer slot before a tool call can follow it", () => {
+  test("the first live sentence is readable before a tool follows", () => {
     const plan = planLabReply(labScenario("tools"));
     const beforeFirstTool = plan.findIndex((step) => step.type === "tool.call");
     const early = turnFor("tools", "running", beforeFirstTool).assistant;
-    expect(early.answer).toBe("");
-    expect(early.liveNote).toBe("Je cherche d'abord le test et ses dépendances.");
+    expect(early.answer).toBe("Je cherche d'abord le test et ses dépendances.");
+    expect(early.liveNote).toBe("");
     const afterCall = turnFor("tools", "running", beforeFirstTool + 1).assistant;
     expect(afterCall.liveNote).toBe("");
     expect(afterCall.activity[0]).toMatchObject({ kind: "narration", text: "Je cherche d'abord le test et ses dépendances." });
   });
 
-  test("a live answer is confirmed by its shape or its length, and every answer at the end", () => {
+  test("live text is readable from its first fragment regardless of shape or length", () => {
     const plan = planLabReply(labScenario("answer"));
     const firstFragment = turnFor("answer", "running", 1).assistant;
-    expect(firstFragment.answer).toBe("");
-    expect(firstFragment.liveNote.length).toBeGreaterThan(0);
+    expect(firstFragment.answer.length).toBeGreaterThan(0);
+    expect(firstFragment.liveNote).toBe("");
     const secondParagraph = plan.findIndex((_, index) =>
       plan.slice(0, index + 1).map((step) => String(step.payload.text ?? "")).join("").includes("\n\n"));
     expect(turnFor("answer", "running", secondParagraph + 1).assistant.answer.length).toBeGreaterThan(0);

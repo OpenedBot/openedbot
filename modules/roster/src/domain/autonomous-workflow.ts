@@ -1,4 +1,5 @@
 import { askUserRule } from "./ask-user";
+import { TOOL_RELEVANCE_RULE } from "./bot-mode";
 import { operatorHandle, type BotIdentity, type OperatorIdentity } from "./bot-identity";
 
 /**
@@ -185,6 +186,7 @@ export function buildAutonomousStepInstructions(input: {
     "",
     `The \`${WORKFLOW_LIMITS_PREFIX}\` line at the top of this step's input states the current depth and the budget still available. The platform enforces these limits.`,
     "Rules:",
+    TOOL_RELEVANCE_RULE,
     "- Work now. If another listed bot is materially needed, end your reply with exactly one `@slug <specific task>` directive as its LAST line. Write that directive once and nowhere else.",
     "- Everything before that last line is a partial result. The platform stores it and resumes you after the delegated bot finishes.",
     "- Never delegate to yourself, a bot already in the active caller chain, or an unlisted bot. Never invent a bot handle.",

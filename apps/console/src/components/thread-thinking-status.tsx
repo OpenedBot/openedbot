@@ -2,18 +2,13 @@ import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { useT } from "../lib/i18n";
-import { useExitGhost } from "../lib/thread/thread-motion";
 import { useHeldValue } from "../lib/hooks/use-held-value";
-import { StreamAgentsHeader } from "./stream/stream-feed";
+import { BotFace } from "./bot-face";
+import { RunStatusLine } from "./stream/run-status-line";
+import { THINKING_LABEL_HOLD_MS, ThinkingDots } from "./stream/thinking-dots";
 
 /** How often the elapsed timer repaints (the reference ticks every 100 ms). */
 export const THINKING_TICK_MS = 100;
-
-/** A status stays at least this long before the next replaces it (the reference app: 800 ms). */
-export const THINKING_LABEL_HOLD_MS = 800;
-
-/** the reference app's typing mark: three dots. */
-const DOT_COUNT = 3;
 
 /**
  * "0,7 s" under a minute, "1:05" after. One decimal while it still reads as a
@@ -27,15 +22,6 @@ export function formatElapsed(
   if (seconds < 60) return `${formatNumber(seconds, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
   const whole = Math.floor(seconds);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
-}
-
-/** the reference app's typing mark, three dots in the bot's colour (`.openedbot-thinking-dots`). */
-export function ThinkingDots({ className }: { className?: string }) {
-  return (
-    <span aria-hidden data-thinking-dots="" className={cn("openedbot-thinking-dots shrink-0", className)}>
-      {Array.from({ length: DOT_COUNT }, (_, index) => <i key={index} />)}
-    </span>
-  );
 }
 
 /**
@@ -104,30 +90,17 @@ export const ThinkingStatus = memo(function ThinkingStatus({ since, label, class
 });
 
 /**
- * The status of a turn that has no block yet: the run is queued or thinking
- * and nothing has been written. It is the reference app's `AgentsHeader` before the
- * agents are called: the bulb and « Réflexion pendant 1s » for a beat, then
- * the 3 × 3 dot loader with « Réflexion • Ns ». The turn's own block takes
- * over (same header, same timer base) the moment the first step arrives; this
- * one leaves as a copy that shrinks to 0.92 and fades out (`useExitGhost`).
+ * A run's pending status row where no turn can host it (the thread's last
+ * row is not mounted): the same `RunStatusLine` as a run's own row.
  */
-export function PendingThinking({ since, author = null }: { since: number | null; author?: MessageAuthorBot | null }) {
-  const [mountedAt] = useState(() => Date.now());
-  const start = since ?? mountedAt;
-  const [pre, setPre] = useState(() => Date.now() - start < PENDING_PRE_BEAT_MS);
-  useEffect(() => {
-    if (!pre) return;
-    const timer = window.setTimeout(() => setPre(false), Math.max(0, PENDING_PRE_BEAT_MS - (Date.now() - start)));
-    return () => window.clearTimeout(timer);
-  }, [pre, start]);
-  const node = useRef<HTMLDivElement>(null);
-  useExitGhost(node);
+export function PendingThinking({ author = null }: { since?: number | null; author?: MessageAuthorBot | null }) {
+  const { t } = useT();
+  const agents = author
+    ? [{ id: author.id, avatar: <BotFace name={author.name ?? author.slug ?? ""} seed={author.id} face={author.face} className="size-[1.125rem]" /> }]
+    : [];
   return (
-    <div ref={node} role="status" data-thread-thinking="" data-thinking-status="" data-author={author?.id} className="flex w-full self-start">
-      <StreamAgentsHeader agents={[]} started={start} running streaming={false} pre={pre} />
+    <div role="status" data-thread-thinking="" data-thinking-status="" data-author={author?.id} className="flex w-full self-start">
+      <RunStatusLine phase="pending" agents={agents} label={t("agentActivity.thinking")} summary="" />
     </div>
   );
 }
-
-/** the reference app's first beat: the bulb before the agents are called. */
-const PENDING_PRE_BEAT_MS = 400;

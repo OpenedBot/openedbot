@@ -11,7 +11,7 @@ describe("turnFeed: a turn as grok's feed", () => {
     const members: Entry[] = [{ kind: "assistant", key: "a1", text: "Je **lance** le calcul.", runId: "r", targetId: "a1" }];
     expect(turnFeed(members, t, speaker)).toEqual([{ id: "a1", kind: "msg", agent: speaker!, text: "Je lance le calcul." }]);
     // Without a bot (an unknown author), it stays a status line.
-    expect(turnFeed(members, t, null)[0]).toMatchObject({ kind: "status" });
+    expect(turnFeed(members, t, null)[0]).toMatchObject({ kind: "status", assistantText: true });
   });
 
   test("a failed tool keeps its error for the panel, never in its label", () => {

@@ -1,10 +1,14 @@
-import { useEffect, useLayoutEffect, type RefObject } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 
 /**
  * The motion of the thread and the composer, taken from the reference app 0.78.1 on 30-10
  * (frame-by-frame capture of a real send, `reports/reference-app/2026_10_30`).
  * The values are its own; the style sheets reuse the same ones
  * (`thread-timeline.css`, `agent-activity.css`).
+ *
+ * A sent message does not rise into place: the thread moves to the bottom
+ * once, in the commit that inserts it (`use-thread-scroll-follow.ts`), and a
+ * rise would be a second motion on that frame.
  */
 
 /** the reference app's spring (composer pill → card, 300 ms): a sampled `linear()`. */
@@ -12,121 +16,11 @@ export const STREAM_SPRING =
   "linear(0 0%, 0.01588 2%, 0.05618 4%, 0.11201 6%, 0.1768 8%, 0.2458 10%, 0.31562 12%, 0.38392 14%, 0.44914 16%, 0.51029 18%, 0.56683 20%, 0.61852 22%, 0.66534 24%, 0.70743 26%, 0.74501 28%, 0.77838 30%, 0.80788 32%, 0.83383 34%, 0.85658 36%, 0.87645 38%, 0.89376 40%, 0.92183 44%, 0.94282 48%, 0.95838 52%, 0.96984 56%, 0.97823 60%, 0.98435 64%, 0.98878 68%, 0.99198 72%, 0.99594 80%, 0.99829 90%, 1 100%)";
 export const STREAM_SPRING_MS = 300;
 
-/** An arriving message rises by 12 px, with no fade: 240 ms. */
-export const ROW_ENTER_MS = 240;
-export const ROW_ENTER_EASING = "cubic-bezier(0.23, 1, 0.32, 1)";
-export const ROW_ENTER_OFFSET_PX = 12;
-
 /** The activity mark that leaves: scale 0.92 and fade, 140 ms (`bubbleExiting`). */
 export const TYPING_EXIT_MS = 140;
 
-/** What follows an added row without making it an addition "in the middle". */
-const TRAILING_CHROME = "[data-thread-scroll-anchor], [data-thread-outgoing], [data-thread-exit-ghost]";
-/** A turn's row (`use-thread-virtual-rows.ts`). */
-const TURN_ROW = "data-thread-turn";
-/** A message row; a date separator or a marker does not animate. */
-const MESSAGE_ROW = "[data-user-bubble], [data-assistant-layout], [data-assistant-response], [data-room-answer], [data-inbound-from]";
-
 export function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-}
-
-function isMessageRow(node: Element): boolean {
-  return node.matches(MESSAGE_ROW) || node.querySelector(MESSAGE_ROW) !== null;
-}
-
-function userBubbleText(node: Element): string | null {
-  const bubble = node.matches("[data-user-bubble]") ? node : node.querySelector("[data-user-bubble]");
-  return bubble ? (bubble.textContent ?? "").trim() : null;
-}
-
-/**
- * Makes every message added AT THE END of the thread rise (send, answer), like
- * The reference app. At the DOM level, not the render: turns are cached
- * (`turnNodeCache`), and a "new" flag in their props would invalidate
- * that cache.
- *
- * These do not move:
- * - a thread's first render (the observer arrives after it) and a
- *   thread change (`threadKey`, the observer is rearmed);
- * - older history, added BEFORE rows already there;
- * - the saved row that replaces the optimistic bubble
- *   (`data-thread-outgoing`): same text, the bubble already rose;
- * - a turn remounted by scrolling (`data-thread-turn` already seen, virtual
- *   rows): it does not arrive, it comes back.
- *
- * A turn's messages live in its row (`data-thread-turn`): a
- * new turn makes its messages rise, an answer added to the last turn's
- * row rises alone.
- */
-export function useThreadRowEnter(content: RefObject<HTMLElement | null>, threadKey: string | null) {
-  useEffect(() => {
-    const root = content.current;
-    if (!root || typeof MutationObserver === "undefined" || prefersReducedMotion()) return;
-    // The text of the last optimistic bubble seen: its replacement does not replay.
-    let outgoingText: string | null = null;
-    let outgoingAt = 0;
-    // Negative `delay`: the entry resumes where it is, instead of starting again from 12 px.
-    const rise = (row: Element, delay = 0) => {
-      if (typeof (row as HTMLElement).animate !== "function") return;
-      (row as HTMLElement).animate(
-        [{ transform: `translateY(${ROW_ENTER_OFFSET_PX}px)` }, { transform: "none" }],
-        { duration: ROW_ENTER_MS, easing: ROW_ENTER_EASING, delay },
-      );
-    };
-    const seenTurns = new Set<string>();
-    for (const turn of root.querySelectorAll(`:scope > [${TURN_ROW}]`)) seenTurns.add(turn.getAttribute(TURN_ROW)!);
-    const isLast = (node: Element, added: ReadonlySet<Element>) => {
-      for (let next = node.nextElementSibling; next; next = next.nextElementSibling) {
-        if (!added.has(next) && !next.matches(TRAILING_CHROME)) return false;
-      }
-      return true;
-    };
-    const observer = new MutationObserver((records) => {
-      const added = new Set<Element>();
-      // What arrived: a direct child, or a message added to a turn's row.
-      // A new turn row stands for its messages; a row seen before is a
-      // virtual row mounted back by scrolling, not an arrival.
-      const candidates: Element[] = [];
-      for (const record of records) {
-        for (const node of record.addedNodes) if (node instanceof Element) added.add(node);
-      }
-      for (const node of added) {
-        const parent = node.parentElement;
-        const turn = node.getAttribute(TURN_ROW);
-        if (parent === root && turn !== null) {
-          const fresh = !seenTurns.has(turn);
-          seenTurns.add(turn);
-          if (fresh && isLast(node, added)) candidates.push(...node.children);
-          continue;
-        }
-        if (parent === root) candidates.push(node);
-        else if (parent?.parentElement === root && parent.hasAttribute(TURN_ROW) && !added.has(parent) && isLast(parent, added)) candidates.push(node);
-      }
-      for (const node of candidates) {
-        if (!isLast(node, added) && !added.has(node.parentElement!)) continue;
-        if (!isMessageRow(node)) continue;
-        const text = userBubbleText(node);
-        if (node.matches("[data-thread-outgoing]")) {
-          outgoingText = text;
-          outgoingAt = performance.now();
-        } else if (text !== null && text === outgoingText) {
-          outgoingText = null;
-          // Saved in the middle of the optimistic bubble's rise, the row (and the
-          // « Réflexion » line that arrived with it) finishes that rise: otherwise
-          // the rest, a few pixels, dropped all at once.
-          const elapsed = performance.now() - outgoingAt;
-          if (elapsed < ROW_ENTER_MS) {
-            for (const row of [node, ...[...added].filter((other) => other.matches("[data-thread-thinking]"))]) rise(row, -elapsed);
-          }
-          continue;
-        }
-        rise(node);
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [content, threadKey]);
 }
 
 /**
@@ -187,6 +81,50 @@ export function useExitGhost(node: RefObject<HTMLElement | null>) {
         animation.addEventListener("cancel", remove, { once: true });
       });
     };
+  }, [node]);
+}
+
+/**
+ * A run's status line entering or leaving a settled turn: height and
+ * opacity over 200 ms with the stream ease (`--stream-ease`). The leaving
+ * row collapses in CSS (`openedbot-run-status-collapse`, stream-motion.css).
+ */
+export const RUN_LINE_MOTION_MS = 200;
+const STREAM_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+/**
+ * A line that appears above a reply already on screen (a run's summary at
+ * its end, the bot's name when its first tool starts) opens from zero
+ * height instead of pushing the reply down in one frame. Its negative top
+ * margin hands back the turn's row gap meanwhile, so the turn grows
+ * smoothly by exactly the line's final room; a pinned thread follows it
+ * through its ResizeObserver. Decided once, on mount; nothing under
+ * `prefers-reduced-motion`.
+ */
+export function useRevealOnMount(node: RefObject<HTMLElement | null>, enabled: boolean) {
+  const enabledOnMount = useRef(enabled);
+  useLayoutEffect(() => {
+    const element = node.current;
+    if (!enabledOnMount.current || !element || prefersReducedMotion() || typeof element.animate !== "function") return;
+    const parent = element.parentElement;
+    // The row gap only exists above a line that has a previous sibling.
+    const gap = parent && element.previousElementSibling ? Number.parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
+    const height = element.getBoundingClientRect().height;
+    const previousOverflow = element.style.overflow;
+    element.style.overflow = "clip";
+    const animation = element.animate(
+      [
+        { height: "0px", opacity: 0, marginTop: `${-gap}px` },
+        { height: `${height}px`, opacity: 1, marginTop: "0px" },
+      ],
+      { duration: RUN_LINE_MOTION_MS, easing: STREAM_EASE },
+    );
+    const restore = () => {
+      element.style.overflow = previousOverflow;
+    };
+    animation.addEventListener("finish", restore, { once: true });
+    animation.addEventListener("cancel", restore, { once: true });
+    return () => animation.cancel();
   }, [node]);
 }
 

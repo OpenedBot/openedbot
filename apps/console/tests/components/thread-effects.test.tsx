@@ -9,6 +9,7 @@ import { I18nProvider } from "../../src/lib/i18n";
 import type { SpeechSynthesisAdapter } from "../../src/lib/voice/web-speech-synthesis";
 import { ThreadTimeline } from "../../src/components/thread-timeline";
 import { ThreadMarkdown } from "../../src/components/thread-markdown";
+import { AssistantMessage } from "../../src/components/thread-messages";
 import { ActivityRow, TurnActivity } from "../../src/components/thread-turn-activity";
 import { formatElapsed, ThinkingStatus } from "../../src/components/thread-thinking-status";
 
@@ -53,47 +54,71 @@ describe("thinking status", () => {
   });
 });
 
-describe("live turn header", () => {
-  const calls: ToolCall[] = [{ tool: "web_search", done: true, preview: "acme pricing" }];
-  const view = (props: { live: boolean; answering?: boolean; waiting?: boolean; workedMs?: number | null }) => (
+describe("run status row", () => {
+  const view = (props: { live: boolean; calls?: ToolCall[]; waiting?: boolean; writing?: boolean; workedMs?: number | null }) => (
     <I18nProvider>
       <TurnActivity
-        calls={calls}
+        calls={props.calls ?? [{ tool: "web_search", done: true, preview: "acme pricing" }]}
         live={props.live}
-        answering={props.answering}
         waiting={props.waiting}
+        writing={props.writing}
         workedMs={props.workedMs}
         since={Date.now() - 2000}
         forceOpen={false}
         author={null}
         showAuthorLabel={false}
       >
-        <ActivityRow kind="thinking">log row</ActivityRow>
+        <ActivityRow kind="tool">log row</ActivityRow>
       </TurnActivity>
     </I18nProvider>
   );
 
-  test("thinks while working, reads « Réflexions » while the answer streams, then « Réflexion : Ns »", () => {
-    const { container, rerender } = render(view({ live: true }));
-    const block = () => container.querySelector<HTMLElement>("[data-turn-activity]")!;
-    const head = () => block().querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    expect(block().hasAttribute("data-thinking")).toBe(true);
-    expect(head().querySelector("[data-thinking-elapsed]")?.textContent).toBe("2s");
-
-    rerender(view({ live: true, answering: true }));
-    expect(block().hasAttribute("data-thinking")).toBe(false);
-    expect(head().querySelector("[data-thinking-elapsed]")).toBeNull();
-    expect(head().querySelector("[data-activity-summary]")?.textContent).toBe("Réflexions");
+  test("one line of fixed height, the same node from the step to « Réflexion : Ns »", () => {
+    const { container, rerender } = render(view({ live: true, calls: [{ tool: "web_search", done: false, preview: "météo Rennes" }] }));
+    const head = container.querySelector<HTMLButtonElement>("[data-activity-head]")!;
+    expect(head.className).toContain("h-[1.4375rem]");
+    expect(head.dataset.runStatus).toBe("working");
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Recherche : météo Rennes");
+    // Live, the row opens nothing.
+    expect(head.hasAttribute("aria-expanded")).toBe(false);
 
     rerender(view({ live: false, workedMs: 6400 }));
-    expect(head().querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 6s");
-    expect(head().getAttribute("aria-expanded")).toBe("false");
+    expect(container.querySelector("[data-activity-head]")).toBe(head);
+    expect(head.dataset.runStatus).toBe("done");
+    expect(head.className).toContain("h-[1.4375rem]");
+    expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réflexion : 6s");
+    expect(head.getAttribute("aria-expanded")).toBe("false");
   });
 
-  test("a turn waiting on a decision opens its log and does not roll the feed", () => {
+  test("a replaced label leaves before the next one enters: never two legible labels on the same spot", () => {
+    const { container, rerender } = render(view({ live: true, calls: [{ tool: "terminal", done: false }] }));
+    const head = container.querySelector<HTMLElement>("[data-activity-head]")!;
+    // The first step is revealed by the sweep, not swapped in.
+    expect(head.querySelector("[data-activity-summary]")!.className).toContain("stream-reveal");
+    rerender(view({ live: false, workedMs: 6400 }));
+    const leaving = head.querySelector<HTMLElement>(".stream-label-out")!;
+    const entering = head.querySelector<HTMLElement>("[data-activity-summary]")!;
+    expect(leaving.textContent).toBe("Exécute des commandes…");
+    expect(leaving.getAttribute("aria-hidden")).toBe("true");
+    expect(entering.textContent).toBe("Réflexion : 6s");
+    expect(entering.className).toContain("stream-label-in");
+    expect(entering.className).not.toContain("stream-swap-in");
+    // In sequence: the entry is delayed by the whole exit.
+    const sheet = css("stream-motion.css");
+    const seconds = (rule: RegExp) => [...sheet.match(rule)!.slice(1)].map(Number);
+    const [outMs] = seconds(/\.stream-label-out \{ animation: stream-swap-out ([\d.]+)s /);
+    const [, inDelay] = seconds(/\.stream-label-in \{ animation: stream-swap-in ([\d.]+)s [^;]*? ([\d.]+)s both;/);
+    expect(inDelay).toBeGreaterThanOrEqual(outMs!);
+    expect(outMs).toBeLessThanOrEqual(0.12);
+    // Reduced motion: the swap is instant.
+    expect(reducedMotion(sheet)).toMatch(/\.stream-label-out \{ display: none; \}/);
+    expect(reducedMotion(sheet)).toContain(".stream-label-in,");
+  });
+
+  test("a turn waiting on a decision says so and opens its log", () => {
     const { container } = render(view({ live: true, waiting: true }));
-    expect(container.querySelector("[data-turn-activity]")!.hasAttribute("data-thinking")).toBe(false);
-    expect(container.querySelector("[data-turn-activity] > [data-open]")!.getAttribute("data-open")).toBe("true");
+    expect(container.querySelector("[data-activity-summary]")?.textContent).toBe("Attend votre décision…");
+    expect(container.querySelector("[data-turn-activity] [data-open]")!.getAttribute("data-open")).toBe("true");
   });
 });
 
@@ -170,11 +195,12 @@ describe("thread timeline status and action row", () => {
     occurredAt: new Date(),
   });
 
-  test("a queued run shows the thinking status before any step, counting from the run's start", () => {
+  test("a queued run shows its pending row under its message before any step", () => {
     const { container } = render(timeline({ events: [], runs: [runOf("queued")], running: true }));
     const status = container.querySelector("[data-thread-thinking][data-thinking-status]");
     expect(status).not.toBeNull();
-    expect(container.querySelector("[data-thinking-elapsed]")!.textContent).toMatch(/^3s$/);
+    expect(status!.querySelector("[data-run-status='pending'] [data-thinking-dots]")).not.toBeNull();
+    expect(container.querySelectorAll("[data-run-status]")).toHaveLength(1);
   });
 
   test("a salon marks the member whose turn it is while their run has no block yet", () => {
@@ -284,7 +310,7 @@ describe("the reference app's thread theme", () => {
     expect(theme).toContain("--openedbot-bubble-agent: rgb(245 245 245 / 0.04);");
     expect(theme).toContain("--openedbot-bubble-user: #1c1c1c;");
     expect(theme).toContain("--openedbot-bubble-user: rgb(245 245 245 / 0.18);");
-    expect(theme).toMatch(/\[data-assistant-layout="stream"\] \{\s*background-color: var\(--openedbot-bubble-agent\);/);
+    expect(theme).toMatch(/\[data-assistant-layout="stream"\] \{\s*background: none;/);
     expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--openedbot-user-fill, var\(--openedbot-bubble-user\)\);/);
     expect(theme).toMatch(/\.dark \[data-thread-column\] \{\s*--openedbot-user-fill: var\(--openedbot-user-fill-dark\);/);
   });
@@ -317,7 +343,7 @@ describe("the reference app's thread theme", () => {
     expect(theme).not.toContain("data-voice-mode");
   });
 
-  test("the bubbles and the composer share the reference app's 960 px lane", () => {
+  test("the bubbles and the composer share the reference app's 60rem (960 px) lane", () => {
     const timeline = css("thread-timeline.css");
     expect(timeline).toMatch(/\[data-thread-column\] \{\s*\/\*[^*]*\*\/\s*--openedbot-thread-column: 60rem;/);
     // The composer is the lane itself: no overhang past the bubbles' edges.
@@ -329,5 +355,51 @@ describe("the reference app's thread theme", () => {
     const chip = block("[data-thread-date] .bui-date-chip");
     expect(chip).toContain("background: none;");
     expect(chip).toContain("font-size: calc(13px * var(--openedbot-text-scale, 1));");
+  });
+});
+
+describe("dev run timing", () => {
+  const labels = {
+    reply: "Répondre", react: "Réagir", removeReaction: "Retirer", reactionFailed: "Échec", more: "Plus d'actions",
+    quoteFrom: (author: string) => author, operator: "Vous", assistant: "Assistant",
+    speak: "Lire", stopSpeaking: "Arrêter", speechFailed: "Échec", copy: "Copier", copied: "Copié",
+    copyFailed: "Échec", copyMessageId: "Copier l'id", edit: "Modifier", regenerate: "Régénérer",
+    previousVersion: "Précédente", nextVersion: "Suivante", versionCount: (current: number, total: number) => `${current}/${total}`,
+  };
+  const timing = { firstTokenMs: 800, totalMs: 23_210, tokensPerSecond: null, chunks: 4 };
+  const reply = (showTiming: boolean) => render(
+    <I18nProvider>
+      <AssistantMessage
+        text="À Lille, les prévisions…"
+        runId="run-1"
+        timing={timing}
+        showTiming={showTiming}
+        findTargetId="message:m1"
+        hover={{ messageId: "m1", labels, copyText: "À Lille, les prévisions…", onReply: () => {}, onReaction: () => {} }}
+      />
+    </I18nProvider>,
+  );
+
+  test("sits on the action row after « … », centred on the icons, never on a line of its own", () => {
+    const { container } = reply(true);
+    const row = container.querySelector<HTMLElement>("[data-message-actions-row]")!;
+    const badge = row.querySelector<HTMLElement>("[data-run-timing]")!;
+    expect(badge.textContent).toContain("23");
+    const trailing = badge.closest<HTMLElement>("[data-message-actions-trailing]")!;
+    expect(trailing.parentElement).toBe(row);
+    expect(trailing.className).toContain("h-8");
+    expect(trailing.className).toContain("items-center");
+    // After the actions, whose last button is « … ».
+    const actions = row.querySelector<HTMLElement>("[data-message-hover-actions]")!;
+    expect(actions.nextElementSibling).toBe(trailing);
+    expect(actions.querySelectorAll("button").item(actions.querySelectorAll("button").length - 1).getAttribute("aria-label")).toBe("Plus d'actions");
+    expect(container.querySelectorAll("[data-run-timing]")).toHaveLength(1);
+  });
+
+  test("absent outside dev builds: the same action row, nothing after it", () => {
+    const { container } = reply(false);
+    expect(container.querySelector("[data-run-timing]")).toBeNull();
+    expect(container.querySelector("[data-message-actions-trailing]")).toBeNull();
+    expect(container.querySelector("[data-message-actions-row]")).not.toBeNull();
   });
 });

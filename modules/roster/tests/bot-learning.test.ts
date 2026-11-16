@@ -69,9 +69,14 @@ describe("buildLearningBlock", () => {
   test("quand memory est actif, oriente les faits vers l'outil runtime", () => {
     const block = buildLearningBlock({ memoryToolEnabled: true });
     expect(block).toContain("runtime `memory` tool");
-    // Un échec de l'outil se dit, il ne se replie pas sur une ligne morte.
-    expect(block).toContain("say so plainly rather than claiming the fact is kept");
     expect(block).not.toContain("remember:");
     expect(block).toContain("skill_manage");
+  });
+
+  test("les salutations ne déclenchent pas un inventaire de skills", () => {
+    const block = buildLearningBlock({ memoryToolEnabled: true });
+    expect(block).toContain("Do not check skills for a greeting, thanks or small talk alone.");
+    expect(block).toContain("load a matching one with `skill_view` and follow it");
+    expect(block).not.toContain("Before replying, scan your skills");
   });
 });

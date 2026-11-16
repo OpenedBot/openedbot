@@ -6,8 +6,11 @@ import {
   HISTORY_CHAR_BUDGET,
   assemblePackedHistory,
   buildConversationPackInstructions,
+  clampReplayedMessages,
+  compactionRetryDue,
   historyCharCount,
   planConversationPack,
+  type CompactionFailure,
   type HistoryMessage,
 } from "@openedbot/conversation/domain/thread-compaction";
 import {
@@ -127,16 +130,21 @@ export async function conversationHistory(
     };
   }
 
+  // Over budget: [summary] + every message after its cut, each one bounded.
+  const replayed = clampReplayedMessages(messages);
   let compaction = await readThreadCompaction(db, context.organizationId, context.threadId);
   let plan = planConversationPack({
-    messages,
+    messages: replayed,
     compaction,
     olderExist,
     budget: HISTORY_CHAR_BUDGET,
   });
 
   if (plan.needsCompact) {
-    if (!compact) return fallback();
+    const failureKey = compactionFailureKey(context.organizationId, context.threadId);
+    if (!compact || !compactionAllowed(failureKey, plan.remainderChars)) {
+      return fallback();
+    }
     const keepFirst = plan.keep[0]?.sequence ?? null;
     const old = await loadCompactInput(
       db,
@@ -158,22 +166,55 @@ export async function conversationHistory(
       { previousSummary: compaction?.summary ?? "", messages: old.length > 0 ? old : plan.old },
       compact.signal,
     );
-    if (!written) return fallback();
+    if (!written) {
+      // A cancelled run says nothing about the summarizer: no backoff for it.
+      if (!compact.signal.aborted) noteCompactionFailure(failureKey, plan.remainderChars);
+      return fallback();
+    }
+    clearCompactionFailure(failureKey);
     compaction = written;
     plan = planConversationPack({
-      messages,
+      messages: replayed,
       compaction,
       olderExist,
       budget: HISTORY_CHAR_BUDGET,
     });
   }
 
-  if (!plan.summary) return fallback();
-
   return {
     history: assemblePackedHistory(plan),
-    packInstructions: buildConversationPackInstructions(),
+    packInstructions: plan.summary ? buildConversationPackInstructions() : null,
   };
+}
+
+/**
+ * Failed compactions per thread, in this worker process only: a restart
+ * forgets them and simply allows one more attempt. Bounded so a long-lived
+ * worker never grows it without limit.
+ */
+const compactionFailures = new Map<string, CompactionFailure>();
+const COMPACTION_FAILURES_MAX = 1_000;
+
+export function compactionFailureKey(organizationId: string, threadId: string): string {
+  return `${organizationId}:${threadId}`;
+}
+
+/** Whether a pre-run compaction of this thread may run now (no recent failure, or enough growth since). */
+export function compactionAllowed(key: string, remainderChars: number): boolean {
+  return compactionRetryDue(compactionFailures.get(key), remainderChars, Date.now());
+}
+
+export function noteCompactionFailure(key: string, remainderChars: number): void {
+  compactionFailures.delete(key);
+  if (compactionFailures.size >= COMPACTION_FAILURES_MAX) {
+    const oldest = compactionFailures.keys().next().value;
+    if (oldest !== undefined) compactionFailures.delete(oldest);
+  }
+  compactionFailures.set(key, { remainderChars, at: Date.now() });
+}
+
+export function clearCompactionFailure(key: string): void {
+  compactionFailures.delete(key);
 }
 
 type InterruptedRunStatus = "failed" | "cancelled";
@@ -244,7 +285,9 @@ export async function loadRunImages(
 /** Budget de contexte (caractères ≈ proxy de tokens). Au-delà de 200 messages,
  * un fil aux messages longs dépassait la fenêtre du modèle → run en échec
  * répété → fil mort en permanence. On borne aussi la TAILLE, pas que le nombre. */
-export const MAX_HISTORY_CHARS = 48_000;
+// Same bound as HISTORY_CHAR_BUDGET: the fallback without a summary must not
+// replay more than the packed history would.
+export const MAX_HISTORY_CHARS = 32_000;
 
 /** Messages relus au plus, avant même le budget de caractères. */
 export const HISTORY_MESSAGE_CAP = 200;

@@ -50,8 +50,15 @@ export function isAbsorbedRun(run: { status: string; completionKind?: string | n
  * Plusieurs messages, UN tour utilisateur. Une seule chaîne, jamais un
  * tableau : sur `/v1/runs`, un `input` en liste fait des premiers éléments
  * de l'historique et du dernier seul le message du tour
- * (`api_server_runs.py#_resolve_conversation_history`). Une ligne vide sépare
- * les messages, comme l'amont sépare ses steers agrégés.
+ * (`api_server_runs.py#_resolve_conversation_history`).
+ *
+ * Two parts or more are numbered under a bracketed header: joined with a bare
+ * blank line, the model read the burst as one message and answered only its
+ * last line. The header is English like the other runtime notes of
+ * `runs.input` (`[routine_manage …]`, `Reply context follows…`, `Message
+ * from …`): the conversation's language is not known at admission, and the
+ * model answers in the user's language whatever the note's language. Each
+ * part stays verbatim; a single part is returned as is, with no header.
  */
 export function mergeFollowupInputs(parts: readonly string[]): string {
   const blocks: string[] = [];
@@ -59,5 +66,25 @@ export function mergeFollowupInputs(parts: readonly string[]): string {
     const text = part.trim();
     if (text.length > 0) blocks.push(text);
   }
-  return blocks.join("\n\n");
+  if (blocks.length < 2) return blocks[0] ?? "";
+  return [followupHeader(blocks.length), ...blocks.map((text, index) => `${index + 1}. ${text}`)].join("\n");
 }
+
+/**
+ * One more message folded into an input that may already be a merged burst:
+ * the header's count is raised and the message is numbered after the others,
+ * so a third message never nests a header inside a numbered item.
+ */
+export function appendFollowupInput(existing: string, next: string): string {
+  const match = FOLLOWUP_HEADER_PATTERN.exec(existing);
+  if (!match) return mergeFollowupInputs([existing, next]);
+  const text = next.trim();
+  if (text.length === 0) return existing;
+  const count = Number(match[1]) + 1;
+  return `${followupHeader(count)}\n${existing.slice(match[0].length).trimEnd()}\n${count}. ${text}`;
+}
+
+const followupHeader = (count: number) =>
+  `[${count} messages sent in a row by the user — answer all of them together]`;
+
+const FOLLOWUP_HEADER_PATTERN = /^\[(\d+) messages sent in a row by the user — answer all of them together\]\n/u;
