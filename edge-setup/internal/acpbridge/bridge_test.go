@@ -119,6 +119,12 @@ func TestACPAgent(t *testing.T) {
 				}
 			case "permission", "permission-basic", "cancel", "cancel-end_turn", "cancel-no-response", "timeout", "timeout-ignore":
 				permission()
+			case "tool-statuses":
+				for _, status := range []string{"completed", "failed"} {
+					update(sessionID, map[string]any{"sessionUpdate": "tool_call", "toolCallId": status, "title": "shell", "status": status})
+				}
+				update(sessionID, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "orphan", "status": "completed"})
+				answer()
 			case "tools":
 				update(sessionID, map[string]any{"sessionUpdate": "agent_thought_chunk", "content": textBlock("PRIVATE THOUGHT")})
 				for _, id := range []string{"first", "second"} {
@@ -1034,5 +1040,28 @@ func TestPromptCacheHintsDoNotRejectDefaultModel(t *testing.T) {
 		body := input("cloud")
 		body[field] = "unknown"
 		expectTerminal(t, f.events(f.run(body, "")), "run.failed")
+	}
+}
+
+func TestFinalToolCallsAndUnmatchedCompletions(t *testing.T) {
+	f := newFixture(t, "tool-statuses")
+	f.session("cloud")
+	id := f.run(input("cloud"), "")
+	events := f.events(id)
+	expectTerminal(t, events, "run.completed")
+	for i, status := range []string{"completed", "failed"} {
+		start, end := events[i*2], events[i*2+1]
+		if start["event"] != "tool.started" || end["event"] != "tool.completed" || start["tool_call_id"] != status || end["tool_call_id"] != status || end["error"] != (status == "failed") {
+			t.Fatalf("final tool status not projected: %v %v", start, end)
+		}
+	}
+	_, raw := f.request("GET", "/v1/runs/"+id, nil, "")
+	if !strings.Contains(string(raw), `"unmatched_tool_completions":1`) {
+		t.Fatal("unmatched completion was not counted")
+	}
+	f.restart()
+	_, raw = f.request("GET", "/v1/runs/"+id, nil, "")
+	if !strings.Contains(string(raw), `"unmatched_tool_completions":1`) {
+		t.Fatal("completion count did not persist")
 	}
 }

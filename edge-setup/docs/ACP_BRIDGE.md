@@ -143,3 +143,11 @@ l'opérateur doit garder celle du pont au-dessus. L'expiration demande
 `CancelTimeout` pour répondre avant son arrêt forcé. Le run finit `failed`
 avec `ACP turn timeout`, même si la réponse est `cancelled` ou `end_turn`.
 Une réponse coopérative conserve le processus partagé pour les autres sessions.
+
+## Statuts d'outils
+
+Un `tool_call` déjà `completed` ou `failed` produit immédiatement
+`tool.started` puis `tool.completed` avec la même identité. Une mise à jour
+terminale sans début connu est ignorée et incrémente
+`unmatched_tool_completions`, conservé dans l'en-tête et exposé sur le statut
+du run ; elle ne fait pas échouer le tour ni arrêter le processus partagé.

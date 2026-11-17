@@ -102,11 +102,16 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 		}
 		r.tools[u.ToolID] = u.Title
 		b.eventLocked(r, "tool.started", Event{"tool": u.Title, "tool_call_id": u.ToolID})
+		if u.Status == "completed" || u.Status == "failed" {
+			delete(r.tools, u.ToolID)
+			b.eventLocked(r, "tool.completed", Event{"tool": u.Title, "tool_call_id": u.ToolID, "duration": 0, "error": u.Status == "failed"})
+		}
+
 	case "tool_call_update":
 		if u.Status == "completed" || u.Status == "failed" {
 			title := r.tools[u.ToolID]
 			if title == "" {
-				b.failActiveLocked(r, "ACP tool completion has no start")
+				r.UnmatchedTools++
 				return
 			}
 			delete(r.tools, u.ToolID)

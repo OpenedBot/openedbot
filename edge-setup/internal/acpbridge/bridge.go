@@ -70,23 +70,24 @@ type session struct {
 }
 type Event map[string]any
 type run struct {
-	ID           string    `json:"run_id"`
-	Profile      string    `json:"profile"`
-	SessionID    string    `json:"session_id"`
-	Key          string    `json:"key"`
-	Status       string    `json:"status"`
-	Output       string    `json:"-"`
-	Events       []Event   `json:"-"`
-	Cancel       bool      `json:"cancel"`
-	Generation   int       `json:"execution_generation"`
-	InvalidLines int       `json:"invalid_stdout_lines"`
-	TerminalAt   time.Time `json:"terminal_at,omitempty"`
-	timedOut     bool
-	permissions  map[string]permission
-	tools        map[string]string
-	bytes        int
-	client       *rpcClient
-	acpID        string
+	ID             string    `json:"run_id"`
+	Profile        string    `json:"profile"`
+	SessionID      string    `json:"session_id"`
+	Key            string    `json:"key"`
+	Status         string    `json:"status"`
+	Output         string    `json:"-"`
+	Events         []Event   `json:"-"`
+	Cancel         bool      `json:"cancel"`
+	Generation     int       `json:"execution_generation"`
+	InvalidLines   int       `json:"invalid_stdout_lines"`
+	UnmatchedTools int       `json:"unmatched_tool_completions"`
+	TerminalAt     time.Time `json:"terminal_at,omitempty"`
+	timedOut       bool
+	permissions    map[string]permission
+	tools          map[string]string
+	bytes          int
+	client         *rpcClient
+	acpID          string
 }
 type permission struct {
 	id      json.RawMessage
@@ -468,7 +469,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		switch {
 		case req.Method == "GET" && action == "":
-			writeJSON(w, 200, map[string]any{"run_id": r.ID, "status": r.Status, "output": r.Output, "execution_generation": r.Generation, "invalid_stdout_lines": r.InvalidLines})
+			writeJSON(w, 200, map[string]any{"run_id": r.ID, "status": r.Status, "output": r.Output, "execution_generation": r.Generation, "invalid_stdout_lines": r.InvalidLines, "unmatched_tool_completions": r.UnmatchedTools})
 		case req.Method == "GET" && action == "events":
 			b.streamLocked(w, req, r)
 		case req.Method == "POST" && action == "stop":
