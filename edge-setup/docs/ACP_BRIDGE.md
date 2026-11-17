@@ -99,3 +99,13 @@ du pont n'est jamais transmis. Un agent exécuté sous le même utilisateur peut
 encore lire les fichiers accessibles à cet utilisateur : l'unité qui exécutera
 le pont doit garder le bearer hors de portée de l'agent. Cette unité appartient
 à un lot ultérieur.
+
+## Sonde de racine
+
+Les quatre lectures `/health`, `/v1/capabilities`, `/v1/toolsets` et
+`/api/model/options` fonctionnent aussi à la racine, même sans profil.
+Les sessions et runs à la racine répondent HTTP 400 avec
+`error.code: "profile_required"` et un message demandant `/p/<slug>`.
+`platform/hermes/src/client/context.ts` classe ce 400 comme
+`HERMES_RESPONSE_INVALID`, avec le corps dans le diagnostic du worker : ce
+n'est ni un 401/403 de bearer, ni un 404 de profil, ni un 429 ou 503 réessayable.

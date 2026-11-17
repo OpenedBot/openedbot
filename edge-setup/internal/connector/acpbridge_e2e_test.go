@@ -269,3 +269,58 @@ func TestACPBridgeThroughConnectorRelayAndJournal(t *testing.T) {
 	}
 	t.Log("real connector WebSocket relay and durable journal: run, both approvals, stop overriding end_turn, numbered late replay, bridge restart and continued session")
 }
+
+func TestACPBridgeRootProbeAndRunRefusalThroughConnector(t *testing.T) {
+	opts := acpbridge.Options{ListenAddress: "127.0.0.1:0", Bearer: "probe-fixture-bearer", StateDirectory: t.TempDir(), ProfilesRoot: t.TempDir(), AgentCommand: os.Args[0]}
+	bridge, err := acpbridge.New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bridge.Close()
+	gateway := httptest.NewServer(bridge)
+	defer gateway.Close()
+	broker := newBroker(t)
+	client := New(broker.wsURL(), Auth{}, gateway.URL, opts.Bearer, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- client.Session(ctx) }()
+	defer func() { cancel(); <-done }()
+	select {
+	case <-broker.ready:
+	case <-ctx.Done():
+		t.Fatal("connector not ready")
+	}
+	var id uint32
+	relay := func(method, path string) (int, string) {
+		t.Helper()
+		id++
+		broker.send(Text{T: TReq, ID: id, Method: method, Path: path, Body: "none"})
+		res := broker.next(t)
+		if res.T != TRes {
+			t.Fatalf("unexpected relay frame %+v", res)
+		}
+		return res.Status, broker.body(t, id)
+	}
+	for _, path := range []string{"/health", "/v1/capabilities", "/v1/toolsets", "/api/model/options"} {
+		if status, body := relay("GET", path); status != 200 {
+			t.Fatalf("root probe %s: %d %s", path, status, body)
+		}
+		if status, _ := relay("GET", "/p/missing"+path); status != 404 {
+			t.Fatalf("unknown profile %s: %d", path, status)
+		}
+	}
+	for _, path := range []string{"/api/sessions", "/v1/runs"} {
+		status, body := relay("POST", path)
+		var failure struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		decodeErr := json.Unmarshal([]byte(body), &failure)
+		if status != 400 || decodeErr != nil || failure.Error.Code != "profile_required" || !strings.Contains(failure.Error.Message, "/p/<slug>") {
+			t.Fatalf("root mutation %d %s", status, body)
+		}
+	}
+}

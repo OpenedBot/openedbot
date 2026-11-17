@@ -332,22 +332,31 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
-	if len(parts) < 3 || parts[0] != "p" || !slugPattern.MatchString(parts[1]) {
-		http.NotFound(w, req)
-		return
+
+	slug := ""
+	path := req.URL.Path
+	if len(parts) > 0 && parts[0] == "p" {
+		if len(parts) < 3 || !slugPattern.MatchString(parts[1]) {
+			http.NotFound(w, req)
+			return
+		}
+		slug = parts[1]
+		info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
+		if err != nil || !info.IsDir() {
+			http.NotFound(w, req)
+			return
+		}
+		path = "/" + strings.Join(parts[2:], "/")
 	}
-	slug := parts[1]
-	dir := filepath.Join(b.opts.ProfilesRoot, slug)
-	info, err := os.Lstat(dir)
-	if err != nil || !info.IsDir() {
-		http.NotFound(w, req)
-		return
-	}
-	path := "/" + strings.Join(parts[2:], "/")
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.closed || b.diskErr != nil {
 		http.Error(w, "bridge unavailable", 503)
+		return
+	}
+
+	if slug == "" && (strings.HasPrefix(path, "/api/sessions") || strings.HasPrefix(path, "/v1/runs")) {
+		writeJSON(w, 400, map[string]any{"error": map[string]string{"code": "profile_required", "message": "ACP sessions and runs require a /p/<slug> profile prefix"}})
 		return
 	}
 	switch {
