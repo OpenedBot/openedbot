@@ -27,7 +27,7 @@ import { WorkflowOverview } from "../../components/workflow-overview";
 import { GroupContextTab } from "../../components/group-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
 import { SiteHeader } from "../../components/dashboard/site-header";
-import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
+import { ConversationPending, ThreadLoading } from "../../components/thread-skeleton";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { useT } from "../../lib/i18n";
@@ -383,7 +383,7 @@ export function GroupConversationScreen() {
               </button>
             </div>
           ) : threadLoading ? (
-            <ThreadSkeleton />
+            <ThreadLoading />
           ) : (
             <div
               className="relative flex min-h-0 flex-1 flex-col"

@@ -224,10 +224,15 @@ const appFrameRoute = createRoute({
     // session that expired in the meantime is still caught by the 401 (`lib/api.ts`).
     if (cause === "stay" && guardedAppPath === location.pathname) return;
     guardedAppPath = null;
+    // The conversation screen's code, now rather than once the guards and
+    // the cache restore are done: the composer it draws is then the real one
+    // sooner, and its stand-in shows less.
+    if (/\/bot\/[^/]+\/?$/u.test(location.pathname)) void ConversationScreen.preload?.();
     // Not awaited: the guard reads and the conversation reads start together,
     // instead of the loader waiting for session, organization and onboarding.
     warmAppAccess();
-    // The cached conversation first, so the frame never paints it as skeletons.
+    // The cached roster first (and the thread, on a conversation), so the
+    // frame never paints them as skeletons.
     await restoreConversationForPath(location.pathname, location.search);
     prefetchConversationForPath(location.pathname, location.search);
     // Guards already passed for this user on this browser: open the frame on
@@ -429,7 +434,7 @@ const botConversationRoute = createRoute({
 /** A bot being created (`lib/bots/pending-bot-creations.ts`) does not have a thread yet. */
 function BotConversationEntry() {
   const { botId } = botConversationRoute.useParams();
-  return <Suspense fallback={<ConversationPending />}>{isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />}</Suspense>;
+  return <Suspense fallback={<ConversationPending botId={botId} />}>{isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />}</Suspense>;
 }
 
 /**

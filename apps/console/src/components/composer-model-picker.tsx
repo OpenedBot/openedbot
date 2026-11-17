@@ -27,6 +27,8 @@ import { BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./boardui/menu
 import { api, ApiError, queryKeys, runtimesQueryOptions } from "../lib/api";
 import { haptics } from "../lib/platform/haptics";
 import { useT } from "../lib/i18n";
+import { rememberBootBot } from "../lib/session/boot-bots";
+import { readCloudSession } from "../lib/session/cloud-session";
 import { displayedRuntimeHealth } from "../lib/runtime/runtime-health";
 import { trackBotModelSave } from "../lib/bots/bot-model-saves";
 import { EffortChip, EffortPanel, FastBoltSlot, type FastModeControl } from "./composer-effort-chip";
@@ -82,6 +84,7 @@ export function ComposerModelPicker({
   onEffortCommit,
   fast,
   onReset,
+  bootBotId,
 }: {
   providers: RuntimeModelProviderDto[];
   selectedModel: string | null;
@@ -123,8 +126,11 @@ export function ComposerModelPicker({
   fast?: FastModeControl;
   /** Back to the default effort and normal speed. */
   onReset?: () => void;
+  /** The bot whose model mark the next refresh redraws at once (`lib/session/boot-bots.ts`). */
+  bootBotId?: string;
 }) {
   const { t } = useT();
+  const glyphRef = useRef<HTMLSpanElement>(null);
   const groups = useMemo(
     () => catalogModelView(providers, [selectedModel, effectiveModel, globalModel]).groups,
     [providers, selectedModel, effectiveModel, globalModel],
@@ -147,6 +153,13 @@ export function ComposerModelPicker({
     error || emptyCatalog ? "composer.modelUnavailable" : unchosen ? "composer.modelChoose" : "composer.modelLoading",
   );
   const triggerProvider = fallback?.provider ?? groups.find((group) => group.models.some((model) => model.id === effectiveModel))?.slug ?? null;
+  // The mark as drawn now, for the composer the next refresh paints before
+  // any read answers. Only a settled reading: a loading spark is not the mark.
+  const settledGlyph = header && bootBotId && !loading && !error;
+  useEffect(() => {
+    if (!settledGlyph || !glyphRef.current) return;
+    rememberBootBot(readCloudSession()?.userId, bootBotId, { glyph: glyphRef.current.innerHTML, provider: triggerProvider });
+  }, [settledGlyph, bootBotId, triggerProvider, unchosen, fallback]);
   const fallbackTitle = fallback
     ? t("composer.modelFallbackTitle", {
       provider: providerLabel(fallback.provider),
@@ -397,7 +410,9 @@ export function ComposerModelPicker({
           {fallbackBadge}
         </>
       ) : header ? (
-        <ModelHeaderGlyph provider={triggerProvider} warn={unchosen || !!fallback} fallback={!!fallback} />
+        <span ref={glyphRef} className="contents">
+          <ModelHeaderGlyph provider={triggerProvider} warn={unchosen || !!fallback} fallback={!!fallback} />
+        </span>
       ) : (
         <>
           <FastBoltSlot on={fastOn && !fallback} />
@@ -707,6 +722,7 @@ export function ThreadModelPicker({
         onChange: (on) => persist({ ...selection, fast: on }),
       }}
       onReset={() => persist({ ...selection, effort: null, fast: false })}
+      bootBotId={bot.id}
     />
   );
 }

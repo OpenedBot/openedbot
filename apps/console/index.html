@@ -183,6 +183,14 @@
         --boot-composer-shadow: 0 1px 2px rgb(13 13 13 / 0.04), 0 4px 16px rgb(13 13 13 / 0.05);
         --boot-composer-edge: rgb(13 13 13 / 0.08);
         --boot-composer-fill: rgb(13 13 13 / 0.06);
+        /* thread-theme.css: the placeholder (`--stream-fg2`), the model
+           button's line, the send disc (`--btn-accent`) and its arrow
+           (`--stream-send-ink`). */
+        --boot-composer-ph: #6e6e6e;
+        --boot-composer-model-edge: #dedede;
+        --boot-send: #007aff;
+        --boot-send-ink: #000000;
+        --boot-veil: rgb(28 28 28 / 6%);
         position: fixed;
         inset: 0;
         z-index: 2147483000;
@@ -209,6 +217,11 @@
         --boot-composer-shadow: none;
         --boot-composer-edge: rgba(252, 252, 252, 0.06);
         --boot-composer-fill: rgba(252, 252, 252, 0.1);
+        --boot-composer-ph: #9e9e9e;
+        --boot-composer-model-edge: lab(27.036% 0 0);
+        --boot-send: #0a84ff;
+        --boot-send-ink: #ffffff;
+        --boot-veil: rgb(245 245 245 / 4%);
       }
       #openedbot-boot * {
         box-sizing: border-box;
@@ -546,81 +559,36 @@
          bubble on the right, the answer's bubble on the left (rounded 18,
          `min(80%, 560px)`), its action row and its duration; rows anchored on
          the composer, in the 60rem lane. */
+      /* No more grey rows: `ThreadLoading` (thread-skeleton.tsx), a 20 px
+         spinner in the middle of the reading area, shown past 300 ms. */
       #openedbot-boot .thread {
         flex: 1;
-        flex-direction: column;
-        justify-content: flex-end;
-        gap: 3rem;
-        min-height: 0;
-        /* `ConversationBodySkeleton`: pt-2 pb-4 above the composer dock, plus
-           the 13 px the loaded thread keeps under its last turn; 4rem on the
-           sides, the gutter of a thread showing its turn rail
-           (thread-timeline.css). */
-        padding: 0.5rem 4rem calc(1rem + 13px);
-        overflow: hidden;
-      }
-      #openedbot-boot .turn {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        max-width: var(--boot-column);
-        margin-inline: auto;
-      }
-      #openedbot-boot .ask {
-        align-self: flex-end;
-        max-width: min(560px, 100%);
-        height: 2.25rem;
-        /* The row gap only: the loaded bubble's copy/edit actions are an
-           overlay beside it, they reserve no height under it. */
-        margin-bottom: 0.75rem;
-        border-radius: 18px;
-      }
-      #openedbot-boot .answer {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      #openedbot-boot .answer .bubble {
-        max-width: 100%;
-        border-radius: 4px;
-      }
-      #openedbot-boot .answer .acts4 {
-        display: flex;
         align-items: center;
-        gap: 1rem;
-        height: 2rem;
-        padding: 0 0.5rem;
+        justify-content: center;
+        min-height: 0;
       }
-      #openedbot-boot .answer .acts4 i {
-        width: 1rem;
-        height: 1rem;
-        border-radius: 0.25rem;
-      }
-      #openedbot-boot .answer .dur {
-        width: 2.5rem;
-        height: 11px;
-        margin: 0.25rem 0 0 0.25rem;
-      }
-      /* The turn rail (`thread-turn-rail.tsx`): one tick per question, on the
-         thread's left edge, halfway down the reading area. */
-      #openedbot-boot .trail {
-        display: none;
-      }
-      /* `TurnRailSkeleton`: three 14 px ticks on an 8 px pitch, centred on
-         the thread above the 70 px composer dock: (100% - 70px) / 2, less
-         half its 32 px block, plus the 7 px to the first tick. */
-      #openedbot-boot.conv .trail {
-        position: absolute;
-        top: calc(50% - 33px - 0.6875rem);
-        left: 1.25rem;
+      #openedbot-boot .thread .spin {
         display: flex;
-        flex-direction: column;
-        gap: 0.375rem;
+        width: 20px;
+        height: 20px;
+        color: var(--boot-text-3);
+        animation: openedbot-boot-fade 200ms ease-out 300ms both;
       }
-      #openedbot-boot .trail i {
-        width: 0.875rem;
-        height: 0.125rem;
-        border-radius: 1px;
+      #openedbot-boot .thread .spin svg {
+        width: 20px;
+        height: 20px;
+        fill: none;
+        animation: openedbot-boot-spin 1s linear infinite;
+      }
+      @keyframes openedbot-boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes openedbot-boot-fade {
+        from {
+          opacity: 0;
+        }
       }
       /* The `Composer` pill on desktop (thread-theme.css, thread-timeline.css):
          as wide as the lane, one 44 px row inside its 1 px line, radius 22:
@@ -661,18 +629,122 @@
         flex: 1;
         min-width: 0;
       }
-      #openedbot-boot .shell .line {
-        width: 7.5rem;
-        height: 0.875rem;
-        margin-inline-start: 0.25rem;
+      /* The composer at rest, not a skeleton: its placeholder, the model
+         button (the mark remembered by `lib/session/boot-bots.ts`) and send,
+         faded as with an empty field. */
+      #openedbot-boot .shell .ph {
+        display: block;
+        overflow: hidden;
+        padding: 2px 4px;
+        font-size: calc(15px * var(--openedbot-text-scale, 1));
+        line-height: calc(24px * var(--openedbot-text-scale, 1));
+        color: var(--boot-composer-ph);
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
       #openedbot-boot .shell .model {
-        width: 99px;
+        display: flex;
+        flex: 0 0 30px;
         height: 30px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--boot-composer-model-edge);
+        border-radius: 999px;
+        background: var(--boot-composer);
+        color: var(--boot-text);
+      }
+      #openedbot-boot .shell .model svg {
+        width: 16px;
+        height: 16px;
       }
       #openedbot-boot .shell .send {
-        width: 28px;
+        display: flex;
+        flex: 0 0 28px;
         height: 28px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--boot-send);
+        color: var(--boot-send-ink);
+        opacity: 0.35;
+      }
+      #openedbot-boot .shell .send svg {
+        width: 16px;
+        height: 16px;
+      }
+      /* The bot remembered by the last visit: its name drawn, its face a
+         still neutral disc. */
+      #openedbot-boot .crumb .title .face {
+        display: block;
+        flex: none;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 999px;
+        background: var(--boot-composer-fill);
+      }
+      /* The floating pill of the rail shell (`BoardHeader`): a 24 px face and
+         the name at 14 px semibold, as the loaded header draws them. */
+      html[data-openedbot-boot-rail] #openedbot-boot.conv.floating .crumb .title .face {
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+      html[data-openedbot-boot-rail] #openedbot-boot.conv.floating .crumb .title .nm {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+      }
+      /* The thread header's own buttons at the top right of the scene, in the
+         rail shell (« c »): « Fichiers » (`BUTTON.small`), then the scenario
+         lab on a dev server. Shown by the script below for a remembered bot. */
+      #openedbot-boot .hacts {
+        display: none;
+      }
+      html[data-openedbot-boot-rail] #openedbot-boot.conv.floating .hacts.on {
+        position: fixed;
+        z-index: 1;
+        top: 1.375rem;
+        right: 24px;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        height: 2rem;
+      }
+      #openedbot-boot .hacts .files {
+        display: flex;
+        align-items: center;
+        height: 1.5rem;
+        padding: 0 0.5rem;
+        border-radius: 999px;
+        background: var(--boot-veil);
+        color: var(--boot-text);
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      #openedbot-boot .hacts .lab {
+        display: none;
+        width: 2rem;
+        height: 2rem;
+        align-items: center;
+        justify-content: center;
+        color: var(--boot-text);
+      }
+      #openedbot-boot .hacts .lab.on {
+        display: flex;
+      }
+      #openedbot-boot .hacts .lab svg {
+        width: 0.875rem;
+        height: 0.875rem;
+        fill: none;
+      }
+      #openedbot-boot .crumb .title .nm {
+        flex: none;
+        max-width: 16rem;
+        overflow: hidden;
+        font-weight: 600;
+        color: var(--boot-text);
+        white-space: nowrap;
+        text-overflow: ellipsis;
       }
       /* Barre latérale repliée : sa rangée d'outils monte dans la barre du haut. */
       html[data-openedbot-sidebar-collapsed] #openedbot-boot .side,
@@ -845,6 +917,9 @@
       }
       html[data-openedbot-boot-rail] #openedbot-boot.conv.floating .crumb {
         position: absolute;
+        /* Its own width: the narrow bar it hangs from must not squeeze a
+           remembered name out of the pill. */
+        width: max-content;
         height: 2.5rem;
         inset-block-start: 0.375rem;
         inset-inline-start: 50%;
@@ -1091,8 +1166,7 @@
           border-radius: 0;
         }
         #openedbot-boot.conv .thread,
-        #openedbot-boot.conv .composer,
-        #openedbot-boot.conv .trail {
+        #openedbot-boot.conv .composer {
           display: none;
         }
       }
@@ -1103,7 +1177,9 @@
       }
       @media (prefers-reduced-motion: reduce) {
         #openedbot-boot i,
-        #openedbot-boot .rfoot .quota {
+        #openedbot-boot .rfoot .quota,
+        #openedbot-boot .thread .spin,
+        #openedbot-boot .thread .spin svg {
           animation: none;
         }
       }
@@ -1165,6 +1241,7 @@
         <div class="crumb"><span class="salon">Salon</span><span class="chev">›</span><span class="title"><i class="round" style="width:1.25rem;height:1.25rem"></i><i class="name"></i></span></div>
         <div class="acts"><i class="round model"></i><i class="round ctx"></i><b class="ico"><svg viewBox="0 0 24 24"><path d="M5 10C3.9 10 3 10.9 3 12C3 13.1 3.9 14 5 14C6.1 14 7 13.1 7 12C7 10.9 6.1 10 5 10ZM19 10C17.9 10 17 10.9 17 12C17 13.1 17.9 14 19 14C20.1 14 21 13.1 21 12C21 10.9 20.1 10 19 10ZM12 10C10.9 10 10 10.9 10 12C10 13.1 10.9 14 12 14C13.1 14 14 13.1 14 12C14 10.9 13.1 10 12 10Z"/></svg></b></div>
       </div>
+      <div class="hacts"><span class="files">Fichiers</span><b class="lab"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/><path d="M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12l0 2.5"/></svg></b></div>
       <div class="body" aria-hidden="true">
         <div class="side">
           <div class="card">
@@ -1191,18 +1268,14 @@
         <div class="main">
           <div class="scene">
             <div class="thread">
-          <div class="turn"><i class="ask" style="width:11rem"></i><div class="answer"><i class="bubble" style="width:20rem;height:58px"></i><div class="acts4"><i></i><i></i><i></i><i></i></div><i class="dur"></i></div></div>
-          <div class="turn"><i class="ask" style="width:7rem"></i><div class="answer"><i class="bubble" style="width:6rem;height:2.25rem"></i><div class="acts4"><i></i><i></i><i></i><i></i></div><i class="dur"></i></div></div>
-          <div class="turn"><i class="ask" style="width:15rem"></i><div class="answer"><i class="bubble" style="width:26rem;height:5rem"></i><div class="acts4"><i></i><i></i><i></i><i></i></div><i class="dur"></i></div></div>
-          <div class="turn"><i class="ask" style="width:9rem"></i><div class="answer"><i class="bubble" style="width:14rem;height:58px"></i><div class="acts4"><i></i><i></i><i></i><i></i></div><i class="dur"></i></div></div>
+              <b class="spin"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></b>
             </div>
-            <div class="trail"><i></i><i></i><i></i></div>
             <div class="composer">
               <div class="shell">
-                <b class="plus"><svg viewBox="0 0 24 24"><path d="M11 11V5H13V11H19V13H13V19H11V13H5V11H11Z"/></svg></b>
-                <span class="field"><i class="line"></i></span>
-                <i class="model round"></i>
-                <i class="send round"></i>
+                <b class="plus"><svg viewBox="0 0 24 24"><path d="M13 4V11H20V13H13V20H11V13H4V11H11V4H13Z"/></svg></b>
+                <span class="field"><span class="ph">Message</span></span>
+                <b class="model"></b>
+                <b class="send"><svg viewBox="0 0 24 24"><path d="M11 7.41406L6 12.4141L4.58594 11L12 3.58594L19.4141 11L18 12.4141L13 7.41406V20H11V7.41406Z"/></svg></b>
               </div>
             </div>
             <div class="pane overview"><div class="tiles"><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div><div class="tile"><div class="head"><div><i style="width:96px;height:12px"></i><i style="width:48px;height:24px;margin-top:8px"></i></div><i class="round" style="width:64px;height:22px"></i></div><div class="foot2"><i style="width:160px;height:12px"></i><i style="width:112px;height:12px"></i></div></div></div><div class="charts"><div class="chart"><div class="head"><div><i style="width:128px;height:14px"></i><i class="d" style="width:224px"></i></div><i style="width:160px;height:36px;border-radius:8px"></i></div><div class="plot"><i></i><div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="chart tokens"><div class="head"><div><i style="width:128px;height:14px"></i><i class="d" style="width:224px"></i><i class="d" style="width:160px"></i></div><i style="width:160px;height:36px;border-radius:8px"></i></div><div class="plot"><i></i><div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div></div></div>
@@ -1245,6 +1318,33 @@
             boot.querySelector(".ph").textContent = "Search conversations…";
           }
           if (/\/(?:bot|g)\/[^/]+\/?$/.test(location.pathname)) boot.className = /\/bot\//.test(location.pathname) ? "conv floating" : "conv";
+          // The bot the last visit remembered (`lib/session/boot-bots.ts`, same
+          // key and scope): its name in the pill and the composer, its model
+          // mark in the model button, drawn instead of pulsing.
+          try {
+            var botMatch = /\/bot\/([^/]+)\/?$/.exec(location.pathname);
+            var bootBots = JSON.parse(localStorage.getItem("openedbot:boot-bots") || "null");
+            var bootSession = JSON.parse(localStorage.getItem("openedbot:cloud-session") || "null");
+            var bootBot = botMatch && bootBots && bootSession && bootBots.userId === bootSession.userId && bootBots.bots
+              ? bootBots.bots[decodeURIComponent(botMatch[1])] : null;
+            if (bootBot && typeof bootBot.name === "string" && bootBot.name) {
+              var botName = bootBot.name.slice(0, 80);
+              boot.querySelector(".shell .ph").textContent = "Message " + botName;
+              var crumbTitle = boot.querySelector(".crumb .title");
+              var face = document.createElement("b");
+              face.className = "face";
+              var label = document.createElement("span");
+              label.className = "nm";
+              label.textContent = botName;
+              crumbTitle.replaceChildren(face, label);
+              if (typeof bootBot.glyph === "string") boot.querySelector(".shell .model").innerHTML = bootBot.glyph.slice(0, 4000);
+              var headerActs = boot.querySelector(".hacts");
+              headerActs.className += " on";
+              if (locale === "en") headerActs.querySelector(".files").textContent = "Files";
+              // `SHOW_FEATURE_LAB` (dev-approval-probe.ts): Vite writes the mode here.
+              if ("%DEV%" === "true") headerActs.querySelector(".lab").className += " on";
+            }
+          } catch (e) { /* the composer keeps « Message » and the title pulses */ }
           // Une rubrique des réglages : `settingsPathOf` (frame-skeletons.tsx).
           var internal = location.pathname.replace(/^\/o\/[^/]+/, "").replace(/\/+$/, "") || "/";
           if (internal === "/settings" || internal.indexOf("/settings/") === 0) {

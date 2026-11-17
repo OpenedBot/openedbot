@@ -26,6 +26,8 @@ import {
 import { useThreadStream } from "../../lib/stream/use-thread-stream";
 import { useConnectedMcpPlugins } from "../../lib/runtime/use-mcp-plugins";
 import { rememberBotThread } from "../../lib/thread/conversation-prefetch";
+import { rememberBootBot } from "../../lib/session/boot-bots";
+import { readCloudSession } from "../../lib/session/cloud-session";
 import { BotFace } from "../../components/bot-face";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { settledBotModelSaves } from "../../lib/bots/bot-model-saves";
@@ -49,7 +51,7 @@ import { useAgentEditor } from "../../lib/bots/agent-editor";
 import { useThreadGoal, withThreadGoal } from "../../lib/thread/thread-goal";
 import { PermissionModeBadge } from "../../components/boardui/permission-picker";
 import { GoalDialog } from "../../components/boardui/goal-dialog";
-import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
+import { ConversationPending, ThreadLoading } from "../../components/thread-skeleton";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { visibleRosterItems } from "@/lib/thread/thread-visibility";
@@ -168,6 +170,11 @@ export function ConversationScreen() {
   useEffect(() => {
     if (bot?.id && bot.threadId) rememberBotThread(bot.id, bot.threadId);
   }, [bot?.id, bot?.threadId]);
+  // Its name, for the header pill and the composer the next refresh paints
+  // before the roster is read (`lib/session/boot-bots.ts`).
+  useEffect(() => {
+    if (bot?.id && bot.name) rememberBootBot(readCloudSession()?.userId, bot.id, { name: bot.name });
+  }, [bot?.id, bot?.name]);
 
   const { thread, streaming, loading, loadOlder, loadingOlder, olderError, liveText } = useThreadStream(activeThreadId);
   // Opening another bot closes the editor instead of carrying its canvas over.
@@ -682,7 +689,7 @@ export function ConversationScreen() {
   };
 
   if (!bot) {
-    if (roster.isPending) return <ConversationPending />;
+    if (roster.isPending) return <ConversationPending botId={botId} />;
     if (botUnavailable) return null;
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -1004,7 +1011,7 @@ export function ConversationScreen() {
               </button>
             </div>
           ) : threadLoading && !starting ? (
-            <ThreadSkeleton />
+            <ThreadLoading />
           ) : <ThreadArrival bot={bot} status={bot.profileProvisionStatus}>{starting ? <ThreadStartStage bot={bot} /> : <div
             className="relative flex min-h-0 flex-1 flex-col"
             data-turn-rail={turnRailShown ? "" : undefined}
@@ -1118,7 +1125,9 @@ export function ConversationScreen() {
               setDraft(next);
             }}
             onSubmit={() => {
-              if (send.isPending || conversationBlocked) return;
+              // The composer stays usable while the thread loads (one can
+              // start typing at once); the send waits for the thread.
+              if (send.isPending || conversationBlocked || threadLoading || runtimes.isPending) return;
               // Planifier d'abord: this field corrects the plan. Lancer is the
               // only send that allows execution; until then, the server
               // decides the turn's gates as in Plan mode (0155).
@@ -1132,7 +1141,7 @@ export function ConversationScreen() {
             }}
             onCancel={() => cancel.mutate()}
             botName={bot.name}
-            disabled={threadLoading || pendingGate || runtimes.isPending || conversationBlocked || !!bot.profileImportStatus || profileMissing}
+            disabled={pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing}
             // Gate: one says why. An in-flight send no longer grays the field
             // : the iOS keyboard must stay open.
             notice={runtimeNotice}

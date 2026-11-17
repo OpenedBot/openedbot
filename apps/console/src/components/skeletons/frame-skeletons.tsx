@@ -17,7 +17,8 @@ import { BotFace } from "../bot-face";
 import { isConversationPath, readBootSidebarShape, type BootSidebarShape } from "../../lib/session/boot-shape";
 import { BAR_ICON_BUTTON, TitlebarLogo, useBoardChrome } from "../boardui/board-chrome";
 import { useAccountLayout } from "../../lib/shell/account-layout";
-import { ConversationBodySkeleton, HeaderActionsSkeleton, HeaderTitleSkeleton } from "../thread-skeleton";
+import { ConversationBodyPending, HeaderActionsSkeleton, HeaderExtrasAtRest, HeaderTitleSkeleton } from "../thread-skeleton";
+import { botIdOfPath, readBootBot } from "../../lib/session/boot-bots";
 import { RAIL_BUTTON, RAIL_DIVIDER } from "../boardui/board-rails";
 import { RailLlmQuotasLoading } from "../boardui/rail-llm-quotas";
 import { SettingsPage, SettingsPageSidebar } from "../boardui/settings-modal";
@@ -193,7 +194,14 @@ function TopBarSkeleton({ conversation, organization, title }: {
           <span className={`${RAIL_BUTTON} pointer-events-none`}><RiSideBarLine /></span>
         </span>
         {conversation ? (
-          <span aria-hidden className="flex h-10 items-center rounded-full border border-border-button-default bg-background-secondary-default px-3 shadow-xs"><HeaderTitleSkeleton /></span>
+          <>
+            <span aria-hidden className="flex h-10 items-center rounded-full border border-border-button-default bg-background-secondary-default px-3 shadow-xs"><HeaderTitleSkeleton botId={botIdOfPath(globalThis.location?.pathname ?? "")} /></span>
+            {/* The thread's own buttons, at the place the loaded header gives
+                them (`.hacts` of `index.html`), for a bot the last visit knows. */}
+            {readBootBot(readCloudSession()?.userId, botIdOfPath(globalThis.location?.pathname ?? "")) ? (
+              <span className="absolute top-[1.375rem] right-6 flex h-8 items-center gap-1"><HeaderExtrasAtRest withFiles /></span>
+            ) : null}
+          </>
         ) : title ? (
           <span className="flex h-9 min-w-0 items-center gap-2 text-body-2-medium text-text-primary"><span>{t("overviewPlaceholder.nav")}</span><span aria-hidden>›</span><span className="truncate font-semibold">{title}</span></span>
         ) : null}
@@ -233,7 +241,7 @@ function TopBarSkeleton({ conversation, organization, title }: {
            (`BoardHeader centered`), the actions on the right. */
         <>
           <span aria-hidden className="flex min-w-0 flex-1 items-center px-1 xl:absolute xl:top-1/2 xl:left-1/2 xl:max-w-[30%] xl:flex-none xl:-translate-x-1/2 xl:-translate-y-1/2">
-            <span className="flex h-[30px] min-w-0 items-center px-1.5"><HeaderTitleSkeleton /></span>
+            <span className="flex h-[30px] min-w-0 items-center px-1.5"><HeaderTitleSkeleton botId={botIdOfPath(globalThis.location?.pathname ?? "")} /></span>
           </span>
           <HeaderActionsSkeleton />
         </>
@@ -306,7 +314,7 @@ export function AppFrameSkeleton() {
           <div className="flex min-h-0 min-w-0 flex-1 px-3 pb-3">
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-clip rounded-3xl bg-background-secondary-default">
               {railShell ? <TopBarSkeleton conversation={conversation && /\/bot\//.test(pathname)} organization={false} title={settingsItem ? t(settingsItem.titleKey) : null} /> : null}
-              {conversation ? <ConversationBodySkeleton /> : null}
+              {conversation ? <ConversationBodyPending botId={botIdOfPath(pathname)} /> : null}
               {SettingsBody ? <SettingsPage><SettingsBody /></SettingsPage> : null}
             </div>
           </div>
