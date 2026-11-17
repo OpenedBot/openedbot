@@ -32,13 +32,15 @@ SETUID and SETGID permit `runuser`; KILL permits termination of the resulting
 service-user process groups. The unit keeps the applicable operator hardening.
 It permits executable JIT memory because OpenCode embeds Bun.
 
-The ACP operator serves only `GET /capabilities` and announces an empty feature
-list. It constructs none of the Hermes wiring. Provider, usage, model, toolset,
-MCP, skills, memory, sessions, gateway restart, A2A and profile administration
-routes are absent. The bridge does not announce `approval_policy`; agent
-permission requests go through the bridge to the user. Profile management is
-not implemented. Before use, an administrator must provision the required
-profile directories under the profiles root for the service account.
+The ACP operator announces only `profile_management`. It serves capability
+discovery and profile creation, inventory for existence checks, and deletion.
+Creating a profile makes `<profiles root>/<slug>` owned by the service account
+with mode 0700. The cloud creates and removes these managed profiles with bots.
+It constructs none of the Hermes wiring. Provider, usage, model, toolset,
+MCP, skills, memory, sessions, gateway restart and A2A administration routes
+are absent. The bridge does not announce `approval_policy`; agent permission
+requests go through the bridge to the user. All bots share the service account:
+profile directories do not isolate bots from one another.
 
 ## Provider credentials
 
@@ -144,8 +146,9 @@ files and rendered unit goldens. They cover the ordered runtime install,
 second-run bearer preservation, checksum refusal, changed-pin replacement,
 engine state and switch gates, Linux-only selection, connector hello on the
 wire, bridge/operator/connector unit rendering, doctor and upgrade runtime
-selection, strict audit unit selection, reset keep/purge, and absent operator
-capabilities and routes. Default Hermes render goldens remain unchanged.
+selection, strict audit unit selection, reset keep/purge, and the bounded
+profile-management capability and absent unrelated operator routes. Default
+Hermes render goldens remain unchanged.
 
 No real OpenCode agent was executed or installed. These tests do not prove
 systemd namespace and credential mount behavior, runuser/PAM behavior inside
