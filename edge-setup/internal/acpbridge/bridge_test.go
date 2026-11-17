@@ -1505,3 +1505,85 @@ func TestExplicitAgentEnvironmentDoesNotInheritOrForwardBearer(t *testing.T) {
 		t.Fatal("explicit environment missing")
 	}
 }
+
+func TestDeletedProfilePrunesState(t *testing.T) {
+	for _, trigger := range []string{"maintenance", "request", "recreated", "startup"} {
+		t.Run(trigger, func(t *testing.T) {
+			f := newFixture(t, "cancel")
+			f.session("cloud")
+			id := f.run(input("cloud"), "old-key")
+			f.await(id, "approval.request")
+			f.b.mu.Lock()
+			oldRun := f.b.disk.Runs[id]
+			client := oldRun.client
+			f.b.mu.Unlock()
+			if err := os.Mkdir(filepath.Join(f.opts.ProfilesRoot, "live"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			f.profile = "live"
+			f.session("kept")
+			liveID := f.run(input("kept"), "live-key")
+			f.await(liveID, "approval.request")
+			// Keep the old directory inode allocated so replacement cannot reuse it.
+			deleted := filepath.Join(t.TempDir(), "deleted")
+			if trigger == "recreated" {
+				if err := os.Rename(filepath.Join(f.opts.ProfilesRoot, "demo"), deleted); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.RemoveAll(filepath.Join(f.opts.ProfilesRoot, "demo")); err != nil {
+				t.Fatal(err)
+			}
+			f.profile = "demo"
+			recreate := func() {
+				t.Helper()
+				if err := os.Mkdir(filepath.Join(f.opts.ProfilesRoot, "demo"), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch trigger {
+			case "maintenance":
+				f.b.mu.Lock()
+				f.b.pruneLocked(time.Now())
+				f.b.mu.Unlock()
+			case "request":
+				if status, _ := f.request("GET", "/health", nil, ""); status != 404 {
+					t.Fatal(status)
+				}
+			case "recreated":
+				recreate()
+				if status, _ := f.request("GET", "/health", nil, ""); status != 200 {
+					t.Fatal(status)
+				}
+			case "startup":
+				f.restart()
+			}
+			if trigger != "recreated" {
+				recreate()
+			}
+			f.b.mu.Lock()
+			staleSession := f.b.disk.Sessions["demo/cloud"] != nil
+			staleRun := f.b.disk.Runs[id] != nil
+			kept := f.b.disk.Sessions["live/kept"] != nil && f.b.disk.Runs[liveID] != nil
+			stopped := terminal(oldRun.Status)
+			f.b.mu.Unlock()
+			if staleSession || staleRun || !kept || !stopped {
+				t.Fatalf("session=%v run=%v live=%v stopped=%v", staleSession, staleRun, kept, stopped)
+			}
+			select {
+			case <-client.done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("deleted profile agent still running")
+			}
+			if _, err := os.Stat(f.b.eventPath(id)); !os.IsNotExist(err) {
+				t.Fatal("deleted profile journal remains", err)
+			}
+			f.restart()
+			if status, _ := f.request("GET", "/v1/runs/"+id, nil, ""); status != 404 {
+				t.Fatal("old run survived restart", status)
+			}
+			if status, _ := f.request("POST", "/v1/runs", input("cloud"), ""); status != 404 {
+				t.Fatal("old session survived restart", status)
+			}
+		})
+	}
+}

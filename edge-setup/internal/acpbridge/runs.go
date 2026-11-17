@@ -257,6 +257,11 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	}
 	blocks = append(prefix, blocks...)
 	b.mu.Lock()
+	if terminal(r.Status) {
+		b.unlockAndSend()
+		b.releaseSession(s, r)
+		return
+	}
 	s.ACPID = acpID
 	s.client = client
 	s.Instructions = input.Instructions

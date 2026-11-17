@@ -51,6 +51,7 @@ type Bridge struct {
 	opts            Options
 	disk            diskState
 	profiles        map[string]*profile
+	profileDirs     map[string]os.FileInfo
 	changed         chan struct{}
 	closed          bool
 	diskErr         error
@@ -162,6 +163,7 @@ func New(opts Options) (*Bridge, error) {
 	b := &Bridge{opts: opts, profiles: map[string]*profile{}, changed: make(chan struct{}), disk: diskState{Sessions: map[string]*session{}, Runs: map[string]*run{}}}
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 	b.dirtyEvents = map[string]bool{}
+	b.profileDirs = map[string]os.FileInfo{}
 	if err = os.MkdirAll(filepath.Join(opts.StateDirectory, "events"), 0700); err != nil {
 		b.cancel()
 		return nil, err
@@ -390,7 +392,13 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		slug = parts[1]
+		b.mu.Lock()
+		b.pruneLocked(time.Now())
 		info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
+		if err == nil && info.IsDir() {
+			b.profileDirs[slug] = info
+		}
+		b.unlockAndSend()
 		if err != nil || !info.IsDir() {
 			http.NotFound(w, req)
 			return

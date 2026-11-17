@@ -124,14 +124,60 @@ func (b *Bridge) readEvents(r *run) error {
 func (b *Bridge) pruneLocked(now time.Time) {
 	expired := []string{}
 	prunedSessions := false
+	// Directory identity also detects a slug deleted and recreated between sweeps.
+	removed := map[string]bool{}
+	for _, s := range b.disk.Sessions {
+		removed[s.Profile] = false
+	}
+	for _, r := range b.disk.Runs {
+		removed[r.Profile] = false
+	}
+	for slug := range removed {
+		info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
+		old := b.profileDirs[slug]
+		removed[slug] = errors.Is(err, os.ErrNotExist) || (err == nil && (!info.IsDir() || (old != nil && !os.SameFile(old, info))))
+		if !removed[slug] {
+			if err == nil {
+				b.profileDirs[slug] = info
+			}
+			continue
+		}
+		delete(b.profileDirs, slug)
+		if p := b.profiles[slug]; p != nil {
+			delete(b.profiles, slug)
+			// Process shutdown can wait on callbacks that need b.mu.
+			b.wg.Add(1)
+			go func() {
+				defer b.wg.Done()
+				p.mu.Lock()
+				defer p.mu.Unlock()
+				if p.idle != nil {
+					p.idle.Stop()
+				}
+				if p.client != nil {
+					p.client.stop()
+				}
+			}()
+		}
+	}
+	// Stop active turns before removing their headers and journals.
+	for _, r := range b.disk.Runs {
+		if removed[r.Profile] && !terminal(r.Status) {
+			if r.client != nil {
+				r.client.kill()
+			}
+			b.cancelPermissionsLocked(r)
+			b.finishLocked(r, "cancelled", "profile deleted")
+		}
+	}
 	for key, s := range b.disk.Sessions {
-		if s.active == "" && now.Sub(s.LastUsed) > sessionRetention {
+		if removed[s.Profile] || (s.active == "" && now.Sub(s.LastUsed) > sessionRetention) {
 			delete(b.disk.Sessions, key)
 			prunedSessions = true
 		}
 	}
 	for id, r := range b.disk.Runs {
-		if terminal(r.Status) && !r.TerminalAt.IsZero() && now.Sub(r.TerminalAt) > runRetention {
+		if removed[r.Profile] || (terminal(r.Status) && !r.TerminalAt.IsZero() && now.Sub(r.TerminalAt) > runRetention) {
 			expired = append(expired, id)
 			delete(b.disk.Runs, id)
 			delete(b.dirtyEvents, id)
