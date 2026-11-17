@@ -144,8 +144,8 @@ function ThreadTimelineView({
   const events = useMemo(() => {
     const serviceRunIds = new Set(runs.filter((run) => isServiceStepKind(run.stepKind)).map((run) => run.id));
     const shown = serviceRunIds.size === 0 ? allEvents : allEvents.filter((event) => !serviceRunIds.has(event.runId));
-    return withFailedRunErrors(shown, runs, userInputs);
-  }, [allEvents, runs, userInputs]);
+    return withFailedRunErrors(shown, runs, userInputs, hasOlderHistory);
+  }, [allEvents, runs, userInputs, hasOlderHistory]);
   const { t, locale, formatNumber, plural } = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);

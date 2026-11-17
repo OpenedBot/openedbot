@@ -30,26 +30,37 @@ const standIns = new WeakMap<object, StoredProductEvent>();
  * a `run.error` built from the run (its code, its text), appended after the
  * events. The real event, once read, replaces it: never both.
  *
- * Only runs the read window already shows (an event or the operator's
- * message) get one: a run whose history is not loaded yet keeps its real
+ * Only runs inside the read window get one: a run the window already shows
+ * (an event or the operator's message), any run when no older history is
+ * left to load, or a run not older than the oldest event or message loaded
+ * (a room turn started by another bot has no operator message and may fail
+ * before any event). A run whose history is not loaded yet keeps its real
  * event for when it is. With nothing to add, `events` comes back unchanged.
  */
 export function withFailedRunErrors(
   events: readonly StoredProductEvent[],
   runs: readonly FailedRunLike[],
   userInputs: readonly TimelineUserInput[],
+  olderHistory: boolean,
 ): readonly StoredProductEvent[] {
   if (!runs.some((run) => run.status === "failed")) return events;
   const shown = new Set<string>();
   const closed = new Set<string>();
+  let oldest = Number.POSITIVE_INFINITY;
   for (const event of events) {
     shown.add(event.runId);
     if (event.type === "run.error" || event.type === "run.completed") closed.add(event.runId);
+    oldest = Math.min(oldest, new Date(event.occurredAt).getTime() || oldest);
   }
-  for (const input of userInputs) if (input.runId) shown.add(input.runId);
+  for (const input of userInputs) {
+    if (input.runId) shown.add(input.runId);
+    if (input.createdAt) oldest = Math.min(oldest, Date.parse(input.createdAt) || oldest);
+  }
+  const inWindow = (run: FailedRunLike) => shown.has(run.id) || !olderHistory
+    || (run.createdAt !== undefined && Date.parse(run.createdAt) >= oldest);
   let withStandIns: StoredProductEvent[] | null = null;
   for (const run of runs) {
-    if (run.status !== "failed" || closed.has(run.id) || !shown.has(run.id)) continue;
+    if (run.status !== "failed" || closed.has(run.id) || !inWindow(run)) continue;
     let event = standIns.get(run);
     if (!event) {
       event = {
