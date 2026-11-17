@@ -127,7 +127,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		p = &profile{}
 		b.profiles[r.Profile] = p
 	}
-	b.mu.Unlock()
+	b.unlockAndSend()
 	p.mu.Lock()
 	if p.idle != nil {
 		p.idle.Stop()
@@ -138,7 +138,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		p.busy--
 		b.mu.Lock()
 		closed := b.closed
-		b.mu.Unlock()
+		b.unlockAndSend()
 		if p.busy == 0 && !closed {
 			p.idle = time.AfterFunc(b.opts.Limits.IdleTimeout, func() {
 				p.mu.Lock()
@@ -154,7 +154,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	// startup is serialized per profile; callbacks never acquire profile.mu.
 	b.mu.Lock()
 	closed := b.closed || terminal(r.Status)
-	b.mu.Unlock()
+	b.unlockAndSend()
 	var err error
 	if closed {
 		p.mu.Unlock()
@@ -162,7 +162,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		return
 	}
 	if p.client == nil || !p.client.alive() {
-		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, b.agentEnvironment(), filepath.Join(b.opts.ProfilesRoot, r.Profile), b.opts.Limits.MaxInvalidLines, b.incoming)
+		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, b.agentEnvironment(), filepath.Join(b.opts.ProfilesRoot, r.Profile), b.opts.Limits.MaxInvalidLines, b.opts.Limits.CancelTimeout, b.incoming)
 		if err == nil {
 			var init struct {
 				Version int               `json:"protocolVersion"`
@@ -186,14 +186,14 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	}
 	b.mu.Lock()
 	if b.closed || terminal(r.Status) {
-		b.mu.Unlock()
+		b.unlockAndSend()
 		b.releaseSession(s, r)
 		return
 	}
 	r.client = client
 	cancelled := r.Cancel
 	oldID, oldClient, used, oldInstructions := s.ACPID, s.client, s.Used, s.Instructions
-	b.mu.Unlock()
+	b.unlockAndSend()
 	if cancelled {
 		b.endExecution(r, s, nil)
 		return
@@ -269,13 +269,13 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		b.eventLocked(r, "context.rebuilt", Event{"history_restored": len(input.History) > 0})
 	}
 	if r.Cancel || b.closed || terminal(r.Status) {
-		b.mu.Unlock()
+		b.unlockAndSend()
 		b.endExecution(r, s, nil)
 		return
 	}
 	r.Status = "running"
 	b.saveLocked()
-	b.mu.Unlock()
+	b.unlockAndSend()
 
 	type promptResult struct {
 		reason string
@@ -301,9 +301,9 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 			r.Status = "stopping"
 			b.cancelPermissionsLocked(r)
 			b.saveLocked()
-			_ = client.notify("session/cancel", map[string]string{"sessionId": acpID})
+			b.outgoing = append(b.outgoing, agentWrite{client: client, method: "session/cancel", value: map[string]string{"sessionId": acpID}})
 		}
-		b.mu.Unlock()
+		b.unlockAndSend()
 		grace := time.NewTimer(b.opts.Limits.CancelTimeout)
 		select {
 		case result = <-done:
@@ -343,18 +343,18 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		b.finishLocked(r, status, message)
 	}
 	s.active = ""
-	b.mu.Unlock()
+	b.unlockAndSend()
 }
 func (b *Bridge) releaseSession(s *session, r *run) {
 	b.mu.Lock()
 	if s.active == r.ID {
 		s.active = ""
 	}
-	b.mu.Unlock()
+	b.unlockAndSend()
 }
 func (b *Bridge) endExecution(r *run, s *session, err error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	defer b.unlockAndSend()
 	status := "failed"
 	message := "ACP run failed"
 	if err != nil {
@@ -379,7 +379,7 @@ func (b *Bridge) stopLocked(r *run) {
 	b.cancelPermissionsLocked(r)
 	b.saveLocked()
 	if r.client != nil && r.acpID != "" {
-		_ = r.client.notify("session/cancel", map[string]string{"sessionId": r.acpID})
+		b.outgoing = append(b.outgoing, agentWrite{client: r.client, method: "session/cancel", value: map[string]string{"sessionId": r.acpID}})
 	}
 	b.wg.Add(1)
 	go func() {
@@ -390,7 +390,7 @@ func (b *Bridge) stopLocked(r *run) {
 			b.mu.Lock()
 			done := terminal(r.Status)
 			wake := b.changed
-			b.mu.Unlock()
+			b.unlockAndSend()
 			if done {
 				return
 			}
@@ -402,7 +402,7 @@ func (b *Bridge) stopLocked(r *run) {
 				if !terminal(r.Status) {
 					b.finishLocked(r, "cancelled", "")
 				}
-				b.mu.Unlock()
+				b.unlockAndSend()
 				if client != nil {
 					client.stop()
 				}
@@ -422,7 +422,7 @@ func (b *Bridge) streamLocked(w http.ResponseWriter, req *http.Request, r *run) 
 		index = len(r.Events)
 		done := terminal(r.Status)
 		wake := b.changed
-		b.mu.Unlock()
+		b.unlockAndSend()
 		failed := false
 		for _, e := range events {
 			raw, _ := json.Marshal(e)

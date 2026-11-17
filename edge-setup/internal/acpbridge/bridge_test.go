@@ -12,7 +12,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -95,6 +97,16 @@ func TestACPAgent(t *testing.T) {
 		case "session/new":
 			newCount++
 			send(m.ID, map[string]string{"sessionId": fmt.Sprintf("s%d", newCount)})
+			if scenario == "blocked-stdin" {
+				conn, err := net.Dial("tcp", os.Args[marker+2])
+				if err != nil {
+					os.Exit(30)
+				}
+				_, _ = fmt.Fprintln(conn, os.Getpid())
+				defer conn.Close()
+				<-time.After(time.Hour)
+			}
+
 		case "session/load":
 			update(p["sessionId"].(string), map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock("OLD HISTORY MUST BE DROPPED")})
 			send(m.ID, map[string]any{})
@@ -1149,5 +1161,79 @@ func TestAgentStopTerminatesChildProcesses(t *testing.T) {
 				t.Fatalf("agent child still holds its connection after %s: %v", mode, err)
 			}
 		})
+	}
+}
+
+func TestBlockedAgentWriteTerminatesRunAndClose(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_ = listener.(*net.TCPListener).SetDeadline(time.Now().Add(3 * time.Second))
+	f := newFixture(t, "blocked-stdin")
+	f.b.opts.AgentArguments = append(f.b.opts.AgentArguments, listener.Addr().String())
+	f.b.opts.Limits.CancelTimeout = 30 * time.Millisecond
+	f.b.opts.Limits.TurnTimeout = 80 * time.Millisecond
+	f.session("cloud")
+	body := input("cloud")
+	body["input"] = strings.Repeat("x", 512*1024)
+	id := f.run(body, "")
+	conn, err := listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	line, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	kill := func() { _ = syscall.Kill(-pid, syscall.SIGKILL) }
+	defer kill()
+	type reply struct {
+		body string
+		err  error
+	}
+	finished := make(chan reply, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		req, _ := http.NewRequestWithContext(ctx, "GET", f.server.URL+"/p/demo/v1/runs/"+id+"/events", nil)
+		req.Header.Set("Authorization", "Bearer "+f.opts.Bearer)
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			finished <- reply{err: err}
+			return
+		}
+		defer res.Body.Close()
+		raw, err := io.ReadAll(res.Body)
+		finished <- reply{string(raw), err}
+	}()
+	select {
+	case got := <-finished:
+		if got.err != nil || !strings.Contains(got.body, `"event":"run.failed"`) {
+			t.Fatalf("missing bounded failure: %v %s", got.err, got.body)
+		}
+	case <-time.After(500 * time.Millisecond):
+		kill()
+		<-finished
+		t.Fatal("blocked stdin prevented the terminal event")
+	}
+	closed := make(chan error, 1)
+	go func() { closed <- f.b.Close() }()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		kill()
+		<-closed
+		t.Fatal("Close blocked after stdin timeout")
 	}
 }

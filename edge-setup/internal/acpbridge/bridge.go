@@ -54,6 +54,7 @@ type Bridge struct {
 	dirtyEvents     map[string]bool
 	maintenanceDone chan struct{}
 	wg              sync.WaitGroup
+	outgoing        []agentWrite
 }
 type diskState struct {
 	Sessions map[string]*session `json:"sessions"`
@@ -315,7 +316,7 @@ func (b *Bridge) Serve(ctx context.Context) error {
 func (b *Bridge) Close() error {
 	b.mu.Lock()
 	if b.closed {
-		b.mu.Unlock()
+		b.unlockAndSend()
 		b.wg.Wait()
 		return nil
 	}
@@ -326,12 +327,12 @@ func (b *Bridge) Close() error {
 			b.finishLocked(r, "interrupted", "bridge stopped")
 		}
 	}
-	b.cancel()
 	profiles := make([]*profile, 0, len(b.profiles))
 	for _, p := range b.profiles {
 		profiles = append(profiles, p)
 	}
-	b.mu.Unlock()
+	b.unlockAndSend()
+	b.cancel()
 	for _, p := range profiles {
 		p.mu.Lock()
 		if p.idle != nil {
@@ -345,7 +346,7 @@ func (b *Bridge) Close() error {
 	b.wg.Wait()
 	<-b.maintenanceDone
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	defer b.unlockAndSend()
 	return b.diskErr
 }
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -389,7 +390,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		path = "/" + strings.Join(parts[2:], "/")
 	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	defer b.unlockAndSend()
 	if b.closed || b.diskErr != nil {
 		http.Error(w, "bridge unavailable", 503)
 		return

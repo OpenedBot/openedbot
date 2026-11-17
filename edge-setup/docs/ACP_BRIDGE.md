@@ -162,3 +162,14 @@ envoyé qu'une fois. La sortie du parent est détectée indépendamment du pipe
 stdout : même si un enfant l'a hérité, le pont arrête le groupe puis draine
 les messages déjà écrits avant de terminer les appels ACP. Le test attend la
 fermeture d'une connexion possédée par un enfant, sans sondage par temporisation.
+
+## Écritures ACP bornées
+
+Chaque écriture vers stdin, y compris l'attente du tour d'écriture, est bornée
+par `CancelTimeout` ; une échéance d'appel plus courte prévaut. Le pipe possède
+une échéance d'écriture réelle. Un dépassement arrête le groupe de processus,
+fait échouer les appels en attente avec `ACP stdin write timeout` et libère
+l'écriture bloquée. Les réponses aux permissions et les annulations sont
+collectées sous le mutex du pont puis envoyées après son relâchement.
+Le journal conserve la décision d'approbation acceptée avant l'envoi ; un échec
+d'envoi rend HTTP 502 et fait échouer le run, sans masquer le défaut de transport.

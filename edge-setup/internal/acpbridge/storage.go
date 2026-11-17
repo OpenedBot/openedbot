@@ -178,7 +178,7 @@ func (b *Bridge) maintain() {
 		case now := <-ticker.C:
 			b.mu.Lock()
 			b.pruneLocked(now)
-			b.mu.Unlock()
+			b.unlockAndSend()
 		case <-b.ctx.Done():
 			return
 		}

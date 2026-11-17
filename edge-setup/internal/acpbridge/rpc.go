@@ -12,9 +12,11 @@ import (
 	"os/exec"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var errAgentExited = errors.New("ACP agent exited")
+var errWriteTimeout = errors.New("ACP stdin write timeout")
 var errInvalidLines = errors.New("ACP stdout invalid-line limit exceeded")
 
 type rpcMessage struct {
@@ -34,42 +36,47 @@ type rpcReply struct {
 	err    error
 }
 type rpcClient struct {
-	cmd      *exec.Cmd
-	stdin    io.WriteCloser
-	writeMu  sync.Mutex
-	mu       sync.Mutex
-	next     uint64
-	pending  map[string]chan rpcReply
-	dead     error
-	done     chan struct{}
-	killOnce sync.Once
+	cmd          *exec.Cmd
+	stdin        *os.File
+	writeGate    chan struct{}
+	writeTimeout time.Duration
+	mu           sync.Mutex
+	next         uint64
+	pending      map[string]chan rpcReply
+	dead         error
+	done         chan struct{}
+	killOnce     sync.Once
 }
 
-func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
+func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, writeTimeout time.Duration, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
 	cmd := exec.Command(command, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Dir = cwd
 	cmd.Env = env
 	// Agent stderr is discarded: it may contain credentials or prompt content.
 	cmd.Stderr = io.Discard
-	stdin, err := cmd.StdinPipe()
+	stdinReader, stdin, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Stdin = stdinReader
 	stdout, stdoutWriter, err := os.Pipe()
 	if err != nil {
 		_ = stdin.Close()
+		_ = stdinReader.Close()
 		return nil, err
 	}
 	cmd.Stdout = stdoutWriter
 	if err = cmd.Start(); err != nil {
 		_ = stdin.Close()
+		_ = stdinReader.Close()
 		_ = stdout.Close()
 		_ = stdoutWriter.Close()
 		return nil, err
 	}
 	_ = stdoutWriter.Close()
-	c := &rpcClient{cmd: cmd, stdin: stdin, pending: map[string]chan rpcReply{}, done: make(chan struct{})}
+	_ = stdinReader.Close()
+	c := &rpcClient{cmd: cmd, stdin: stdin, pending: map[string]chan rpcReply{}, done: make(chan struct{}), writeGate: make(chan struct{}, 1), writeTimeout: writeTimeout}
 	// Own stdout independently of cmd.Wait so buffered protocol messages drain
 	// after parent exit, while inherited child pipes cannot hide that exit.
 	waited := make(chan struct{})
@@ -112,21 +119,62 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 		c.kill()
 		<-waited
 		_ = stdin.Close()
-		c.mu.Lock()
-		c.dead = cause
-		for id, ch := range c.pending {
-			ch <- rpcReply{err: cause}
-			delete(c.pending, id)
-		}
-		c.mu.Unlock()
+		c.failPending(cause)
 		close(c.done)
 	}()
 	return c, nil
 }
-func (c *rpcClient) write(m rpcMessage) error {
-	c.writeMu.Lock()
-	defer c.writeMu.Unlock()
-	return json.NewEncoder(c.stdin).Encode(m)
+func (c *rpcClient) failPending(err error) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.dead == nil {
+		c.dead = err
+	}
+	for id, ch := range c.pending {
+		ch <- rpcReply{err: c.dead}
+		delete(c.pending, id)
+	}
+	return c.dead
+}
+func (c *rpcClient) write(ctx context.Context, m rpcMessage) error {
+	ctx, cancel := context.WithTimeout(ctx, c.writeTimeout)
+	defer cancel()
+	fail := func(err error) error {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+			err = errWriteTimeout
+		}
+		c.kill()
+		return c.failPending(err)
+	}
+	select {
+	case c.writeGate <- struct{}{}:
+		defer func() { <-c.writeGate }()
+	case <-ctx.Done():
+		return fail(ctx.Err())
+	}
+	c.mu.Lock()
+	dead := c.dead
+	c.mu.Unlock()
+	if dead != nil {
+		return dead
+	}
+	if err := ctx.Err(); err != nil {
+		return fail(err)
+	}
+	deadline, _ := ctx.Deadline()
+	if err := c.stdin.SetWriteDeadline(deadline); err != nil {
+		return fail(err)
+	}
+	if err := json.NewEncoder(c.stdin).Encode(m); err != nil {
+		if ctx.Err() != nil {
+			return fail(ctx.Err())
+		}
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return fail(err)
+		}
+		return fail(errAgentExited)
+	}
+	return nil
 }
 func (c *rpcClient) call(ctx context.Context, method string, params any, out any) error {
 	raw, err := json.Marshal(params)
@@ -145,8 +193,8 @@ func (c *rpcClient) call(ctx context.Context, method string, params any, out any
 	c.pending[id] = ch
 	c.mu.Unlock()
 	defer func() { c.mu.Lock(); delete(c.pending, id); c.mu.Unlock() }()
-	if err = c.write(rpcMessage{JSONRPC: "2.0", ID: json.RawMessage(id), Method: method, Params: raw}); err != nil {
-		return errAgentExited
+	if err = c.write(ctx, rpcMessage{JSONRPC: "2.0", ID: json.RawMessage(id), Method: method, Params: raw}); err != nil {
+		return err
 	}
 	select {
 	case r := <-ch:
@@ -163,14 +211,14 @@ func (c *rpcClient) notify(method string, params any) error {
 	if err != nil {
 		return err
 	}
-	return c.write(rpcMessage{JSONRPC: "2.0", Method: method, Params: raw})
+	return c.write(context.Background(), rpcMessage{JSONRPC: "2.0", Method: method, Params: raw})
 }
 func (c *rpcClient) respond(id json.RawMessage, result any) error {
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
-	return c.write(rpcMessage{JSONRPC: "2.0", ID: id, Result: raw})
+	return c.write(context.Background(), rpcMessage{JSONRPC: "2.0", ID: id, Result: raw})
 }
 func (c *rpcClient) kill() {
 	c.killOnce.Do(func() { _ = syscall.Kill(-c.cmd.Process.Pid, syscall.SIGKILL) })

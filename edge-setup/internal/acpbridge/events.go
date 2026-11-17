@@ -7,7 +7,7 @@ import (
 
 func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	defer b.unlockAndSend()
 	if m.JSONRPC == "" {
 		for _, r := range b.disk.Runs {
 			if r.client == client && !terminal(r.Status) {
@@ -51,7 +51,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 	}
 	if m.Method == "session/request_permission" && len(m.ID) > 0 {
 		if r == nil || r.Cancel {
-			_ = client.respond(m.ID, map[string]any{"outcome": map[string]string{"outcome": "cancelled"}})
+			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
 			return
 		}
 		options := map[string]string{}
@@ -72,7 +72,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 			}
 		}
 		if options["once"] == "" || options["deny"] == "" {
-			_ = client.respond(m.ID, map[string]any{"outcome": map[string]string{"outcome": "cancelled"}})
+			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
 			b.failActiveLocked(r, "ACP permission lacks allow_once or reject_once")
 			return
 		}
@@ -83,7 +83,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 		return
 	}
 	if len(m.ID) > 0 {
-		_ = client.write(rpcMessage{JSONRPC: "2.0", ID: m.ID, Error: &rpcError{Code: -32601, Message: "method not supported"}})
+		b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, rpcError: &rpcError{Code: -32601, Message: "method not supported"}})
 		return
 	}
 	if r == nil || m.Method != "session/update" {
@@ -123,7 +123,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 func (b *Bridge) cancelPermissionsLocked(r *run) {
 	for id, p := range r.permissions {
 		if r.client != nil {
-			_ = r.client.respond(p.id, map[string]any{"outcome": map[string]string{"outcome": "cancelled"}})
+			b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
 		}
 		delete(r.permissions, id)
 	}
@@ -149,15 +149,20 @@ func (b *Bridge) approveLocked(w http.ResponseWriter, req *http.Request, r *run)
 		http.Error(w, "choice not offered", 400)
 		return
 	}
-	if err := r.client.respond(p.id, map[string]any{"outcome": map[string]string{"outcome": "selected", "optionId": option}}); err != nil {
-		http.Error(w, "agent unavailable", 502)
-		return
-	}
 	delete(r.permissions, id)
 	if len(r.permissions) == 0 {
 		r.Status = "running"
 	}
+	// Journal the accepted decision before releasing the lock so a fast agent
+	// cannot finish the run before its approval.responded event is recorded.
 	b.eventLocked(r, "approval.responded", Event{"choice": choice, "resolved": 1})
+	b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: map[string]any{"outcome": map[string]string{"outcome": "selected", "optionId": option}}})
+	err := b.unlockAndSend()
+	b.mu.Lock()
+	if err != nil {
+		http.Error(w, "agent unavailable", 502)
+		return
+	}
 	if b.diskErr != nil {
 		http.Error(w, "persistence failed", 500)
 		return
@@ -170,6 +175,6 @@ func (b *Bridge) failActiveLocked(r *run, message string) {
 	b.cancelPermissionsLocked(r)
 	b.finishLocked(r, "failed", message)
 	if r.client != nil {
-		r.client.kill()
+		b.outgoing = append(b.outgoing, agentWrite{client: r.client, kill: true})
 	}
 }
