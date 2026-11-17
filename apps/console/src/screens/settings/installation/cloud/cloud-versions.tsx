@@ -22,12 +22,14 @@ export function RuntimeVersionRows({ link, engine, engineVersion }: { link: Runt
     <ToneBadge tone="success">{t("connectorUpgrade.versionCurrent", { version: connector.version })}</ToneBadge>
   );
   const hermes = hermesVersionState(link);
-  const hermesValue = engine !== "hermes" || hermes.kind === "unknown" ? (
+  const hermesValue = engine !== "hermes" ? (
     <ToneBadge tone="neutral">{engineVersion ?? t("connectorUpgrade.versionUnknown")}</ToneBadge>
+  ) : hermes.kind === "unknown" ? (
+    <ToneBadge tone="neutral">{t("connectorUpgrade.versionUnknown")}</ToneBadge>
   ) : hermes.kind === "behind" ? (
-    <ToneBadge tone="warning">{t("connectorUpgrade.versionBehind", { version: engineVersion ?? hermes.version, latest: hermes.latest })}</ToneBadge>
+    <ToneBadge tone="warning">{t("connectorUpgrade.versionBehind", { version: hermes.version, latest: hermes.latest })}</ToneBadge>
   ) : (
-    <ToneBadge tone="success">{t("connectorUpgrade.versionCurrent", { version: engineVersion ?? hermes.version })}</ToneBadge>
+    <ToneBadge tone="success">{t("connectorUpgrade.versionCurrent", { version: hermes.version })}</ToneBadge>
   );
   return (
     <>
