@@ -20,13 +20,9 @@ export const mvp = {
   exportBot: "Export bot configuration",
   exportHint: "Markdown with attachment references, without file binaries.",
   exportError: "Download failed. Try again.",
-  diagnostic: "Diagnostics",
   modelsAction: "Check provider and model",
   runtimeAction: "Check machine",
   permissionsAction: "Check permissions",
-  retry: "Refresh diagnostics",
-  unknownError:
-    "The cause is unknown. Refresh diagnostics; if the problem persists, send the reference to support.",
   reference: "Reference",
   noMachine: "Link a machine so this bot can reply.",
   providerProblem:

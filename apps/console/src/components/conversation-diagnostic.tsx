@@ -10,60 +10,12 @@ import { useThreadEditAvailability } from "../lib/thread/thread-edit-availabilit
 import { FailureState } from "./failure-state";
 import { BUTTON } from "./settings/primitives";
 
-/** What each diagnostic kind says; `unknown` is the banner's, about a failed turn. */
-const KIND_MESSAGE: Record<DiagnosticKind, MessageKey> = {
+/** What each diagnostic kind says; an unknown kind keeps the failure's own words. */
+const KIND_MESSAGE: Record<Exclude<DiagnosticKind, "unknown">, MessageKey> = {
   runtime: "mvp.noMachine",
   models: "mvp.providerProblem",
   permissions: "mvp.permissionsProblem",
-  unknown: "mvp.unknownError",
 };
-
-export function ConversationDiagnostic({
-  code,
-  reference,
-  onRetry,
-  onPermissions,
-  retrying = false,
-  floating = false,
-}: {
-  code?: string | null;
-  reference?: string;
-  onRetry: () => void;
-  onPermissions?: () => void;
-  retrying?: boolean;
-  floating?: boolean;
-}) {
-  const { t } = useT();
-  const layout = useAccountLayout();
-  const mobile = useIsMobile();
-  const kind = conversationDiagnostic(code);
-  return (
-    <section
-      role="status"
-      aria-label={t("mvp.diagnostic")}
-      className={`mx-4 mb-2 shrink-0 rounded-xl border border-border bg-background px-3 py-2 text-sm ${floating && layout === "c" && !mobile ? "mt-[72px]" : "mt-2"}`}
-    >
-      <p>{t(KIND_MESSAGE[kind])}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <DiagnosticAction kind={kind} onPermissions={onPermissions} className={BUTTON.small} />
-        <button
-          className={BUTTON.small}
-          type="button"
-          disabled={retrying}
-          onClick={onRetry}
-        >
-          {t("mvp.retry")}
-        </button>
-      </div>
-      {reference ? (
-        <p className="mt-1 break-all text-xs text-muted-foreground">
-          {t("mvp.reference")}: {reference}
-          {code ? ` / ${code}` : ""}
-        </p>
-      ) : null}
-    </section>
-  );
-}
 
 const ACTION_LABEL: Record<Exclude<DiagnosticKind, "unknown">, MessageKey> = {
   runtime: "mvp.runtimeAction",

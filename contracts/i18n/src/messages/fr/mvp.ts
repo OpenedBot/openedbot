@@ -21,13 +21,9 @@ export const mvp = {
   exportHint:
     "Markdown avec références des pièces jointes, sans les fichiers binaires.",
   exportError: "Le téléchargement a échoué. Réessayez.",
-  diagnostic: "Diagnostic",
   modelsAction: "Vérifier le fournisseur et le modèle",
   runtimeAction: "Vérifier la machine",
   permissionsAction: "Vérifier les permissions",
-  retry: "Actualiser le diagnostic",
-  unknownError:
-    "La cause du blocage reste inconnue. Actualisez le diagnostic ; si le problème persiste, transmettez la référence au support.",
   reference: "Référence",
   noMachine: "Reliez une machine pour permettre au bot de répondre.",
   providerProblem:
