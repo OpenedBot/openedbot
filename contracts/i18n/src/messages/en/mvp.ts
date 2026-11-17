@@ -20,9 +20,6 @@ export const mvp = {
   exportBot: "Export bot configuration",
   exportHint: "Markdown with attachment references, without file binaries.",
   exportError: "Download failed. Try again.",
-  firstPrompt:
-    "Suggest three concrete ways to help me with my mission, then ask for the information you need to start.",
-  firstPromptAction: "Prepare my first request",
   diagnostic: "Diagnostics",
   modelsAction: "Check provider and model",
   runtimeAction: "Check machine",

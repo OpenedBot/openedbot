@@ -990,7 +990,6 @@ export function ConversationScreen() {
           retrying={retrying}
           onRetry={() => void retryConversation()}
         >
-{thread.data && !timelineMessages.some(m=>m.role==="user") && !draft.trim() && attachments.length === 0 && !conversationBlocked && !provisioning && !starting ? ( <button type="button" className={`${BUTTON.small} mx-auto my-2`} onClick={()=>setDraft(t("mvp.firstPrompt"))}>{t("mvp.firstPromptAction")}</button> ) : null}
           <div data-thread-lane="" className="w-full px-4 pt-2 empty:hidden sm:px-6">
             {threadFind.bar}
           </div>

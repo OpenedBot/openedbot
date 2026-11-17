@@ -21,9 +21,6 @@ export const mvp = {
   exportHint:
     "Markdown avec références des pièces jointes, sans les fichiers binaires.",
   exportError: "Le téléchargement a échoué. Réessayez.",
-  firstPrompt:
-    "Propose-moi trois façons concrètes de m’aider dans ma mission, puis demande-moi les informations nécessaires pour commencer.",
-  firstPromptAction: "Préparer ma première demande",
   diagnostic: "Diagnostic",
   modelsAction: "Vérifier le fournisseur et le modèle",
   runtimeAction: "Vérifier la machine",
