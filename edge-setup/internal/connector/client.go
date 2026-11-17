@@ -52,6 +52,8 @@ type Client struct {
 	// Agent and HermesVersion go into hello.
 	Agent         string
 	HermesVersion string
+	Engine        string
+	EngineVersion string
 	// Gateway is the loopback base URL; Bearer is added to every request.
 	Gateway string
 	Bearer  string
@@ -939,7 +941,7 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "bye")
 	conn.SetReadLimit(MaxResponseBody + 4)
-	hello, err := EncodeText(Text{T: THello, Protocol: Protocol, Agent: c.Agent, HermesVersion: c.HermesVersion, Features: announced, DevicePublicKey: c.devicePublicKey()})
+	hello, err := EncodeText(Text{T: THello, Protocol: Protocol, Agent: c.Agent, HermesVersion: c.HermesVersion, Engine: c.Engine, EngineVersion: c.EngineVersion, Features: announced, DevicePublicKey: c.devicePublicKey()})
 	if err != nil {
 		return err
 	}

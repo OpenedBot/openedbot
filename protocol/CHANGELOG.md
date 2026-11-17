@@ -5,6 +5,14 @@ All notable changes to the openedbot connector protocol. The format follows
 uses [semantic versioning](https://semver.org/) as described in
 [SPEC.md](SPEC.md#versioning).
 
+## [1.1.0] - 2026-11-17
+
+### Added
+- Optional `hello.engine` (a name matching `^[a-z][a-z0-9_.:-]{0,63}$`)
+  and `hello.engineVersion` (free text, at most 64 characters). Invalid
+  values are frame errors. An absent engine means Hermes. Deploy the API
+  before hosts; unchanged Hermes hosts send the same hello as before.
+
 ## [Unreleased]
 
 ### Changed

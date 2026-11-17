@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/enroll"
 )
@@ -282,6 +283,8 @@ func announceFeatures(link, operator []string, bound int) (kept, dropped []strin
 	return ordered[:bound:bound], ordered[bound:]
 }
 
+var engineRe = regexp.MustCompile(`^[a-z][a-z0-9_.:-]{0,63}$`)
+
 var featureRe = regexp.MustCompile(`^[a-z0-9_]{1,64}$`)
 var eventIDRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 var diagnosticCodeRe = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
@@ -317,6 +320,8 @@ type Text struct {
 	Protocol      int    `json:"protocol,omitempty"`
 	Agent         string `json:"agent,omitempty"`
 	HermesVersion string `json:"hermesVersion,omitempty"`
+	Engine        string `json:"engine,omitempty"`
+	EngineVersion string `json:"engineVersion,omitempty"`
 	// Features lists what the host serves beyond the gateway allowlist
 	// (hello and capabilities). Unknown names are ignored by the other side.
 	Features  []string `json:"features,omitempty"`
@@ -455,6 +460,19 @@ func DecodeText(b []byte) (Text, error) {
 	case THello:
 		if f.Protocol != Protocol {
 			return f, fmt.Errorf("unsupported protocol %d", f.Protocol)
+		}
+		// A pointer distinguishes an absent engine from an invalid empty name.
+		var hello struct {
+			Engine *string `json:"engine"`
+		}
+		if err := json.Unmarshal(b, &hello); err != nil {
+			return f, err
+		}
+		if hello.Engine != nil && !engineRe.MatchString(*hello.Engine) {
+			return f, errors.New("hello engine must be an engine name")
+		}
+		if utf8.RuneCountInString(f.EngineVersion) > 64 {
+			return f, errors.New("hello engineVersion exceeds 64 characters")
 		}
 		if f.DevicePublicKey != "" {
 			if _, err := enroll.ParseDevicePublicKey(f.DevicePublicKey); err != nil {

@@ -1,6 +1,6 @@
 {
   "name": "@openedbot/contracts-connector",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

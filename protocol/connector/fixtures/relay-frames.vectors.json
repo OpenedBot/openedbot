@@ -1,5 +1,9 @@
 [
   {"name": "hello v1", "frame": {"t": "hello", "protocol": 1, "agent": "hermes-setup/1.0.0", "hermesVersion": "0.22.2"}, "valid": true},
+  {"name": "hello with engine", "frame": {"t": "hello", "protocol": 1, "agent": "edge-setup/1.1.0", "engine": "acp:opencode", "engineVersion": "preview 1"}, "valid": true},
+  {"name": "hello invalid engine", "frame": {"t": "hello", "protocol": 1, "engine": "ACP:opencode"}, "valid": false},
+  {"name": "hello empty engine", "frame": {"t": "hello", "protocol": 1, "engine": ""}, "valid": false},
+  {"name": "hello oversized engine version", "frame": {"t": "hello", "protocol": 1, "engineVersion": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"}, "valid": false},
   {"name": "hello wrong protocol", "frame": {"t": "hello", "protocol": 2, "agent": "x"}, "valid": false},
   {"name": "hello with features", "frame": {"t": "hello", "protocol": 1, "agent": "hermes-setup/1.1.0", "hermesVersion": "0.22.2", "features": ["provider_management", "provider_usage"]}, "valid": true},
   {"name": "hello with an unknown feature", "frame": {"t": "hello", "protocol": 1, "agent": "hermes-setup/9.0.0", "features": ["provider_management", "future_feature"]}, "valid": true},
