@@ -556,3 +556,56 @@ func TestACPResetKeepAndPurgeData(t *testing.T) {
 		})
 	}
 }
+
+func TestACPPurgeAfterResetLosesEngine(t *testing.T) {
+	for _, engine := range []string{"", state.EngineHermes} {
+		t.Run("later-engine-"+engine, func(t *testing.T) {
+			r, runner := newTestResetter(t, false, "")
+			hookRemovals(t, runner)
+			r.Engine = state.EngineOpenCode
+			root := t.TempDir()
+			paths := []string{layout.ToolConfig, layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials}
+			files := map[string]string{}
+			for _, path := range paths {
+				file := filepath.Join(root, strings.ReplaceAll(path, "/", "_"))
+				if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				files[path] = file
+			}
+			oldExists := dataPathExists
+			dataPathExists = func(path string) bool {
+				file := files[path]
+				if file == "" {
+					return false
+				}
+				_, err := os.Stat(file)
+				return err == nil
+			}
+			t.Cleanup(func() { dataPathExists = oldExists })
+			oldRemove := removeTree
+			removeTree = func(path string) error {
+				if file := files[path]; file != "" {
+					return os.RemoveAll(file)
+				}
+				return nil
+			}
+			t.Cleanup(func() { removeTree = oldRemove })
+			if err := r.Run(context.Background(), Options{}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(files[layout.ToolConfig]); !os.IsNotExist(err) {
+				t.Fatal("reset kept engine state")
+			}
+			r.Engine = engine
+			if err := r.Run(context.Background(), Options{PurgeData: true, DataLossAccepted: true}); err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range paths[1:] {
+				if _, err := os.Stat(files[path]); !os.IsNotExist(err) {
+					t.Errorf("later purge left %s", path)
+				}
+			}
+		})
+	}
+}

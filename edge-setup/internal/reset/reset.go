@@ -118,6 +118,9 @@ var removeFile = fsx.Remove
 // removeTree is the recursive deletion seam used by reset inventory tests.
 var removeTree = os.RemoveAll
 
+// dataPathExists detects retained ACP data after the engine state was removed.
+var dataPathExists = fsx.Exists
+
 // ufwInstalled reports whether the ufw binary is on the host; tests replace it.
 var ufwInstalled = func() bool { return fsx.Exists("/usr/sbin/ufw") }
 
@@ -607,6 +610,17 @@ func (r *Resetter) inventory() (units, runtimePaths, statePaths, dataPaths []str
 	runtimePaths = append([]string{}, RuntimePaths...)
 	statePaths = append([]string{}, StatePaths...)
 	dataPaths = append([]string{}, DataPaths...)
+	acpData := []string{layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials}
+	hasACPData := r.Engine == state.EngineOpenCode
+	for _, path := range acpData {
+		hasACPData = hasACPData || dataPathExists(path)
+	}
+	if hasACPData {
+		dataPaths = append(dataPaths, acpData...)
+		// The provider file must also survive another reset that keeps data.
+		statePaths = slices.DeleteFunc(statePaths, func(p string) bool { return p == "/etc/hermes" })
+		statePaths = append(statePaths, layout.ToolConfig)
+	}
 	if r.Engine != state.EngineOpenCode {
 		return
 	}
@@ -616,9 +630,6 @@ func (r *Resetter) inventory() (units, runtimePaths, statePaths, dataPaths []str
 		}
 	}
 	runtimePaths = append(runtimePaths, layout.ACPAgentDir, layout.ACPConfigDir)
-	statePaths = slices.DeleteFunc(statePaths, func(p string) bool { return p == "/etc/hermes" })
-	statePaths = append(statePaths, layout.ToolConfig)
-	dataPaths = append(dataPaths, layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials)
 	return
 }
 
