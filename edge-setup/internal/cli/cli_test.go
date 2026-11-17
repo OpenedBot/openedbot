@@ -153,6 +153,7 @@ func TestNoColorFlagOverridesEnvAndIsStrippedFromArgv(t *testing.T) {
 		t.Fatalf("--no-color must win over EDGE_SETUP_COLOR=always: %q", out.String())
 	}
 
+	t.Cleanup(func() { delete(commands, "colortest") })
 	var gotColorEnabled bool
 	var gotArgs []string
 	Register(Command{Name: "colortest", Summary: "test seam for --no-color plumbing", Run: func(env Env, args []string) int {
@@ -175,6 +176,7 @@ func TestNoColorFlagOverridesEnvAndIsStrippedFromArgv(t *testing.T) {
 
 func TestJSONFlagCarriesNoANSIEvenWhenColorForced(t *testing.T) {
 	t.Setenv("EDGE_SETUP_COLOR", "always")
+	t.Cleanup(func() { delete(commands, "jsontest") })
 	var out bytes.Buffer
 	Register(Command{Name: "jsontest", Summary: "test seam for --json cleanliness", Run: func(env Env, _ []string) int {
 		out2 := env.Stdout
