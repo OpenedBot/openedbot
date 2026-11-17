@@ -66,6 +66,7 @@ export const botHostCleanup = {
 export const profileImport = {
   groups: "Groups",
   notInInventory: "Profile no longer listed by the host",
+  skippedTitle: "Skipped profiles",
   notes: {
     "model-not-available": "Requested model unavailable; runtime fallback selected when possible.",
     "profile-model-unset": "No valid model selection was available. Review the profile model.",
