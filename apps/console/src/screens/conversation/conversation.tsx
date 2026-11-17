@@ -983,7 +983,7 @@ export function ConversationScreen() {
               )}
             /></DevRenderProfiler>
           )}
-{!readFailed && ((runtimeUnavailable && !runtimeOffline) || Boolean(blockingError)) ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : null} reference={thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
+{!readFailed && runtimeUnavailable && !runtimeOffline ? ( <ConversationDiagnostic floating code="RUNTIME_MISSING" reference={thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
         {readFailed ? <ConversationErrorPage error={pageError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
