@@ -50,7 +50,9 @@ annoncé. Les changements ultérieurs passent dans un bloc texte ; sans cette
 capacité, le premier tour reçoit aussi ce bloc. `session/load` est utilisé
 seulement si annoncé, sans réinjecter l'historique de chargement dans le run.
 Sinon une session neuve reçoit une fois l'historique cloud, dans son ordre,
-et un `message.delta` indique la reconstruction, avec ou sans historique.
+et un événement de métadonnées `context.rebuilt` indique la reconstruction
+avec `history_restored` vrai ou faux. Aucun texte technique ne rejoint les
+deltas de réponse ; leur concaténation reste égale à `run.completed.output`.
 
 Les images demandent `promptCapabilities.image` et une URL `data:image/...`
 avec base64. Une URL distante échoue explicitement : ce paquet ne télécharge

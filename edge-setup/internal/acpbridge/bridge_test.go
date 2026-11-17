@@ -587,7 +587,7 @@ func TestInstructionsAndHistory(t *testing.T) {
 				if !strings.Contains(prompt, "old question") || strings.Index(prompt, "old question") > strings.Index(prompt, "old answer") {
 					t.Fatalf("ordered history missing %s", prompt)
 				}
-				if !strings.Contains(events[0]["delta"].(string), "context rebuilt") {
+				if events[0]["event"] != "context.rebuilt" {
 					t.Fatal("rebuild event missing")
 				}
 			}
@@ -608,7 +608,7 @@ func TestRebuildWithoutHistoryAndInterruptedRestart(t *testing.T) {
 	f.opts.AgentArguments[len(f.opts.AgentArguments)-1] = "plain"
 	f.restart()
 	events := f.events(f.run(input("cloud"), ""))
-	if !strings.Contains(events[0]["delta"].(string), "history: false") {
+	if events[0]["event"] != "context.rebuilt" || events[0]["history_restored"] != false {
 		t.Fatal("missing no-history rebuild notice")
 	}
 }
@@ -654,7 +654,7 @@ func TestIdleAgentIsStoppedAndContextRebuilt(t *testing.T) {
 	}
 	events := f.events(f.run(input("cloud"), ""))
 	expectTerminal(t, events, "run.completed")
-	if !strings.Contains(events[0]["delta"].(string), "context rebuilt") {
+	if events[0]["event"] != "context.rebuilt" {
 		t.Fatal("idle restart lost rebuild notice")
 	}
 	trace := completedTrace(t, events)
@@ -945,4 +945,28 @@ func TestAppendOnlyStorageRetentionAndSessionDeletion(t *testing.T) {
 			t.Fatal("expired events retained")
 		}
 	})
+}
+
+func TestContextRebuildMetadataDoesNotChangeAnswer(t *testing.T) {
+	f := newFixture(t, "plain")
+	f.session("cloud")
+	f.events(f.run(input("cloud"), ""))
+	f.restart()
+	events := f.events(f.run(input("cloud"), ""))
+	text := ""
+	metadata := false
+	for _, e := range events {
+		if e["event"] == "message.delta" {
+			text += e["delta"].(string)
+		}
+		if e["event"] == "context.rebuilt" {
+			metadata = true
+		}
+	}
+	if text != events[len(events)-1]["output"] {
+		t.Fatal("rebuild notice changed deltas without changing completed output")
+	}
+	if !metadata {
+		t.Fatal("dedicated rebuild metadata missing")
+	}
 }

@@ -261,7 +261,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	s.Used = true
 	r.acpID = acpID
 	if rebuilt {
-		b.eventLocked(r, "message.delta", Event{"delta": fmt.Sprintf("[Agent context rebuilt; conversation history: %t]\n", len(input.History) > 0)})
+		b.eventLocked(r, "context.rebuilt", Event{"history_restored": len(input.History) > 0})
 	}
 	if r.Cancel || b.closed || terminal(r.Status) {
 		b.mu.Unlock()
