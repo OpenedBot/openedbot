@@ -127,7 +127,7 @@ export function ConversationErrorPage({
   const layout = useAccountLayout();
   const mobile = useIsMobile();
   const kind = conversationDiagnostic(error instanceof ApiError ? error.code : null);
-  const description = kind === "unknown" ? t("conversation.readFailed") : t(KIND_MESSAGE[kind]);
+  const description = kind !== "unknown" ? t(KIND_MESSAGE[kind]) : error instanceof ApiError && error.code === "DATABASE_MIGRATION_REQUIRED" ? t("conversation.migrationRequired") : t("conversation.readFailed");
   const retryRef = useRef<HTMLButtonElement>(null);
   // The thread or the composer that held the focus is gone, and a disabled
   // button drops it during a retry: it lands on the retry button when the page
