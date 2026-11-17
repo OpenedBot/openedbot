@@ -15,6 +15,7 @@ import (
 // The execution contract retains terminal runs for seven days, like the
 // connector journal. Sweep hourly as well as at startup.
 const runRetention = 7 * 24 * time.Hour
+const sessionRetention = 30 * 24 * time.Hour
 
 func (b *Bridge) eventPath(id string) string {
 	return filepath.Join(b.opts.StateDirectory, "events", id+".jsonl")
@@ -122,6 +123,13 @@ func (b *Bridge) readEvents(r *run) error {
 }
 func (b *Bridge) pruneLocked(now time.Time) {
 	expired := []string{}
+	prunedSessions := false
+	for key, s := range b.disk.Sessions {
+		if s.active == "" && now.Sub(s.LastUsed) > sessionRetention {
+			delete(b.disk.Sessions, key)
+			prunedSessions = true
+		}
+	}
 	for id, r := range b.disk.Runs {
 		if terminal(r.Status) && !r.TerminalAt.IsZero() && now.Sub(r.TerminalAt) > runRetention {
 			expired = append(expired, id)
@@ -150,7 +158,7 @@ func (b *Bridge) pruneLocked(now time.Time) {
 			}
 		}
 	}
-	if len(expired) == 0 {
+	if len(expired) == 0 && !prunedSessions {
 		return
 	}
 	// Persist removal before unlinking journals so a crash cannot leave a live

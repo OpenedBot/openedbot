@@ -616,8 +616,8 @@ func TestInstructionsAndHistory(t *testing.T) {
 			events := f.events(f.run(body, ""))
 			trace := completedTrace(t, events)
 			prompt := lastPrompt(t, trace)
-			if strings.Contains(prompt, "old question") {
-				t.Fatal("history injected into fresh session")
+			if !strings.Contains(prompt, "old question") {
+				t.Fatal("new ACP session lost supplied cloud history")
 			}
 			hasSystem := strings.Contains(scenario, "system")
 			if strings.Contains(string(trace[1].Params), `"systemPrompt"`) != hasSystem {
@@ -632,6 +632,10 @@ func TestInstructionsAndHistory(t *testing.T) {
 			if !strings.Contains(prompt, "new instructions") {
 				t.Fatal("changed instructions missing")
 			}
+			if strings.Contains(prompt, "old question") {
+				t.Fatal("history reinjected into a live ACP session")
+			}
+
 			events = f.events(f.run(body, ""))
 			if strings.Contains(lastPrompt(t, completedTrace(t, events)), "Instructions:") {
 				t.Fatal("repeated unchanged instructions")
@@ -1327,4 +1331,71 @@ func TestStalledRequestBodyDoesNotBlockBridge(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIdleSessionRetentionKeepsRecentAndActiveAndRebuildsContext(t *testing.T) {
+	t.Run("periodic retention preserves active turns", func(t *testing.T) {
+		f := newFixture(t, "cancel")
+		for _, id := range []string{"expired", "recent", "active"} {
+			f.session(id)
+		}
+		id := f.run(input("active"), "")
+		f.await(id, "approval.request")
+		now := time.Now()
+		f.b.mu.Lock()
+		f.b.disk.Sessions["demo/expired"].LastUsed = now.Add(-31 * 24 * time.Hour)
+		f.b.disk.Sessions["demo/recent"].LastUsed = now.Add(-29 * 24 * time.Hour)
+		f.b.disk.Sessions["demo/active"].LastUsed = now.Add(-31 * 24 * time.Hour)
+		f.b.pruneLocked(now)
+		expired := f.b.disk.Sessions["demo/expired"]
+		recent := f.b.disk.Sessions["demo/recent"]
+		active := f.b.disk.Sessions["demo/active"]
+		f.b.mu.Unlock()
+		if expired != nil || recent == nil || active == nil || active.active != id {
+			t.Fatal("periodic session retention removed the wrong sessions")
+		}
+		f.restart()
+		f.b.mu.Lock()
+		expired = f.b.disk.Sessions["demo/expired"]
+		recent = f.b.disk.Sessions["demo/recent"]
+		active = f.b.disk.Sessions["demo/active"]
+		f.b.mu.Unlock()
+		if expired != nil || recent == nil || active == nil {
+			t.Fatal("session retention did not persist")
+		}
+	})
+
+	t.Run("startup and reconstruction", func(t *testing.T) {
+		f := newFixture(t, "plain")
+		_ = f.b.Close()
+		f.server.Close()
+		now := time.Now()
+		seed := map[string]any{"sessions": map[string]any{"demo/expired": map[string]any{"profile": "demo", "id": "expired", "acp_id": "old-agent-session", "used": true, "last_used": now.Add(-31 * 24 * time.Hour)}, "demo/recent": map[string]any{"profile": "demo", "id": "recent", "last_used": now.Add(-29 * 24 * time.Hour)}}, "runs": map[string]any{}}
+		raw, _ := json.Marshal(seed)
+		if err := os.WriteFile(filepath.Join(f.opts.StateDirectory, "state.json"), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		f.open()
+		if status, _ := f.request("POST", "/v1/runs", input("expired"), ""); status != 404 {
+			t.Fatal("expired idle session survived startup retention")
+		}
+		f.b.mu.Lock()
+		recent := f.b.disk.Sessions[sessionKey("demo", "recent")] != nil
+		f.b.mu.Unlock()
+		if !recent {
+			t.Fatal("recent session was pruned")
+		}
+		f.session("expired")
+		body := input("expired")
+		body["conversation_history"] = []any{map[string]string{"role": "user", "content": "previous question"}, map[string]string{"role": "assistant", "content": "previous answer"}}
+		events := f.events(f.run(body, ""))
+		expectTerminal(t, events, "run.completed")
+		prompt := lastPrompt(t, completedTrace(t, events))
+		if !strings.Contains(prompt, "previous question") || strings.Index(prompt, "previous question") > strings.Index(prompt, "previous answer") {
+			t.Fatal("recreated session lost ordered cloud history")
+		}
+		if events[0]["event"] != "context.rebuilt" || events[0]["history_restored"] != true {
+			t.Fatal("recreated session did not report its restored context")
+		}
+	})
 }

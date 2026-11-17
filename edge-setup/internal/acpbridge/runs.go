@@ -58,6 +58,7 @@ func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug 
 	r := &run{ID: uniqueID(), Profile: slug, SessionID: s.ID, Key: key, Status: "queued", Generation: 1, Events: []Event{}, permissions: map[string]permission{}, tools: map[string]string{}}
 	b.disk.Runs[r.ID] = r
 	s.active = r.ID
+	s.LastUsed = time.Now()
 	b.saveLocked()
 	if b.diskErr != nil {
 		http.Error(w, "persistence failed", 500)
@@ -229,7 +230,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 			err = b.setupCall(client, "session/new", params, &result)
 			acpID = result.SessionID
 			created = true
-			rebuilt = used
+			rebuilt = used || len(input.History) > 0
 			if err == nil && acpID == "" {
 				err = errors.New("ACP returned an empty session id")
 			}

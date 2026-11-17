@@ -62,11 +62,12 @@ type diskState struct {
 	Runs     map[string]*run     `json:"runs"`
 }
 type session struct {
-	Profile      string `json:"profile"`
-	ID           string `json:"id"`
-	ACPID        string `json:"acp_id"`
-	Instructions string `json:"instructions"`
-	Used         bool   `json:"used"`
+	Profile      string    `json:"profile"`
+	ID           string    `json:"id"`
+	ACPID        string    `json:"acp_id"`
+	Instructions string    `json:"instructions"`
+	Used         bool      `json:"used"`
+	LastUsed     time.Time `json:"last_used"`
 	client       *rpcClient
 	active       string
 }
@@ -283,6 +284,9 @@ func (b *Bridge) finishLocked(r *run, status, message string) {
 	}
 	r.Status = status
 	r.TerminalAt = time.Now()
+	if s := b.disk.Sessions[sessionKey(r.Profile, r.SessionID)]; s != nil && s.active == r.ID {
+		s.LastUsed = r.TerminalAt
+	}
 	fields := Event{}
 	if status == "completed" {
 		fields["output"] = r.Output
@@ -457,11 +461,17 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case req.Method == "POST" && path == "/api/sessions":
 		body := sessionBody
 		key := sessionKey(slug, body.ID)
-		if b.disk.Sessions[key] != nil {
+		if s := b.disk.Sessions[key]; s != nil {
+			s.LastUsed = time.Now()
+			b.saveLocked()
+			if b.diskErr != nil {
+				http.Error(w, "persistence failed", 500)
+				return
+			}
 			writeJSON(w, 409, map[string]string{"id": body.ID})
 			return
 		}
-		b.disk.Sessions[key] = &session{Profile: slug, ID: body.ID}
+		b.disk.Sessions[key] = &session{Profile: slug, ID: body.ID, LastUsed: time.Now()}
 		b.saveLocked()
 		if b.diskErr != nil {
 			http.Error(w, "persistence failed", 500)

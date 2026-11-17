@@ -183,3 +183,18 @@ borne la lecture du corps par une échéance réseau et configure aussi
 reste active jusqu'à la fermeture de la requête pour borner aussi le drainage
 HTTP. Les lectures réussies libèrent cette échéance. Un corps lent ne retient
 ni les événements d'agent, ni `/health`, ni l'annulation d'un run.
+
+## Rétention des sessions
+
+Une session sans tour actif est supprimée après trente jours sans utilisation,
+au démarrage et lors du balayage horaire des runs. `last_used` dans `state.json`
+est mis à jour lors de la création ou confirmation HTTP de la session, de
+l'admission d'un tour et de sa fin. Une session active est conservée même si
+son horodatage est ancien. Un horodatage nul est expiré ; il n'y a pas de
+migration du stockage de prototype.
+
+Le cloud peut recréer une session supprimée par `POST /api/sessions` avant
+son prochain run. Une session ACP neuve reprend alors, une seule fois,
+l'historique cloud fourni, même quand aucune ancienne correspondance ACP ne
+subsiste. Le pont émet `context.rebuilt` sans ajouter de texte à la réponse.
+Une session ACP encore vivante continue d'ignorer l'historique déjà détenu.
