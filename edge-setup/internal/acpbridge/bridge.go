@@ -420,6 +420,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var sessionBody sessionInput
 	var runBody runInput
 	var approvalBody approvalInput
+	invalidApproval := false
 	switch {
 	case req.Method == "POST" && path == "/api/sessions":
 		if json.Unmarshal(rawBody, &sessionBody) != nil || strings.TrimSpace(sessionBody.ID) == "" {
@@ -434,8 +435,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case req.Method == "POST" && len(parts) == 6 && parts[2] == "v1" && parts[3] == "runs" && parts[5] == "approval":
 		var body map[string]json.RawMessage
 		if json.Unmarshal(rawBody, &body) != nil || len(body) != 3 || json.Unmarshal(body["request_id"], &approvalBody.RequestID) != nil || json.Unmarshal(body["execution_generation"], &approvalBody.Generation) != nil || json.Unmarshal(body["choice"], &approvalBody.Choice) != nil || approvalBody.RequestID == "" || len(approvalBody.RequestID) > 256 || approvalBody.Generation < 0 || approvalBody.Choice == "" {
-			http.Error(w, "invalid approval body", 400)
-			return
+			invalidApproval = true
 		}
 	}
 	b.mu.Lock()
@@ -512,6 +512,10 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			b.stopLocked(r)
 			writeJSON(w, 200, map[string]bool{"ok": true})
 		case req.Method == "POST" && action == "approval":
+			if invalidApproval {
+				http.Error(w, "invalid approval body", 400)
+				return
+			}
 			b.approveLocked(w, r, approvalBody)
 		default:
 			http.NotFound(w, req)
