@@ -13,7 +13,8 @@ import type { MessageKey } from "@openedbot/browser-i18n";
 import { cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError } from "../lib/api";
 import { useFallbackT } from "../lib/i18n";
-import { BUTTON, CopyButton } from "./settings/primitives";
+import { BUTTON } from "./settings/primitives";
+import { CopyButton } from "./settings/copy-button";
 
 /** The code set when the request never reached the API (`api.ts`). */
 const API_UNAVAILABLE = "API_UNAVAILABLE";
