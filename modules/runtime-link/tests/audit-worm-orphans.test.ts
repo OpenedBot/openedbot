@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   AuditAnchorError,
   createAuditAnchoring,
@@ -142,23 +140,5 @@ describe("vitalité du lien : une ancre annulée laisse un orphelin marqué", ()
     const store = createLinkLivenessStore(db, { archive: new MemoryAuditArchive() });
     expect(await store.auditAnchor!(link, frame)).toBe("recorded");
     expect(statements.some((entry) => entry.sql.includes("audit_worm_orphans"))).toBe(false);
-  });
-});
-
-describe("migration 0153", () => {
-  const root = join(import.meta.dir, "../../..");
-  const sql = readFileSync(join(root, "db/migrations/0153_audit_worm_orphans.sql"), "utf8");
-
-  test("append-only (trigger, aucune grant update/delete), RLS forcée, enregistrée et attribuée", () => {
-    expect(sql).toContain("create trigger audit_worm_orphans_no_update before update on audit_worm_orphans");
-    expect(sql).toContain("alter table audit_worm_orphans force row level security;");
-    expect(sql).toContain("grant select, insert on audit_worm_orphans to openedbot_api;");
-    expect(sql).toContain("grant select on audit_worm_orphans to openedbot_worker;"); // retirée par 0154
-    expect(sql).not.toMatch(/grant[^;]*\b(update|delete)\b[^;]*audit_worm_orphans/i);
-    expect(sql).toContain("('0153_audit_worm_orphans')");
-    // The table stays in the core schema (applied in production) but belongs
-    // to the external archive: the core neither reads nor writes it.
-    const ownership = JSON.parse(readFileSync(join(root, "db/ownership.json"), "utf8")) as Record<string, { owner?: string }>;
-    expect(ownership.audit_worm_orphans?.owner).toBe("audit");
   });
 });

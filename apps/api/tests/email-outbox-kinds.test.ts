@@ -25,7 +25,10 @@ function lastKindConstraint(): string[] {
   let latest: string | null = null;
   for (const name of files) {
     const sql = readFileSync(join(MIGRATIONS, name), "utf8");
-    const match = /add constraint email_outbox_kind_check\s*check\s*\(kind in \(([^)]*)\)\)/i.exec(sql);
+    // A migration writes `check (kind in (...))`; the baseline, dumped by
+    // PostgreSQL, `CHECK ((kind = ANY (ARRAY[...])))`.
+    const match = /add constraint email_outbox_kind_check\s*check\s*\(kind in \(([^)]*)\)\)/i.exec(sql)
+      ?? /CONSTRAINT email_outbox_kind_check CHECK \(\(kind = ANY \(ARRAY\[([^\]]*)\]\)\)\)/.exec(sql);
     if (match?.[1]) latest = match[1];
   }
   if (latest === null) throw new Error("aucune migration ne définit email_outbox_kind_check");

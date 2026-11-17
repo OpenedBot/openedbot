@@ -50,7 +50,7 @@ jobs:
     #             edge-setup/docs, the install bootstrap and its tests live there
     #   contract  both halves of the link contract (`make contract-check`)
     name: Changes (validated tree, path scopes)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -91,7 +91,7 @@ jobs:
     name: Checks (static, tests, release assets, scripts, build-all)
     needs: [changes]
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.docs == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
       GO_CHANGED: ${{ needs.changes.outputs.go }}
@@ -152,7 +152,7 @@ jobs:
     name: Connector contract (Go and TypeScript halves)
     needs: [changes]
     if: needs.changes.outputs.contract == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,7 +176,7 @@ jobs:
     name: E2E (${{ matrix.base }})
     needs: [changes, checks]
     if: needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 75
     strategy:
       fail-fast: false
@@ -206,7 +206,7 @@ jobs:
     name: edge-setup-ci ok
     if: always() && needs.changes.outputs.validated != 'true'
     needs: [changes, checks, contract, e2e]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Check every job result

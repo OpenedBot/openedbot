@@ -12,7 +12,8 @@ function capturingDb(count: string | number) {
   return { db, captured };
 }
 
-const migration = readFileSync(new URL("../../../db/migrations/0169_worker_retention_purges.sql", import.meta.url), "utf8");
+const functions = readFileSync(new URL("../../../db/migrations/0002_functions.sql", import.meta.url), "utf8");
+const grants = readFileSync(new URL("../../../db/migrations/0009_grants.sql", import.meta.url), "utf8");
 
 describe("purges des données de connexion", () => {
   test("le worker n'envoie aucune borne : il appelle la fonction et rend son compte", async () => {
@@ -27,13 +28,12 @@ describe("purges des données de connexion", () => {
     expect(sessions.captured.bound).toEqual([]);
   });
 
-  test("la migration porte les délais publiés et n'ouvre que l'EXECUTE au worker", () => {
-    expect(migration).toContain("expires_at < pg_catalog.now() - interval '1 day'");
-    expect(migration).toContain("coalesce(refresh_expires_at, access_expires_at) < pg_catalog.now() - interval '30 days'");
-    expect(migration).toContain("revoked_at is null or revoked_at < pg_catalog.now() - interval '30 days'");
-    expect(migration).toMatch(/grant execute on function public\.purge_dead_sessions\(\) to openedbot_worker;/);
-    expect(migration).toMatch(/grant execute on function public\.purge_spent_email_login_codes\(\) to openedbot_worker;/);
-    expect(migration).not.toMatch(/grant [^;]* on (table )?(sessions|email_login_codes)\b/);
-    expect(migration).not.toMatch(/create policy/);
+  test("les fonctions portent les délais publiés et le worker n'a que l'EXECUTE", () => {
+    expect(functions).toContain("expires_at < pg_catalog.now() - interval '1 day'");
+    expect(functions).toContain("coalesce(refresh_expires_at, access_expires_at) < pg_catalog.now() - interval '30 days'");
+    expect(functions).toContain("revoked_at is null or revoked_at < pg_catalog.now() - interval '30 days'");
+    expect(grants).toContain("GRANT ALL ON FUNCTION public.purge_dead_sessions() TO openedbot_worker;");
+    expect(grants).toContain("GRANT ALL ON FUNCTION public.purge_spent_email_login_codes() TO openedbot_worker;");
+    expect(grants).not.toMatch(/ON TABLE public\.(sessions|email_login_codes) TO openedbot_worker/);
   });
 });

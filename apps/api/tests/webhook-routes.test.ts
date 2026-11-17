@@ -1,5 +1,4 @@
 import { beforeAll, afterAll, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import type { SQL } from "bun";
 import { Hono } from "hono";
 import { secretEncryptionKey } from "@openedbot/hermes/secrets";
@@ -441,16 +440,5 @@ describe("webhook management and schema", () => {
     const superseded = await request(MANAGEMENT_KEY);
     expect(superseded.status).toBe(409);
     expect(await superseded.json()).toMatchObject({ error: { code: "WEBHOOK_OPERATION_SUPERSEDED" } });
-  });
-
-  test("schema persists only the secret digest, durable idempotency, RLS and receipts", () => {
-    const migration = readFileSync(new URL("../../../db/migrations/0010_webhooks.sql", import.meta.url), "utf8");
-    expect(migration).toContain("secret_hash text not null");
-    expect(migration).not.toMatch(/\bsecret\s+text\b/);
-    expect(migration).toContain("unique (organization_id, endpoint_id, idempotency_key)");
-    expect(migration).toContain("force row level security");
-    expect(migration).toContain("state in ('reserved', 'accepted')");
-    expect(migration).toContain("unique (organization_id, user_id, operation, idempotency_key)");
-    expect(migration).toContain("secret_ciphertext text");
   });
 });

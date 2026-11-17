@@ -7,7 +7,7 @@ import type { SQL } from "bun";
  *
  * Le worker n'a aucun droit sur `sessions` ni sur `email_login_codes` : les
  * bornes vivent dans deux fonctions SECURITY DEFINER sans argument
- * (`0169_worker_retention_purges.sql`), qu'il ne peut qu'appeler. Changer un
+ * (`db/migrations/0002_functions.sql`), qu'il ne peut qu'appeler. Changer un
  * délai, c'est une migration ET le texte publié.
  */
 export async function purgeSpentEmailLoginCodes(db: SQL): Promise<number> {

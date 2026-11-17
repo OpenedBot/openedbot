@@ -28,9 +28,9 @@ import type { Db } from "@openedbot/platform-db";
  * `payload` est passé en OBJET, pas en texte : le `SQL` de Bun sérialise
  * lui-même le paramètre vers `jsonb`, si bien qu'un `JSON.stringify` en amont
  * produit une CHAÎNE jsonb, que la contrainte `jsonb_typeof(payload) =
- * 'object'` de la table rejette (`0002_billing_tenant_ops.sql`).
+ * 'object'` de la table rejette (`db/migrations/0003_tables.sql`).
  *
- * `kind` est borné par la contrainte SQL (`0064_email_outbox_api.sql`) et par
+ * `kind` est borné par la contrainte SQL (`db/migrations/0003_tables.sql`) et par
  * le rendu (`modules/notifications/src/domain/email/templates.ts`) : un genre
  * ajouté ici sans son gabarit part en échec de rendu, pas en e-mail vide.
  */

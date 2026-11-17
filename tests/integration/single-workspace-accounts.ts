@@ -1,9 +1,7 @@
 /**
- * Migration 0190 on a database shaped like production: migrated up to 0189,
- * seeded with personal workspaces only, then 0190. Each guard refuses to run
- * (and changes nothing) while a row still depends on what goes; once the
- * offending row is gone, 0190 runs and leaves direct membership as the only
- * access, with the signatures the previous release calls.
+ * Single-workspace accounts: direct membership is the only access, with the
+ * signatures the previous release calls, and what only the removed agency
+ * feature wrote is refused.
  */
 import { withDisposablePostgres } from "./disposable-postgres";
 
@@ -19,7 +17,7 @@ const ERASED = "71900000-0000-4000-8000-0000000000a3";
 const RUNTIME = "71900000-0000-4000-8000-0000000000c1";
 const STAFF = "71900000-0000-4000-8000-0000000000d1";
 
-await withDisposablePostgres("openedbot0190_single_workspace", async ({ owner, connect, migrateRest }) => {
+await withDisposablePostgres("openedbot0190_single_workspace", async ({ owner, connect }) => {
   await owner`insert into users (id, email) values
     (${OWNER}, 'owner@single.test'), (${OUTSIDER}, 'outsider@single.test'), (${ERASED}, 'erased@single.test')`;
   await owner`insert into organizations (id, slug, name, kind, personal_owner_user_id) values
@@ -34,91 +32,6 @@ await withDisposablePostgres("openedbot0190_single_workspace", async ({ owner, c
     values (${RUNTIME}, ${ORG}, false, ${OWNER}, 'member')`;
   await owner`insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload)
     values (gen_random_uuid(), 'email_login_code', 'single:kept', 'owner@single.test', 'fr', '{}'::jsonb)`;
-
-  // Each row a guard must refuse, the fragment of its message, and its removal.
-  const blockers: Array<{ name: string; message: string; add: () => Promise<unknown>; remove: () => Promise<unknown> }> = [
-    {
-      name: "a non-personal organization",
-      message: "an organization of another kind than personal exists",
-      add: () => owner`insert into organizations (id, slug, name, kind) values ('71900000-0000-4000-8000-000000000003', 'single-c', 'Single C', 'agency')`,
-      remove: () => owner`delete from organizations where id = '71900000-0000-4000-8000-000000000003'`,
-    },
-    {
-      name: "a grant",
-      message: "agency_grants is not empty",
-      add: () => owner`insert into agency_grants (id, agency_organization_id, client_organization_id) values (gen_random_uuid(), ${OTHER}, ${ORG})`,
-      remove: () => owner`delete from agency_grants`,
-    },
-    {
-      name: "a client invitation",
-      message: "agency_client_invitations is not empty",
-      add: () => owner`insert into agency_client_invitations (id, agency_organization_id, email, token_hash)
-        values (gen_random_uuid(), ${OTHER}, 'client@single.test', 'single-hash')`,
-      remove: () => owner`delete from agency_client_invitations`,
-    },
-    {
-      name: "an account preference",
-      message: "account_preferences is not empty",
-      add: () => owner`insert into account_preferences (user_id) values (${OWNER})`,
-      remove: () => owner`delete from account_preferences`,
-    },
-    {
-      name: "a grant event",
-      message: "membership_events holds grant events",
-      add: () => owner`insert into membership_events (id, organization_id, actor_user_id, subject_organization_id, kind, role)
-        values ('71900000-0000-4000-8000-0000000000e1', ${ORG}, ${OWNER}, ${OTHER}, 'agency_granted', 'agency')`,
-      remove: () => owner`delete from membership_events where id = '71900000-0000-4000-8000-0000000000e1'`,
-    },
-    {
-      name: "a delegated actor",
-      message: "written by a delegated (agency) actor",
-      add: () => owner`update runtime_permission_settings set updated_by_kind = 'agency', updated_by_agency_organization_id = ${OTHER}`,
-      remove: () => owner`update runtime_permission_settings set updated_by_kind = 'member', updated_by_agency_organization_id = null`,
-    },
-    {
-      name: "a queued invitation e-mail",
-      message: "an invitation e-mail is still queued",
-      add: () => owner`insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload)
-        values (gen_random_uuid(), 'organization_member_invitation', 'single:queued', 'x@single.test', 'fr', '{}'::jsonb)`,
-      remove: () => owner`delete from email_outbox where dedupe_key = 'single:queued'`,
-    },
-    {
-      name: "a delivered invitation e-mail",
-      message: "email_outbox keeps delivered invitation e-mails",
-      add: () => owner`insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload, status, sent_at)
-        values (gen_random_uuid(), 'agency_client_invitation', 'single:sent', null, 'fr', '{}'::jsonb, 'sent', now())`,
-      remove: () => owner`delete from email_outbox where dedupe_key = 'single:sent'`,
-    },
-  ];
-
-  for (const blocker of blockers) {
-    await blocker.add();
-    let refused = "";
-    try { await migrateRest(); } catch (error) { refused = String(error); }
-    assert(refused.includes(blocker.message), `0190 ran over ${blocker.name}: ${refused || "no error"}`);
-    const [state] = await owner<Array<{ version: string | null; grants: string | null }>>`
-      select (select version from schema_migrations where version = '0190_single_workspace_accounts') as version,
-             to_regclass('agency_grants')::text as grants`;
-    assert(state !== undefined && state.version === null && state.grants === "agency_grants", `a refused 0190 changed the schema (${blocker.name})`);
-    await blocker.remove();
-  }
-
-  // Production: only personal workspaces, no grant data. 0190 runs.
-  await migrateRest();
-
-  const [gone] = await owner<Array<{ tables: number; functions: number; index: string | null; features: string }>>`
-    select (select count(*)::int from unnest(array['agency_grants', 'agency_client_invitations', 'account_preferences']) t(name)
-             where to_regclass(t.name) is not null) as tables,
-           (select count(*)::int from pg_proc where proname in ('agency_business_summary', 'agency_client_directory', 'agency_authorized_clients')) as functions,
-           to_regclass('membership_events_agency_timeline')::text as index,
-           (select string_agg(feature_key, ',' order by feature_key) from product_features) as features`;
-  assert(gone?.tables === 0 && gone.functions === 0 && gone.index === null, `0190 left a removed object: ${JSON.stringify(gone)}`);
-  assert(gone.features === "connector_only_enrollment", `0190 changed the other switches: ${gone.features}`);
-  const [kept] = await owner<Array<{ functions: number; mails: number; events: number }>>`
-    select (select count(*)::int from pg_proc where proname in ('workspace_run_activity', 'workspace_business_metrics')) as functions,
-           (select count(*)::int from email_outbox where dedupe_key = 'single:kept') as mails,
-           (select count(*)::int from membership_events where organization_id = ${ORG}) as events`;
-  assert(kept?.functions === 2 && kept.mails === 1 && kept.events === 1, `0190 removed what stays: ${JSON.stringify(kept)}`);
 
   // The previous release selects (role, kind, via_agency_ids) as openedbot_api.
   const api = await connect("openedbot_api");
@@ -151,13 +64,13 @@ await withDisposablePostgres("openedbot0190_single_workspace", async ({ owner, c
   // Account erasure no longer touches the dropped table.
   const worker = await connect("openedbot_worker");
   const [erased] = await worker<Array<{ outcome: string }>>`select public.erase_account_user(${ERASED}::uuid) as outcome`;
-  assert(erased?.outcome === "pseudonymized", `erase_account_user after 0190: ${JSON.stringify(erased)}`);
+  assert(erased?.outcome === "pseudonymized", `erase_account_user: ${JSON.stringify(erased)}`);
 
   // What only the removed feature wrote is refused from now on.
   const refuses = async (label: string, write: () => Promise<unknown>) => {
     let error = "";
     try { await write(); } catch (caught) { error = String(caught); }
-    assert(error.includes("violates check constraint"), `${label} was accepted after 0190: ${error || "no error"}`);
+    assert(error.includes("violates check constraint"), `${label} was accepted: ${error || "no error"}`);
   };
   await refuses("an agency organization", () => owner`insert into organizations (id, slug, name, kind)
     values (gen_random_uuid(), 'single-agency', 'Agency', 'agency')`);
@@ -165,11 +78,10 @@ await withDisposablePostgres("openedbot0190_single_workspace", async ({ owner, c
     values (gen_random_uuid(), ${ORG}, ${OWNER}, 'agency_revoked', 'agency')`);
   await refuses("a client invitation e-mail", () => owner`insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload)
     values (gen_random_uuid(), 'agency_client_invitation', 'single:after', 'x@single.test', 'fr', '{}'::jsonb)`);
-  // 0191 (applied by the same `migrateRest`) brings the member invitation e-mail back.
   await owner`insert into email_outbox (id, kind, dedupe_key, recipient_email, locale, payload)
     values (gen_random_uuid(), 'organization_member_invitation', 'single:member-after', 'x@single.test', 'fr', '{}'::jsonb)`;
   await refuses("a delegated actor", () => owner`update runtime_permission_settings
     set updated_by_kind = 'agency', updated_by_agency_organization_id = ${ORG}`);
 
-  console.log("0190 single-workspace accounts: guards, removal, access and refusals verified");
-}, { stopBefore: "0190_" });
+  console.log("single-workspace accounts: access and refusals verified");
+});

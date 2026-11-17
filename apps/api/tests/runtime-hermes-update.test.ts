@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import type { SQL } from "bun";
-import { readFileSync } from "node:fs";
 import { decodeTextFrame, type RelayTextFrame } from "@openedbot/contracts-connector";
 import { EDGE_SETUP_HERMES_VERSION } from "@openedbot/platform-config/connector-version";
 import { RuntimeLinkBroker } from "@openedbot/runtime-link/application/broker";
@@ -83,16 +82,5 @@ describe("link.hermesUpdate", () => {
 
   test("no block before the connector has said hello", () => {
     expect(publicRuntime({ ...row, linkAgent: null, linkHermesVersion: null }, "disabled").link?.hermesUpdate).toBeNull();
-  });
-
-  test("0162 adds one bounded nullable column, in a transaction", () => {
-    const sql = readFileSync(new URL("../../../db/migrations/0162_runtime_link_hermes_version.sql", import.meta.url), "utf8");
-    expect(sql.trimStart().startsWith("begin;")).toBe(true);
-    expect(sql.trimEnd().endsWith("commit;")).toBe(true);
-    expect(sql).toContain("add column if not exists link_hermes_version text null");
-    expect(sql).toContain("char_length(link_hermes_version) <= 64");
-    expect(sql).toContain("comment on column runtimes.link_hermes_version is");
-    expect(sql).toContain("insert into schema_migrations(version) values ('0162_runtime_link_hermes_version')");
-    expect(sql).not.toMatch(/drop table|disable row level security|grant .*public/i);
   });
 });

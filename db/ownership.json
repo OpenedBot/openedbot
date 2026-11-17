@@ -1,41 +1,4 @@
 {
-  "$migrations": {
-    "0139_permission_review.sql": {
-      "owner": "permissions",
-      "debt": {
-        "until": "2026-12-31",
-        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Crée runtime_review_profiles (relecteur automatique, hors du cœur) et les colonnes de revue d'approval_requests (execution)."
-      }
-    },
-    "0145_permission_rules.sql": {
-      "owner": "permissions",
-      "debt": {
-        "until": "2026-12-31",
-        "reason": "Règles de permission en langage naturel (plug-in permissions) : la migration est appliquée en production, elle reste au cœur sans renumérotation. Le cœur ne lit ni n'écrit plus bot_permission_rules ; la colonne rules_mode de la politique d'organisation reste stockée et renvoyée telle quelle."
-      }
-    },
-    "0177_review_profile_verified_watermark.sql": {
-      "owner": "permissions",
-      "debt": {
-        "until": "2026-12-31",
-        "reason": "Preuve du profil de revue du relecteur automatique (port approvalReviewer) : la migration est appliquée en production, elle reste au cœur sans renumérotation ; le cœur ne lit plus runtime_review_profiles."
-      }
-    },
-    "0146_staff_permission_unattended.sql": {
-      "owner": "permissions",
-      "debt": {
-        "until": "2026-12-31",
-        "reason": "Permissions v2 (plug-in permissions) : la migration reste au cœur, sans renumérotation, jusqu'à l'étape 8. Les tables bot_permission_* restent au roster ; la porte lit leurs règles par le port PermissionRuleSource. Redéfinit staff_permission_decisions (lecture backoffice, étape unattended)."
-      }
-    },
-    "0153_audit_worm_orphans.sql": {
-      "owner": "audit",
-      "debt": {
-        "until": "2026-12-31",
-        "reason": "Archive externe de l'audit (plug-in audit, port auditArchive) : la migration est appliquée en production, elle reste au cœur sans renumérotation. Le cœur n'écrit plus audit_worm_orphans : il confie les dépôts d'une transaction annulée au hook auditArchive.orphaned."
-      }
-    }
-  },
   "account_deletions": "identity",
   "api_errors": {
     "owner": "apps/api",

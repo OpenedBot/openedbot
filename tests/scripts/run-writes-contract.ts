@@ -8,7 +8,7 @@
  *    workflows`, `delete from runs|workflows` and a workflow step claim (an
  *    `update workflows` that sets `used_steps` or `used_handoffs`) appear only
  *    in PRIMITIVES. In `db/migrations`, an insert into runs or workflows
- *    appears only in the review trigger's migrations (REVIEW_TRIGGER).
+ *    appears only in the body of the review trigger function (REVIEW_TRIGGER).
  * 2. Privacy, strict. Only COMMANDS import the primitives (also held by the
  *    dependency-cruiser rule `primitives-de-creation-privees`).
  * 3. Run transitions, strict (S2d). `update runs` appears only in
@@ -45,7 +45,11 @@ const COMMANDS = new Set([
   "modules/execution/src/application/run-creation.ts",
   "modules/execution/src/application/runner/workflow-steps.ts",
 ]);
-const REVIEW_TRIGGER = new Set(["0091_run_admission_envelope.sql", "0175_review_path_for_every_unknown_run.sql"]);
+const REVIEW_TRIGGER = "open_unknown_run_review_workflow";
+// Its head, then its dollar-quoted body up to the same closing tag. The head
+// stops at the first `;` or `$`: a body quoted otherwise matches nothing, so
+// its inserts are refused rather than the next function's body taken for it.
+const REVIEW_TRIGGER_BODY = /\bcreate\s+(?:or\s+replace\s+)?function\s+(?:public\.)?open_unknown_run_review_workflow\s*\([^)]*\)[^$;]*?\bas\s+(\$(?:[a-z_][a-z0-9_]*)?\$)([\s\S]*?)\1/giu;
 const DEBT_FILE = join(root, "tests/scripts/run-writes-debt.json");
 
 type Debt = { until: string; step: string; reason: string; files: Record<string, { workflows?: number }> };
@@ -136,9 +140,13 @@ const migrations = join(root, "db/migrations");
 if (existsSync(migrations)) {
   for (const name of readdirSync(migrations).filter((entry) => entry.endsWith(".sql")).sort()) {
     const text = readFileSync(join(migrations, name), "utf8").replace(/--[^\n]*/gu, "");
+    const bodies = [...text.matchAll(REVIEW_TRIGGER_BODY)].map((body) => {
+      const start = body.index + body[0].length - body[1]!.length - body[2]!.length;
+      return { start, end: start + body[2]!.length };
+    });
     for (const match of text.matchAll(/\binsert\s+into\s+(?:public\.)?"?(runs|workflows)"?\b/giu)) {
-      if (!REVIEW_TRIGGER.has(name)) {
-        errors.push(`db/migrations/${name}:${line(text, match.index)} : « ${match[0]} » ; seul le trigger de revue (${[...REVIEW_TRIGGER].join(", ")}) crée un workflow en SQL.`);
+      if (!bodies.some((body) => body.start <= match.index && match.index < body.end)) {
+        errors.push(`db/migrations/${name}:${line(text, match.index)} : « ${match[0]} » ; seul le trigger de revue (${REVIEW_TRIGGER}) crée un workflow en SQL.`);
       }
     }
     for (const match of text.matchAll(/\bupdate\s+(?:public\.)?"?runs"?\b[^;]*/giu)) {

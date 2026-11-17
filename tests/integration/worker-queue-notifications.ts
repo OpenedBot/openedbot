@@ -29,9 +29,6 @@ const id = (n: number) => `91210000-0000-4000-8000-${String(n).padStart(12, "0")
 }
 
 await withDisposablePostgres("openedbot121_queue", async ({ owner, url, connect }) => {
-  const versions = await owner<Array<{ version: string }>>`select version from schema_migrations where version in
-    ('0094_worker_run_queue_notifications', '0095_worker_run_queue_unblock_notifications') order by version`;
-  assert(versions.length === 2, "Both notification migrations must commit their version receipts.");
   await owner`insert into organizations (id, slug, name) values (${ORG}, 'openedbot121', 'Queue integration')`;
   await owner`insert into sections (id, organization_id, name, position) values (${id(4)}, ${ORG}, 'Queue', 0)`;
   await owner`insert into bots (id, organization_id, section_id, name, slug, position) values (${BOT}, ${ORG}, ${id(4)}, 'Queue', 'queue', 0)`;
