@@ -159,6 +159,20 @@ uses [semantic versioning](https://semver.org/) as described in
   only that name: `LEGACY_RELAY_STAGE_HEADER` is removed. Hosts never read or
   set this header.
 
+## [1.0.1] - 2026-11-17
+
+### Changed
+- Clarify the existing execution contract consumed by the cloud: routes,
+  payloads, approval and tool identities, terminal events, replay and local
+  transport. Document optional-route fallbacks and the current absence of
+  usage/transcript capability gates. No wire or production behavior change.
+
+### Added
+- Machine-readable run payload validators, route list and synthetic fixtures
+  derived from cloud readers and the fake gateway, with normalizer unit tests.
+- A contract-only fake gateway mode and real-runner integration proof for
+  completion, approval and confirmed stop with optional routes returning 404.
+
 ## [1.0.0] - 2026-10-28
 
 First versioned release of the specification. Wire protocol `1`.
