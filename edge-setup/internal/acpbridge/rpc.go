@@ -42,9 +42,10 @@ type rpcClient struct {
 	done    chan struct{}
 }
 
-func startRPC(command string, args []string, cwd string, invalidLimit int, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
+func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
 	cmd := exec.Command(command, args...)
 	cmd.Dir = cwd
+	cmd.Env = env
 	// Agent stderr is discarded: it may contain credentials or prompt content.
 	cmd.Stderr = io.Discard
 	stdin, err := cmd.StdinPipe()

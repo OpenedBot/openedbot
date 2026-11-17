@@ -163,7 +163,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		return
 	}
 	if p.client == nil || !p.client.alive() {
-		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, filepath.Join(b.opts.ProfilesRoot, r.Profile), b.opts.Limits.MaxInvalidLines, b.incoming)
+		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, b.agentEnvironment(), filepath.Join(b.opts.ProfilesRoot, r.Profile), b.opts.Limits.MaxInvalidLines, b.incoming)
 		if err == nil {
 			var init struct {
 				Version int               `json:"protocolVersion"`

@@ -89,3 +89,13 @@ Le schéma n'est pas embarqué ni copié dans le dépôt.
 Les noms de méthodes viennent des attributs `x-method` des définitions.
 Le champ d'enveloppe JSON-RPC `jsonrpc:"2.0"` relève de JSON-RPC 2.0 ; les
 objets d'enveloppe de ce schéma ne le décrivent pas explicitement.
+
+## Environnement de l'agent
+
+Le processus reçoit uniquement `PATH`, `HOME`, `LANG`, `TERM` et les noms
+supplémentaires de `Options.AgentEnvironment`. Une valeur contenant le bearer
+est exclue même si son nom est explicitement autorisé. L'environnement complet
+du pont n'est jamais transmis. Un agent exécuté sous le même utilisateur peut
+encore lire les fichiers accessibles à cet utilisateur : l'unité qui exécutera
+le pont doit garder le bearer hors de portée de l'agent. Cette unité appartient
+à un lot ultérieur.

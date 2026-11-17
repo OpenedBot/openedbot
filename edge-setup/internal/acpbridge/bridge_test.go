@@ -87,6 +87,16 @@ func TestACPAgent(t *testing.T) {
 			promptID = m.ID
 			sessionID = p["sessionId"].(string)
 			switch scenario {
+			case "environment":
+				found := false
+				for _, entry := range os.Environ() {
+					if strings.Contains(entry, "fixture-bearer") {
+						found = true
+					}
+				}
+				raw, _ := json.Marshal(map[string]bool{"private": os.Getenv("ACP_BRIDGE_PRIVATE") != "", "bearer": found, "operator": os.Getenv("ACP_AGENT_ALLOWED") != "", "path": os.Getenv("PATH") != ""})
+				update(sessionID, map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock(string(raw))})
+				send(m.ID, map[string]string{"stopReason": "end_turn"})
 			case "crash":
 				update(sessionID, map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock("before crash")})
 				os.Exit(7)
@@ -822,5 +832,29 @@ func TestOneProcessPerProfile(t *testing.T) {
 	other.mu.Unlock()
 	if second == first || second.cmd.Process.Pid == first.cmd.Process.Pid {
 		t.Fatal("profiles share agent process")
+	}
+}
+
+func TestAgentEnvironmentExcludesBridgeSecrets(t *testing.T) {
+	f := newFixture(t, "environment")
+	t.Setenv("ACP_BRIDGE_PRIVATE", "fixture-private")
+	t.Setenv("ACP_BRIDGE_BEARER", f.opts.Bearer)
+	t.Setenv("ACP_AGENT_ALLOWED", "fixture-allowed")
+	f.b.opts.AgentEnvironment = []string{"ACP_AGENT_ALLOWED", "ACP_BRIDGE_BEARER"}
+	f.session("cloud")
+	events := f.events(f.run(input("cloud"), ""))
+	expectTerminal(t, events, "run.completed")
+	var visible map[string]bool
+	if err := json.Unmarshal([]byte(events[len(events)-1]["output"].(string)), &visible); err != nil {
+		t.Fatal(err)
+	}
+	if visible["private"] || visible["bearer"] {
+		t.Fatal("agent inherited bridge-only environment or bearer")
+	}
+	if !visible["operator"] {
+		t.Fatal("operator allowlist missing")
+	}
+	if !visible["path"] {
+		t.Fatal("default PATH missing")
 	}
 }

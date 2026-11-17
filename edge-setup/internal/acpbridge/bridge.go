@@ -33,7 +33,9 @@ type Options struct {
 	ProfilesRoot   string
 	AgentCommand   string
 	AgentArguments []string
-	Limits         Limits
+	// AgentEnvironment lists additional environment variable names to pass.
+	AgentEnvironment []string
+	Limits           Limits
 }
 
 // Bridge owns its agent processes and durable run journal. Close must precede
@@ -412,4 +414,20 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	default:
 		http.NotFound(w, req)
 	}
+}
+
+func (b *Bridge) agentEnvironment() []string {
+	env := []string{}
+	names := append([]string{"PATH", "HOME", "LANG", "TERM"}, b.opts.AgentEnvironment...)
+	seen := map[string]bool{}
+	for _, name := range names {
+		if seen[name] || name == "" || strings.ContainsAny(name, "=\x00") {
+			continue
+		}
+		seen[name] = true
+		if value, ok := os.LookupEnv(name); ok && !strings.Contains(value, b.opts.Bearer) {
+			env = append(env, name+"="+value)
+		}
+	}
+	return env
 }
