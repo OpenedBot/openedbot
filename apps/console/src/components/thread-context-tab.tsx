@@ -39,6 +39,7 @@ import {
 } from "./dashboard/provider-limits-panel";
 import { useSecondaryReadsReady } from "../lib/shell/after-first-paint";
 import { canvasChromeButton, useAttachmentCanvas } from "./attachment-canvas";
+import { SETTINGS_INSET, SETTINGS_SHELL } from "./settings/primitives";
 
 /**
  * The status tab hooked to the composer's top edge, and its detail.
@@ -450,30 +451,33 @@ export function ThreadContextTab({
 
   const contextBody = (
     <>
-      <AgentLimitsCard
-        defaultExpanded
-        budget={window > 0 ? {
-          label: t("threadContext.windowLabel"),
-          readout,
-          max: window,
-          segments: budget.segments,
-          groups: budget.groups,
-          formatValue: (value) => formatNumber(value),
-        } : null}
-        // The bottom of the card: the windows of the plan in service. The
-        // arrow opens the full statement (every account, reread).
-        limits={plan ? {
-          ...plan,
-          action: showQuotas ? { label: t("threadContext.planLimitsOpen"), onClick: () => setTab("quotas") } : undefined,
-        } : null}
-        formatPercent={(value) => t("threadContext.inline", {
-          percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-        })}
-        formatLimitPercent={(value) => t("providerLimits.usedPercentValue", { percent: Math.round(value) })}
-        freeLabel={t("threadContext.free")}
-        expandLabel={t("threadContext.expand")}
-        collapseLabel={t("threadContext.collapse")}
-      />
+      <div className={SETTINGS_SHELL}>
+        <AgentLimitsCard
+          className={SETTINGS_INSET}
+          defaultExpanded
+          budget={window > 0 ? {
+            label: t("threadContext.windowLabel"),
+            readout,
+            max: window,
+            segments: budget.segments,
+            groups: budget.groups,
+            formatValue: (value) => formatNumber(value),
+          } : null}
+          // The bottom of the card: the windows of the plan in service. The
+          // arrow opens the full statement (every account, reread).
+          limits={plan ? {
+            ...plan,
+            action: showQuotas ? { label: t("threadContext.planLimitsOpen"), onClick: () => setTab("quotas") } : undefined,
+          } : null}
+          formatPercent={(value) => t("threadContext.inline", {
+            percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+          })}
+          formatLimitPercent={(value) => t("providerLimits.usedPercentValue", { percent: Math.round(value) })}
+          freeLabel={t("threadContext.free")}
+          expandLabel={t("threadContext.expand")}
+          collapseLabel={t("threadContext.collapse")}
+        />
+      </div>
       {/* The last turn's cost is read apart: it is not a share
           of the window, it is what the call billed. */}
       <p className="mt-3 text-xs leading-snug text-muted-foreground">
