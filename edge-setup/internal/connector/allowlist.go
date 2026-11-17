@@ -59,7 +59,7 @@ const HostPrefix = "/hermes-setup/"
 
 // Allowlist is the exact set of routes openedbot consumes.
 // Anything else is refused before touching the loopback. It must stay
-// identical to contracts/connector/src/relay-allowlist.ts in OpenedBot/openedbot.
+// identical to protocol/connector/src/relay-allowlist.ts in OpenedBot/openedbot.
 var Allowlist = []Route{
 	{Method: "GET", Path: regexp.MustCompile(`^/health$`)},
 	{Method: "GET", Path: regexp.MustCompile(`^/v1/capabilities$`)},
