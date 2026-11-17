@@ -37,7 +37,9 @@ type Options struct {
 	AgentArguments []string
 	// AgentEnvironment lists additional environment variable names to pass.
 	AgentEnvironment []string
-	Limits           Limits
+	// AgentEnvironmentValues supplies explicit values without changing the bridge environment.
+	AgentEnvironmentValues []string
+	Limits                 Limits
 }
 
 // Bridge owns its agent processes and durable run journal. Close must precede
@@ -537,10 +539,18 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (b *Bridge) agentEnvironment() []string {
 	env := []string{}
+	explicit := map[string]bool{}
+	for _, entry := range b.opts.AgentEnvironmentValues {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && name != "" && !strings.ContainsAny(entry, "\x00") && !strings.Contains(value, b.opts.Bearer) {
+			explicit[name] = true
+			env = append(env, entry)
+		}
+	}
 	names := append([]string{"PATH", "HOME", "LANG", "TERM"}, b.opts.AgentEnvironment...)
 	seen := map[string]bool{}
 	for _, name := range names {
-		if seen[name] || name == "" || strings.ContainsAny(name, "=\x00") {
+		if explicit[name] || seen[name] || name == "" || strings.ContainsAny(name, "=\x00") {
 			continue
 		}
 		seen[name] = true

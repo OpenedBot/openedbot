@@ -926,3 +926,9 @@ func Token() (string, error) {
 	}
 	return t, nil
 }
+
+// EnsureRuntimeEnv provisions the shared gateway bearer using the same token
+// preservation and environment writer as the Hermes installer.
+func EnsureRuntimeEnv(path string, owner fsx.Owner, log func(string, ...any)) (bool, error) {
+	return writeRuntimeEnvAt(path, owner, log)
+}

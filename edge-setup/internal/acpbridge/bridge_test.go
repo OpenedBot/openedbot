@@ -1491,3 +1491,17 @@ func TestConcurrentApprovalAndStopPreserveAgentOrder(t *testing.T) {
 		t.Fatalf("accepted approvals %d; selected replies received after cancel %d", accepted, violations)
 	}
 }
+
+func TestExplicitAgentEnvironmentDoesNotInheritOrForwardBearer(t *testing.T) {
+	f := newFixture(t, "plain")
+	t.Setenv("ACP_BRIDGE_PRIVATE", "fixture-private")
+	t.Setenv("PATH", "inherited-path")
+	f.b.opts.AgentEnvironmentValues = []string{"PATH=explicit-path", "OPENAI_API_KEY=fixture-provider", "FORBIDDEN=" + f.opts.Bearer}
+	env := strings.Join(f.b.agentEnvironment(), "\n")
+	if strings.Contains(env, "inherited-path") || strings.Contains(env, "fixture-private") || strings.Contains(env, f.opts.Bearer) {
+		t.Fatal("bridge data reached agent environment")
+	}
+	if !strings.Contains(env, "PATH=explicit-path") || !strings.Contains(env, "OPENAI_API_KEY=fixture-provider") {
+		t.Fatal("explicit environment missing")
+	}
+}
