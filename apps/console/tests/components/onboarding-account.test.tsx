@@ -22,10 +22,6 @@ function mount(inline: boolean, pending = false) {
       deletion:closing ? {reason:"account_deleted",requestedAt:"2026-01-01T00:00:00Z",purgeAfter:"2026-02-01T00:00:00Z",inProgress:false} : null,
     });
     if (path === "/api/account/deletion/cancel" && method === "POST") { closing = false; return Response.json({cancelled:true,deletion:null}); }
-    if (path === "/api/account/security") return Response.json({
-      method:{email:"owner@example.test",password:true,google:false},mustChangePassword:false,
-      sessions:[{id:"session-own",kind:"web",current:true,createdAt:"2026-01-01T00:00:00Z",lastSeenAt:"2026-01-01T00:00:00Z",expiresAt:"2027-01-01T00:00:00Z",revokedAt:null,revokedReason:null,userAgent:"Mozilla/5.0",ip:null}],
-    });
     throw new Error(`Unexpected account-only request: ${method} ${path}`);
   }, { preconnect: globalThis.fetch.preconnect })));
   const client = new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
@@ -33,25 +29,23 @@ function mount(inline: boolean, pending = false) {
   return requests;
 }
 for (const inline of [false,true]) {
-  test(`orgless onboarding opens closure and own sessions without a tenant (inline=${inline})`, async () => {
+  test(`orgless onboarding opens account closure alone, without a tenant (inline=${inline})`, async () => {
     const requests = mount(inline);
     const button = await screen.findByRole("button",{name:"My account"});
     expect(requests.every(({path}) => path === "/api/auth/me")).toBe(true);
     fireEvent.click(button);
-    const dialog = await screen.findByRole("dialog",{name:"My account"});
+    const dialog = await screen.findByRole("dialog",{name:"Close my account"});
     await within(dialog).findByText("No workspaces to delete or leave.");
     expect(within(dialog).getByText(/Deletion may begin 30 days after/)).toBeTruthy();
-    fireEvent.mouseDown(within(dialog).getByRole("tab",{name:"Devices"}),{button:0,ctrlKey:false});
-    await within(dialog).findByText("owner@example.test");
-    expect(within(dialog).queryByRole("tab",{name:"Password"})).toBeNull();
-    expect(requests.some(({path}) => path === "/api/account/security")).toBe(true);
-    expect(requests.every(({path,method}) => method === "GET" && ["/api/auth/me","/api/account/deletion","/api/account/security"].includes(path))).toBe(true);
+    // Sessions belong to the settings once a workspace exists (28a7b9fa): no tabs here.
+    expect(within(dialog).queryByRole("tab")).toBeNull();
+    expect(requests.every(({path,method}) => method === "GET" && ["/api/auth/me","/api/account/deletion"].includes(path))).toBe(true);
   });
 }
 test("orgless onboarding cancels a pending closure without creating a workspace", async () => {
   const requests = mount(true,true);
   fireEvent.click(await screen.findByRole("button",{name:"My account"}));
-  const dialog = await screen.findByRole("dialog",{name:"My account"});
+  const dialog = await screen.findByRole("dialog",{name:"Close my account"});
   fireEvent.click(await within(dialog).findByRole("button",{name:"Cancel account closure"}));
   await within(dialog).findByRole("button",{name:"Schedule account closure"});
   await waitFor(() => expect(requests.filter(({method}) => method === "POST")).toEqual([{path:"/api/account/deletion/cancel",method:"POST"}]));
