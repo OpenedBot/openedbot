@@ -77,7 +77,7 @@ describe("versions du connecteur", () => {
 });
 
 /** Direct call of the handlers with in-memory transport and SQL: no server. */
-async function hello(agent?: string, env: Record<string, string> = {}, failWrite = false, capabilitiesMarked = false) {
+async function hello(agent?: string, env: Record<string, string> = {}, failWrite = false, capabilitiesMarked = false, identity: { engine?: string; engineVersion?: string; hermesVersion?: string } = {}) {
   const statements: Array<{ sql: string; values: unknown[] }> = [];
   const events: Array<{ kind: LinkEventKind; meta: LinkEventMeta }> = [];
   const logs: Array<{ event: string; fields: Record<string, unknown> }> = [];
@@ -109,7 +109,7 @@ async function hello(agent?: string, env: Record<string, string> = {}, failWrite
     close: (code = 1000) => { closed.push(code); },
   };
   try {
-    gateway.websocket.message(ws, JSON.stringify({ t: "hello", protocol: 1, ...(agent === undefined ? {} : { agent }) }));
+    gateway.websocket.message(ws, JSON.stringify({ t: "hello", protocol: 1, ...identity, ...(agent === undefined ? {} : { agent }) }));
     for (let attempt = 0; attempt < 100 && !frames.some((frame) => frame.t === "link.context") && !closed.length; attempt++) await Bun.sleep(1);
     expect(frames.some((frame) => frame.t === "link.context")).toBe(true);
     return { statements, events, logs, frames, closed, bound: broker.connected("rt"), tx };
@@ -124,9 +124,9 @@ describe("déclaration hello et migration", () => {
     expect(session.bound).toBe(true);
     expect(session.closed).not.toContain(4401);
     const write = session.statements.find(({ sql }) => sql.includes("set link_agent ="));
-    expect(write?.sql).toContain("link_agent_seen_at = now()");
+    expect(write?.sql).toContain("then link_agent_seen_at else now() end");
     expect(write?.sql).toContain("link_generation =");
-    expect(write?.values).toEqual(["hermes-setup/v0.1.0", null, "hermes-setup/v0.1.0", "rt", "org", "42", "hash", "hash"]);
+    expect(write?.values).toEqual(["hermes-setup/v0.1.0", null, null, null, "hermes-setup/v0.1.0", "hermes-setup/v0.1.0", "rt", "org", "42", "hash", "hash"]);
     const meta = { ip: "203.0.113.7", agent: "hermes-setup/v0.1.0", minimum: "v0.2.0" };
     expect(session.events.filter(({ kind }) => kind === "agent_outdated")).toEqual([{ kind: "agent_outdated", meta: { ...meta, instanceId: "agent-version-test", generation: "42" } }]);
     expect(session.logs).toContainEqual({ event: "runtime_link.agent_outdated", fields: { runtimeId: "rt", ...meta } });
@@ -154,7 +154,7 @@ describe("déclaration hello et migration", () => {
     const session = await hello("x".repeat(300));
     expect(session.statements.find(({ sql }) => sql.includes("set link_agent ="))?.values[0]).toBe("x".repeat(256));
     const absent = await hello();
-    expect(absent.statements.some(({ sql }) => sql.includes("set link_agent ="))).toBe(false);
+    expect(absent.statements.find(({ sql }) => sql.includes("set link_agent ="))?.values.slice(0, 5)).toEqual([null, null, null, null, null]);
   });
 
   test("a changed agent marks the runtime's capabilities in the same statement, once, and logs it", async () => {
@@ -162,7 +162,7 @@ describe("déclaration hello et migration", () => {
     const write = changed.statements.find(({ sql }) => sql.includes("set link_agent ="));
     // Only an actual change from a recorded agent marks: same agent or first declaration keep the marker.
     expect(write?.sql.replace(/\s+/g, " ")).toContain("capabilities_changed_at = case when link_agent is not null and link_agent <> ? then now() else capabilities_changed_at end");
-    expect(write?.values[2]).toBe("edge-setup/v1.5.11");
+    expect(write?.values[5]).toBe("edge-setup/v1.5.11");
     expect(changed.logs).toContainEqual({ event: "runtime_link.agent_changed_sessions_rotate", fields: { runtimeId: "rt", agent: "edge-setup/v1.5.11" } });
     const same = await hello("edge-setup/v1.5.11");
     expect(same.logs.some(({ event }) => event === "runtime_link.agent_changed_sessions_rotate")).toBe(false);
@@ -173,4 +173,25 @@ describe("déclaration hello et migration", () => {
     expect(session.bound).toBe(true);
     expect(session.logs.some(({ event }) => event === "runtime_link.agent_write_failed")).toBe(true);
   });
+});
+
+
+test("admitted hello persists its engine identity under the link generation", async () => {
+  const session = await hello("edge-setup/1.1.0", {}, false, false, { engine: "acp:opencode", engineVersion: "preview 1" });
+  const write = session.statements.find(({ sql }) => sql.includes("set link_agent ="));
+  expect(write?.sql).toContain("link_engine =");
+  expect(write?.sql).toContain("link_engine_version =");
+  expect(write?.values.slice(0, 4)).toEqual(["edge-setup/1.1.0", null, "acp:opencode", "preview 1"]);
+  expect(write?.values).toContain("42");
+});
+
+test("runtime DTO defaults to Hermes and only falls back to its version for Hermes", () => {
+  const row = { reachability: "connector", linkConnectedAt: null, linkFeatures: [], linkHermesVersion: "0.22.6" } as unknown as RuntimeRow;
+  expect(publicRuntime(row, "disabled")).toMatchObject({ engine: "hermes", engineVersion: "0.22.6" });
+  expect(publicRuntime({ ...row, linkEngine: "hermes", linkEngineVersion: "raw 1" }, "disabled"))
+    .toMatchObject({ engine: "hermes", engineVersion: "raw 1" });
+  expect(publicRuntime({ ...row, linkEngine: "acp:opencode", linkEngineVersion: "preview 1" }, "disabled"))
+    .toMatchObject({ engine: "acp:opencode", engineVersion: "preview 1" });
+  expect(publicRuntime({ ...row, linkEngine: "acp:opencode" }, "disabled").engineVersion).toBeNull();
+  expect(publicRuntime({ ...row, linkHermesVersion: null }, "disabled").engineVersion).toBeNull();
 });

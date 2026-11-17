@@ -12,7 +12,7 @@ import { StepRuntime } from "../../src/screens/onboarding/steps/step-runtime";
 
 const runtime: RuntimePublicDto = {
   id: "runtime-onboarding",
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: "https://hermes.example.test",
   // Runtime joined by the LINK: it is the only path where onboarding offers to
   // configure a provider from openedbot (`step-runtime.tsx` reserves the

@@ -17,19 +17,18 @@ export type LinkAgentRecordDeps = {
 
 /**
  * Ce que `hello` a déclaré (`agent`, `hermesVersion`), retenu après admission
- * seulement ; ce signalement ne ferme jamais le lien. Un `hello` sans `agent`
- * ne touche à rien : la déclaration précédente reste. Sans `hermesVersion`,
- * la colonne repasse à null : la console ne compare alors rien.
+ * seulement ; ce signalement ne ferme jamais le lien.
+ * Missing engine fields clear the previous identity, including on an
+ * agent-less hello. An absent agent preserves the previous agent.
  */
 export async function recordLinkAgent(
   deps: LinkAgentRecordDeps,
   connection: LinkConnection,
   identity: LinkIdentity,
-  hello: { peerIp: string | null; hermesVersion: string | null },
+  hello: { peerIp: string | null; hermesVersion: string | null; engine?: string | null; engineVersion?: string | null },
 ): Promise<void> {
   const { db, config, broker, log } = deps;
-  const agent = connection.agent?.slice(0, 256);
-  if (agent === undefined) return;
+  const agent = connection.agent?.slice(0, 256) ?? null;
   const hermesVersion = hello.hermesVersion?.slice(0, HERMES_VERSION_MAX) ?? null;
   const connector = runtimeConnector(agent, null, config.connectorVersions);
   if (connector?.outdated && connector.minimumVersion) {
@@ -39,7 +38,7 @@ export async function recordLinkAgent(
   }
   try {
     const capabilitiesMarked = await withCredential(db, identity.tokenHash, (tx) =>
-      writeLinkAgent(tx, identity, { agent, hermesVersion, generation: connection.link?.generation ?? null }));
+      writeLinkAgent(tx, identity, { agent, hermesVersion, engine: hello.engine, engineVersion: hello.engineVersion, generation: connection.link?.generation ?? null }));
     // A new agent version: every thread of this runtime opens a fresh Hermes
     // session at its next run (see writeLinkAgent).
     if (capabilitiesMarked) log("runtime_link.agent_changed_sessions_rotate", { runtimeId: identity.runtimeId, agent });

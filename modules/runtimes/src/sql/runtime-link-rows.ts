@@ -31,13 +31,15 @@ export type LinkRuntimeScope = { runtimeId: string; organizationId: string; toke
 export async function writeLinkAgent(
   tx: Db,
   scope: LinkRuntimeScope,
-  input: { agent: string; hermesVersion: string | null; generation: string | null },
+  input: { agent: string | null; hermesVersion: string | null; engine?: string | null; engineVersion?: string | null; generation: string | null },
 ): Promise<boolean> {
   // `link_agent` on the right-hand side is the value before this update.
   // `now()` is fixed for the transaction, so the returned comparison is true
   // exactly when this statement set the marker.
   const rows = await tx`
-    update runtimes set link_agent = ${input.agent}, link_hermes_version = ${input.hermesVersion}, link_agent_seen_at = now(),
+    update runtimes set link_agent = coalesce(${input.agent}, link_agent), link_hermes_version = ${input.hermesVersion},
+           link_engine = ${input.engine ?? null}, link_engine_version = ${input.engineVersion ?? null},
+           link_agent_seen_at = case when ${input.agent}::text is null then link_agent_seen_at else now() end,
            capabilities_changed_at = case when link_agent is not null and link_agent <> ${input.agent}
                                           then now() else capabilities_changed_at end
      where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}

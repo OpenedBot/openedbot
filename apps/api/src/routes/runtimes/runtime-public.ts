@@ -133,6 +133,8 @@ export function publicRuntime(
   return {
     id: row.id,
     name: row.name,
+    engine: row.linkEngine ?? "hermes",
+    engineVersion: row.linkEngineVersion ?? ((row.linkEngine ?? "hermes") === "hermes" ? row.linkHermesVersion ?? null : null),
     // `null` for a connector runtime: no URL exists on the cloud side.
     baseUrl: row.endpoint,
     configured: true,

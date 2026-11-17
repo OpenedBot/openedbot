@@ -150,6 +150,7 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            (select max(e.occurred_at) from runtime_link_events e
