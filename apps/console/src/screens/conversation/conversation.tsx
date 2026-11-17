@@ -231,11 +231,15 @@ export function ConversationScreen() {
   // the composer (the runtime-offline treatment keeps its own). The page holds
   // through its own retry, until every read is back: otherwise the thread would
   // reappear while the other reads still run, under the « indisponible » dialog.
-  const [readRetry, setReadRetry] = useState(false);
-  const readFailed = !runtimeOffline && (Boolean(readError) || (retrying && readRetry));
+  // It keeps the error that opened it: a read that never had data is pending
+  // again during its refetch, without its error.
+  const [heldReadError, setHeldReadError] = useState<unknown>(null);
+  const readRetryError = retrying ? heldReadError : null;
+  const pageError = readRetryError ?? readError;
+  const readFailed = !runtimeOffline && Boolean(pageError);
   const retryReads = () => {
-    setReadRetry(true);
-    void retryConversation().finally(() => setReadRetry(false));
+    setHeldReadError(readError);
+    void retryConversation().finally(() => setHeldReadError(null));
   };
   const openRuntimeSettings = () => openSettings("/settings/runtime");
   const requireRuntime = () => {
@@ -700,9 +704,9 @@ export function ConversationScreen() {
   };
 
   if (!bot) {
-    if (roster.isPending) return <ConversationPending botId={botId} />;
+    if (roster.isPending && !readRetryError) return <ConversationPending botId={botId} />;
     if (botUnavailable) return null;
-    if (roster.error) return <ConversationErrorPage error={roster.error} retrying={retrying} onRetry={retryReads} />;
+    if (roster.error || readRetryError) return <ConversationErrorPage error={readRetryError ?? roster.error} retrying={retrying} onRetry={retryReads} />;
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         {t("conversation.botGone")}
@@ -997,7 +1001,7 @@ export function ConversationScreen() {
             /></DevRenderProfiler>
           )}
 {!readFailed && ((runtimeUnavailable && !runtimeOffline) || Boolean(blockingError) || activeRun?.status === "failed") ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : activeRun?.errorCode} reference={activeRun?.id ?? thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
-        {readFailed ? <ConversationErrorPage error={readError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
+        {readFailed ? <ConversationErrorPage error={pageError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
             setDismissedError(blockingError);
