@@ -213,7 +213,7 @@ export function MessageInteractionShell({
   children: ReactNode;
   /** `below` bar: what precedes the actions on the same line (the author). */
   footerStart?: ReactNode;
-  /** `below` bar: meta after the actions on the same line, centred on them (the dev run timing). */
+  /** Meta after the actions on the same line (the dev run timing). */
   footerEnd?: ReactNode;
   /** Visual context placed above the message, outside the zone that anchors
    * the hover actions. An answered question must not widen the bubble. */
@@ -372,6 +372,7 @@ export function MessageInteractionShell({
         className={cn(
           "group/message flex",
           below ? "w-full flex-col items-start" : "items-end gap-1.5",
+          side && surface === "card" && "items-center",
           !below && (width === "fill"
             ? "w-full"
             : side
@@ -563,8 +564,8 @@ export function MessageInteractionShell({
             className={cn(
               "flex shrink-0 items-center gap-1 transition-opacity duration-150",
               align === "end" && "order-first",
-              "opacity-0 group-hover/message:opacity-100 focus-within:opacity-100",
-              (pickerOpen || menuOpen) && "opacity-100",
+              "pointer-events-none opacity-0 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100",
+              (pickerOpen || menuOpen) && "pointer-events-auto opacity-100",
             )}
           >
             {canReact && messageId ? (
@@ -657,6 +658,7 @@ export function MessageInteractionShell({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
+            {footerEnd ? <span data-message-actions-trailing="" className="flex shrink-0 items-center">{footerEnd}</span> : null}
           </div>
         ) : null}
       </div>
