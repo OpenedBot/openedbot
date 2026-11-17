@@ -359,6 +359,26 @@ func TestHelloEngineIdentity(t *testing.T) {
 	}
 }
 
+func TestHelloEngineKeysAreCaseSensitive(t *testing.T) {
+	for _, input := range []string{
+		`{"t":"hello","protocol":1,"ENGINE":""}`,
+		`{"t":"hello","protocol":1,"ENGINEVERSION":123}`,
+		`{"t":"hello","PROTOCOL":1,"engine":"acp:opencode","ENGINE":123,"engineVersion":"preview 1","EngineVersion":false}`,
+	} {
+		decoded, err := DecodeText([]byte(input))
+		if err != nil {
+			t.Fatalf("%s: %v", input, err)
+		}
+		if strings.Contains(input, `"engine":`) {
+			if decoded.Engine != "acp:opencode" || decoded.EngineVersion != "preview 1" {
+				t.Fatalf("exact engine keys lost: %+v", decoded)
+			}
+		} else if decoded.Engine != "" || decoded.EngineVersion != "" {
+			t.Fatalf("non-exact engine keys decoded: %+v", decoded)
+		}
+	}
+}
+
 func TestHelloInvalidEngine(t *testing.T) {
 	for _, engine := range []string{"", "Hermes", "acp/opencode", strings.Repeat("a", 65), "hermes\n"} {
 		encoded, _ := json.Marshal(map[string]any{"t": THello, "protocol": 1, "engine": engine})

@@ -438,8 +438,20 @@ func DecodeText(b []byte) (Text, error) {
 		return Text{}, fmt.Errorf("text frame of %d bytes exceeds %d", len(b), MaxTextFrame)
 	}
 	var f Text
-	if err := json.Unmarshal(b, &f); err != nil {
+	// Shadow the engine fields so encoding/json cannot decode alternate casing
+	// before hello's exact-key lookup. All other fields retain struct decoding.
+	wire := struct {
+		*Text
+		Engine        json.RawMessage `json:"engine"`
+		EngineVersion json.RawMessage `json:"engineVersion"`
+	}{Text: &f}
+	if err := json.Unmarshal(b, &wire); err != nil {
 		return Text{}, fmt.Errorf("malformed text frame: %w", err)
+	}
+	if f.T != THello {
+		if err := json.Unmarshal(b, &f); err != nil {
+			return Text{}, fmt.Errorf("malformed text frame: %w", err)
+		}
 	}
 	switch f.T {
 	case TDiagnostic, TDiagnosticAck:
@@ -461,15 +473,27 @@ func DecodeText(b []byte) (Text, error) {
 		if f.Protocol != Protocol {
 			return f, fmt.Errorf("unsupported protocol %d", f.Protocol)
 		}
-		// A pointer distinguishes an absent engine from an invalid empty name.
-		var hello struct {
-			Engine *string `json:"engine"`
-		}
-		if err := json.Unmarshal(b, &hello); err != nil {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(b, &fields); err != nil {
 			return f, err
 		}
-		if hello.Engine != nil && !engineRe.MatchString(*hello.Engine) {
-			return f, errors.New("hello engine must be an engine name")
+		// A pointer distinguishes an absent engine from an invalid empty name.
+		var engine *string
+		if value, ok := fields["engine"]; ok {
+			if err := json.Unmarshal(value, &engine); err != nil {
+				return f, err
+			}
+		}
+		if engine != nil {
+			if !engineRe.MatchString(*engine) {
+				return f, errors.New("hello engine must be an engine name")
+			}
+			f.Engine = *engine
+		}
+		if value, ok := fields["engineVersion"]; ok {
+			if err := json.Unmarshal(value, &f.EngineVersion); err != nil {
+				return f, err
+			}
 		}
 		if utf8.RuneCountInString(f.EngineVersion) > 64 {
 			return f, errors.New("hello engineVersion exceeds 64 characters")
