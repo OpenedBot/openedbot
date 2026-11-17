@@ -195,6 +195,7 @@ export type FailureFact = { label: string; value: string; status?: boolean };
 export function FailureState({
   error,
   fallback,
+  description,
   title,
   icon,
   facts: extraFacts = [],
@@ -206,6 +207,8 @@ export function FailureState({
   error: unknown;
   /** The screen's sentence, when the error carries none that can be read. */
   fallback: string;
+  /** The screen's sentence in place of the error's, when the screen knows the cause and the next gesture better. */
+  description?: string;
   /** The screen's title, when it knows more than the error's nature. */
   title?: string;
   icon?: ComponentType<IconProps>;
@@ -236,7 +239,7 @@ export function FailureState({
     <FailureSurface
       icon={icon ?? look.icon}
       title={title ?? t(look.titleKey)}
-      description={detail.message || fallback}
+      description={description ?? (detail.message || fallback)}
       tone={look.tone}
       path={shape && look.pathKey ? { shape, label: t(look.pathKey) } : null}
       facts={[...extraFacts, ...facts]}
