@@ -9,7 +9,6 @@ import { useT } from "../../lib/i18n";
 import { BUTTON } from "../settings/primitives";
 import { ProviderIcon } from "../provider-icon";
 import { UsageBar } from "../usage-bar";
-import { useSecondaryReadsReady } from "../../lib/shell/after-first-paint";
 import { countPendingPolls, providerUsagePollMs, providerUsageStaleMs } from "../../lib/runtime/provider-usage-poll";
 import {
   ALERT_PERCENT, BotUsageList, BotsDisclosure, LIMIT_GRID, PanelSkeleton, StatusBanner, elapsedMinutes, peakUsedPercent,
@@ -107,16 +106,18 @@ export function useProviderLimits(_active: boolean) {
   const auth = useQuery({ queryKey: queryKeys.authMe, queryFn: api.authMe });
   const canView = auth.data?.session.role === "owner" || auth.data?.session.role === "admin";
   const runtimes = useQuery({ ...runtimesQueryOptions(), enabled: canView });
-  const secondaryReady = useSecondaryReadsReady();
   const runtime = runtimes.data?.runtimes[0] ?? null;
   const runtimeId = runtime?.id ?? null;
   // Polled at the API's `freshUntil`, quick only while a probe runs
   // (`provider-usage-poll.ts`, rework-flux-api step 1).
+  // Read as soon as the runtime is known, not behind the secondary reads
+  // gate: the API answers from its own cache in milliseconds, and the gate
+  // left the rail's rings empty for 1.3 s on every refresh (measured 17-11-2026).
   const pendingPolls = useRef({ dataUpdatedAt: 0, count: 0 });
   const limits = useQuery({
     queryKey: queryKeys.runtimeProviderUsage(runtimeId ?? "none"),
     queryFn: () => api.runtimeProviderUsage(runtimeId!),
-    enabled: canView && runtimeId !== null && secondaryReady,
+    enabled: canView && runtimeId !== null,
     staleTime: (query) => providerUsageStaleMs(query.state.data, query.state.dataUpdatedAt),
     refetchInterval: (query) => {
       pendingPolls.current = countPendingPolls(pendingPolls.current, query.state.data, query.state.dataUpdatedAt);
@@ -220,6 +221,8 @@ export function useProviderLimits(_active: boolean) {
 
   return {
     canView,
+    /** The role is not known yet: a false `canView` does not yet mean « membre ». */
+    authPending: auth.isPending,
     runtimeId,
     /** The runtime is not known yet: a null `runtimeId` does not yet mean « aucun runtime ». */
     runtimePending: canView && runtimes.isPending,

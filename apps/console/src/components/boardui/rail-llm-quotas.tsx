@@ -189,9 +189,10 @@ export function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: str
  *
  * The same read, cached, as the composer's tab (`useProviderLimits`):
  * no extra request. Nothing for a member (quotas are read by
- * owners and admins). During the first read (on reload, it
- * waits for the secondary reads, ~1.5 s), the three logos already hold their
- * place (`RailLlmQuotasLoading`): they no longer pop up above the runtime.
+ * owners and admins). Until the first reading (the role, the runtime, the
+ * catalogue, then the quotas; and the host probe after an API restart), the
+ * three logos hold their place (`RailLlmQuotasLoading`): they neither vanish
+ * nor pop up above the runtime.
  */
 export function RailLlmQuotas({ buttonClassName }: { buttonClassName: string }) {
   const { t } = useT();
@@ -205,12 +206,19 @@ export function RailLlmQuotas({ buttonClassName }: { buttonClassName: string }) 
   */
   const swallowFocusRef = useRef(false);
   const limits = useProviderLimits(open);
+  // The frame opens before `/api/auth/me` answers (`lib/session/app-access-hint.ts`):
+  // an unknown role keeps the slots of the boot silhouette, it does not empty them.
+  if (limits.authPending) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
   if (!limits.canView) return null;
   if (limits.runtimePending || (limits.runtimeId !== null && limits.pending)) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
   if (limits.runtimeId === null) return null;
   const families = railQuotaFamilies(limits);
   const broken = limits.readFailed || limits.status === "error" || limits.status === "disconnected";
   if (!broken && families.every((family) => family.reading.state === "off")) return null;
+  // The API has no reading yet and probes the host (its cache is per process,
+  // empty after a restart): a reading on its way is not « indisponible ».
+  // An open reading stays open.
+  if (limits.status === "loading" && !open) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
   const context = railQuotaContext(limits, t);
   return (
     <>
