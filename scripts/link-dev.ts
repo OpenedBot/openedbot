@@ -444,7 +444,7 @@ async function main(): Promise<void> {
     }
 
     // L'enrôlement n'active le nouveau runtime que si aucun autre ne l'est
-    // (gateway.ts, enrollConnectorRuntime) : `activateInstanceRuntime` le met en service.
+    // (connector-enrollment.ts, enrollConnectorRuntime) : `activateInstanceRuntime` le met en service.
     let completed = false;
     for (let attempt = 0; attempt < 30 && !completed; attempt += 1) {
       const poll = await fetch(`${api}/api/runtime-enrollments/${enrollment.enrollmentId}/status`, { headers });
