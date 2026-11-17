@@ -341,10 +341,12 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       connection.sendFrame(auditKeyFrame(identity.runtimeId, keys));
       log("runtime_link.audit_key_sent", { runtimeId: identity.runtimeId, keyId: keys.current.keyId, previous: keys.previous.length });
     }
-    await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, {
-      peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null,
-      engine: ws.data.engine ?? null, engineVersion: ws.data.engineVersion ?? null,
-    });
+    if (ws.data.credential.kind === "link") {
+      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, {
+        peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null,
+        engine: ws.data.engine ?? null, engineVersion: ws.data.engineVersion ?? null,
+      });
+    }
     await sendLinkContext(connection, identity);
   }
 

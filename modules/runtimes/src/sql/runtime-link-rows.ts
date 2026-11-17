@@ -33,13 +33,24 @@ export async function writeLinkAgent(
   scope: LinkRuntimeScope,
   input: { agent: string | null; hermesVersion: string | null; engine?: string | null; engineVersion?: string | null; generation: string | null },
 ): Promise<boolean> {
+  if (input.agent === null) {
+    await tx`
+      update runtimes set link_engine = ${input.engine ?? null}, link_engine_version = ${input.engineVersion ?? null}
+       where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}
+         and revoked_at is null and link_connected_at is not null
+         and link_generation = ${input.generation}::bigint
+         and (link_token_hash = ${scope.tokenHash}
+           or (link_token_previous_hash = ${scope.tokenHash} and link_token_previous_expires_at > now()))
+    `;
+    return false;
+  }
   // `link_agent` on the right-hand side is the value before this update.
   // `now()` is fixed for the transaction, so the returned comparison is true
   // exactly when this statement set the marker.
   const rows = await tx`
-    update runtimes set link_agent = coalesce(${input.agent}, link_agent), link_hermes_version = ${input.hermesVersion},
+    update runtimes set link_agent = ${input.agent}, link_hermes_version = ${input.hermesVersion},
            link_engine = ${input.engine ?? null}, link_engine_version = ${input.engineVersion ?? null},
-           link_agent_seen_at = case when ${input.agent}::text is null then link_agent_seen_at else now() end,
+           link_agent_seen_at = now(),
            capabilities_changed_at = case when link_agent is not null and link_agent <> ${input.agent}
                                           then now() else capabilities_changed_at end
      where id = ${scope.runtimeId} and organization_id = ${scope.organizationId}
