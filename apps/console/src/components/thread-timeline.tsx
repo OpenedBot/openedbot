@@ -1,5 +1,5 @@
 import { ThreadInitialLayout } from "./thread-initial-layout";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { CircleHelp, ListChecks } from "lucide-react";
 import { AgentProgress, TrailItem, type AgentStep } from "@openedbot/browser-ui-kit";
 import type { BotSettingProposalDto, MessageAuthorBot } from "@openedbot/contracts-api";
@@ -20,7 +20,7 @@ import {
   MessageInteractionShell,
   type MessageCardHover,
 } from "./message-interactions";
-import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
+import { usePublishEditAvailability } from "../lib/thread/thread-edit-availability";
 import { dismissComposerKeyboardFromThread } from "../lib/composer/composer-keyboard";
 import {
   nextThreadPin,
@@ -111,6 +111,7 @@ function ThreadTimelineView({
   onEditMessage,
   onRegenerateMessage,
   canEditMessages = true,
+  editBlockedReason,
   hiddenAssistantRunIds = "",
   onSelectMessageVersion,
   onReaction,
@@ -179,11 +180,7 @@ function ThreadTimelineView({
   const runLines = useRef<RunLineTracker | null>(null);
   // Edit availability goes through the store (`thread-edit-availability`),
   // outside the turn signatures: its switch re-renders only the message shells.
-  const setCanEdit = useThreadEditAvailability((state) => state.setCanEdit);
-  useLayoutEffect(() => {
-    setCanEdit(canEditMessages);
-    return () => setCanEdit(true);
-  }, [canEditMessages, setCanEdit]);
+  usePublishEditAvailability(canEditMessages, editBlockedReason);
   /** Last list of "stable" dependencies seen by the cache above. */
   const contextEpochRef = useRef<unknown[] | null>(null);
   // Stable set (same identity for as long as `mentionables` does not change): otherwise

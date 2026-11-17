@@ -110,6 +110,8 @@ export type ThreadTimelineProps = {
    * thread on every run start/end.
    */
   canEditMessages?: boolean;
+  /** Why editing is refused when the conversation cannot send (the composer's sentence). */
+  editBlockedReason?: string;
   /**
    * Turns whose prose is a plan card (dock), not a bubble.
    * Run identifiers separated by a comma. A string, so the `memo`

@@ -18,6 +18,7 @@ import { Button, Dialog, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, userFacingError, runtimesQueryOptions } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
+import { threadReadFailureMessage } from "../../lib/thread/thread-read-failure";
 import { randomId } from "../../lib/random-id";
 import { displayedRuntimeHealth, isRuntimeUnavailableError, runtimeBlocksConversation } from "../../lib/runtime/runtime-health";
 import { conversationBlockedMessage } from "../../lib/runtime/conversation-blocked-message";
@@ -623,7 +624,7 @@ export function ConversationScreen() {
   // Data passed to the thread, not a conditional callback: see the comment
   // on `onEditMessage`/`onRegenerateMessage` below.
   const canEditMessages = me.data?.session.canWrite === true && !running && !pendingGate &&
-    !createVersion.isPending;
+    !createVersion.isPending && !conversationBlocked;
 
   // ask_user: the question that ENDS the last completed turn. The run's
   // output is the source (not the timeline): as soon as the operator answers, the
@@ -647,10 +648,7 @@ export function ConversationScreen() {
   // can never flash during a bot switch.
   const threadLoading = loading || thread.data?.id !== activeThreadId;
   const threadFailed = thread.isError && thread.data?.id !== activeThreadId;
-  const threadFailureMessage = thread.error instanceof ApiError &&
-    thread.error.code === "DATABASE_MIGRATION_REQUIRED"
-    ? t("conversation.migrationRequired")
-    : t("conversation.loadFailed");
+  const threadFailureMessage = threadReadFailureMessage(t, thread.error);
 
   // The lab stays readable even while the thread is working: the
   // header button always opens the box, but the CTA explains why
@@ -1040,6 +1038,7 @@ export function ConversationScreen() {
             resnap={askUser !== null}
             scrollToBottomOnThreadKey={activeThreadId ?? null}
             canEditMessages={canEditMessages}
+            editBlockedReason={conversationBlocked ? conversationErrorMessage : pendingGate ? t("conversation.pendingDecision") : undefined}
             hiddenAssistantRunIds={hiddenAssistantRunIds}
           /></DevRenderProfiler>
           {isMobile ? null : <ThreadTurnRail turns={railTurns} />}

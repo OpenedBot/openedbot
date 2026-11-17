@@ -90,6 +90,7 @@ export function RunFailureFooter({
   const { t } = useT();
   // Replay is the message's « Régénérer »: same availability (no run in progress, no gate).
   const canRetry = useThreadEditAvailability((state) => state.canEdit);
+  const blockedReason = useThreadEditAvailability((state) => state.reason);
   const excerpt = question?.trim().replace(/\s+/g, " ");
   const turn = excerpt ? (excerpt.length > 40 ? `${excerpt.slice(0, 40)}…` : excerpt) : null;
   const label = (name: string) => (turn ? t("threadTimeline.runFailureFor", { action: name, question: turn }) : undefined);
@@ -105,6 +106,7 @@ export function RunFailureFooter({
               type="button"
               className={BUBBLE_ACTION}
               disabled={!canRetry}
+              title={canRetry ? undefined : blockedReason ?? undefined}
               aria-label={label(t("conversation.retry"))}
               onClick={onRetry}
             >

@@ -9,9 +9,10 @@ import { toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText } from "@openedbot/conversation/domain/message-reply";
 import { useMessageReactionToggle } from "../../lib/thread/use-message-reaction-toggle";
-import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
+import { api, queryKeys, userFacingError } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
+import { threadReadFailureMessage } from "../../lib/thread/thread-read-failure";
 import {
   threadContainsOutgoingUserInput,
 } from "../../lib/thread/thread-anchor";
@@ -197,10 +198,7 @@ export function GroupConversationScreen() {
     : undefined;
   const threadLoading = loading || thread.data?.id !== group?.threadId;
   const threadFailed = thread.isError && thread.data?.id !== group?.threadId;
-  const threadFailureMessage = thread.error instanceof ApiError &&
-    thread.error.code === "DATABASE_MIGRATION_REQUIRED"
-    ? t("conversation.migrationRequired")
-    : t("conversation.loadFailed");
+  const threadFailureMessage = threadReadFailureMessage(t, thread.error);
 
   // A room turn that fails deserves more than a chip in the thread: a toast,
   // ONCE per run: the same "failed" comes back on every refetch.
