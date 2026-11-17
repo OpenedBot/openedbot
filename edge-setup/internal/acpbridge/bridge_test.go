@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -1235,5 +1236,95 @@ func TestBlockedAgentWriteTerminatesRunAndClose(t *testing.T) {
 		kill()
 		<-closed
 		t.Fatal("Close blocked after stdin timeout")
+	}
+}
+
+type signalledRequestBody struct {
+	io.ReadCloser
+	once    sync.Once
+	started chan struct{}
+}
+
+func (b *signalledRequestBody) Read(p []byte) (int, error) {
+	b.once.Do(func() { close(b.started) })
+	return b.ReadCloser.Read(p)
+}
+
+func TestStalledRequestBodyDoesNotBlockBridge(t *testing.T) {
+	for _, target := range []string{"session", "run", "approval"} {
+		t.Run(target, func(t *testing.T) {
+			f := newFixture(t, "cancel")
+			f.b.opts.Limits.BodyTimeout = 500 * time.Millisecond
+			started := make(chan struct{})
+			f.server.Close()
+			f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("X-Test-Stall") == "yes" {
+					r.Body = &signalledRequestBody{ReadCloser: r.Body, started: started}
+				}
+				f.b.ServeHTTP(w, r)
+			}))
+			f.session("cloud")
+			id := f.run(input("cloud"), "")
+			f.await(id, "approval.request")
+			path := "/api/sessions"
+			if target == "run" {
+				path = "/v1/runs"
+			}
+			if target == "approval" {
+				path = "/v1/runs/" + id + "/approval"
+			}
+			reader, writer := io.Pipe()
+			defer writer.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(ctx, "POST", f.server.URL+"/p/demo"+path, reader)
+			req.Header.Set("Authorization", "Bearer "+f.opts.Bearer)
+			req.Header.Set("X-Test-Stall", "yes")
+			type reply struct {
+				status int
+				err    error
+			}
+			done := make(chan reply, 1)
+			go func() {
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					done <- reply{err: err}
+					return
+				}
+				defer res.Body.Close()
+				_, err = io.ReadAll(res.Body)
+				done <- reply{res.StatusCode, err}
+			}()
+			go func() { _, _ = writer.Write([]byte(`{"id":"slow"`)) }()
+			select {
+			case <-started:
+			case <-time.After(time.Second):
+				t.Fatal("body read never started")
+			}
+			healthCtx, healthCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer healthCancel()
+			health, _ := http.NewRequestWithContext(healthCtx, "GET", f.server.URL+"/p/demo/health", nil)
+			health.Header.Set("Authorization", "Bearer "+f.opts.Bearer)
+			res, err := http.DefaultClient.Do(health)
+			if err != nil {
+				t.Fatalf("stalled body delayed health: %v", err)
+			}
+			res.Body.Close()
+			if res.StatusCode != 200 {
+				t.Fatal(res.StatusCode)
+			}
+			if status, _ := f.request("POST", "/v1/runs/"+id+"/stop", nil, ""); status != 200 {
+				t.Fatal(status)
+			}
+			expectTerminal(t, f.events(id), "run.cancelled")
+			select {
+			case got := <-done:
+				if got.err != nil || got.status != 408 {
+					t.Fatalf("stalled body did not receive timeout error: %+v", got)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("stalled body has no bounded client error")
+			}
+		})
 	}
 }

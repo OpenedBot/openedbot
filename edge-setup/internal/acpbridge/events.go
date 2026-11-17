@@ -128,17 +128,8 @@ func (b *Bridge) cancelPermissionsLocked(r *run) {
 		delete(r.permissions, id)
 	}
 }
-func (b *Bridge) approveLocked(w http.ResponseWriter, req *http.Request, r *run) {
-	var body map[string]json.RawMessage
-	if !decode(w, req, &body) {
-		return
-	}
-	var id, choice string
-	var gen int
-	if len(body) != 3 || json.Unmarshal(body["request_id"], &id) != nil || json.Unmarshal(body["choice"], &choice) != nil || json.Unmarshal(body["execution_generation"], &gen) != nil {
-		http.Error(w, "invalid approval body", 400)
-		return
-	}
+func (b *Bridge) approveLocked(w http.ResponseWriter, r *run, body approvalInput) {
+	id, choice, gen := body.RequestID, body.Choice, body.Generation
 	p, ok := r.permissions[id]
 	if !ok || gen != r.Generation || terminal(r.Status) || r.Cancel {
 		http.Error(w, "approval is no longer pending", 409)

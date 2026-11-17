@@ -25,6 +25,7 @@ type Limits struct {
 	RPCTimeout        time.Duration
 	TurnTimeout       time.Duration
 	CancelTimeout     time.Duration
+	BodyTimeout       time.Duration
 	MaxInvalidLines   int
 }
 type Options struct {
@@ -143,10 +144,13 @@ func New(opts Options) (*Bridge, error) {
 	if opts.Limits.CancelTimeout == 0 {
 		opts.Limits.CancelTimeout = 5 * time.Second
 	}
+	if opts.Limits.BodyTimeout == 0 {
+		opts.Limits.BodyTimeout = 5 * time.Second
+	}
 	if opts.Limits.MaxInvalidLines == 0 {
 		opts.Limits.MaxInvalidLines = 8
 	}
-	if opts.Limits.IdleTimeout < 0 || opts.Limits.RPCTimeout < 0 || opts.Limits.TurnTimeout < 0 || opts.Limits.CancelTimeout < 0 || opts.Limits.MaxInvalidLines < 0 {
+	if opts.Limits.IdleTimeout < 0 || opts.Limits.RPCTimeout < 0 || opts.Limits.TurnTimeout < 0 || opts.Limits.CancelTimeout < 0 || opts.Limits.BodyTimeout < 0 || opts.Limits.MaxInvalidLines < 0 {
 		return nil, errors.New("limits must be positive")
 	}
 	if err = os.MkdirAll(opts.StateDirectory, 0700); err != nil {
@@ -296,7 +300,7 @@ func (b *Bridge) Serve(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Handler: b, ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: b, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: b.opts.Limits.BodyTimeout}
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -354,19 +358,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
-func decode(w http.ResponseWriter, r *http.Request, out any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4*1024*1024))
-	if dec.Decode(out) != nil {
-		http.Error(w, "invalid JSON body", 400)
-		return false
-	}
-	var extra any
-	if dec.Decode(&extra) != io.EOF {
-		http.Error(w, "invalid JSON body", 400)
-		return false
-	}
-	return true
+
+type sessionInput struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
+type approvalInput struct {
+	RequestID  string
+	Generation int
+	Choice     string
+}
+
 func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if subtle.ConstantTimeCompare([]byte(req.Header.Get("Authorization")), []byte("Bearer "+b.opts.Bearer)) != 1 {
 		http.Error(w, "unauthorized", 401)
@@ -389,6 +391,53 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		path = "/" + strings.Join(parts[2:], "/")
 	}
+
+	if slug == "" && (strings.HasPrefix(path, "/api/sessions") || strings.HasPrefix(path, "/v1/runs")) {
+		writeJSON(w, 400, map[string]any{"error": map[string]string{"code": "profile_required", "message": "ACP sessions and runs require a /p/<slug> profile prefix"}})
+		return
+	}
+	// Consume and validate the entire body before entering shared state. This
+	// also drains unexpected bodies on otherwise bodyless routes outside b.mu.
+	var rawBody []byte
+	if req.Body != nil {
+		controller := http.NewResponseController(w)
+		_ = controller.SetReadDeadline(time.Now().Add(b.opts.Limits.BodyTimeout))
+		var err error
+		rawBody, err = io.ReadAll(http.MaxBytesReader(w, req.Body, 4*1024*1024))
+		if err == nil {
+			_ = controller.SetReadDeadline(time.Time{})
+		}
+		if err != nil {
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				http.Error(w, "request body timeout", 408)
+			} else {
+				http.Error(w, "invalid request body", 400)
+			}
+			return
+		}
+	}
+	var sessionBody sessionInput
+	var runBody runInput
+	var approvalBody approvalInput
+	switch {
+	case req.Method == "POST" && path == "/api/sessions":
+		if json.Unmarshal(rawBody, &sessionBody) != nil || strings.TrimSpace(sessionBody.ID) == "" {
+			http.Error(w, "invalid session body", 400)
+			return
+		}
+	case req.Method == "POST" && path == "/v1/runs":
+		if json.Unmarshal(rawBody, &runBody) != nil || strings.TrimSpace(runBody.SessionID) == "" {
+			http.Error(w, "invalid run body", 400)
+			return
+		}
+	case req.Method == "POST" && len(parts) == 6 && parts[2] == "v1" && parts[3] == "runs" && parts[5] == "approval":
+		var body map[string]json.RawMessage
+		if json.Unmarshal(rawBody, &body) != nil || len(body) != 3 || json.Unmarshal(body["request_id"], &approvalBody.RequestID) != nil || json.Unmarshal(body["execution_generation"], &approvalBody.Generation) != nil || json.Unmarshal(body["choice"], &approvalBody.Choice) != nil || approvalBody.RequestID == "" || len(approvalBody.RequestID) > 256 || approvalBody.Generation < 0 || approvalBody.Choice == "" {
+			http.Error(w, "invalid approval body", 400)
+			return
+		}
+	}
 	b.mu.Lock()
 	defer b.unlockAndSend()
 	if b.closed || b.diskErr != nil {
@@ -396,10 +445,6 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if slug == "" && (strings.HasPrefix(path, "/api/sessions") || strings.HasPrefix(path, "/v1/runs")) {
-		writeJSON(w, 400, map[string]any{"error": map[string]string{"code": "profile_required", "message": "ACP sessions and runs require a /p/<slug> profile prefix"}})
-		return
-	}
 	switch {
 	case req.Method == "GET" && path == "/health":
 		writeJSON(w, 200, map[string]bool{"ok": true})
@@ -410,17 +455,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case req.Method == "GET" && path == "/api/model/options":
 		writeJSON(w, 200, map[string]any{"provider": "acp", "model": "agent-default", "providers": []any{map[string]any{"slug": "acp", "name": "ACP agent default", "is_current": true, "authenticated": true, "models": []string{"agent-default"}}}})
 	case req.Method == "POST" && path == "/api/sessions":
-		var body struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
-		}
-		if !decode(w, req, &body) {
-			return
-		}
-		if strings.TrimSpace(body.ID) == "" {
-			http.Error(w, "session id required", 400)
-			return
-		}
+		body := sessionBody
 		key := sessionKey(slug, body.ID)
 		if b.disk.Sessions[key] != nil {
 			writeJSON(w, 409, map[string]string{"id": body.ID})
@@ -454,7 +489,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.WriteHeader(204)
 	case req.Method == "POST" && path == "/v1/runs":
-		b.createRunLocked(w, req, slug)
+		b.createRunLocked(w, req, slug, runBody)
 	case len(parts) >= 5 && parts[2] == "v1" && parts[3] == "runs":
 		r := b.disk.Runs[parts[4]]
 		if r == nil || r.Profile != slug {
@@ -477,7 +512,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			b.stopLocked(r)
 			writeJSON(w, 200, map[string]bool{"ok": true})
 		case req.Method == "POST" && action == "approval":
-			b.approveLocked(w, req, r)
+			b.approveLocked(w, r, approvalBody)
 		default:
 			http.NotFound(w, req)
 		}

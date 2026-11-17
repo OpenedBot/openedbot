@@ -173,3 +173,13 @@ l'écriture bloquée. Les réponses aux permissions et les annulations sont
 collectées sous le mutex du pont puis envoyées après son relâchement.
 Le journal conserve la décision d'approbation acceptée avant l'envoi ; un échec
 d'envoi rend HTTP 502 et fait échouer le run, sans masquer le défaut de transport.
+
+## Lecture des requêtes HTTP
+
+Les corps sont lus intégralement (au plus 4 MiB) et les mutations sont validées
+avant de prendre le mutex partagé. `BodyTimeout`, cinq secondes par défaut,
+borne la lecture du corps par une échéance réseau et configure aussi
+`http.Server.ReadTimeout`. Une lecture expirée reçoit HTTP 408 ; son échéance
+reste active jusqu'à la fermeture de la requête pour borner aussi le drainage
+HTTP. Les lectures réussies libèrent cette échéance. Un corps lent ne retient
+ni les événements d'agent, ni `/health`, ni l'annulation d'un run.

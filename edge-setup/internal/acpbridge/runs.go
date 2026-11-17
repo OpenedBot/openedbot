@@ -26,7 +26,7 @@ type runInput struct {
 	} `json:"conversation_history"`
 }
 
-func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug string) {
+func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug string, input runInput) {
 	key := req.Header.Get("Idempotency-Key")
 	if key != "" {
 		for _, r := range b.disk.Runs {
@@ -35,10 +35,6 @@ func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug 
 				return
 			}
 		}
-	}
-	var input runInput
-	if !decode(w, req, &input) {
-		return
 	}
 	s := b.disk.Sessions[sessionKey(slug, input.SessionID)]
 	if s == nil {
