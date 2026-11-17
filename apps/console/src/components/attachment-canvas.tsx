@@ -152,6 +152,9 @@ const CANVAS_GUTTER = "bg-background";
 // the transition jumped at once to 320 px, the thread shifted 160 px in one
 // frame, before sliding the rest of the way.
 const ATTACHMENT_CANVAS_WIDTH = "w-[max(20rem,min(42rem,38vw))]";
+// The context and quota panel is a narrow column of figures: it opens at
+// its own width, not at the one set for reading a file.
+const PANEL_CANVAS_WIDTH = "w-[25rem]";
 
 /**
  * The panel itself: beside the thread, never over it.
@@ -291,7 +294,8 @@ export function AttachmentCanvas() {
   }, [displayed, shownId, shownKind]);
 
   const mounted = Boolean(close);
-  const { asideRef, resizing, shownWidth, maxWidth, resetWidth, startResize, moveResize, endResize, keyResize } = useCanvasResize(isMobile, mounted);
+  const { asideRef, resizing, shownWidth, maxWidth, resetWidth, startResize, moveResize, endResize, keyResize } = useCanvasResize(isMobile, mounted, shownPanel !== null);
+  const defaultWidth = shownPanel ? PANEL_CANVAS_WIDTH : ATTACHMENT_CANVAS_WIDTH;
 
   // Outside a provider only. The panel stays MOUNTED even when empty: a
   // CSS transition only plays on an element that already existed on the previous
@@ -355,7 +359,7 @@ export function AttachmentCanvas() {
               "relative",
               resizing ? "transition-none select-none" : "transition-[width,opacity]",
               CANVAS_GUTTER,
-              open ? cn(ATTACHMENT_CANVAS_WIDTH, "opacity-100") : "pointer-events-none w-0 opacity-0",
+              open ? cn(defaultWidth, "opacity-100") : "pointer-events-none w-0 opacity-0",
             ],
       )}
     >
@@ -385,7 +389,7 @@ export function AttachmentCanvas() {
         />
       ) : null}
       {shownPanel ? (
-        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(ATTACHMENT_CANVAS_WIDTH, "p-2"))} style={innerWidth}>
+        <div className={cn("flex min-h-0 flex-1 flex-col", isMobile ? "w-full" : cn(PANEL_CANVAS_WIDTH, "p-2"))} style={innerWidth}>
           <div
             ref={panelSlotRef}
             data-canvas-panel=""

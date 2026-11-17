@@ -54,12 +54,18 @@ export const CANVAS_WIDTH_PROPERTY = "--attachment-canvas-width";
  * The canvas handle: drag, arrows, Home/End, Enter (default
  * width). `mounted` restarts observation of the row when the panel
  * appears; `isMobile` stops it (the panel takes the whole screen there).
+ * `panel`: a non-file panel (context and quotas) is shown. It opens at its
+ * own default width; its handle setting lasts for the session and never
+ * overwrites the stored file width.
  */
-export function useCanvasResize(isMobile: boolean, mounted: boolean) {
+export function useCanvasResize(isMobile: boolean, mounted: boolean, panel = false) {
   // The width set on the handle, bounded by the row that holds the thread:
   // a shrinking window must not push the thread under its minimum.
   const asideRef = useRef<HTMLElement>(null);
-  const [width, setWidth] = useState<number | null>(readCanvasWidth);
+  const [fileWidth, setFileWidth] = useState<number | null>(readCanvasWidth);
+  const [panelWidth, setPanelWidth] = useState<number | null>(null);
+  const width = panel ? panelWidth : fileWidth;
+  const setWidth = panel ? setPanelWidth : setFileWidth;
   const [rowWidth, setRowWidth] = useState<number | null>(null);
   const [resizing, setResizing] = useState(false);
   const drag = useRef<{ pointerId: number; startX: number; startWidth: number; sign: 1 | -1 } | null>(null);
@@ -91,8 +97,8 @@ export function useCanvasResize(isMobile: boolean, mounted: boolean) {
   }, [isMobile, mounted]);
   // Stored on release, not on every pixel of the drag.
   useEffect(() => {
-    if (!resizing) writeCanvasWidth(width);
-  }, [resizing, width]);
+    if (!resizing) writeCanvasWidth(fileWidth);
+  }, [resizing, fileWidth]);
   const shownWidth = !isMobile && width !== null ? clampCanvasWidth(width, rowWidth) : null;
   const maxWidth = rowWidth === null ? undefined : Math.max(CANVAS_MIN_WIDTH, rowWidth - CANVAS_THREAD_MIN_WIDTH);
 
