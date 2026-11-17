@@ -11,11 +11,26 @@ Un profil est un dossier existant, sans lien symbolique. Le pont ne démarre
 l'agent qu'au premier tour, avec ce dossier comme répertoire de travail. La
 création HTTP réserve la session cloud ; l'identifiant ACP est alloué avec le
 premier tour pour pouvoir transmettre ses instructions dans `systemPrompt`.
-Le fichier privé `state.json` conserve les correspondances, l'idempotence,
-les statuts et tous les événements. Chaque modification remplace atomiquement
-cet état et le synchronise. Après redémarrage, tout run non terminal devient
-`interrupted` ; les événements terminés restent disponibles, sans purge dans
-ce paquet. Ne pas partager son dossier d'état entre plusieurs instances.
+Le fichier privé `state.json` conserve les correspondances de sessions et les
+en-têtes des runs (identité, profil, session, clé d'idempotence, statut,
+génération, compteurs et date terminale). Il ne contient ni événements ni texte
+de sortie. Chaque run possède `events/<run_id>.jsonl`, un objet événement JSON
+par ligne, ajouté sans réécrire le préfixe. Les événements restent en mémoire
+pour les abonnements actifs ; au démarrage, ces fichiers reconstruisent le flux
+et la sortie. Une dernière ligne incomplète après crash est tronquée avant de
+reprendre l'ajout. Un événement terminal déjà présent prévaut sur un en-tête
+plus ancien ; sinon un run non terminal devient `interrupted`.
+
+Les chunks sont écrits sans fsync individuel. Les transitions d'état, y compris
+les permissions et les fins, synchronisent les événements modifiés puis
+remplacent atomiquement `state.json` et synchronisent ses dossiers. Les runs
+terminés sont supprimés sept jours après leur événement terminal, au démarrage
+et lors d'un balayage horaire. Les fichiers orphelins sont aussi supprimés.
+`DELETE /api/sessions/{id}`, annoncé par `endpoints.session_delete`, supprime
+la correspondance cloud de façon durable et annule son éventuel tour actif.
+Les runs restent rejouables jusqu'à expiration ; le stockage propre à l'agent
+reste sous sa responsabilité. Ce format remplace celui du prototype sans
+migration. Une seule instance possède un dossier d'état.
 
 Les limites par défaut sont quatre runs, un tour par session, cinq minutes
 d'inactivité, dix minutes par appel/tour ACP, cinq secondes pour terminer une

@@ -686,6 +686,14 @@ func TestUncleanRestartRecoversPersistedInflightRun(t *testing.T) {
 	if err = os.WriteFile(filepath.Join(f.opts.StateDirectory, "state.json"), raw, 0600); err != nil {
 		t.Fatal(err)
 	}
+
+	if err = os.MkdirAll(filepath.Join(f.opts.StateDirectory, "events"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	event, _ := json.Marshal(seed.Runs["lost"].Events[0])
+	if err = os.WriteFile(filepath.Join(f.opts.StateDirectory, "events", "lost.jsonl"), append(append(event, '\n'), []byte(`{"event":`)...), 0600); err != nil {
+		t.Fatal(err)
+	}
 	f.open()
 	events := f.events("lost")
 	expectTerminal(t, events, "run.interrupted")
@@ -857,4 +865,84 @@ func TestAgentEnvironmentExcludesBridgeSecrets(t *testing.T) {
 	if !visible["path"] {
 		t.Fatal("default PATH missing")
 	}
+}
+
+func TestAppendOnlyStorageRetentionAndSessionDeletion(t *testing.T) {
+	t.Run("periodic retention", func(t *testing.T) {
+		f := newFixture(t, "plain")
+		f.session("cloud")
+		id := f.run(input("cloud"), "")
+		f.events(id)
+		f.b.mu.Lock()
+		f.b.pruneLocked(time.Now().Add(8 * 24 * time.Hour))
+		f.b.mu.Unlock()
+		if status, _ := f.request("GET", "/v1/runs/"+id, nil, ""); status != 404 {
+			t.Fatal("periodic sweep retained expired run")
+		}
+	})
+
+	t.Run("chunks do not rewrite headers", func(t *testing.T) {
+		f := newFixture(t, "cancel")
+		f.session("cloud")
+		id := f.run(input("cloud"), "")
+		f.await(id, "approval.request")
+		before, err := os.ReadFile(filepath.Join(f.opts.StateDirectory, "state.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.b.mu.Lock()
+		f.b.eventLocked(f.b.disk.Runs[id], "message.delta", Event{"delta": "stored chunk"})
+		f.b.mu.Unlock()
+		after, err := os.ReadFile(filepath.Join(f.opts.StateDirectory, "state.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(before) != string(after) || strings.Contains(string(after), `"events"`) {
+			t.Fatal("message chunk rewrote all run events into state.json")
+		}
+		events, err := os.ReadFile(filepath.Join(f.opts.StateDirectory, "events", id+".jsonl"))
+		if err != nil || !strings.Contains(string(events), "stored chunk") {
+			t.Fatal("append-only event missing")
+		}
+	})
+	t.Run("session deletion persists", func(t *testing.T) {
+		f := newFixture(t, "plain")
+		f.session("cloud")
+		if status, raw := f.request("DELETE", "/api/sessions/cloud", nil, ""); status != 204 {
+			t.Fatalf("delete %d %s", status, raw)
+		}
+		f.restart()
+		if status, _ := f.request("POST", "/v1/runs", input("cloud"), ""); status != 404 {
+			t.Fatal("deleted session retained")
+		}
+		_, raw := f.request("GET", "/v1/capabilities", nil, "")
+		if !strings.Contains(string(raw), "session_delete") {
+			t.Fatal("delete endpoint not announced")
+		}
+	})
+	t.Run("startup retention", func(t *testing.T) {
+		f := newFixture(t, "plain")
+		_ = f.b.Close()
+		f.server.Close()
+		past := time.Now().Add(-8 * 24 * time.Hour)
+		seed := map[string]any{"sessions": map[string]any{}, "runs": map[string]any{"expired": map[string]any{"run_id": "expired", "profile": "demo", "session_id": "cloud", "status": "completed", "terminal_at": past}}}
+		raw, _ := json.Marshal(seed)
+		if err := os.WriteFile(filepath.Join(f.opts.StateDirectory, "state.json"), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(f.opts.StateDirectory, "events"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		event, _ := json.Marshal(Event{"event": "run.completed", "run_id": "expired", "timestamp": float64(past.Unix()), "output": "old"})
+		if err := os.WriteFile(filepath.Join(f.opts.StateDirectory, "events", "expired.jsonl"), append(event, '\n'), 0600); err != nil {
+			t.Fatal(err)
+		}
+		f.open()
+		if status, _ := f.request("GET", "/v1/runs/expired", nil, ""); status != 404 {
+			t.Fatal("expired run retained")
+		}
+		if _, err := os.Stat(filepath.Join(f.opts.StateDirectory, "events", "expired.jsonl")); !os.IsNotExist(err) {
+			t.Fatal("expired events retained")
+		}
+	})
 }

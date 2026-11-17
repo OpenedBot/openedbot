@@ -41,16 +41,18 @@ type Options struct {
 // Bridge owns its agent processes and durable run journal. Close must precede
 // reopening the same state directory; one bridge owns a directory at a time.
 type Bridge struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	mu       sync.Mutex
-	opts     Options
-	disk     diskState
-	profiles map[string]*profile
-	changed  chan struct{}
-	closed   bool
-	diskErr  error
-	wg       sync.WaitGroup
+	ctx             context.Context
+	cancel          context.CancelFunc
+	mu              sync.Mutex
+	opts            Options
+	disk            diskState
+	profiles        map[string]*profile
+	changed         chan struct{}
+	closed          bool
+	diskErr         error
+	dirtyEvents     map[string]bool
+	maintenanceDone chan struct{}
+	wg              sync.WaitGroup
 }
 type diskState struct {
 	Sessions map[string]*session `json:"sessions"`
@@ -67,16 +69,17 @@ type session struct {
 }
 type Event map[string]any
 type run struct {
-	ID           string  `json:"run_id"`
-	Profile      string  `json:"profile"`
-	SessionID    string  `json:"session_id"`
-	Key          string  `json:"key"`
-	Status       string  `json:"status"`
-	Output       string  `json:"output"`
-	Events       []Event `json:"events"`
-	Cancel       bool    `json:"cancel"`
-	Generation   int     `json:"execution_generation"`
-	InvalidLines int     `json:"invalid_stdout_lines"`
+	ID           string    `json:"run_id"`
+	Profile      string    `json:"profile"`
+	SessionID    string    `json:"session_id"`
+	Key          string    `json:"key"`
+	Status       string    `json:"status"`
+	Output       string    `json:"-"`
+	Events       []Event   `json:"-"`
+	Cancel       bool      `json:"cancel"`
+	Generation   int       `json:"execution_generation"`
+	InvalidLines int       `json:"invalid_stdout_lines"`
+	TerminalAt   time.Time `json:"terminal_at,omitempty"`
 	permissions  map[string]permission
 	tools        map[string]string
 	bytes        int
@@ -144,6 +147,11 @@ func New(opts Options) (*Bridge, error) {
 	}
 	b := &Bridge{opts: opts, profiles: map[string]*profile{}, changed: make(chan struct{}), disk: diskState{Sessions: map[string]*session{}, Runs: map[string]*run{}}}
 	b.ctx, b.cancel = context.WithCancel(context.Background())
+	b.dirtyEvents = map[string]bool{}
+	if err = os.MkdirAll(filepath.Join(opts.StateDirectory, "events"), 0700); err != nil {
+		b.cancel()
+		return nil, err
+	}
 	raw, err := os.ReadFile(filepath.Join(opts.StateDirectory, "state.json"))
 	if err == nil {
 		if err = json.Unmarshal(raw, &b.disk); err != nil {
@@ -159,6 +167,10 @@ func New(opts Options) (*Bridge, error) {
 		return nil, errors.New("invalid bridge state maps")
 	}
 	for _, r := range b.disk.Runs {
+		if err = b.readEvents(r); err != nil {
+			b.cancel()
+			return nil, err
+		}
 		if !terminal(r.Status) {
 			b.finishLocked(r, "interrupted", "bridge restarted")
 		}
@@ -167,6 +179,13 @@ func New(opts Options) (*Bridge, error) {
 		b.cancel()
 		return nil, b.diskErr
 	}
+	b.pruneLocked(time.Now())
+	if b.diskErr != nil {
+		b.cancel()
+		return nil, b.diskErr
+	}
+	b.maintenanceDone = make(chan struct{})
+	go b.maintain()
 	return b, nil
 }
 func terminal(s string) bool {
@@ -182,6 +201,11 @@ func uniqueID() string {
 func sessionKey(profile, id string) string { return profile + "/" + id }
 func (b *Bridge) saveLocked() {
 	if b.diskErr != nil {
+		return
+	}
+	if err := b.syncEventsLocked(); err != nil {
+		b.diskErr = err
+		b.wakeLocked()
 		return
 	}
 	raw, err := json.Marshal(b.disk)
@@ -215,8 +239,7 @@ func (b *Bridge) saveLocked() {
 	if err != nil {
 		b.diskErr = fmt.Errorf("persist bridge state: %w", err)
 	}
-	close(b.changed)
-	b.changed = make(chan struct{})
+	b.wakeLocked()
 }
 func (b *Bridge) eventLocked(r *run, event string, fields Event) {
 	if fields == nil {
@@ -230,15 +253,25 @@ func (b *Bridge) eventLocked(r *run, event string, fields Event) {
 		b.failActiveLocked(r, "ACP event stream limit exceeded")
 		return
 	}
+	if err := b.appendEvent(r, raw); err != nil {
+		b.diskErr = err
+		b.wakeLocked()
+		return
+	}
 	r.Events = append(r.Events, fields)
 	r.bytes += len(raw) + 8
-	b.saveLocked()
+	if strings.HasPrefix(event, "run.") || event == "approval.request" || event == "approval.responded" {
+		b.saveLocked()
+	} else {
+		b.wakeLocked()
+	}
 }
 func (b *Bridge) finishLocked(r *run, status, message string) {
 	if terminal(r.Status) {
 		return
 	}
 	r.Status = status
+	r.TerminalAt = time.Now()
 	fields := Event{}
 	if status == "completed" {
 		fields["output"] = r.Output
@@ -304,6 +337,7 @@ func (b *Bridge) Close() error {
 		p.mu.Unlock()
 	}
 	b.wg.Wait()
+	<-b.maintenanceDone
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.diskErr
@@ -363,7 +397,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case req.Method == "GET" && path == "/health":
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	case req.Method == "GET" && path == "/v1/capabilities":
-		writeJSON(w, 200, map[string]any{"features": map[string]bool{"run_steer": false}, "endpoints": map[string]any{}, "max_concurrent_runs": b.opts.Limits.MaxConcurrentRuns})
+		writeJSON(w, 200, map[string]any{"features": map[string]bool{"run_steer": false}, "endpoints": map[string]any{"session_delete": map[string]string{"method": "DELETE", "path": "/api/sessions/{session_id}"}}, "max_concurrent_runs": b.opts.Limits.MaxConcurrentRuns})
 	case req.Method == "GET" && path == "/v1/toolsets":
 		writeJSON(w, 200, map[string]any{"data": []any{}})
 	case req.Method == "GET" && path == "/api/model/options":
@@ -392,6 +426,26 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		writeJSON(w, 201, map[string]string{"id": body.ID})
+	case req.Method == "DELETE" && strings.HasPrefix(path, "/api/sessions/"):
+		id := strings.TrimPrefix(path, "/api/sessions/")
+		key := sessionKey(slug, id)
+		s := b.disk.Sessions[key]
+		if s == nil {
+			http.NotFound(w, req)
+			return
+		}
+		if s.active != "" {
+			if r := b.disk.Runs[s.active]; r != nil {
+				b.stopLocked(r)
+			}
+		}
+		delete(b.disk.Sessions, key)
+		b.saveLocked()
+		if b.diskErr != nil {
+			http.Error(w, "persistence failed", 500)
+			return
+		}
+		w.WriteHeader(204)
 	case req.Method == "POST" && path == "/v1/runs":
 		b.createRunLocked(w, req, slug)
 	case len(parts) >= 5 && parts[2] == "v1" && parts[3] == "runs":
