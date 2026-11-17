@@ -393,6 +393,7 @@ export const connectorUpgrade = {
   upToDateTitle: "Runtime up to date",
   upToDate: "edge-setup {version} is installed on “{runtime}”.",
   hermesRow: "Hermes",
+  engineRow: "{engine}",
   versionUnknown: "version unknown",
   versionRequired: "{version} · {latest} required",
   versionCurrent: "{version} · up to date",

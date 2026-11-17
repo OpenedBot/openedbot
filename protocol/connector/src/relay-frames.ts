@@ -66,6 +66,8 @@ export type RelayHelloFrame = {
   protocol: number;
   agent?: string;
   hermesVersion?: string;
+  engine?: string;
+  engineVersion?: string;
   features?: string[];
   /**
    * Clé publique Ed25519 de la machine (base64, 32 octets), présentée à
@@ -258,6 +260,14 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
     case "hello": {
       const protocol = optionalInt(frame, "protocol");
       if (protocol !== RELAY_PROTOCOL) throw new RelayFrameError(`unsupported protocol ${protocol ?? 0}`);
+      const engine = optionalString(frame, "engine");
+      if (engine !== undefined && /^[a-z][a-z0-9_.:-]{0,63}$/.exec(engine)?.[0] !== engine) {
+        throw new RelayFrameError("hello engine must be an engine name");
+      }
+      const engineVersion = optionalString(frame, "engineVersion");
+      if (engineVersion !== undefined && Array.from(engineVersion).length > 64) {
+        throw new RelayFrameError("hello engineVersion exceeds 64 characters");
+      }
       const devicePublicKey = optionalString(frame, "devicePublicKey");
       if (devicePublicKey !== undefined && !BASE64_32_PATTERN.test(devicePublicKey)) {
         throw new RelayFrameError("hello devicePublicKey must be a 32-byte base64 key");
@@ -267,6 +277,8 @@ export function decodeTextFrame(raw: string | Uint8Array): RelayTextFrame {
         protocol,
         ...withOptional("agent", optionalString(frame, "agent")),
         ...withOptional("hermesVersion", optionalString(frame, "hermesVersion")),
+        ...withOptional("engine", engine),
+        ...withOptional("engineVersion", engineVersion),
         ...withOptional("features", optionalFeatures(frame)),
         ...withOptional("devicePublicKey", devicePublicKey),
       };

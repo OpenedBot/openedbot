@@ -34,10 +34,16 @@ import {
   FAKE_HERMES_TOKEN,
 } from "./defaults";
 import { createFakeHost } from "./host-operator";
+import { runContractRoute } from "../../protocol/connector/src/run-contract";
 
 import type { Server } from "bun";
 
 export type FakeHermesOptions = {
+  /** Serve only the execution contract, recording method/path and JSON bodies, never headers. */
+  contractOnly?: boolean;
+  profileManagementOnly?: boolean;
+  hostRequests?: Array<{ method: string; path: string; status: number }>;
+  requests?: Array<{ method: string; path: string; body: unknown; idempotencyKey: string | null }>;
   hostname?: string;
   port?: number;
   token?: string;
@@ -195,10 +201,15 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
   const streamDeltas = Math.max(0, Math.floor(options.streamDeltas ?? 0));
   const streamIntervalMs = Math.max(0, options.streamIntervalMs ?? 100);
   const unattributedSessions = options.unattributedSessions ?? [];
-  const host = createFakeHost({ restartReads: options.restartReads, profileMcpFacts: options.profileMcpFacts });
+  const host = createFakeHost({ restartReads: options.restartReads, profileMcpFacts: options.profileMcpFacts, profileManagementOnly: options.profileManagementOnly, requests: options.hostRequests });
   const runs = new Map<string, FakeRun>();
   const sessions = new Map<string, FakeSession>();
   const idempotentRuns = new Map<string, string>();
+  const journals = new Map<string, {
+    chunks: Uint8Array[];
+    subscribers: Set<ReadableStreamDefaultController<Uint8Array>>;
+    done: boolean;
+  }>();
 
   const isActive = (run: FakeRun) => run.status === "queued" || run.status === "running" || run.status === "waiting_for_approval";
   const activeRuns = () => [...runs.values()].filter(isActive).length;
@@ -214,7 +225,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
         run.pendingApprovals.push({ requestId, resolve });
       });
       run.status = "waiting_for_approval";
-      emit({ event: "approval.request", run_id: run.id, timestamp: Date.now() / 1_000, ...fakeApprovalGate(match[1]!, requestId) });
+      emit({ event: "approval.request", run_id: run.id, timestamp: Date.now() / 1_000, ...fakeApprovalGate(match[1]!, requestId), ...(options.contractOnly ? { execution_generation: 1 } : {}) });
       const choice = await answered;
       if (choice === "__withdrawn__") return;
       run.status = "running";
@@ -253,29 +264,37 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
       const path = url.pathname.replace(/^\/p\/[a-z0-9_-]+/i, "");
       const scopedProfile = /^\/p\/([a-z0-9_-]+)/i.exec(url.pathname)?.[1];
       const method = request.method;
-      if (request.headers.get("Authorization") !== `Bearer ${token}` && path !== "/health") {
+      if (options.requests) {
+        options.requests.push({ method, path: url.pathname + url.search,
+          body: method === "POST" ? await readJson(request.clone()) : null,
+          idempotencyKey: request.headers.get("Idempotency-Key") });
+      }
+      if (options.contractOnly && !(options.profileManagementOnly && path.startsWith("/hermes-setup/")) && !(options.profileManagementOnly && path === "/api/model/options" && method === "GET") && !runContractRoute(method, url.pathname)?.mandatory) {
+        return json({ error: "contract_route_absent" }, 404);
+      }
+      if (request.headers.get("Authorization") !== `Bearer ${token}` && (options.contractOnly || path !== "/health")) {
         return json({ error: "invalid_token" }, 401);
       }
 
       if (scopedProfile && !host.hasProfile(scopedProfile)) return json({ error: { code: "PROFILE_NOT_FOUND", message: "Unknown profile" } }, 404);
-      const hostResponse = await host.handleHostRoute(request, path);
+      const hostResponse = (!options.contractOnly || (options.profileManagementOnly && path.startsWith("/hermes-setup/"))) ? await host.handleHostRoute(request, path) : null;
       if (hostResponse) return hostResponse;
       if (path === "/health") return json({ ok: true, service: "fake-hermes" });
       if (path === "/v1/capabilities") {
         return json({
           platform: "fake",
           version: "fake-hermes",
-          features: { max_concurrent_runs: capacity, run_steer: true, approvals: true },
+          features: { max_concurrent_runs: capacity, run_steer: !options.contractOnly, approvals: true },
           endpoints: {
-            run_steer: { method: "POST", path: "/v1/runs/{run_id}/steer" },
+            ...(!options.contractOnly ? { run_steer: { method: "POST", path: "/v1/runs/{run_id}/steer" } } : {}),
             run_approval: { method: "POST", path: "/v1/runs/{run_id}/approval" },
           },
         });
       }
       if (path === "/v1/models") return json({ data: [{ id: "fake/hermes" }, { id: "fake/hermes-fast" }] });
-      if (path === "/v1/toolsets" && method === "GET") return json(host.toolsetsDocument(scopedProfile ?? null));
+      if (path === "/v1/toolsets" && method === "GET") return json(options.contractOnly ? { data: [] } : host.toolsetsDocument(scopedProfile ?? null));
       if (path === "/v1/skills" && method === "GET") return json(host.skillsDocument(scopedProfile ?? null));
-      if (path === "/api/model/options" && method === "GET") return json(MODEL_OPTIONS);
+      if (path === "/api/model/options" && method === "GET") return json(options.profileManagementOnly ? { provider: "acp", model: "agent-default", providers: [{ slug: "acp", name: "ACP agent default", is_current: true, authenticated: true, models: ["agent-default"] }] } : MODEL_OPTIONS);
 
       // The host operator's bounded inventory: identifiers only, never
       // a title, a model or a message. Served by the fake gateway so the worker
@@ -365,6 +384,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
           return json({ run_id: run.id, status: run.status, output: run.output, usage: run.usage, ...pendingSteer(run) });
         }
         if (action === "events" && method === "GET") {
+          if (!options.contractOnly || !journals.has(run.id)) {
           const stream = new ReadableStream<Uint8Array>({
             async start(controller) {
               const encoder = new TextEncoder();
@@ -398,10 +418,12 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
               emit({ event: "message.interim", run_id: run.id, timestamp: Date.now() / 1_000, text: "Working", already_streamed: false });
               emit({
                 event: "tool.started", run_id: run.id, timestamp: Date.now() / 1_000,
+                ...(options.contractOnly ? { tool_call_id: "echo-1" } : {}),
                 tool: "fake_echo", preview: "Fake gateway run",
               });
               emit({
                 event: "tool.completed", run_id: run.id, timestamp: Date.now() / 1_000,
+                ...(options.contractOnly ? { tool_call_id: "echo-1" } : {}),
                 tool: "fake_echo", duration: 0.001, error: false, preview: "Fake gateway run",
               });
               await awaitApprovals(run, emit);
@@ -439,7 +461,41 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
               controller.close();
             },
           });
-          return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+          if (!options.contractOnly) {
+            return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+          }
+          const journal = { chunks: [] as Uint8Array[], subscribers: new Set<ReadableStreamDefaultController<Uint8Array>>(), done: false };
+          journals.set(run.id, journal);
+          // One execution feeds every subscription, including late subscribers.
+          void (async () => {
+            const reader = stream.getReader();
+            try {
+              while (true) {
+                const next = await reader.read();
+                if (next.done) break;
+                journal.chunks.push(next.value);
+                for (const subscriber of journal.subscribers) subscriber.enqueue(next.value);
+              }
+            } finally {
+              journal.done = true;
+              for (const subscriber of journal.subscribers) subscriber.close();
+              journal.subscribers.clear();
+              reader.releaseLock();
+            }
+          })();
+          }
+          const journal = journals.get(run.id)!;
+          let subscriber: ReadableStreamDefaultController<Uint8Array>;
+          const replay = new ReadableStream<Uint8Array>({
+            start(controller) {
+              subscriber = controller;
+              for (const chunk of journal.chunks) controller.enqueue(chunk);
+              if (journal.done) controller.close();
+              else journal.subscribers.add(controller);
+            },
+            cancel() { journal.subscribers.delete(subscriber); },
+          });
+          return new Response(replay, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
         }
         if (action === "stop" && method === "POST") {
           completeRun(run, true);
@@ -453,7 +509,11 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
           return json({ accepted: true, run_id: run.id, pending: run.steers.length }, 202);
         }
         if (action === "approval" && method === "POST") {
-          const body = await readJson<{ choice?: unknown; request_id?: unknown }>(request);
+          const body = await readJson<{ choice?: unknown; request_id?: unknown; execution_generation?: unknown }>(request);
+          if (options.contractOnly && (body.execution_generation !== 1 || typeof body.request_id !== "string" ||
+            Object.keys(body).some((key) => !["request_id", "execution_generation", "choice"].includes(key)))) {
+            return json({ error: "invalid_approval_identity" }, 400);
+          }
           const rawChoice = String(body.choice ?? "").trim().toLowerCase();
           const choice = APPROVAL_CHOICE_ALIASES[rawChoice] ?? rawChoice;
           const requestId = typeof body.request_id === "string" ? body.request_id.trim() : "";

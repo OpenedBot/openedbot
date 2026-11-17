@@ -222,7 +222,10 @@ describe("enrôlement par le lien connecteur", () => {
     expect(issued.runtimeId).toMatch(/^[0-9a-f-]{36}$/);
     expect(issued.linkToken.length).toBeGreaterThanOrEqual(32);
 
+    await session.waitFrame((frame) => frame.t === "link.context");
     const statements = session.fixture.statements;
+    expect(statements.some((entry) => entry.sql.includes("set link_agent ="))).toBe(false);
+    expect(statements.some((entry) => entry.sql.includes("set link_engine ="))).toBe(false);
     const insert = statements.find((entry) => entry.sql.includes("insert into runtimes"));
     expect(insert).toBeDefined();
     expect(insert!.sql).toContain("'connector'");

@@ -5,6 +5,23 @@ All notable changes to the openedbot connector protocol. The format follows
 uses [semantic versioning](https://semver.org/) as described in
 [SPEC.md](SPEC.md#versioning).
 
+## [1.1.1] - 2026-11-17
+
+### Clarified
+- Workflows always have a token budget, but engines that report no usage
+  (including the ACP bridge) are not refused for that reason: missing usage
+  counts as zero, so the token budget is not enforced. Step, handoff, depth
+  and deadline limits remain in force, with their enforcing code cited in
+  the execution contract. No production behavior or wire protocol change.
+
+## [1.1.0] - 2026-11-17
+
+### Added
+- Optional `hello.engine` (a name matching `^[a-z][a-z0-9_.:-]{0,63}$`)
+  and `hello.engineVersion` (free text, at most 64 characters). Invalid
+  values are frame errors. An absent engine means Hermes. Deploy the API
+  before hosts; unchanged Hermes hosts send the same hello as before.
+
 ## [Unreleased]
 
 ### Changed
@@ -158,6 +175,20 @@ uses [semantic versioning](https://semver.org/) as described in
 - `RELAY_STAGE_HEADER` is `X-OpenedBot-Relay-Stage`, and `relayStageOf` reads
   only that name: `LEGACY_RELAY_STAGE_HEADER` is removed. Hosts never read or
   set this header.
+
+## [1.0.1] - 2026-11-17
+
+### Changed
+- Clarify the existing execution contract consumed by the cloud: routes,
+  payloads, approval and tool identities, terminal events, replay and local
+  transport. Document optional-route fallbacks and the current absence of
+  usage/transcript capability gates. No wire or production behavior change.
+
+### Added
+- Machine-readable run payload validators, route list and synthetic fixtures
+  derived from cloud readers and the fake gateway, with normalizer unit tests.
+- A contract-only fake gateway mode and real-runner integration proof for
+  completion, approval and confirmed stop with optional routes returning 404.
 
 ## [1.0.0] - 2026-10-28
 

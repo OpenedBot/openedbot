@@ -36,6 +36,7 @@ import (
 )
 
 type upOptions struct {
+	engine            string
 	adminKeyFile      string
 	adminSudo         string
 	adminPasswordFile string
@@ -99,6 +100,7 @@ func (o *upOptions) requestedFeatures() state.Features {
 
 func bindUpFlags(fs *flag.FlagSet) *upOptions {
 	o := &upOptions{}
+	fs.StringVar(&o.engine, "engine", state.EngineHermes, "agent engine: hermes (default) or acp:opencode (experimental, Linux with systemd only)")
 	fs.StringVar(&o.adminKeyFile, "admin-key", "", "file with the single ssh-ed25519 public key of the administrator")
 	fs.StringVar(&o.adminSudo, "admin-sudo", layout.AdminSudoPassword, "sudo rule of hermes-admin with --ssh-hardening: password (asked on the terminal, or generated and shown once) or nopasswd")
 	fs.StringVar(&o.adminPasswordFile, "admin-password-file", "", "0600 file with the sudo password of hermes-admin (--admin-sudo=password without a terminal)")
@@ -128,6 +130,9 @@ func runUp(env cli.Env, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	if err := validateEngine(o.engine, runtime.GOOS, nil, o.sandbox); err != nil {
+		return fail(env, cli.ExitRefused, "%v", err)
+	}
 	if o.dryRun {
 		return printPlan(env, o)
 	}
@@ -140,9 +145,12 @@ func runUp(env cli.Env, args []string) int {
 	if code := requireRoot(env); code != 0 {
 		return code
 	}
-	previous, err := state.Load()
+	previous, err := loadHostState()
 	if err != nil {
 		return fail(env, cli.ExitFailure, "%v", err)
+	}
+	if err := validateEngine(o.engine, runtime.GOOS, previous, o.sandbox); err != nil {
+		return fail(env, cli.ExitRefused, "%v", err)
 	}
 	if err := reconcileRolledBackFeatures(previous, guard.Default(runner)); err != nil {
 		return fail(env, cli.ExitFailure, "%v", err)
@@ -193,7 +201,7 @@ func runUp(env cli.Env, args []string) int {
 	ctx, cancel := ctxWithSignals()
 	defer cancel()
 	resumed := false
-	if st, _ := state.Load(); st != nil {
+	if st, _ := loadHostState(); st != nil {
 		resumed = resumeAfterCommit(st.Phases, guard.Default(runner).State().Finalized)
 	}
 	pb := term.NewProgressBar(env.Stdout, env.Color, len(phaseTags(effective, resumed, newAccessChange)))
@@ -231,12 +239,18 @@ func up(ctx context.Context, env cli.Env, o *upOptions, features, selectedChange
 	if p := facts.PreflightFor(features.Sandbox, protections); len(p) > 0 {
 		return fmt.Errorf("preflight: %s", strings.Join(p, "; "))
 	}
-	st, err := state.Load()
+	st, err := loadHostState()
 	if err != nil {
+		return err
+	}
+	if err := validateEngine(o.engine, runtime.GOOS, st, features.Sandbox); err != nil {
 		return err
 	}
 	if st == nil {
 		st = state.New(env.Version)
+	}
+	if o.engine == state.EngineOpenCode {
+		st.Engine = o.engine
 	}
 	if err := reconcileRolledBackFeatures(st, guard.Default(runner)); err != nil {
 		return err
@@ -285,50 +299,57 @@ func up(ctx context.Context, env cli.Env, o *upOptions, features, selectedChange
 	st.MarkPhase("base", "")
 	_ = st.Save()
 	// P3+P5 runtime (docker unit variant decided now: docker is installed in P4).
-	log("P3/P5 Hermes runtime %s (uv %s, Python %s)", pins.HermesVersion, pins.UVVersion, pins.PythonVersion)
-	hermesBefore := hermes.InstalledVersion(layout.InstallDir)
-	inst := hermes.New(runner, a, features.Sandbox, log)
-	rep, err := inst.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("runtime: %w", err)
-	}
-	if err := reannounceHermes(ctx, sd, hermesBefore, hermes.InstalledVersion(layout.InstallDir), log); err != nil {
-		return fmt.Errorf("runtime: %w", err)
-	}
-	st.PinsApplied["hermes"] = pins.HermesVersion
-	st.MarkPhase("runtime", "")
-	_ = st.Save()
-	uid := rep.UID
-	if !features.Sandbox {
-		log("P4/P6 optional sandbox not selected: tools run as %s", layout.ServiceUser)
-		st.DockerEnabled = false
-		if err := sandbox.ApplyContractOnly(ctx, runner, uid, rep.UID); err != nil {
-			return fmt.Errorf("toolset contract: %w", err)
+	if st.EngineName() == state.EngineOpenCode {
+		log("P3/P5 experimental ACP runtime OpenCode %s", pins.OpenCodeVersion)
+		if err := installACPRuntime(ctx, a.Go, false, st, log); err != nil {
+			return fmt.Errorf("runtime: %w", err)
 		}
 	} else {
-		// P4 docker
-		log("P4 rootless docker for %s", layout.ServiceUser)
-		dk := docker.New(runner, a, facts.OSCodename, facts.Virt == "lxc")
-		if _, err := dk.Run(ctx); err != nil {
-			return fmt.Errorf("docker: %w", err)
+		log("P3/P5 Hermes runtime %s (uv %s, Python %s)", pins.HermesVersion, pins.UVVersion, pins.PythonVersion)
+		hermesBefore := hermes.InstalledVersion(layout.InstallDir)
+		inst := hermes.New(runner, a, features.Sandbox, log)
+		rep, err := inst.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("runtime: %w", err)
 		}
-		st.DockerEnabled = true
-		st.Features.Sandbox = true
-		st.MarkPhase("docker", "")
+		if err := reannounceHermes(ctx, sd, hermesBefore, hermes.InstalledVersion(layout.InstallDir), log); err != nil {
+			return fmt.Errorf("runtime: %w", err)
+		}
+		st.PinsApplied["hermes"] = pins.HermesVersion
+		st.MarkPhase("runtime", "")
 		_ = st.Save()
-		// The gateway unit was rendered with docker enabled; restart it now
-		// that the rootless socket exists.
-		if err := sd.Restart(ctx, layout.GatewayUnit); err != nil {
-			return err
+		uid := rep.UID
+		if !features.Sandbox {
+			log("P4/P6 optional sandbox not selected: tools run as %s", layout.ServiceUser)
+			st.DockerEnabled = false
+			if err := sandbox.ApplyContractOnly(ctx, runner, uid, rep.UID); err != nil {
+				return fmt.Errorf("toolset contract: %w", err)
+			}
+		} else {
+			// P4 docker
+			log("P4 rootless docker for %s", layout.ServiceUser)
+			dk := docker.New(runner, a, facts.OSCodename, facts.Virt == "lxc")
+			if _, err := dk.Run(ctx); err != nil {
+				return fmt.Errorf("docker: %w", err)
+			}
+			st.DockerEnabled = true
+			st.Features.Sandbox = true
+			st.MarkPhase("docker", "")
+			_ = st.Save()
+			// The gateway unit was rendered with docker enabled; restart it now
+			// that the rootless socket exists.
+			if err := sd.Restart(ctx, layout.GatewayUnit); err != nil {
+				return err
+			}
+			// P6 sandbox
+			log("P6 sandbox (docker backend, exact toolsets)")
+			sb := sandbox.New(runner, uid, rep.UID, sandbox.Machine{VCPUs: facts.VCPUs, MemTotalMB: facts.MemTotalMB})
+			if _, err := sb.Run(ctx); err != nil {
+				return fmt.Errorf("sandbox: %w", err)
+			}
+			st.MarkPhase("sandbox", "")
+			_ = st.Save()
 		}
-		// P6 sandbox
-		log("P6 sandbox (docker backend, exact toolsets)")
-		sb := sandbox.New(runner, uid, rep.UID, sandbox.Machine{VCPUs: facts.VCPUs, MemTotalMB: facts.MemTotalMB})
-		if _, err := sb.Run(ctx); err != nil {
-			return fmt.Errorf("sandbox: %w", err)
-		}
-		st.MarkPhase("sandbox", "")
-		_ = st.Save()
 	}
 	// P7 harden
 	hopts := hardening.Options{Features: selectedChanges, Guarded: newAccessChange, QuarantineExpectedKey: st.QuarantineKeyFingerprint, AdminSudo: o.adminSudo, AdminPassword: o.adminPassword}
@@ -599,6 +620,15 @@ func installConnectorUnit(ctx context.Context, log func(string, ...any)) error {
 	if err != nil {
 		return err
 	}
+	st, err := loadHostState()
+	if err != nil {
+		return err
+	}
+	if st.EngineName() == state.EngineOpenCode {
+		unit = render.ACPConnectorUnit(unit)
+		templateUnit = render.ACPConnectorUnit(templateUnit)
+	}
+
 	for name, text := range map[string]string{layout.ConnectorUnit: unit, layout.ConnectorTemplateUnit: templateUnit} {
 		path := "/etc/systemd/system/" + name + ".service"
 		if cur, err := os.ReadFile(path); err != nil || string(cur) != text {
@@ -663,10 +693,20 @@ func applyOperatorUnit(ctx context.Context, sd systemd.Client, force bool, resol
 	// leaves /usr/local read-only to the service. Without it the operator
 	// starts fine but announces neither toolset_management nor mcp_management,
 	// and openedbot renders the runtime as read-only.
-	if err := operator.InstallProbe(); err != nil {
+	st, err := loadHostState()
+	if err != nil {
 		return false, nil, err
 	}
+	isACP := st.EngineName() == state.EngineOpenCode
+	if !isACP {
+		if err := operator.InstallProbe(); err != nil {
+			return false, nil, err
+		}
+	}
 	unit, err := render.OperatorUnit(resolvers)
+	if isACP {
+		unit, err = render.ACPOperatorUnit(resolvers)
+	}
 	if err != nil {
 		return false, nil, err
 	}
@@ -771,7 +811,7 @@ func runVerifyAccess(env cli.Env, args []string) int {
 		return fail(env, cli.ExitFailure, "commit: %v", err)
 	}
 	printf(env.Stdout, "hardening %s; rollback timer stopped", res)
-	st, _ := state.Load()
+	st, _ := loadHostState()
 	if st == nil {
 		return cli.ExitOK
 	}
@@ -795,7 +835,7 @@ func runVerifyAccess(env cli.Env, args []string) int {
 
 func runInternal(env cli.Env, args []string) int {
 	if len(args) == 0 {
-		return fail(env, cli.ExitUsage, "internal <rollback-access|proxy-rollback|connector|operator>")
+		return fail(env, cli.ExitUsage, "internal <rollback-access|proxy-rollback|connector|operator|acp-bridge>")
 	}
 	if args[0] == "mac-upgrade-check" || args[0] == "mac-upgrade-apply" {
 		ctx, cancel := ctxWithSignals()
@@ -838,6 +878,8 @@ func runInternal(env cli.Env, args []string) int {
 		return runConnectorDaemon(env)
 	case "operator":
 		return runOperatorDaemon(env, ctx)
+	case "acp-bridge":
+		return runACPBridge(env, ctx)
 	}
 	return fail(env, cli.ExitUsage, "unknown internal entry point %q", args[0])
 }

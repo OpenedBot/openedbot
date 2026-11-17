@@ -53,6 +53,42 @@ await withDisposablePostgres("openedbot50_agent_rotation", async ({ owner: db })
       assert(row.agent === "edge-setup/v1.5.11" && row.markedNow === true, "agent change did not mark the runtime");
       assert(row.profileChangedAt !== null && new Date(row.profileChangedAt).toISOString() === new Date(past).toISOString(), "profile map was rewritten");
 
+      // Engine identity is persisted by the API role under the same admission lease.
+      await tx`set local role openedbot_api`;
+      await tx`select set_config('app.session_credential_hash', ${tokenHash}, true)`;
+      await writeLinkAgent(tx, scope, { agent: "edge-setup/v1.5.11", hermesVersion: "0.22.6",
+        engine: "acp:opencode", engineVersion: "preview 1", generation: "7" });
+      await tx`reset role`;
+      let engine = (await tx`select link_engine, link_engine_version from runtimes where id = ${runtimeId}`)[0]!;
+      assert(engine.link_engine === "acp:opencode" && engine.link_engine_version === "preview 1", "hello engine identity not persisted");
+
+      // An agent-less hello only writes engine identity, preserving the last agent declaration.
+      await tx`update runtimes set link_agent_seen_at = ${past}::timestamptz,
+        capabilities_changed_at = ${past}::timestamptz where id = ${runtimeId}`;
+      await tx`set local role openedbot_api`;
+      await tx`select set_config('app.session_credential_hash', ${tokenHash}, true)`;
+      assert(!(await writeLinkAgent(tx, scope, { agent: null, hermesVersion: null,
+        engine: "acp:opencode", engineVersion: "preview 2", generation: "7" })), "agent-less hello reported a capabilities mark");
+      await tx`reset role`;
+      const declaration = (await tx`select link_agent, link_agent_seen_at, link_hermes_version,
+        capabilities_changed_at, link_engine, link_engine_version from runtimes where id = ${runtimeId}`)[0]!;
+      assert(declaration.link_agent === "edge-setup/v1.5.11" && declaration.link_hermes_version === "0.22.6",
+        "agent-less hello changed the agent or Hermes version");
+      assert(declaration.link_agent_seen_at.toISOString() === new Date(past).toISOString()
+        && declaration.capabilities_changed_at.toISOString() === new Date(past).toISOString(),
+        "agent-less hello changed the agent timestamp or capabilities marker");
+      assert(declaration.link_engine === "acp:opencode" && declaration.link_engine_version === "preview 2",
+        "agent-less hello did not write the engine");
+
+      // A legacy reconnect, even without agent, clears the identity back to Hermes.
+      await tx`set local role openedbot_api`;
+      await tx`select set_config('app.session_credential_hash', ${tokenHash}, true)`;
+      await writeLinkAgent(tx, scope, { agent: null, hermesVersion: null, generation: "7" });
+      await tx`reset role`;
+      engine = (await tx`select link_engine, link_engine_version, link_agent from runtimes where id = ${runtimeId}`)[0]!;
+      assert(engine.link_engine === null && engine.link_engine_version === null, "legacy reconnect retained the previous engine");
+      assert(engine.link_agent === "edge-setup/v1.5.11", "agent-less reconnect erased the agent");
+
       // A stale link generation writes nothing, marker included.
       await resetMarker();
       assert(!(await hello("edge-setup/v1.5.12", "6")), "stale generation reported a mark");

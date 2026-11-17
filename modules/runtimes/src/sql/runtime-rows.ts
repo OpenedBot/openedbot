@@ -31,6 +31,9 @@ export type RuntimeRow = {
   linkAgent?: string | null;
   /** `hello.hermesVersion` de la même déclaration (0162), brut ; absent des projections qui ne le lisent pas. */
   linkHermesVersion?: string | null;
+  /** Engine identity from the last admitted hello; null means Hermes. */
+  linkEngine?: string | null;
+  linkEngineVersion?: string | null;
   /** Origine signée à la dernière preuve (0110). Absente des projections qui ne la lisent pas. */
   linkOrigin?: string | null;
   linkAgentSeenAt?: Date | null;
@@ -78,6 +81,7 @@ export function readRuntimeRows(tx: Bun.TransactionSQL, organizationId: string) 
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",
@@ -106,6 +110,7 @@ export function readAllRuntimeRows(tx: Bun.TransactionSQL, organizationId: strin
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",
@@ -133,6 +138,7 @@ export function readRuntimeRowById(tx: Bun.TransactionSQL, organizationId: strin
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",

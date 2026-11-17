@@ -186,6 +186,7 @@ func (f Features) NewComparedTo(previous Features) Features {
 
 // File is the persisted document.
 type File struct {
+	Engine      string `json:"engine,omitempty"`
 	Schema      int    `json:"schema"`
 	ToolVersion string `json:"tool_version"`
 	Mode        Mode   `json:"mode"`
@@ -241,6 +242,9 @@ func LoadFrom(path string, owner fsx.Owner) (*File, error) {
 	var f File
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if f.EngineName() != EngineHermes && f.EngineName() != EngineOpenCode {
+		return nil, fmt.Errorf("unsupported host engine %q", f.Engine)
 	}
 	if f.Schema != 1 && f.Schema != SchemaVersion {
 		return nil, fmt.Errorf("%s: schema %d is not supported by this build (want 1 or %d)", path, f.Schema, SchemaVersion)
@@ -318,3 +322,16 @@ func dirOf(path string) string {
 	}
 	return "."
 }
+
+// EngineName treats an omitted engine as the default Hermes engine.
+func (f *File) EngineName() string {
+	if f == nil || f.Engine == "" {
+		return EngineHermes
+	}
+	return f.Engine
+}
+
+const (
+	EngineHermes   = "hermes"
+	EngineOpenCode = "acp:opencode"
+)

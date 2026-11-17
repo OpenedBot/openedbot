@@ -555,6 +555,8 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/text-array-binds.ts
 	bun tests/integration/provider-fallback-stream.ts
 	bun tests/integration/run-stop-cause.ts
+	bun tests/integration/engine-run-contract.ts
+	bun tests/integration/engine-profile-contract.ts
 	# S7 : un run suivi de bout en bout par un seul trace-id (API, worker, passerelle, connecteur Go réel, Hermes) ; exige go.
 	bun tests/integration/run-trace-correlation.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.
@@ -676,6 +678,8 @@ EDGE_SETUP_DIR ?= $(CURDIR)/edge-setup
 CONTRACT_GO  := $(EDGE_SETUP_DIR)
 CONTRACT_TS  := platform/hermes
 CONTRACT_COPIES := \
+	$(CONTRACT_GO)/test/golden/run-contract/routes.json=protocol/connector/fixtures/run-contract.routes.json \
+	$(CONTRACT_GO)/test/golden/run-contract/vectors.json=protocol/connector/fixtures/run-contract.vectors.json \
 	$(CONTRACT_GO)/test/golden/relay-frames/vectors.json=$(CONTRACT_TS)/tests/fixtures/relay-frames.vectors.json \
 	$(CONTRACT_GO)/test/golden/relay-allowlist/allowlist.json=$(CONTRACT_TS)/tests/fixtures/relay-allowlist.json \
 	$(CONTRACT_GO)/test/golden/forbidden-toolsets/forbidden-toolsets.json=modules/runtimes/tests/fixtures/forbidden-toolsets.json \

@@ -340,3 +340,16 @@ func (i ConnectorInstance) StateDir() string {
 	}
 	return ConnectorStateDir + "/" + string(i)
 }
+
+// Experimental Linux ACP engine, separate from the Hermes installation.
+const (
+	ACPBridgeUnit     = "openedbot-acp-bridge"
+	ACPBridgeUnitPath = "/etc/systemd/system/" + ACPBridgeUnit + ".service"
+	ACPAgentDir       = "/usr/local/lib/openedbot-opencode"
+	ACPAgentBinary    = ACPAgentDir + "/opencode"
+	ACPProfilesRoot   = RuntimeRoot + "/acp-profiles"
+	ACPBridgeState    = "/var/lib/" + ACPBridgeUnit
+	ACPConfigDir      = "/etc/hermes/opencode"
+	ACPConfig         = ACPConfigDir + "/opencode.json"
+	ACPCredentials    = "/etc/hermes/opencode.env"
+)

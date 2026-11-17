@@ -341,3 +341,56 @@ func TestSSEParsing(t *testing.T) {
 		t.Fatal("terminal detection")
 	}
 }
+
+func TestHelloEngineIdentity(t *testing.T) {
+	original := `{"t":"hello","protocol":1,"agent":"hermes-setup/1.0","hermesVersion":"0.22.2"}`
+	encoded, err := EncodeText(Text{T: THello, Protocol: 1, Agent: "hermes-setup/1.0", HermesVersion: "0.22.2"})
+	if err != nil || string(encoded) != original {
+		t.Fatalf("legacy hello changed: %s, %v", encoded, err)
+	}
+	engine := Text{T: THello, Protocol: 1, Engine: "acp:opencode", EngineVersion: "preview 1"}
+	encoded, err = EncodeText(engine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeText(encoded)
+	if err != nil || decoded.Engine != engine.Engine || decoded.EngineVersion != engine.EngineVersion {
+		t.Fatalf("engine identity lost: %+v, %v", decoded, err)
+	}
+}
+
+func TestHelloEngineKeysAreCaseSensitive(t *testing.T) {
+	for _, input := range []string{
+		`{"t":"hello","protocol":1,"ENGINE":""}`,
+		`{"t":"hello","protocol":1,"ENGINEVERSION":123}`,
+		`{"t":"hello","PROTOCOL":1,"engine":"acp:opencode","ENGINE":123,"engineVersion":"preview 1","EngineVersion":false}`,
+	} {
+		decoded, err := DecodeText([]byte(input))
+		if err != nil {
+			t.Fatalf("%s: %v", input, err)
+		}
+		if strings.Contains(input, `"engine":`) {
+			if decoded.Engine != "acp:opencode" || decoded.EngineVersion != "preview 1" {
+				t.Fatalf("exact engine keys lost: %+v", decoded)
+			}
+		} else if decoded.Engine != "" || decoded.EngineVersion != "" {
+			t.Fatalf("non-exact engine keys decoded: %+v", decoded)
+		}
+	}
+}
+
+func TestHelloInvalidEngine(t *testing.T) {
+	for _, engine := range []string{"", "Hermes", "acp/opencode", strings.Repeat("a", 65), "hermes\n"} {
+		encoded, _ := json.Marshal(map[string]any{"t": THello, "protocol": 1, "engine": engine})
+		if _, err := DecodeText(encoded); err == nil {
+			t.Errorf("accepted engine %q", engine)
+		}
+	}
+	for _, count := range []int{64, 65} {
+		encoded, _ := EncodeText(Text{T: THello, Protocol: 1, EngineVersion: strings.Repeat("é", count)})
+		_, err := DecodeText(encoded)
+		if (err == nil) != (count == 64) {
+			t.Errorf("engineVersion of %d characters: %v", count, err)
+		}
+	}
+}

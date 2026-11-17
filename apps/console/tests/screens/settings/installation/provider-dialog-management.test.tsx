@@ -36,7 +36,7 @@ const API_KEY_PLACEHOLDER = t("fr", "modelsSettings.apiKeyPlaceholder");
 
 const connectorRuntime: RuntimePublicDto = {
   id: "runtime-1",
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: null,
   transport: "connector",
   reachability: "connector",

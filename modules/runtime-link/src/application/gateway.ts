@@ -116,6 +116,8 @@ export type LinkSocketData = {
   pop?: LinkPopState | null;
   /** `hello.hermesVersion`, écrit avec l'agent au `bind` (0162). */
   hermesVersion?: string | null;
+  engine?: string | null;
+  engineVersion?: string | null;
   /** Hors production : `ws://127.0.0.1:<port>` du tunnel composé (en-tête `Host`), voir devTunnelWsUrl. */
   devTunnelWsUrl?: string | null;
 };
@@ -340,7 +342,10 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       log("runtime_link.audit_key_sent", { runtimeId: identity.runtimeId, keyId: keys.current.keyId, previous: keys.previous.length });
     }
     if (ws.data.credential.kind === "link") {
-      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, { peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null });
+      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, {
+        peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null,
+        engine: ws.data.engine ?? null, engineVersion: ws.data.engineVersion ?? null,
+      });
     }
     await sendLinkContext(connection, identity);
   }
@@ -543,6 +548,8 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
         const connection = broker.open(ws);
         connection.agent = frame.agent ?? null;
         ws.data.hermesVersion = frame.hermesVersion ?? null;
+        ws.data.engine = frame.engine ?? null;
+        ws.data.engineVersion = frame.engineVersion ?? null;
         // Ce que l'hôte sait faire, tel qu'il l'a dit : rien de plus.
         connection.features = frame.features ?? [];
         connection.devicePublicKey = frame.devicePublicKey ?? null;

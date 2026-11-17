@@ -1,0 +1,112 @@
+[
+  {
+    "method": "GET",
+    "path": "/health",
+    "mandatory": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/capabilities",
+    "mandatory": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/toolsets",
+    "mandatory": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/sessions",
+    "mandatory": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs",
+    "mandatory": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/runs/{id}",
+    "mandatory": true
+  },
+  {
+    "method": "GET",
+    "path": "/v1/runs/{id}/events",
+    "mandatory": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}/stop",
+    "mandatory": true
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}/approval",
+    "mandatory": true
+  },
+  {
+    "method": "GET",
+    "path": "/api/model/options",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/sessions/{id}",
+    "mandatory": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/sessions/{id}",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/sessions/{id}/messages",
+    "mandatory": false
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}/steer",
+    "mandatory": false
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}/resolve-unknown",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/v1/models",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/v1/skills",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/mcp/servers",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/hermes-setup/capabilities",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/hermes-setup/workspace/files/{file}",
+    "mandatory": false
+  },
+  {
+    "method": "GET",
+    "path": "/hermes-setup/profiles/{slug}/workspace/files/{file}",
+    "mandatory": false
+  },
+  {
+    "method": "POST",
+    "path": "/hermes-setup/profiles/{slug}/model",
+    "mandatory": false
+  }
+]

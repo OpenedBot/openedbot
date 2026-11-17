@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,5 +79,32 @@ func TestFeaturesMergeAndDelta(t *testing.T) {
 	delta := effective.NewComparedTo(previous)
 	if !delta.Firewall || !delta.SudoLogging || delta.SSHHardening || len(delta.AllowedInbound) != 2 {
 		t.Fatalf("unexpected delta: %+v", delta)
+	}
+}
+
+func TestEngineStateRoundTrip(t *testing.T) {
+	for _, engine := range []string{EngineHermes, EngineOpenCode} {
+		st := New("test")
+		if engine != EngineHermes {
+			st.Engine = engine
+		}
+		path := filepath.Join(t.TempDir(), "state.json")
+		if err := st.SaveTo(path, fsx.Current()); err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := LoadFrom(path, fsx.Current())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loaded.EngineName() != engine {
+			t.Fatal("engine state lost")
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if engine == EngineHermes && bytes.Contains(data, []byte(`"engine"`)) {
+			t.Fatal("default state representation changed")
+		}
 	}
 }

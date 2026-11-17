@@ -232,3 +232,22 @@ func PythonMinor() string {
 	}
 	return parts[0] + "." + parts[1]
 }
+
+// OpenCodeVersion and archive digests come from the official GitHub release
+// asset metadata at /repos/anomalyco/opencode/releases/tags/v1.19.6.
+const OpenCodeVersion = "1.19.6"
+
+type OpenCodeRelease struct{ Target, SHA256 string }
+
+var OpenCodeArches = map[string]OpenCodeRelease{
+	"amd64": {"x64-baseline", "8443113b3f3dfebf8b0fa91c4377e5519a62b9231732d9344a5df001e4a852b3"},
+	"arm64": {"arm64", "5b68c1f4c5e75b4134e664cc8f36d634d64208d4fcfe5bcf3b48bab699c2dbac"},
+}
+
+func OpenCodeArchiveURL(a OpenCodeRelease) string {
+	return "https://github.com/anomalyco/opencode/releases/download/v" + OpenCodeVersion + "/opencode-linux-" + a.Target + ".tar.gz"
+}
+
+// OpenCodeSystemPackages provide TLS, project discovery and the Linux
+// account, listener and privilege tools used by the ACP host.
+var OpenCodeSystemPackages = []string{"ca-certificates", "git", "iproute2", "passwd", "util-linux"}

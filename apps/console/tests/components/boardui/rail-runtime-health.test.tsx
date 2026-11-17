@@ -19,7 +19,7 @@ const realFetch = globalThis.fetch;
 function runtime(overrides: Partial<RuntimePublicDto> = {}): RuntimePublicDto {
   return {
     id: "6f0a1b2c-3d4e-4f50-9a1b-2c3d4e5f6071",
-    configured: true,
+    configured: true, engine: "hermes", engineVersion: null,
     baseUrl: null,
     reachability: "connector",
     transport: "connector",

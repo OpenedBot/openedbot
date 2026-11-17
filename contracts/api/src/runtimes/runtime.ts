@@ -8,6 +8,10 @@ import type { RuntimeHealthStatus } from "../shared/domain";
 export type RuntimePublicDto = {
   id: string | null;
   configured: boolean;
+  /** Engine declared by the last admitted host; Hermes when not declared. */
+  engine: string;
+  /** Raw engine version; falls back to the Hermes version for Hermes hosts. */
+  engineVersion: string | null;
   /** `null` for a `connector` runtime: no URL exists on the cloud side. */
   baseUrl: string | null;
   reachability: RuntimeReachability;

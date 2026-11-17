@@ -139,7 +139,7 @@ const emptyInventory: RuntimeIntegrationInventoryDto = {
 const declaredRuntime: RuntimePublicDto = {
   id: "rt-1",
   name: "Hermes",
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: "https://hermes.example.test",
   transport: "connector",
   reachability: "connector",

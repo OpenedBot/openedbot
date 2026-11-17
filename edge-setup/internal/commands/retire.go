@@ -63,7 +63,11 @@ func retireLink(ctx context.Context, env cli.Env, inst layout.ConnectorInstance)
 	// No gateway and no bearer: a retiring session refuses every request.
 	c := connector.New(lf.WSURL, connector.Auth{RuntimeID: lf.RuntimeID, LinkToken: lf.LinkToken}, "http://127.0.0.1:8642", "", nil)
 	c.Agent = "edge-setup/" + env.Version
-	c.HermesVersion = installedHermesVersion()
+	st, err := loadConnectorState()
+	if err != nil {
+		return lf.RuntimeID, err
+	}
+	configureConnectorEngine(c, st.EngineName())
 	c.DeviceKey = key
 	if err := retireSession(ctx, c); err != nil {
 		if ctx.Err() != nil {
