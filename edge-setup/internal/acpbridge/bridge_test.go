@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,6 +32,19 @@ func TestACPAgent(t *testing.T) {
 		return
 	}
 	scenario := os.Args[marker+1]
+	if scenario == "child" {
+		conn, err := net.Dial("tcp", os.Args[marker+2])
+		if err != nil {
+			os.Exit(20)
+		}
+		_, _ = fmt.Fprintln(conn, os.Getpid())
+		ready := os.NewFile(3, "ready")
+		fmt.Fprintln(ready, "child ready")
+		_ = ready.Close()
+		_, _ = io.Copy(io.Discard, conn)
+		_ = conn.Close()
+		os.Exit(0)
+	}
 	enc := json.NewEncoder(os.Stdout)
 	send := func(id json.RawMessage, result any) {
 		_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
@@ -87,6 +102,27 @@ func TestACPAgent(t *testing.T) {
 			promptID = m.ID
 			sessionID = p["sessionId"].(string)
 			switch scenario {
+			case "children", "children-crash":
+				child := exec.Command(os.Args[0], "-test.run=^TestACPAgent$", "--", "--acp-fake", "child", os.Args[marker+2])
+				readyReader, readyWriter, err := os.Pipe()
+				if err != nil {
+					os.Exit(21)
+				}
+				child.Stdout = os.Stdout
+				child.ExtraFiles = []*os.File{readyWriter}
+				if child.Start() != nil {
+					os.Exit(21)
+				}
+				_ = readyWriter.Close()
+				ready := bufio.NewScanner(readyReader)
+				if !ready.Scan() {
+					os.Exit(22)
+				}
+				_ = readyReader.Close()
+				if scenario == "children-crash" {
+					os.Exit(23)
+				}
+				permission()
 			case "environment":
 				found := false
 				for _, entry := range os.Environ() {
@@ -145,7 +181,7 @@ func TestACPAgent(t *testing.T) {
 			if scenario == "timeout-ignore" {
 				continue
 			}
-			if scenario == "cancel-no-response" {
+			if scenario == "cancel-no-response" || scenario == "children" {
 				continue
 			}
 			reason := "cancelled"
@@ -1063,5 +1099,55 @@ func TestFinalToolCallsAndUnmatchedCompletions(t *testing.T) {
 	_, raw = f.request("GET", "/v1/runs/"+id, nil, "")
 	if !strings.Contains(string(raw), `"unmatched_tool_completions":1`) {
 		t.Fatal("completion count did not persist")
+	}
+}
+
+func TestAgentStopTerminatesChildProcesses(t *testing.T) {
+	for _, mode := range []string{"stop", "close", "crash"} {
+		t.Run(mode, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			_ = listener.(*net.TCPListener).SetDeadline(time.Now().Add(5 * time.Second))
+			scenario := "children"
+			if mode == "crash" {
+				scenario = "children-crash"
+			}
+			f := newFixture(t, scenario)
+			f.b.opts.AgentArguments = append(f.b.opts.AgentArguments, listener.Addr().String())
+			f.b.opts.Limits.CancelTimeout = 20 * time.Millisecond
+			f.b.opts.Limits.TurnTimeout = 500 * time.Millisecond
+			f.session("cloud")
+			id := f.run(input("cloud"), "")
+			conn, err := listener.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			reader := bufio.NewReader(conn)
+			if _, err := reader.ReadString('\n'); err != nil {
+				t.Fatal("child did not report readiness")
+			}
+			switch mode {
+			case "stop":
+				f.await(id, "approval.request")
+				f.request("POST", "/v1/runs/"+id+"/stop", nil, "")
+				expectTerminal(t, f.events(id), "run.cancelled")
+			case "close":
+				f.await(id, "approval.request")
+				if err := f.b.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "crash":
+				expectTerminal(t, f.events(id), "run.interrupted")
+			}
+			_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+			if _, err := reader.ReadByte(); err != io.EOF {
+				t.Fatalf("agent child still holds its connection after %s: %v", mode, err)
+			}
+		})
 	}
 }

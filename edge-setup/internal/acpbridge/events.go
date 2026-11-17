@@ -170,6 +170,6 @@ func (b *Bridge) failActiveLocked(r *run, message string) {
 	b.cancelPermissionsLocked(r)
 	b.finishLocked(r, "failed", message)
 	if r.client != nil {
-		_ = r.client.cmd.Process.Kill()
+		r.client.kill()
 	}
 }

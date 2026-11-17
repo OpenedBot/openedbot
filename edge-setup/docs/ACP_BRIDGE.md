@@ -151,3 +151,14 @@ Un `tool_call` déjà `completed` ou `failed` produit immédiatement
 terminale sans début connu est ignorée et incrémente
 `unmatched_tool_completions`, conservé dans l'en-tête et exposé sur le statut
 du run ; elle ne fait pas échouer le tour ni arrêter le processus partagé.
+
+## Arrêt des descendants
+
+L'agent démarre dans son propre groupe de processus (`Setpgid`), comme les
+commandes hôte du paquet `internal/exec` sur Linux et macOS. Les chemins
+d'arrêt forcé, de panne et de fermeture signalent ce groupe par `SIGKILL`,
+y compris les shells et outils descendants qui en ont hérité. Le signal n'est
+envoyé qu'une fois. La sortie du parent est détectée indépendamment du pipe
+stdout : même si un enfant l'a hérité, le pont arrête le groupe puis draine
+les messages déjà écrits avant de terminer les appels ACP. Le test attend la
+fermeture d'une connexion possédée par un enfant, sans sondage par temporisation.

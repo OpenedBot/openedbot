@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 )
 
 var errAgentExited = errors.New("ACP agent exited")
@@ -32,18 +34,20 @@ type rpcReply struct {
 	err    error
 }
 type rpcClient struct {
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
-	writeMu sync.Mutex
-	mu      sync.Mutex
-	next    uint64
-	pending map[string]chan rpcReply
-	dead    error
-	done    chan struct{}
+	cmd      *exec.Cmd
+	stdin    io.WriteCloser
+	writeMu  sync.Mutex
+	mu       sync.Mutex
+	next     uint64
+	pending  map[string]chan rpcReply
+	dead     error
+	done     chan struct{}
+	killOnce sync.Once
 }
 
 func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
 	cmd := exec.Command(command, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Dir = cwd
 	cmd.Env = env
 	// Agent stderr is discarded: it may contain credentials or prompt content.
@@ -52,17 +56,26 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 	if err != nil {
 		return nil, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	stdout, stdoutWriter, err := os.Pipe()
 	if err != nil {
 		_ = stdin.Close()
 		return nil, err
 	}
+	cmd.Stdout = stdoutWriter
 	if err = cmd.Start(); err != nil {
 		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stdoutWriter.Close()
 		return nil, err
 	}
+	_ = stdoutWriter.Close()
 	c := &rpcClient{cmd: cmd, stdin: stdin, pending: map[string]chan rpcReply{}, done: make(chan struct{})}
+	// Own stdout independently of cmd.Wait so buffered protocol messages drain
+	// after parent exit, while inherited child pipes cannot hide that exit.
+	waited := make(chan struct{})
+	go func() { _ = cmd.Wait(); c.kill(); close(waited) }()
 	go func() {
+		defer stdout.Close()
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 4096), 1024*1024)
 		cause := errAgentExited
@@ -74,7 +87,7 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 				incoming(c, rpcMessage{})
 				if invalidCount > invalidLimit {
 					cause = errInvalidLines
-					_ = cmd.Process.Kill()
+					c.kill()
 					break
 				}
 				continue
@@ -96,8 +109,8 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 				}
 			}
 		}
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		c.kill()
+		<-waited
 		_ = stdin.Close()
 		c.mu.Lock()
 		c.dead = cause
@@ -159,7 +172,10 @@ func (c *rpcClient) respond(id json.RawMessage, result any) error {
 	}
 	return c.write(rpcMessage{JSONRPC: "2.0", ID: id, Result: raw})
 }
-func (c *rpcClient) stop() { _ = c.cmd.Process.Kill(); <-c.done }
+func (c *rpcClient) kill() {
+	c.killOnce.Do(func() { _ = syscall.Kill(-c.cmd.Process.Pid, syscall.SIGKILL) })
+}
+func (c *rpcClient) stop() { c.kill(); <-c.done }
 func (c *rpcClient) alive() bool {
 	select {
 	case <-c.done:
