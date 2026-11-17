@@ -1214,7 +1214,7 @@ export function ConversationScreen() {
           />
         </ConversationAvailability>}
         {/* A missing profile blocks sending, but the operator can still return home. */}
-        {profileMissing && profileStatus.data ? <BotProfileRepair bot={bot} status={profileStatus.data} onClose={closeConversation} /> : null}
+        {!readFailed && profileMissing && profileStatus.data ? <BotProfileRepair bot={bot} status={profileStatus.data} onClose={closeConversation} /> : null}
         </div>
         <AttachmentCanvas />
       </div>
