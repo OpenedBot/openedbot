@@ -336,7 +336,7 @@
   background-color: transparent;
 }
 
-/* The model picker and its effort panel (`composer-model-picker.tsx`,
+/* The model picker and its effort panel (`composer-model-picker-view.tsx`,
    a clone of boardui.com « Multi-agent Chat »): the same entry as above but
    on the template's ease-out curve, a symmetric exit (Radix waits for the
    animation to end before unmounting), and the zoom origin on the

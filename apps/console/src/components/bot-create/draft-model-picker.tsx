@@ -4,7 +4,7 @@ import { isHermesReasoningEffort, type HermesReasoningEffort } from "@openedbot/
 import { catalogModelView, globalModelIsAutomatic, resolveThreadModel, runtimeGlobalModel } from "@/lib/bots/model-catalog";
 import { api, queryKeys, runtimesQueryOptions } from "../../lib/api";
 import { displayedRuntimeHealth } from "../../lib/runtime/runtime-health";
-import { ComposerModelPicker } from "../composer-model-picker";
+import { ComposerModelPicker } from "../composer-model-picker-view";
 
 /** The model a bot will be created with: `null` follows the runtime's model. */
 export type DraftModelChoice = {
