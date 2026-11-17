@@ -1,4 +1,5 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import { RiFlashlightFill } from "@remixicon/react";
 import { CommandGroup, CommandItem } from "@openedbot/browser-ui-kit";
 import type { RuntimeModelDto, RuntimeModelProviderDto } from "@openedbot/contracts-api";
 import { useT } from "../../../../lib/i18n";
@@ -152,12 +153,18 @@ export function ModelPreferenceCombobox({
   disabled,
   onValueChange,
   id = "runtime-model-model",
+  inline,
+  showFast = false,
 }: {
   models: RuntimeModelDto[];
   value: string | null;
   disabled?: boolean;
   onValueChange: (value: string) => void;
   id?: string;
+  /** See `SearchCombobox`: the search inside the field, the list under it. */
+  inline?: boolean;
+  /** A faint bolt on the models that offer a fast mode, as in the composer's picker. */
+  showFast?: boolean;
 }) {
   const { t } = useT();
   const ordered = modelsByRelease(models, [value]);
@@ -166,6 +173,7 @@ export function ModelPreferenceCombobox({
       id={id}
       triggerLabel={value ?? t("modelsSettings.noModel")}
       disabled={disabled}
+      inline={inline}
       searchPlaceholder={t("modelsSettings.modelSearchPlaceholder")}
       emptyText={t("modelsSettings.modelSearchEmpty")}
     >
@@ -182,6 +190,12 @@ export function ModelPreferenceCombobox({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{model.id}</span>
+              {showFast && model.fast ? (
+                <span title={t("composer.modelFastAvailable")} className="flex shrink-0">
+                  <RiFlashlightFill aria-hidden className="size-3.5 text-muted-foreground/60" />
+                  <span className="sr-only">{t("composer.modelFastAvailable")}</span>
+                </span>
+              ) : null}
               {model.isRuntimeDefault ? (
                 <span className="shrink-0 text-xs text-muted-foreground">{t("modelsSettings.defaultBadge")}</span>
               ) : null}

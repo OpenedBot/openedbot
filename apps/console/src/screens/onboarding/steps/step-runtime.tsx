@@ -1,21 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { directProbePassed } from "../../../components/runtime-direct";
 import { RuntimeReplacement } from "../../settings/installation/cloud";
 import { CheckCircle2, Loader2, Plug } from "lucide-react";
-import type { RuntimeModelProviderDto } from "@openedbot/contracts-api";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue, toast } from "@openedbot/browser-ui-kit";
-import { ObButton, Field, FieldDescription, FieldGroup, FieldLabel } from "@openedbot/browser-ui-kit/components/onboarding";
+import { DEFAULT_REASONING_EFFORT, HERMES_REASONING_EFFORTS, type HermesReasoningEffort, type RuntimeModelProviderDto } from "@openedbot/contracts-api";
+import { cn, CommandGroup, CommandItem, Skeleton, SkeletonRegion, toast } from "@openedbot/browser-ui-kit";
+import { ObButton, FieldLabel } from "@openedbot/browser-ui-kit/components/onboarding";
 import { api, errorMessage, queryKeys } from "../../../lib/api";
 import { EMPTY_RUNTIME_DRAFT, readOnboardingDraft, writeOnboardingDraft } from "../../../lib/session/onboarding-draft";
 import { useT } from "../../../lib/i18n";
-import { modelsByRelease } from "../../../lib/bots/model-catalog";
 import { defaultTierModel } from "@openedbot/runtimes/domain/runtime/default-model";
 import { ProviderConfigDialog } from "../../settings/installation/models";
+import { ModelPreferenceCombobox } from "../../settings/installation/models/models-provider-combobox";
+import { SearchCombobox } from "../../settings/installation/models/models-search-combobox";
+import { ProviderIcon } from "../../../components/provider-icon";
+import { effortLabel } from "../../../lib/bots/effort-label";
+import { RiFlashlightFill } from "@remixicon/react";
+import { CARD_DESCRIPTION, CARD_TITLE, SETTINGS_INSET, SETTINGS_SHELL, SETTINGS_SHELL_HEADER } from "../../../components/settings/primitives";
 import { StepFooter, StepHeading } from "../components/step-shell";
 
 const MODEL_VERIFY_POLL_MS = 1_000;
 const MODEL_VERIFY_TIMEOUT_MS = 3 * 60_000;
+/** Past this wait, the status line says why it can last (a host that just restarted reconnects within a minute). */
+const SLOW_WAIT_MS = 10_000;
 
 type Translate = ReturnType<typeof useT>["t"];
 
@@ -48,6 +55,11 @@ export function StepRuntime({
   // replace them automatically if the reread catalog no longer offers them.
   const [providerSlug, setProviderSlug] = useState(draft.providerSlug);
   const [modelId, setModelId] = useState(draft.modelId);
+  // `null`: the runtime decides. Starts from the effort already saved on the runtime.
+  const [effort, setEffort] = useState<HermesReasoningEffort | null>(null);
+  useEffect(() => {
+    if (runtime) setEffort(runtime.reasoningEffort);
+  }, [runtime?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [providerDialogSlug, setProviderDialogSlug] = useState<string | null>(null);
 
   // A row in the database is not proof of availability. This probe
@@ -116,7 +128,11 @@ export function StepRuntime({
 
   const saveSelection = useMutation({
     mutationFn: async () => {
-      const saved = await api.saveRuntimeModelSelection(runtime!.id!, { provider: providerSlug, model: modelId });
+      const saved = await api.saveRuntimeModelSelection(runtime!.id!, {
+        provider: providerSlug,
+        model: modelId,
+        reasoningEffort: selectedModel?.reasoning ? effort : null,
+      });
       const status = saved.modelSelection?.status;
       // 202: the server proves the model with a real trial (about ten
       // seconds for a large model). The welcome does not wait: the proof
@@ -152,6 +168,18 @@ export function StepRuntime({
   const providerToConfigure: RuntimeModelProviderDto | null = modelCatalog.data?.providers
     .find((provider) => provider.slug === providerDialogSlug) ?? null;
   const ready = Boolean(!configuration.error && !modelCatalog.error && runtime?.id && runtimeVerified && selectedUsable && selectedModel);
+  // Probe then catalog: ONE status line follows them in the machine card, and
+  // the fields keep their final place as a silhouette until the catalog lands.
+  const probing = Boolean(runtime?.id) && runtimeProbe.isPending;
+  const catalogLoading = runtimeVerified && modelCatalog.isPending;
+  const waiting = probing || catalogLoading;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (!waiting) return;
+    const timer = setTimeout(() => setSlow(true), SLOW_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [waiting]);
 
   return (
     <div className="flex flex-col gap-8 pt-2 sm:pt-6">
@@ -159,7 +187,12 @@ export function StepRuntime({
         title={t("onboarding.runtime.title")}
         description={t("onboarding.runtime.description")}
       />
-      {configuration.isPending ? <p role="status">{t("onboarding.runtime.machineLoading")}</p> : null}
+      {configuration.isPending ? (
+        <SkeletonRegion label={t("onboarding.runtime.machineLoading")} className="space-y-3 rounded-lg border bg-muted/30 px-4 py-3">
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-1/2" />
+        </SkeletonRegion>
+      ) : null}
       {configuration.error ? (
         <div className="space-y-3">
           <p className="text-sm text-destructive-text" role="alert">{errorMessage(configuration.error, t("onboarding.runtime.machineLoadFailed"))}</p>
@@ -176,8 +209,14 @@ export function StepRuntime({
       {runtime ? (
         <div className="space-y-3 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
           <p>{t("onboarding.runtime.machineLabel")} : <strong>{runtime.name}</strong> · {runtime.reachability === "direct" ? t("onboarding.runtime.machineDirect") : t("onboarding.runtime.machineConnector")}</p>
-          {runtimeProbe.isPending ? <p className="flex items-center gap-2" role="status"><Loader2 className="size-4 animate-spin" aria-hidden />{t("onboarding.runtime.machineChecking")}</p> : null}
-          {runtimeVerified ? <p className="flex items-center gap-2 text-pos-700" role="status"><CheckCircle2 className="size-4" aria-hidden />{t("onboarding.runtime.machineVerified")}</p> : null}
+          {waiting ? (
+            <p className="flex items-center gap-2 text-muted-foreground" role="status">
+              <Loader2 className="size-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+              {probing ? t("onboarding.runtime.machineChecking") : t("onboarding.runtime.catalogLoading")}
+            </p>
+          ) : null}
+          {waiting && slow ? <p className="text-caption text-muted-foreground">{t("onboarding.runtime.machineSlow")}</p> : null}
+          {runtimeVerified && !catalogLoading ? <p className="flex items-center gap-2 text-pos-700" role="status"><CheckCircle2 className="size-4" aria-hidden />{t("onboarding.runtime.machineVerified")}</p> : null}
           {/*
             A host that does not offer `provider_management` over the outgoing link
             will receive no credential from this interface: say so here,
@@ -191,7 +230,19 @@ export function StepRuntime({
         </div>
       ) : null}
 
-      {runtimeVerified && modelCatalog.isPending ? <p className="flex items-center gap-2" role="status"><Loader2 className="size-4 animate-spin" aria-hidden />{t("onboarding.runtime.catalogLoading")}</p> : null}
+      {waiting ? (
+        // The card already in its final shape: real title and sentence, a
+        // silhouette in place of each field (`h-11`, `rounded-[10px]` of the trigger).
+        <AiCard t={t}>
+          <div aria-hidden className="flex flex-col gap-4">
+            <Skeleton className="h-11 rounded-[10px]" />
+            <div className="flex flex-col gap-2">
+              <FieldLabel>{t("onboarding.runtime.modelLabel")}</FieldLabel>
+              <Skeleton className="h-11 rounded-[10px]" />
+            </div>
+          </div>
+        </AiCard>
+      ) : null}
       {modelCatalog.error ? (
         <div className="space-y-3">
           <p className="text-sm text-destructive-text" role="alert">{errorMessage(modelCatalog.error, t("onboarding.runtime.catalogUnavailable"))}</p>
@@ -199,93 +250,144 @@ export function StepRuntime({
         </div>
       ) : null}
       {modelCatalog.data ? (
-        <FieldGroup>
-          <Field data-disabled={providerOptions.length === 0 || undefined}>
-            <FieldLabel htmlFor="onboarding-provider">{t("onboarding.runtime.providerLabel")}</FieldLabel>
-            <FieldDescription>{t("onboarding.runtime.providerHint")}</FieldDescription>
-            <Select
-              value={providerSlug}
+        <AiCard t={t}>
+          <div className="flex flex-col gap-4">
+            <SearchCombobox
+              id="onboarding-provider"
+              triggerLabel={selectedProvider ? (
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <ProviderIcon provider={selectedProvider.slug} name={selectedProvider.name} decorative withTitle={false} />
+                  <span className="truncate">{selectedProvider.name}</span>
+                </span>
+              ) : <span className="text-muted-foreground">{t("onboarding.runtime.providerPlaceholder")}</span>}
               disabled={providerOptions.length === 0}
-              onValueChange={(slug) => {
-                const provider = providerOptions.find((candidate) => candidate.slug === slug) ?? null;
-                setProviderSlug(slug);
-                setModelId(provider && isUsable(provider) ? defaultModel(provider) : "");
-              }}
+              inline
+              searchPlaceholder={t("modelsSettings.providerSearchPlaceholder")}
+              emptyText={t("modelsSettings.providerSearchEmpty")}
             >
-              <SelectTrigger id="onboarding-provider">
-                <SelectValue placeholder={t("onboarding.runtime.providerPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {readyOptions.length > 0 ? (
-                  <SelectGroup>
-                    <SelectLabel>{t("onboarding.runtime.providerGroupReady")}</SelectLabel>
-                    {readyOptions.map((provider) => (
-                      <SelectItem key={provider.slug} value={provider.slug}>{provider.name}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : null}
-                {readyOptions.length > 0 && connectOptions.length > 0 ? <SelectSeparator /> : null}
-                {connectOptions.length > 0 ? (
-                  <SelectGroup>
-                    <SelectLabel>{t("onboarding.runtime.providerGroupToConnect")}</SelectLabel>
-                    {connectOptions.map((provider) => (
-                      <SelectItem key={provider.slug} value={provider.slug}>{provider.name}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                ) : null}
-              </SelectContent>
-            </Select>
-          </Field>
+              {(close) => {
+                const pick = (provider: RuntimeModelProviderDto) => {
+                  close();
+                  setProviderSlug(provider.slug);
+                  setModelId(isUsable(provider) ? defaultModel(provider) : "");
+                };
+                return (
+                  <>
+                    {readyOptions.length > 0 ? (
+                      <CommandGroup heading={t("onboarding.runtime.providerGroupReady")}>
+                        {readyOptions.map((provider) => (
+                          <CommandItem
+                            key={provider.slug}
+                            value={`${provider.name} ${provider.slug}`}
+                            data-checked={provider.slug === providerSlug ? true : undefined}
+                            onSelect={() => pick(provider)}
+                          >
+                            <ProviderIcon provider={provider.slug} name={provider.name} decorative withTitle={false} />
+                            <span className="min-w-0 flex-1 truncate">{provider.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ) : null}
+                    {connectOptions.length > 0 ? (
+                      <CommandGroup heading={t("onboarding.runtime.providerGroupToConnect")}>
+                        {connectOptions.map((provider) => (
+                          <CommandItem
+                            key={provider.slug}
+                            value={`${provider.name} ${provider.slug}`}
+                            data-checked={provider.slug === providerSlug ? true : undefined}
+                            className="text-muted-foreground"
+                            onSelect={() => pick(provider)}
+                          >
+                            <ProviderIcon provider={provider.slug} name={provider.name} decorative withTitle={false} className="opacity-60" />
+                            <span className="min-w-0 flex-1 truncate">{provider.name}</span>
+                            <Plug aria-hidden className="size-3.5 text-muted-foreground/70" />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ) : null}
+                  </>
+                );
+              }}
+            </SearchCombobox>
 
-          {selectedProvider && !selectedUsable ? (
-            // The chosen provider does not answer yet: linking it is THE next
-            // gesture, right under it, not a parallel form.
-            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-muted-foreground">{t("onboarding.runtime.providerNotConnected", { provider: selectedProvider.name })}</p>
-              <ObButton
-                type="button"
-                variant="secondary"
-                className="shrink-0"
-                onClick={() => setProviderDialogSlug(selectedProvider.slug)}
-              >
-                <Plug aria-hidden />
-                {t("onboarding.runtime.providerConnect", { provider: selectedProvider.name })}
-              </ObButton>
-            </div>
-          ) : null}
+            {selectedProvider && !selectedUsable ? (
+              // The chosen provider does not answer yet: linking it is THE next
+              // gesture, right under it, not a parallel form.
+              <div className="flex flex-col gap-3 rounded-[10px] bg-muted/40 px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-muted-foreground">{t("onboarding.runtime.providerNotConnected", { provider: selectedProvider.name })}</p>
+                <ObButton
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => setProviderDialogSlug(selectedProvider.slug)}
+                >
+                  <Plug aria-hidden />
+                  {t("onboarding.runtime.providerConnect", { provider: selectedProvider.name })}
+                </ObButton>
+              </div>
+            ) : null}
 
-          {selectedUsable ? (
-            <Field>
-              <FieldLabel htmlFor="onboarding-model">{t("onboarding.runtime.modelLabel")}</FieldLabel>
-              <Select value={modelId} onValueChange={setModelId} disabled={selectedUsable.models.length === 0}>
-                <SelectTrigger id="onboarding-model">
-                  <SelectValue placeholder={t("onboarding.runtime.modelPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <SelectGroup>
-                    {modelsByRelease(selectedUsable.models).map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <span className="block max-w-[min(28rem,75vw)] truncate font-mono">{model.id}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
+            {selectedUsable ? (
+              <div className="flex flex-col gap-2">
+                <FieldLabel htmlFor="onboarding-model">{t("onboarding.runtime.modelLabel")}</FieldLabel>
+                <ModelPreferenceCombobox
+                  id="onboarding-model"
+                  models={selectedUsable.models}
+                  value={modelId || null}
+                  disabled={selectedUsable.models.length === 0}
+                  onValueChange={setModelId}
+                  inline
+                  showFast
+                />
+              </div>
+            ) : null}
 
-          {providerOptions.length === 0 ? (
-            <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive-text" role="alert">
-              {t("onboarding.runtime.providerMissing")}
-            </p>
-          ) : null}
-        </FieldGroup>
+            {selectedModel ? (
+              // The effort follows the model: a model that does not reason gets
+              // no control, only the sentence that says why.
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel id="onboarding-effort">{t("onboarding.runtime.effortLabel")}</FieldLabel>
+                  {selectedModel.fast ? (
+                    <span className="flex shrink-0 items-center gap-1 text-caption text-muted-foreground">
+                      <RiFlashlightFill aria-hidden className="size-3.5 text-accent-500" />
+                      {t("onboarding.runtime.fastPerBot")}
+                    </span>
+                  ) : null}
+                </div>
+                {selectedModel.reasoning ? (
+                  <>
+                    <EffortSegments
+                      t={t}
+                      value={effort ?? DEFAULT_REASONING_EFFORT}
+                      disabled={saveSelection.isPending}
+                      onChange={setEffort}
+                    />
+                    <p className="text-caption text-muted-foreground" aria-live="polite">
+                      {t(EFFORT_HINTS[effort ?? DEFAULT_REASONING_EFFORT])}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-caption text-muted-foreground">{t("composer.modelNoEffort")}</p>
+                )}
+              </div>
+            ) : null}
+
+            {providerOptions.length === 0 ? (
+              <p className="text-sm text-destructive-text" role="alert">
+                {t("onboarding.runtime.providerMissing")}
+              </p>
+            ) : null}
+          </div>
+        </AiCard>
       ) : null}
 
       <StepFooter
         hint={ready
           ? t("onboarding.runtime.footerReady")
-          : selectedProvider && !selectedUsable
+          : waiting
+            ? t("onboarding.runtime.footerWaiting")
+            : selectedProvider && !selectedUsable
             ? t("onboarding.runtime.footerConnect", { provider: selectedProvider.name })
             : t("onboarding.runtime.footerMissing")}
       >
@@ -371,6 +473,94 @@ async function watchModelProof({ provider, model, queryClient, runtimeId, t }: {
     await queryClient.invalidateQueries({ queryKey: queryKeys.runtimeConfiguration });
     await queryClient.invalidateQueries({ queryKey: queryKeys.runtimeModels(runtimeId) });
   }
+}
+
+/**
+ * The AI choice as a settings card (`SETTINGS_SHELL` › `SETTINGS_INSET`): the
+ * tray carries the title and its sentence, the white inset the fields. The
+ * title labels the provider field.
+ */
+function AiCard({ t, children }: { t: Translate; children: ReactNode }) {
+  return (
+    <section className={SETTINGS_SHELL}>
+      <div className={SETTINGS_SHELL_HEADER}>
+        <label htmlFor="onboarding-provider" className={CARD_TITLE}>{t("onboarding.runtime.providerLabel")}</label>
+        <p className={CARD_DESCRIPTION}>{t("onboarding.runtime.providerHint")}</p>
+      </div>
+      <div className={cn(SETTINGS_INSET, "p-3")}>{children}</div>
+    </section>
+  );
+}
+
+/** What each level changes, said in the user's terms: speed, quality, cost. */
+const EFFORT_HINTS = {
+  none: "onboarding.runtime.effortHintNone",
+  minimal: "onboarding.runtime.effortHintMinimal",
+  low: "onboarding.runtime.effortHintLow",
+  medium: "onboarding.runtime.effortHintMedium",
+  high: "onboarding.runtime.effortHintHigh",
+  xhigh: "onboarding.runtime.effortHintXhigh",
+} as const satisfies Record<HermesReasoningEffort, string>;
+
+/**
+ * The six Hermes levels as one segmented radio group: the white thumb slides
+ * to the chosen level (the only motion, answering the click), a dot marks the
+ * runtime default. Arrows, Home and End move the choice, as in a native group.
+ */
+function EffortSegments({ t, value, disabled, onChange }: {
+  t: Translate;
+  value: HermesReasoningEffort;
+  disabled: boolean;
+  onChange: (effort: HermesReasoningEffort) => void;
+}) {
+  const buttons = useRef<Array<HTMLButtonElement | null>>([]);
+  const count = HERMES_REASONING_EFFORTS.length;
+  const index = HERMES_REASONING_EFFORTS.indexOf(value);
+  const move = (next: number) => {
+    const target = (next + count) % count;
+    onChange(HERMES_REASONING_EFFORTS[target]!);
+    buttons.current[target]?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-labelledby="onboarding-effort" className="relative grid grid-cols-6 rounded-[10px] bg-muted p-0.5">
+      <span
+        aria-hidden
+        className="absolute inset-y-0.5 left-0.5 rounded-[8px] bg-card shadow-[var(--shadow-xs)] transition-transform duration-200 ease-out motion-reduce:transition-none"
+        style={{ width: `calc((100% - 0.25rem) / ${count})`, transform: `translateX(${index * 100}%)` }}
+      />
+      {HERMES_REASONING_EFFORTS.map((level, position) => {
+        const label = effortLabel(t, level);
+        const isDefault = level === DEFAULT_REASONING_EFFORT;
+        return (
+          <button
+            key={level}
+            ref={(element) => { buttons.current[position] = element; }}
+            type="button"
+            role="radio"
+            aria-checked={position === index}
+            aria-label={isDefault ? `${label}, ${t("composer.modelEffortDefault")}` : label}
+            tabIndex={position === index ? 0 : -1}
+            disabled={disabled}
+            onClick={() => onChange(level)}
+            onKeyDown={(event) => {
+              const next = { ArrowRight: position + 1, ArrowDown: position + 1, ArrowLeft: position - 1, ArrowUp: position - 1, Home: 0, End: count - 1 }[event.key];
+              if (next === undefined) return;
+              event.preventDefault();
+              move(next);
+            }}
+            className={cn(
+              "relative z-10 flex h-8 items-center justify-center rounded-[8px] px-1 text-caption font-medium whitespace-nowrap outline-none transition-colors duration-150",
+              "focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed",
+              position === index ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+            {isDefault ? <span aria-hidden className="absolute bottom-0.5 size-1 rounded-full bg-current opacity-40" /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function isUsable(provider: RuntimeModelProviderDto): boolean {
