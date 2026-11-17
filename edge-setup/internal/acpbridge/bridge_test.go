@@ -117,7 +117,7 @@ func TestACPAgent(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					fmt.Fprintln(os.Stdout, "agent log line")
 				}
-			case "permission", "permission-basic", "cancel", "cancel-end_turn", "cancel-no-response":
+			case "permission", "permission-basic", "cancel", "cancel-end_turn", "cancel-no-response", "timeout", "timeout-ignore":
 				permission()
 			case "tools":
 				update(sessionID, map[string]any{"sessionUpdate": "agent_thought_chunk", "content": textBlock("PRIVATE THOUGHT")})
@@ -133,6 +133,12 @@ func TestACPAgent(t *testing.T) {
 				answer()
 			}
 		case "session/cancel":
+			if strings.HasPrefix(scenario, "timeout") {
+				update(sessionID, map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock("cancel received")})
+			}
+			if scenario == "timeout-ignore" {
+				continue
+			}
 			if scenario == "cancel-no-response" {
 				continue
 			}
@@ -968,5 +974,41 @@ func TestContextRebuildMetadataDoesNotChangeAnswer(t *testing.T) {
 	}
 	if !metadata {
 		t.Fatal("dedicated rebuild metadata missing")
+	}
+}
+
+func TestTurnTimeoutCancelsBeforeKillingSharedAgent(t *testing.T) {
+	for _, scenario := range []string{"timeout", "timeout-ignore"} {
+		t.Run(scenario, func(t *testing.T) {
+			f := newFixture(t, scenario)
+			f.b.opts.Limits.CancelTimeout = 40 * time.Millisecond
+			f.b.opts.Limits.TurnTimeout = 80 * time.Millisecond
+			f.session("cloud")
+			id := f.run(input("cloud"), "")
+			f.await(id, "approval.request")
+			events := f.events(id)
+			expectTerminal(t, events, "run.failed")
+			if !strings.Contains(events[len(events)-1]["message"].(string), "timeout") {
+				t.Fatal("turn timeout has no explicit timeout diagnostic")
+			}
+			cancelled := false
+			for _, e := range events {
+				if e["delta"] == "cancel received" {
+					cancelled = true
+				}
+			}
+			if !cancelled {
+				t.Fatal("agent was killed without session/cancel")
+			}
+			f.b.mu.Lock()
+			p := f.b.profiles["demo"]
+			f.b.mu.Unlock()
+			p.mu.Lock()
+			alive := p.client.alive()
+			p.mu.Unlock()
+			if (scenario == "timeout") != alive {
+				t.Fatalf("unexpected agent liveness for %s: %t", scenario, alive)
+			}
+		})
 	}
 }

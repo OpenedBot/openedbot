@@ -33,7 +33,8 @@ reste sous sa responsabilité. Ce format remplace celui du prototype sans
 migration. Une seule instance possède un dossier d'état.
 
 Les limites par défaut sont quatre runs, un tour par session, cinq minutes
-d'inactivité, dix minutes par appel/tour ACP, cinq secondes pour terminer une
+d'inactivité, trente secondes par appel de préparation ACP, trente minutes
+par tour, cinq secondes pour terminer une
 annulation et huit lignes stdout invalides par run. Un flot de lignes invalides
 pendant l'initialisation est également borné. Le protocole lit au plus 1 MiB
 par ligne ACP ; le pont garde au plus 128 KiB de texte de sortie et réserve
@@ -126,3 +127,17 @@ Les sessions et runs à la racine répondent HTTP 400 avec
 `platform/hermes/src/client/context.ts` classe ce 400 comme
 `HERMES_RESPONSE_INVALID`, avec le corps dans le diagnostic du worker : ce
 n'est ni un 401/403 de bearer, ni un 404 de profil, ni un 429 ou 503 réessayable.
+
+## Délais de préparation et de tour
+
+`Limits.RPCTimeout` borne séparément `initialize`, `session/new` et
+`session/load` à trente secondes par défaut. `Limits.TurnTimeout` borne
+`session/prompt` à trente minutes par défaut, au-dessus des quinze minutes du
+cloud (`apps/worker/src/config.ts`, `WORKER_RUN_TIMEOUT_MS=900000`, appliqué
+par `modules/execution/src/application/runner/supervision.ts` et identifié par
+`RUN_TIMEOUT` dans `contracts/errors`). Si la limite cloud est personnalisée,
+l'opérateur doit garder celle du pont au-dessus. L'expiration demande
+`session/cancel` et annule les permissions ouvertes ; l'agent dispose de
+`CancelTimeout` pour répondre avant son arrêt forcé. Le run finit `failed`
+avec `ACP turn timeout`, même si la réponse est `cancelled` ou `end_turn`.
+Une réponse coopérative conserve le processus partagé pour les autres sessions.

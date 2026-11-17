@@ -23,6 +23,7 @@ type Limits struct {
 	MaxConcurrentRuns int
 	IdleTimeout       time.Duration
 	RPCTimeout        time.Duration
+	TurnTimeout       time.Duration
 	CancelTimeout     time.Duration
 	MaxInvalidLines   int
 }
@@ -80,6 +81,7 @@ type run struct {
 	Generation   int       `json:"execution_generation"`
 	InvalidLines int       `json:"invalid_stdout_lines"`
 	TerminalAt   time.Time `json:"terminal_at,omitempty"`
+	timedOut     bool
 	permissions  map[string]permission
 	tools        map[string]string
 	bytes        int
@@ -131,7 +133,10 @@ func New(opts Options) (*Bridge, error) {
 		opts.Limits.IdleTimeout = 5 * time.Minute
 	}
 	if opts.Limits.RPCTimeout == 0 {
-		opts.Limits.RPCTimeout = 10 * time.Minute
+		opts.Limits.RPCTimeout = 30 * time.Second
+	}
+	if opts.Limits.TurnTimeout == 0 {
+		opts.Limits.TurnTimeout = 30 * time.Minute
 	}
 	if opts.Limits.CancelTimeout == 0 {
 		opts.Limits.CancelTimeout = 5 * time.Second
@@ -139,7 +144,7 @@ func New(opts Options) (*Bridge, error) {
 	if opts.Limits.MaxInvalidLines == 0 {
 		opts.Limits.MaxInvalidLines = 8
 	}
-	if opts.Limits.IdleTimeout < 0 || opts.Limits.RPCTimeout < 0 || opts.Limits.CancelTimeout < 0 || opts.Limits.MaxInvalidLines < 0 {
+	if opts.Limits.IdleTimeout < 0 || opts.Limits.RPCTimeout < 0 || opts.Limits.TurnTimeout < 0 || opts.Limits.CancelTimeout < 0 || opts.Limits.MaxInvalidLines < 0 {
 		return nil, errors.New("limits must be positive")
 	}
 	if err = os.MkdirAll(opts.StateDirectory, 0700); err != nil {

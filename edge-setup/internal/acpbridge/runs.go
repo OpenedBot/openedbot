@@ -120,8 +120,7 @@ func promptBlocks(raw json.RawMessage, image bool) ([]any, error) {
 	return blocks, nil
 }
 func (b *Bridge) execute(r *run, s *session, input runInput) {
-	ctx, cancel := context.WithTimeout(b.ctx, b.opts.Limits.RPCTimeout)
-	defer cancel()
+	ctx := b.ctx
 	b.mu.Lock()
 	p := b.profiles[r.Profile]
 	if p == nil {
@@ -169,7 +168,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 				Version int               `json:"protocolVersion"`
 				Caps    agentCapabilities `json:"agentCapabilities"`
 			}
-			err = p.client.call(ctx, "initialize", map[string]any{"protocolVersion": 1, "clientCapabilities": map[string]any{"fs": map[string]bool{"readTextFile": false, "writeTextFile": false}, "terminal": false}}, &init)
+			err = b.setupCall(p.client, "initialize", map[string]any{"protocolVersion": 1, "clientCapabilities": map[string]any{"fs": map[string]bool{"readTextFile": false, "writeTextFile": false}, "terminal": false}}, &init)
 			if err == nil && init.Version != 1 {
 				err = errors.New("unsupported ACP protocol version")
 			}
@@ -217,7 +216,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		if oldID != "" && caps.LoadSession {
 			params["sessionId"] = oldID
 			var result map[string]any
-			err = client.call(ctx, "session/load", params, &result)
+			err = b.setupCall(client, "session/load", params, &result)
 		} else {
 			if caps.Session.SystemPrompt != nil {
 				params["systemPrompt"] = map[string]any{"mode": "append", "content": []any{textBlock(input.Instructions)}}
@@ -225,7 +224,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 			var result struct {
 				SessionID string `json:"sessionId"`
 			}
-			err = client.call(ctx, "session/new", params, &result)
+			err = b.setupCall(client, "session/new", params, &result)
 			acpID = result.SessionID
 			created = true
 			rebuilt = used
@@ -271,10 +270,44 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	r.Status = "running"
 	b.saveLocked()
 	b.mu.Unlock()
-	var response struct {
-		StopReason string `json:"stopReason"`
+
+	type promptResult struct {
+		reason string
+		err    error
 	}
-	err = client.call(ctx, "session/prompt", map[string]any{"sessionId": acpID, "prompt": blocks}, &response)
+	done := make(chan promptResult, 1)
+	go func() {
+		var response struct {
+			StopReason string `json:"stopReason"`
+		}
+		err := client.call(ctx, "session/prompt", map[string]any{"sessionId": acpID, "prompt": blocks}, &response)
+		done <- promptResult{response.StopReason, err}
+	}()
+	timer := time.NewTimer(b.opts.Limits.TurnTimeout)
+	defer timer.Stop()
+	var result promptResult
+	select {
+	case result = <-done:
+	case <-timer.C:
+		b.mu.Lock()
+		if !terminal(r.Status) && !r.Cancel {
+			r.timedOut = true
+			r.Status = "stopping"
+			b.cancelPermissionsLocked(r)
+			b.saveLocked()
+			_ = client.notify("session/cancel", map[string]string{"sessionId": acpID})
+		}
+		b.mu.Unlock()
+		grace := time.NewTimer(b.opts.Limits.CancelTimeout)
+		select {
+		case result = <-done:
+		case <-grace.C:
+			client.stop()
+			result = <-done
+		}
+		grace.Stop()
+	}
+	err = result.err
 	if err != nil {
 		client.stop()
 	}
@@ -284,18 +317,21 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		status := "failed"
 		message := "ACP prompt failed"
 		switch {
+		case r.timedOut:
+			status = "failed"
+			message = "ACP turn timeout"
 		case r.Cancel:
 			status = "cancelled"
 		case errors.Is(err, errAgentExited):
 			status = "interrupted"
 		case err != nil:
 			message = err.Error()
-		case response.StopReason == "end_turn":
+		case result.reason == "end_turn":
 			status = "completed"
-		case response.StopReason == "cancelled":
+		case result.reason == "cancelled":
 			status = "cancelled"
 		default:
-			message = "ACP stop reason: " + response.StopReason
+			message = "ACP stop reason: " + result.reason
 		}
 		b.cancelPermissionsLocked(r)
 		b.finishLocked(r, status, message)
@@ -423,4 +459,14 @@ func (b *Bridge) appendMessageLocked(r *run, text string) {
 		text = text[n:]
 		b.eventLocked(r, "message.delta", Event{"delta": chunk})
 	}
+}
+
+func (b *Bridge) setupCall(client *rpcClient, method string, params, out any) error {
+	ctx, cancel := context.WithTimeout(b.ctx, b.opts.Limits.RPCTimeout)
+	defer cancel()
+	err := client.call(ctx, method, params, out)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("ACP setup timeout: %s", method)
+	}
+	return err
 }
