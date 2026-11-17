@@ -100,7 +100,7 @@ endif
 .PHONY: help help-all
 
 # Les cibles du quotidien, par mode ; toutes les autres restent dans help-all.
-HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
+HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down db-migrate db-pending db-reset-keep-users
 # Les fragments privés (plugins/make/*.mk, en fin de fichier) y ajoutent leurs cibles.
 HELP_PREPROD :=
 HELP_PROD    := link-prod
@@ -140,7 +140,7 @@ env-prod-list: ## Prints the production template (no production file is versione
 	@bun scripts/env.ts --template --print-production
 
 # ─── Dev: database and services ──────────────────────────────────────────────
-.PHONY: db-up infra-up mailpit-up fake-hermes db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
+.PHONY: db-up infra-up mailpit-up fake-hermes db-migrate db-pending db-seed db-reset db-reset-keep-users runtime-token-rotate
 
 db-up: ## [DB] Checks the development PostgreSQL (restarted when stopped; created from compose.dev.yml only with OPENEDBOT_DEV_INFRA=compose); never Hermes.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --up
@@ -158,6 +158,12 @@ fake-hermes: ## [FAKE] Serves the fake Hermes gateway on 127.0.0.1:18642 in the 
 
 db-migrate: ## [DB] Applies the migrations; requires the infrastructure to be running already.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --migrate
+
+# Prerequisite of dev, dev-api and dev-worker: an API started on a database
+# that lacks a migration only fails later, request by request, with an opaque
+# 500. Read-only: the database changes only through make db-migrate.
+db-pending: ## [DB] Fails when a migration is pending (names it); silent otherwise. Writes nothing.
+	@$(LOAD_ENV_OPT) bash scripts/db.sh --pending
 
 db-seed: db-migrate env-check ## Creates the development account, organization, subscription and Hermes.
 	$(LOAD_ENV) ENV_FILE="$(abspath $(ENV_FILE))" OPENEDBOT_DEV_PROFILE="$(MODE)" bun run --filter api seed
@@ -197,7 +203,7 @@ runtime-token-rotate: db-migrate env-check ## Atomically re-encrypts the tokens 
 
 # format_dev_logs ignore INT/TERM/HUP et lit jusqu'à la fin du tuyau : mort
 # le premier sur Ctrl-C, il cassait le tuyau sous les apps en plein arrêt.
-dev: env-check ## [API + CONSOLE + WORKER] Validates .env.local then starts the apps, without the desktop app (`make desktop` separately, DESKTOP=1 to add it); no infrastructure, no migration. MODE=fake|bundled|external forces the profile.
+dev: env-check db-pending ## [API + CONSOLE + WORKER] Validates .env.local then starts the apps, without the desktop app (`make desktop` separately, DESKTOP=1 to add it); no infrastructure; refuses while a migration is pending (make db-migrate). MODE=fake|bundled|external forces the profile.
 	@set -eo pipefail; $(LOAD_ENV) \
 	format_dev_logs() { \
 		local line label color payload; \
@@ -220,13 +226,13 @@ dev: env-check ## [API + CONSOLE + WORKER] Validates .env.local then starts the 
 	ENV_FILE="$(ENV_FILE)" bun scripts/dev-accounts.ts; \
 	$(DEV_COMMAND) 2>&1 | format_dev_logs
 
-dev-api: env-check ## [API] Starts the API only; infrastructure already running.
+dev-api: env-check db-pending ## [API] Starts the API only; infrastructure already running, no migration pending.
 	$(LOAD_ENV) $(DEV_API_COMMAND)
 
 dev-console: ## [CONSOLE] Starts Vite only, on :1420.
 	$(LOAD_ENV_OPT) $(DEV_CONSOLE_COMMAND)
 
-dev-worker: env-check ## [WORKER] Processes runs/workflows; API and infrastructure separately.
+dev-worker: env-check db-pending ## [WORKER] Processes runs/workflows; API and infrastructure separately, no migration pending.
 	$(LOAD_ENV) $(DEV_WORKER_COMMAND)
 
 
@@ -414,6 +420,7 @@ test-unit: ## Unit tests of API, worker, web, contracts, platform, modules and s
 	bun tests/scripts/code-structure-contract.ts
 	bash tests/scripts/migration-record-contract.sh
 	bash tests/scripts/pro-migrations-contract.sh
+	bash tests/scripts/db-pending-contract.sh
 	bash tests/scripts/css-backdrop-order-contract.sh
 	bash tests/scripts/policies-claims-contract.sh
 	bash tests/scripts/console-build-guard-contract.sh

@@ -164,6 +164,14 @@ for target in dev dev-api dev-worker; do
   assert_literal_count "$target" "$(dry_run "$target")" "scripts/env.ts --check" 1
 done
 
+# They also refuse to start while a migration is pending (read-only check,
+# never --migrate). The console needs no database. The real runs below skip
+# it with -o db-pending: it needs the development PostgreSQL.
+for target in dev dev-api dev-worker; do
+  assert_literal_count "$target" "$(dry_run "$target")" "scripts/db.sh --pending" 1
+done
+assert_literal_count dev-console "$console_plan" "scripts/db.sh --pending" 0
+
 # Profiles. The default profile is `fake`: the apps run against
 # tests/fake-hermes, and nothing pulls the Hermes image.
 assert_literal_count "db-seed" "$(dry_run db-seed)" 'OPENEDBOT_DEV_PROFILE="fake"' 1
@@ -308,7 +316,7 @@ sentinel_env="$sentinel_dir/env"
 } > "$sentinel_env"
 for target in dev dev-api dev-worker; do
   sentinel_output="$sentinel_dir/$target.out"
-  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check -o db-pending \
     ENV_FILE="$sentinel_env" DEV_COMMAND=true DEV_API_COMMAND=true DEV_WORKER_COMMAND=true \
     "$target" >"$sentinel_output" 2>&1 </dev/null; then
     fail "make $target with a stubbed launcher exited non-zero (output withheld: it may hold env values)."
@@ -327,7 +335,7 @@ printf '#!/bin/sh\n[ -n "${OPENEDBOT_TEST_SENTINEL_SECRET:-}" ]\n' > "$sentinel_
 chmod +x "$sentinel_dir/bin/require-env"
 require_env="$sentinel_dir/bin/require-env"
 for target in dev dev-api dev-worker; do
-  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check -o db-pending \
     ENV_FILE="$sentinel_env" DEV_COMMAND="$require_env" DEV_API_COMMAND="$require_env" \
     DEV_WORKER_COMMAND="$require_env" "$target" >/dev/null 2>&1 </dev/null; then
     fail "make $target must export the env file to the app it starts."
