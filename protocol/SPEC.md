@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Specification version | **1.1.0** (2026-11-17) |
+| Specification version | **1.1.1** (2026-11-17) |
 | Wire protocol | `protocol: 1` in the `hello` frame (`RELAY_PROTOCOL` in `connector/src/relay-frames.ts`) |
 | Status | Stable. Changes are listed in [CHANGELOG.md](CHANGELOG.md). |
 | Reference implementations | Host: `edge-setup` (Go, `internal/connector`). Cloud: openedbot (TypeScript, this package). |
@@ -1165,11 +1165,23 @@ ce contrat ne leur invente pas de nouveau nom de capacité.
 
 `usage` est facultatif sur le statut et `run.completed` :
 `{input_tokens?,output_tokens?,total_tokens?}`, nombres finis non négatifs.
-Le normaliseur rend `usage:null` en son absence. Le budget de workflow
-compte actuellement cet usage absent comme zéro ; il n'existe pas encore de
-garde `run_usage` ni de négociation du transcript dans le cloud. Ce lot ne
-modifie pas cette limite (`modules/execution/src/domain/hermes-events.ts:453`,
-`modules/execution/src/application/runner/workflows.ts:372`).
+Le normaliseur rend `usage:null` en son absence
+(`modules/execution/src/domain/hermes-events.ts`, normalisation de `run.completed`).
+Chaque workflow a un budget de jetons obligatoire (`db/migrations/0003_tables.sql`,
+`workflows.token_budget`). Si le moteur ne rapporte aucun usage (notamment le
+pont ACP), ce budget n'est pas appliqué : l'usage absent compte comme zéro
+(`modules/execution/src/application/runner/workflows.ts`, `usageTotal`).
+Aucun workflow n'est refusé pour absence d'usage. Il reste borné par les étapes,
+les délégations, la profondeur et l'échéance :
+`modules/roster/src/domain/autonomous-workflow.ts`, `canDelegate`, vérifie
+`maxSteps`, `maxHandoffs`, `maxDepth` et `deadlineAt` avant une délégation ;
+`modules/execution/src/application/runner/workflows.ts`,
+`createWorkflowContinuationTx`, borne les reprises par `maxSteps`, et
+`advanceWorkflowCompletionTx` vérifie aussi l'échéance à la fin d'une étape.
+Pour les salons, `modules/execution/src/application/runner/rooms.ts`,
+`groupWorkflowLimitOutcome`, vérifie les étapes et l'échéance entre les tours.
+`modules/execution/src/application/queue-sweeps.ts`, `sweepExpiredRunsTx`,
+applique également l'échéance aux runs en attente ou en cours.
 
 ### Événements et identités
 

@@ -5,6 +5,15 @@ All notable changes to the openedbot connector protocol. The format follows
 uses [semantic versioning](https://semver.org/) as described in
 [SPEC.md](SPEC.md#versioning).
 
+## [1.1.1] - 2026-11-17
+
+### Clarified
+- Workflows always have a token budget, but engines that report no usage
+  (including the ACP bridge) are not refused for that reason: missing usage
+  counts as zero, so the token budget is not enforced. Step, handoff, depth
+  and deadline limits remain in force, with their enforcing code cited in
+  the execution contract. No production behavior or wire protocol change.
+
 ## [1.1.0] - 2026-11-17
 
 ### Added

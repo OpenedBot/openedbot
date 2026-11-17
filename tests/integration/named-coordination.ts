@@ -26,6 +26,7 @@ const hermes = startFakeHermes({ port: 0, delayMs: 5, capacity: 4 });
 const scripts: Array<{ output: string; onDispatch?: () => Promise<unknown> }> = [];
 const outputs = new Map<string, string>();
 const inputs: string[] = [];
+let omitUsage = false;
 const recorder = Bun.serve({
   port: 0, hostname: "127.0.0.1",
   async fetch(request) {
@@ -45,9 +46,12 @@ const recorder = Bun.serve({
     if (url.pathname.endsWith("/events") && response.ok) {
       const raw = await response.text();
       const rewritten = raw.replace(/^data: (.+)$/gm, (_line, json: string) => {
-        const frame = JSON.parse(json) as { event: string; run_id: string; output?: string; delta?: string };
+        const frame = JSON.parse(json) as { event: string; run_id: string; output?: string; delta?: string; usage?: unknown };
         const output = outputs.get(frame.run_id);
-        if (frame.event === "run.completed") frame.output = output;
+        if (frame.event === "run.completed") {
+          frame.output = output;
+          if (omitUsage) delete frame.usage;
+        }
         if (frame.event === "message.delta") frame.delta = "";
         return `data: ${JSON.stringify(frame)}`;
       });
@@ -230,6 +234,28 @@ try {
       await owner`update bots set autonomy_enabled = true where id = ${A}`;
       proof.push({ scenario: reason, notice: true, noChild: true, emptyBodyFailed: true });
     }
+    // An engine without usage keeps running until a non-token limit stops it.
+    omitUsage = true;
+    const noUsage = await send(); assert(noUsage.workflowId, "Missing-usage fixture workflow");
+    await owner`update workflows set token_budget = 1000, max_steps = 3 where id = ${noUsage.workflowId}`;
+    await execute("Partial.\n@bravo Verify.");
+    assert((await workflow(noUsage.workflowId)).status === "running", "Missing usage blocked delegation");
+    await execute("Verified.");
+    await execute("@bravo Verify again.");
+    const noUsageState = (await owner`select status, used_steps, used_tokens, token_budget from workflows
+      where id = ${noUsage.workflowId}`)[0]!;
+    assert(noUsageState.status === "failed" && noUsageState.used_steps === 3
+      && Number(noUsageState.used_tokens) === 0 && Number(noUsageState.token_budget) === 1000,
+      "Missing usage must count as zero while the step ceiling remains enforced");
+    const noUsageRuns = await owner<Array<{ usage: unknown }>>`select usage from runs where workflow_id = ${noUsage.workflowId}`;
+    assert(noUsageRuns.length === 3 && noUsageRuns.every((run) => run.usage === null), "Every turn must omit usage");
+    const noUsageNotes = await receipts(noUsage.workflowId);
+    assert(noUsageNotes.some((note) => note.payload.reason === "STEP_LIMIT")
+      && !noUsageNotes.some((note) => note.payload.reason === "TOKEN_BUDGET_EXHAUSTED"),
+      "Expected step refusal, never token refusal, without usage");
+    omitUsage = false;
+    proof.push({ scenario: "no-usage-step-limit", tokenBudget: 1000, usedTokens: 0, steps: 3, refusal: "STEP_LIMIT" });
+
     assert(inputs.every((input) => input.includes("[Workflow limits]")), "Step limits must remain in input");
     console.log(JSON.stringify({ event: "openedbot102.postgres-proof", passed: true, proof }));
   });
