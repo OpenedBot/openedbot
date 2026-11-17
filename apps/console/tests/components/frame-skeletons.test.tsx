@@ -102,8 +102,9 @@ describe("silhouettes du cadre", () => {
     renderGuardedFrame("/o/dev/settings/agents");
     expect(await screen.findByText("Quitter les réglages")).toBeTruthy();
     expect(document.querySelectorAll('[data-slot="skeleton-list-row"]')).toHaveLength(0);
-    // Agent import is filed under Runtime, as in the menu.
-    expect(screen.getAllByText("Runtime").length).toBeGreaterThan(1);
+    // Agent import is its own entry, as in the menu: the breadcrumb names it, not Runtime.
+    expect(screen.getAllByText("Importer des agents").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Runtime")).toHaveLength(1);
     expect(screen.getByText("Salon")).toBeTruthy();
   });
 
