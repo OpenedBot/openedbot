@@ -1012,3 +1012,27 @@ func TestTurnTimeoutCancelsBeforeKillingSharedAgent(t *testing.T) {
 		})
 	}
 }
+
+func TestPromptCacheHintsDoNotRejectDefaultModel(t *testing.T) {
+	f := newFixture(t, "plain")
+	f.session("cloud")
+	for _, ttl := range []string{"5m", "1h"} {
+		body := input("cloud")
+		body["model_options"] = map[string]any{"prompt_cache_ttl": ttl}
+		events := f.events(f.run(body, ""))
+		expectTerminal(t, events, "run.completed")
+		if strings.Contains(lastPrompt(t, completedTrace(t, events)), "prompt_cache_ttl") {
+			t.Fatal("cache hint changed the ACP prompt")
+		}
+	}
+	for _, options := range []map[string]any{{"reasoning_effort": "high"}, {"fast": true}, {"unknown": true}} {
+		body := input("cloud")
+		body["model_options"] = options
+		expectTerminal(t, f.events(f.run(body, "")), "run.failed")
+	}
+	for _, field := range []string{"model", "provider"} {
+		body := input("cloud")
+		body[field] = "unknown"
+		expectTerminal(t, f.events(f.run(body, "")), "run.failed")
+	}
+}

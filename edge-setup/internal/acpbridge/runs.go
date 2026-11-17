@@ -199,9 +199,15 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		return
 	}
 	// The catalogue names the agent's configured default, not a model switch.
-	if (input.Model != "" && input.Model != "agent-default") || (input.Provider != "" && input.Provider != "acp") || len(input.ModelOptions) > 0 {
-		b.endExecution(r, s, errors.New("ACP bridge serves only the configured agent default without model options"))
+	if (input.Model != "" && input.Model != "agent-default") || (input.Provider != "" && input.Provider != "acp") {
+		b.endExecution(r, s, errors.New("ACP bridge serves only the configured agent default"))
 		return
+	}
+	for option := range input.ModelOptions {
+		if option != "prompt_cache_ttl" {
+			b.endExecution(r, s, errors.New("ACP bridge does not support behavior-changing or unknown model options"))
+			return
+		}
 	}
 	blocks, err := promptBlocks(input.Input, caps.Prompt.Image)
 	if err != nil {

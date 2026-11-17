@@ -45,8 +45,10 @@ prétendre fournir une isolation système entre eux. Le stderr de l'agent est
 écarté ; les messages d'erreur JSON-RPC sont réduits à leur code numérique.
 
 Le catalogue désigne uniquement `acp` / `agent-default`, le modèle configuré
-dans l'agent. Un autre modèle, fournisseur ou des options de modèle échouent
-explicitement. `systemPrompt` est envoyé en mode `append` à la création si
+dans l'agent. Un autre modèle ou fournisseur échoue explicitement. Le hint
+`prompt_cache_ttl` (`5m` ou `1h` envoyé par le cloud) est ignoré sans modifier
+le prompt. Les options de comportement `reasoning_effort`, `fast` et les
+options inconnues échouent explicitement. `systemPrompt` est envoyé en mode `append` à la création si
 annoncé. Les changements ultérieurs passent dans un bloc texte ; sans cette
 capacité, le premier tour reçoit aussi ce bloc. `session/load` est utilisé
 seulement si annoncé, sans réinjecter l'historique de chargement dans le run.
