@@ -49,6 +49,7 @@ import {
 import { authorRenderKey, entryDayIso, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
 import { RunErrorEntry } from "./thread-run-error";
+import { questionsByRun, withFailedRunErrors } from "../lib/thread/failed-turns";
 import { AssistantMessage, BotInboundMessage, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
 import { ToolActivity } from "./thread-tool-activity";
 import { callsHaveCards, ToolCallCards } from "./cards/run-card-view";
@@ -137,11 +138,13 @@ function ThreadTimelineView({
   // memory extraction) share the bot's thread but have no bubble:
   // their output is consumed by the worker. Without this filter, their
   // `agent.message` formed an empty assistant bubble under the avatar,
-  // seen on screen on 04-09.
+  // seen on screen on 04-09. A failed run whose `run.error` never came gets one
+  // built from the run (`withFailedRunErrors`).
   const events = useMemo(() => {
     const serviceRunIds = new Set(runs.filter((run) => isServiceStepKind(run.stepKind)).map((run) => run.id));
-    return serviceRunIds.size === 0 ? allEvents : allEvents.filter((event) => !serviceRunIds.has(event.runId));
-  }, [allEvents, runs]);
+    const shown = serviceRunIds.size === 0 ? allEvents : allEvents.filter((event) => !serviceRunIds.has(event.runId));
+    return withFailedRunErrors(shown, runs, userInputs);
+  }, [allEvents, runs, userInputs]);
   const { t, locale, formatNumber, plural } = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -213,14 +216,7 @@ function ThreadTimelineView({
     versionCount: (current: number, total: number) => t("threadTimeline.versionCount", { current, total }),
   }), [t]);
 
-  // The operator's message that started each run: a failed turn names it and replays it.
-  const questionByRun = useMemo(() => {
-    const map = new Map<string, { id: string; text: string }>();
-    for (const input of userInputs) {
-      if (input.runId && !input.authorBot && !map.has(input.runId)) map.set(input.runId, input);
-    }
-    return map;
-  }, [userInputs]);
+  const questionByRun = useMemo(() => questionsByRun(userInputs), [userInputs]);
 
   // A bot's thread: the sent message brings its « Réflexion » line in the same paint, not 70 ms later.
   const outgoingThinks = Boolean(outgoing && !outgoing.failed && defaultAuthor);

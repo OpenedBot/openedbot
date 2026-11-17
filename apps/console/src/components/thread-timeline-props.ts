@@ -50,6 +50,8 @@ export type ThreadTimelineProps = {
   workflowId?: string | null;
     stepKind?: string | null;
     errorCode?: string | null;
+    /** The run's own failure text: a failed turn without its `run.error` tells it. */
+    error?: string | null;
     model?: string | null;
     usage?: { totalTokens?: number; outputTokens?: number } | null;
     /** ISO: the run's bounds, for the real duration shown under the reply. */
