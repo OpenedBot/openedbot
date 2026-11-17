@@ -20,6 +20,7 @@ import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted"
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
 import { randomId } from "../../lib/random-id";
 import { displayedRuntimeHealth, isRuntimeUnavailableError, runtimeBlocksConversation } from "../../lib/runtime/runtime-health";
+import { conversationBlockedMessage } from "../../lib/runtime/conversation-blocked-message";
 import {
   threadContainsOutgoingUserInput,
 } from "../../lib/thread/thread-anchor";
@@ -86,7 +87,7 @@ import { DevRenderProfiler } from "../../components/dev/dev-render-profiler";
 import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/hooks/use-content-stable";
 import { BUTTON } from "../../components/settings/primitives";
 export function ConversationScreen() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const isMobile = useIsMobile();
   const [standalone] = useState(isStandaloneDisplay);
   const { botId } = useParams({ strict: false }) as { botId?: string };
@@ -213,12 +214,7 @@ export function ConversationScreen() {
     runtimes.error ?? runtimeModels.error;
   const blockingError = readError ?? submissionError;
   const conversationBlocked = (Boolean(blockingError) && blockingError !== dismissedError) || runtimeUnavailable || retrying;
-  const conversationErrorMessage = runtimeUnavailable && !runtime ? t("mvp.noMachine") : runtimeUnavailable && runtimeHealth === "disconnected"
-    ? t("conversation.linkUnavailable")
-    : blockingError instanceof ApiError &&
-    blockingError.code === "RUNTIME_LINK_UNAVAILABLE"
-    ? t("conversation.linkUnavailable")
-    : userFacingError(blockingError, t("conversation.loadFailed"));
+  const conversationErrorMessage = conversationBlockedMessage(t, locale, { runtime, runtimeUnavailable, error: blockingError });
   const hostUnavailable = isRuntimeUnavailableError(blockingError);
   const runtimeOffline =
     (runtimeUnavailable &&
