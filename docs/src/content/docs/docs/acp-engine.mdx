@@ -1,0 +1,58 @@
+---
+title: Experimental ACP engine
+description: Run OpenCode on a Linux host, with a smaller set of openedbot features.
+icon: FlaskConical
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The experimental ACP engine runs OpenCode instead of Hermes. It is **Linux only**, with systemd, on `amd64` or `arm64`. Hermes remains the default and reference engine.
+
+<Aside type="caution" title="Shared host, no isolation between bots">
+Each bot has its own profile directory, but all agents run as the same service user. Two bots on the same host are not isolated from each other: one can access the other's files. Use a dedicated machine without unrelated services or private files.
+</Aside>
+
+## Install and link
+
+Follow [Link a machine](/docs/machine) to download `edge-setup`. At the installation step, select the engine explicitly:
+
+```sh
+sudo edge-setup up --engine acp:opencode --yes
+```
+
+Then pair the machine with the console using the `edge-setup link` command shown there. Repeat `--engine acp:opencode` whenever you run `up` again. An installed host cannot switch engines: uninstall it first. The `--sandbox` option is not available with ACP.
+
+Creating a bot in openedbot creates its profile directory on the host. Its runs use that profile, and deleting the bot schedules deletion of the profile and its sessions.
+
+## Provider credential
+
+An administrator supplies the provider credential in `/etc/hermes/opencode.env` on the host, as a regular file owned by `root:root` with mode `0600`. Installation does not create this file. Use the environment variable for your provider, such as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. Never paste the key into a conversation or a command line.
+
+Accepted names are `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GEMINI_API_KEY`, `OPENCODE_API_KEY`, `OPENROUTER_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` and `AWS_REGION`. Other names are refused. Restart `openedbot-acp-bridge.service` after changing this file. openedbot cannot manage these credentials from the provider screens.
+
+## What works
+
+You can hold a conversation, approve each file edit and command, and stop a run. Rooms and routines use the same run path. The host requires the agent to ask for permission; permission requests are forwarded to the user through openedbot.
+
+## What is not available
+
+This engine does not provide:
+
+- Model choice or provider management in openedbot.
+- MCP and skills screens.
+- Per-bot approval policy.
+- Token usage. The workflow token budget is therefore not enforced.
+- An execution plan or displayed web searches.
+- Files delivered as attachments.
+- Steer, to change instructions during a running turn.
+
+## What still needs a real Linux machine
+
+Automated tests use fake agents and commands. No real OpenCode agent has been installed or executed as part of this validation. The following have not been proven on a real machine:
+
+- systemd namespace behavior and credential mounts.
+- `runuser` and PAM behavior inside the sandbox.
+- OpenCode JIT compatibility with the syscall filter.
+- Boot and shutdown on a Linux host.
+- Authentication with a real provider.
+- A real OpenCode file edit or shell request waiting for user approval.
