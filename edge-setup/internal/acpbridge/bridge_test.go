@@ -1723,3 +1723,79 @@ func TestProfileRequestOnlyPrunesRequestedSlug(t *testing.T) {
 		t.Fatal("deleted slug pruning was not durable")
 	}
 }
+
+func TestProfileRemovedDuringCreationDoesNotDisableBridge(t *testing.T) {
+	for _, target := range []string{"session", "run"} {
+		for _, replacement := range []string{"missing", "file"} {
+			t.Run(target+"/"+replacement, func(t *testing.T) {
+				f := newFixture(t, "text")
+				if err := os.Mkdir(filepath.Join(f.opts.ProfilesRoot, "live"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				path := "/api/sessions"
+				body := any(map[string]string{"id": "new"})
+				if target == "run" {
+					f.session("existing")
+					path = "/v1/runs"
+					body = input("existing")
+				}
+				reader, writer := io.Pipe()
+				defer reader.Close()
+				defer writer.Close()
+				started := make(chan struct{})
+				req := httptest.NewRequest("POST", "/p/demo"+path, nil)
+				req.Header.Set("Authorization", "Bearer "+f.opts.Bearer)
+				req.Body = &signalledRequestBody{ReadCloser: reader, started: started}
+				response := httptest.NewRecorder()
+				done := make(chan struct{})
+				go func() { defer close(done); f.b.ServeHTTP(response, req) }()
+				select {
+				case <-started:
+				case <-time.After(time.Second):
+					t.Fatal("request-start check did not complete")
+				}
+				dir := filepath.Join(f.opts.ProfilesRoot, "demo")
+				if err := os.RemoveAll(dir); err != nil {
+					t.Fatal(err)
+				}
+				if replacement == "file" {
+					if err := os.WriteFile(dir, []byte("fixture"), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				raw, err := json.Marshal(body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = writer.Write(raw); err != nil {
+					t.Fatal(err)
+				}
+				if err = writer.Close(); err != nil {
+					t.Fatal(err)
+				}
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Fatal("creation did not finish")
+				}
+				if response.Code != http.StatusNotFound {
+					t.Errorf("creation status=%d, want 404", response.Code)
+				}
+				f.b.mu.Lock()
+				stored := f.b.disk.Sessions["demo/new"] != nil || len(f.b.disk.Runs) != 0
+				diskErr := f.b.diskErr
+				f.b.mu.Unlock()
+				if stored {
+					t.Error("creation stored state for a missing profile")
+				}
+				if diskErr != nil {
+					t.Errorf("profile lookup poisoned bridge state: %v", diskErr)
+				}
+				f.profile = "live"
+				if status, _ := f.request("POST", "/api/sessions", map[string]string{"id": "live"}, ""); status != http.StatusCreated {
+					t.Errorf("live profile status=%d, want 201", status)
+				}
+			})
+		}
+	}
+}

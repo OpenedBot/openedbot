@@ -134,13 +134,13 @@ func directoryIdentity(info os.FileInfo) profileIdentity {
 	return profileIdentity{Device: uint64(stat.Dev), Inode: uint64(stat.Ino)}
 }
 
-func (b *Bridge) recordProfileDirLocked(slug string) {
+func (b *Bridge) recordProfileDirLocked(slug string) bool {
 	info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
-	if err != nil {
-		b.diskErr = err
-		return
+	if err != nil || !info.IsDir() {
+		return false
 	}
 	b.disk.ProfileDirs[slug] = directoryIdentity(info)
+	return true
 }
 
 func (b *Bridge) pruneLocked(now time.Time, requested ...string) {

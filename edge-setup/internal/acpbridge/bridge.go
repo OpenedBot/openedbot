@@ -481,7 +481,10 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			writeJSON(w, 409, map[string]string{"id": body.ID})
 			return
 		}
-		b.recordProfileDirLocked(slug)
+		if !b.recordProfileDirLocked(slug) {
+			http.NotFound(w, req)
+			return
+		}
 		b.disk.Sessions[key] = &session{Profile: slug, ID: body.ID, LastUsed: time.Now()}
 		b.saveLocked()
 		if b.diskErr != nil {
