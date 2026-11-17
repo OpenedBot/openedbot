@@ -244,17 +244,20 @@ describe("thread timeline status and action row", () => {
     expect(container.querySelector("[data-assistant-layout='stream']")).not.toBeNull();
   });
 
-  test("a finished answer carries grok's action row, risen in once; no stopwatch", () => {
+  test("a finished answer carries its actions beside the bubble, shown on hover or focus; no stopwatch", () => {
     const long = `${"Une réponse assez longue pour être confirmée. ".repeat(8)}`;
     const done = text(long);
     const live = render(timeline({ events: [done], runs: [runOf("running")], running: true }));
-    expect(live.container.querySelector("[data-message-actions-placement='below']")).toBeNull();
+    expect(live.container.querySelector("[data-message-hover-actions]")).toBeNull();
     live.rerender(timeline({ events: [done], runs: [runOf("completed")], running: false }));
-    const row = live.container.querySelector("[data-message-actions-placement='below']");
-    expect(row).not.toBeNull();
-    expect(row!.className).toContain("opacity-100");
-    expect(row!.className).toContain("stream-enter");
-    expect(row!.querySelector("button[aria-label]")).not.toBeNull();
+    const actions = live.container.querySelector("[data-message-actions-placement='side']");
+    expect(actions).not.toBeNull();
+    expect(live.container.querySelector("[data-message-actions-placement='below']")).toBeNull();
+    // Hidden at rest, revealed by the pointer and by the keyboard alike.
+    expect(actions!.className).toContain("opacity-0");
+    expect(actions!.className).toContain("group-hover/message:opacity-100");
+    expect(actions!.className).toContain("group-focus-within/message:opacity-100");
+    expect(actions!.querySelector("button[aria-label]")).not.toBeNull();
     expect(live.container.querySelector("[data-run-timing]")).toBeNull();
   });
 });
@@ -310,7 +313,7 @@ describe("the reference app's thread theme", () => {
     expect(theme).toContain("--openedbot-bubble-agent: rgb(245 245 245 / 0.04);");
     expect(theme).toContain("--openedbot-bubble-user: #1c1c1c;");
     expect(theme).toContain("--openedbot-bubble-user: rgb(245 245 245 / 0.18);");
-    expect(theme).toMatch(/\[data-assistant-layout="stream"\] \{\s*background: none;/);
+    expect(theme).toMatch(/\n\[data-assistant-layout="stream"\] \{\s*background-color: var\(--openedbot-bubble-agent\);/);
     expect(theme).toMatch(/\n\[data-user-bubble\] \{\s*background-color: var\(--openedbot-user-fill, var\(--openedbot-bubble-user\)\);/);
     expect(theme).toMatch(/\.dark \[data-thread-column\] \{\s*--openedbot-user-fill: var\(--openedbot-user-fill-dark\);/);
   });
@@ -380,26 +383,24 @@ describe("dev run timing", () => {
     </I18nProvider>,
   );
 
-  test("sits on the action row after « … », centred on the icons, never on a line of its own", () => {
+  test("rides with the side actions after « … », centred on the icons, hidden with them", () => {
     const { container } = reply(true);
-    const row = container.querySelector<HTMLElement>("[data-message-actions-row]")!;
-    const badge = row.querySelector<HTMLElement>("[data-run-timing]")!;
+    const actions = container.querySelector<HTMLElement>("[data-message-actions-placement='side']")!;
+    const badge = actions.querySelector<HTMLElement>("[data-run-timing]")!;
     expect(badge.textContent).toContain("23");
     const trailing = badge.closest<HTMLElement>("[data-message-actions-trailing]")!;
-    expect(trailing.parentElement).toBe(row);
-    expect(trailing.className).toContain("h-8");
+    expect(trailing.parentElement).toBe(actions);
     expect(trailing.className).toContain("items-center");
-    // After the actions, whose last button is « … ».
-    const actions = row.querySelector<HTMLElement>("[data-message-hover-actions]")!;
-    expect(actions.nextElementSibling).toBe(trailing);
-    expect(actions.querySelectorAll("button").item(actions.querySelectorAll("button").length - 1).getAttribute("aria-label")).toBe("Plus d'actions");
+    // Last of the actions, right after « … ».
+    expect(actions.lastElementChild).toBe(trailing);
+    expect(trailing.previousElementSibling?.getAttribute("aria-label")).toBe("Plus d'actions");
     expect(container.querySelectorAll("[data-run-timing]")).toHaveLength(1);
   });
 
-  test("absent outside dev builds: the same action row, nothing after it", () => {
+  test("absent outside dev builds: the same side actions, nothing after them", () => {
     const { container } = reply(false);
     expect(container.querySelector("[data-run-timing]")).toBeNull();
     expect(container.querySelector("[data-message-actions-trailing]")).toBeNull();
-    expect(container.querySelector("[data-message-actions-row]")).not.toBeNull();
+    expect(container.querySelector("[data-message-actions-placement='side']")).not.toBeNull();
   });
 });
