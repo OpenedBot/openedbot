@@ -159,8 +159,8 @@
         display: none;
       }
       html[data-openedbot-booting] #openedbot-boot {
-        --boot-full: #e8e8eb;
-        --boot-surface: #f5f5f6;
+        --boot-full: #fff;
+        --boot-surface: #f7f7f7;
         --boot-card-edge: #fff;
         --boot-raised: #fff;
         --boot-shape: #ebebeb;
@@ -193,8 +193,8 @@
         font-family: ui-sans-serif, system-ui, sans-serif;
       }
       html.dark[data-openedbot-booting] #openedbot-boot {
-        --boot-full: #0d0d0d;
-        --boot-surface: #1a1a1a;
+        --boot-full: #121212;
+        --boot-surface: #171717;
         --boot-card-edge: lab(15.7305% 0.613764 -2.16959);
         --boot-raised: lab(15.204% 0 0);
         --boot-shape: lab(15.204% 0 0);
@@ -534,7 +534,8 @@
         min-width: 0;
         overflow: hidden;
         border-radius: 1.5rem;
-        background: var(--boot-surface);
+        /* The main area is the page itself (`board-frame.tsx`), not a grey card. */
+        background: var(--boot-full);
       }
       /* La colonne de lecture (`data-thread-column`, thread-timeline.css) :
          la page du fil a son propre fond (`--stream-base`, thread-theme.css). */
