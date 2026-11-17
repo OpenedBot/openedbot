@@ -556,6 +556,7 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/provider-fallback-stream.ts
 	bun tests/integration/run-stop-cause.ts
 	bun tests/integration/engine-run-contract.ts
+	bun tests/integration/engine-profile-contract.ts
 	# S7 : un run suivi de bout en bout par un seul trace-id (API, worker, passerelle, connecteur Go réel, Hermes) ; exige go.
 	bun tests/integration/run-trace-correlation.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.

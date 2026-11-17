@@ -41,6 +41,8 @@ import type { Server } from "bun";
 export type FakeHermesOptions = {
   /** Serve only the execution contract, recording method/path and JSON bodies, never headers. */
   contractOnly?: boolean;
+  profileManagementOnly?: boolean;
+  hostRequests?: Array<{ method: string; path: string; status: number }>;
   requests?: Array<{ method: string; path: string; body: unknown; idempotencyKey: string | null }>;
   hostname?: string;
   port?: number;
@@ -199,7 +201,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
   const streamDeltas = Math.max(0, Math.floor(options.streamDeltas ?? 0));
   const streamIntervalMs = Math.max(0, options.streamIntervalMs ?? 100);
   const unattributedSessions = options.unattributedSessions ?? [];
-  const host = createFakeHost({ restartReads: options.restartReads, profileMcpFacts: options.profileMcpFacts });
+  const host = createFakeHost({ restartReads: options.restartReads, profileMcpFacts: options.profileMcpFacts, profileManagementOnly: options.profileManagementOnly, requests: options.hostRequests });
   const runs = new Map<string, FakeRun>();
   const sessions = new Map<string, FakeSession>();
   const idempotentRuns = new Map<string, string>();
@@ -267,7 +269,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
           body: method === "POST" ? await readJson(request.clone()) : null,
           idempotencyKey: request.headers.get("Idempotency-Key") });
       }
-      if (options.contractOnly && !runContractRoute(method, url.pathname)?.mandatory) {
+      if (options.contractOnly && !(options.profileManagementOnly && path.startsWith("/hermes-setup/")) && !(options.profileManagementOnly && path === "/api/model/options" && method === "GET") && !runContractRoute(method, url.pathname)?.mandatory) {
         return json({ error: "contract_route_absent" }, 404);
       }
       if (request.headers.get("Authorization") !== `Bearer ${token}` && (options.contractOnly || path !== "/health")) {
@@ -275,7 +277,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
       }
 
       if (scopedProfile && !host.hasProfile(scopedProfile)) return json({ error: { code: "PROFILE_NOT_FOUND", message: "Unknown profile" } }, 404);
-      const hostResponse = options.contractOnly ? null : await host.handleHostRoute(request, path);
+      const hostResponse = (!options.contractOnly || (options.profileManagementOnly && path.startsWith("/hermes-setup/"))) ? await host.handleHostRoute(request, path) : null;
       if (hostResponse) return hostResponse;
       if (path === "/health") return json({ ok: true, service: "fake-hermes" });
       if (path === "/v1/capabilities") {
@@ -292,7 +294,7 @@ export function startFakeHermes(options: FakeHermesOptions = {}): Server<undefin
       if (path === "/v1/models") return json({ data: [{ id: "fake/hermes" }, { id: "fake/hermes-fast" }] });
       if (path === "/v1/toolsets" && method === "GET") return json(options.contractOnly ? { data: [] } : host.toolsetsDocument(scopedProfile ?? null));
       if (path === "/v1/skills" && method === "GET") return json(host.skillsDocument(scopedProfile ?? null));
-      if (path === "/api/model/options" && method === "GET") return json(MODEL_OPTIONS);
+      if (path === "/api/model/options" && method === "GET") return json(options.profileManagementOnly ? { provider: "acp", model: "agent-default", providers: [{ slug: "acp", name: "ACP agent default", is_current: true, authenticated: true, models: ["agent-default"] }] } : MODEL_OPTIONS);
 
       // The host operator's bounded inventory: identifiers only, never
       // a title, a model or a message. Served by the fake gateway so the worker
