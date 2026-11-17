@@ -121,6 +121,8 @@ var removeTree = os.RemoveAll
 // dataPathExists detects retained ACP data after the engine state was removed.
 var dataPathExists = fsx.Exists
 
+var readConfigDir = func() ([]os.DirEntry, error) { return os.ReadDir("/etc/hermes") }
+
 // ufwInstalled reports whether the ufw binary is on the host; tests replace it.
 var ufwInstalled = func() bool { return fsx.Exists("/usr/sbin/ufw") }
 
@@ -162,6 +164,9 @@ func (r *Resetter) Plan(o Options) []string {
 	}
 	steps = append(steps, "remove runtime files: "+strings.Join(runtimePaths, ", "))
 	steps = append(steps, "remove state: "+strings.Join(statePaths, ", "))
+	if !o.PurgeData && slices.Contains(dataPaths, layout.ACPCredentials) {
+		steps = append(steps, "preserve only "+layout.ACPCredentials+" under /etc/hermes when present")
+	}
 	if o.PurgeData {
 		steps = append(steps, "PURGE DATA (bearer, workspaces): "+strings.Join(dataPaths, ", "))
 	}
@@ -242,7 +247,7 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 	if err := r.restoreAccess(ctx, h, o); err != nil {
 		return err
 	}
-	// 4–5. Files and state.
+	// 4 and 5. Files and state.
 	r.removeManagedCaddyfile(ctx)
 	for _, p := range runtimePaths {
 		_ = removeTree(p)
@@ -268,6 +273,21 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 		r.purgeLegacy(ctx, o.PurgeTailscale)
 	}
 	for _, p := range statePaths {
+		if p == "/etc/hermes" && !o.PurgeData && slices.Contains(dataPaths, layout.ACPCredentials) {
+			entries, err := readConfigDir()
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			for _, entry := range entries {
+				path := filepath.Join(p, entry.Name())
+				if path != layout.ACPCredentials {
+					if err := removeTree(path); err != nil {
+						return err
+					}
+				}
+			}
+			continue
+		}
 		_ = removeTree(p)
 	}
 	// 8. Accounts.
@@ -577,8 +597,21 @@ func (r *Resetter) Residue(ctx context.Context, legacy bool) ([]string, error) {
 	for _, u := range units {
 		out = append(out, "unit "+u)
 	}
-	_, runtimePaths, statePaths, _ := r.inventory()
+	_, runtimePaths, statePaths, dataPaths := r.inventory()
 	for _, p := range append(append([]string{}, statePaths...), runtimePaths...) {
+		if p == "/etc/hermes" && slices.Contains(dataPaths, layout.ACPCredentials) {
+			entries, err := readConfigDir()
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+			for _, entry := range entries {
+				path := filepath.Join(p, entry.Name())
+				if path != layout.ACPCredentials {
+					out = append(out, path)
+				}
+			}
+			continue
+		}
 		if fsx.Exists(p) {
 			out = append(out, p)
 		}
@@ -617,9 +650,6 @@ func (r *Resetter) inventory() (units, runtimePaths, statePaths, dataPaths []str
 	}
 	if hasACPData {
 		dataPaths = append(dataPaths, acpData...)
-		// The provider file must also survive another reset that keeps data.
-		statePaths = slices.DeleteFunc(statePaths, func(p string) bool { return p == "/etc/hermes" })
-		statePaths = append(statePaths, layout.ToolConfig)
 	}
 	if r.Engine != state.EngineOpenCode {
 		return

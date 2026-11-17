@@ -2,10 +2,13 @@ package reset
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -542,7 +545,7 @@ func TestACPResetKeepAndPurgeData(t *testing.T) {
 					t.Errorf("%s virtual deletion differs", path)
 				}
 			}
-			if removed["/etc/hermes"] {
+			if removed["/etc/hermes"] && !purge {
 				t.Fatal("ACP provider file destroyed by unconditional parent deletion")
 			}
 			if !rec.removed(layout.ACPBridgeUnitPath) || !f.Ran("/usr/bin/systemctl stop openedbot-acp-bridge.service") {
@@ -567,7 +570,10 @@ func TestACPPurgeAfterResetLosesEngine(t *testing.T) {
 			paths := []string{layout.ToolConfig, layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials}
 			files := map[string]string{}
 			for _, path := range paths {
-				file := filepath.Join(root, strings.ReplaceAll(path, "/", "_"))
+				file := filepath.Join(root, path)
+				if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
+					t.Fatal(err)
+				}
 				if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
 					t.Fatal(err)
 				}
@@ -583,12 +589,12 @@ func TestACPPurgeAfterResetLosesEngine(t *testing.T) {
 				return err == nil
 			}
 			t.Cleanup(func() { dataPathExists = oldExists })
+			oldRead := readConfigDir
+			readConfigDir = func() ([]os.DirEntry, error) { return os.ReadDir(filepath.Join(root, "/etc/hermes")) }
+			t.Cleanup(func() { readConfigDir = oldRead })
 			oldRemove := removeTree
 			removeTree = func(path string) error {
-				if file := files[path]; file != "" {
-					return os.RemoveAll(file)
-				}
-				return nil
+				return os.RemoveAll(filepath.Join(root, path))
 			}
 			t.Cleanup(func() { removeTree = oldRemove })
 			if err := r.Run(context.Background(), Options{}); err != nil {
@@ -643,5 +649,103 @@ func TestACPPurgeRemovesSharedAgentHistory(t *testing.T) {
 	}
 	if _, err := os.Stat(history); !os.IsNotExist(err) {
 		t.Fatal("purge left shared history", err)
+	}
+}
+
+func TestResetConfigDirectory(t *testing.T) {
+	for _, mode := range []string{"keep", "keep-without-provider", "purge", "hermes-after-acp"} {
+		t.Run(mode, func(t *testing.T) {
+			r, runner := newTestResetter(t, false, "")
+			hookRemovals(t, runner)
+			r.Engine = state.EngineOpenCode
+			root := t.TempDir()
+			paths := []string{layout.ToolConfig, layout.ConnectorDir + "/dev/device.key.cred", layout.ManagedConfig, layout.DeployKey, layout.ACPConfigDir + "/config.json", layout.ACPProfilesRoot + "/demo/data", layout.ACPBridgeState + "/state.json"}
+			if mode != "keep-without-provider" {
+				paths = append(paths, layout.ACPCredentials)
+			}
+			write := func(path string) {
+				t.Helper()
+				target := filepath.Join(root, path)
+				if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(target, []byte("fixture"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, path := range paths {
+				write(path)
+			}
+			oldRemove, oldExists, oldRead := removeTree, dataPathExists, readConfigDir
+			removeTree = func(path string) error { return os.RemoveAll(filepath.Join(root, path)) }
+			dataPathExists = func(path string) bool { _, err := os.Stat(filepath.Join(root, path)); return err == nil }
+			readConfigDir = func() ([]os.DirEntry, error) { return os.ReadDir(filepath.Join(root, "/etc/hermes")) }
+			t.Cleanup(func() { removeTree, dataPathExists, readConfigDir = oldRemove, oldExists, oldRead })
+			purge := mode == "purge"
+			if err := r.Run(context.Background(), Options{PurgeData: purge, DataLossAccepted: purge}); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "hermes-after-acp" {
+				r.Engine = state.EngineHermes
+				write(layout.ToolConfig)
+				write(layout.ConnectorDir + "/link.json")
+				purge = true
+				if err := r.Run(context.Background(), Options{PurgeData: true, DataLossAccepted: true}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			residue, err := r.Residue(context.Background(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range residue {
+				if strings.HasPrefix(path, "/etc/hermes") {
+					t.Errorf("retained provider reported as residue: %s", path)
+				}
+			}
+			if purge {
+				for _, path := range []string{"/etc/hermes", layout.ACPProfilesRoot, layout.ACPBridgeState} {
+					if _, err := os.Stat(filepath.Join(root, path)); !os.IsNotExist(err) {
+						t.Errorf("purge left %s", path)
+					}
+				}
+			} else {
+				entries, err := os.ReadDir(filepath.Join(root, "/etc/hermes"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := 1
+				if mode == "keep-without-provider" {
+					want = 0
+				}
+				if len(entries) != want || (want == 1 && entries[0].Name() != filepath.Base(layout.ACPCredentials)) {
+					t.Fatalf("kept %d config entries, want only provider credential when present", len(entries))
+				}
+			}
+		})
+	}
+}
+
+func TestHermesResetInventoryAndPlanUnchanged(t *testing.T) {
+	r, _ := newTestResetter(t, false, "")
+	r.Engine = state.EngineHermes
+	oldExists := dataPathExists
+	dataPathExists = func(string) bool { return false }
+	t.Cleanup(func() { dataPathExists = oldExists })
+	units, runtime, config, data := r.inventory()
+	if !reflect.DeepEqual(units, Units) || !reflect.DeepEqual(runtime, RuntimePaths) || !reflect.DeepEqual(config, StatePaths) || !reflect.DeepEqual(data, DataPaths) {
+		t.Fatal("Hermes inventory changed")
+	}
+	for _, tc := range []struct {
+		options Options
+		digest  string
+	}{
+		{Options{}, "975a40f2b79ea438e0aa4f34624f4d7f6045eb3e2ae27a96c2559e738af0a67c"},
+		{Options{PurgeData: true, PurgePackages: true, Legacy: true, RemoveAdmin: true}, "5b40a76477cd70078b65ad2828ec37e2c96dcaee387a4dc1d92a25e215063bb7"},
+	} {
+		got := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(r.Plan(tc.options), "\n"))))
+		if got != tc.digest {
+			t.Errorf("Hermes plan digest=%s want=%s", got, tc.digest)
+		}
 	}
 }
