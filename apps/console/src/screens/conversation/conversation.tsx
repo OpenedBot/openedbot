@@ -1,5 +1,5 @@
 import { ConversationFiles } from "../../components/conversation-files";
-import { ConversationDiagnostic } from "../../components/conversation-diagnostic";
+import { ConversationDiagnostic, ConversationErrorPage } from "../../components/conversation-diagnostic";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
@@ -211,8 +211,9 @@ export function ConversationScreen() {
   // Runtime replaced: the profile named by the bot no longer exists on the host.
   const profileStatus = useBotProfileStatus(bot, !linkClosed);
   const profileMissing = profileStatus.data?.state === "missing";
-  const blockingError = roster.error ?? me.error ?? thread.error ??
-    runtimes.error ?? runtimeModels.error ?? submissionError;
+  const readError = roster.error ?? me.error ?? thread.error ??
+    runtimes.error ?? runtimeModels.error;
+  const blockingError = readError ?? submissionError;
   const conversationBlocked = (Boolean(blockingError) && blockingError !== dismissedError) || runtimeUnavailable || retrying;
   const conversationErrorMessage = runtimeUnavailable && !runtime ? t("mvp.noMachine") : runtimeUnavailable && runtimeHealth === "disconnected"
     ? t("conversation.linkUnavailable")
@@ -226,6 +227,16 @@ export function ConversationScreen() {
       (runtimeHealth === "disconnected" || runtimeHealth === "unreachable") &&
       (!blockingError || hostUnavailable || blockingError === dismissedError)) ||
     (hostUnavailable && blockingError !== dismissedError);
+  // A failed read stops the whole screen: the error page replaces the thread and
+  // the composer (the runtime-offline treatment keeps its own). The page holds
+  // through its own retry, until every read is back: otherwise the thread would
+  // reappear while the other reads still run, under the « indisponible » dialog.
+  const [readRetry, setReadRetry] = useState(false);
+  const readFailed = !runtimeOffline && (Boolean(readError) || (retrying && readRetry));
+  const retryReads = () => {
+    setReadRetry(true);
+    void retryConversation().finally(() => setReadRetry(false));
+  };
   const openRuntimeSettings = () => openSettings("/settings/runtime");
   const requireRuntime = () => {
     if (blockingError) throw blockingError;
@@ -691,9 +702,10 @@ export function ConversationScreen() {
   if (!bot) {
     if (roster.isPending) return <ConversationPending botId={botId} />;
     if (botUnavailable) return null;
+    if (roster.error) return <ConversationErrorPage error={roster.error} retrying={retrying} onRetry={retryReads} />;
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {roster.error ? userFacingError(roster.error, t("conversation.loadFailed")) : t("conversation.botGone")}
+        {t("conversation.botGone")}
       </div>
     );
   }
@@ -984,8 +996,8 @@ export function ConversationScreen() {
               )}
             /></DevRenderProfiler>
           )}
-{(runtimeUnavailable && !runtimeOffline) || Boolean(blockingError) || activeRun?.status === "failed" ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : activeRun?.errorCode} reference={activeRun?.id ?? thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
-        <ConversationAvailability
+{!readFailed && ((runtimeUnavailable && !runtimeOffline) || Boolean(blockingError) || activeRun?.status === "failed") ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : activeRun?.errorCode} reference={activeRun?.id ?? thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
+        {readFailed ? <ConversationErrorPage error={readError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
             setDismissedError(blockingError);
@@ -1196,7 +1208,7 @@ export function ConversationScreen() {
             onClose={() => setGoalOpen(false)}
             onSave={(next) => { setGoal(next); setGoalOpen(false); }}
           />
-        </ConversationAvailability>
+        </ConversationAvailability>}
         {/* A missing profile blocks sending, but the operator can still return home. */}
         {profileMissing && profileStatus.data ? <BotProfileRepair bot={bot} status={profileStatus.data} onClose={closeConversation} /> : null}
         </div>

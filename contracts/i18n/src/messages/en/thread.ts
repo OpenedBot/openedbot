@@ -76,6 +76,8 @@ export const conversation = {
   loadFailed: "This conversation could not be loaded. Retry after checking the connection.",
   migrationRequired: "This server is missing a required database migration. Apply the current migrations, then retry.",
   retry: "Retry",
+  retrying: "Retrying…",
+  readFailed: "The information this conversation needs could not be read. Try again in a moment.",
   botGone: "This bot no longer exists.",
   streamInterrupted: "Stream interrupted : reconnecting.",
   pendingDecision: "A decision is pending above…",
