@@ -5,7 +5,6 @@ import { AgentProgress, TrailItem, type AgentStep } from "@openedbot/browser-ui-
 import type { BotSettingProposalDto, MessageAuthorBot } from "@openedbot/contracts-api";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
 import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
-import { isServiceStepKind } from "@openedbot/execution/domain/run-step";
 import {
   HANDOFF_NOTICE_KIND,
   splitHandoff,
@@ -49,7 +48,7 @@ import {
 import { authorRenderKey, entryDayIso, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
 import { RunErrorEntry } from "./thread-run-error";
-import { questionsByRun, withFailedRunErrors } from "../lib/thread/failed-turns";
+import { questionsByRun, shownThreadEvents } from "../lib/thread/failed-turns";
 import { AssistantMessage, BotInboundMessage, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
 import { ToolActivity } from "./thread-tool-activity";
 import { callsHaveCards, ToolCallCards } from "./cards/run-card-view";
@@ -135,17 +134,12 @@ function ThreadTimelineView({
   onOpenBotApprovals,
   liveText = null,
 }: ThreadTimelineProps) {
-  // SERVICE runs (persona draft, compaction, and the old
-  // memory extraction) share the bot's thread but have no bubble:
-  // their output is consumed by the worker. Without this filter, their
-  // `agent.message` formed an empty assistant bubble under the avatar,
-  // seen on screen on 04-09. A failed run whose `run.error` never came gets one
-  // built from the run (`withFailedRunErrors`).
-  const events = useMemo(() => {
-    const serviceRunIds = new Set(runs.filter((run) => isServiceStepKind(run.stepKind)).map((run) => run.id));
-    const shown = serviceRunIds.size === 0 ? allEvents : allEvents.filter((event) => !serviceRunIds.has(event.runId));
-    return withFailedRunErrors(shown, runs, userInputs, hasOlderHistory);
-  }, [allEvents, runs, userInputs, hasOlderHistory]);
+  // Without service runs (their `agent.message` formed an empty assistant bubble
+  // under the avatar, seen on screen on 04-09), with failed turns made whole.
+  const events = useMemo(
+    () => shownThreadEvents(allEvents, runs, userInputs, hasOlderHistory),
+    [allEvents, runs, userInputs, hasOlderHistory],
+  );
   const { t, locale, formatNumber, plural } = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);

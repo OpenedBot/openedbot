@@ -1,9 +1,11 @@
 import type { StoredProductEvent } from "@openedbot/contracts-events";
+import { isServiceStepKind } from "@openedbot/execution/domain/run-step";
 import type { TimelineUserInput } from "./thread-timeline-model";
 
 type FailedRunLike = {
   id: string;
   status: string;
+  stepKind?: string | null;
   errorCode?: string | null;
   error?: string | null;
   createdAt?: string;
@@ -76,4 +78,22 @@ export function withFailedRunErrors(
     (withStandIns ??= [...events]).push(event);
   }
   return withStandIns ?? events;
+}
+
+/**
+ * The events the thread draws. SERVICE runs (persona draft, compaction, the
+ * old memory extraction) share the bot's thread but have no bubble: their
+ * output is consumed by the worker, and their events and failures stay out.
+ * A shown run that failed without its `run.error` gets one (`withFailedRunErrors`).
+ */
+export function shownThreadEvents(
+  events: readonly StoredProductEvent[],
+  runs: readonly FailedRunLike[],
+  userInputs: readonly TimelineUserInput[],
+  olderHistory: boolean,
+): readonly StoredProductEvent[] {
+  const serviceRunIds = new Set(runs.filter((run) => isServiceStepKind(run.stepKind)).map((run) => run.id));
+  if (serviceRunIds.size === 0) return withFailedRunErrors(events, runs, userInputs, olderHistory);
+  const shownRuns = runs.filter((run) => !serviceRunIds.has(run.id));
+  return withFailedRunErrors(events.filter((event) => !serviceRunIds.has(event.runId)), shownRuns, userInputs, olderHistory);
 }
