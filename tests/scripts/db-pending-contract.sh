@@ -109,7 +109,8 @@ assert_no_write "a pending migration"
 
 # 3. No registry yet: every migration is pending.
 if output="$(run_pending FAKE_NO_REGISTRY=1)"; then fail "a fresh database must exit non-zero"; fi
-[ "$(printf '%s\n' "$output" | grep -c '^  ')" -eq "${#migrations[@]}" ] || fail "a fresh database has every migration pending; got: $output"
+expected="$(for file in "${migrations[@]}"; do printf '  %s\n' "$(basename "$file" .sql)"; done)"
+[ "$(printf '%s\n' "$output" | grep '^  ')" = "$expected" ] || fail "a fresh database has every migration pending, each named once; got: $output"
 assert_no_write "a fresh database"
 
 # 4. Unreachable database, absent container, either registry query failing:
