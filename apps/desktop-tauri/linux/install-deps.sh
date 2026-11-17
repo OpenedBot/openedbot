@@ -33,7 +33,7 @@ packages=(
 if $want_test; then
   packages+=(
     xvfb xauth dbus dbus-x11 gnome-keyring libsecret-tools
-    webkit2gtk-driver imagemagick x11-utils xdotool procps jq
+    imagemagick x11-utils xdotool procps jq
     # An XEmbed tray, so the tray icon has somewhere to show under Xvfb.
     stalonetray
     fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji
@@ -44,4 +44,15 @@ sudo_if_needed=()
 if [ "$(id -u)" -ne 0 ]; then sudo_if_needed=(sudo); fi
 export DEBIAN_FRONTEND=noninteractive
 "${sudo_if_needed[@]}" apt-get update -qq
+if $want_test; then
+  # The same /usr/bin/WebKitWebDriver, renamed webkitgtk-webdriver in Ubuntu
+  # 26.04 (the CI runner); 24.04 (the build image) still calls it
+  # webkit2gtk-driver.
+  candidate="$(apt-cache policy webkitgtk-webdriver)"
+  if [[ "$candidate" == *"Candidate: "[0-9]* ]]; then
+    packages+=(webkitgtk-webdriver)
+  else
+    packages+=(webkit2gtk-driver)
+  fi
+fi
 "${sudo_if_needed[@]}" apt-get install -y -qq --no-install-recommends "${packages[@]}"

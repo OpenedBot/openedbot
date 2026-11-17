@@ -48,7 +48,7 @@ jobs:
     # it builds changed. In doubt (manual run, nothing to diff, API
     # unreachable) every job runs.
     name: Plan (validated tree, path scopes)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -91,14 +91,14 @@ jobs:
     # fails.
     # Unit tests include tests/scripts/make-dev-contract.sh (real `make dev`
     # with stubbed launchers and a temporary env file), the Python
-    # provider-fault test (python3 ships with ubuntu-24.04) and the vite
+    # provider-fault test (python3 ships with ubuntu-26.04) and the vite
     # build-id test, which needs git (also preinstalled). The bundle budget is
     # a solo console build held under the first-load budgets: entry
     # chunk and first load, gzip (apps/console/scripts/bundle-budget.ts).
     name: Checks (typecheck, boundaries, unit, console journeys, bundle budget)
     needs: [plan]
     if: needs.plan.outputs.validated != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -134,7 +134,7 @@ jobs:
     name: Integration tests (PostgreSQL 17)
     needs: [plan]
     if: needs.plan.outputs.validated != 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     services:
       postgres:
@@ -219,7 +219,7 @@ jobs:
     name: Desktop shell (Linux)
     needs: [plan]
     if: needs.plan.outputs.desktop_linux == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     env:
       RUST_VERSION: 1.98.0
@@ -281,7 +281,7 @@ jobs:
     name: core-ci ok
     if: always() && needs.plan.outputs.validated != 'true'
     needs: [plan, checks, integration, desktop-tauri, desktop-linux]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Check every job result

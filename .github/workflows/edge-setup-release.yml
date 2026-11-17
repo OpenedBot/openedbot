@@ -40,7 +40,7 @@ defaults:
 jobs:
   verify:
     name: Verify, build and sign the tag
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -149,7 +149,7 @@ jobs:
     needs: verify
     # The signed files only exist for a run on the tag itself (see Sign).
     if: github.ref == format('refs/tags/edge-setup/{0}', needs.verify.outputs.version)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     # Holds the R2 write token (secret CLOUDFLARE_R2_TOKEN) and CF_ACCOUNT_ID;
     # its deployment policy only admits edge-setup/v* tags.
@@ -199,7 +199,7 @@ jobs:
     # R2 first (hosts read it), then GitHub with the very same bytes: a
     # release exists in both places, identical, or the run fails.
     if: github.ref == format('refs/tags/edge-setup/{0}', needs.verify.outputs.version)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write
