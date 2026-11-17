@@ -66,7 +66,7 @@ export function AccountClosureSection({ bare = false }: { bare?: boolean } = {})
               : <Note tone="warning">{t("settingsAccount.closureGraceUnavailable")}</Note>}
             <label htmlFor="account-closure-confirmation" className="text-sm">{t("settingsAccount.closureConfirmation")}</label>
             <input id="account-closure-confirmation" className={FIELD} autoComplete="off" value={confirmation} disabled={!data.eligible || !hasGracePeriod || pending} onChange={(event) => setConfirmationDraft({ planKey, value: event.target.value })} />
-            <button type="submit" className={bare ? BUTTON.danger : BUTTON.secondary} disabled={!canSchedule}>{t("settingsAccount.closureSubmit")}</button>
+            <button type="submit" className={`${bare ? BUTTON.danger : BUTTON.secondary} self-end`} disabled={!canSchedule}>{t("settingsAccount.closureSubmit")}</button>
           </form>}
         </> : null}
       </div>
