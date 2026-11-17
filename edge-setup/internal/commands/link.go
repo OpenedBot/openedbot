@@ -412,7 +412,7 @@ func runLink(env cli.Env, args []string) int {
 	}
 	c := connector.New(wsURLOf(u.String()), connector.Auth{EnrollmentTicket: ticket.ID + "." + ticket.Secret}, "http://127.0.0.1:8642", token, nil)
 	c.Agent = "edge-setup/" + env.Version
-	c.HermesVersion = installedHermesVersion()
+	configureConnectorEngine(c, st.EngineName())
 	c.Logf = func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }
 	// A fresh device key per enrollment: hello presents its public half, the
 	// seed is sealed only once openedbot has issued the link.
@@ -591,7 +591,7 @@ func runConnectorDaemon(env cli.Env) int {
 	}
 	c.OperatorSocket = operatorSocket
 	c.Agent = "edge-setup/" + env.Version
-	c.HermesVersion = installedHermesVersion()
+	configureConnectorEngine(c, os.Getenv("OPENEDBOT_ENGINE"))
 	c.Logf = func(f string, a ...any) { printf(env.Stderr, f, a...) }
 	c.DeviceKey = deviceKey
 	if diagnostics, diagnosticErr := connector.NewRuntimeDiagnosticSpool(filepath.Join(stateDir, "diagnostics"), lf.RuntimeID, lf.WSURL); diagnosticErr == nil {
@@ -687,6 +687,16 @@ func runConnectorDaemon(env cli.Env) int {
 func runOperatorDaemon(env cli.Env, ctx context.Context) int {
 	if runtime.GOOS == "darwin" {
 		return runMacOperatorDaemon(env, ctx)
+	}
+	st, err := loadHostState()
+	if err != nil {
+		return fail(env, cli.ExitFailure, "state: %v", err)
+	}
+	if st.EngineName() == state.EngineOpenCode {
+		if err := operator.Listen(ctx, layout.OperatorSocket, operator.ACPHost(), func(f string, a ...any) { printf(env.Stderr, f, a...) }); err != nil {
+			return fail(env, cli.ExitFailure, "operator: %v", err)
+		}
+		return cli.ExitOK
 	}
 	token, err := hermes.Token()
 	if err != nil {

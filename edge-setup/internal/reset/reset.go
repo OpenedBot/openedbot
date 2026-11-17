@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/OpenedBot/openedbot/edge-setup/internal/layout"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/pins"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/proxy"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/systemd"
 )
 
@@ -113,11 +115,15 @@ var LegacyUnits = []string{
 // removeFile deletes one restored access file; tests record the paths.
 var removeFile = fsx.Remove
 
+// removeTree is the recursive deletion seam used by reset inventory tests.
+var removeTree = os.RemoveAll
+
 // ufwInstalled reports whether the ufw binary is on the host; tests replace it.
 var ufwInstalled = func() bool { return fsx.Exists("/usr/sbin/ufw") }
 
 // Resetter carries dependencies.
 type Resetter struct {
+	Engine   string
 	Runner   exec.Runner
 	Systemd  systemd.Client
 	Apt      apt.Client
@@ -134,11 +140,14 @@ func New(r exec.Runner, out func(string, ...any)) *Resetter {
 
 // Plan lists what Run would do.
 func (r *Resetter) Plan(o Options) []string {
+	units, runtimePaths, statePaths, dataPaths := r.inventory()
 	var steps []string
-	steps = append(steps, "stop, disable and remove units: "+strings.Join(Units, ", "))
+	steps = append(steps, "stop, disable and remove units: "+strings.Join(units, ", "))
 	steps = append(steps, "delete the iptables OUTPUT rules of "+layout.LoopbackGuardUnit+".service (loopback ports "+loopbackGuardPortList()+"): reopens them to local users, never closes SSH")
 	steps = append(steps, "remove old hermes-managed caddy only when its Caddyfile carries the hermes-setup marker; keep third-party Caddy")
-	steps = append(steps, "disable the rootless docker of "+layout.ServiceUser+" (systemctl --user, linger, subuid/subgid, delegate.conf, nf_tables modules-load entry)")
+	if r.Engine != state.EngineOpenCode {
+		steps = append(steps, "disable the rootless docker of "+layout.ServiceUser+" (systemctl --user, linger, subuid/subgid, delegate.conf, nf_tables modules-load entry)")
+	}
 	steps = append(steps, "restore access files from backups: sshd drop-in, UFW (4 files) or disable UFW, fail2ban jail, resolved/pwquality drop-ins, sudoers logging drop-in, logrotate, apt drop-ins; then visudo -cf")
 	if o.RemoveAdmin {
 		steps = append(steps, "remove the "+layout.AdminUser+" account and its sudoers file "+layout.SudoersAdmin+", then visudo -cf (refused from the "+layout.AdminUser+" session)")
@@ -148,10 +157,10 @@ func (r *Resetter) Plan(o Options) []string {
 	if o.RestoreCloudUser {
 		steps = append(steps, "restore the quarantined "+layout.QuarantineUser+" account from backups")
 	}
-	steps = append(steps, "remove runtime files: "+strings.Join(RuntimePaths, ", "))
-	steps = append(steps, "remove state: "+strings.Join(StatePaths, ", "))
+	steps = append(steps, "remove runtime files: "+strings.Join(runtimePaths, ", "))
+	steps = append(steps, "remove state: "+strings.Join(statePaths, ", "))
 	if o.PurgeData {
-		steps = append(steps, "PURGE DATA (bearer, workspaces): "+strings.Join(DataPaths, ", "))
+		steps = append(steps, "PURGE DATA (bearer, workspaces): "+strings.Join(dataPaths, ", "))
 	}
 	if o.PurgePackages {
 		steps = append(steps, "purge packages: "+strings.Join(Packages, ", ")+" and "+strings.Join(PackageFiles, ", "))
@@ -173,6 +182,7 @@ func (r *Resetter) Plan(o Options) []string {
 
 // Run performs the reset.
 func (r *Resetter) Run(ctx context.Context, o Options) error {
+	units, runtimePaths, statePaths, dataPaths := r.inventory()
 	if o.PurgeData && !o.DataLossAccepted {
 		return errors.New("--purge-data destroys the bearer and every workspace; add --i-understand-data-loss")
 	}
@@ -194,31 +204,33 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 	// 1. Units. Named connector instances are stopped through their glob:
 	// only loaded units match it, which is exactly the running ones.
 	_ = r.Systemd.Stop(ctx, layout.ConnectorTemplateUnit+"*")
-	for _, u := range Units {
+	for _, u := range units {
 		_ = r.Systemd.Stop(ctx, u)
 		_ = r.Systemd.Disable(ctx, u)
-		_ = fsx.Remove("/etc/systemd/system/" + u)
+		_ = removeFile("/etc/systemd/system/" + u)
 	}
 	// The guard rules outlive the stopped unit: delete them while the service
 	// account still exists, its uid is part of the rule specs.
 	r.removeLoopbackGuardRules(ctx)
 	// 2. Rootless docker.
-	if info, _ := r.Accounts.Get(ctx, layout.ServiceUser); info != nil {
-		_, _ = r.Runner.Run(ctx, account.AsUser(layout.ServiceUser, []string{"XDG_RUNTIME_DIR=" + fmt.Sprintf("/run/user/%d", info.UID), "DBUS_SESSION_BUS_ADDRESS=" + fmt.Sprintf("unix:path=/run/user/%d/bus", info.UID), "PATH=/usr/bin:/bin"}, "systemctl", "--user", "disable", "--now", "docker.service"))
-		_ = os.RemoveAll("/home/" + layout.ServiceUser + "/.config/docker")
-		_ = os.RemoveAll("/home/" + layout.ServiceUser + "/.config/systemd")
-		_, _ = r.Runner.Run(ctx, exec.Cmd{Path: "/usr/bin/loginctl", Args: []string{"disable-linger", layout.ServiceUser}})
-		_ = r.Systemd.Stop(ctx, fmt.Sprintf("user@%d.service", info.UID))
-	}
-	for _, p := range []string{"/etc/subuid", "/etc/subgid"} {
-		if data, err := os.ReadFile(p); err == nil {
-			var keep []string
-			for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
-				if l != "" && !strings.HasPrefix(l, layout.ServiceUser+":") {
-					keep = append(keep, l)
+	if r.Engine != state.EngineOpenCode {
+		if info, _ := r.Accounts.Get(ctx, layout.ServiceUser); info != nil {
+			_, _ = r.Runner.Run(ctx, account.AsUser(layout.ServiceUser, []string{"XDG_RUNTIME_DIR=" + fmt.Sprintf("/run/user/%d", info.UID), "DBUS_SESSION_BUS_ADDRESS=" + fmt.Sprintf("unix:path=/run/user/%d/bus", info.UID), "PATH=/usr/bin:/bin"}, "systemctl", "--user", "disable", "--now", "docker.service"))
+			_ = removeTree("/home/" + layout.ServiceUser + "/.config/docker")
+			_ = removeTree("/home/" + layout.ServiceUser + "/.config/systemd")
+			_, _ = r.Runner.Run(ctx, exec.Cmd{Path: "/usr/bin/loginctl", Args: []string{"disable-linger", layout.ServiceUser}})
+			_ = r.Systemd.Stop(ctx, fmt.Sprintf("user@%d.service", info.UID))
+		}
+		for _, p := range []string{"/etc/subuid", "/etc/subgid"} {
+			if data, err := os.ReadFile(p); err == nil {
+				var keep []string
+				for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+					if l != "" && !strings.HasPrefix(l, layout.ServiceUser+":") {
+						keep = append(keep, l)
+					}
 				}
+				_ = fsx.WriteAtomic(p, []byte(strings.Join(keep, "\n")+"\n"), 0o644, fsx.Root)
 			}
-			_ = fsx.WriteAtomic(p, []byte(strings.Join(keep, "\n")+"\n"), 0o644, fsx.Root)
 		}
 	}
 	// 3. Access: restore, never close.
@@ -229,29 +241,31 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 	}
 	// 4–5. Files and state.
 	r.removeManagedCaddyfile(ctx)
-	for _, p := range RuntimePaths {
-		_ = os.RemoveAll(p)
+	for _, p := range runtimePaths {
+		_ = removeTree(p)
 	}
-	for _, u := range []string{"docker.socket", "docker.service", "containerd.service"} {
-		_ = r.Systemd.Unmask(ctx, u)
+	if r.Engine != state.EngineOpenCode {
+		for _, u := range []string{"docker.socket", "docker.service", "containerd.service"} {
+			_ = r.Systemd.Unmask(ctx, u)
+		}
 	}
 	if o.PurgeData {
-		for _, p := range DataPaths {
-			_ = os.RemoveAll(p)
+		for _, p := range dataPaths {
+			_ = removeTree(p)
 		}
 	}
 	if o.PurgePackages {
 		_ = r.Apt.Unhold(ctx, Packages...)
 		_ = r.Apt.Purge(ctx, Packages...)
 		for _, p := range PackageFiles {
-			_ = fsx.Remove(p)
+			_ = removeFile(p)
 		}
 	}
 	if o.Legacy {
 		r.purgeLegacy(ctx, o.PurgeTailscale)
 	}
-	for _, p := range StatePaths {
-		_ = os.RemoveAll(p)
+	for _, p := range statePaths {
+		_ = removeTree(p)
 	}
 	// 8. Accounts.
 	if info, _ := r.Accounts.Get(ctx, layout.LegacyConnectorUser); info != nil {
@@ -263,7 +277,7 @@ func (r *Resetter) Run(ctx context.Context, o Options) error {
 		}
 	}
 	_ = r.Systemd.DaemonReload(ctx)
-	_ = os.RemoveAll(layout.ToolInstallDir)
+	_ = removeTree(layout.ToolInstallDir)
 	for _, p := range RemoveToolPathEntries(ToolPathEntries, PackageFileList) {
 		r.Out("kept %s: owned by the edge-setup package; remove it with apt remove edge-setup", p)
 	}
@@ -311,7 +325,7 @@ func (r *Resetter) restoreAccess(ctx context.Context, h *hardening.Hardener, o O
 		if fsx.Exists(g.BackupPath("ssh-dropin.original")) {
 			_ = fsx.CopyFile(g.BackupPath("ssh-dropin.original"), layout.SSHDropin, 0o644, fsx.Root)
 		} else {
-			_ = fsx.Remove(layout.SSHDropin)
+			_ = removeFile(layout.SSHDropin)
 		}
 		if _, err := exec.Must(ctx, r.Runner, exec.Cmd{Path: "/usr/sbin/sshd", Args: []string{"-t"}}); err != nil {
 			return fmt.Errorf("sshd configuration invalid after removing the drop-in; not reloading: %w", err)
@@ -319,7 +333,7 @@ func (r *Resetter) restoreAccess(ctx context.Context, h *hardening.Hardener, o O
 		_ = r.Systemd.Reload(ctx, "ssh")
 	}
 	if g.HasSnapshot("fail2ban-dropin.created-by-bootstrap") {
-		_ = fsx.Remove(layout.Fail2banJail)
+		_ = removeFile(layout.Fail2banJail)
 	}
 	if g.HasSnapshot("fail2ban.was-inactive") {
 		_ = r.Systemd.Stop(ctx, "fail2ban")
@@ -471,7 +485,7 @@ func (r *Resetter) removeManagedCaddyfile(ctx context.Context) {
 	}
 	_ = r.Systemd.Stop(ctx, "caddy.service")
 	_ = r.Systemd.Disable(ctx, "caddy.service")
-	_ = os.Remove(layout.Caddyfile)
+	_ = removeFile(layout.Caddyfile)
 }
 
 // removeCreatedAutoUpgrades deletes 20auto-upgrades only if the hardening
@@ -519,7 +533,7 @@ func (r *Resetter) purgeLegacy(ctx context.Context, purgeTailscale bool) {
 		}
 		_ = r.Systemd.Stop(ctx, u)
 		_ = r.Systemd.Disable(ctx, u)
-		_ = fsx.Remove("/etc/systemd/system/" + u)
+		_ = removeFile("/etc/systemd/system/" + u)
 	}
 	if purgeTailscale {
 		_ = r.Apt.Purge(ctx, "tailscale")
@@ -532,11 +546,11 @@ func (r *Resetter) purgeLegacy(ctx context.Context, purgeTailscale bool) {
 		r.Out("kept tailscale: it may be your way into this host (--purge-tailscale to remove it)")
 	}
 	for _, p := range LegacyPaths {
-		_ = os.RemoveAll(p)
+		_ = removeTree(p)
 	}
 	if m, _ := filepath.Glob("/root/hermes-rename-*"); m != nil {
 		for _, p := range m {
-			_ = os.RemoveAll(p)
+			_ = removeTree(p)
 		}
 	}
 	_, _ = r.Runner.Run(ctx, exec.Cmd{Path: "/usr/sbin/groupdel", Args: []string{"hermes_runtime"}})
@@ -546,6 +560,9 @@ func (r *Resetter) purgeLegacy(ctx context.Context, purgeTailscale bool) {
 // Residue lists what still mentions the namespaces after a reset.
 func (r *Resetter) Residue(ctx context.Context, legacy bool) ([]string, error) {
 	patterns := []string{"hermes-*"}
+	if r.Engine == state.EngineOpenCode {
+		patterns = append(patterns, layout.ACPBridgeUnit+".service")
+	}
 	if legacy {
 		patterns = append(patterns, "openhermesbot-*")
 	}
@@ -557,7 +574,8 @@ func (r *Resetter) Residue(ctx context.Context, legacy bool) ([]string, error) {
 	for _, u := range units {
 		out = append(out, "unit "+u)
 	}
-	for _, p := range append(append([]string{}, StatePaths...), RuntimePaths...) {
+	_, runtimePaths, statePaths, _ := r.inventory()
+	for _, p := range append(append([]string{}, statePaths...), runtimePaths...) {
 		if fsx.Exists(p) {
 			out = append(out, p)
 		}
@@ -581,3 +599,28 @@ func (r *Resetter) Residue(ctx context.Context, legacy bool) ([]string, error) {
 // isTailscaleUnit reports whether a legacy unit belongs to tailscale rather
 // than to the previous tool's own namespace.
 func isTailscaleUnit(unit string) bool { return strings.HasPrefix(unit, "tailscale") }
+
+// inventory keeps the default Hermes reset byte-for-byte in its old order.
+// ACP credentials and journals are runtime data, preserved unless purged.
+func (r *Resetter) inventory() (units, runtimePaths, statePaths, dataPaths []string) {
+	units = append([]string{}, Units...)
+	runtimePaths = append([]string{}, RuntimePaths...)
+	statePaths = append([]string{}, StatePaths...)
+	dataPaths = append([]string{}, DataPaths...)
+	if r.Engine != state.EngineOpenCode {
+		return
+	}
+	for n, u := range units {
+		if u == layout.GatewayUnit+".service" {
+			units[n] = layout.ACPBridgeUnit + ".service"
+		}
+	}
+	runtimePaths = append(runtimePaths, layout.ACPAgentDir, layout.ACPConfigDir)
+	statePaths = slices.DeleteFunc(statePaths, func(p string) bool { return p == "/etc/hermes" })
+	statePaths = append(statePaths, layout.ToolConfig)
+	dataPaths = append(dataPaths, layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials)
+	return
+}
+
+// DataInventory lists the engine's retained data for reset and uninstall.
+func (r *Resetter) DataInventory() []string { _, _, _, data := r.inventory(); return data }

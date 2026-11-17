@@ -16,6 +16,7 @@ import (
 	"github.com/OpenedBot/openedbot/edge-setup/internal/guard"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hardening"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/layout"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/systemd"
 )
 
@@ -494,5 +495,64 @@ func TestRestoreAccessCloudUserFailureKeepsAdminAndStops(t *testing.T) {
 	}
 	if !fsx.Exists(r.Guard.BackupPath("debian.manifest")) {
 		t.Fatal("backups removed")
+	}
+}
+
+func TestACPResetKeepAndPurgeData(t *testing.T) {
+	for _, purge := range []bool{false, true} {
+		t.Run(map[bool]string{false: "keep", true: "purge"}[purge], func(t *testing.T) {
+			r, f := newTestResetter(t, false, "")
+			r.Engine = state.EngineOpenCode
+			rec := hookRemovals(t, f)
+			root := t.TempDir()
+			// Every deletion goes to a temporary inventory mirror, never the host.
+			virtual := map[string]string{}
+			for _, path := range []string{layout.RuntimeRoot, layout.ACPProfilesRoot, layout.ACPBridgeState, layout.ACPCredentials, layout.ACPAgentDir, layout.ACPConfigDir} {
+				file := filepath.Join(root, strings.ReplaceAll(path, "/", "_"))
+				if err := os.WriteFile(file, []byte("fixture"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				virtual[path] = file
+			}
+			oldRemove := removeTree
+			removed := map[string]bool{}
+			removeTree = func(path string) error {
+				removed[path] = true
+				if temp := virtual[path]; temp != "" {
+					return os.Remove(temp)
+				}
+				return nil
+			}
+			t.Cleanup(func() { removeTree = oldRemove })
+			options := Options{PurgeData: purge, DataLossAccepted: purge}
+			plan := strings.Join(r.Plan(options), "\n")
+			if !strings.Contains(plan, layout.ACPBridgeUnit+".service") || strings.Contains(plan, layout.GatewayUnit+".service") {
+				t.Fatal("wrong engine unit inventory")
+			}
+			if err := r.Run(context.Background(), options); err != nil {
+				t.Fatal(err)
+			}
+			for path, temp := range virtual {
+				data := path == layout.RuntimeRoot || path == layout.ACPProfilesRoot || path == layout.ACPBridgeState || path == layout.ACPCredentials
+				wantRemoved := !data || purge
+				if removed[path] != wantRemoved {
+					t.Errorf("%s removed=%v, want=%v", path, removed[path], wantRemoved)
+				}
+				if _, err := os.Stat(temp); os.IsNotExist(err) != wantRemoved {
+					t.Errorf("%s virtual deletion differs", path)
+				}
+			}
+			if removed["/etc/hermes"] {
+				t.Fatal("ACP provider file destroyed by unconditional parent deletion")
+			}
+			if !rec.removed(layout.ACPBridgeUnitPath) || !f.Ran("/usr/bin/systemctl stop openedbot-acp-bridge.service") {
+				t.Fatal("bridge unit not removed")
+			}
+			for _, command := range f.Commands() {
+				if strings.Contains(command, "hermes-gateway") || strings.Contains(command, "--user disable --now docker") {
+					t.Fatal("Hermes runtime cleanup on ACP host", command)
+				}
+			}
+		})
 	}
 }

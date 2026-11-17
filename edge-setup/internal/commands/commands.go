@@ -207,12 +207,18 @@ func runPlan(env cli.Env, args []string) int {
 // printPlan is `plan`, and `up --dry-run`: what `up` would do with these
 // options, read from the host and the state, without writing anything.
 func printPlan(env cli.Env, o *upOptions) int {
+	if err := validateEngine(o.engine, runtime.GOOS, nil, o.sandbox); err != nil {
+		return fail(env, cli.ExitRefused, "%v", err)
+	}
 	if runtime.GOOS == "darwin" {
 		return runMacPlan(env, o)
 	}
-	st, err := state.Load()
+	st, err := loadHostState()
 	if err != nil {
 		return fail(env, cli.ExitFailure, "%v", err)
+	}
+	if err := validateEngine(o.engine, runtime.GOOS, st, o.sandbox); err != nil {
+		return fail(env, cli.ExitRefused, "%v", err)
 	}
 	features := state.Features{}
 	if st != nil {
@@ -225,7 +231,7 @@ func printPlan(env cli.Env, o *upOptions) int {
 	if err != nil {
 		return fail(env, cli.ExitFailure, "%v", err)
 	}
-	for _, line := range planLines(features, facts) {
+	for _, line := range enginePlanLines(o.engine, features, facts) {
 		printf(env.Stdout, "%s", colorizePhaseLine(env.Color, line))
 	}
 	printf(env.Stdout, "%s", autoUpgradePlanLine(o.autoUpgrade))
@@ -306,6 +312,21 @@ func planLines(features state.Features, facts hostfacts.Facts) []string {
 	lines = append(lines, "P8 connect     connector unit installed (starts after `link`), no inbound port")
 	lines = append(lines, "P9 finalize    core plus selected-policy proofs, audit --strict; unselected checks are SKIP")
 	lines = append(lines, "writes        "+layout.ToolConfig+" (no secret)")
+	return lines
+}
+
+func enginePlanLines(engine string, features state.Features, facts hostfacts.Facts) []string {
+	lines := planLines(features, facts)
+	if engine == state.EngineOpenCode {
+		for n, line := range lines {
+			if strings.HasPrefix(line, "P5 runtime") {
+				lines[n] = fmt.Sprintf("P5 runtime     experimental OpenCode %s, openedbot-acp-bridge on 127.0.0.1:%d; root-owned config, manual permissions", pins.OpenCodeVersion, layout.GatewayPort)
+			}
+			if strings.HasPrefix(line, "P4/P6") {
+				lines[n] = "P4/P6          ACP agents run as hermes through runuser, no Hermes sandbox"
+			}
+		}
+	}
 	return lines
 }
 

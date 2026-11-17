@@ -681,7 +681,7 @@ func runUpgrade(env cli.Env, args []string) int {
 		installed = env.Version
 	}
 	if !semver.IsValid(installed) {
-		if st, err := state.Load(); err == nil && st != nil && semver.IsValid(st.ToolVersion) {
+		if st, err := loadHostState(); err == nil && st != nil && semver.IsValid(st.ToolVersion) {
 			installed = st.ToolVersion
 		}
 	}
@@ -786,24 +786,43 @@ func finishUpgrade(ctx context.Context, env cli.Env, previous, sum string, rollb
 		previous = "unknown"
 	}
 	sd := systemd.Client{Runner: runner}
-	// Deliver the checkout repairs of this release to a host already
-	// installed: `up` is the only command that touches the checkout, so a
-	// host `up` refuses would otherwise never receive the fix for the very
-	// reason it is refused. Offline and bounded; a failure is reported, and
-	// never turns a delivered binary into a failed upgrade.
-	if err := hermes.ReconcileCheckout(ctx, runner, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }); err != nil {
-		printf(env.Stdout, "  warning: managed Hermes checkout not reconciled: %v", err)
-	}
-	providerSDKs, probeErr := hermes.ProbeProviderSDKs(ctx, runner, layout.VenvBin+"/python")
-	if probeErr != nil {
-		printf(env.Stdout, "  warning: provider SDK probe failed: %v", probeErr)
-	} else {
-		printProviderSDKUpgradeNotice(env.Stdout, providerSDKs)
-	}
-	gatewayRestarted, err := reconcileUpgradeSecurityDefaults(ctx, runner, sd, waitGatewayHealthy,
-		func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) })
+	st, err := loadHostState()
 	if err != nil {
-		return fail(env, cli.ExitFailure, "upgrade: security defaults: %v", err)
+		return fail(env, cli.ExitFailure, "upgrade: state: %v", err)
+	}
+	isACP := st.EngineName() == state.EngineOpenCode
+	gatewayRestarted := false
+	if isACP {
+		a, ok := arch()
+		if !ok {
+			return fail(env, cli.ExitFailure, "unsupported architecture")
+		}
+		if err := installACPRuntime(ctx, a.Go, true, st, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }); err != nil {
+			return fail(env, cli.ExitFailure, "upgrade: ACP runtime: %v", err)
+		}
+		if err := proveEngineRuntime(ctx, sd, st, waitGatewayHealthy); err != nil {
+			return fail(env, cli.ExitFailure, "upgrade: ACP health: %v", err)
+		}
+	} else {
+		// Deliver the checkout repairs of this release to a host already
+		// installed: `up` is the only command that touches the checkout, so a
+		// host `up` refuses would otherwise never receive the fix for the very
+		// reason it is refused. Offline and bounded; a failure is reported, and
+		// never turns a delivered binary into a failed upgrade.
+		if err := hermes.ReconcileCheckout(ctx, runner, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) }); err != nil {
+			printf(env.Stdout, "  warning: managed Hermes checkout not reconciled: %v", err)
+		}
+		providerSDKs, probeErr := hermes.ProbeProviderSDKs(ctx, runner, layout.VenvBin+"/python")
+		if probeErr != nil {
+			printf(env.Stdout, "  warning: provider SDK probe failed: %v", probeErr)
+		} else {
+			printProviderSDKUpgradeNotice(env.Stdout, providerSDKs)
+		}
+		gatewayRestarted, err = reconcileUpgradeSecurityDefaults(ctx, runner, sd, waitGatewayHealthy,
+			func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) })
+		if err != nil {
+			return fail(env, cli.ExitFailure, "upgrade: security defaults: %v", err)
+		}
 	}
 	connectorPath := "/etc/systemd/system/" + layout.ConnectorUnit + ".service"
 	if fsx.Exists(connectorPath) {
@@ -828,16 +847,15 @@ func finishUpgrade(ctx context.Context, env cli.Env, previous, sum string, rollb
 	if err != nil {
 		return fail(env, cli.ExitFailure, "upgrade: %v", err)
 	}
-	st, err := state.Load()
-	if err != nil {
-		return fail(env, cli.ExitFailure, "upgrade: state: %v", err)
-	}
 	// The gateway unit comes after the operator restart on purpose: the
 	// « restart pending » marker it may set lives in the operator's
 	// RuntimeDirectory, which exists once that unit has started. The unit
 	// keeps the directory across restarts (RuntimeDirectoryPreserve=yes), so a
 	// marker set earlier survives the restart above as well.
-	gatewayUnit, err := reconcileGatewayUnit(ctx, sd, st, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) })
+	var gatewayUnit gatewayUnitResult
+	if !isACP {
+		gatewayUnit, err = reconcileGatewayUnit(ctx, sd, st, func(f string, a ...any) { printf(env.Stdout, "  "+f, a...) })
+	}
 	if err != nil {
 		return fail(env, cli.ExitFailure, "upgrade: gateway unit: %v", err)
 	}
@@ -866,6 +884,9 @@ func finishUpgrade(ctx context.Context, env cli.Env, previous, sum string, rollb
 		}
 	}
 	restarted := layout.OperatorUnit
+	if isACP {
+		restarted = layout.ACPBridgeUnit + ", " + restarted
+	}
 	if gatewayRestarted || gatewayUnit.Outcome == gatewayUnitRestarted {
 		restarted = layout.GatewayUnit + ", " + restarted
 	}

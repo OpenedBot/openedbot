@@ -30,6 +30,7 @@ import (
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hardening"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hermes"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/layout"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/render"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/systemd"
 )
@@ -140,7 +141,7 @@ func (a *Auditor) Run(ctx context.Context) (Report, error) {
 		{"unattended_upgrades", a.unattended, f.UnattendedUpgrades}, {"intrusion_prevention", a.fail2ban, f.Fail2Ban}, {"failed_logins", a.failedLogins, f.SSHHardening || f.Fail2Ban},
 		{"package_updates", a.packageUpdates, f.UnattendedUpgrades}, {"listening_ports", a.listeningPorts, true}, {"disk_usage", a.disk, true}, {"memory_usage", a.memory, true}, {"cpu_usage", a.load, true},
 		{"sudo_logging", a.sudoLogging, f.SudoLogging}, {"password_policy", a.passwordPolicy, f.PasswordPolicy}, {"llmnr", a.llmnr, f.DisableLLMNR}, {"privileged_files", a.privilegedFiles, true}, {"sudoers", a.sudoers, true},
-		{"hermes_gateway", a.hermesGateway, true}, {"hermes_gateway_unit", a.hermesGatewayUnit, true}, {"hermes_catalogue", a.hermesCatalogue, true}, {"hermes_sandbox", a.hermesSandbox, f.Sandbox}, {"hermes_platforms", a.hermesPlatforms, true}, {"hermes_secrets", a.hermesSecrets, true},
+		{"hermes_gateway", a.hermesGateway, true}, {"hermes_gateway_unit", a.hermesGatewayUnit, true}, {"hermes_catalogue", a.hermesCatalogue, true}, {"hermes_sandbox", a.hermesSandbox, f.Sandbox}, {"hermes_platforms", a.hermesPlatforms, a.State.EngineName() != state.EngineOpenCode}, {"hermes_secrets", a.hermesSecrets, true},
 		{"proxy_transaction", a.proxyTransaction, true},
 	}
 	for _, c := range checks {
@@ -285,7 +286,7 @@ func (a *Auditor) metadataEgress(ctx context.Context) Result {
 			}
 		}
 	}
-	unit, _ := a.Systemd.Show(ctx, layout.GatewayUnit, "IPAddressDeny")
+	unit, _ := a.Systemd.Show(ctx, a.gatewayUnit(), "IPAddressDeny")
 	if !strings.Contains(unit, "169.254.0.0/16") {
 		return Result{"cloud_metadata_egress", Fail, "gateway unit carries no mandatory IPAddressDeny"}
 	}
@@ -296,7 +297,7 @@ func (a *Auditor) metadataEgress(ctx context.Context) Result {
 	// metadata range is a configured nameserver allowed alone, as a single host
 	// (internal/egress): the unit keeps its DNS, and metadata stays reachable
 	// through that address.
-	allow, err := a.Systemd.Show(ctx, layout.GatewayUnit, "IPAddressAllow")
+	allow, err := a.Systemd.Show(ctx, a.gatewayUnit(), "IPAddressAllow")
 	if err != nil {
 		return Result{"cloud_metadata_egress", Unknown, "systemctl show IPAddressAllow failed"}
 	}
@@ -608,8 +609,8 @@ func (a *Auditor) sudoers(context.Context) Result {
 }
 
 func (a *Auditor) hermesGateway(ctx context.Context) Result {
-	if active, _ := a.Systemd.IsActive(ctx, layout.GatewayUnit); !active {
-		return Result{"hermes_gateway", Fail, layout.GatewayUnit + " is not active"}
+	if active, _ := a.Systemd.IsActive(ctx, a.gatewayUnit()); !active {
+		return Result{"hermes_gateway", Fail, a.gatewayUnit() + " is not active"}
 	}
 	out, ok := a.out(ctx, "/usr/bin/ss", "-H", "-ltn")
 	if !ok {
@@ -636,9 +637,17 @@ func (a *Auditor) hermesGateway(ctx context.Context) Result {
 // and `up` both bring it. A parameter that cannot be derived leaves the check
 // UNKNOWN: no verdict is made on a guess.
 func (a *Auditor) hermesGatewayUnit(ctx context.Context) Result {
-	installed, err := os.ReadFile(a.path(layout.GatewayUnitPath))
+	unitPath := layout.GatewayUnitPath
+	if a.State.EngineName() == state.EngineOpenCode {
+		unitPath = layout.ACPBridgeUnitPath
+	}
+	installed, err := os.ReadFile(a.path(unitPath))
 	if errors.Is(err, fs.ErrNotExist) {
-		return Result{"hermes_gateway_unit", Fail, layout.GatewayUnit + ".service is not installed; run `sudo edge-setup up --yes`"}
+		message := layout.GatewayUnit + ".service is not installed; run `sudo edge-setup up --yes`"
+		if a.State.EngineName() == state.EngineOpenCode {
+			message = layout.ACPBridgeUnit + ".service is not installed; run `sudo edge-setup up --engine acp:opencode --yes`"
+		}
+		return Result{"hermes_gateway_unit", Fail, message}
 	}
 	if err != nil {
 		return Result{"hermes_gateway_unit", Unknown, err.Error()}
@@ -647,14 +656,22 @@ func (a *Auditor) hermesGatewayUnit(ctx context.Context) Result {
 	if accounts.Lookup == nil {
 		accounts = account.New(a.Runner)
 	}
-	want, err := hermes.DesiredGatewayUnit(ctx, accounts, a.State, a.path(layout.ResolvConf), nil)
+	var want string
+	if a.State.EngineName() == state.EngineOpenCode {
+		want, err = render.ACPBridgeUnit(egress.ResolverAllowFrom(a.path(layout.ResolvConf), "", nil))
+	} else {
+		want, err = hermes.DesiredGatewayUnit(ctx, accounts, a.State, a.path(layout.ResolvConf), nil)
+	}
 	if err != nil {
 		return Result{"hermes_gateway_unit", Unknown, "the unit this binary would install cannot be rendered: " + err.Error()}
 	}
 	if string(installed) != want {
+		if a.State.EngineName() == state.EngineOpenCode {
+			return Result{"hermes_gateway_unit", Warn, "ACP bridge unit differs from this binary; run upgrade or up --engine acp:opencode"}
+		}
 		return Result{"hermes_gateway_unit", Warn, hermes.GatewayUnitStale}
 	}
-	return Result{"hermes_gateway_unit", Pass, layout.GatewayUnit + ".service is the unit this binary renders"}
+	return Result{"hermes_gateway_unit", Pass, a.gatewayUnit() + ".service is the unit this binary renders"}
 }
 
 func (a *Auditor) hermesCatalogue(ctx context.Context) Result {
@@ -743,4 +760,11 @@ func (a *Auditor) hermesSecrets(context.Context) Result {
 		}
 	}
 	return Result{"hermes_secrets", Pass, "runtime.env, .env, config.yaml and link.json are owner-only"}
+}
+
+func (a *Auditor) gatewayUnit() string {
+	if a.State.EngineName() == state.EngineOpenCode {
+		return layout.ACPBridgeUnit
+	}
+	return layout.GatewayUnit
 }

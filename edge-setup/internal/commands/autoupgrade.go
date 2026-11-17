@@ -477,13 +477,11 @@ func proveUpgrade(ctx context.Context, sd systemd.Client, since time.Time, versi
 			return fmt.Errorf("%s.service stopped after its admission", l.Unit)
 		}
 	}
-	// The runtime itself: a gateway that runs must still answer /health.
-	if active, _ := sd.IsActive(ctx, layout.GatewayUnit); active {
-		if err := waitGatewayHealthy(ctx); err != nil {
-			return fmt.Errorf("%s does not answer /health: %w", layout.GatewayUnit, err)
-		}
+	st, err := loadHostState()
+	if err != nil {
+		return fmt.Errorf("runtime state: %w", err)
 	}
-	return nil
+	return proveEngineRuntime(ctx, sd, st, waitGatewayHealthy)
 }
 
 // lockUpgrade serialises a manual upgrade and an automatic pass.

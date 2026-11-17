@@ -13,6 +13,7 @@ import (
 	"github.com/OpenedBot/openedbot/edge-setup/internal/exec/exectest"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hermes"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/layout"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/render"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/systemd"
 )
@@ -265,5 +266,36 @@ func TestPrivilegedFilesScansEveryManagedTree(t *testing.T) {
 	}
 	if strings.Contains(args, a.Root+"/srv/hermes") {
 		t.Errorf("a missing tree was passed to find: %q", args)
+	}
+}
+
+func TestACPUnitAndListenerAuditNeverReconcileHermes(t *testing.T) {
+	st := state.New("test")
+	st.Engine = state.EngineOpenCode
+	fake := exectest.NewFake()
+	fake.On("/usr/bin/systemctl is-active --quiet openedbot-acp-bridge", exec.Result{})
+	fake.On("/usr/bin/ss -H -ltn", exec.Result{Stdout: "LISTEN 0 128 127.0.0.1:8642 0.0.0.0:*\n"})
+	a := New(fake, st)
+	a.Root = t.TempDir()
+	unit, err := render.ACPBridgeUnit(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := a.path(layout.ACPBridgeUnitPath)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(unit), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range []Result{a.hermesGateway(context.Background()), a.hermesGatewayUnit(context.Background())} {
+		if result.Status != Pass {
+			t.Fatalf("%+v", result)
+		}
+	}
+	for _, command := range fake.Commands() {
+		if strings.Contains(command, "hermes-gateway") || strings.Contains(command, "runuser") {
+			t.Fatal("Hermes command on ACP host", command)
+		}
 	}
 }
