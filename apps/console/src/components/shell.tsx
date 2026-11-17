@@ -112,8 +112,10 @@ export function Shell({ children }: { children: ReactNode }) {
         <ClientUpdateGate>
           {children}
           {/* Everywhere at the bottom right, settings included: they are now a
-              page of the frame, no longer a centred modal to sit under. */}
-          <Toaster position="bottom-right" />
+              page of the frame, no longer a centred modal to sit under.
+              No close « x » and no countdown line: a toast leaves on its own,
+              by a swipe or with Escape. */}
+          <Toaster position="bottom-right" closeButton={false} hairline={false} />
         </ClientUpdateGate>
       </SidebarProvider>
     </TooltipProvider>
