@@ -1,4 +1,6 @@
 -- Engine identity belongs to the last admitted connector hello.
+BEGIN;
+
 ALTER TABLE public.runtimes
     ADD COLUMN link_engine text,
     ADD COLUMN link_engine_version text,
@@ -37,3 +39,7 @@ FOR EACH ROW WHEN (
     OR old.link_engine_version IS DISTINCT FROM new.link_engine_version
     OR (old.edge_auth_ciphertext IS NULL) IS DISTINCT FROM (new.edge_auth_ciphertext IS NULL)
 ) EXECUTE FUNCTION public.notify_openedbot_runtime();
+
+INSERT INTO schema_migrations(version) VALUES ('0011_runtime_link_engine') ON CONFLICT DO NOTHING;
+
+COMMIT;
