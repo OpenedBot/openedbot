@@ -609,3 +609,39 @@ func TestACPPurgeAfterResetLosesEngine(t *testing.T) {
 		})
 	}
 }
+
+func TestACPPurgeRemovesSharedAgentHistory(t *testing.T) {
+	r, runner := newTestResetter(t, false, "")
+	hookRemovals(t, runner)
+	r.Engine = state.EngineOpenCode
+	runtime := filepath.Join(t.TempDir(), "runtime")
+	// acphost.agentCommand sets XDG_DATA_HOME to this shared directory.
+	history := filepath.Join(runtime, "acp-home", "data", "history")
+	if err := os.MkdirAll(filepath.Dir(history), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(history, []byte("fixture history"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	oldRemove := removeTree
+	removeTree = func(path string) error {
+		if path == layout.RuntimeRoot {
+			return os.RemoveAll(runtime)
+		}
+		return nil
+	}
+	t.Cleanup(func() { removeTree = oldRemove })
+	if err := r.Run(context.Background(), Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(history); err != nil {
+		t.Fatal("keep-data removed shared history", err)
+	}
+	r.Engine = ""
+	if err := r.Run(context.Background(), Options{PurgeData: true, DataLossAccepted: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(history); !os.IsNotExist(err) {
+		t.Fatal("purge left shared history", err)
+	}
+}

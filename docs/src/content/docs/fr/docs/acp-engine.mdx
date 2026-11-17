@@ -22,7 +22,9 @@ sudo edge-setup up --engine acp:opencode --yes
 
 Appairez ensuite la machine avec la console à l’aide de la commande `edge-setup link` qui y est affichée. Répétez `--engine acp:opencode` à chaque nouvelle exécution de `up`. Une machine installée ne peut pas changer de moteur : désinstallez-le d’abord. L’option `--sandbox` n’est pas disponible avec ACP.
 
-Créer un bot dans openedbot crée son répertoire de profil sur la machine. Ses exécutions utilisent ce profil. Supprimer le bot programme la suppression du profil et de ses sessions.
+Créer un bot dans openedbot crée son répertoire de profil sur la machine. Ses exécutions utilisent ce profil. Supprimer le bot programme la suppression de ce répertoire. Le bridge supprime les sessions et les journaux d’exécution du profil supprimé à son démarrage, lors de son nettoyage horaire ou avant de traiter une requête pour ce profil. Les exécutions actives sont d’abord arrêtées.
+
+L’historique de conversation propre à l’agent reste sur la machine dans le répertoire de données partagé de l’agent (`XDG_DATA_HOME`, `/srv/hermes/data/acp-home/data`). Supprimer un bot n’efface pas cet historique. Un reset ou une désinstallation avec `--purge-data --i-understand-data-loss` le supprime.
 
 ## Identifiant du fournisseur
 

@@ -36,6 +36,15 @@ The ACP operator announces only `profile_management`. It serves capability
 discovery and profile creation, inventory for existence checks, and deletion.
 Creating a profile makes `<profiles root>/<slug>` owned by the service account
 with mode 0700. The cloud creates and removes these managed profiles with bots.
+Deleting a bot schedules removal of its profile directory. The bridge removes
+that profile's sessions and run journals at startup, during hourly pruning,
+or before serving a request for that slug, stopping active runs first. It
+also detects a directory replaced under the same slug while it is running.
+The agent's own conversation history remains in the shared `XDG_DATA_HOME`
+at `/srv/hermes/data/acp-home/data`; bot deletion does not erase it. A reset
+or uninstall with `--purge-data --i-understand-data-loss` removes it by deleting
+`layout.RuntimeRoot` (`/srv/hermes/data`), even after engine state is gone.
+
 It constructs none of the Hermes wiring. Provider, usage, model, toolset,
 MCP, skills, memory, sessions, gateway restart and A2A administration routes
 are absent. The bridge does not announce `approval_policy`; agent permission
