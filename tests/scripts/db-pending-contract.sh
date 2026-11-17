@@ -35,6 +35,10 @@ case "$*" in
     fi
     ;;
   *"select version from schema_migrations"*)
+    if [ -n "${FAKE_REGISTRY_UNREADABLE:-}" ]; then
+      printf 'ERROR:  permission denied for table schema_migrations\n' >&2
+      exit 1
+    fi
     for file in "$FAKE_ROOT"/db/migrations/*.sql; do
       version="$(basename "$file" .sql)"
       [ "$version" = "${FAKE_MISSING:-}" ] || printf '%s\n' "$version"
@@ -72,8 +76,9 @@ printf '%s\n' "$output" | grep -qx "  $latest" || fail "the pending migration mu
 [ "$(printf '%s\n' "$output" | grep -c '^  ')" -eq 1 ] || fail "only $latest is pending; got: $output"
 assert_no_write "a pending migration"
 
-# 3. Unreachable database, then absent container: no false "pending".
-for case_env in FAKE_UNREACHABLE=1 FAKE_NO_CONTAINER=1; do
+# 3. Unreachable database, absent container, unreadable registry: no false
+#    "pending".
+for case_env in FAKE_UNREACHABLE=1 FAKE_NO_CONTAINER=1 FAKE_REGISTRY_UNREADABLE=1; do
   if output="$(run_pending "$case_env")"; then fail "$case_env must exit non-zero"; fi
   [[ "$output" == *"Cannot check pending migrations"* ]] || fail "$case_env must say the check could not run; got: $output"
   [[ "$output" != *"has pending migrations"* ]] || fail "$case_env must not report migrations as pending; got: $output"

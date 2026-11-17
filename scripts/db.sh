@@ -156,7 +156,22 @@ SQL
   read_applied() {
     docker exec "$container" sh -ceu 'psql -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations" 2>/dev/null || true' -- "$database"
   }
-  applied="$(read_applied)"
+  if [ "$check_only" = 1 ]; then
+    # --pending must not read an unreadable registry (connection lost after
+    # the probe, no privilege) as an empty one: only an absent
+    # schema_migrations reads as empty, any other failure stops the check.
+    read_applied() {
+      docker exec "$container" sh -ceu '
+        exists="$(psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1" -c "select to_regclass(\$\$public.schema_migrations\$\$) is not null")"
+        [ "$exists" = t ] || exit 0
+        psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations"
+      ' -- "$database"
+    }
+  fi
+  if ! applied="$(read_applied)"; then
+    printf 'Cannot check pending migrations: the migration registry of database %s could not be read. Run make db-up, then start again.\n' "$database" >&2
+    exit 1
+  fi
 
   # A literal newline, so a version is matched delimited on both sides:
   # `0055_x` must not answer for `0055_x_bis`. Command substitution would eat

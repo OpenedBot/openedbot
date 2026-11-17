@@ -342,4 +342,24 @@ for target in dev dev-api dev-worker; do
   fi
 done
 
+# A pending migration stops each launcher before it starts: a fake docker
+# answers the reachability probe and an empty migration registry, so every
+# migration is pending; the launcher would leave a marker if it ran.
+pending_bin="$contract_tmpdir/pending-bin"
+mkdir -p "$pending_bin"
+printf '#!/bin/sh\nexit 0\n' > "$pending_bin/docker"
+chmod +x "$pending_bin/docker"
+launch_marker="$contract_tmpdir/launched"
+printf '#!/bin/sh\ntouch "%s"\n' "$launch_marker" > "$pending_bin/launch"
+chmod +x "$pending_bin/launch"
+for target in dev dev-api dev-worker; do
+  rm -f "$launch_marker"
+  if PATH="$pending_bin:$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND="$pending_bin/launch" DEV_API_COMMAND="$pending_bin/launch" \
+    DEV_WORKER_COMMAND="$pending_bin/launch" "$target" >/dev/null 2>&1 </dev/null; then
+    fail "make $target must fail while a migration is pending."
+  fi
+  [ ! -e "$launch_marker" ] || fail "make $target started its app while a migration is pending."
+done
+
 printf 'make dev dry-run contract passed.\n'
