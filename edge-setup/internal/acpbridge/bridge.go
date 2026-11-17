@@ -1,0 +1,415 @@
+package acpbridge
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+)
+
+type Limits struct {
+	MaxConcurrentRuns int
+	IdleTimeout       time.Duration
+	RPCTimeout        time.Duration
+	CancelTimeout     time.Duration
+	MaxInvalidLines   int
+}
+type Options struct {
+	ListenAddress  string
+	Bearer         string
+	StateDirectory string
+	ProfilesRoot   string
+	AgentCommand   string
+	AgentArguments []string
+	Limits         Limits
+}
+
+// Bridge owns its agent processes and durable run journal. Close must precede
+// reopening the same state directory; one bridge owns a directory at a time.
+type Bridge struct {
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	opts     Options
+	disk     diskState
+	profiles map[string]*profile
+	changed  chan struct{}
+	closed   bool
+	diskErr  error
+	wg       sync.WaitGroup
+}
+type diskState struct {
+	Sessions map[string]*session `json:"sessions"`
+	Runs     map[string]*run     `json:"runs"`
+}
+type session struct {
+	Profile      string `json:"profile"`
+	ID           string `json:"id"`
+	ACPID        string `json:"acp_id"`
+	Instructions string `json:"instructions"`
+	Used         bool   `json:"used"`
+	client       *rpcClient
+	active       string
+}
+type Event map[string]any
+type run struct {
+	ID           string  `json:"run_id"`
+	Profile      string  `json:"profile"`
+	SessionID    string  `json:"session_id"`
+	Key          string  `json:"key"`
+	Status       string  `json:"status"`
+	Output       string  `json:"output"`
+	Events       []Event `json:"events"`
+	Cancel       bool    `json:"cancel"`
+	Generation   int     `json:"execution_generation"`
+	InvalidLines int     `json:"invalid_stdout_lines"`
+	permissions  map[string]permission
+	tools        map[string]string
+	bytes        int
+	client       *rpcClient
+	acpID        string
+}
+type permission struct {
+	id      json.RawMessage
+	options map[string]string
+}
+type profile struct {
+	mu     sync.Mutex
+	client *rpcClient
+	caps   agentCapabilities
+	idle   *time.Timer
+	busy   int
+}
+type agentCapabilities struct {
+	LoadSession bool `json:"loadSession"`
+	Prompt      struct {
+		Image bool `json:"image"`
+	} `json:"promptCapabilities"`
+	Session struct {
+		SystemPrompt *json.RawMessage `json:"systemPrompt"`
+	} `json:"sessionCapabilities"`
+}
+
+var slugPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func New(opts Options) (*Bridge, error) {
+	host, _, err := net.SplitHostPort(opts.ListenAddress)
+	if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+		return nil, errors.New("listen address must be a loopback IP and port")
+	}
+	if opts.Bearer == "" || opts.StateDirectory == "" || opts.ProfilesRoot == "" || opts.AgentCommand == "" {
+		return nil, errors.New("bearer, state directory, profiles root and agent command are required")
+	}
+	opts.ProfilesRoot, err = filepath.Abs(opts.ProfilesRoot)
+	if err != nil {
+		return nil, err
+	}
+	if opts.Limits.MaxConcurrentRuns == 0 {
+		opts.Limits.MaxConcurrentRuns = 4
+	}
+	if opts.Limits.MaxConcurrentRuns < 1 || opts.Limits.MaxConcurrentRuns > 4 {
+		return nil, errors.New("max concurrent runs must be between 1 and 4")
+	}
+	if opts.Limits.IdleTimeout == 0 {
+		opts.Limits.IdleTimeout = 5 * time.Minute
+	}
+	if opts.Limits.RPCTimeout == 0 {
+		opts.Limits.RPCTimeout = 10 * time.Minute
+	}
+	if opts.Limits.CancelTimeout == 0 {
+		opts.Limits.CancelTimeout = 5 * time.Second
+	}
+	if opts.Limits.MaxInvalidLines == 0 {
+		opts.Limits.MaxInvalidLines = 8
+	}
+	if opts.Limits.IdleTimeout < 0 || opts.Limits.RPCTimeout < 0 || opts.Limits.CancelTimeout < 0 || opts.Limits.MaxInvalidLines < 0 {
+		return nil, errors.New("limits must be positive")
+	}
+	if err = os.MkdirAll(opts.StateDirectory, 0700); err != nil {
+		return nil, err
+	}
+	b := &Bridge{opts: opts, profiles: map[string]*profile{}, changed: make(chan struct{}), disk: diskState{Sessions: map[string]*session{}, Runs: map[string]*run{}}}
+	b.ctx, b.cancel = context.WithCancel(context.Background())
+	raw, err := os.ReadFile(filepath.Join(opts.StateDirectory, "state.json"))
+	if err == nil {
+		if err = json.Unmarshal(raw, &b.disk); err != nil {
+			b.cancel()
+			return nil, fmt.Errorf("read bridge state: %w", err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		b.cancel()
+		return nil, err
+	}
+	if b.disk.Sessions == nil || b.disk.Runs == nil {
+		b.cancel()
+		return nil, errors.New("invalid bridge state maps")
+	}
+	for _, r := range b.disk.Runs {
+		if !terminal(r.Status) {
+			b.finishLocked(r, "interrupted", "bridge restarted")
+		}
+	}
+	if b.diskErr != nil {
+		b.cancel()
+		return nil, b.diskErr
+	}
+	return b, nil
+}
+func terminal(s string) bool {
+	return s == "completed" || s == "failed" || s == "interrupted" || s == "cancelled"
+}
+func uniqueID() string {
+	var x [16]byte
+	if _, err := rand.Read(x[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(x[:])
+}
+func sessionKey(profile, id string) string { return profile + "/" + id }
+func (b *Bridge) saveLocked() {
+	if b.diskErr != nil {
+		return
+	}
+	raw, err := json.Marshal(b.disk)
+	if err == nil {
+		var f *os.File
+		f, err = os.CreateTemp(b.opts.StateDirectory, ".state-*")
+		if err == nil {
+			name := f.Name()
+			defer os.Remove(name)
+			_, err = f.Write(raw)
+			if err == nil {
+				err = f.Sync()
+			}
+			closeErr := f.Close()
+			if err == nil {
+				err = closeErr
+			}
+			if err == nil {
+				err = os.Rename(name, filepath.Join(b.opts.StateDirectory, "state.json"))
+			}
+			if err == nil {
+				var d *os.File
+				d, err = os.Open(b.opts.StateDirectory)
+				if err == nil {
+					err = d.Sync()
+					_ = d.Close()
+				}
+			}
+		}
+	}
+	if err != nil {
+		b.diskErr = fmt.Errorf("persist bridge state: %w", err)
+	}
+	close(b.changed)
+	b.changed = make(chan struct{})
+}
+func (b *Bridge) eventLocked(r *run, event string, fields Event) {
+	if fields == nil {
+		fields = Event{}
+	}
+	fields["event"] = event
+	fields["run_id"] = r.ID
+	fields["timestamp"] = float64(time.Now().UnixMilli()) / 1000
+	raw, _ := json.Marshal(fields)
+	if !strings.HasPrefix(event, "run.") && (len(raw) > 1024*1024-1024 || r.bytes+len(raw)+8 > 3*1024*1024 || len(r.Events) >= 9990) {
+		b.failActiveLocked(r, "ACP event stream limit exceeded")
+		return
+	}
+	r.Events = append(r.Events, fields)
+	r.bytes += len(raw) + 8
+	b.saveLocked()
+}
+func (b *Bridge) finishLocked(r *run, status, message string) {
+	if terminal(r.Status) {
+		return
+	}
+	r.Status = status
+	fields := Event{}
+	if status == "completed" {
+		fields["output"] = r.Output
+	}
+	if status == "failed" {
+		fields["message"] = message
+	}
+	b.eventLocked(r, "run."+status, fields)
+}
+
+// Serve listens only on the validated loopback address. Closing the context
+// shuts down HTTP streams and all owned agents.
+func (b *Bridge) Serve(ctx context.Context) error {
+	l, err := net.Listen("tcp", b.opts.ListenAddress)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{Handler: b, ReadHeaderTimeout: 5 * time.Second}
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = b.Close()
+			_ = srv.Close()
+		case <-done:
+		}
+	}()
+	err = srv.Serve(l)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+func (b *Bridge) Close() error {
+	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		b.wg.Wait()
+		return nil
+	}
+	b.closed = true
+	for _, r := range b.disk.Runs {
+		if !terminal(r.Status) {
+			b.cancelPermissionsLocked(r)
+			b.finishLocked(r, "interrupted", "bridge stopped")
+		}
+	}
+	b.cancel()
+	profiles := make([]*profile, 0, len(b.profiles))
+	for _, p := range b.profiles {
+		profiles = append(profiles, p)
+	}
+	b.mu.Unlock()
+	for _, p := range profiles {
+		p.mu.Lock()
+		if p.idle != nil {
+			p.idle.Stop()
+		}
+		if p.client != nil {
+			p.client.stop()
+		}
+		p.mu.Unlock()
+	}
+	b.wg.Wait()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.diskErr
+}
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+func decode(w http.ResponseWriter, r *http.Request, out any) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4*1024*1024))
+	if dec.Decode(out) != nil {
+		http.Error(w, "invalid JSON body", 400)
+		return false
+	}
+	var extra any
+	if dec.Decode(&extra) != io.EOF {
+		http.Error(w, "invalid JSON body", 400)
+		return false
+	}
+	return true
+}
+func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if subtle.ConstantTimeCompare([]byte(req.Header.Get("Authorization")), []byte("Bearer "+b.opts.Bearer)) != 1 {
+		http.Error(w, "unauthorized", 401)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
+	if len(parts) < 3 || parts[0] != "p" || !slugPattern.MatchString(parts[1]) {
+		http.NotFound(w, req)
+		return
+	}
+	slug := parts[1]
+	dir := filepath.Join(b.opts.ProfilesRoot, slug)
+	info, err := os.Lstat(dir)
+	if err != nil || !info.IsDir() {
+		http.NotFound(w, req)
+		return
+	}
+	path := "/" + strings.Join(parts[2:], "/")
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed || b.diskErr != nil {
+		http.Error(w, "bridge unavailable", 503)
+		return
+	}
+	switch {
+	case req.Method == "GET" && path == "/health":
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	case req.Method == "GET" && path == "/v1/capabilities":
+		writeJSON(w, 200, map[string]any{"features": map[string]bool{"run_steer": false}, "endpoints": map[string]any{}, "max_concurrent_runs": b.opts.Limits.MaxConcurrentRuns})
+	case req.Method == "GET" && path == "/v1/toolsets":
+		writeJSON(w, 200, map[string]any{"data": []any{}})
+	case req.Method == "GET" && path == "/api/model/options":
+		writeJSON(w, 200, map[string]any{"provider": "acp", "model": "agent-default", "providers": []any{map[string]any{"slug": "acp", "name": "ACP agent default", "is_current": true, "authenticated": true, "models": []string{"agent-default"}}}})
+	case req.Method == "POST" && path == "/api/sessions":
+		var body struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		}
+		if !decode(w, req, &body) {
+			return
+		}
+		if strings.TrimSpace(body.ID) == "" {
+			http.Error(w, "session id required", 400)
+			return
+		}
+		key := sessionKey(slug, body.ID)
+		if b.disk.Sessions[key] != nil {
+			writeJSON(w, 409, map[string]string{"id": body.ID})
+			return
+		}
+		b.disk.Sessions[key] = &session{Profile: slug, ID: body.ID}
+		b.saveLocked()
+		if b.diskErr != nil {
+			http.Error(w, "persistence failed", 500)
+			return
+		}
+		writeJSON(w, 201, map[string]string{"id": body.ID})
+	case req.Method == "POST" && path == "/v1/runs":
+		b.createRunLocked(w, req, slug)
+	case len(parts) >= 5 && parts[2] == "v1" && parts[3] == "runs":
+		r := b.disk.Runs[parts[4]]
+		if r == nil || r.Profile != slug {
+			http.NotFound(w, req)
+			return
+		}
+		action := ""
+		if len(parts) == 6 {
+			action = parts[5]
+		} else if len(parts) != 5 {
+			http.NotFound(w, req)
+			return
+		}
+		switch {
+		case req.Method == "GET" && action == "":
+			writeJSON(w, 200, map[string]any{"run_id": r.ID, "status": r.Status, "output": r.Output, "execution_generation": r.Generation, "invalid_stdout_lines": r.InvalidLines})
+		case req.Method == "GET" && action == "events":
+			b.streamLocked(w, req, r)
+		case req.Method == "POST" && action == "stop":
+			b.stopLocked(r)
+			writeJSON(w, 200, map[string]bool{"ok": true})
+		case req.Method == "POST" && action == "approval":
+			b.approveLocked(w, req, r)
+		default:
+			http.NotFound(w, req)
+		}
+	default:
+		http.NotFound(w, req)
+	}
+}

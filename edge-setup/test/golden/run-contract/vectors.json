@@ -1,0 +1,546 @@
+[
+  {
+    "name": "message.delta",
+    "kind": "event",
+    "payload": {
+      "event": "message.delta",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "delta": "Hello"
+    },
+    "expected": [
+      {
+        "type": "agent.message",
+        "payload": {
+          "text": "Hello"
+        }
+      }
+    ]
+  },
+  {
+    "name": "tool.started",
+    "kind": "event",
+    "payload": {
+      "event": "tool.started",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "tool": "fake_echo",
+      "tool_call_id": "echo-1",
+      "preview": "Fake gateway run"
+    },
+    "expected": [
+      {
+        "type": "tool.call",
+        "payload": {
+          "toolCallId": "tc_0",
+          "tool": "fake_echo",
+          "preview": "Fake gateway run"
+        }
+      }
+    ]
+  },
+  {
+    "name": "tool.completed",
+    "kind": "event",
+    "payload": {
+      "event": "tool.completed",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "tool": "fake_echo",
+      "tool_call_id": "echo-1",
+      "duration": 0.001,
+      "error": false,
+      "preview": "Fake gateway run"
+    },
+    "expected": [
+      {
+        "type": "tool.result",
+        "payload": {
+          "toolCallId": "tc_orphan_0",
+          "tool": "fake_echo",
+          "durationMs": 1,
+          "error": false,
+          "errorMessage": null,
+          "resultExcerpt": "Fake gateway run",
+          "hasResultPayload": true
+        }
+      }
+    ]
+  },
+  {
+    "name": "approval.request",
+    "kind": "event",
+    "payload": {
+      "event": "approval.request",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "command": "rm -rf ./build",
+      "pattern_key": "recursive delete",
+      "pattern_keys": [
+        "recursive delete"
+      ],
+      "description": "recursive delete",
+      "request_id": "gate-1",
+      "execution_generation": 1,
+      "choices": [
+        "once",
+        "deny"
+      ]
+    },
+    "expected": [
+      {
+        "type": "approval.requested",
+        "payload": {
+          "approvalRequestId": "approval_0",
+          "command": "rm -rf ./build",
+          "choices": [
+            "once",
+            "deny"
+          ],
+          "description": "recursive delete",
+          "gate": {
+            "hermesRequestId": "gate-1",
+            "hermesExecutionGeneration": 1,
+            "gateKind": "terminal_danger",
+            "toolKey": null,
+            "gateArgs": {
+              "command": "rm -rf ./build",
+              "patternKey": "recursive delete"
+            },
+            "descriptorVersion": null
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "approval.responded",
+    "kind": "event",
+    "payload": {
+      "event": "approval.responded",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "choice": "once",
+      "resolved": 1
+    },
+    "expected": [
+      {
+        "type": "approval.responded",
+        "payload": {
+          "choice": "once",
+          "resolved": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "run.completed",
+    "kind": "event",
+    "payload": {
+      "event": "run.completed",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "output": "OPENEDBOT_CANARY_OK",
+      "usage": {
+        "input_tokens": 2,
+        "output_tokens": 3,
+        "total_tokens": 5
+      },
+      "messages": []
+    },
+    "expected": [
+      {
+        "type": "run.completed",
+        "payload": {
+          "output": "OPENEDBOT_CANARY_OK",
+          "usage": {
+            "inputTokens": 2,
+            "outputTokens": 3,
+            "totalTokens": 5
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "run.failed",
+    "kind": "event",
+    "payload": {
+      "event": "run.failed",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "message": "Gateway failure"
+    },
+    "expected": [
+      {
+        "type": "run.error",
+        "payload": {
+          "message": "Gateway failure",
+          "errorCode": "HERMES_RUN_FAILED"
+        }
+      }
+    ]
+  },
+  {
+    "name": "run.error",
+    "kind": "event",
+    "payload": {
+      "event": "run.error",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "message": "Gateway failure"
+    },
+    "expected": [
+      {
+        "type": "run.error",
+        "payload": {
+          "message": "Gateway failure",
+          "errorCode": "HERMES_RUN_FAILED"
+        }
+      }
+    ]
+  },
+  {
+    "name": "run.interrupted",
+    "kind": "event",
+    "payload": {
+      "event": "run.interrupted",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "error": "Gateway restart"
+    },
+    "expected": [
+      {
+        "type": "run.error",
+        "payload": {
+          "message": "Le gateway Hermes a interrompu le run, probablement lors d’un redémarrage.",
+          "errorCode": "HERMES_RUN_INTERRUPTED"
+        }
+      }
+    ]
+  },
+  {
+    "name": "run.cancelled",
+    "kind": "event",
+    "payload": {
+      "event": "run.cancelled",
+      "run_id": "contract-run",
+      "timestamp": 1794873600
+    },
+    "expected": [
+      {
+        "type": "system.notice",
+        "payload": {
+          "message": "Mission annulée.",
+          "kind": "cancelled"
+        }
+      }
+    ]
+  },
+  {
+    "name": "message.interim",
+    "kind": "event",
+    "payload": {
+      "event": "message.interim",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "text": "Working",
+      "already_streamed": false
+    },
+    "expected": []
+  },
+  {
+    "name": "reasoning.available",
+    "kind": "event",
+    "payload": {
+      "event": "reasoning.available",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "text": "Final text"
+    },
+    "expected": []
+  },
+  {
+    "name": "completion-without-usage",
+    "kind": "event",
+    "payload": {
+      "event": "run.completed",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "output": "OK"
+    },
+    "expected": [
+      {
+        "type": "run.completed",
+        "payload": {
+          "output": "OK",
+          "usage": null
+        }
+      }
+    ]
+  },
+  {
+    "name": "approval-prompt-identity",
+    "kind": "event",
+    "payload": {
+      "event": "approval.request",
+      "run_id": "contract-run",
+      "timestamp": 1794873600,
+      "command": "rm -rf ./build",
+      "pattern_key": "recursive delete",
+      "pattern_keys": [
+        "recursive delete"
+      ],
+      "description": "recursive delete",
+      "execution_generation": 1,
+      "choices": [
+        "once",
+        "deny"
+      ],
+      "prompt_id": "gate-1"
+    },
+    "expected": [
+      {
+        "type": "approval.requested",
+        "payload": {
+          "approvalRequestId": "approval_0",
+          "command": "rm -rf ./build",
+          "choices": [
+            "once",
+            "deny"
+          ],
+          "description": "recursive delete",
+          "gate": {
+            "hermesRequestId": "gate-1",
+            "hermesExecutionGeneration": 1,
+            "gateKind": "terminal_danger",
+            "toolKey": null,
+            "gateArgs": {
+              "command": "rm -rf ./build",
+              "patternKey": "recursive delete"
+            },
+            "descriptorVersion": null
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "run-create-14",
+    "kind": "run-create",
+    "payload": {
+      "run_id": "contract-run"
+    }
+  },
+  {
+    "name": "approval-15",
+    "kind": "approval",
+    "payload": {
+      "request_id": "gate-1",
+      "execution_generation": 1,
+      "choice": "once"
+    }
+  },
+  {
+    "name": "approval-16",
+    "kind": "approval",
+    "payload": {
+      "request_id": "gate-1",
+      "choice": "deny",
+      "approved": false
+    }
+  },
+  {
+    "name": "session-create-17",
+    "kind": "session-create",
+    "payload": {
+      "id": "contract-session",
+      "title": "Contract bot"
+    }
+  },
+  {
+    "name": "session-created-18",
+    "kind": "session-created",
+    "payload": {
+      "id": "contract-session"
+    }
+  },
+  {
+    "name": "capabilities-19",
+    "kind": "capabilities",
+    "payload": {
+      "features": {
+        "approvals": true,
+        "max_concurrent_runs": 4
+      },
+      "endpoints": {
+        "run_approval": {
+          "method": "POST",
+          "path": "/v1/runs/{run_id}/approval"
+        }
+      }
+    }
+  },
+  {
+    "name": "toolsets-20",
+    "kind": "toolsets",
+    "payload": {
+      "data": []
+    }
+  },
+  {
+    "name": "toolsets-21",
+    "kind": "toolsets",
+    "payload": {
+      "data": [
+        {
+          "name": "web",
+          "label": "Web",
+          "description": "Search",
+          "enabled": true,
+          "configured": true,
+          "tools": [
+            "web_search",
+            "web_extract"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "model-options-22",
+    "kind": "model-options",
+    "payload": {
+      "provider": "fake",
+      "model": "fake/hermes",
+      "providers": [
+        {
+          "slug": "fake",
+          "name": "Fake provider",
+          "is_current": true,
+          "authenticated": true,
+          "auth_type": "api_key",
+          "models": [
+            "fake/hermes"
+          ],
+          "capabilities": {
+            "fake/hermes": {
+              "fast": false,
+              "reasoning": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "status-queued",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "queued",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-started",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "started",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-running",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "running",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-stopping",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "stopping",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-waiting_for_approval",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "waiting_for_approval",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-completed",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "completed",
+      "output": "OK",
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-failed",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "failed",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-interrupted",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "interrupted",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-cancelled",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "cancelled",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  },
+  {
+    "name": "status-unknown",
+    "kind": "run-status",
+    "payload": {
+      "run_id": "contract-run",
+      "status": "unknown",
+      "output": null,
+      "admission_id": "admission-1",
+      "execution_generation": 1
+    }
+  }
+]
