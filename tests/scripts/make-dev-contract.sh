@@ -352,14 +352,19 @@ chmod +x "$pending_bin/docker"
 launch_marker="$contract_tmpdir/launched"
 printf '#!/bin/sh\ntouch "%s"\n' "$launch_marker" > "$pending_bin/launch"
 chmod +x "$pending_bin/launch"
+pending_output="$contract_tmpdir/pending.out"
 for target in dev dev-api dev-worker; do
   rm -f "$launch_marker"
   if PATH="$pending_bin:$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
     ENV_FILE="$sentinel_env" DEV_COMMAND="$pending_bin/launch" DEV_API_COMMAND="$pending_bin/launch" \
-    DEV_WORKER_COMMAND="$pending_bin/launch" "$target" >/dev/null 2>&1 </dev/null; then
+    DEV_WORKER_COMMAND="$pending_bin/launch" "$target" >"$pending_output" 2>&1 </dev/null; then
     fail "make $target must fail while a migration is pending."
   fi
   [ ! -e "$launch_marker" ] || fail "make $target started its app while a migration is pending."
+  # The refusal must be the pending check's, not any other failure (output
+  # withheld: it may hold env values).
+  grep -qF "has pending migrations" "$pending_output" && grep -qF "make db-migrate" "$pending_output" ||
+    fail "make $target must refuse because a migration is pending and name make db-migrate."
 done
 
 printf 'make dev dry-run contract passed.\n'
