@@ -198,3 +198,9 @@ son prochain run. Une session ACP neuve reprend alors, une seule fois,
 l'historique cloud fourni, même quand aucune ancienne correspondance ACP ne
 subsiste. Le pont émet `context.rebuilt` sans ajouter de texte à la réponse.
 Une session ACP encore vivante continue d'ignorer l'historique déjà détenu.
+
+Les lots sortants réservent leur position dans une chaîne propre à chaque agent
+sous le mutex du pont. Hors mutex, chaque envoi attend la fin de son prédécesseur,
+puis écrit au pipe ; un lot plus récent ne peut pas dépasser une approbation
+acceptée avant son annulation. Cette attente fait partie de la même échéance
+`CancelTimeout`. Si elle expire, les appels échouent et le groupe est arrêté.

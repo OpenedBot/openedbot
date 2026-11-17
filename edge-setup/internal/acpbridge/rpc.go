@@ -46,6 +46,8 @@ type rpcClient struct {
 	dead         error
 	done         chan struct{}
 	killOnce     sync.Once
+	// outboundTail is reserved only while the owning bridge mutex is held.
+	outboundTail <-chan struct{}
 }
 
 func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, writeTimeout time.Duration, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
@@ -136,21 +138,22 @@ func (c *rpcClient) failPending(err error) error {
 	}
 	return c.dead
 }
+func (c *rpcClient) failWrite(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+		err = errWriteTimeout
+	}
+	failure := c.failPending(err)
+	c.kill()
+	return failure
+}
 func (c *rpcClient) write(ctx context.Context, m rpcMessage) error {
 	ctx, cancel := context.WithTimeout(ctx, c.writeTimeout)
 	defer cancel()
-	fail := func(err error) error {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
-			err = errWriteTimeout
-		}
-		c.kill()
-		return c.failPending(err)
-	}
 	select {
 	case c.writeGate <- struct{}{}:
 		defer func() { <-c.writeGate }()
 	case <-ctx.Done():
-		return fail(ctx.Err())
+		return c.failWrite(ctx.Err())
 	}
 	c.mu.Lock()
 	dead := c.dead
@@ -159,20 +162,20 @@ func (c *rpcClient) write(ctx context.Context, m rpcMessage) error {
 		return dead
 	}
 	if err := ctx.Err(); err != nil {
-		return fail(err)
+		return c.failWrite(err)
 	}
 	deadline, _ := ctx.Deadline()
 	if err := c.stdin.SetWriteDeadline(deadline); err != nil {
-		return fail(err)
+		return c.failWrite(err)
 	}
 	if err := json.NewEncoder(c.stdin).Encode(m); err != nil {
 		if ctx.Err() != nil {
-			return fail(ctx.Err())
+			return c.failWrite(ctx.Err())
 		}
 		if errors.Is(err, os.ErrDeadlineExceeded) {
-			return fail(err)
+			return c.failWrite(err)
 		}
-		return fail(errAgentExited)
+		return c.failWrite(errAgentExited)
 	}
 	return nil
 }
@@ -206,19 +209,19 @@ func (c *rpcClient) call(ctx context.Context, method string, params any, out any
 		return ctx.Err()
 	}
 }
-func (c *rpcClient) notify(method string, params any) error {
+func (c *rpcClient) notify(ctx context.Context, method string, params any) error {
 	raw, err := json.Marshal(params)
 	if err != nil {
 		return err
 	}
-	return c.write(context.Background(), rpcMessage{JSONRPC: "2.0", Method: method, Params: raw})
+	return c.write(ctx, rpcMessage{JSONRPC: "2.0", Method: method, Params: raw})
 }
-func (c *rpcClient) respond(id json.RawMessage, result any) error {
+func (c *rpcClient) respond(ctx context.Context, id json.RawMessage, result any) error {
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return err
 	}
-	return c.write(context.Background(), rpcMessage{JSONRPC: "2.0", ID: id, Result: raw})
+	return c.write(ctx, rpcMessage{JSONRPC: "2.0", ID: id, Result: raw})
 }
 func (c *rpcClient) kill() {
 	c.killOnce.Do(func() { _ = syscall.Kill(-c.cmd.Process.Pid, syscall.SIGKILL) })

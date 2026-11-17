@@ -59,12 +59,25 @@ func TestACPAgent(t *testing.T) {
 	var sessionID string
 	var trace []rpcMessage
 	var decisions []any
+	var receiveOrder []string
+	var permissionReceived, cancelReceived bool
+	finishOrder := func() {
+		if permissionReceived && cancelReceived {
+			raw, _ := json.Marshal(receiveOrder)
+			update(sessionID, map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock(string(raw))})
+			send(promptID, map[string]string{"stopReason": "cancelled"})
+		}
+	}
 	newCount := 0
 	permissionCount := 0
 	permission := func() {
 		permissionCount++
 		_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": fmt.Sprintf("permission-%d", permissionCount), "method": "session/request_permission", "params": map[string]any{"sessionId": sessionID, "toolCall": map[string]any{"toolCallId": "t1", "title": "write a file"}, "options": func() []any {
-			options := []any{map[string]string{"optionId": "a", "name": "Allow", "kind": "allow_once"}, map[string]string{"optionId": "d", "name": "Deny", "kind": "reject_once"}}
+			allowID := "a"
+			if scenario == "approval-stop-order" {
+				allowID = strings.Repeat("a", 256*1024)
+			}
+			options := []any{map[string]string{"optionId": allowID, "name": "Allow", "kind": "allow_once"}, map[string]string{"optionId": "d", "name": "Deny", "kind": "reject_once"}}
 			if scenario != "permission-basic" {
 				options = append(options, map[string]string{"optionId": "aa", "name": "Always", "kind": "allow_always"}, map[string]string{"optionId": "dd", "name": "Never", "kind": "reject_always"})
 			}
@@ -115,6 +128,11 @@ func TestACPAgent(t *testing.T) {
 			promptID = m.ID
 			sessionID = p["sessionId"].(string)
 			switch scenario {
+			case "approval-stop-order":
+				receiveOrder = nil
+				permissionReceived = false
+				cancelReceived = false
+				permission()
 			case "children", "children-crash":
 				child := exec.Command(os.Args[0], "-test.run=^TestACPAgent$", "--", "--acp-fake", "child", os.Args[marker+2])
 				readyReader, readyWriter, err := os.Pipe()
@@ -188,6 +206,12 @@ func TestACPAgent(t *testing.T) {
 				answer()
 			}
 		case "session/cancel":
+			if scenario == "approval-stop-order" {
+				receiveOrder = append(receiveOrder, "cancel")
+				cancelReceived = true
+				finishOrder()
+				continue
+			}
 			if strings.HasPrefix(scenario, "timeout") {
 				update(sessionID, map[string]any{"sessionUpdate": "agent_message_chunk", "content": textBlock("cancel received")})
 			}
@@ -205,6 +229,13 @@ func TestACPAgent(t *testing.T) {
 		case "":
 			var result any
 			_ = json.Unmarshal(m.Result, &result)
+			if scenario == "approval-stop-order" {
+				outcome := result.(map[string]any)["outcome"].(map[string]any)["outcome"].(string)
+				receiveOrder = append(receiveOrder, outcome)
+				permissionReceived = true
+				finishOrder()
+				continue
+			}
 			decisions = append(decisions, result)
 			if scenario == "cancel" || scenario == "cancel-end_turn" {
 				v := result.(map[string]any)
@@ -1398,4 +1429,65 @@ func TestIdleSessionRetentionKeepsRecentAndActiveAndRebuildsContext(t *testing.T
 			t.Fatal("recreated session did not report its restored context")
 		}
 	})
+}
+
+func TestConcurrentApprovalAndStopPreserveAgentOrder(t *testing.T) {
+	f := newFixture(t, "approval-stop-order")
+	f.session("cloud")
+	accepted, violations := 0, 0
+	for i := 0; i < 100; i++ {
+		id := f.run(input("cloud"), "")
+		gate := f.await(id, "approval.request")
+		start := make(chan struct{})
+		type reply struct {
+			status int
+			err    error
+		}
+		approvalDone, stopDone := make(chan reply, 1), make(chan reply, 1)
+		request := func(path string, body any, done chan<- reply) {
+			raw, _ := json.Marshal(body)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(ctx, "POST", f.server.URL+"/p/demo/v1/runs/"+id+path, strings.NewReader(string(raw)))
+			req.Header.Set("Authorization", "Bearer "+f.opts.Bearer)
+			<-start
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				done <- reply{err: err}
+				return
+			}
+			defer res.Body.Close()
+			_, err = io.Copy(io.Discard, res.Body)
+			done <- reply{res.StatusCode, err}
+		}
+		go request("/stop", nil, stopDone)
+		go request("/approval", map[string]any{"request_id": gate["request_id"], "execution_generation": gate["execution_generation"], "choice": "once"}, approvalDone)
+		close(start)
+		approval, stop := <-approvalDone, <-stopDone
+		if approval.err != nil || stop.err != nil || stop.status != 200 || (approval.status != 200 && approval.status != 409) {
+			t.Fatalf("iteration %d: approval %+v stop %+v", i, approval, stop)
+		}
+		if approval.status == 200 {
+			accepted++
+		}
+		events := f.events(id)
+		expectTerminal(t, events, "run.cancelled")
+		var order []string
+		for _, e := range events {
+			if e["event"] == "message.delta" {
+				if err := json.Unmarshal([]byte(e["delta"].(string)), &order); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if len(order) != 2 {
+			t.Fatalf("missing agent order: %v", order)
+		}
+		if order[0] == "cancel" && order[1] == "selected" {
+			violations++
+		}
+	}
+	if accepted == 0 || violations > 0 {
+		t.Fatalf("accepted approvals %d; selected replies received after cancel %d", accepted, violations)
+	}
 }
