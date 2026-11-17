@@ -5,7 +5,8 @@
 d'état et de profils, la commande de l'agent et les limites. `Serve(ctx)` gère
 l'écoute HTTP ; le paquet est aussi un `http.Handler`. `Close()` termine les
 processus et rend les runs interrompus lisibles. Une seule instance possède un
-dossier d'état. Ce lot ne fournit ni commande, ni installation, ni unité système.
+dossier d'état. L’intégration Linux expérimentale, sa commande et son unité système sont
+décrites dans [ACP_HOST.md](ACP_HOST.md).
 
 Un profil est un dossier existant, sans lien symbolique. Le pont ne démarre
 l'agent qu'au premier tour, avec ce dossier comme répertoire de travail. La
@@ -117,8 +118,8 @@ supplémentaires de `Options.AgentEnvironment`. Une valeur contenant le bearer
 est exclue même si son nom est explicitement autorisé. L'environnement complet
 du pont n'est jamais transmis. Un agent exécuté sous le même utilisateur peut
 encore lire les fichiers accessibles à cet utilisateur : l'unité qui exécutera
-le pont doit garder le bearer hors de portée de l'agent. Cette unité appartient
-à un lot ultérieur.
+le pont doit garder le bearer hors de portée de l'agent. L’unité Linux et la séparation de privilèges sont décrites dans
+[ACP_HOST.md](ACP_HOST.md).
 
 ## Sonde de racine
 
