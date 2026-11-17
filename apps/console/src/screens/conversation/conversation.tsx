@@ -236,7 +236,7 @@ export function ConversationScreen() {
   const [heldReadError, setHeldReadError] = useState<unknown>(null);
   const readRetryError = retrying ? heldReadError : null;
   const pageError = readRetryError ?? readError;
-  const readFailed = !runtimeOffline && Boolean(pageError);
+  const readFailed = Boolean(readRetryError) || (!runtimeOffline && Boolean(readError));
   const retryReads = () => {
     setHeldReadError(readError);
     void retryConversation().finally(() => setHeldReadError(null));
