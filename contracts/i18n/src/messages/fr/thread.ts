@@ -223,6 +223,7 @@ export const threadTimeline = {
   providerAuthRequired: "{name} ne peut pas répondre : {provider} a refusé sa connexion. Reconnectez {provider} dans Réglages → Modèles.",
   providerAuthRequiredGeneric: "{name} ne peut pas répondre : son fournisseur a refusé sa connexion. Reconnectez-le dans Réglages → Modèles.",
   providerAuthRequiredAction: "Reconnecter {provider}",
+  runFailureFor: "{action} : réponse à « {question} »",
   scrollToBottom: "Aller en bas de la conversation",
   unknownBot: "Bot inconnu",
   roomAnswer: "Réponse de l'équipe : {names}",

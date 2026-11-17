@@ -222,6 +222,7 @@ export const threadTimeline = {
   providerAuthRequired: "{name} can't answer: {provider} refused its login. Reconnect {provider} in Settings → Models.",
   providerAuthRequiredGeneric: "{name} can't answer: its provider refused its login. Reconnect it in Settings → Models.",
   providerAuthRequiredAction: "Reconnect {provider}",
+  runFailureFor: "{action}: reply to “{question}”",
   scrollToBottom: "Scroll to bottom of conversation",
   unknownBot: "Unknown bot",
   roomAnswer: "Team answer: {names}",

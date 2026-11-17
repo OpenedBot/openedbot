@@ -74,6 +74,11 @@ export type ThreadTimelineProps = {
   onLoadOlder?: (beforeMerge?: () => void) => Promise<boolean>;
   /** Opens the bot's failures section in its settings. */
   onOpenBotErrors?: () => void;
+  /**
+   * Opens the bot's approvals: the gesture of a turn that failed on its
+   * permissions. Without it (rooms), that turn opens the policies settings.
+   */
+  onOpenBotApprovals?: () => void;
   /** The operator's handle: `@elodie` then reads as `@user` in the ask_user blocks. */
   operatorUsername?: string | null;
   /**

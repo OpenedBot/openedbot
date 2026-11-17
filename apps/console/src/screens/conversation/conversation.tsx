@@ -56,8 +56,6 @@ import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { useT } from "../../lib/i18n";
-import { readableRunFailure, runFailureExplainedInThread } from "../../lib/run/model-unavailable";
-import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
 import { latestRunFallback, sameRunFallback } from "../../lib/run/run-fallback";
 import { currentThreadRun } from "../../lib/thread/current-thread-run";
 import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
@@ -573,34 +571,19 @@ export function ConversationScreen() {
     if (!running && cancel.isError) cancel.reset();
   }, [cancel.isError, running]);
 
-  // Surface asynchronous runtime failures once per run, including failures
-  // reported after the message POST succeeded (SSE + polling).
+  // A run that fails during this visit may come from a profile gone from the
+  // runtime: reread its status once per run so the repair notice can follow.
+  // The failure itself is told by its turn in the thread (`RunFailureNotice`):
+  // a blocking modal would hide it while the next send may succeed.
   const notifiedFailedRunId = useRef<string | null>(null);
-  // Read when the failure fires, never a dependency: a streaming delta
-  // rebuilds the events and must not re-run this once-per-run effect.
-  const failureEventsRef = useRef(thread.data?.events);
-  failureEventsRef.current = thread.data?.events;
-  // A failure older than this visit is told by its notice in the thread.
+  // A failure older than this visit says nothing new about the profile.
   const failedRunAtOpen = useRunFailureAtOpen(activeThreadId, Boolean(thread.data) && !isRestoredQueryData(thread.data), activeRun);
   useEffect(() => {
     if (activeRun?.status !== "failed" || activeRun.id === notifiedFailedRunId.current) return;
     if (activeRun.id === failedRunAtOpen) return;
     notifiedFailedRunId.current = activeRun.id;
     if (bot?.id) void queryClient.invalidateQueries({ queryKey: queryKeys.botProfileStatus(bot.id) });
-    // Profile missing from the runtime: the repair notice already says what to do.
-    if (profileMissing) return;
-    // A refused model or provider login: its notice in the thread names the
-    // fix and carries the action. A blocking modal would hide it.
-    if (runFailureExplainedInThread(activeRun, failureEventsRef.current)) return;
-    setDismissedError(null);
-    setSubmissionError(new ApiError(
-      502,
-      readableRunFailure(t, activeRun, bot?.name ?? t("threadTimeline.unknownBot"), runProviderAuthLabel(failureEventsRef.current, activeRun.id))
-        ?? activeRun.error
-        ?? t("threadTimeline.runtimeErrorFallback"),
-      "RUNTIME_RUN_FAILED",
-    ));
-  }, [activeRun?.id, activeRun?.status, activeRun?.error, activeRun?.errorCode, failedRunAtOpen, t, bot?.id, profileMissing, queryClient]);
+  }, [activeRun?.id, activeRun?.status, failedRunAtOpen, bot?.id, queryClient]);
 
   // A pending gate blocks the composer: letting one type while a
   // decision is due would give the illusion that the bot can continue without it.
@@ -1000,7 +983,7 @@ export function ConversationScreen() {
               )}
             /></DevRenderProfiler>
           )}
-{!readFailed && ((runtimeUnavailable && !runtimeOffline) || Boolean(blockingError) || activeRun?.status === "failed") ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : activeRun?.errorCode} reference={activeRun?.id ?? thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
+{!readFailed && ((runtimeUnavailable && !runtimeOffline) || Boolean(blockingError)) ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : null} reference={thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
         {readFailed ? <ConversationErrorPage error={pageError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
@@ -1068,6 +1051,7 @@ export function ConversationScreen() {
             onSelectMessageVersion={selectMessageVersion}
             onReaction={onReaction}
             onOpenBotErrors={openBotErrors}
+            onOpenBotApprovals={openBotApprovals}
             speechScope={bot.id}
             speechVoiceByBotId={speechVoiceByBotId}
             resnap={askUser !== null}

@@ -1,4 +1,3 @@
-import { ConversationDiagnostic } from "../../components/conversation-diagnostic";
 import { ConversationFiles } from "../../components/conversation-files";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
@@ -363,7 +362,6 @@ export function GroupConversationScreen() {
             docks and composer stretched across the whole window. */}
         <div data-thread-column="" className="flex min-h-0 min-w-0 flex-1 flex-col">
           {isMobile ? null : header}
-          {activeRun?.status === "failed" ? <ConversationDiagnostic code={activeRun.errorCode} reference={activeRun.id} onRetry={()=>void thread.refetch()} retrying={thread.isFetching} /> : null}
           {group.needsYou ? (
             <p data-thread-lane="" className="w-full shrink-0 px-4 sm:px-6 pt-2 text-xs text-muted-foreground">
               {t("groups.needsYou")}

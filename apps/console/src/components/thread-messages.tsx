@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { segmentMentions } from "@openedbot/roster/domain/mentions";
@@ -31,11 +31,14 @@ export function ProviderAuthNotice({
   provider,
   findTargetId,
   findActive = false,
+  children,
 }: {
   name: string;
   provider: string;
   findTargetId: string;
   findActive?: boolean;
+  /** The failed turn's footer (`RunFailureFooter`): retry and reference. */
+  children?: ReactNode;
 }) {
   const { t } = useT();
   const openSettings = useOpenSettings();
@@ -58,6 +61,7 @@ export function ProviderAuthNotice({
       >
         {t("threadTimeline.providerAuthRequiredAction", { provider: label })}
       </button>
+      {children}
     </div>
   );
 }
@@ -74,12 +78,15 @@ export function ModelUnavailableNotice({
   botId,
   findTargetId,
   findActive = false,
+  children,
 }: {
   name: string;
   model: string | null;
   botId: string | null;
   findTargetId: string;
   findActive?: boolean;
+  /** The failed turn's footer (`RunFailureFooter`): retry and reference. */
+  children?: ReactNode;
 }) {
   const { t } = useT();
   return (
@@ -99,6 +106,7 @@ export function ModelUnavailableNotice({
           {t("threadTimeline.modelUnavailableAction")}
         </Link>
       ) : null}
+      {children}
     </div>
   );
 }

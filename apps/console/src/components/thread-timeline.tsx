@@ -48,6 +48,7 @@ import {
 } from "../lib/thread/thread-timeline-model";
 import { authorRenderKey, entryDayIso, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
+import { RunFailureFooter, RunFailureNotice } from "./conversation-diagnostic";
 import { AssistantMessage, BotInboundMessage, ModelUnavailableNotice, ProviderAuthNotice, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
 import { isModelUnavailableCode } from "../lib/run/model-unavailable";
 import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/runtime/provider-auth";
@@ -131,6 +132,7 @@ function ThreadTimelineView({
   olderError = false,
   onLoadOlder,
   onOpenBotErrors,
+  onOpenBotApprovals,
   liveText = null,
 }: ThreadTimelineProps) {
   // SERVICE runs (persona draft, compaction, and the old
@@ -212,6 +214,15 @@ function ThreadTimelineView({
     nextVersion: t("threadTimeline.nextVersion"),
     versionCount: (current: number, total: number) => t("threadTimeline.versionCount", { current, total }),
   }), [t]);
+
+  // The operator's message that started each run: a failed turn names it and replays it.
+  const questionByRun = useMemo(() => {
+    const map = new Map<string, { id: string; text: string }>();
+    for (const input of userInputs) {
+      if (input.runId && !input.authorBot && !map.has(input.runId)) map.set(input.runId, input);
+    }
+    return map;
+  }, [userInputs]);
 
   // A bot's thread: the sent message brings its « Réflexion » line in the same paint, not 70 ms later.
   const outgoingThinks = Boolean(outgoing && !outgoing.failed && defaultAuthor);
@@ -778,6 +789,9 @@ function ThreadTimelineView({
               const failedRun = runsById.get(event.runId);
               const code = typeof event.payload.errorCode === "string" ? event.payload.errorCode : failedRun?.errorCode;
               const authProvider = isProviderAuthRequiredCode(code) ? providerAuthRequiredSlug(event.payload) : null;
+              const question = questionByRun.get(event.runId);
+              const retry = question && onRegenerateMessage ? () => onRegenerateMessage(question.id) : undefined;
+              const footer = <RunFailureFooter runId={event.runId} code={code} question={question?.text} onRetry={retry} />;
               if (authProvider) {
                 const author = runAuthors?.get(event.runId) ?? defaultAuthor;
                 return (
@@ -787,7 +801,9 @@ function ThreadTimelineView({
                     provider={authProvider}
                     findTargetId={entry.targetId}
                     findActive={entry.targetId === activeFindTargetId}
-                  />
+                  >
+                    {footer}
+                  </ProviderAuthNotice>
                 );
               }
               if (isModelUnavailableCode(code)) {
@@ -800,17 +816,23 @@ function ThreadTimelineView({
                     botId={author?.id ?? null}
                     findTargetId={entry.targetId}
                     findActive={entry.targetId === activeFindTargetId}
-                  />
+                  >
+                    {footer}
+                  </ModelUnavailableNotice>
                 );
               }
               return (
-                <p
+                <RunFailureNotice
                   key={entry.key}
-                  data-thread-find-target={entry.targetId}
-                  className={`max-w-[85%] self-start rounded-2xl rounded-bl-md bg-destructive px-3.5 py-2.5 text-sm font-medium text-white ${entry.targetId === activeFindTargetId ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                >
-                  {eventText(event) || t("threadTimeline.runtimeErrorFallback")}
-                </p>
+                  runId={event.runId}
+                  code={code}
+                  text={eventText(event) || t("threadTimeline.runtimeErrorFallback")}
+                  question={question?.text}
+                  onRetry={retry}
+                  onPermissions={onOpenBotApprovals}
+                  findTargetId={entry.targetId}
+                  findActive={entry.targetId === activeFindTargetId}
+                />
               );
             }
             case "run.provider_fallback": {
@@ -971,6 +993,10 @@ function ThreadTimelineView({
             version: entry.kind === "user" ? messageVersionFamilies?.get(entry.key) ?? null : null,
             planHidden: entry.kind === "assistant" && hiddenAssistantRunIds.length > 0
               && hiddenAssistantRunIds.split(",").includes(entry.runId),
+            // A failed turn: its run's code can land after the event, its question names and replays it.
+            failure: entry.kind === "event" && entry.event.type === "run.error"
+              ? [turnRun?.errorCode ?? null, questionByRun.get(entry.event.runId)?.id ?? null]
+              : null,
           };
           return `${entrySignature(entry)}${JSON.stringify(ctx)}`;
         };
@@ -992,7 +1018,7 @@ function ThreadTimelineView({
         const defaultAuthorKey = authorRenderKey(defaultAuthor);
         const contextEpochDeps = [
           interactionLabels, onReply, onReaction, onEditMessage, onRegenerateMessage, onAskUserPick,
-          onSelectMessageVersion, mentionKey, activeFindTargetId,
+          onSelectMessageVersion, onOpenBotApprovals, mentionKey, activeFindTargetId,
           defaultAuthorKey, operatorUsername, speechDisabled,
           speechAdapter, speechState, playSpeech, t, plural, formatNumber,
         ];
@@ -1286,6 +1312,8 @@ function ThreadTimelineView({
           onEditMessage,
           onRegenerateMessage,
           onSelectMessageVersion,
+          onOpenBotApprovals,
+          questionByRun,
           mentionSlugs,
           activeFindTargetId,
           authorLabelEntryKeys,
