@@ -48,10 +48,8 @@ import {
 } from "../lib/thread/thread-timeline-model";
 import { authorRenderKey, entryDayIso, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
-import { RunFailureFooter, RunFailureNotice } from "./conversation-diagnostic";
-import { AssistantMessage, BotInboundMessage, ModelUnavailableNotice, ProviderAuthNotice, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
-import { isModelUnavailableCode } from "../lib/run/model-unavailable";
-import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/runtime/provider-auth";
+import { RunErrorEntry } from "./thread-run-error";
+import { AssistantMessage, BotInboundMessage, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
 import { ToolActivity } from "./thread-tool-activity";
 import { callsHaveCards, ToolCallCards } from "./cards/run-card-view";
 import { PendingThinking } from "./thread-thinking-status";
@@ -784,57 +782,20 @@ function ThreadTimelineView({
 
           const { event } = entry;
           switch (event.type) {
-            case "run.error": {
-              // The code comes from the event (direct), otherwise from the run (reread).
-              const failedRun = runsById.get(event.runId);
-              const code = typeof event.payload.errorCode === "string" ? event.payload.errorCode : failedRun?.errorCode;
-              const authProvider = isProviderAuthRequiredCode(code) ? providerAuthRequiredSlug(event.payload) : null;
-              const question = questionByRun.get(event.runId);
-              const retry = question && onRegenerateMessage ? () => onRegenerateMessage(question.id) : undefined;
-              const footer = <RunFailureFooter runId={event.runId} code={code} question={question?.text} onRetry={retry} />;
-              if (authProvider) {
-                const author = runAuthors?.get(event.runId) ?? defaultAuthor;
-                return (
-                  <ProviderAuthNotice
-                    key={entry.key}
-                    name={author?.name ?? author?.slug ?? t("threadTimeline.unknownBot")}
-                    provider={authProvider}
-                    findTargetId={entry.targetId}
-                    findActive={entry.targetId === activeFindTargetId}
-                  >
-                    {footer}
-                  </ProviderAuthNotice>
-                );
-              }
-              if (isModelUnavailableCode(code)) {
-                const author = runAuthors?.get(event.runId) ?? defaultAuthor;
-                return (
-                  <ModelUnavailableNotice
-                    key={entry.key}
-                    name={author?.name ?? author?.slug ?? t("threadTimeline.unknownBot")}
-                    model={failedRun?.model ?? (typeof event.payload.model === "string" ? event.payload.model : null)}
-                    botId={author?.id ?? null}
-                    findTargetId={entry.targetId}
-                    findActive={entry.targetId === activeFindTargetId}
-                  >
-                    {footer}
-                  </ModelUnavailableNotice>
-                );
-              }
+            case "run.error":
               return (
-                <RunFailureNotice
+                <RunErrorEntry
                   key={entry.key}
-                  runId={event.runId}
-                  code={code}
-                  text={eventText(event) || t("threadTimeline.runtimeErrorFallback")}
-                  question={question?.text}
-                  onRetry={retry}
+                  event={event}
+                  run={runsById.get(event.runId)}
+                  author={runAuthors?.get(event.runId) ?? defaultAuthor}
+                  question={questionByRun.get(event.runId)}
+                  onRegenerate={onRegenerateMessage}
                   onPermissions={onOpenBotApprovals}
                   findTargetId={entry.targetId}
                   findActive={entry.targetId === activeFindTargetId}
                 />
               );
-            }
             case "run.provider_fallback": {
               const from = typeof event.payload.from === "string" ? event.payload.from : "-";
               const to = typeof event.payload.to === "string" ? event.payload.to : "-";

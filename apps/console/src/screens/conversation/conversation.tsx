@@ -33,7 +33,7 @@ import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { settledBotModelSaves } from "../../lib/bots/bot-model-saves";
 import { Composer } from "../../components/composer";
 import { ConversationAvailability } from "../../components/conversation-availability";
-import { useRunFailureAtOpen } from "../../lib/run/run-failure-at-open";
+import { useProfileRereadOnRunFailure } from "../../lib/run/run-failure-at-open";
 import { NoMachineNotice, RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
 import { BotProfileRepair, useBotProfileStatus } from "../../components/bot-profile-repair";
 import { ComposerArrival, ThreadArrival, ThreadStartStage, threadStartShown } from "../../components/thread-start-stage";
@@ -571,19 +571,7 @@ export function ConversationScreen() {
     if (!running && cancel.isError) cancel.reset();
   }, [cancel.isError, running]);
 
-  // A run that fails during this visit may come from a profile gone from the
-  // runtime: reread its status once per run so the repair notice can follow.
-  // The failure itself is told by its turn in the thread (`RunFailureNotice`):
-  // a blocking modal would hide it while the next send may succeed.
-  const notifiedFailedRunId = useRef<string | null>(null);
-  // A failure older than this visit says nothing new about the profile.
-  const failedRunAtOpen = useRunFailureAtOpen(activeThreadId, Boolean(thread.data) && !isRestoredQueryData(thread.data), activeRun);
-  useEffect(() => {
-    if (activeRun?.status !== "failed" || activeRun.id === notifiedFailedRunId.current) return;
-    if (activeRun.id === failedRunAtOpen) return;
-    notifiedFailedRunId.current = activeRun.id;
-    if (bot?.id) void queryClient.invalidateQueries({ queryKey: queryKeys.botProfileStatus(bot.id) });
-  }, [activeRun?.id, activeRun?.status, failedRunAtOpen, bot?.id, queryClient]);
+  useProfileRereadOnRunFailure(activeThreadId, Boolean(thread.data) && !isRestoredQueryData(thread.data), activeRun, bot?.id);
 
   // A pending gate blocks the composer: letting one type while a
   // decision is due would give the illusion that the bot can continue without it.
