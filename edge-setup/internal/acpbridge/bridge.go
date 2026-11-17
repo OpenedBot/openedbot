@@ -51,7 +51,6 @@ type Bridge struct {
 	opts            Options
 	disk            diskState
 	profiles        map[string]*profile
-	profileDirs     map[string]os.FileInfo
 	changed         chan struct{}
 	closed          bool
 	diskErr         error
@@ -61,8 +60,9 @@ type Bridge struct {
 	outgoing        []agentWrite
 }
 type diskState struct {
-	Sessions map[string]*session `json:"sessions"`
-	Runs     map[string]*run     `json:"runs"`
+	Sessions    map[string]*session        `json:"sessions"`
+	Runs        map[string]*run            `json:"runs"`
+	ProfileDirs map[string]profileIdentity `json:"profile_dirs,omitempty"`
 }
 type session struct {
 	Profile      string    `json:"profile"`
@@ -163,7 +163,7 @@ func New(opts Options) (*Bridge, error) {
 	b := &Bridge{opts: opts, profiles: map[string]*profile{}, changed: make(chan struct{}), disk: diskState{Sessions: map[string]*session{}, Runs: map[string]*run{}}}
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 	b.dirtyEvents = map[string]bool{}
-	b.profileDirs = map[string]os.FileInfo{}
+	b.disk.ProfileDirs = map[string]profileIdentity{}
 	if err = os.MkdirAll(filepath.Join(opts.StateDirectory, "events"), 0700); err != nil {
 		b.cancel()
 		return nil, err
@@ -177,6 +177,9 @@ func New(opts Options) (*Bridge, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		b.cancel()
 		return nil, err
+	}
+	if b.disk.ProfileDirs == nil {
+		b.disk.ProfileDirs = map[string]profileIdentity{}
 	}
 	if b.disk.Sessions == nil || b.disk.Runs == nil {
 		b.cancel()
@@ -393,11 +396,8 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		slug = parts[1]
 		b.mu.Lock()
-		b.pruneLocked(time.Now())
+		b.pruneLocked(time.Now(), slug)
 		info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
-		if err == nil && info.IsDir() {
-			b.profileDirs[slug] = info
-		}
 		b.unlockAndSend()
 		if err != nil || !info.IsDir() {
 			http.NotFound(w, req)
@@ -481,6 +481,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			writeJSON(w, 409, map[string]string{"id": body.ID})
 			return
 		}
+		b.recordProfileDirLocked(slug)
 		b.disk.Sessions[key] = &session{Profile: slug, ID: body.ID, LastUsed: time.Now()}
 		b.saveLocked()
 		if b.diskErr != nil {

@@ -56,6 +56,7 @@ func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug 
 		return
 	}
 	r := &run{ID: uniqueID(), Profile: slug, SessionID: s.ID, Key: key, Status: "queued", Generation: 1, Events: []Event{}, permissions: map[string]permission{}, tools: map[string]string{}}
+	b.recordProfileDirLocked(slug)
 	b.disk.Runs[r.ID] = r
 	s.active = r.ID
 	s.LastUsed = time.Now()

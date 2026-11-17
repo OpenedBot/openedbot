@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -121,28 +122,65 @@ func (b *Bridge) readEvents(r *run) error {
 	}
 	return nil
 }
-func (b *Bridge) pruneLocked(now time.Time) {
+
+// Device and inode identify the directory across bridge restarts on Linux and macOS.
+type profileIdentity struct {
+	Device uint64 `json:"device"`
+	Inode  uint64 `json:"inode"`
+}
+
+func directoryIdentity(info os.FileInfo) profileIdentity {
+	stat := info.Sys().(*syscall.Stat_t)
+	return profileIdentity{Device: uint64(stat.Dev), Inode: uint64(stat.Ino)}
+}
+
+func (b *Bridge) recordProfileDirLocked(slug string) {
+	info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
+	if err != nil {
+		b.diskErr = err
+		return
+	}
+	b.disk.ProfileDirs[slug] = directoryIdentity(info)
+}
+
+func (b *Bridge) pruneLocked(now time.Time, requested ...string) {
 	expired := []string{}
 	prunedSessions := false
+	identityChanged := false
+	fullSweep := len(requested) == 0
 	// Directory identity also detects a slug deleted and recreated between sweeps.
 	removed := map[string]bool{}
 	for _, s := range b.disk.Sessions {
-		removed[s.Profile] = false
+		if fullSweep || s.Profile == requested[0] {
+			removed[s.Profile] = false
+		}
 	}
 	for _, r := range b.disk.Runs {
-		removed[r.Profile] = false
+		if fullSweep || r.Profile == requested[0] {
+			removed[r.Profile] = false
+		}
+	}
+	if fullSweep {
+		for slug := range b.disk.ProfileDirs {
+			removed[slug] = false
+		}
 	}
 	for slug := range removed {
 		info, err := os.Lstat(filepath.Join(b.opts.ProfilesRoot, slug))
-		old := b.profileDirs[slug]
-		removed[slug] = errors.Is(err, os.ErrNotExist) || (err == nil && (!info.IsDir() || (old != nil && !os.SameFile(old, info))))
+		old, known := b.disk.ProfileDirs[slug]
+		removed[slug] = errors.Is(err, os.ErrNotExist) || (err == nil && (!info.IsDir() || (known && old != directoryIdentity(info))))
 		if !removed[slug] {
-			if err == nil {
-				b.profileDirs[slug] = info
+			if err == nil && !known {
+				// Old state has no identity. Adopt once without losing history.
+				b.disk.ProfileDirs[slug] = directoryIdentity(info)
+				identityChanged = true
 			}
 			continue
 		}
-		delete(b.profileDirs, slug)
+		if known {
+			delete(b.disk.ProfileDirs, slug)
+			identityChanged = true
+		}
 		if p := b.profiles[slug]; p != nil {
 			delete(b.profiles, slug)
 			// Process shutdown can wait on callbacks that need b.mu.
@@ -171,40 +209,48 @@ func (b *Bridge) pruneLocked(now time.Time) {
 		}
 	}
 	for key, s := range b.disk.Sessions {
+		if !fullSweep && s.Profile != requested[0] {
+			continue
+		}
 		if removed[s.Profile] || (s.active == "" && now.Sub(s.LastUsed) > sessionRetention) {
 			delete(b.disk.Sessions, key)
 			prunedSessions = true
 		}
 	}
 	for id, r := range b.disk.Runs {
+		if !fullSweep && r.Profile != requested[0] {
+			continue
+		}
 		if removed[r.Profile] || (terminal(r.Status) && !r.TerminalAt.IsZero() && now.Sub(r.TerminalAt) > runRetention) {
 			expired = append(expired, id)
 			delete(b.disk.Runs, id)
 			delete(b.dirtyEvents, id)
 		}
 	}
-	entries, err := os.ReadDir(filepath.Join(b.opts.StateDirectory, "events"))
-	if err != nil {
-		b.diskErr = err
-		return
-	}
-	for _, entry := range entries {
-		if strings.HasSuffix(entry.Name(), ".jsonl") {
-			id := strings.TrimSuffix(entry.Name(), ".jsonl")
-			if b.disk.Runs[id] == nil {
-				found := false
-				for _, old := range expired {
-					if old == id {
-						found = true
+	if fullSweep {
+		entries, err := os.ReadDir(filepath.Join(b.opts.StateDirectory, "events"))
+		if err != nil {
+			b.diskErr = err
+			return
+		}
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), ".jsonl") {
+				id := strings.TrimSuffix(entry.Name(), ".jsonl")
+				if b.disk.Runs[id] == nil {
+					found := false
+					for _, old := range expired {
+						if old == id {
+							found = true
+						}
 					}
-				}
-				if !found {
-					expired = append(expired, id)
+					if !found {
+						expired = append(expired, id)
+					}
 				}
 			}
 		}
 	}
-	if len(expired) == 0 && !prunedSessions {
+	if len(expired) == 0 && !prunedSessions && !identityChanged {
 		return
 	}
 	// Persist removal before unlinking journals so a crash cannot leave a live

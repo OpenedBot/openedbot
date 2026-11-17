@@ -1587,3 +1587,139 @@ func TestDeletedProfilePrunesState(t *testing.T) {
 		})
 	}
 }
+
+func TestProfileIdentityAcrossStoppedBridge(t *testing.T) {
+	for _, mode := range []string{"recreated", "same", "legacy", "session-only", "legacy-adopted"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newFixture(t, "text")
+			f.session("cloud")
+			id := ""
+			if mode != "session-only" {
+				id = f.run(input("cloud"), "old")
+				f.await(id, "run.completed")
+			}
+			if err := f.b.Close(); err != nil {
+				t.Fatal(err)
+			}
+			f.server.Close()
+			if mode == "legacy" || mode == "legacy-adopted" {
+				path := filepath.Join(f.opts.StateDirectory, "state.json")
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var state map[string]json.RawMessage
+				if err = json.Unmarshal(raw, &state); err != nil {
+					t.Fatal(err)
+				}
+				delete(state, "profile_dirs")
+				raw, err = json.Marshal(state)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = os.WriteFile(path, raw, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if mode == "legacy-adopted" {
+					f.open()
+					if err = f.b.Close(); err != nil {
+						t.Fatal(err)
+					}
+					f.server.Close()
+				}
+			}
+			replaced := mode == "recreated" || mode == "session-only" || mode == "legacy-adopted"
+			if replaced {
+				dir := filepath.Join(f.opts.ProfilesRoot, "demo")
+				// Hold the unlinked inode so the filesystem cannot reuse it.
+				old, err := os.Open(dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer old.Close()
+				if err = os.RemoveAll(dir); err != nil {
+					t.Fatal(err)
+				}
+				if err = os.Mkdir(dir, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.open()
+			f.b.mu.Lock()
+			sessionKept := f.b.disk.Sessions["demo/cloud"] != nil
+			runKept := f.b.disk.Runs[id] != nil
+			f.b.mu.Unlock()
+			if sessionKept == replaced || (id != "" && runKept == replaced) {
+				t.Fatalf("replaced=%v session=%v run=%v", replaced, sessionKept, runKept)
+			}
+			if id != "" && replaced {
+				if _, err := os.Stat(f.b.eventPath(id)); !os.IsNotExist(err) {
+					t.Fatal("stale journal remains", err)
+				}
+			}
+		})
+	}
+}
+
+func TestProfileRequestOnlyPrunesRequestedSlug(t *testing.T) {
+	f := newFixture(t, "text")
+	f.session("cloud")
+	id := f.run(input("cloud"), "old")
+	f.await(id, "run.completed")
+	orphan := f.b.eventPath("orphan")
+	if err := os.WriteFile(orphan, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(f.opts.ProfilesRoot, "other"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	f.profile = "other"
+	f.session("kept")
+	if err := os.RemoveAll(filepath.Join(f.opts.ProfilesRoot, "other")); err != nil {
+		t.Fatal(err)
+	}
+	f.profile = "demo"
+	if status, _ := f.request("GET", "/health", nil, ""); status != 200 {
+		t.Fatal(status)
+	}
+	if _, err := os.Stat(orphan); err != nil {
+		t.Fatal("request swept orphan journals", err)
+	}
+	f.b.mu.Lock()
+	otherKept := f.b.disk.Sessions["other/kept"] != nil
+	f.b.mu.Unlock()
+	if !otherKept {
+		t.Fatal("request pruned another slug")
+	}
+	if err := os.RemoveAll(filepath.Join(f.opts.ProfilesRoot, "demo")); err != nil {
+		t.Fatal(err)
+	}
+	if status, _ := f.request("GET", "/health", nil, ""); status != 404 {
+		t.Fatal(status)
+	}
+	f.b.mu.Lock()
+	stale := f.b.disk.Sessions["demo/cloud"] != nil || f.b.disk.Runs[id] != nil
+	f.b.mu.Unlock()
+	if stale {
+		t.Fatal("deleted requested slug kept its state")
+	}
+	if _, err := os.Stat(f.b.eventPath(id)); !os.IsNotExist(err) {
+		t.Fatal("deleted slug journal remains", err)
+	}
+	if _, err := os.Stat(orphan); err != nil {
+		t.Fatal("deleted slug request swept orphans", err)
+	}
+	f.b.mu.Lock()
+	f.b.pruneLocked(time.Now())
+	f.b.mu.Unlock()
+	if _, err := os.Stat(orphan); !os.IsNotExist(err) {
+		t.Fatal("maintenance kept orphan journal", err)
+	}
+	f.restart()
+	f.b.mu.Lock()
+	stale = f.b.disk.Sessions["demo/cloud"] != nil || f.b.disk.Runs[id] != nil
+	f.b.mu.Unlock()
+	if stale {
+		t.Fatal("deleted slug pruning was not durable")
+	}
+}
