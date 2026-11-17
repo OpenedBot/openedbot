@@ -232,7 +232,7 @@ function RuntimeConnectionForm({
                 <ToneBadge tone="warning">non</ToneBadge>
               )}
             />
-            <RuntimeVersionRows link={runtime.link} />
+            <RuntimeVersionRows link={runtime.link} engine={runtime.engine} engineVersion={runtime.engineVersion} />
             {/* The last sign of life is already under the thread: here it truncated at 390 px. */}
             {runtime.link?.rotatedAt ? (
               <StatusRow
@@ -273,7 +273,7 @@ function RuntimeConnectionForm({
                   connected={runtime.link?.connected === true}
                   autoUpgrade={hasAutoUpgrade(runtime.linkFeatures)}
                 />
-                <HermesUpdateNotice link={runtime.link} />
+                {runtime.engine === "hermes" && <HermesUpdateNotice link={runtime.link} />}
               </>
             )}
             <RuntimeLinkCheck key={runtime.id} runtime={runtime} retiredOrigin={retired ? runtime.link?.origin ?? null : null} />
