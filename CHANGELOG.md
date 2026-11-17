@@ -8,6 +8,8 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 0.1.5 - 2026-11-17
+
 ### Modifié
 
 - **Les migrations SQL tiennent en dix fichiers.** Les 186 fichiers
