@@ -1,5 +1,5 @@
 import { ConversationFiles } from "../../components/conversation-files";
-import { ConversationDiagnostic, ConversationErrorPage } from "../../components/conversation-diagnostic";
+import { ConversationErrorPage } from "../../components/conversation-diagnostic";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
@@ -34,7 +34,7 @@ import { settledBotModelSaves } from "../../lib/bots/bot-model-saves";
 import { Composer } from "../../components/composer";
 import { ConversationAvailability } from "../../components/conversation-availability";
 import { useRunFailureAtOpen } from "../../lib/run/run-failure-at-open";
-import { RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
+import { NoMachineNotice, RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
 import { BotProfileRepair, useBotProfileStatus } from "../../components/bot-profile-repair";
 import { ComposerArrival, ThreadArrival, ThreadStartStage, threadStartShown } from "../../components/thread-start-stage";
 import { ThreadTimeline } from "../../components/thread-timeline";
@@ -983,7 +983,6 @@ export function ConversationScreen() {
               )}
             /></DevRenderProfiler>
           )}
-{!readFailed && runtimeUnavailable && !runtimeOffline ? ( <ConversationDiagnostic floating code="RUNTIME_MISSING" reference={thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
         {readFailed ? <ConversationErrorPage error={pageError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
@@ -1144,13 +1143,14 @@ export function ConversationScreen() {
             disabled={pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing}
             // Gate: one says why. An in-flight send no longer grays the field
             // : the iOS keyboard must stay open.
-            notice={runtimeNotice}
+            // No usable machine: its tab is the one explanation, with « Vérifier la machine ».
+            notice={runtimeUnavailable && !runtimeOffline
+              ? <NoMachineNotice message={conversationErrorMessage} onOpenRuntime={openRuntimeSettings} />
+              : runtimeNotice}
             // Offline, the status tab carries the sentence: the field only
             // says what it waits for, short enough not to be truncated.
             disabledReason={runtimeOffline
               ? t("runtimeOffline.composer")
-              : runtimeUnavailable
-              ? conversationErrorMessage
               : pendingGate
                 ? t("conversation.pendingDecision")
                 : undefined}
