@@ -1,6 +1,6 @@
 import { IconCloud, IconServer, IconServerBolt } from "@tabler/icons-react";
 import type { RuntimePublicDto } from "@openedbot/contracts-api";
-import { Tooltip, TooltipContent, TooltipTrigger, cn } from "@openedbot/browser-ui-kit";
+import { cn } from "@openedbot/browser-ui-kit";
 import { useT, type Locale } from "../../lib/i18n";
 import { runtimeHealthLabel } from "../../lib/runtime/runtime-health";
 import type { RuntimeHealthReading } from "../../lib/runtime/use-runtime-health";
@@ -89,53 +89,59 @@ const DOT: Record<RailRuntimeState, string> = {
   degraded: "bg-warn-700",
 };
 
+/** The runtime's health as a dot: the last mark of the models pill, and the badge of the runtime row. KO and degraded pulse. */
+export function RailRuntimeDot({ state, className }: { state: RailRuntimeState; className?: string }) {
+  const alarm = state === "ko" || state === "degraded";
+  return (
+    <span aria-hidden data-rail-runtime-badge={state} className={cn("relative inline-flex size-2.5 shrink-0", className)}>
+      {alarm ? (
+        <span className={cn("absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:animate-none", DOT[state])} />
+      ) : null}
+      <span className={cn("relative size-2.5 rounded-full", DOT[state])} />
+    </span>
+  );
+}
+
 /**
- * Runtime health on the icon rail. The runtime's own icon
- * (see `railRuntimeIcon`) with the health as a status badge on its corner: the
- * rail is 56 px wide, so no label. Hover (or focus) names the runtime and the
- * state; a click or a tap opens the runtime settings, where the full state lives.
+ * The runtime row of the models pill's popover (`RailModelsPill`): the
+ * runtime's own icon (see `railRuntimeIcon`) with its health as a badge on the
+ * corner, then its sentences. A click opens the runtime settings, where the
+ * full state lives.
  */
 export function RailRuntimeHealth({
   reading,
-  buttonClassName,
+  className,
   onOpenSettings,
 }: {
   reading: RuntimeHealthReading;
-  buttonClassName: string;
+  className: string;
   onOpenSettings: (to: string) => void;
 }) {
   const { t, formatDate, locale } = useT();
   const state = railRuntimeState(reading);
-  const lines = railRuntimeLines(reading, t, formatDate, locale);
-  const alarm = state === "ko" || state === "degraded";
-  // Loading stays on the neutral icon: no swap, no layout shift once the read lands.
+  const [head, ...rest] = railRuntimeLines(reading, t, formatDate, locale);
+  // Loading stays on the neutral icon: no swap once the read lands.
   const Icon = state === "pending" ? IconServerBolt : railRuntimeIcon(reading.runtime);
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          data-rail-runtime-health={state}
-          aria-label={lines.join(" ")}
-          // 36 px to the eye, 44 pt to the finger (a coarse pointer on a tablet).
-          className={cn(
-            buttonClassName,
-            "pointer-coarse:before:absolute pointer-coarse:before:-inset-1 pointer-coarse:before:rounded-[inherit] pointer-coarse:before:content-['']",
-          )}
-          onClick={() => onOpenSettings(RUNTIME_SETTINGS_PATH)}
-        >
-          <Icon aria-hidden data-rail-runtime-icon={Icon === IconServerBolt ? "server-bolt" : Icon === IconCloud ? "cloud" : "server"} />
-          <span aria-hidden data-rail-runtime-badge={state} className="absolute right-1 bottom-1 inline-flex size-2.5">
-            {alarm ? (
-              <span className={cn("absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:animate-none", DOT[state])} />
-            ) : null}
-            <span className={cn("relative size-2.5 rounded-full ring-2 ring-background", DOT[state])} />
-          </span>
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-64">
-        {lines.map((line) => <p key={line}>{line}</p>)}
-      </TooltipContent>
-    </Tooltip>
+    <button
+      type="button"
+      data-rail-runtime-health={state}
+      // Spans glue their sentences together in the computed name: say them with their spaces.
+      aria-label={[head, ...rest].join(" ")}
+      className={className}
+      onClick={() => onOpenSettings(RUNTIME_SETTINGS_PATH)}
+    >
+      <span className="relative inline-flex size-7 shrink-0 items-center justify-center text-foreground-icon-secondary">
+        <Icon aria-hidden className="size-[18px]" data-rail-runtime-icon={Icon === IconServerBolt ? "server-bolt" : Icon === IconCloud ? "cloud" : "server"} />
+        {/* The popover's own surface as the ring: the dot stands off the icon. */}
+        <span className="absolute -right-0.5 -bottom-0.5 inline-flex rounded-full bg-card p-0.5">
+          <RailRuntimeDot state={state} />
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block">{head}</span>
+        {rest.map((line) => <span key={line} className="block text-text-tertiary">{line}</span>)}
+      </span>
+    </button>
   );
 }

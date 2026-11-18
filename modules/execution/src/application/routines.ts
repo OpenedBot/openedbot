@@ -26,7 +26,7 @@ import {
   routineFireText,
 } from "../domain/routines";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
-import { disconnectedHostOrganizations } from "@openedbot/runtimes/application/link-vitality";
+import { disconnectedHosts } from "@openedbot/runtimes/application/link-vitality";
 
 /** The routine writes other packages call: a removed member's routines pause, an import inserts its routines disabled. */
 export { insertDisabledRoutine, pauseMemberRoutines } from "../sql/routines";
@@ -178,7 +178,9 @@ export async function readRoutines(
            coalesce(r.enabled and r.next_run_at <= now() and offline.organization_id is not null
              and not ${target.botArchived}::boolean, false) as "waitingForHost"
       from routines r
-      left join ${disconnectedHostOrganizations(tx)} offline on offline.organization_id = r.organization_id
+      left join bots b on b.organization_id = r.organization_id and b.id = r.bot_id
+      left join ${disconnectedHosts(tx)} offline on offline.organization_id = r.organization_id
+        and (offline.runtime_id = b.runtime_id or (b.runtime_id is null and offline.is_active))
      where r.organization_id = ${organizationId} and (r.bot_id = ${target.botId} or r.group_id = ${target.groupId})
      order by r.created_at asc
   `;
@@ -206,9 +208,10 @@ export async function fireDueRoutine(db: SQL, billingEnforced: boolean, now: Dat
              b.autonomy_token_budget as "autonomyTokenBudget"
         from routines r
         left join ${subscriptionPort().admission(tx)} s on s.organization_id = r.organization_id
-        left join ${disconnectedHostOrganizations(tx)} offline on offline.organization_id = r.organization_id
         left join bots b on b.organization_id = r.organization_id and b.id = r.bot_id
           and b.archived_at is null
+        left join ${disconnectedHosts(tx)} offline on offline.organization_id = r.organization_id
+          and (offline.runtime_id = b.runtime_id or (b.runtime_id is null and offline.is_active))
         left join bot_groups g on g.organization_id = r.organization_id and g.id = r.group_id
         join threads t on t.organization_id = r.organization_id
           and (

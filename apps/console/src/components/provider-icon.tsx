@@ -82,6 +82,11 @@ const GEMINI_STOPS = ["#4285F4", "#9B72CB", "#D96570"] as const;
 const PROVIDERS: Record<string, KnownProvider> = {
   anthropic: { label: "Anthropic", mark: "anthropic" },
   "openai-codex": { label: "OpenAI Codex", mark: "openai", tag: "Codex" },
+  // The agent CLIs of a user's own machine (`edge-setup connect`, `LOCAL_ENGINES`).
+  "claude-code": { label: "Claude Code", mark: "anthropic" },
+  "grok-cli": { label: "Grok CLI", mark: "grok" },
+  "gemini-cli": { label: "Gemini CLI", mark: "googlegemini" },
+  "opencode-cli": { label: "OpenCode", mark: "opencode" },
   "openai-api": { label: "OpenAI API", mark: "openai", tag: "API" },
   "opencode-free": { label: "OpenCode Free", mark: "opencode" },
   "opencode-zen": { label: "OpenCode Zen", mark: "opencode" },

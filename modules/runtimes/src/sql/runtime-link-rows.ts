@@ -113,6 +113,7 @@ export async function insertConnectorRuntime(
     features: readonly string[];
     capacity: number;
     active: boolean;
+    dedicated: boolean;
     devicePublicKey: string | null;
   },
 ): Promise<void> {
@@ -120,11 +121,11 @@ export async function insertConnectorRuntime(
     insert into runtimes (
       id, organization_id, name, reachability, link_token_hash, link_instance_id,
       link_connected_at, link_last_seen_at, link_features, capacity, last_health_status, last_health_error,
-      last_probed_at, is_active, link_device_pubkey
+      last_probed_at, is_active, link_device_pubkey, dedicated
     ) values (
       ${input.runtimeId}, ${input.organizationId}, ${input.name}, 'connector', ${input.tokenHash}, ${input.instanceId},
       now(), now(), ${pgTextArray(input.features)}::text[], ${input.capacity}, 'healthy', null, now(), ${input.active},
-      ${input.devicePublicKey}
+      ${input.devicePublicKey}, ${input.dedicated}
     )
   `;
 }

@@ -114,17 +114,18 @@ export function messageVersionRoutes(
       return context.json(publicCreated(existing, sourceThreadId, sourceMessageId, true), 200);
     }
 
-    await assertPveReady(db, config, auth.organizationId, dependencies);
-
     // Message rows are append-only. Read the immutable attachment manifest
     // and payload outside the write transaction, then re-check the source and
     // all stateful gates under locks below. A missing legacy blob fails
     // explicitly; it is never silently dropped from the regenerated prompt.
-    const sourceAttachments = await withTenant(db, auth.organizationId, async (tx) => {
+    const source = await withTenant(db, auth.organizationId, async (tx) => {
       const source = await readSource(tx, auth.organizationId, sourceThreadId, sourceMessageId, false);
       assertSourceEligible(source, auth.userId);
-      return loadSourceAttachments(tx, blobs, auth.organizationId, source.content);
+      return source;
     });
+    await assertPveReady(db, config, auth.organizationId, dependencies, source.runtimeId ?? undefined);
+    const sourceAttachments = await withTenant(db, auth.organizationId, (tx) =>
+      loadSourceAttachments(tx, blobs, auth.organizationId, source.content));
 
     try {
       const created = await withTenant(db, auth.organizationId, async (tx) => {
@@ -397,16 +398,17 @@ async function assertPveReady(
   config: ApiConfig,
   organizationId: string,
   dependencies: { readRuntime?: RuntimeReader; clientFactory?: (clientConfig: HermesClientConfig) => ToolsetClient },
+  runtimeId?: string,
 ): Promise<void> {
-  const runtime = await (dependencies.readRuntime ?? readRuntimeSecret)(db, config, organizationId);
-  if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Aucun runtime Hermes actif n’est configuré.");
+  const runtime = await (dependencies.readRuntime ?? readRuntimeSecret)(db, config, organizationId, undefined, undefined, runtimeId);
+  if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "La machine d’exécution de ce bot est indisponible.");
   try {
     const client = (dependencies.clientFactory ?? runtimeAdminClient)(runtime.client);
     const violation = runtimeToolsetContractViolation(await client.toolsets());
     if (violation) throw new HttpError(409, violation.code, runtimeToolsetContractMessage(violation));
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(502, "RUNTIME_UNREACHABLE", "Le runtime Hermes n’est pas joignable.");
+    throw new HttpError(502, "RUNTIME_UNREACHABLE", "La machine d’exécution de ce bot n’est pas joignable.");
   }
 }
 

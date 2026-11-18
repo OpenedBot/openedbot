@@ -79,8 +79,8 @@ describe("run status row", () => {
     expect(head.className).toContain("h-[1.4375rem]");
     expect(head.dataset.runStatus).toBe("working");
     expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Recherche : météo Rennes");
-    // Live, the row opens nothing.
-    expect(head.hasAttribute("aria-expanded")).toBe(false);
+    // Live, the row already opens its log, folded until clicked.
+    expect(head.getAttribute("aria-expanded")).toBe("false");
 
     rerender(view({ live: false, workedMs: 6400 }));
     expect(container.querySelector("[data-activity-head]")).toBe(head);

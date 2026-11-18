@@ -30,6 +30,11 @@ func ACPHost() http.Handler {
 	})
 }
 
+// UserAgentHost serves the same profile operations for a user-owned runtime.
+func UserAgentHost(profilesRoot string) http.Handler {
+	return acpHost(profilesRoot, func() (int, int, error) { return os.Geteuid(), os.Getegid(), nil })
+}
+
 func acpHost(profilesRoot string, owner func() (int, int, error)) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /capabilities", func(w http.ResponseWriter, r *http.Request) {

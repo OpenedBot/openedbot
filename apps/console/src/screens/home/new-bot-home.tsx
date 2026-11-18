@@ -12,6 +12,8 @@ import { DRAFT_MODEL_DEFAULT, DraftModelPicker, type DraftModelChoice } from "..
 import type { BotCreationRequest } from "../../components/bot-create/creation-request";
 import { useBotCreationLaunch } from "../../components/bot-create/use-bot-launch";
 import { DEFAULT_CREATION_OPTIONS } from "../../components/bot-create/creation-options";
+import { ExecutionHostField, useBotCreationHosts } from "../../components/bot-create/execution-host-field";
+import { LocalAgentModelLabel } from "../../components/local-agent-model-label";
 import { consumeNewBotNameFocus } from "../../lib/bots/use-new-bot";
 import {
   HOME_FACE_COLORS,
@@ -39,6 +41,7 @@ type Draft = {
   mission: string;
   face: HomeFaceChoice;
   model: DraftModelChoice;
+  runtimeId: string;
   /** The suggestion the form was filled from: it brings the role and the working rules. */
   suggestion: HomeSuggestion | null;
   /** Its routine is kept: the operator can drop it before creating. */
@@ -70,14 +73,16 @@ export function NewBotHome({ empty }: { empty: boolean }) {
   const launch = useBotCreationLaunch();
   const assignment = useQuery({ queryKey: queryKeys.runtimeConfiguration, queryFn: api.runtimeConfiguration });
   const fresh = (): Draft => ({
-    name: t("newBotDialog.defaultName"),
+    name: "",
     mission: "",
     face: defaultHomeFaceChoice(),
     model: DRAFT_MODEL_DEFAULT,
+    runtimeId: "",
     suggestion: null,
     withRoutine: false,
   });
   const [draft, setDraft] = useState<Draft>(fresh);
+  const { selectedHost, requiresHost, ...executionHosts } = useBotCreationHosts(draft.runtimeId);
   const [sending, setSending] = useState(false);
   useEffect(consumeNewBotNameFocus, []);
   const attempts = useRef(creationAttempts());
@@ -98,14 +103,16 @@ export function NewBotHome({ empty }: { empty: boolean }) {
   ].join("\n");
   const routine = suggestion?.routine && draft.withRoutine ? suggestion.routine : null;
   const routineName = routine ? t(`homeNewBot.routines.${routine.key}.name`) : "";
-  const canCreate = name.length > 0 && !sending;
+  const canCreate = name.length > 0 && !sending && executionHosts.registryReady
+    && (selectedHost !== null || (!requiresHost && !draft.runtimeId));
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
     if (!canCreate) return;
-    const { model, provider, effort } = draft.model;
+    const { model, provider, effort } = selectedHost ? DRAFT_MODEL_DEFAULT : draft.model;
     const content: Omit<BotCreationRequest, "clientRequestId"> = {
       name,
+      ...(selectedHost?.id ? { runtimeId: selectedHost.id } : {}),
       role,
       mission,
       instructions: persona,
@@ -220,6 +227,7 @@ export function NewBotHome({ empty }: { empty: boolean }) {
               id={`${id}-name`}
               data-new-bot-name=""
               value={draft.name}
+              placeholder={t("newBotDialog.defaultName")}
               maxLength={100}
               required
               autoComplete="off"
@@ -254,22 +262,34 @@ export function NewBotHome({ empty }: { empty: boolean }) {
               </button>
             </div>
           ) : null}
-          {/* The whole row opens the picker, like a field; the picker's own
-              button stays the control that screen readers and keys reach. */}
-          <div
-            ref={modelRow}
-            data-new-bot-model=""
-            onClick={(event) => {
-              if (event.target === event.currentTarget || !(event.target as HTMLElement).closest("button")) {
-                modelRow.current?.querySelector<HTMLButtonElement>("[data-composer-model-picker]")?.click();
-              }
-            }}
-            // The picker's pill reads as plain text inside the row.
-            className={cn(FIELD, "flex h-11 cursor-pointer items-center justify-between gap-2 ps-3 pe-1.5 [&_[data-composer-model-picker]]:border-transparent [&_[data-composer-model-picker]]:bg-transparent")}
-          >
-            <span className={cn(LABEL, "font-normal")}>{t("homeNewBot.modelLabel")}</span>
-            <DraftModelPicker value={draft.model} onChange={(model) => update({ model })} />
-          </div>
+          <ExecutionHostField
+            id={`${id}-execution-host`}
+            {...executionHosts}
+            value={draft.runtimeId}
+            onChange={(runtimeId) => update({ runtimeId })}
+          />
+          {selectedHost && (
+            <div className={cn(FIELD, "flex min-h-11 items-center justify-between gap-2 px-3 py-1.5")}>
+              <span className={cn(LABEL, "shrink-0 font-normal")}>{t("homeNewBot.modelLabel")}</span>
+              <LocalAgentModelLabel host={selectedHost} />
+            </div>
+          )}
+          {!requiresHost && !draft.runtimeId && (
+            <div
+              ref={modelRow}
+              data-new-bot-model=""
+              onClick={(event) => {
+                if (event.target === event.currentTarget || !(event.target as HTMLElement).closest("button")) {
+                  modelRow.current?.querySelector<HTMLButtonElement>("[data-composer-model-picker]")?.click();
+                }
+              }}
+              // The picker's pill reads as plain text inside the row.
+              className={cn(FIELD, "flex h-11 cursor-pointer items-center justify-between gap-2 ps-3 pe-1.5 [&_[data-composer-model-picker]]:border-transparent [&_[data-composer-model-picker]]:bg-transparent")}
+            >
+              <span className={cn(LABEL, "font-normal")}>{t("homeNewBot.modelLabel")}</span>
+              <DraftModelPicker value={draft.model} onChange={(model) => update({ model })} />
+            </div>
+          )}
           <div className="flex justify-center pt-1">
             <button
               type="submit"
@@ -280,7 +300,8 @@ export function NewBotHome({ empty }: { empty: boolean }) {
             </button>
           </div>
         </form>
-        <section aria-labelledby={`${id}-suggestions`} className="shrink-0 px-6 pb-4">
+        {/* w-fit + mx-auto centres the row; max-w-full keeps the scroll when it overflows. */}
+        <section aria-labelledby={`${id}-suggestions`} className="mx-auto w-fit max-w-full shrink-0 px-6 pb-4">
           <h2 id={`${id}-suggestions`} className="mb-2 text-caption-1-medium text-text-tertiary">{t("homeNewBot.suggestions")}</h2>
           {/* Name and role only on the card, every card the same height; the
               description waits for the hover (and the focus), so cards never

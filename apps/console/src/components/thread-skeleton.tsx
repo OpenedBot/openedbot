@@ -12,7 +12,6 @@ import { queryKeys } from "../lib/api";
 import { readBootBot } from "../lib/session/boot-bots";
 import { readCloudSession } from "../lib/session/cloud-session";
 import { SHOW_FEATURE_LAB } from "../lib/thread/dev-approval-probe";
-import { BUTTON } from "./settings/primitives";
 import { SiteHeader } from "./dashboard/site-header";
 import { BAR_ICON_BUTTON } from "./boardui/board-chrome";
 import { useT } from "../lib/i18n";
@@ -163,16 +162,13 @@ export function HeaderTitleSkeleton({ botId }: { botId?: string }) {
 }
 
 /**
- * The conversation header's own buttons as they will be (« Fichiers », and
- * the scenario lab on a dev server), inert until the screen draws the real
- * ones. Keep in step with `conversation.tsx` (`extra`) and the `.hacts` of
+ * The conversation header's own button as it will be (the scenario lab on a
+ * dev server), inert until the screen draws the real one. Keep in step with `conversation.tsx` (`extra`) and the `.hacts` of
  * `index.html`.
  */
-export function HeaderExtrasAtRest({ withFiles }: { withFiles: boolean }) {
-  const { t } = useT();
+export function HeaderExtrasAtRest() {
   return (
     <span aria-hidden inert className="contents">
-      {withFiles ? <span className={BUTTON.small}>{t("mvp.files")}</span> : null}
       {SHOW_FEATURE_LAB ? (
         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-foreground">
           <IconShieldLock className="size-3.5" />
@@ -198,7 +194,7 @@ export function ConversationPending({ botId }: { botId?: string }) {
   const isMobile = useIsMobile();
   return (
     <>
-      {bot && !isMobile ? <ConversationHeader bot={bot} extra={<HeaderExtrasAtRest withFiles={Boolean(bot.threadId)} />} /> : (
+      {bot && !isMobile ? <ConversationHeader bot={bot} extra={<HeaderExtrasAtRest />} /> : (
         <SiteHeader
           /* The title carries a face and a name: it stays pinned to the left. */
           align="start"

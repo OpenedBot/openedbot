@@ -27,6 +27,7 @@ import type { BotDto } from "@openedbot/contracts-api";
 import { normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
 import { Dialog, cn, toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError, api, queryKeys, runtimesQueryOptions } from "../../lib/api";
+import { useBotRuntime } from "../../lib/runtime/use-bot-runtime";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { haptics } from "../../lib/platform/haptics";
 import { isBotManagePageParked, useBotDialogs, type BotManagePage } from "../../lib/bots/bot-dialogs";
@@ -42,7 +43,7 @@ import { MobileSheetStack } from "../mobile/sheet-stack";
 import { BUTTON } from "../settings/primitives";
 import { BotDeleteDialog, useBotActions } from "./bot-actions";
 import { shownPermissionMode, useAutoReviewAvailable } from "../boardui/permission-picker";
-import { ActivityPage, ApprovalsPage, ModelPage, RuntimePane, useCoordinationPage, usePersonaPage } from "./bot-manage-pages";
+import { ActivityPage, ApprovalsPage, BotMachinePage, ModelPage, useCoordinationPage, usePersonaPage } from "./bot-manage-pages";
 import { RELAY_FEATURE_PROFILE_CREDENTIALS, RELAY_FEATURE_PROFILE_MANAGEMENT } from "@openedbot/contracts-connector/features";
 
 type Icon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -137,6 +138,8 @@ export function BotManageDialog({
   const canWrite = me.data?.kind === "session" && me.data.session.canWrite === true;
   const runtimes = useQuery({ ...runtimesQueryOptions(), enabled: open });
   const runtime = runtimes.data?.runtimes[0] ?? null;
+  // The machine row names the bot's own machine, not the organization's default.
+  const host = useBotRuntime(bot.runtimeId);
   const profileCredentialsAvailable = Boolean(bot.hermesProfile && runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_CREDENTIALS) === true);
   const shown = (id: BotManagePage) =>
     (id !== "routines" || canWrite) && (id !== "credentials" || profileCredentialsAvailable);
@@ -171,7 +174,7 @@ export function BotManageDialog({
       case "model": return bot.model ?? t("botManage.value.modelRuntime");
       case "approvals": return t(`boardui.permission.${shownPermissionMode(bot.permissionMode, autoReview)}`);
       case "coordination": return t(normalizeAutonomyPolicy(bot.autonomy).enabled ? "botManage.value.on" : "botManage.value.off");
-      case "runtime": return runtime?.name ?? undefined;
+      case "runtime": return host.runtime?.name ?? (bot.runtimeId ? t("newBotDialog.executionHostUnavailable") : undefined);
       case "webhooks": return t("botManage.value.parked");
       default: return undefined;
     }
@@ -373,8 +376,7 @@ export function BotManageDialog({
   } else if (page === "webhooks" && !PAGES.webhooks.disabled) {
     body = <BotWebhooksPanel bot={bot} open={open} />;
   }
-  /** The runtime page is the `/settings/runtime` screen: its own scroller and footer. */
-  const runtimePane = page === "runtime";
+  if (page === "runtime") body = <BotMachinePage bot={bot} />;
 
   const detail = page ? (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -409,10 +411,7 @@ export function BotManageDialog({
           </button>
         )}
       </header>
-      {runtimePane ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden"><RuntimePane /></div>
-      ) : (
-        <div
+      <div
           // Focusable: a page with text only must still scroll from the keyboard
           // (axe `scrollable-region-focusable`).
           tabIndex={0}
@@ -424,14 +423,13 @@ export function BotManageDialog({
         >
           <div className={cn(isMobile && "rounded-[20px] bg-[var(--openedbot-grouped-card)] px-4 py-4")}>{body}</div>
         </div>
-      )}
       {footer ? (
         isMobile ? (
           <MobileActionFooter>{footer}</MobileActionFooter>
         ) : (
           <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">{footer}</footer>
         )
-      ) : isMobile && !runtimePane ? (
+      ) : isMobile ? (
         <div className="shrink-0 bg-[var(--openedbot-grouped-canvas)] pb-[max(0.75rem,var(--openedbot-safe-bottom))]" />
       ) : null}
     </div>
@@ -447,7 +445,6 @@ export function BotManageDialog({
         showHandle={!isMobile}
         className={cn(
           !isMobile && "openedbot-manage h-[min(48rem,calc(100dvh-6rem))] max-h-[min(48rem,calc(100dvh-6rem))] max-w-[min(48rem,calc(100vw-2rem))]",
-          !isMobile && runtimePane && "max-w-[min(80rem,calc(100vw-2rem))]",
           isMobile &&
             "openedbot-inset-sheet h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)] max-h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)] max-sm:max-h-[calc(100dvh-var(--openedbot-safe-top)-0.75rem)]",
         )}

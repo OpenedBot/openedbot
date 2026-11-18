@@ -100,7 +100,13 @@ export type HermesSessionCounters = {
   cacheWriteTokens: number;
 };
 
-export type HermesModelOption = { id: string; fast: boolean; reasoning: boolean };
+export type HermesModelOption = {
+  id: string;
+  fast: boolean;
+  reasoning: boolean;
+  /** The efforts the model accepts, when the host lists them (local Codex); absent: any. */
+  efforts?: string[];
+};
 
 export type HermesModelProvider = {
   slug: string;

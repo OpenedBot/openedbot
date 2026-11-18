@@ -15,7 +15,7 @@ export async function lockRuntimeDeclarations(tx: TransactionDb, organizationId:
 export async function hasPendingReplacement(tx: TransactionDb, organizationId: string): Promise<boolean> {
   const pending = await tx<Array<{ id: string }>>`
     select id from runtimes
-     where organization_id = ${organizationId} and revoked_at is null and not is_active
+     where organization_id = ${organizationId} and revoked_at is null and not is_active and not dedicated
      limit 1
   `;
   return pending.length > 0;

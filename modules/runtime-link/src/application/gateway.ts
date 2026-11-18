@@ -9,6 +9,7 @@ import {
   type RelayLinkContextFrame,
   type RelayTextFrame,
 } from "@openedbot/contracts-connector";
+import { isLocalEngine } from "@openedbot/contracts-api";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
 import { withCredential, withTenant } from "@openedbot/platform-db";
@@ -80,6 +81,9 @@ export type LinkEnrollment = {
   id: string;
   organizationId: string;
   runtimeName: string;
+  dedicated?: boolean;
+  /** The engine its `hello` declared: a machine ticket names its runtime after it. */
+  engine?: string | null;
 };
 
 export type LinkCredential =
@@ -282,7 +286,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       }
       credential = {
         kind: "enrollment",
-        enrollment: { id: row.id, organizationId: row.organizationId, runtimeName: row.runtimeName },
+        enrollment: { id: row.id, organizationId: row.organizationId, runtimeName: row.runtimeName, dedicated: row.dedicated },
       };
     }
 
@@ -562,7 +566,16 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
             connection.close(1012, "LINK_ADMISSION_FAILED");
           });
         }
-        else void beginProvisional(ws, connection, ws.data.credential.enrollment);
+        else {
+          const enrollment = ws.data.credential.enrollment;
+          // A machine ticket pairs only the agent CLIs of `edge-setup connect`;
+          // a host ticket never pairs one of them.
+          if (Boolean(enrollment.dedicated) !== isLocalEngine(frame.engine)) {
+            connection.close(RELAY_CLOSE_UNAUTHORIZED, "ENROLLMENT_ENGINE_MISMATCH");
+            return;
+          }
+          void beginProvisional(ws, connection, { ...enrollment, engine: frame.engine ?? null });
+        }
         return;
       }
       const connection = ws.data.connection;

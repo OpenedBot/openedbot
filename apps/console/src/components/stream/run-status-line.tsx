@@ -112,7 +112,8 @@ export function RunStatusLine({
   const [sawPending] = useState(phase === "pending");
   const text = useHeldText(live ? label : phase === "done" ? summary : null, live);
   const swap = useLabelSwap(text, mountedLive);
-  const openable = phase === "done" && onOpen !== undefined;
+  // Live too: the operator follows the steps while the bot works, not only after.
+  const openable = (phase === "done" || live) && onOpen !== undefined;
   const marks = agents.length + (overflow > 0 ? 1 : 0);
   return (
     <button

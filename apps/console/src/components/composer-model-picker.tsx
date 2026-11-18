@@ -3,16 +3,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   BotDto,
   RosterDto,
+  RuntimePublicDto,
 } from "@openedbot/contracts-api";
 import {
   isHermesReasoningEffort,
+  isLocalEngine,
+  LOCAL_ENGINES,
   type HermesReasoningEffort,
 } from "@openedbot/contracts-api";
 import { catalogModelView, globalModelIsAutomatic, resolveThreadModel, runtimeGlobalModel } from "@/lib/bots/model-catalog";
 import { toast } from "@openedbot/browser-ui-kit";
 import type { RunFallbackServed } from "../lib/run/run-fallback";
-import { api, ApiError, queryKeys, runtimesQueryOptions } from "../lib/api";
+import { api, ApiError, queryKeys } from "../lib/api";
 import { useT } from "../lib/i18n";
+import { useBotRuntime } from "../lib/runtime/use-bot-runtime";
 import { displayedRuntimeHealth } from "../lib/runtime/runtime-health";
 import { trackBotModelSave } from "../lib/bots/bot-model-saves";
 import { ComposerModelPicker } from "./composer-model-picker-view";
@@ -38,25 +42,38 @@ const selectionFromBot = (bot: BotDto): ModelSelection => ({
  * the bot's preference directly so the choice made in the composer is
  * the one the worker will actually resolve.
  */
-export function ThreadModelPicker({
-  bot,
-  disabled = false,
-  variant = "chip",
-  servedBy = null,
-}: {
+type ThreadModelPickerProps = {
   bot: BotDto;
   /** See `ComposerModelPicker`: the fallback that served the bot's last turn. */
   servedBy?: RunFallbackServed | null;
   disabled?: boolean;
   /** See `ComposerModelPicker`: composer chip, mobile subtitle text, or top-bar pill. */
   variant?: "chip" | "inline" | "header";
-}) {
+};
+
+export function ThreadModelPicker(props: ThreadModelPickerProps) {
+  const { t } = useT();
+  const host = useBotRuntime(props.bot.runtimeId);
+  const { runtime } = host;
+  if (props.bot.runtimeId && !runtime) {
+    return (
+      <span className="truncate text-caption-1-regular text-text-secondary" role="status">
+        {t(host.isPending ? "composer.modelLoading" : "newBotDialog.executionHostUnavailable")}
+      </span>
+    );
+  }
+  return <RuntimeThreadModelPicker {...props} host={host} />;
+}
+
+function RuntimeThreadModelPicker({
+  bot,
+  disabled = false,
+  variant = "chip",
+  servedBy = null,
+  host,
+}: ThreadModelPickerProps & { host: ReturnType<typeof useBotRuntime> }) {
   const { t } = useT();
   const queryClient = useQueryClient();
-  // Reread on return to the tab: the global preference is changed in
-  // Réglages → Modèles, often in another tab, and the app does not refetch
-  // on focus by default (query-client.ts). Here nothing streams, nothing flickers.
-  const runtimes = useQuery({ ...runtimesQueryOptions(), refetchOnWindowFocus: true });
   // The assignment mode lives on the organization, not on the runtime: the same
   // cache entry as `runtimes` above, read without `select`.
   const assignment = useQuery({
@@ -66,7 +83,7 @@ export function ThreadModelPicker({
   });
   // The picker offers the whole catalogue; a per-bot choice switches
   // the organization to « Par bot » mode in `write`.
-  const runtime = runtimes.data?.runtimes[0] ?? null;
+  const runtime = host.runtime ?? null;
   // « Le même modèle pour tous » imposes only a global model that is set:
   // without one, the worker runs the bot's own model
   // (`applyRuntimeModelSelection`), so the display must too.
@@ -120,7 +137,9 @@ export function ThreadModelPicker({
 
   const flush = (): Promise<void> => {
     if (inFlight.current) return inFlight.current;
-    const run = (async () => {
+    // Declared first: its own `finally` compares the slot with it.
+    let run: Promise<void> | null = null;
+    run = (async () => {
       try {
         // Choices made during a round trip wait for it to finish, then only the
         // last one leaves: the intermediates are no longer worth anything.
@@ -156,7 +175,8 @@ export function ThreadModelPicker({
         }
         void queryClient.invalidateQueries({ queryKey: queryKeys.roster });
       } finally {
-        inFlight.current = null;
+        // A machine move may have queued behind this save: it keeps its slot.
+        if (inFlight.current === run) inFlight.current = null;
       }
     })();
     inFlight.current = run;
@@ -218,6 +238,7 @@ export function ThreadModelPicker({
     persist({
       model,
       effort: effectiveId && view.reasoningIds.has(effectiveId) && isHermesReasoningEffort(selection.effort)
+        && (view.effortsById.get(effectiveId)?.includes(selection.effort) ?? true)
         ? selection.effort
         : null,
       // The wish is kept across models: it shows, and applies, again on a
@@ -228,12 +249,97 @@ export function ThreadModelPicker({
 
   const allProviders = catalog.data?.providers ?? [];
 
+  // The workspace's other machines: the default one and each agent of a
+  // machine, as the bot's Machine page lists them. One opens its catalogue in
+  // the list; a model picked there moves the bot (`moveTo`).
+  const registry = useQuery({ queryKey: queryKeys.runtimeList, queryFn: api.runtimeList });
+  const [browsingId, setBrowsingId] = useState<string | null>(null);
+  // A move freezes the picker until it lands: a second pick would race it.
+  const [moving, setMoving] = useState(false);
+  const machines = (registry.data ?? []).filter((host): host is RuntimePublicDto & { id: string } =>
+    host.id !== null && (host.dedicated === true || host.isActive));
+  const browsed = browsingId && browsingId !== runtime?.id ? machines.find((host) => host.id === browsingId) ?? null : null;
+  const browsedCatalog = useQuery({
+    queryKey: queryKeys.runtimeModels(browsed?.id ?? "none"),
+    queryFn: () => api.runtimeModels(browsed!.id),
+    enabled: browsed !== null && displayedRuntimeHealth(browsed) !== "disconnected",
+    staleTime: 30_000,
+  });
+  const machineLabel = (host: RuntimePublicDto) => host.dedicated
+    ? t("newBotDialog.localHost", { host: host.name ?? t("newBotDialog.rulesServerFallback") })
+    : t("newBotDialog.defaultExecutionHost", { host: host.name ?? t("newBotDialog.rulesServerFallback") });
+  const machineEntries = machines.map((host) => ({
+    id: host.id,
+    label: machineLabel(host),
+    provider: isLocalEngine(host.engine) ? LOCAL_ENGINES[host.engine].provider : null,
+  }));
+
+
+  // The other machine's catalogue cannot be read: the list says why, and offers nothing to pick.
+  const browsedNotice = !browsed ? null
+    : displayedRuntimeHealth(browsed) === "disconnected" || browsedCatalog.isError ? t("newBotDialog.executionHostUnavailable")
+    : browsedCatalog.isLoading ? t("composer.modelLoading") : null;
+
+  const moveTo = (target: RuntimePublicDto & { id: string }, model: string | null) => {
+    // Serialized with the model saves, and tracked like them: a send waits
+    // for the move, so the next turn never starts on the old machine.
+    const before = inFlight.current;
+    setMoving(true);
+    let run: Promise<void> | null = null;
+    run = (async () => {
+      try {
+        await before;
+        const provider = model === null ? null : catalogModelView(browsedCatalog.data?.providers ?? []).groups
+          .find((group) => group.models.some((entry) => entry.id === model))?.slug ?? null;
+        // One call: the model rides with the move (a separate update would
+        // wait for the profile the move queues again).
+        let moved: BotDto;
+        try {
+          moved = await api.moveBot(bot.id, target.dedicated ? target.id : null, model === null ? undefined : { model, provider });
+        } catch (error) {
+          // The server refuses while the bot still runs a request, and says so.
+          toast.error(error instanceof ApiError ? error.message : t("composer.machineMoveFailed"), { id: toastId });
+          return;
+        }
+        setBrowsingId(null);
+        // The sync effect skips a bot update while this move holds the slot:
+        // the moved bot's model becomes the shown and confirmed one here.
+        const landed = selectionFromBot(moved);
+        confirmed.current = landed;
+        wanted.current = landed;
+        setSelection(landed);
+        queryClient.setQueryData<RosterDto>(queryKeys.roster, (current) => current
+          ? { ...current, bots: current.bots.map((entry) => entry.id === moved.id ? moved : entry) }
+          : current);
+        toast.success(t("composer.machineMoved", { bot: moved.name, host: target.name ?? machineLabel(target) }), { id: toastId });
+        // As `write`: in global mode the worker would ignore the bot's own
+        // model. The move stands either way; only this switch is reported.
+        if (model !== null && assignment.data?.modelAssignmentMode === "global" && target.selectedModel?.trim()) {
+          try {
+            await api.saveModelAssignmentMode("per_bot");
+          } catch (error) {
+            toast.error(error instanceof ApiError ? error.message : t("composer.modelSaveFailed"), { id: `${toastId}-mode` });
+          }
+          void queryClient.invalidateQueries({ queryKey: queryKeys.runtimeConfiguration });
+        }
+      } finally {
+        setMoving(false);
+        if (inFlight.current === run) inFlight.current = null;
+        void queryClient.invalidateQueries({ queryKey: queryKeys.roster });
+      }
+    })();
+    inFlight.current = run;
+    trackBotModelSave(bot.id, run);
+  };
+
   return (
     <ComposerModelPicker
+      catalogHost={runtime?.name ?? undefined}
       providers={allProviders}
       selectedModel={selection.model}
       effectiveModel={resolved?.model ?? null}
       effectiveEffort={resolved?.effort ?? null}
+      efforts={resolved ? view.effortsById.get(resolved.model) : undefined}
       globalModel={globalModel}
       globalAutomatic={globalModelIsAutomatic(runtime)}
       supportsEffort={resolved ? view.reasoningIds.has(resolved.model) : false}
@@ -242,11 +348,23 @@ export function ThreadModelPicker({
       servedBy={shownFallback}
       // `isLoading`, not `isPending`: a disabled catalog query (runtime without
       // an id) stays pending forever and would pin the chip on "loading".
-      loading={runtimes.isPending || catalog.isLoading || assignment.isPending}
-      // Never frozen while saving: see `flush`.
-      saving={false}
-      error={runtimes.isError || catalog.isError || (!runtimes.isPending && runtime === null)}
-      onModelChange={selectModel}
+      loading={host.isPending || catalog.isLoading || assignment.isPending}
+      // Never frozen while a model saves (see `flush`); frozen while the bot changes machine.
+      saving={moving}
+      // A disconnected machine's catalogue is not read at all: unreadable all the same.
+      error={Boolean(host.error) || catalog.isError || (!host.isPending && runtime === null) || (runtime !== null && displayedRuntimeHealth(runtime) === "disconnected")}
+      onModelChange={(model) => browsed ? moveTo(browsed, model) : selectModel(model)}
+      machines={machineEntries}
+      machineId={browsed?.id ?? runtime?.id ?? null}
+      browsing={browsed ? {
+        host: machineLabel(browsed),
+        providers: browsedCatalog.data?.providers ?? [],
+        globalModel: runtimeGlobalModel(browsed, browsedCatalog.data),
+        globalAutomatic: globalModelIsAutomatic(browsed),
+        notice: browsedNotice,
+      } : null}
+      onMachine={(id) => setBrowsingId(id === runtime?.id ? null : id)}
+      onClose={() => setBrowsingId(null)}
       onEffortChange={(effort) => setSelection((current) => ({ ...current, effort }))}
       onEffortCommit={(effort) => persist({ ...selection, effort })}
       fast={{

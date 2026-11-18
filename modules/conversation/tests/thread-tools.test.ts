@@ -137,6 +137,12 @@ describe("toolKind", () => {
     expect(toolKind("mcp__files__read_file")).toBe("read");
   });
 
+  test("an ACP agent's tool title names the same family as the Hermes tool", () => {
+    expect(toolKind("web_fetch")).toBe("web");
+    expect(toolKind("Web search:")).toBe("search");
+    expect(toolKind("Web search: infirmière Lille")).toBe("search");
+  });
+
   test("an unknown tool is other, an unknown MCP tool keeps its service", () => {
     expect(toolKind("skill_manage")).toBe("other");
     expect(toolKind("constructor")).toBe("other");

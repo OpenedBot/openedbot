@@ -2,6 +2,7 @@ import { isoOrNull } from "@openedbot/contracts-primitives";
 import type { BotFaceSpec, BotPermissionMode, BotProfileProvisionProgress, BotReplyLanguage, BotSpeechRate } from "@openedbot/contracts-api";
 
 export type BotRow = {
+  runtimeId?: string | null;
   id: string;
   threadId: string;
   name: string;

@@ -20,12 +20,14 @@ function reducedMotionSnapshot() {
 }
 
 /**
- * The slider offers only the values Hermes actually understands. The
- * six notches are therefore options, not a numeric approximation of
+ * The slider offers only the values the model actually understands: the
+ * six Hermes notches, or the model's own list when its host gives one
+ * (local Codex). The notches are options, not a numeric approximation of
  * `reasoning_effort`.
  */
 export function EffortSlider({
   value,
+  efforts = HERMES_REASONING_EFFORTS,
   explicit,
   disabled,
   look = "sheet",
@@ -34,6 +36,7 @@ export function EffortSlider({
   onCommit,
 }: {
   value: HermesReasoningEffort;
+  efforts?: readonly HermesReasoningEffort[];
   /** `false` means the runtime still decides the effective value. */
   explicit: boolean;
   disabled: boolean;
@@ -50,9 +53,9 @@ export function EffortSlider({
 }) {
   const { t } = useT();
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionSnapshot, () => false);
-  const index = HERMES_REASONING_EFFORTS.indexOf(value);
-  const max = HERMES_REASONING_EFFORTS.length - 1;
-  const ratio = index / max;
+  const index = Math.max(0, efforts.indexOf(value));
+  const max = efforts.length - 1;
+  const ratio = max > 0 ? index / max : 1;
   const isMax = !reducedMotion && index === max;
   const label = explicit
     ? effortLabel(t, value)
@@ -60,13 +63,13 @@ export function EffortSlider({
 
   /** The notches leave the track as they light up, on a fresh path. */
   const scatter = useMemo(
-    () => HERMES_REASONING_EFFORTS.map(() => ({
+    () => efforts.map(() => ({
       x: -(70 + 130 * Math.random()),
       y: (Math.random() - 0.5) * 70,
       rotate: (Math.random() - 0.5) * 720,
       delay: 0.3 * Math.random(),
     })),
-    [isMax],
+    [isMax, efforts.length],
   );
   const [burning, setBurning] = useState(isMax);
 
@@ -79,8 +82,10 @@ export function EffortSlider({
     return () => window.clearTimeout(timer);
   }, [isMax]);
 
-  const effortAt = (raw: string) => HERMES_REASONING_EFFORTS[Number(raw)];
-  const interactionEffort = useRef(value);
+  const effortAt = (raw: string) => efforts[Number(raw)];
+  // A press while the runtime decides starts from `null`: the notch clicked is
+  // a choice, even the one the placeholder sits on. Focus alone never commits.
+  const interactionEffort = useRef<HermesReasoningEffort | null>(value);
   // A click on the track can give focus AFTER having moved the value:
   // during a press, the starting point is the pointerdown's.
   const pointerActive = useRef(false);
@@ -121,7 +126,7 @@ export function EffortSlider({
             style={{ width: `calc(${ratio} * (100% - 21px) + 21px)` }}
           />
           <div aria-hidden className="absolute inset-x-[9px] top-[7px] flex h-[13px] items-center justify-between">
-            {HERMES_REASONING_EFFORTS.map((effort, effortIndex) => (
+            {efforts.map((effort, effortIndex) => (
               <span
                 key={effort}
                 className="h-full w-[3px] rounded-[2px] bg-foreground-icon-tertiary"
@@ -174,7 +179,7 @@ export function EffortSlider({
               }}
               onPointerDown={(event) => {
                 pointerActive.current = true;
-                interactionEffort.current = effortAt(event.currentTarget.value) ?? value;
+                interactionEffort.current = explicit ? effortAt(event.currentTarget.value) ?? value : null;
               }}
               onPointerUp={(event) => {
                 pointerActive.current = false;

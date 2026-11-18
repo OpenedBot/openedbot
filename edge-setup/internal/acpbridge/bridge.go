@@ -29,6 +29,13 @@ type Limits struct {
 	MaxInvalidLines   int
 }
 type Options struct {
+	// Protocol is ProtocolCodex for the Codex App Server, empty for ACP.
+	Protocol string
+	// Workspace, when set, is the one working directory of every profile.
+	Workspace string
+	// Catalogue, when set, is served as `/api/model/options` and validates
+	// every run's model choice; without it, only the agent default runs.
+	Catalogue      *Catalogue
 	ListenAddress  string
 	Bearer         string
 	StateDirectory string
@@ -73,6 +80,9 @@ type session struct {
 	LastUsed     time.Time `json:"last_used"`
 	client       *rpcClient
 	active       string
+	// EffortSet: a turn of this ACP session set an effort the bot chose. Kept
+	// on disk: an agent that restores its session on `session/load` keeps it.
+	EffortSet bool `json:"effort_set,omitempty"`
 }
 type Event map[string]any
 type run struct {
@@ -94,6 +104,8 @@ type run struct {
 	bytes          int
 	client         *rpcClient
 	acpID          string
+	codexTurn      string
+	codexDone      chan rpcReply
 }
 type permission struct {
 	id      json.RawMessage
@@ -311,6 +323,11 @@ func (b *Bridge) Serve(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return b.ServeListener(ctx, l)
+}
+
+// ServeListener serves an already bound loopback listener.
+func (b *Bridge) ServeListener(ctx context.Context, l net.Listener) error {
 	srv := &http.Server{Handler: b, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: b.opts.Limits.BodyTimeout}
 	done := make(chan struct{})
 	defer close(done)
@@ -322,7 +339,7 @@ func (b *Bridge) Serve(ctx context.Context) error {
 		case <-done:
 		}
 	}()
-	err = srv.Serve(l)
+	err := srv.Serve(l)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
@@ -466,6 +483,8 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, 200, map[string]any{"features": map[string]bool{"run_steer": false}, "endpoints": map[string]any{"session_delete": map[string]string{"method": "DELETE", "path": "/api/sessions/{session_id}"}}, "max_concurrent_runs": b.opts.Limits.MaxConcurrentRuns})
 	case req.Method == "GET" && path == "/v1/toolsets":
 		writeJSON(w, 200, map[string]any{"data": []any{}})
+	case req.Method == "GET" && path == "/api/model/options" && b.opts.Catalogue != nil:
+		writeJSON(w, 200, b.catalogueOptions())
 	case req.Method == "GET" && path == "/api/model/options":
 		writeJSON(w, 200, map[string]any{"provider": "acp", "model": "agent-default", "providers": []any{map[string]any{"slug": "acp", "name": "ACP agent default", "is_current": true, "authenticated": true, "models": []string{"agent-default"}}}})
 	case req.Method == "POST" && path == "/api/sessions":

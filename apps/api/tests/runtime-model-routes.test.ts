@@ -144,6 +144,17 @@ describe("runtime model management", () => {
     expect(() => runtimeModelSelection({ reasoningEffort: "maximum" })).toThrow(HttpError);
   });
 
+  test("lists a model's efforts weakest first, whatever the host's order", () => {
+    const catalog = runtimeModelCatalog(row, {
+      provider: "grok-cli",
+      model: "grok-4.7",
+      providers: [
+        { slug: "grok-cli", name: "Grok CLI", isCurrent: true, authenticated: true, authType: null, warning: null, models: [{ id: "grok-4.7", fast: false, reasoning: true, efforts: ["high", "medium", "low", "turbo"] }] },
+      ],
+    });
+    expect(catalog.providers[0]?.models[0]?.efforts).toEqual(["low", "medium", "high"]);
+  });
+
   test("maps the live Hermes catalog without treating moa as inference proof", () => {
     const catalog = runtimeModelCatalog(row, {
       provider: "openai-api",
@@ -373,7 +384,7 @@ describe("GET /:runtimeId/models : verdict de santé", () => {
 
   type Call = { sql: string; values: unknown[] };
 
-  type MountOptions = { failHealthWrite?: boolean; row?: RuntimeRow; storedProof?: unknown; provenModel?: boolean; effortRace?: boolean };
+  type MountOptions = { failHealthWrite?: boolean; row?: RuntimeRow; storedProof?: unknown; provenModel?: boolean; effortRace?: boolean; dedicated?: RuntimeRow };
 
   function memorySnapshots(): SnapshotStore {
     const rows = new Map<string, { document: unknown; observedAt: Date }>();
@@ -407,6 +418,10 @@ describe("GET /:runtimeId/models : verdict de santé", () => {
       if (sql.startsWith("update runtimes set selected_provider")) return [{
         ...(options.row ?? connector), selectedProvider: values[0], selectedModel: values[1], reasoningEffort: values[2],
       }];
+      // A dedicated agent is only read by its id; the active-runtime read never returns it.
+      if (options.dedicated && sql.includes("from runtimes")) {
+        return sql.includes("and id = ?") ? (values.includes(options.dedicated.id) ? [options.dedicated] : []) : [connector];
+      }
       return sql.includes("from runtimes") ? [options.row ?? connector] : [];
     }) as unknown as SQL;
     (tx as unknown as { begin(callback: (inner: Bun.TransactionSQL) => Promise<unknown>): Promise<unknown> }).begin =
@@ -450,6 +465,12 @@ describe("GET /:runtimeId/models : verdict de santé", () => {
     expect(hostReads).toBe(1);
     expect((await app.request("/runtime-1/models?fresh=1")).status).toBe(200);
     expect(hostReads).toBe(2);
+  });
+
+  test("serves the catalogue of a machine's dedicated agent, not only the active runtime", async () => {
+    const dedicated: RuntimeRow = { ...connector, id: "runtime-agent", name: "ubuntu-server · Grok", isActive: false, dedicated: true };
+    const { app } = mount(() => Response.json(catalog), { dedicated });
+    expect((await app.request("/runtime-agent/models")).status).toBe(200);
   });
 
   test("une écriture openedbot invalide le snapshot", async () => {

@@ -110,6 +110,14 @@ func TestACPAgent(t *testing.T) {
 			send(m.ID, map[string]any{"protocolVersion": 1, "agentCapabilities": caps})
 		case "session/new":
 			newCount++
+			if scenario == "catalogue-login" {
+				_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": m.ID, "error": map[string]any{"code": -32000, "message": "auth required"}})
+				continue
+			}
+			if scenario == "catalogue" {
+				send(m.ID, map[string]any{"sessionId": fmt.Sprintf("s%d", newCount), "configOptions": fakeConfigOptions("fake-pro")})
+				continue
+			}
 			send(m.ID, map[string]string{"sessionId": fmt.Sprintf("s%d", newCount)})
 			if scenario == "blocked-stdin" {
 				conn, err := net.Dial("tcp", os.Args[marker+2])
@@ -192,6 +200,15 @@ func TestACPAgent(t *testing.T) {
 				}
 				update(sessionID, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "orphan", "status": "completed"})
 				answer()
+			case "tool-kinds":
+				for i, call := range [][2]string{{"execute", "`rm -rf build`"}, {"read", "Read /src/a.ts"}, {"move", "Move a to b"}, {"search", "grep -n TODO"}, {"search", "Web search: \"infirmière\""}, {"fetch", "Fetch https://example.com/offre?id=1"}, {"think", "Plan"}} {
+					fields := map[string]any{"sessionUpdate": "tool_call", "toolCallId": fmt.Sprint(i), "kind": call[0], "title": call[1], "status": "completed"}
+					if call[0] == "read" {
+						fields["locations"] = []any{map[string]any{"path": "/src/a.ts", "line": 3}}
+					}
+					update(sessionID, fields)
+				}
+				answer()
 			case "tools":
 				update(sessionID, map[string]any{"sessionUpdate": "agent_thought_chunk", "content": textBlock("PRIVATE THOUGHT")})
 				for _, id := range []string{"first", "second"} {
@@ -205,6 +222,15 @@ func TestACPAgent(t *testing.T) {
 			default:
 				answer()
 			}
+		case "session/set_config_option":
+			// The second model drops the effort and the speed, as a small model does.
+			model, _ := p["value"].(string)
+			if p["configId"] != "model" {
+				model = "fake-pro"
+			}
+			send(m.ID, map[string]any{"configOptions": fakeConfigOptions(model)})
+		case "session/close":
+			send(m.ID, map[string]any{})
 		case "session/cancel":
 			if scenario == "approval-stop-order" {
 				receiveOrder = append(receiveOrder, "cancel")
@@ -1150,6 +1176,21 @@ func TestFinalToolCallsAndUnmatchedCompletions(t *testing.T) {
 	}
 }
 
+func TestToolCallsNamedByTheirACPKind(t *testing.T) {
+	f := newFixture(t, "tool-kinds")
+	f.session("cloud")
+	events := f.events(f.run(input("cloud"), ""))
+	expectTerminal(t, events, "run.completed")
+	want := [][2]string{{"terminal", "`rm -rf build`"}, {"read_file", "/src/a.ts"}, {"edit_file", ""}, {"search_files", "grep -n TODO"}, {"web_search", `"infirmière"`}, {"web_extract", "Fetch https://example.com/offre?id=1"}, {"Plan", ""}}
+	for i, w := range want {
+		start, end := events[i*2], events[i*2+1]
+		preview, _ := start["preview"].(string)
+		if start["event"] != "tool.started" || start["tool"] != w[0] || preview != w[1] || end["tool"] != w[0] {
+			t.Fatalf("call %d: want %v, got %v %v", i, w, start, end)
+		}
+	}
+}
+
 func TestAgentStopTerminatesChildProcesses(t *testing.T) {
 	for _, mode := range []string{"stop", "close", "crash"} {
 		t.Run(mode, func(t *testing.T) {
@@ -1798,4 +1839,28 @@ func TestProfileRemovedDuringCreationDoesNotDisableBridge(t *testing.T) {
 			})
 		}
 	}
+}
+
+// fakeConfigOptions is the session's options once `model` is set: the small
+// model drops the effort and speed switches, as Claude's `haiku` does, and
+// the light one offers a single effort.
+func fakeConfigOptions(model string) []any {
+	values := func(list ...string) []any {
+		out := []any{}
+		for _, value := range list {
+			out = append(out, map[string]string{"value": value, "name": value})
+		}
+		return out
+	}
+	options := []any{
+		map[string]any{"id": "mode", "category": "mode", "currentValue": "auto", "options": values("default", "auto")},
+		map[string]any{"id": "model", "category": "model", "currentValue": "fake-pro", "options": values("default", "fake-pro", "fake-mini", "fake-lite")},
+	}
+	efforts := map[string][]string{"fake-pro": {"default", "low", "medium", "high"}, "fake-lite": {"low"}}[model]
+	if efforts != nil {
+		options = append(options,
+			map[string]any{"id": "effort", "category": "thought_level", "currentValue": map[string]string{"fake-pro": "medium", "fake-lite": "low"}[model], "options": values(efforts...)},
+			map[string]any{"id": "fast", "category": "model_config", "currentValue": "off", "options": values("on", "off")})
+	}
+	return options
 }

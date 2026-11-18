@@ -3,6 +3,7 @@ package acpbridge
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
@@ -19,6 +20,10 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 		}
 		return
 	}
+	if b.codex() {
+		b.codexEventLocked(client, m)
+		return
+	}
 	var params struct {
 		SessionID string `json:"sessionId"`
 		Update    struct {
@@ -27,9 +32,13 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 				Type string `json:"type"`
 				Text string `json:"text"`
 			} `json:"content"`
-			ToolID string `json:"toolCallId"`
-			Title  string `json:"title"`
-			Status string `json:"status"`
+			ToolID   string `json:"toolCallId"`
+			Title    string `json:"title"`
+			ToolKind string `json:"kind"`
+			Status   string `json:"status"`
+			Places   []struct {
+				Path string `json:"path"`
+			} `json:"locations"`
 		} `json:"update"`
 		ToolCall struct {
 			Title string `json:"title"`
@@ -51,7 +60,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 	}
 	if m.Method == "session/request_permission" && len(m.ID) > 0 {
 		if r == nil || r.Cancel {
-			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
+			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: b.permissionResponse("")})
 			return
 		}
 		options := map[string]string{}
@@ -72,7 +81,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 			}
 		}
 		if options["once"] == "" || options["deny"] == "" {
-			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
+			b.outgoing = append(b.outgoing, agentWrite{client: client, id: m.ID, value: b.permissionResponse("")})
 			b.failActiveLocked(r, "ACP permission lacks allow_once or reject_once")
 			return
 		}
@@ -100,11 +109,20 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 			b.failActiveLocked(r, "invalid ACP tool identity")
 			return
 		}
-		r.tools[u.ToolID] = u.Title
-		b.eventLocked(r, "tool.started", Event{"tool": u.Title, "tool_call_id": u.ToolID})
+		path := ""
+		if len(u.Places) > 0 {
+			path = u.Places[0].Path
+		}
+		name, preview := acpToolName(u.ToolKind, u.Title, path)
+		r.tools[u.ToolID] = name
+		started := Event{"tool": name, "tool_call_id": u.ToolID}
+		if preview != "" {
+			started["preview"] = preview
+		}
+		b.eventLocked(r, "tool.started", started)
 		if u.Status == "completed" || u.Status == "failed" {
 			delete(r.tools, u.ToolID)
-			b.eventLocked(r, "tool.completed", Event{"tool": u.Title, "tool_call_id": u.ToolID, "duration": 0, "error": u.Status == "failed"})
+			b.eventLocked(r, "tool.completed", Event{"tool": name, "tool_call_id": u.ToolID, "duration": 0, "error": u.Status == "failed"})
 		}
 
 	case "tool_call_update":
@@ -123,7 +141,7 @@ func (b *Bridge) incoming(client *rpcClient, m rpcMessage) {
 func (b *Bridge) cancelPermissionsLocked(r *run) {
 	for id, p := range r.permissions {
 		if r.client != nil {
-			b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: map[string]any{"outcome": map[string]string{"outcome": "cancelled"}}})
+			b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: b.permissionResponse("")})
 		}
 		delete(r.permissions, id)
 	}
@@ -147,7 +165,7 @@ func (b *Bridge) approveLocked(w http.ResponseWriter, r *run, body approvalInput
 	// Journal the accepted decision before releasing the lock so a fast agent
 	// cannot finish the run before its approval.responded event is recorded.
 	b.eventLocked(r, "approval.responded", Event{"choice": choice, "resolved": 1})
-	b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: map[string]any{"outcome": map[string]string{"outcome": "selected", "optionId": option}}})
+	b.outgoing = append(b.outgoing, agentWrite{client: r.client, id: p.id, value: b.permissionResponse(option)})
 	err := b.unlockAndSend()
 	b.mu.Lock()
 	if err != nil {
@@ -168,4 +186,33 @@ func (b *Bridge) failActiveLocked(r *run, message string) {
 	if r.client != nil {
 		b.outgoing = append(b.outgoing, agentWrite{client: r.client, kill: true})
 	}
+}
+
+// acpToolName names an ACP tool call with the Hermes tool the console already
+// reads, from the `kind` every ACP agent sends. A title is free text that
+// differs per agent (« Read /src/a.ts », a whole shell command, « web_fetch »):
+// it becomes the preview, where the console takes only what it can show
+// safely, and stays the name only when the kind says nothing. A file tool
+// previews the path of its first location, as Hermes previews a path.
+func acpToolName(kind, title, path string) (name, preview string) {
+	switch kind {
+	case "execute":
+		return "terminal", title
+	case "read":
+		return "read_file", path
+	case "edit", "delete", "move":
+		return "edit_file", path
+	case "search", "fetch":
+		lower := strings.ToLower(strings.TrimSpace(title))
+		for _, prefix := range []string{"web search", "web_search"} {
+			if strings.HasPrefix(lower, prefix) {
+				return "web_search", strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(title)[len(prefix):], ":"))
+			}
+		}
+		if kind == "search" {
+			return "search_files", title
+		}
+		return "web_extract", title
+	}
+	return title, ""
 }

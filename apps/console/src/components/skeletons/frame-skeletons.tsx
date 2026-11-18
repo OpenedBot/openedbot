@@ -8,7 +8,6 @@ import {
   RiSettings3Line,
   RiSideBarLine,
 } from "@remixicon/react";
-import { IconServerBolt } from "@tabler/icons-react";
 import { Skeleton, SkeletonListRow, SkeletonRegion, useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
 import { readBootIdentityLabel } from "../../lib/session/boot-identity";
@@ -20,7 +19,8 @@ import { useAccountLayout } from "../../lib/shell/account-layout";
 import { ConversationBodyPending, HeaderActionsSkeleton, HeaderExtrasAtRest, HeaderTitleSkeleton } from "../thread-skeleton";
 import { botIdOfPath, readBootBot } from "../../lib/session/boot-bots";
 import { RAIL_BUTTON, RAIL_DIVIDER } from "../boardui/board-rails";
-import { RailLlmQuotasLoading } from "../boardui/rail-llm-quotas";
+import { RailModelsPillLoading } from "../boardui/rail-llm-quotas";
+import { RailConnectorsPillLoading } from "../boardui/rail-connectors-pill";
 import { SettingsPage, SettingsPageSidebar } from "../boardui/settings-modal";
 import { isSettingsEntryActive, SETTINGS_GROUPS } from "../dashboard/settings-sidebar";
 import { settingsBodySkeletonFor } from "../../screens/settings/settings-skeletons";
@@ -111,23 +111,17 @@ function RailHeadSkeleton() {
 }
 
 /**
- * Variant C (`RailFooter`): the foot row of the card, the LLM quotas loading
- * (`RailLlmQuotasLoading`, the three slots the first reading fills), the
- * runtime (neutral, as during its first reading), then Settings past the
- * hairline.
+ * Variant C (`RailFooter`): the foot row of the card, the « Modèles » pill
+ * loading (`RailModelsPillLoading`, the box the first reading fills), the
+ * « Connecteurs » plug, then Settings past the hairline.
  */
 function RailFooterSkeleton() {
   const icon = `${RAIL_BUTTON} pointer-events-none`;
   return (
     <div aria-hidden data-rail-footer="" className="mt-1.5 flex shrink-0 items-center gap-1">
-      <RailLlmQuotasLoading buttonClassName={RAIL_BUTTON} />
-      <span className={icon}>
-        <IconServerBolt />
-        <span className="absolute right-1 bottom-1 inline-flex size-2.5">
-          <span className="relative size-2.5 rounded-full bg-muted-foreground/30 ring-2 ring-background-secondary-default" />
-        </span>
-      </span>
+      <RailModelsPillLoading />
       <div className="ms-auto flex shrink-0 items-center gap-1">
+        <RailConnectorsPillLoading />
         <span className={RAIL_DIVIDER} />
         <span className={icon}><RiSettings3Line /></span>
       </div>
@@ -199,7 +193,7 @@ function TopBarSkeleton({ conversation, organization, title }: {
             {/* The thread's own buttons, at the place the loaded header gives
                 them (`.hacts` of `index.html`), for a bot the last visit knows. */}
             {readBootBot(readCloudSession()?.userId, botIdOfPath(globalThis.location?.pathname ?? "")) ? (
-              <span className="absolute top-[1.375rem] right-6 flex h-8 items-center gap-1"><HeaderExtrasAtRest withFiles /></span>
+              <span className="absolute top-[1.375rem] right-6 flex h-8 items-center gap-1"><HeaderExtrasAtRest /></span>
             ) : null}
           </>
         ) : title ? (

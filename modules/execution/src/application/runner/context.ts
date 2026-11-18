@@ -77,7 +77,8 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
            rt.profile_capabilities_changed_at ->> b.hermes_profile as "profileCapabilitiesChangedAt",
            t.group_id as "groupId", t.title as "threadTitle",
            s.context as "sectionContext",
-           rt.id as "runtimeId", rt.reachability, rt.link_last_seen_at as "linkLastSeenAt",
+           rt.id as "runtimeId", rt.name as "runtimeName", rt.link_engine as "runtimeEngine",
+           rt.reachability, rt.link_last_seen_at as "linkLastSeenAt",
            rt.link_connected_at as "linkConnectedAt", rt.inventory_changed_at as "inventoryChangedAt",
            rt.toolset_epoch::text as "toolsetEpoch",
            coalesce(rt.link_features, '{}'::text[]) as "linkFeatures",
@@ -101,7 +102,8 @@ export async function readContext(db: SQL, config: WorkerConfig, claimed: Claime
       join organizations org on org.id = r.organization_id
       join threads t on t.organization_id = r.organization_id and t.id = r.thread_id
       left join bots b on b.organization_id = r.organization_id and b.id = r.bot_id
-      join runtimes rt on rt.organization_id = r.organization_id and rt.revoked_at is null and rt.is_active
+      join runtimes rt on rt.organization_id = r.organization_id and rt.revoked_at is null
+        and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active))
         -- Même prédicat de vitalité que la réclamation (queue.ts) : un lien
         -- connecteur muet depuis 45 s ne sert aucun run.
         and ((rt.reachability = 'connector' and rt.link_last_seen_at > now() - interval '45 seconds')

@@ -56,6 +56,7 @@ export function DraftModelPicker({ value, onChange }: {
 
   return (
     <ComposerModelPicker
+      catalogHost={runtime?.name ?? undefined}
       providers={catalog.data?.providers ?? []}
       selectedModel={value.model}
       effectiveModel={resolved?.model ?? null}

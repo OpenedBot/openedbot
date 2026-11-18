@@ -41,6 +41,8 @@ export const botProfileProvision = {
   stepRules: "Setting their approval rules",
   stepTools: "Plugging in their tools",
   stepsLabel: "Setting up {name}",
+  moving: "{name} is moving to {host}…",
+  movingComposer: "{name} is changing machines…",
   toolWeb: "Web",
   toolTerminal: "Terminal",
   toolFile: "Files",

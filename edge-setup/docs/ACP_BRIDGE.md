@@ -147,6 +147,14 @@ Une réponse coopérative conserve le processus partagé pour les autres session
 
 ## Statuts d'outils
 
+Le nom d'outil vient du `kind` ACP, pas du titre, qui est un texte libre propre
+à chaque agent : `execute` donne `terminal`, `read` donne `read_file`, `edit`,
+`delete` et `move` donnent `edit_file`, `search` donne `search_files`, `fetch`
+donne `web_extract`. Un titre qui commence par « Web search » donne
+`web_search`. Le titre part en `preview` (la requête seule pour `web_search`) ;
+un outil de fichier prévisualise le chemin de sa première `location`. Un autre
+`kind` garde le titre comme nom, sans `preview`.
+
 Un `tool_call` déjà `completed` ou `failed` produit immédiatement
 `tool.started` puis `tool.completed` avec la même identité. Une mise à jour
 terminale sans début connu est ignorée et incrémente

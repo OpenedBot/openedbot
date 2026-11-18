@@ -162,6 +162,7 @@ export function publicRuntime(
     management: runtimeManagement(row, adminMode),
     isDefault: row.isActive,
     isActive: row.isActive,
+    ...(row.dedicated ? { dedicated: true } : {}),
     tokenConfigured: true,
     edgeAuthConfigured: row.reachability === "direct" && !!row.edgeAuthCiphertext,
     exposure: row.reachability === "direct" ? exposure : null,

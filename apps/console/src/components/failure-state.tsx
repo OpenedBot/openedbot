@@ -373,8 +373,8 @@ type FailureToneClasses = (typeof TONES)[FailureTone];
 /**
  * The screen that gave way, full frame.
  *
- * The title is the only strong element: a sentence, on the left, at the width
- * of a thread message. The gesture comes right after. The journey, the reference
+ * The title is the only strong element: a sentence, centred in the frame
+ * (operator request of 17-11-2026). The gesture comes right after. The journey, the reference
  * and the technical line form the receipt, below. No card: the void
  * around it is the conversation that is no longer there.
  */
@@ -405,7 +405,7 @@ function FailurePage({
     <section
       role="alert"
       className={cn(
-        "flex w-full min-h-0 flex-1 flex-col items-start justify-center",
+        "flex w-full min-h-0 flex-1 flex-col items-center justify-center",
         // With an illustration the text keeps its column and the art takes
         // the right of the page on a wide screen, above the text on a phone.
         art ? "gap-8 md:flex-row-reverse md:items-center md:justify-center md:gap-16" : undefined,
@@ -414,8 +414,8 @@ function FailurePage({
       )}
     >
       {art ?? null}
-      <div className="flex w-full max-w-[26rem] flex-col items-start gap-5">
-        <div className="flex flex-col gap-3">
+      <div className="flex w-full max-w-[26rem] flex-col items-center gap-5 text-center">
+        <div className="flex flex-col items-center gap-3">
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
           <p className="max-w-[34ch] text-base leading-6 text-muted-foreground">{description}</p>
         </div>
@@ -423,16 +423,16 @@ function FailurePage({
           <div
             className={cn(
               "flex gap-2",
-              isMobile ? "w-full flex-col [&>*]:w-full" : "flex-row flex-wrap",
+              isMobile ? "w-full flex-col [&>*]:w-full" : "flex-row flex-wrap justify-center",
             )}
           >
             {action}
           </div>
         ) : null}
         {path || reference || facts.length > 0 ? (
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex flex-col items-center gap-3">
             {path ? <FailurePath shape={path.shape} label={path.label} accent={tone.accent} /> : null}
-            {reference ? <Reference value={reference} button={BUTTON.secondary} align="start" /> : null}
+            {reference ? <Reference value={reference} button={BUTTON.secondary} /> : null}
             {facts.length > 0 ? <FailureFacts facts={facts} tone={tone} /> : null}
           </div>
         ) : null}
@@ -443,7 +443,7 @@ function FailurePage({
 
 function FailureFacts({ facts, tone }: { facts: ReadonlyArray<FailureFact>; tone: FailureToneClasses }) {
   return (
-    <dl className="flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[11px] text-muted-foreground">
+    <dl className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-[11px] text-muted-foreground">
       {facts.map(({ label, value, status }) => (
         <div
           key={label}
@@ -529,20 +529,17 @@ function PathSegment({ crossed }: { crossed: boolean }) {
 function Reference({
   value,
   button,
-  align = "center",
 }: {
   value: string;
   button: string;
-  align?: "start" | "center";
 }) {
   const { t } = useFallbackT();
-  const start = align === "start";
   return (
-    <div className={cn("flex w-full flex-col gap-2 pt-1", start ? "items-start" : "items-center")}>
-      <p className={cn("max-w-[46ch] text-xs leading-5 text-muted-foreground", start ? "text-left" : "text-center")}>
+    <div className="flex w-full flex-col items-center gap-2 pt-1">
+      <p className="max-w-[46ch] text-center text-xs leading-5 text-muted-foreground">
         {t("errorState.transmit")}
       </p>
-      <div className={cn("flex max-w-full flex-wrap gap-2", start ? "items-center justify-start" : "items-center justify-center")}>
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         <code className="min-w-0 max-w-full select-all truncate rounded-md border border-border bg-surface-sunken/60 px-2.5 py-1.5 font-mono text-xs leading-5">
           {value}
         </code>

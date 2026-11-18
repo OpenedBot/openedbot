@@ -42,6 +42,7 @@ export { readBlockedTools, readToolPolicyTx } from "../sql/tool-policies";
 
 type ToolPolicyTarget = {
   profile: string | null;
+  runtimeId: string | null;
   profileManaged: boolean;
   permissionMode: BotPermissionMode;
   pipeline: string;
@@ -51,14 +52,14 @@ type ToolPolicyTarget = {
 async function readTarget(tx: TransactionDb, organizationId: string, botId: string, lock: boolean): Promise<ToolPolicyTarget> {
   const rows = lock
     ? await tx<ToolPolicyTarget[]>`
-      select b.hermes_profile as profile, b.hermes_profile_managed as "profileManaged", b.permission_mode as "permissionMode",
+      select b.hermes_profile as profile, b.runtime_id as "runtimeId", b.hermes_profile_managed as "profileManaged", b.permission_mode as "permissionMode",
              o.permission_pipeline as pipeline, b.approval_policy_effective_at as "policyEffectiveAt"
         from bots b join organizations o on o.id = b.organization_id
        where b.organization_id = ${organizationId} and b.id = ${botId} and b.deleted_at is null
        for update of b
     `
     : await tx<ToolPolicyTarget[]>`
-      select b.hermes_profile as profile, b.hermes_profile_managed as "profileManaged", b.permission_mode as "permissionMode",
+      select b.hermes_profile as profile, b.runtime_id as "runtimeId", b.hermes_profile_managed as "profileManaged", b.permission_mode as "permissionMode",
              o.permission_pipeline as pipeline, b.approval_policy_effective_at as "policyEffectiveAt"
         from bots b join organizations o on o.id = b.organization_id
        where b.organization_id = ${organizationId} and b.id = ${botId} and b.deleted_at is null
@@ -117,7 +118,7 @@ export async function setBotToolPolicies(
     });
 
     if (outcome.hostWrite && outcome.target.profile) {
-      const runtime = await deps.readRuntime(db, organizationId);
+      const runtime = await deps.readRuntime(db, organizationId, outcome.target.runtimeId ?? undefined);
       if (runtime?.linkFeatures?.includes(RELAY_FEATURE_APPROVAL_POLICY)) {
         try {
           const state = await applyHostApprovalPolicy(

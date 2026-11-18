@@ -23,7 +23,7 @@ import { assertEntitled } from "@openedbot/identity/domain/entitlement";
 import { readIdempotencyKey } from "@openedbot/conversation/application/message-ingress";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 import { readRoutines } from "@openedbot/execution/application/routines";
-import { disconnectedHostOrganizations } from "@openedbot/runtimes/application/link-vitality";
+import { disconnectedHosts } from "@openedbot/runtimes/application/link-vitality";
 import { editedClock, validatedRoutineInput } from "./routine-input";
 
 export { validatedRoutineInput };
@@ -309,9 +309,10 @@ export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variable
                  bot.autonomy_token_budget as "autonomyTokenBudget",
                  offline.organization_id is not null as "hostOffline"
             from routines r
-            left join ${disconnectedHostOrganizations(tx)} offline on offline.organization_id = r.organization_id
             left join bots bot on bot.organization_id = r.organization_id and bot.id = r.bot_id
               and bot.archived_at is null
+            left join ${disconnectedHosts(tx)} offline on offline.organization_id = r.organization_id
+              and (offline.runtime_id = bot.runtime_id or (bot.runtime_id is null and offline.is_active))
             left join bot_groups g on g.organization_id = r.organization_id and g.id = r.group_id
             join threads thread on thread.organization_id = r.organization_id
               and (

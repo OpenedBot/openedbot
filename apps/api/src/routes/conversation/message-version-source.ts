@@ -7,6 +7,7 @@ export type SourceRow = {
   threadId: string;
   threadTitle: string;
   botId: string | null;
+  runtimeId: string | null;
   botName: string | null;
   botSlug: string | null;
   messageId: string;
@@ -29,7 +30,7 @@ export async function readSource(
   const rows = lock
     ? await tx<SourceRow[]>`
         select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
+               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug", bot.runtime_id as "runtimeId",
                message.id as "messageId", message.role, message.content,
                message.author_bot_id as "authorBotId",
                coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",
@@ -48,7 +49,7 @@ export async function readSource(
       `
     : await tx<SourceRow[]>`
         select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
+               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug", bot.runtime_id as "runtimeId",
                message.id as "messageId", message.role, message.content,
                message.author_bot_id as "authorBotId",
                coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",

@@ -58,6 +58,7 @@ export type RuntimeRow = {
   lastHealthError: string | null;
   lastProbedAt: Date | null;
   isActive: boolean;
+  dedicated?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -75,7 +76,7 @@ export function readRuntimeRows(tx: Bun.TransactionSQL, organizationId: string) 
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
@@ -104,7 +105,7 @@ export function readAllRuntimeRows(tx: Bun.TransactionSQL, organizationId: strin
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
@@ -132,7 +133,7 @@ export function readRuntimeRowById(tx: Bun.TransactionSQL, organizationId: strin
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",

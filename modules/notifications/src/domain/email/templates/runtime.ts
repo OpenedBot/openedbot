@@ -75,140 +75,105 @@ export const RUNTIME_TEMPLATES = {
   },
   /**
    * Le connector d'un runtime ne joint plus openedbot depuis plusieurs minutes
-   * (`modules/runtime-link/src/application/link-alerts.ts`). Le message dit ce
-   * qui s'arrête et les deux gestes qui le réparent, sans jeton ni adresse IP.
+   * (`modules/runtime-link/src/application/link-alerts.ts`). Court : ce qui
+   * s'arrête et depuis quand ; le diagnostic vit dans les réglages, derrière
+   * le bouton. Ni jeton, ni adresse IP, ni commande.
    */
   runtime_link_down: {
     fr: (data) => {
-      const runtimeName = text(data.runtimeName) || "votre runtime";
+      const runtimeName = text(data.runtimeName) || "votre machine";
       const downSince = formatTime(text(data.downSince), "fr");
-      const reason = text(data.reason);
       const settingsUrl = text(data.settingsUrl);
       return {
-        subject: `${runtimeName} ne répond plus`,
-        preheader: "Vos bots sur cette machine ne répondent plus tant que le lien n’est pas rétabli.",
+        subject: `${runtimeName} est hors ligne`,
+        preheader: "Vos bots sur cette machine ne répondent plus.",
         blocks: [
-          { kind: "heading", text: `${runtimeName} est déconnecté` },
+          { kind: "heading", text: `${runtimeName} est hors ligne` },
           {
             kind: "paragraph",
-            text: "Le connector de cette machine ne joint plus openedbot. Les runs qui l’attendent échouent tant que le lien n’est pas rétabli.",
-          },
-          {
-            kind: "rows",
-            rows: [
-              ["Runtime", runtimeName],
-              ...(downSince ? ([["Coupé depuis", downSince]] as Array<[string, string]>) : []),
-              ...(reason ? ([["Raison", reason]] as Array<[string, string]>) : []),
-            ],
-          },
-          {
-            kind: "paragraph",
-            text: "Sur la machine, lancez « edge-setup status » puis « edge-setup doctor ». Si le lien a été refusé, réappairez-la avec un nouveau ticket depuis les réglages.",
+            text: downSince
+              ? `Depuis ${downSince}, vos bots sur cette machine ne répondent plus.`
+              : "Vos bots sur cette machine ne répondent plus.",
           },
           ...(settingsUrl
-            ? ([{ kind: "button", label: "Ouvrir les réglages du runtime", url: settingsUrl }] as EmailBlock[])
+            ? ([{ kind: "button", label: "Voir la machine", url: settingsUrl }] as EmailBlock[])
             : []),
         ],
-        footerReason: "Vous recevez ce message parce que vous avez relié ce runtime ou que vous administrez cette organisation openedbot.",
+        footerReason: "Vous recevez ce message parce que vous avez relié cette machine ou que vous administrez cette organisation openedbot.",
       };
     },
     en: (data) => {
-      const runtimeName = text(data.runtimeName) || "your runtime";
+      const runtimeName = text(data.runtimeName) || "your machine";
       const downSince = formatTime(text(data.downSince), "en");
-      const reason = text(data.reason);
       const settingsUrl = text(data.settingsUrl);
       return {
-        subject: `${runtimeName} is not responding`,
-        preheader: "Your bots on this machine stop answering until the link is back.",
+        subject: `${runtimeName} is offline`,
+        preheader: "Your bots on this machine stopped answering.",
         blocks: [
-          { kind: "heading", text: `${runtimeName} is disconnected` },
+          { kind: "heading", text: `${runtimeName} is offline` },
           {
             kind: "paragraph",
-            text: "The connector on this machine no longer reaches openedbot. Runs waiting for it fail until the link is back.",
-          },
-          {
-            kind: "rows",
-            rows: [
-              ["Runtime", runtimeName],
-              ...(downSince ? ([["Down since", downSince]] as Array<[string, string]>) : []),
-              ...(reason ? ([["Reason", reason]] as Array<[string, string]>) : []),
-            ],
-          },
-          {
-            kind: "paragraph",
-            text: "On the machine, run \"edge-setup status\" then \"edge-setup doctor\". If the link was refused, pair it again with a new ticket from the settings.",
+            text: downSince
+              ? `Since ${downSince}, your bots on this machine have stopped answering.`
+              : "Your bots on this machine have stopped answering.",
           },
           ...(settingsUrl
-            ? ([{ kind: "button", label: "Open runtime settings", url: settingsUrl }] as EmailBlock[])
+            ? ([{ kind: "button", label: "View the machine", url: settingsUrl }] as EmailBlock[])
             : []),
         ],
-        footerReason: "You are getting this message because you linked this runtime or administer this openedbot organization.",
+        footerReason: "You are getting this message because you linked this machine or administer this openedbot organization.",
       };
     },
   },
   /**
    * Le connector d'un runtime signalé par `runtime_link_down` a rejoint openedbot
    * (`modules/runtime-link/src/application/link-alerts.ts`) : les mêmes
-   * destinataires apprennent que c'est revenu, sans avoir à surveiller la
-   * console. Jamais envoyé pour une révocation ou une suppression.
+   * destinataires apprennent que c'est revenu, en une phrase. Jamais envoyé
+   * pour une révocation ou une suppression.
    */
   runtime_link_restored: {
     fr: (data) => {
-      const runtimeName = text(data.runtimeName) || "votre runtime";
-      const downSince = formatTime(text(data.downSince), "fr");
+      const runtimeName = text(data.runtimeName) || "votre machine";
       const restoredAt = formatTime(text(data.restoredAt), "fr");
       const settingsUrl = text(data.settingsUrl);
       return {
-        subject: `${runtimeName} est de nouveau connecté`,
+        subject: `${runtimeName} est de retour`,
         preheader: "Vos bots sur cette machine répondent de nouveau.",
         blocks: [
           { kind: "heading", text: `${runtimeName} est de retour` },
           {
             kind: "paragraph",
-            text: "Le connector de cette machine a rejoint openedbot : vos bots répondent de nouveau. Les runs qui ont échoué pendant la coupure ne repartent pas d’eux-mêmes ; relancez-les depuis leur conversation si besoin.",
-          },
-          {
-            kind: "rows",
-            rows: [
-              ["Runtime", runtimeName],
-              ...(downSince ? ([["Coupé depuis", downSince]] as Array<[string, string]>) : []),
-              ...(restoredAt ? ([["Rétabli à", restoredAt]] as Array<[string, string]>) : []),
-            ],
+            text: restoredAt
+              ? `Depuis ${restoredAt}, vos bots sur cette machine répondent de nouveau.`
+              : "Vos bots sur cette machine répondent de nouveau.",
           },
           ...(settingsUrl
-            ? ([{ kind: "button", label: "Ouvrir les réglages du runtime", url: settingsUrl }] as EmailBlock[])
+            ? ([{ kind: "button", label: "Voir la machine", url: settingsUrl }] as EmailBlock[])
             : []),
         ],
-        footerReason: "Vous recevez ce message parce que vous avez été prévenu de la coupure de ce runtime.",
+        footerReason: "Vous recevez ce message parce que vous avez été prévenu de la coupure de cette machine.",
       };
     },
     en: (data) => {
-      const runtimeName = text(data.runtimeName) || "your runtime";
-      const downSince = formatTime(text(data.downSince), "en");
+      const runtimeName = text(data.runtimeName) || "your machine";
       const restoredAt = formatTime(text(data.restoredAt), "en");
       const settingsUrl = text(data.settingsUrl);
       return {
-        subject: `${runtimeName} is connected again`,
+        subject: `${runtimeName} is back`,
         preheader: "Your bots on this machine answer again.",
         blocks: [
           { kind: "heading", text: `${runtimeName} is back` },
           {
             kind: "paragraph",
-            text: "The connector on this machine reached openedbot again: your bots answer again. Runs that failed during the outage do not restart by themselves; run them again from their conversation if needed.",
-          },
-          {
-            kind: "rows",
-            rows: [
-              ["Runtime", runtimeName],
-              ...(downSince ? ([["Down since", downSince]] as Array<[string, string]>) : []),
-              ...(restoredAt ? ([["Back at", restoredAt]] as Array<[string, string]>) : []),
-            ],
+            text: restoredAt
+              ? `Since ${restoredAt}, your bots on this machine answer again.`
+              : "Your bots on this machine answer again.",
           },
           ...(settingsUrl
-            ? ([{ kind: "button", label: "Open runtime settings", url: settingsUrl }] as EmailBlock[])
+            ? ([{ kind: "button", label: "View the machine", url: settingsUrl }] as EmailBlock[])
             : []),
         ],
-        footerReason: "You are getting this message because you were told this runtime was down.",
+        footerReason: "You are getting this message because you were told this machine was down.",
       };
     },
   },

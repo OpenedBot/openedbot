@@ -3,7 +3,8 @@ import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { hashCredential, randomCredential } from "@openedbot/platform-db/credential";
-import { consumeRuntimeEnrollment } from "@openedbot/runtimes/application/runtime-enrollment";
+import { claimMachineEnrollment, consumeRuntimeEnrollment } from "@openedbot/runtimes/application/runtime-enrollment";
+import { isLocalEngine, LOCAL_ENGINES } from "@openedbot/contracts-api";
 import { insertConnectorRuntime } from "@openedbot/runtimes/application/runtime-link-rows";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtime-probe";
@@ -44,7 +45,10 @@ export async function enrollConnectorRuntime(
     // avant qu'un autre remplaçant soit déclaré.
     await lockRuntimeDeclarations(tx, organizationId);
     const existing = await readAllRuntimeRows(tx, organizationId);
-    let { active, retireId } = enrolledRuntimeActivation(existing);
+    const shared = existing.filter((row) => !row.dedicated);
+    let { active, retireId } = enrollment.dedicated
+      ? { active: false, retireId: null }
+      : enrolledRuntimeActivation(shared);
     if (retireId) {
       // Le WHERE rejoue la condition : un lien rouvert entre la lecture et
       // l'écriture n'est pas retiré, et le nouveau runtime reste en attente
@@ -62,7 +66,7 @@ export async function enrollConnectorRuntime(
     }
     // Une organisation n'a qu'un runtime : un remplaçant de plus ne s'ajoute
     // pas à celui qui attend déjà. Le rollback laisse le ticket intact.
-    if (!active && existing.some((row) => !row.isActive)) {
+    if (!enrollment.dedicated && !active && shared.some((row) => !row.isActive)) {
       throw new HttpError(409, "RUNTIME_REPLACEMENT_PENDING", "Un runtime attend déjà de remplacer l’actuel : terminez ce remplacement ou retirez-le d’abord.");
     }
     // La clé device annoncée dans `hello` est enregistrée avec le runtime :
@@ -70,17 +74,24 @@ export async function enrollConnectorRuntime(
     await insertConnectorRuntime(tx, {
       runtimeId,
       organizationId,
-      name: enrollment.runtimeName,
+      // A machine ticket names each engine's runtime: « ubuntu-server · Grok ».
+      name: enrollment.dedicated && isLocalEngine(enrollment.engine)
+        ? `${enrollment.runtimeName} · ${LOCAL_ENGINES[enrollment.engine].label}`
+        : enrollment.runtimeName,
       tokenHash,
       instanceId: context.instanceId,
       features: connection.features,
       capacity,
       active,
+      dedicated: enrollment.dedicated ?? false,
       devicePublicKey: connection.devicePublicKey,
     });
     // Le secret est effacé en même temps que l'enrôlement est consommé : la
     // ligne reste pour l'audit, mais plus rien ne la rouvre.
-    const burned = await consumeRuntimeEnrollment(tx, { enrollmentId: enrollment.id, organizationId, runtimeId });
+    const burned = enrollment.dedicated
+      ? isLocalEngine(enrollment.engine)
+        && await claimMachineEnrollment(tx, { enrollmentId: enrollment.id, organizationId, runtimeId, engine: enrollment.engine })
+      : await consumeRuntimeEnrollment(tx, { enrollmentId: enrollment.id, organizationId, runtimeId });
     if (!burned) {
       throw new HttpError(409, "ENROLLMENT_CONSUMED", "Cet enrôlement a déjà été utilisé.");
     }

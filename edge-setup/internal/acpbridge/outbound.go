@@ -54,6 +54,8 @@ func (b *Bridge) unlockAndSend() error {
 				write.client.kill()
 			case write.rpcError != nil:
 				err = write.client.write(ctx, rpcMessage{JSONRPC: "2.0", ID: write.id, Error: write.rpcError})
+			case write.method == "turn/interrupt":
+				err = write.client.requestWithoutWaiting(ctx, write.method, write.value)
 			case write.method != "":
 				err = write.client.notify(ctx, write.method, write.value)
 			default:

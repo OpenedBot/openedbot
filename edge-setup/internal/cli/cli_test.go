@@ -44,7 +44,7 @@ func TestVersionNameFollowsTheInvokedFileName(t *testing.T) {
 }
 
 func TestElevationOnlyForRootCommands(t *testing.T) {
-	for _, free := range []string{"help", "version", "self-verify", "internal"} {
+	for _, free := range []string{"help", "version", "self-verify", "internal", "connect"} {
 		if NeedsRoot(free) {
 			t.Errorf("%s must run without root", free)
 		}

@@ -62,7 +62,7 @@ function fileNameOf(preview: string): string | null {
 /**
  * What a running tool is doing, as one short line for the live status:
  * « Recherche : cours du bitcoin » for `web_search` (the query), « Lecture :
- * lemonde.fr » for `web_extract` (the host), « Écrit note.txt » for
+ * lemonde.fr » for a web tool such as `web_extract` (the host), « Écrit note.txt » for
  * `write_file` (the file name), « Délègue : Chercheur web » for a delegation
  * (its task, under the search rule). Every other tool, and every tool whose
  * preview does not hold a safe field, gets the translated family verb
@@ -82,7 +82,7 @@ export function toolProgressLabel(t: Translate, tool: string, preview?: string |
     } else if (kind === "delegate") {
       const task = delegateTask(text);
       if (task) return t("agentActivity.progressDelegate", { task });
-    } else if (bare === "web_extract" || bare === "http" || bare.startsWith("browser_")) {
+    } else if (kind === "web") {
       const site = siteOf(text);
       if (site) return t("agentActivity.progressWeb", { site });
     } else if (bare === "read_file" || bare === "cat") {

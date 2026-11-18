@@ -72,7 +72,10 @@ export function Popover({ trigger, children, align = "end", side = "bottom", wid
       close()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close()
+      if (e.key !== "Escape") return
+      close()
+      // Focus may be inside the panel, which unmounts: hand it back to the trigger.
+      anchorRef.current?.focus()
     }
     document.addEventListener("mousedown", onDoc)
     document.addEventListener("keydown", onKey)

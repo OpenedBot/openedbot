@@ -11,7 +11,7 @@ import type { ApiConfig } from "../../infrastructure/config";
 import type { Db } from "@openedbot/platform-db";
 import { withTenant } from "@openedbot/platform-db";
 import { assertLinkReachable, runtimeClientConfig } from "@openedbot/runtimes/application/runtime-access";
-import { readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
+import { readRuntimeRowById } from "@openedbot/runtimes/application/runtime-rows";
 import { requireOperator, type AppVariables } from "../identity/auth";
 import { HttpError } from "../../interfaces/http/http-error";
 import { runtimeLinks, type RuntimeLinks } from "@openedbot/runtime-link/application/dialer";
@@ -102,8 +102,7 @@ export function runtimeModelContextRoutes(
     }
     const observedAt = now();
     const row = await withTenant(db, auth.organizationId, async (tx) => {
-      const rows = await readRuntimeRows(tx, auth.organizationId);
-      return rows.find((candidate) => candidate.id === runtimeId) ?? null;
+      return (await readRuntimeRowById(tx, auth.organizationId, runtimeId))[0] ?? null;
     });
     if (!row) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
     // The column can stay NULL after a sweep while the socket is

@@ -100,7 +100,7 @@ endif
 .PHONY: help help-all
 
 # Les cibles du quotidien, par mode ; toutes les autres restent dans help-all.
-HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down db-migrate db-pending db-reset-keep-users
+HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down connect-dev-build db-migrate db-pending db-reset-keep-users
 # Les fragments privés (plugins/make/*.mk, en fin de fichier) y ajoutent leurs cibles.
 HELP_PREPROD :=
 HELP_PROD    := link-prod
@@ -354,6 +354,15 @@ link-dev-verify: ## [DEV] Browser pass of /settings/runtime in a throwaway Chrom
 link-gateway-install: ## [HERMES] Installs the systemd user service without starting it or enabling it at boot.
 	@bun scripts/runtime-link-service.ts --install
 
+# ─── Dev: local agents ───────────────────────────────────────────────────────
+.PHONY: connect-dev-build
+
+connect-dev-build: ## [AGENTS] Builds edge-setup at edge-setup/dist/edge-setup, for `edge-setup connect` (Codex, Claude Code, Grok, Gemini, OpenCode).
+	@$(MAKE) --no-print-directory -C edge-setup build
+	@printf '%b[make]%b Binaire local prêt. Depuis la racine du dépôt :\n' '$(C_OK)' '$(C_RESET)'
+	@printf '%s\n' 'export PATH="$$PWD/edge-setup/dist:$$PATH"'
+	@printf '%b[make]%b Agents trouvés sans rien appairer : %bedge-setup connect --probe%b. La commande d’appairage vient de Réglages, « Connecter les agents d’une machine ».\n' '$(C_OK)' '$(C_RESET)' '$(C_TARGET)' '$(C_RESET)'
+
 # ─── Quality ─────────────────────────────────────────────────────────────────
 .PHONY: typecheck deps-check license-check test-unit test-dual solo-check pro-check bundle-budget test-integration test-trace-legacy test check
 
@@ -564,6 +573,8 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/run-stop-cause.ts
 	bun tests/integration/engine-run-contract.ts
 	bun tests/integration/engine-profile-contract.ts
+	# Bots on a dedicated machine: machine ticket (one place per agent), moving a bot between machines.
+	bun tests/integration/engine-profile-contract.ts --assigned-runtime
 	# S7 : un run suivi de bout en bout par un seul trace-id (API, worker, passerelle, connecteur Go réel, Hermes) ; exige go.
 	bun tests/integration/run-trace-correlation.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.

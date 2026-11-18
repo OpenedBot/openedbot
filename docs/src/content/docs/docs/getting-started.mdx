@@ -27,9 +27,34 @@ needed for another openedbot origin.
 If that origin does not respond, installation and `upgrade` fail without
 installing anything, with no fallback to GitHub.
 
+## Use the agents on your machine
+
+One command connects every agent CLI installed under your account: Codex,
+Claude Code, Grok, Gemini CLI and OpenCode. Sign in to each CLI first. On
+Linux or macOS, install the standalone `edge-setup` binary. In
+**Installation → Machines**, choose **Ajouter une machine**, then
+**Connecter les agents d’une machine**. From the working directory, run the
+displayed `edge-setup connect` command and enter the ticket at the prompt.
+
+The command lists what it finds and pairs each agent with the same ticket.
+When Claude Code is installed, it also installs its ACP adapter
+(`@agentclientprotocol/claude-agent-acp`) with Bun. It then starts a user
+service (`systemd --user` on Linux, a LaunchAgent on macOS) that keeps the
+agents connected after you log out or reboot. Hermes is not installed by this
+command: `sudo edge-setup up` does it on a server. To list the agents without
+pairing anything, run `edge-setup connect --probe`.
+
+In the desktop app, choose **Ajouter cet ordinateur** and select the working
+directory. Closing the window leaves the agents connected. Quitting the app or
+choosing **Arrêter les agents de cet ordinateur** disconnects them.
+
+When creating a bot, select its **Execution host**: each agent of each
+machine is listed, such as « ubuntu-server · Grok ». In the conversation, the
+composer offers that agent's own models and efforts.
+
 <Aside type="note" title="No sudo to type">
 `up` and `upgrade` create the `/usr/local/bin/edge-setup` link. Only
-`version`, `help` and `self-verify` run as is; any other command started
+`version`, `help`, `self-verify` and `connect` run as is. Any other command started
 as non-root re-executes itself through `sudo` (stdin preserved).
 `EDGE_SETUP_NO_SUDO=1` disables this; without `sudo` installed → "must run as
 root" (code 77). The examples write `sudo` only for the first commands,

@@ -89,7 +89,7 @@ export async function reconcileHostApprovalPolicies(
            b.approval_policy_mode, b.approval_policy_effective_at
       from bots b
       join organizations o on o.id = b.organization_id
-      join runtimes rt on rt.organization_id = b.organization_id and rt.is_active and rt.revoked_at is null
+      join runtimes rt on rt.organization_id = b.organization_id and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active)) and rt.revoked_at is null
      where b.hermes_profile_managed
        and b.hermes_profile is not null
        and b.deleted_at is null

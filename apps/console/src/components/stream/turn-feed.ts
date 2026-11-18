@@ -1,6 +1,6 @@
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
-import { isWebSearchTool, type WebSearchQuery } from "@openedbot/execution/domain/agent-web-search";
-import { toolKind, type ToolCall } from "@openedbot/conversation/domain/thread-tools";
+import type { WebSearchQuery } from "@openedbot/execution/domain/agent-web-search";
+import { toolKind, toolService, type ToolCall } from "@openedbot/conversation/domain/thread-tools";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import type { Entry } from "../../lib/thread/thread-timeline-model";
 import { searchQuery, toolProgressLabel } from "../../lib/run/tool-progress-label";
@@ -141,7 +141,9 @@ export function turnFeed(members: readonly Entry[], t: Translate, speaker: Strea
         items.push(searchItem(id, query, !call.done));
         return;
       }
-      if (isWebSearchTool(call.tool) && !call.failed) {
+      // A web search, Hermes's or an ACP agent's (« Web search: … »); an MCP
+      // `search` is the service's own and keeps its result as a tool row.
+      if (toolService(call.tool) === null && toolKind(call.tool) === "search" && !call.failed) {
         // The masked terms (`searchQuery`), never the raw preview.
         const terms = call.preview ? searchQuery(call.preview) : null;
         items.push({ id, kind: "search", query: terms ?? toolProgressLabel(t, call.tool, call.preview), results: 0, sites: [], pending: !call.done });

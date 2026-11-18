@@ -79,6 +79,7 @@ function EffortLabelStack({ effort, className }: { effort: HermesReasoningEffort
 /** The panel's content: shared by the chip's popover and the mobile sheet. */
 export function EffortPanel({
   effort,
+  efforts,
   supportsEffort,
   saving,
   fast,
@@ -89,6 +90,8 @@ export function EffortPanel({
 }: {
   /** `null`: the runtime decides (« Par défaut »). */
   effort: HermesReasoningEffort | null;
+  /** The model's own efforts, when its host lists them; absent: every Hermes level. */
+  efforts?: readonly HermesReasoningEffort[];
   supportsEffort: boolean;
   saving: boolean;
   fast?: FastModeControl;
@@ -163,6 +166,7 @@ export function EffortPanel({
           look={look}
           showTitle={false}
           value={effort ?? DEFAULT_REASONING_EFFORT}
+          efforts={efforts}
           explicit={effort !== null}
           disabled={saving || !supportsEffort}
           onChange={onEffortChange}

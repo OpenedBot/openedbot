@@ -28,6 +28,8 @@ export type RuntimeModelDto = {
   id: string;
   fast: boolean;
   reasoning: boolean;
+  /** The efforts the model accepts, when the host lists them (local Codex); absent: all of them. */
+  efforts?: HermesReasoningEffort[];
   isRuntimeDefault: boolean;
   freeTier: { tokensPerDay: number | null } | null;
 };

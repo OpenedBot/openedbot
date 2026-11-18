@@ -338,7 +338,9 @@ export async function executeExecutionCommand(db: SQL, command: ExecutionCommand
       return await settleBeforeRun({ status: "failed", errorCode: TARGET_REFUSALS[target.kind] });
     }
     const runtime = await runtimeRow();
-    if (!runtime?.isActive) return await settleBeforeRun({ status: "failed", errorCode: "RUNTIME_REQUIRED" });
+    if (!runtime || (target.speaker.runtimeId ? target.speaker.runtimeId !== runtime.id : !runtime.isActive)) {
+      return await settleBeforeRun({ status: "failed", errorCode: "RUNTIME_REQUIRED" });
+    }
     let client: CommandHermes;
     try {
       client = clientFor(runtime, target.speaker.profile);

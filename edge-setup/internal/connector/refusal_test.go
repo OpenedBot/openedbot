@@ -3,13 +3,40 @@ package connector
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/coder/websocket"
 )
+
+func TestInteractiveLinkStopsOnlyWhenBrokerRejectsItsCredential(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		c := New("ws://127.0.0.1:1/api/runtime-links/ws", Auth{}, "", "", nil)
+		c.StopOnInvalidCredential = true
+		dials := 0
+		c.Dial = func(context.Context, string, *websocket.DialOptions) (*websocket.Conn, *http.Response, error) {
+			dials++
+			body := "Access proxy refused"
+			if dials == 2 {
+				body = `{"error":{"code":"LINK_AUTH_INVALID"}}`
+			}
+			if dials > 2 {
+				cancel()
+			}
+			return nil, &http.Response{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(body))},
+				errors.New("upgrade refused")
+		}
+		if err := c.Run(ctx); !errors.Is(err, ErrLinkCredentialInvalid) || dials != 2 {
+			t.Fatalf("want explicit credential refusal after the proxy response, got %v after %d dials", err, dials)
+		}
+	})
+}
 
 // A refused link does not heal by knocking fast, but a refusal caused on the
 // openedbot side does heal: past MaxLinkRefusals the link is reported

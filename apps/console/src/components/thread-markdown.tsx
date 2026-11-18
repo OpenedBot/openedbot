@@ -542,7 +542,9 @@ const wells: Pick<Components, "pre" | "table" | "a"> = {
   a: MarkdownLink,
   table: carryingClassName(({ children }: { children?: ReactNode; className?: string }) => (
     <div data-md-table="" className="scrollbar-subtle my-2 overflow-x-auto rounded-lg border border-border/50">
-      <table className="w-full text-sm">{children}</table>
+      {/* `wrap-break-word`: the prose's `wrap-anywhere` would let auto layout
+          size a column to one letter (« Ann/once »); a word too long scrolls. */}
+      <table className="w-full text-sm wrap-break-word">{children}</table>
     </div>
   )),
 };

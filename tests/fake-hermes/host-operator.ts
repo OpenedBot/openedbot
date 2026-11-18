@@ -583,6 +583,12 @@ export function createFakeHost(options: FakeHostOptions = {}): FakeHost {
       const body = await readBody(request) ?? {};
       const name = String(body.name ?? "");
       if (!PROFILE_SLUG.test(name) || name === "default") return refuse(400, "PROFILE_INVALID", "Invalid profile");
+      // As the real ACP host (`edge-setup/internal/operator/acp.go`), the body
+      // before the name's presence: its model comes with each run, so a model
+      // at creation is refused.
+      if (options.profileManagementOnly && (body.provider !== undefined || body.model !== undefined || body.bundledSkills === true)) {
+        return refuse(400, "BODY_INVALID", "ACP does not support model or bundled skill selection");
+      }
       if (profiles.has(name)) return refuse(409, "PROFILE_EXISTS", "Existing profile");
       // A profile clones the root config (toolsets) and the bundled skills;
       // `memory` is on, as on a profile `edge-setup` isolates.

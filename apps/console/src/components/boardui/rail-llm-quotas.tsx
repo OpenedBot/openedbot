@@ -1,12 +1,13 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ProviderUsageSnapshotDto, ProviderUsageWindowDto } from "@openedbot/contracts-api";
-import { Tooltip, TooltipContent, TooltipTrigger, cn, syncPulse } from "@openedbot/browser-ui-kit";
+import { Popover, Tooltip, TooltipContent, TooltipTrigger, cn, syncPulse } from "@openedbot/browser-ui-kit";
 import { useT } from "../../lib/i18n";
-import { useOpenSettings } from "../../lib/shell/settings-overlay";
+import type { RuntimeHealthReading } from "../../lib/runtime/use-runtime-health";
 import { BRAND_MARKS, type BrandMarkKey } from "../brand-marks";
 import { ProviderLimitsDialog } from "../dashboard/provider-limits-card";
 import { useProviderLimits, type ProviderLimits } from "../dashboard/provider-limits-panel";
 import { elapsedMinutes, resetLabel, statusMessage } from "../dashboard/provider-limits-parts";
+import { RailRuntimeDot, RailRuntimeHealth, railRuntimeIcon, railRuntimeLines, railRuntimeState } from "./rail-runtime-health";
 
 type Translate = ReturnType<typeof useT>["t"];
 
@@ -155,15 +156,36 @@ function QuotaMark({ family }: { family: RailQuotaFamily }) {
   );
 }
 
+
 /**
- * The three logos' place before the first reading: a faded logo in a
- * neutral track that pulses, inert and silent (no state to announce yet).
+ * A pill of the rail's foot row: the rail's 36 px pitch, no label (its name is
+ * the tooltip and the accessible name), so « Modèles » and « Connecteurs »
+ * share one row with Settings (operator request of 17-11-2026).
  */
-export function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: string }) {
+export const RAIL_PILL = "relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border-button-default text-foreground";
+
+/** The models pill's padding: 4 px around a 28 px ring, room for the dot. */
+const MODELS_PILL = cn(RAIL_PILL, "ps-1 pe-2.5");
+
+/**
+ * Hovered, a pill grows a little: a transform, so its neighbours do not move.
+ * Pressed, it settles back.
+ */
+export const RAIL_PILL_BUTTON = cn(
+  "cursor-pointer outline-none transition-[transform,background-color] duration-200 ease-out hover:scale-[1.06] hover:bg-board-row-hover active:scale-100 focus-visible:ring-2 focus-visible:ring-border-focus-ring aria-expanded:bg-board-row-hover motion-reduce:transition-none motion-reduce:hover:scale-100",
+  // 44 pt to the finger on a coarse pointer.
+  "pointer-coarse:before:absolute pointer-coarse:before:-inset-1 pointer-coarse:before:rounded-[inherit] pointer-coarse:before:content-['']",
+);
+
+/** One row of the popover: a mark, then its sentences. */
+export const POPOVER_ROW = "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-start text-body-2-regular text-foreground outline-none transition-colors duration-150 hover:bg-board-row-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring motion-reduce:transition-none";
+
+/** The three marks before the first reading: a faded logo in a neutral track that pulses, inert and silent. */
+function QuotaMarksLoading() {
   return (
-    <div aria-hidden data-rail-llm-quotas="loading" className="flex shrink-0 items-center gap-1">
+    <span aria-hidden data-rail-llm-quotas="loading" className="flex items-center">
       {RAIL_QUOTA_FAMILIES.map((family) => (
-        <span key={family.key} data-rail-quota={family.key} data-rail-quota-state="loading" className={cn(buttonClassName, "pointer-events-none")}>
+        <span key={family.key} data-rail-quota={family.key} data-rail-quota-state="loading" className="inline-flex">
           {/* `syncPulse`: same beat as the boot silhouette it replaces. */}
           <span ref={syncPulse} className="relative inline-flex size-7 items-center justify-center motion-safe:animate-pulse">
             <svg viewBox="0 0 28 28" className="absolute inset-0 size-7 overflow-visible">
@@ -175,103 +197,169 @@ export function RailLlmQuotasLoading({ buttonClassName }: { buttonClassName: str
           </span>
         </span>
       ))}
-    </div>
+    </span>
   );
 }
 
 /**
- * The remaining LLM quota at GPT, Anthropic and Grok, just above the runtime
- * in the rail: the three logos, stacked in this order, each in a
- * ring filled with what remains on the account's window furthest spent.
- * Each logo has its tooltip (and the same text for the accessible name); a click
- * opens the full reading, or the model settings for a family with no
- * account connected.
- *
- * The same read, cached, as the composer's tab (`useProviderLimits`):
- * no extra request. Nothing for a member (quotas are read by
- * owners and admins). Until the first reading (the role, the runtime, the
- * catalogue, then the quotas; and the host probe after an API restart), the
- * three logos hold their place (`RailLlmQuotasLoading`): they neither vanish
- * nor pop up above the runtime.
+ * The pill before the role is known, also drawn by the frame skeleton
+ * (`RailFooterSkeleton`): the same box as the live pill, so nothing moves
+ * when the reading lands.
  */
-export function RailLlmQuotas({ buttonClassName }: { buttonClassName: string }) {
-  const { t } = useT();
-  const openSettings = useOpenSettings();
-  const [open, setOpen] = useState(false);
-  /*
-    The modal returns focus to the logo that opened it, and the Radix tooltip
-    opens on any focus that does not come from a click: it reappeared on
-    close. That return focus is swallowed once; hovering the logo
-    lifts the rule, and the tooltip comes back on hover.
-  */
-  const swallowFocusRef = useRef(false);
-  const limits = useProviderLimits(open);
+export function RailModelsPillLoading() {
+  return (
+    <span aria-hidden data-rail-models-pill="loading" className={MODELS_PILL}>
+      <QuotaMarksLoading />
+      <RailRuntimeDot state="pending" />
+    </span>
+  );
+}
+
+/**
+ * « Modèles » at the foot of the conversations card, one pill: the GPT,
+ * Anthropic and Grok logos side by side, each in a ring filled with what
+ * remains on the account's window furthest spent, then the runtime's health
+ * as a dot (operator request of 17-11-2026, after a « Connectors » pill).
+ * A click opens a popover: one row per family (the full reading, or the model
+ * settings for a family with no account connected), then the runtime row.
+ *
+ * The same read, cached, as the composer's tab (`useProviderLimits`): no
+ * extra request. No logo for a member (quotas are read by owners and admins),
+ * nor when none of the three families is connected: the pill then shows the
+ * runtime's own icon before its dot. Until the first reading (the role, the runtime, the
+ * catalogue, then the quotas; and the host probe after an API restart), the
+ * three logos hold their place: they neither vanish nor pop up.
+ */
+export function RailModelsPill({ runtime, onOpenSettings }: { runtime: RuntimeHealthReading; onOpenSettings: (to: string) => void }) {
+  const { t, formatDate, locale } = useT();
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const limits = useProviderLimits(limitsOpen);
+  const pillRef = useRef<HTMLButtonElement | null>(null);
+  // The ui-kit popover leaves focus where it was: the panel takes it, so the keyboard
+  // lands on the rows. Stable, so a re-render (a new reading) does not pull focus back.
+  const focusFirstRow = useCallback((node: HTMLDivElement | null) => node?.querySelector("button")?.focus(), []);
+
   // The frame opens before `/api/auth/me` answers (`lib/session/app-access-hint.ts`):
-  // an unknown role keeps the slots of the boot silhouette, it does not empty them.
-  if (limits.authPending) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
-  if (!limits.canView) return null;
-  if (limits.runtimePending || (limits.runtimeId !== null && limits.pending)) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
-  if (limits.runtimeId === null) return null;
-  const families = railQuotaFamilies(limits);
-  const broken = limits.readFailed || limits.status === "error" || limits.status === "disconnected";
-  if (!broken && families.every((family) => family.reading.state === "off")) return null;
-  // The API has no reading yet and probes the host (its cache is per process,
-  // empty after a restart): a reading on its way is not « indisponible ».
-  // An open reading stays open.
-  if (limits.status === "loading" && !open) return <RailLlmQuotasLoading buttonClassName={buttonClassName} />;
-  const context = railQuotaContext(limits, t);
+  // an unknown role keeps the three slots, and the runtime stays reachable.
+  let families: RailQuotaFamily[] | "loading" | null = null;
+  if (limits.authPending) families = "loading";
+  else if (limits.canView) {
+    if (limits.runtimePending || (limits.runtimeId !== null && limits.pending)) families = "loading";
+    else if (limits.runtimeId !== null) {
+      const read = railQuotaFamilies(limits);
+      const broken = limits.readFailed || limits.status === "error" || limits.status === "disconnected";
+      if (broken || read.some((family) => family.reading.state !== "off")) {
+        // The API has no reading yet and probes the host (its cache is per process,
+        // empty after a restart): a reading on its way is not « indisponible ».
+        // An open reading stays open.
+        families = limits.status === "loading" && !limitsOpen ? "loading" : read;
+      }
+    }
+  }
+  const context = Array.isArray(families) ? railQuotaContext(limits, t) : [];
+  const runtimeState = railRuntimeState(runtime);
+  const RuntimeIcon = railRuntimeIcon(runtime.runtime);
+  const label = t("railQuotas.pill");
+  const summary = [
+    label,
+    ...(Array.isArray(families) ? families.map((family) => railQuotaLine(family, t)) : []),
+    ...railRuntimeLines(runtime, t, formatDate, locale),
+  ].join(" ");
+
   return (
     <>
-      <div role="group" aria-label={t("railQuotas.title")} data-rail-llm-quotas="" className="flex shrink-0 items-center gap-1">
-        {families.map((family) => {
-          const line = railQuotaLine(family, t);
-          const off = family.reading.state === "off";
-          return (
-            <Tooltip key={family.key}>
-              <TooltipTrigger
-                asChild
-                onFocus={(event) => {
-                  if (!swallowFocusRef.current) return;
-                  swallowFocusRef.current = false;
-                  event.preventDefault();
+      <Popover
+        side="top"
+        align="start"
+        width={300}
+        className="p-1.5"
+        trigger={({ ref, onClick, "aria-expanded": expanded }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                ref={(node) => {
+                  ref(node);
+                  pillRef.current = node;
                 }}
-                onPointerMove={() => { swallowFocusRef.current = false; }}
+                type="button"
+                data-rail-models-pill=""
+                aria-haspopup="dialog"
+                aria-expanded={expanded}
+                aria-label={summary}
+                className={cn(MODELS_PILL, RAIL_PILL_BUTTON)}
+                onClick={onClick}
               >
-                <button
-                  type="button"
-                  data-rail-quota={family.key}
-                  data-rail-quota-state={family.reading.state}
-                  aria-haspopup={off ? undefined : "dialog"}
-                  aria-label={[line, ...context].join(" ")}
-                  // The rail's pitch (36 px); 44 pt to the finger on a coarse pointer.
-                  className={cn(
-                    buttonClassName,
-                    "pointer-coarse:before:absolute pointer-coarse:before:-inset-1 pointer-coarse:before:rounded-[inherit] pointer-coarse:before:content-['']",
-                  )}
-                  onClick={() => (off ? openSettings("/settings/models") : setOpen(true))}
-                >
-                  <QuotaMark family={family} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-72">
-                {/* One row per piece of information: the tooltip content lays out as a row by default. */}
-                <div className="flex flex-col gap-0.5">
-                  <p className="font-medium">{line}</p>
-                  {context.map((item) => <p key={item}>{item}</p>)}
+                {families === "loading" ? <QuotaMarksLoading /> : Array.isArray(families) ? (
+                  <span aria-hidden data-rail-llm-quotas="" className="flex items-center">
+                    {families.map((family) => (
+                      <span key={family.key} data-rail-quota={family.key} data-rail-quota-state={family.reading.state} className="inline-flex">
+                        <QuotaMark family={family} />
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span aria-hidden className="inline-flex size-7 items-center justify-center text-foreground-icon-secondary">
+                    <RuntimeIcon className="size-[18px]" />
+                  </span>
+                )}
+                <RailRuntimeDot state={runtimeState} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{label}</TooltipContent>
+          </Tooltip>
+        )}
+      >
+        {(close) => (
+          <div ref={focusFirstRow} className="flex flex-col">
+            {Array.isArray(families) ? (
+              <>
+                <div role="group" aria-label={t("railQuotas.title")} className="flex flex-col">
+                  {families.map((family) => {
+                    const line = railQuotaLine(family, t);
+                    const off = family.reading.state === "off";
+                    return (
+                      <button
+                        key={family.key}
+                        type="button"
+                        data-rail-quota={family.key}
+                        data-rail-quota-state={family.reading.state}
+                        aria-haspopup={off ? undefined : "dialog"}
+                        aria-label={[line, ...context].join(" ")}
+                        className={POPOVER_ROW}
+                        onClick={() => {
+                          close();
+                          if (off) onOpenSettings("/settings/models");
+                          else {
+                            // The modal gives focus back to what held it: the pill, not this row, which unmounts.
+                            pillRef.current?.focus();
+                            setLimitsOpen(true);
+                          }
+                        }}
+                      >
+                        <QuotaMark family={family} />
+                        <span className="min-w-0">{line}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
-      <ProviderLimitsDialog
-        open={open}
-        onClose={() => {
-          swallowFocusRef.current = true;
-          setOpen(false);
-        }}
-        limits={limits}
-      />
+                {context.length > 0 ? (
+                  <p className="px-2 pt-0.5 pb-1.5 text-caption-1-regular text-text-tertiary">{context.join(" · ")}</p>
+                ) : null}
+                <div aria-hidden className="mx-2 my-1 h-px bg-border" />
+              </>
+            ) : null}
+            <RailRuntimeHealth
+              reading={runtime}
+              className={POPOVER_ROW}
+              onOpenSettings={(to) => {
+                close();
+                onOpenSettings(to);
+              }}
+            />
+          </div>
+        )}
+      </Popover>
+      <ProviderLimitsDialog open={limitsOpen} onClose={() => setLimitsOpen(false)} limits={limits} />
     </>
   );
 }

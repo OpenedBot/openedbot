@@ -50,7 +50,7 @@ type rpcClient struct {
 	outboundTail <-chan struct{}
 }
 
-func startRPC(command string, args []string, env []string, cwd string, invalidLimit int, writeTimeout time.Duration, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
+func startRPC(command string, args []string, env []string, cwd string, codex bool, invalidLimit int, writeTimeout time.Duration, incoming func(*rpcClient, rpcMessage)) (*rpcClient, error) {
 	cmd := exec.Command(command, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Dir = cwd
@@ -91,7 +91,7 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 		invalidCount := 0
 		for scanner.Scan() {
 			var m rpcMessage
-			if json.Unmarshal(scanner.Bytes(), &m) != nil || m.JSONRPC != "2.0" {
+			if json.Unmarshal(scanner.Bytes(), &m) != nil || (m.JSONRPC != "2.0" && !(codex && m.JSONRPC == "")) {
 				invalidCount++
 				incoming(c, rpcMessage{})
 				if invalidCount > invalidLimit {
@@ -102,6 +102,7 @@ func startRPC(command string, args []string, env []string, cwd string, invalidLi
 				continue
 			}
 			invalidCount = 0
+			m.JSONRPC = "2.0"
 			if m.Method != "" {
 				incoming(c, m)
 				continue
@@ -234,4 +235,17 @@ func (c *rpcClient) alive() bool {
 	default:
 		return true
 	}
+}
+
+// Interrupt can be sent from the reader while processing turn/started.
+func (c *rpcClient) requestWithoutWaiting(ctx context.Context, method string, params any) error {
+	raw, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	c.next++
+	id := fmt.Sprint(c.next)
+	c.mu.Unlock()
+	return c.write(ctx, rpcMessage{JSONRPC: "2.0", ID: json.RawMessage(id), Method: method, Params: raw})
 }

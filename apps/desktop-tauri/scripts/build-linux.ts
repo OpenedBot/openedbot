@@ -32,6 +32,7 @@
  * builds without updater artifacts (CI has no secret).
  */
 import { $ } from "bun";
+import { stageEdgeSetup } from "./stage-edge-setup";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -142,9 +143,10 @@ async function buildHere(options: BuildOptions): Promise<void> {
   // flag, as on macOS.
   const staging = path.join(tmpdir(), `openedbot-linux-${process.pid}`);
   mkdirSync(staging, { recursive: true });
+  const edgeSetup = await stageEdgeSetup(ROOT, staging);
   const overlay = mergeConfig(identityOverlay(APP_DIR, IDENTITIES[identity]), {
     version,
-    bundle: { createUpdaterArtifacts: signed },
+    bundle: { createUpdaterArtifacts: signed, resources: { [edgeSetup]: "edge-setup" } },
     plugins: {
       updater: {
         pubkey: signed ? readFileSync(path.join(keyDir, "updater.key.pub"), "utf8").trim() : "",

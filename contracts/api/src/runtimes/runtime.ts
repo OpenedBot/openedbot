@@ -8,6 +8,8 @@ import type { RuntimeHealthStatus } from "../shared/domain";
 export type RuntimePublicDto = {
   id: string | null;
   configured: boolean;
+  /** Only serves bots assigned to this host. */
+  dedicated?: boolean;
   /** Engine declared by the last admitted host; Hermes when not declared. */
   engine: string;
   /** Raw engine version; falls back to the Hermes version for Hermes hosts. */

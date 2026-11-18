@@ -59,8 +59,8 @@ export type BotRouteDeps = {
 
 /** Les dépendances d'un cas d'usage du roster, la configuration de l'API déjà liée. */
 export type BotDeps = {
-  readRuntime: (db: Db, organizationId: string) => Promise<BotRuntime | null>;
-  readRuntimeForDeletion: (db: Db, organizationId: string) => Promise<{ id: string; linkFeatures: string[] } | null>;
+  readRuntime: (db: Db, organizationId: string, runtimeId?: string) => Promise<BotRuntime | null>;
+  readRuntimeForDeletion: (db: Db, organizationId: string, runtimeId?: string) => Promise<{ id: string; linkFeatures: string[] } | null>;
   clientFactory: (clientConfig: HermesClientConfig) => BotRouteClient;
   /** Les runs que le roster demande à l'exécution (accueil, brouillon de persona, passes de maintenance). */
   runs: BotRuns;
@@ -70,7 +70,9 @@ export type BotDeps = {
 export function resolveBotDeps(config: RuntimeAccessConfig, runs: BotRuns, deps: BotRouteDeps = {}): BotDeps {
   const readRuntime = deps.readRuntime ?? readRuntimeSecret;
   return {
-    readRuntime: (db, organizationId) => readRuntime(db, config, organizationId),
+    readRuntime: (db, organizationId, runtimeId) => runtimeId
+      ? readRuntime(db, config, organizationId, undefined, undefined, runtimeId)
+      : readRuntime(db, config, organizationId),
     readRuntimeForDeletion: deps.readRuntimeForDeletion ?? readRegisteredRuntimeForCleanup,
     clientFactory: deps.clientFactory ?? runtimeAdminClient,
     runs,

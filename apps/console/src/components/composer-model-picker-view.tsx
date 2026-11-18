@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { RiArrowDownSLine, RiSearchLine } from "@remixicon/react";
 import type { RuntimeModelProviderDto } from "@openedbot/contracts-api";
 import type { HermesReasoningEffort } from "@openedbot/contracts-api";
@@ -6,6 +6,11 @@ import { catalogModelView, providerRail } from "@/lib/bots/model-catalog";
 import {
   cn,
   Dialog,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Drawer,
   DrawerContent,
   DrawerTitle,
@@ -39,6 +44,7 @@ export function ComposerModelPicker({
   selectedModel,
   effectiveModel,
   effectiveEffort,
+  efforts,
   globalModel,
   supportsEffort,
   disabled,
@@ -55,11 +61,19 @@ export function ComposerModelPicker({
   fast,
   onReset,
   bootBotId,
+  catalogHost,
+  machines = [],
+  machineId = null,
+  browsing = null,
+  onMachine,
+  onClose,
 }: {
   providers: RuntimeModelProviderDto[];
   selectedModel: string | null;
   effectiveModel: string | null;
   effectiveEffort: HermesReasoningEffort | null;
+  /** See `EffortPanel`: the effective model's own efforts. */
+  efforts?: readonly HermesReasoningEffort[];
   globalModel: string | null;
   supportsEffort: boolean;
   disabled: boolean;
@@ -98,6 +112,31 @@ export function ComposerModelPicker({
   onReset?: () => void;
   /** The bot whose model mark the next refresh redraws at once (`lib/session/boot-bots.ts`). */
   bootBotId?: string;
+  catalogHost?: string;
+  /**
+   * The workspace's machines, in the « Machine » menu that heads the panel:
+   * the rail then lists only the shown machine's providers, never another
+   * machine's marks beside them.
+   */
+  machines?: Array<{ id: string; label: string; provider: string | null }>;
+  /** The machine whose catalogue the panel shows. */
+  machineId?: string | null;
+  /**
+   * Another machine's catalogue the list shows instead of the bot's own:
+   * nothing is checked there, and a pick moves the bot (`onModelChange`).
+   * The trigger keeps telling the bot's own model.
+   */
+  browsing?: {
+    host: string;
+    providers: RuntimeModelProviderDto[];
+    globalModel: string | null;
+    globalAutomatic: boolean;
+    /** Why its catalogue is not there (loading, machine unavailable): the list shows it, nothing to pick. */
+    notice: string | null;
+  } | null;
+  onMachine?: (id: string) => void;
+  /** The panel closed: the container stops browsing another machine. */
+  onClose?: () => void;
 }) {
   const { t } = useT();
   const glyphRef = useRef<HTMLSpanElement>(null);
@@ -105,9 +144,19 @@ export function ComposerModelPicker({
     () => catalogModelView(providers, [selectedModel, effectiveModel, globalModel]).groups,
     [providers, selectedModel, effectiveModel, globalModel],
   );
-  const rail = providerRail(providers);
+  // The list: the bot's own catalogue, or the machine the rail opened.
+  const listGroups = useMemo(
+    () => browsing ? catalogModelView(browsing.providers).groups : groups,
+    [browsing, groups],
+  );
+  const rail = providerRail(browsing?.providers ?? providers);
+  // Why the list cannot show models: the other machine's reason, or this one's failure.
+  const listNotice = browsing ? browsing.notice : error ? t("newBotDialog.executionHostUnavailable") : null;
+  // "" matches no row: another machine's list has no checked model, not even the global one.
+  const listSelected = browsing ? "" : selectedModel;
   const modelCount = groups.reduce((total, group) => total + group.models.length, 0);
-  const unavailable = disabled || loading || error || modelCount === 0;
+  // Another machine can still be chosen when this one has no catalogue.
+  const unavailable = disabled || loading || ((error || modelCount === 0) && machines.length <= 1);
   const emptyCatalog = !loading && modelCount === 0;
 
   const inline = variant === "inline";
@@ -149,16 +198,17 @@ export function ComposerModelPicker({
     ? t("composer.modelPickerGlobalAria", { model: effectiveModel ?? t(unchosen ? "composer.modelChoose" : "composer.modelUnavailable") })
     : t("composer.modelPickerAria", { model: effectiveModel ?? t(unchosen ? "composer.modelChoose" : "composer.modelUnavailable") }))
     + (fallbackTitle ? `. ${fallbackTitle}` : "");
-  const globalDetail = globalModel === null
+  const listGlobal = browsing ? browsing.globalModel : globalModel;
+  const globalDetail = listGlobal === null
     ? t("composer.modelUnavailable")
-    : globalAutomatic ? t("composer.modelGlobalAuto", { model: globalModel }) : globalModel;
+    : (browsing ? browsing.globalAutomatic : globalAutomatic) ? t("composer.modelGlobalAuto", { model: listGlobal }) : listGlobal;
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
-  const selectedGroup = groups.find((group) => group.models.some((model) => model.id === (selectedModel ?? effectiveModel)))?.slug;
+  const selectedGroup = browsing ? undefined : groups.find((group) => group.models.some((model) => model.id === (selectedModel ?? effectiveModel)))?.slug;
   const [providerTab, setProviderTab] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const activeTab = providerTab ?? selectedGroup ?? groups[0]?.slug ?? null;
+  const activeTab = providerTab ?? selectedGroup ?? listGroups[0]?.slug ?? null;
   const activeProvider = rail.find((entry) => entry.slug === activeTab);
   const activeProviderDisconnected = activeProvider?.connected === false;
   const needle = query.trim().toLowerCase();
@@ -167,14 +217,15 @@ export function ComposerModelPicker({
     if (listRef.current) listRef.current.scrollTop = 0;
   }, [activeTab, needle]);
   const visibleGroups = needle
-    ? groups
+    ? listGroups
         .map((group) => ({ ...group, models: group.models.filter((model) => model.id.toLowerCase().includes(needle)) }))
         .filter((group) => group.models.length > 0)
-    : groups.filter((group) => group.slug === activeTab);
+    : listGroups.filter((group) => group.slug === activeTab);
   const fastOn = Boolean(fast?.available && fast.on);
   const effortChip = (
     <EffortChip
       effort={effectiveEffort}
+      efforts={efforts}
       supportsEffort={supportsEffort}
       saving={saving}
       fast={fast}
@@ -183,6 +234,44 @@ export function ComposerModelPicker({
       onEffortCommit={onEffortCommit}
     />
   );
+  const machineSelectId = useId();
+  const otherMachineHint = browsing
+    ? <p className="px-3 pb-2 text-caption-1-regular text-text-tertiary">{t("composer.modelOtherMachineHint")}</p>
+    : null;
+  // Several machines: a « Machine » menu heads the catalogue. One: its name only.
+  const catalogHostLabel = machines.length > 1 && machineId ? (
+    <>
+      <div className="flex items-center gap-2 px-3 py-2">
+        <label htmlFor={machineSelectId} className="shrink-0 text-caption-1-regular text-text-secondary">{t("composer.machine")}</label>
+        <Select
+          value={machineId}
+          onValueChange={(id) => {
+            setProviderTab(null);
+            setQuery("");
+            setSearching(false);
+            onMachine?.(id);
+          }}
+        >
+          <SelectTrigger id={machineSelectId} size="sm" className="min-w-0 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {machines.map((machine) => (
+              <SelectItem key={machine.id} value={machine.id}>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  {machine.provider ? <ProviderIcon provider={machine.provider} className="size-4 shrink-0" decorative withTitle={false} /> : null}
+                  <span className="truncate">{machine.label}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {otherMachineHint}
+    </>
+  ) : catalogHost ? (
+    <p className="px-3 py-2 text-caption-1-regular text-text-secondary">{t("composer.modelCatalogHost", { host: catalogHost })}</p>
+  ) : null;
 
   if (inline) {
     return (
@@ -196,6 +285,7 @@ export function ComposerModelPicker({
             setSearching(false);
             setQuery("");
             setProviderTab(null);
+            onClose?.();
           }
         }}
       >
@@ -224,6 +314,7 @@ export function ComposerModelPicker({
           style={{ borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
         >
           <DrawerTitle className="sr-only">{t("composer.modelSettings")}</DrawerTitle>
+          {catalogHostLabel}
           <div className="flex h-11 items-center justify-between gap-2 px-1">
             {searching ? (
               <input
@@ -283,11 +374,13 @@ export function ComposerModelPicker({
             ))}
           </div>
           <div
-            role={!needle && activeProviderDisconnected ? undefined : "radiogroup"}
-            aria-label={!needle && activeProviderDisconnected ? undefined : t("composer.model")}
+            role={listNotice || (!needle && activeProviderDisconnected) ? undefined : "radiogroup"}
+            aria-label={listNotice || (!needle && activeProviderDisconnected) ? undefined : t("composer.model")}
             className="bui-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-2"
           >
-            {!needle && activeProviderDisconnected ? (
+            {listNotice ? (
+              <p role="status" className="px-2 py-3 text-body-2-medium text-text-tertiary">{listNotice}</p>
+            ) : !needle && activeProviderDisconnected ? (
               <ProviderNotConnectedPanel
                 provider={activeProvider.slug}
                 name={activeProvider.name}
@@ -300,7 +393,7 @@ export function ComposerModelPicker({
                     tall
                     label={t("composer.modelGlobal")}
                     detail={globalDetail}
-                    checked={selectedModel === null}
+                    checked={listSelected === null}
                     disabled={saving}
                     onSelect={() => onModelChange(null)}
                   />
@@ -314,7 +407,7 @@ export function ComposerModelPicker({
                         tall
                         label={model.id}
                         provider={group.slug}
-                        checked={selectedModel === model.id}
+                        checked={listSelected === model.id}
                         disabled={saving}
                         onSelect={() => onModelChange(model.id)}
                       />
@@ -331,6 +424,7 @@ export function ComposerModelPicker({
             <EffortPanel
               look="sheet"
               effort={effectiveEffort}
+              efforts={efforts}
               supportsEffort={supportsEffort}
               saving={saving}
               fast={fast}
@@ -352,6 +446,7 @@ export function ComposerModelPicker({
     setSearching(false);
     setQuery("");
     setProviderTab(null);
+    onClose?.();
   };
   const trigger = (
     <button
@@ -400,21 +495,24 @@ export function ComposerModelPicker({
   );
   const panel = (
     <ModelCatalogPanel
+      // One panel per machine: its provider tab and search start afresh.
+      key={machineId ?? "machine"}
       // In the modal, the panel sits flat in the dialog's card (`DESIGN.md`
       // › Bureau › Carte, Cloudflare's LayerDialog): no frame of its own, a
       // hairline under the title, the rail as a column beside the list.
       layout={header ? "flat" : "popover"}
-      className={header ? "mt-3 h-[min(26rem,60dvh)] w-full border-t border-border/60" : "h-[280px] w-[339px]"}
-      groups={groups}
+      className={header ? cn(!catalogHost && "mt-3", "h-[min(26rem,60dvh)] w-full border-t border-border/60") : "h-[280px] w-[339px]"}
+      groups={listGroups}
       rail={rail}
-      selectedModel={selectedModel}
-      openOnModel={selectedModel ?? effectiveModel}
+      selectedModel={listSelected}
+      openOnModel={browsing ? null : selectedModel ?? effectiveModel}
       globalLabel={t("composer.modelGlobal")}
       globalDetail={globalDetail}
       disabled={saving}
       onModelChange={onModelChange}
       trailing={effortChip}
-      onClose={() => setOpen(false)}
+      onClose={closePanel}
+      notice={listNotice}
       listRef={listRef}
     />
   );
@@ -433,6 +531,7 @@ export function ComposerModelPicker({
           className="sm:max-w-[560px]"
           bodyClassName="p-0"
         >
+          {catalogHostLabel}
           {panel}
         </Dialog>
       </>
@@ -464,6 +563,7 @@ export function ComposerModelPicker({
           (list?.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]') ?? list?.querySelector<HTMLElement>('[role="radio"]'))?.focus();
         }}
       >
+        {catalogHostLabel}
         {panel}
       </BuiPopoverContent>
     </BuiPopover>

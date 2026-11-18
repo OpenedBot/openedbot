@@ -14,6 +14,7 @@ export type SendMessageResult = SendMessageAccepted;
 export type WorkflowRecoveryResult = SendMessageResult & { duplicateRisk?: true };
 
 export type CreateBotInput = Omit<PortableBotCreationDraft, "instructions" | "reasoningEffort"> & {
+  runtimeId?: string;
   instructions?: string;
   mission?: string;
   reasoningEffort?: string;

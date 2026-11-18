@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -163,8 +162,11 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 		return
 	}
 	if p.client == nil || !p.client.alive() {
-		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, b.agentEnvironment(), filepath.Join(b.opts.ProfilesRoot, r.Profile), b.opts.Limits.MaxInvalidLines, b.opts.Limits.CancelTimeout, b.incoming)
-		if err == nil {
+		p.client, err = startRPC(b.opts.AgentCommand, b.opts.AgentArguments, b.agentEnvironment(), b.workspace(r.Profile), b.codex(), b.opts.Limits.MaxInvalidLines, b.opts.Limits.CancelTimeout, b.incoming)
+		if err == nil && b.codex() {
+			err = initializeCodex(ctx, p.client)
+			p.caps = agentCapabilities{LoadSession: true}
+		} else if err == nil {
 			var init struct {
 				Version int               `json:"protocolVersion"`
 				Caps    agentCapabilities `json:"agentCapabilities"`
@@ -193,21 +195,29 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	}
 	r.client = client
 	cancelled := r.Cancel
-	oldID, oldClient, used, oldInstructions := s.ACPID, s.client, s.Used, s.Instructions
+	oldID, oldClient, used, oldInstructions, effortSet := s.ACPID, s.client, s.Used, s.Instructions, s.EffortSet
 	b.unlockAndSend()
 	if cancelled {
 		b.endExecution(r, s, nil)
 		return
 	}
-	// The catalogue names the agent's configured default, not a model switch.
-	if (input.Model != "" && input.Model != "agent-default") || (input.Provider != "" && input.Provider != "acp") {
-		b.endExecution(r, s, errors.New("ACP bridge serves only the configured agent default"))
-		return
-	}
-	for option := range input.ModelOptions {
-		if option != "prompt_cache_ttl" {
-			b.endExecution(r, s, errors.New("ACP bridge does not support behavior-changing or unknown model options"))
+	var choice turnChoice
+	if b.opts.Catalogue != nil {
+		if choice, err = b.turnChoice(input); err != nil {
+			b.endExecution(r, s, err)
 			return
+		}
+	} else {
+		// The catalogue names the agent's configured default, not a model switch.
+		if (input.Model != "" && input.Model != "agent-default") || (input.Provider != "" && input.Provider != "acp") {
+			b.endExecution(r, s, errors.New("ACP bridge serves only the configured agent default"))
+			return
+		}
+		for option := range input.ModelOptions {
+			if option != "prompt_cache_ttl" {
+				b.endExecution(r, s, errors.New("ACP bridge does not support behavior-changing or unknown model options"))
+				return
+			}
 		}
 	}
 	blocks, err := promptBlocks(input.Input, caps.Prompt.Image)
@@ -219,8 +229,12 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	rebuilt := false
 	created := false
 	if oldClient != client || oldID == "" {
-		params := map[string]any{"cwd": filepath.Join(b.opts.ProfilesRoot, r.Profile), "mcpServers": []any{}}
-		if oldID != "" && caps.LoadSession {
+		params := map[string]any{"cwd": b.workspace(r.Profile), "mcpServers": []any{}}
+		if b.codex() {
+			acpID, err = b.codexThread(client, oldID)
+			created = oldID == ""
+			rebuilt = created && (used || len(input.History) > 0)
+		} else if oldID != "" && caps.LoadSession {
 			params["sessionId"] = oldID
 			var result map[string]any
 			err = b.setupCall(client, "session/load", params, &result)
@@ -239,6 +253,13 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 				err = errors.New("ACP returned an empty session id")
 			}
 		}
+	}
+	if err == nil && b.opts.Catalogue != nil && !b.codex() {
+		// A new agent session starts on its model's own effort.
+		if created {
+			effortSet = false
+		}
+		effortSet, err = b.applyACPChoice(client, acpID, choice, effortSet)
 	}
 	if err != nil {
 		b.endExecution(r, s, err)
@@ -269,6 +290,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	s.ACPID = acpID
 	s.client = client
 	s.Instructions = input.Instructions
+	s.EffortSet = effortSet
 	s.Used = true
 	r.acpID = acpID
 	if rebuilt {
@@ -289,6 +311,11 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 	}
 	done := make(chan promptResult, 1)
 	go func() {
+		if b.codex() {
+			reason, err := b.codexPrompt(ctx, r, client, blocks, codexTurnParams(choice))
+			done <- promptResult{reason, err}
+			return
+		}
 		var response struct {
 			StopReason string `json:"stopReason"`
 		}
@@ -307,7 +334,7 @@ func (b *Bridge) execute(r *run, s *session, input runInput) {
 			r.Status = "stopping"
 			b.cancelPermissionsLocked(r)
 			b.saveLocked()
-			b.outgoing = append(b.outgoing, agentWrite{client: client, method: "session/cancel", value: map[string]string{"sessionId": acpID}})
+			b.requestStopLocked(r)
 		}
 		b.unlockAndSend()
 		grace := time.NewTimer(b.opts.Limits.CancelTimeout)
@@ -385,7 +412,7 @@ func (b *Bridge) stopLocked(r *run) {
 	b.cancelPermissionsLocked(r)
 	b.saveLocked()
 	if r.client != nil && r.acpID != "" {
-		b.outgoing = append(b.outgoing, agentWrite{client: r.client, method: "session/cancel", value: map[string]string{"sessionId": r.acpID}})
+		b.requestStopLocked(r)
 	}
 	b.wg.Add(1)
 	go func() {

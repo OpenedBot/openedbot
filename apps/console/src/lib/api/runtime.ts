@@ -12,7 +12,7 @@ export const runtimeApi = {
    * Never returns a bearer: the ticket only authorizes the script, running
    * on the host, to push THIS runtime's token once.
    */
-  openRuntimeEnrollment: (input: { name: string }) =>
+  openRuntimeEnrollment: (input: { name: string; machine?: true }) =>
     request<RuntimeEnrollmentTicketDto>("/api/runtime-enrollments/open", {
       method: "POST",
       body: JSON.stringify(input),

@@ -334,6 +334,8 @@ export const runtimeHealth = {
 } as const;
 
 export const railQuotas = {
+  /** The rail foot's pill: LLM quotas and runtime. */
+  pill: "Models",
   title: "LLM quota left",
   remaining: "{provider}: {percent}% left",
   remainingReset: "{provider}: {percent}% left · resets in {reset}",

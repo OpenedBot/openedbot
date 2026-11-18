@@ -25,7 +25,7 @@ import { takeWarmOrSelectModel } from "../warm-model-selection";
 import type { WorkerConfig } from "../worker-config";
 import { retiredServiceStep, settleOrphanCreate } from "./failure";
 import { conversationHistory, loadRunImages } from "./history";
-import { type DmStepPrompt, assignedPlaybookBlock, dmInstructions, withTurnGuidance } from "./instructions";
+import { type DmStepPrompt, assignedPlaybookBlock, dmInstructions, machineBlock, withTurnGuidance } from "./instructions";
 import { confirmFirstCreate, heldLease, runKey } from "./lease-transitions";
 import { persistUnnumberedEvents } from "./persist";
 import type { RunPreflight } from "./preflight";
@@ -257,6 +257,12 @@ export async function composeRunRequest(
       : await trace.span("preflight.instructions", () => dmInstructions(db, context));
   if (packed.packInstructions) {
     prompt.instructions = withBotModeInstructions(prompt.instructions, packed.packInstructions);
+  }
+  if (!isServiceStepKind(context.stepKind)) {
+    prompt.instructions = withBotModeInstructions(
+      prompt.instructions,
+      machineBlock({ name: context.runtimeName, engine: context.runtimeEngine }),
+    );
   }
   const routing = groupSendState(context)?.phase === "route";
   // L'apprentissage passe par les skills du runtime, jamais par une ligne

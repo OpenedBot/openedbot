@@ -417,6 +417,7 @@ const TOOL_KINDS: Readonly<Record<string, ToolKind>> = {
   web_search: "search",
   search: "search",
   web_extract: "web",
+  web_fetch: "web",
   http: "web",
   read_file: "read",
   cat: "read",
@@ -435,7 +436,9 @@ const TOOL_KINDS: Readonly<Record<string, ToolKind>> = {
 };
 
 export function toolKind(tool: string): ToolKind {
-  const bare = tool.replace(/^mcp__.+?__/, "");
+  // An ACP agent (Grok…) names a tool by its title, « Web search: <query> »:
+  // the words before the colon, lower-cased and joined by `_`, are its name.
+  const bare = tool.replace(/^mcp__.+?__/, "").split(":")[0]!.trim().toLowerCase().replace(/\s+/g, "_");
   if (Object.prototype.hasOwnProperty.call(TOOL_KINDS, bare)) return TOOL_KINDS[bare]!;
   if (bare.startsWith("browser_")) return "web";
   return tool.startsWith("mcp__") ? "mcp" : "other";

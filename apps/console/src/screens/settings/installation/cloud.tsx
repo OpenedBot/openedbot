@@ -122,21 +122,22 @@ function RuntimeConnectionForm({
   // The rail's counter: a replacement waiting, visible without opening the
   // section. Same key as the section, so a single request.
   const registry = useQuery({ queryKey: queryKeys.runtimeList, queryFn: api.runtimeList, refetchInterval: RUNTIME_REFETCH_MS });
-  const pendingCount = registry.data?.filter((entry) => !entry.isActive).length ?? 0;
+  const pendingCount = registry.data?.filter((entry) => !entry.isActive && !entry.dedicated).length ?? 0;
   // With no runtime declared, « État » has nothing to tell: we do not offer a
   // tab that would lead only to emptiness.
+  // The list of machines first: it is what the page is about. « État » details
+  // the default machine's link, « Alertes » who is told when it drops.
   const sections: { id: RuntimeSection; label: string; count?: number }[] = [
-    ...(runtime ? [{ id: "status" as const, label: "État" }] : []),
-    // The alerts say a runtime is down: with no runtime, nothing to watch.
-    ...(runtime ? [{ id: "alerts" as const, label: t("runtimeAlerts.tab") }] : []),
     {
       id: "runtimes",
-      label: t(runtime ? "cloudRuntimeSettings.replaceAction" : "cloudRuntimeSettings.addAction"),
+      label: "Machines",
       ...(pendingCount > 0 ? { count: pendingCount } : {}),
     },
+    ...(runtime ? [{ id: "status" as const, label: "Machine par défaut" }] : []),
+    // The alerts say a runtime is down: with no runtime, nothing to watch.
+    ...(runtime ? [{ id: "alerts" as const, label: t("runtimeAlerts.tab") }] : []),
   ];
-  // With no runtime, one lands on the add: it is the only thing to do.
-  const fallbackSection: RuntimeSection = !runtime ? "runtimes" : "status";
+  const fallbackSection: RuntimeSection = "runtimes";
   const [localSection, setLocalSection] = useState<RuntimeSection | null>(null);
   const requested = section ?? localSection;
   const currentSection = requested && sections.some((entry) => entry.id === requested) ? requested : fallbackSection;
@@ -211,6 +212,7 @@ function RuntimeConnectionForm({
   );
   const statusSection = (
     <>
+      <RuntimeLinkHero runtime={runtime} actions={actions} />
       {runtime?.reachability === "direct" ? <RuntimeDirectStatus runtime={runtime} /> : null}
       {isConnectorRuntime && runtime ? (
         // Desktop: the facts sit flat in the card (no bordered list inside
@@ -289,7 +291,7 @@ function RuntimeConnectionForm({
     <SettingsPane footer={isMobile && currentSection !== "runtimes" && actions ? actions : undefined}>
       <SectionHeading
         title={t("settingsSidebar.runtime")}
-        description="Choisissez comment openedbot joint votre runtime : lien sortant ou accès direct à votre charge."
+        description="Les ordinateurs et serveurs qui exécutent vos bots."
         action={runtime ? (
           <div className="flex items-center gap-2">
             {runtime.link?.connector ? <ConnectorReleaseNotesButton /> : null}
@@ -298,17 +300,12 @@ function RuntimeConnectionForm({
         ) : undefined}
       />
       {loadError ? <Note tone="danger" role="alert">{loadError}</Note> : null}
-      <RuntimeLinkHero
-        runtime={runtime}
-        actions={actions}
-      >
-        {hijackBanner}
-        {issuedLinkBox}
-      </RuntimeLinkHero>
+      {hijackBanner}
+      {issuedLinkBox}
       <RuntimeSectionRail sections={sections} current={currentSection} onChange={goTo}>
         {currentSection === "status" ? statusSection : null}
         {currentSection === "alerts" ? <RuntimeAlertsSection /> : null}
-        {currentSection === "runtimes" ? <RuntimeReplacement activeId={runtime?.id ?? null} /> : null}
+        {currentSection === "runtimes" ? <RuntimeReplacement activeId={runtime?.id ?? null} onDiagnose={() => goTo("status")} /> : null}
       </RuntimeSectionRail>
     </SettingsPane>
   );

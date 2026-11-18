@@ -1,4 +1,3 @@
-import { ConversationFiles } from "../../components/conversation-files";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
@@ -325,7 +324,6 @@ export function GroupConversationScreen() {
                 band pinned above the thread (see `WorkflowOverview`). */}
             {!threadLoading && thread.data ? (
               <>
-                <ConversationFiles key={thread.data.id} threadId={thread.data.id} />
                 <WorkflowOverview
                   threadId={thread.data.id}
                   workflows={thread.data.workflows}
