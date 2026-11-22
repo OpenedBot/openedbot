@@ -22,6 +22,8 @@ Réservez à `edge-setup` une machine qui n’héberge pas d’autres services. 
 `sudo edge-setup up --yes` installe Hermes et prépare la machine à être reliée, sans rien publier sur Internet. Il ne configure ni SSH, ni UFW, ni fail2ban, ni PAM, ni journald. Sous Linux, il active la mise à jour automatique d’edge-setup (voir plus bas), sauf si elle a été refusée. Une machine sur Internet qui s’arrête là n’a **pas** reçu de durcissement.
 </Aside>
 
+Hermes est le moteur par défaut. Sous Linux, `--engine acp:opencode` choisit le [moteur ACP expérimental](/fr/docs/acp-engine), avec ses limites et sa configuration des clés fournisseur.
+
 ## Ce que l’outil fait
 
 - Installe une version épinglée et vérifiée d’Hermes sous un compte dédié non privilégié.

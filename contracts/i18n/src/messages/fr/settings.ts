@@ -74,7 +74,7 @@ export const settingsSidebar = {
   notch: "Encoche",
   archives: "Archives",
   notifications: "Notifications",
-  runtime: "Runtime",
+  runtime: "Machines",
   agents: "Importer des agents",
   connectors: "Connecteurs",
   models: "Modèles",

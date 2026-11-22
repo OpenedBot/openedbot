@@ -2,16 +2,14 @@ import { EnrollmentStep } from "../../../../components/runtime-command";
 import {
   DIRECT_DIALOG_WIDTH,
   RuntimeDirectWizard,
-  RuntimeDirectActions,
   RuntimeDirectStatus,
   RuntimePendingExposures,
   RuntimeReachabilityPicker,
 } from "../../../../components/runtime-direct";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconServerBolt } from "@tabler/icons-react";
+import { IconServer2, IconServerBolt, IconTerminal2 } from "@tabler/icons-react";
 import {
-  cn,
   Dialog,
   Input,
   Label,
@@ -20,157 +18,25 @@ import {
 } from "@openedbot/browser-ui-kit";
 import { Link } from "@tanstack/react-router";
 import { api, errorMessage, queryKeys } from "../../../../lib/api";
-import { displayedRuntimeHealth } from "../../../../lib/runtime/runtime-health";
-import { linkKind, useDeployEnvironment } from "../../../../lib/platform/deploy-environment";
 import { useT } from "../../../../lib/i18n";
-import type { RuntimeEnrollmentTicketDto, RuntimePublicDto } from "@openedbot/contracts-api";
+import { type RuntimeEnrollmentTicketDto, type RuntimePublicDto } from "@openedbot/contracts-api";
 import {
-  ACTIONS,
   BUTTON,
   CardHeading,
   EmptyState,
   Note,
   SettingsCard,
-  ToneBadge,
 } from "../../../../components/settings/primitives";
-import { HEALTH_LABEL, RUNTIME_REFETCH_MS, invalidateRuntimeQueries } from "./cloud-shared";
+import { nativeBridge } from "../../../../lib/platform";
+import { RUNTIME_REFETCH_MS, invalidateRuntimeQueries } from "./cloud-shared";
 import {
   EDGE_SETUP_INSTALL_STEPS,
   ENROLLMENT_DIALOG_WIDTH,
   RuntimeEnrollmentDialog,
 } from "./cloud-enrollment";
+import { AgentMachineCard, DefaultMachineCard, PendingRuntimeCard } from "./cloud-machine-cards";
 
-/**
- * A runtime's removal: the button, and its confirmation when it serves the
- * runs.
- *
- * It lives in the TWO places where one looks at a runtime: the screen's « Runtime
- * actif » card and the waiting replacement's card.
- *
- * The active one goes through a modal because it is the only one whose removal cuts
- * the runs; a waiting replacement serves nothing, so the second gesture
- * would be noise.
- */
-export function RuntimeRemoval({
-  runtime,
-  disabled,
-  className,
-}: {
-  runtime: RuntimePublicDto;
-  disabled?: boolean;
-  className?: string;
-}) {
-  const { t } = useT();
-  const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
-  const remove = useMutation({
-    mutationFn: (confirm: boolean) => {
-      if (!runtime.id) throw new Error("runtime");
-      return api.deleteRuntime(runtime.id, confirm);
-    },
-    onSuccess: async () => {
-      setConfirming(false);
-      toast.success("Runtime retiré.");
-      await invalidateRuntimeQueries(queryClient);
-    },
-    onError: (error) => toast.error(errorMessage(error, "Le retrait du runtime a échoué.")),
-  });
-  return (
-    <>
-      {/*
-        `danger` and not `ghost`: the gesture destroys a link that will have to be
-        paired again by hand on the host. It reads as such before the click,
-        not only in the modal that follows.
-      */}
-      <button
-        type="button"
-        className={cn(BUTTON.danger, className)}
-        disabled={disabled || remove.isPending || !runtime.id}
-        onClick={() => (runtime.isActive ? setConfirming(true) : remove.mutate(false))}
-        aria-label={`Retirer ${runtime.name}`}
-      >
-        Retirer
-      </button>
-      <Dialog
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title={`Retirer ${runtime.name} ?`}
-        description="Ce runtime sert les runs. Une fois retiré, plus rien ne les sert tant qu’un nouveau n’est pas appairé. Pour changer de machine, préférez Remplacer : il n’y a pas de trou."
-        role="alertdialog"
-        closeLabel={t("common.close")}
-      >
-        <div className="space-y-4">
-          <Note tone="warning" role="alert">
-            Les runs en cours sur cet hôte s’arrêtent, et son lien sortant est fermé sur-le-champ : le jeton posé sur la machine n’ouvre plus rien. Il faudra réappairer pour le reconnecter.
-          </Note>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className={BUTTON.secondary} disabled={remove.isPending} onClick={() => setConfirming(false)}>
-              {t("common.cancel")}
-            </button>
-            <button
-              type="button"
-              className={BUTTON.danger}
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(true)}
-            >
-              Retirer quand même
-            </button>
-          </div>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
-/**
- * The runtime waiting to replace the current one: an organization has only ONE
- * runtime, a second exists only for the duration of a replacement.
- *
- * Off desktop as on desktop, it is a card: there is at most one (the API
- * refuses to declare a second, `RUNTIME_REPLACEMENT_PENDING`), a table of
- * runtimes no longer has an object.
- */
-function PendingRuntimeCard({
-  runtime,
-  hasActive,
-  busy,
-  onReplace,
-}: {
-  runtime: RuntimePublicDto;
-  /** With no runtime serving, the gesture is not a replacement: it puts it into service. */
-  hasActive: boolean;
-  busy: boolean;
-  onReplace: (runtime: RuntimePublicDto) => void;
-}) {
-  const { t, formatDate } = useT();
-  const environment = useDeployEnvironment();
-  const status = displayedRuntimeHealth(runtime);
-  const shown = status === "not_configured" ? "unknown" : status;
-  // The kind of link follows the connection: the old one and the new one often
-  // carry the same name, the connection distinguishes them.
-  const kind = runtime.reachability === "connector" ? linkKind(runtime.link?.origin, environment) : null;
-  const reach = runtime.reachability !== "connector"
-    ? t("cloudRuntimeSettings.reachDirect")
-    : kind ? `${t("cloudRuntimeSettings.reachConnector")} · ${kind.label}` : t("cloudRuntimeSettings.reachConnector");
-  const seenAt = runtime.reachability === "connector" ? runtime.link?.lastSeenAt : runtime.lastCheckedAt;
-  const seen = seenAt ? t("cloudRuntimeSettings.seenAt", { date: formatDate(seenAt) }) : t("cloudRuntimeSettings.neverSeen");
-  return (
-    <div className="space-y-2 rounded-xl border border-dashed border-border px-3 py-2.5" data-pending-runtime={runtime.id ?? ""}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold">{runtime.name}</p>
-        <ToneBadge tone={shown === "healthy" ? "success" : "warning"}>{t(HEALTH_LABEL[shown])}</ToneBadge>
-      </div>
-      <p className="text-xs text-muted-foreground">{t("cloudRuntimeSettings.pendingLabel")} · {reach} · {seen}</p>
-      <div className={ACTIONS}>
-        <button type="button" className={BUTTON.primary} disabled={busy || !runtime.id} onClick={() => onReplace(runtime)}>
-          {t(hasActive ? "cloudRuntimeSettings.replaceAction" : "cloudRuntimeSettings.useAction")}
-        </button>
-        {runtime.reachability === "direct" ? <RuntimeDirectActions runtime={runtime} /> : null}
-        <RuntimeRemoval runtime={runtime} disabled={busy} />
-      </div>
-    </div>
-  );
-}
+export { RuntimeRemoval } from "./cloud-machine-cards";
 
 /**
  * The replacement's confirmation: what leaves with the old runtime.
@@ -256,7 +122,12 @@ function RuntimeRegistrySkeleton() {
  * attached to no runtime, and switching ran every bot on a
  * host where their profiles did not exist.
  */
-export function RuntimeReplacement({ activeId, initiallyAdding = false }: { activeId: string | null; initiallyAdding?: boolean }) {
+export function RuntimeReplacement({ activeId, initiallyAdding = false, onDiagnose }: {
+  activeId: string | null;
+  initiallyAdding?: boolean;
+  /** Opens the default machine's « État » section, where the link is diagnosed. */
+  onDiagnose?: () => void;
+}) {
   const { t } = useT();
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(initiallyAdding);
@@ -264,6 +135,10 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
   const [replacing, setReplacing] = useState<RuntimePublicDto | null>(null);
   const [draftName, setDraftName] = useState("");
   const [reachability, setReachability] = useState<"connector" | "direct">("connector");
+  // The add starts with a choice: the agent CLIs of a machine, or a Hermes server.
+  // Onboarding waits for a default machine, which only a Hermes server gives:
+  // it opens straight on that one.
+  const [addKind, setAddKind] = useState<"agents" | "hermes" | null>(initiallyAdding ? "hermes" : null);
   const list = useQuery({ queryKey: queryKeys.runtimeList, queryFn: api.runtimeList, refetchInterval: RUNTIME_REFETCH_MS });
   const replace = useMutation({
     mutationFn: api.replaceRuntime,
@@ -278,16 +153,24 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
 
   const [ticket, setTicket] = useState<RuntimeEnrollmentTicketDto | null>(null);
   const enroll = useMutation({
-    mutationFn: () => api.openRuntimeEnrollment({
-      name: draftName.trim(),
-    }),
+    // `machine`: one ticket for every agent CLI of the machine (`edge-setup connect`).
+    mutationFn: ({ name, machine }: { name: string; machine?: true }) => api.openRuntimeEnrollment({ name, machine }),
     onSuccess: (opened) => setTicket(opened),
     onError: (error) => toast.error(errorMessage(error, "L’ouverture de l’appairage a échoué.")),
   });
 
   const runtimes = list.data ?? [];
   const active = runtimes.find((runtime) => runtime.isActive) ?? null;
-  const pending = runtimes.filter((runtime) => !runtime.isActive);
+  const pending = runtimes.filter((runtime) => !runtime.isActive && !runtime.dedicated);
+  const dedicated = runtimes.filter((runtime) => runtime.dedicated);
+  // A machine ticket names each agent's runtime « <machine> · <agent> »: one
+  // card per machine, one line per agent.
+  const machines = [...dedicated.reduce((groups, runtime) => {
+    // The agent's label is the last « · » part: a machine name may hold one too.
+    const cut = runtime.name?.lastIndexOf(" · ") ?? -1;
+    const machine = runtime.name ? (cut > 0 ? runtime.name.slice(0, cut) : runtime.name) : t("newBotDialog.rulesServerFallback");
+    return groups.set(machine, [...(groups.get(machine) ?? []), runtime]);
+  }, new Map<string, RuntimePublicDto[]>())];
   // Three silences looked alike: a read in progress, a failed read, a registry
   // really empty. `list.data ?? []` crushed all three into « aucun
   // runtime », so an API outage read as a new organization.
@@ -300,7 +183,27 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
         : "listed";
   // The API's word on the failure, if it has one; empty otherwise.
   const listFailure = list.error ? errorMessage(list.error, "") : "";
-  const busy = replace.isPending || enroll.isPending;
+  const localMachine = nativeBridge()?.localMachine;
+  const stopDesktop = useMutation({
+    mutationFn: async () => localMachine?.stop(),
+    onSuccess: () => invalidateRuntimeQueries(queryClient),
+    onError: (error) => toast.error(errorMessage(error, "L’arrêt des agents a échoué.")),
+  });
+  const attachDesktop = useMutation({
+    mutationFn: async () => {
+      if (!localMachine) return false;
+      const enrollment = await api.openRuntimeEnrollment({ name: draftName.trim() || "Cet ordinateur", machine: true });
+      if (!enrollment.workspaceId) throw new Error("L’identifiant de l’espace d’appairage est absent.");
+      return localMachine.start(enrollment.ticket, enrollment.workspaceId);
+    },
+    onSuccess: async (attached) => {
+      if (!attached) return;
+      closeDraft();
+      await invalidateRuntimeQueries(queryClient);
+    },
+    onError: (error) => toast.error(errorMessage(error, "La connexion des agents a échoué.")),
+  });
+  const busy = replace.isPending || enroll.isPending || attachDesktop.isPending || stopDesktop.isPending;
   // With no runtime serving, putting the replacement into service removes nothing:
   // no confirmation to read.
   const startReplace = (runtime: RuntimePublicDto): void => {
@@ -314,12 +217,27 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
     setTicket(null);
     setDraftName("");
     setReachability("connector");
+    setAddKind(null);
   };
+  // `connect` again re-pairs a revoked agent and restarts the user service.
+  const relaunch = (machine: string): void => enroll.mutate({ name: machine, machine: true });
   return (
     <SettingsCard className="space-y-3">
       <CardHeading
-        title={t(active ? "cloudRuntimeSettings.replaceTitle" : "cloudRuntimeSettings.addTitle")}
-        description={t(active ? "cloudRuntimeSettings.replaceDescription" : "cloudRuntimeSettings.addDescription")}
+        title="Vos machines"
+        description="Chaque bot s’exécute sur la machine par défaut, ou sur l’agent choisi à sa création."
+        action={registryState === "listed" ? (
+          <div className="flex flex-wrap gap-2">
+            {localMachine && dedicated.length > 0 ? (
+              <button type="button" className={BUTTON.secondary} disabled={busy} onClick={() => stopDesktop.mutate()}>
+                Arrêter les agents de cet ordinateur
+              </button>
+            ) : null}
+            <button type="button" className={BUTTON.primary} disabled={busy} onClick={() => setIsAdding(true)}>
+              Ajouter une machine
+            </button>
+          </div>
+        ) : undefined}
       />
       {added ? <Dialog open onClose={() => setAdded(null)} title={t("cloudRuntimeSettings.addedTitle")} footer={<>
         <button type="button" className={BUTTON.secondary} onClick={() => setAdded(null)}>{t("common.close")}</button>
@@ -365,24 +283,30 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
       ) : registryState === "empty" ? (
         <EmptyState
           icon={<IconServerBolt />}
-          title="Aucun runtime déclaré"
-          description="Déclarez la machine qui exécutera vos runs : c’est elle qui ouvre la connexion vers openedbot, aucune URL ni aucun jeton ne sort d’ici."
+          title="Aucune machine"
+          description="Connectez les agents de votre ordinateur (Codex, Claude Code, Grok, Gemini, OpenCode) ou un serveur Hermes : la machine ouvre elle-même la connexion vers openedbot."
           actions={(
             <button type="button" className={BUTTON.primary} disabled={busy} onClick={() => setIsAdding(true)}>
-              {t("cloudRuntimeSettings.addAction")}
+              Ajouter une machine
             </button>
           )}
         />
       ) : (
-        pending.map((runtime) => (
-          <PendingRuntimeCard
-            key={runtime.id ?? runtime.baseUrl}
-            runtime={runtime}
-            hasActive={active !== null}
-            busy={busy}
-            onReplace={startReplace}
-          />
-        ))
+        <>
+          {active ? <DefaultMachineCard runtime={active} busy={busy} onDiagnose={onDiagnose} /> : null}
+          {pending.map((runtime) => (
+            <PendingRuntimeCard
+              key={runtime.id ?? runtime.baseUrl}
+              runtime={runtime}
+              hasActive={active !== null}
+              busy={busy}
+              onReplace={startReplace}
+            />
+          ))}
+          {machines.map(([machine, agents]) => (
+            <AgentMachineCard key={machine} machine={machine} agents={agents} busy={busy} onRelaunch={() => relaunch(machine)} />
+          ))}
+        </>
       )}
       <RuntimePendingExposures />
       {activeId === null && pending.length > 0 ? (
@@ -394,25 +318,92 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
           onDone={closeDraft}
           onCancel={closeDraft}
         />
+      ) : isAdding && addKind === null ? (
+        <Dialog open onClose={closeDraft} title="Ajouter une machine" className={ENROLLMENT_DIALOG_WIDTH}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              className="space-y-1.5 rounded-xl border border-border p-4 text-left transition-colors hover:bg-[var(--btn-veil)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setAddKind("agents")}
+            >
+              <IconTerminal2 className="size-5 text-muted-foreground" aria-hidden />
+              <p className="text-sm font-medium">Les agents d’une machine</p>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Codex, Claude Code, Grok, Gemini, OpenCode déjà installés : une commande les connecte tous.
+              </p>
+            </button>
+            <button
+              type="button"
+              className="space-y-1.5 rounded-xl border border-border p-4 text-left transition-colors hover:bg-[var(--btn-veil)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setAddKind("hermes")}
+            >
+              <IconServer2 className="size-5 text-muted-foreground" aria-hidden />
+              <p className="text-sm font-medium">Un serveur Hermes</p>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Installe Hermes sur un serveur Linux et le relie à openedbot, sans port entrant.
+              </p>
+            </button>
+          </div>
+        </Dialog>
+      ) : isAdding && addKind === "agents" ? (
+        <Dialog
+          open
+          onClose={closeDraft}
+          title="Connecter les agents d’une machine"
+          className={ENROLLMENT_DIALOG_WIDTH}
+          footer={<>
+            <button type="button" className={BUTTON.secondary} disabled={busy} onClick={() => setAddKind(null)}>
+              Retour
+            </button>
+            {localMachine ? (
+              <button type="button" className={BUTTON.secondary} disabled={busy} onClick={() => attachDesktop.mutate()}>
+                {attachDesktop.isPending ? "Connexion des agents…" : "Ajouter cet ordinateur"}
+              </button>
+            ) : null}
+            <button type="button" className={BUTTON.primary} disabled={busy || !canEnroll}
+              onClick={() => enroll.mutate({ name: draftName.trim(), machine: true })}>
+              Obtenir la commande
+            </button>
+          </>}
+        >
+          <form className="space-y-3" onSubmit={(event) => {
+            event.preventDefault();
+            if (canEnroll && !busy) enroll.mutate({ name: draftName.trim(), machine: true });
+          }}>
+            <div className="space-y-2">
+              <Label htmlFor="machine-add-name">Nom de la machine</Label>
+              <Input
+                id="machine-add-name"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder="ubuntu-server"
+                autoComplete="off"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Connectez-vous d’abord à chaque CLI sur cette machine. L’étape suivante donne les commandes à lancer dans votre dossier de travail.
+            </p>
+          </form>
+        </Dialog>
       ) : isAdding ? (
         <Dialog
           open
           onClose={closeDraft}
-          title={t(active ? "cloudRuntimeSettings.replaceStart" : "cloudRuntimeSettings.addAction")}
+          title="Ajouter un serveur Hermes"
           className={reachability === "direct" ? DIRECT_DIALOG_WIDTH : ENROLLMENT_DIALOG_WIDTH}
           bodyClassName="flex flex-col overflow-y-hidden"
           footer={reachability === "connector" ? (
             <>
-              <button type="button" className={BUTTON.secondary} disabled={busy} onClick={closeDraft}>
-                Annuler
+              <button type="button" className={BUTTON.secondary} disabled={busy} onClick={() => setAddKind(null)}>
+                Retour
               </button>
               <button
                 type="button"
                 className={BUTTON.primary}
-                disabled={busy || !canEnroll}
-                onClick={() => enroll.mutate()}
+                disabled={busy || !canEnroll || pending.length > 0}
+                onClick={() => enroll.mutate({ name: draftName.trim() })}
               >
-                Appairer depuis le serveur
+                Appairer Hermes
               </button>
             </>
           ) : undefined}
@@ -455,28 +446,13 @@ export function RuntimeReplacement({ activeId, initiallyAdding = false }: { acti
                 </EnrollmentStep>
               ))}
             </ol>
-            <p className="text-xs leading-5 text-muted-foreground">
-              Déjà fait sur cette machine ? Passez directement à l’appairage. Le ticket, valable cinq minutes, ne s’ouvre qu’au clic sur « Appairer depuis le serveur ».
-            </p>
+            <p className="text-xs leading-5 text-muted-foreground">Le ticket est valable cinq minutes.</p>
           </div>
-          {/*
-            Pairing is the default path: it avoids going to fetch the
-            bearer oneself, and therefore passing it through a terminal and a
-            clipboard. The input stays offered to whoever already has it at hand.
-          */}
           </div>
           )}
         </div>
         </Dialog>
-      ) : registryState !== "listed" || pending.length > 0 ? null : (
-        // One replacement at a time: while it waits, the API refuses to
-        // pair another (`RUNTIME_REPLACEMENT_PENDING`), and so does the button.
-        <div className="flex justify-end">
-          <button type="button" className={BUTTON.secondary} disabled={busy} onClick={() => setIsAdding(true)}>
-            {t(active ? "cloudRuntimeSettings.replaceStart" : "cloudRuntimeSettings.addAction")}
-          </button>
-        </div>
-      )}
+      ) : null}
     </SettingsCard>
   );
 }

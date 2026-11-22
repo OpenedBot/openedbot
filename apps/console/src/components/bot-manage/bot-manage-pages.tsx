@@ -1,6 +1,8 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BotDto } from "@openedbot/contracts-api";
+import type { BotDto, RosterDto } from "@openedbot/contracts-api";
+import { ExecutionHostField, useBotCreationHosts } from "../bot-create/execution-host-field";
 import {
   AUTONOMY_CEILINGS,
   AUTONOMY_MINIMUMS,
@@ -21,12 +23,48 @@ import { PermissionModeList, shownEffectivePermission, useAutoReviewAvailable, u
 import { ThreadActivityList } from "../thread-activity-panel";
 import { BotPermissionRules, useHasProPermissions } from "../../pro-console/slots";
 
-// The runtime pane is the whole `/settings/runtime` screen: loaded when opened.
-export const CloudRuntimeSettings = lazy(() =>
-  import("../../screens/settings/installation/cloud").then((module) => ({ default: module.CloudRuntimeSettings })));
-
-export function RuntimePane() {
-  return <Suspense fallback={null}><CloudRuntimeSettings /></Suspense>;
+/**
+ * The machine this bot runs on: the organization's default one or an agent of
+ * a machine. Changing it takes effect at the next message, on the new
+ * machine's default model, with the conversation's history.
+ */
+export function BotMachinePage({ bot }: { bot: BotDto }) {
+  const queryClient = useQueryClient();
+  const { selectedHost: _selected, requiresHost: _requires, ...hosts } = useBotCreationHosts(bot.runtimeId ?? "");
+  const move = useMutation({
+    mutationFn: (runtimeId: string) => api.moveBot(bot.id, runtimeId || null),
+    onSuccess: async (moved) => {
+      queryClient.setQueryData<RosterDto>(queryKeys.roster, (current) => current
+        ? { ...current, bots: current.bots.map((entry) => entry.id === moved.id ? moved : entry) }
+        : current);
+      toast.success(`${moved.name} change de machine.`);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.roster });
+    },
+    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Le changement de machine a échoué."),
+  });
+  return (
+    <div className="space-y-3">
+      <p className="text-sm leading-5 text-text-secondary">
+        La machine qui exécute les demandes de ce bot : la machine par défaut, ou l’un des agents d’une machine.
+      </p>
+      <fieldset disabled={move.isPending} className="min-w-0">
+        <ExecutionHostField
+          id={`bot-machine-${bot.id}`}
+          {...hosts}
+          value={bot.runtimeId ?? ""}
+          onChange={(next) => move.mutate(next)}
+        />
+      </fieldset>
+      <p role="status" className="text-xs leading-5 text-text-tertiary">
+        {move.isPending
+          ? "Changement de machine…"
+          : "Le changement vaut dès le prochain message. Le modèle repart sur celui par défaut de la nouvelle machine, la conversation garde son historique."}
+      </p>
+      <Link to="/settings/runtime" search={{ section: "runtimes" }} className="inline-block text-caption-1-medium text-text-secondary underline underline-offset-2">
+        Gérer les machines
+      </Link>
+    </div>
+  );
 }
 
 /**

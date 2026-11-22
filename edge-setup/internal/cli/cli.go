@@ -168,7 +168,7 @@ func stripNoColor(args []string) ([]string, bool) {
 // while rollback-access, proxy-rollback and operator still call requireRoot.
 // Elevating `internal` here would make the connector unit invoke sudo under
 // NoNewPrivileges=true and enter a permanent restart loop.
-var rootFree = map[string]bool{"help": true, "version": true, "self-verify": true, "internal": true}
+var rootFree = map[string]bool{"help": true, "version": true, "self-verify": true, "internal": true, "connect": true}
 
 // NeedsRoot reports whether a command must run as root.
 func NeedsRoot(name string) bool { return !rootFree[name] }

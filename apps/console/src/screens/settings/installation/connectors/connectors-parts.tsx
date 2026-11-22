@@ -10,11 +10,11 @@ import { useT } from "../../../../lib/i18n";
 import { McpPanel } from "./connectors-mcp";
 import {
   BUTTON,
-  CopyButton,
   Note,
   ToneBadge,
   type Tone,
 } from "../../../../components/settings/primitives";
+import { CopyButton } from "../../../../components/settings/copy-button";
 
 /**
  * The pieces shared by Settings › Connectors, desktop and phone: the

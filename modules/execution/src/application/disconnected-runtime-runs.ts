@@ -17,8 +17,7 @@ const DISCONNECTED_MESSAGE = "Le runtime nâ€™a pas rouvert son lien connecteur Ã
 export async function failRunsOnDisconnectedRuntimes(db: SQL, timeoutMs: number): Promise<number> {
   return db.begin(async (tx) => {
     const sql = tx as unknown as SQL;
-    // Queued, never sent to Hermes: no lease to hold. Every run of an
-    // organization with a stale runtime, as the join on the organization did.
+    // Queued, never dispatched: only the runtime selected for this run matters.
     const failed = await transitionRuns(sql, {
       target: { sweep: true }, fence: "unleased",
       transition: { from: ["queued"], to: { status: "failed", externalState: "settled" } },
@@ -27,13 +26,15 @@ export async function failRunsOnDisconnectedRuntimes(db: SQL, timeoutMs: number)
         endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null,
       },
       where: sqlExpr`hermes_run_id is null and created_at < now() - (${timeoutMs} * interval '1 millisecond')
-        and organization_id in (
-          select rt.organization_id
+        and exists (
+          select 1
             from runtimes rt
             left join api_instances inst on inst.instance_id = rt.link_instance_id
-           where rt.reachability = 'connector'
+            left join bots b on b.organization_id = runs.organization_id and b.id = runs.bot_id
+           where rt.organization_id = runs.organization_id
+             and rt.reachability = 'connector'
+             and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active))
              and rt.revoked_at is null
-             and rt.is_active
              and rt.last_health_status = 'disconnected'
              and (
                coalesce(rt.link_last_seen_at, rt.updated_at) < now() - (${timeoutMs} * interval '1 millisecond')

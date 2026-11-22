@@ -12,7 +12,7 @@ import { cn } from "@openedbot/browser-ui-kit";
  * the template's.
  */
 export const BUI_POPOVER =
-  "bui-popover bui-scroll z-50 flex max-h-[min(var(--radix-popper-available-height,828px),828px)] max-w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-[20px] border border-border-button-default bg-background-primary-default p-1.5 text-text-primary shadow-dropdown outline-none";
+  "bui-popover bui-scroll z-[115] flex max-h-[min(var(--radix-popper-available-height,828px),828px)] max-w-[calc(100vw-32px)] flex-col overflow-y-auto rounded-[20px] border border-border-button-default bg-background-primary-default p-1.5 text-text-primary shadow-dropdown outline-none";
 
 /** A menu row: 36 px, a 20 px grey icon. The hover is `dropdown-item-hover` (light #f7f7f7, dark one step above the panel). */
 export const BUI_MENU_ITEM =

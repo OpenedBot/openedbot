@@ -30,6 +30,8 @@ export type ModelCatalogView = {
    * they show the switch, and the worker honours it only for them.
    */
   fastIds: Set<string>;
+  /** The efforts a model accepts, for the models whose host lists them (local Codex). */
+  effortsById: Map<string, HermesReasoningEffort[]>;
 };
 
 /** Two ids that differ only by `.` or `-` name the same model. */
@@ -89,6 +91,9 @@ export function catalogModelView(
   const fastIds = new Set(
     authenticated.flatMap((provider) => provider.models.filter((model) => model.fast).map((model) => model.id)),
   );
+  const effortsById = new Map(
+    authenticated.flatMap((provider) => provider.models.flatMap((model) => model.efforts ? [[model.id, model.efforts] as const] : [])),
+  );
   const seen = new Set<string>();
   const groups = authenticated
     .map((provider) => ({
@@ -101,7 +106,7 @@ export function catalogModelView(
       }),
     }))
     .filter((group) => group.models.length > 0);
-  return { groups, knownIds, reasoningIds, fastIds };
+  return { groups, knownIds, reasoningIds, fastIds, effortsById };
 }
 
 export function providerRail(providers: RuntimeModelProviderDto[]): ProviderRailEntry[] {
@@ -224,7 +229,10 @@ export function resolveThreadModel(input: {
   return {
     model,
     effort:
-      catalog.reasoningIds.has(model) && isHermesReasoningEffort(storedEffort) ? storedEffort : null,
+      catalog.reasoningIds.has(model) && isHermesReasoningEffort(storedEffort)
+        && (catalog.effortsById.get(model)?.includes(storedEffort) ?? true)
+        ? storedEffort
+        : null,
     source: botModelUsable ? "perBot" : botModel !== null ? "fallback" : "global",
   };
 }

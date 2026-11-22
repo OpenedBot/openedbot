@@ -1,4 +1,4 @@
-import { Children, isValidElement, useState, type ComponentProps, type ReactNode } from "react";
+import { Children, isValidElement, type ComponentProps, type ReactNode } from "react";
 import { Badge, cn, useIsMobile } from "@openedbot/browser-ui-kit";
 
 /**
@@ -119,19 +119,20 @@ export function SectionHeading({
  * On desktop nothing moves.
  */
 /**
- * Desktop: a card in two layers (`DESIGN.md` › Bureau › Carte). The SHELL, a
- * solid recessed tray (`surface-sunken`, the dialogs' tray too, so both read
- * as one colour), carries the title and its sentence; the INSET, the white card (`bg-card`, #262626 in dark) set in it
- * with a 6 px margin, carries the content, its rows and its footer. Three
- * steps of surface (page, tray, card) keep the card readable in dark, where a
- * single `bg-card` panel used to melt into the page. Shared by
- * `SettingsCard`, `ListSection` and the screens that draw their own card.
+ * Desktop: a card in two layers (`DESIGN.md` › Bureau › Carte), as the
+ * sections of boardui.com's Dashboard. The SHELL, a borderless grey tray
+ * (`surface-sunken`, #f7f7f7 on the white page, #171717 on #121212), carries
+ * the title and its sentence; the INSET, the card (`bg-card`, #262626 in dark)
+ * set in it with a 6 px margin, carries the content, its rows and its footer.
+ * The tray/card contrast is the edge: no border, a 1 px shadow only. Radii
+ * are concentric (16 = 10 + 6). Shared by `SettingsCard`, `ListSection` and
+ * the screens that draw their own card.
  */
 export const SETTINGS_SHELL =
-  "flex flex-col rounded-[20px] border border-border/60 bg-surface-sunken p-1.5";
+  "flex flex-col rounded-2xl bg-surface-sunken p-1.5";
 export const SETTINGS_SHELL_HEADER = "px-3 pt-2.5 pb-3";
 export const SETTINGS_INSET =
-  "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-border/60 bg-card shadow-sm";
+  "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] bg-card shadow-[0_1px_1px_rgb(0_0_0/0.05)] dark:shadow-[0_1px_1px_rgb(0_0_0/0.14)]";
 /** A lone surface (a toolbar, a row-card): the inset's look, without a tray. */
 export const SETTINGS_PANEL = "rounded-[14px] border border-border/60 bg-card shadow-sm";
 
@@ -593,43 +594,5 @@ export function EmptyState({
         {actions ? <div className="mt-2 flex flex-col items-center gap-2">{actions}</div> : null}
       </div>
     </div>
-  );
-}
-
-/**
- * Copy a value: third occurrence of the pattern, hence the extraction.
- *
- * Both details inherited from the copies (Devices, Models) are kept:
- * `navigator.clipboard?` (absent outside a secure context) and the `.catch` which
- * never says « Copié » when permission has been refused.
- */
-export function CopyButton({
-  value,
-  copyLabel,
-  copiedLabel,
-  className = BUTTON.secondary,
-  copiedClassName,
-}: {
-  value: string;
-  copyLabel: string;
-  copiedLabel: string;
-  className?: string;
-  /** The button's appearance once copied: green « success » when the screen wants it. */
-  copiedClassName?: string;
-}) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className={copied ? (copiedClassName ?? className) : className}
-      onClick={() => {
-        void navigator.clipboard
-          ?.writeText(value)
-          .then(() => setCopied(true))
-          .catch(() => setCopied(false));
-      }}
-    >
-      {copied ? copiedLabel : copyLabel}
-    </button>
   );
 }

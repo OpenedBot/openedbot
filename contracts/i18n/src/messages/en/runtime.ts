@@ -132,10 +132,9 @@ export const providerLimits = {
   open: "View provider limits",
   close: "Close",
   subtitle: "Provider subscriptions and per-bot tokens.",
-  peak: "{percent}% peak",
   loading: "Reading limits…",
-  usedLabel: "{percent}% · {reset}",
-  usedPercentValue: "{percent}%",
+  remainingLabel: "{percent}% left · {reset}",
+  remainingPercentValue: "{percent}% left",
   resetIn: "Resets in {reset}",
   resetDays: "{days}d",
   resetHours: "{hours}h",
@@ -334,6 +333,8 @@ export const runtimeHealth = {
 } as const;
 
 export const railQuotas = {
+  /** The rail foot's pill: LLM quotas and runtime. */
+  pill: "Models",
   title: "LLM quota left",
   remaining: "{provider}: {percent}% left",
   remainingReset: "{provider}: {percent}% left · resets in {reset}",
@@ -393,6 +394,7 @@ export const connectorUpgrade = {
   upToDateTitle: "Runtime up to date",
   upToDate: "edge-setup {version} is installed on “{runtime}”.",
   hermesRow: "Hermes",
+  engineRow: "{engine}",
   versionUnknown: "version unknown",
   versionRequired: "{version} · {latest} required",
   versionCurrent: "{version} · up to date",

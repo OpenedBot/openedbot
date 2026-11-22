@@ -41,3 +41,23 @@ export async function consumeRuntimeEnrollment(
   `;
   return burned.length === 1;
 }
+
+/**
+ * A machine ticket is not burned by one runtime: each local engine of the
+ * machine takes its place once, until the ticket expires. `false` when this
+ * engine already has its runtime or the ticket is over.
+ */
+export async function claimMachineEnrollment(
+  tx: Db,
+  input: { enrollmentId: string; organizationId: string; runtimeId: string; engine: string },
+): Promise<boolean> {
+  const claimed = await tx<Array<{ id: string }>>`
+    update runtime_enrollments
+       set claimed_engines = array_append(claimed_engines, ${input.engine}), runtime_id = ${input.runtimeId}
+     where id = ${input.enrollmentId} and organization_id = ${input.organizationId} and dedicated
+       and consumed_at is null and expires_at > now()
+       and not (${input.engine} = any(claimed_engines))
+    returning id
+  `;
+  return claimed.length === 1;
+}

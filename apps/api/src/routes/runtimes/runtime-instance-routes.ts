@@ -87,6 +87,9 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       return rows[0] ?? null;
     });
     if (!target) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Ce runtime n’existe pas.");
+    if (target.dedicated) {
+      throw new HttpError(409, "RUNTIME_DEDICATED", "Choisissez cette machine dans les réglages de création du bot.");
+    }
 
     // Same probe through the pipe as at enrollment: a closed link (503) or a
     // host that no longer answers is not activated, and the badge says so.
@@ -150,6 +153,7 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            (select max(e.occurred_at) from runtime_link_events e
@@ -198,6 +202,9 @@ export function runtimeInstanceRoutes(ctx: RuntimeRouteContext): Hono<{ Variable
       const declared = await readAllRuntimeRows(tx, auth.organizationId);
       const target = declared.find((row) => row.id === runtimeId) ?? null;
       if (!target) return null;
+      if (target.dedicated && !confirmed) {
+        throw new HttpError(409, "RUNTIME_DEDICATED", "Confirmez le retrait de cette machine utilisée par les bots qui lui sont affectés.");
+      }
       if (target.isActive && !confirmed) {
         throw new HttpError(
           409,

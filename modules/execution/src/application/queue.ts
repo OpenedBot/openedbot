@@ -48,7 +48,10 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
         select r.id, r.organization_id, r.workflow_id, r.remote_stop_state
           from runs r
           left join ${subscriptionPort().admission(tx)} s on s.organization_id = r.organization_id
-          join runtimes rt on rt.organization_id = r.organization_id and rt.revoked_at is null and rt.is_active
+          join organizations org on org.id = r.organization_id
+          left join bots b on b.organization_id = r.organization_id and b.id = r.bot_id
+          join runtimes rt on rt.organization_id = r.organization_id and rt.revoked_at is null
+            and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active))
             -- Un runtime connector dont le lien est muet depuis 45 s ne
             -- réclame rien : le run attend, ou échoue RUNTIME_DISCONNECTED
             -- passé WORKER_LINK_QUEUE_TIMEOUT_MS (maintenance/runtime-links.ts).
@@ -151,7 +154,7 @@ export async function claimRun(db: SQL, config: WorkerConfig): Promise<ClaimedRu
                   coalesce(workflow.created_at, r.created_at) asc,
                   coalesce(workflow.id, r.id) asc,
                   coalesce(r.step_index, 0) asc, r.created_at asc, r.id asc
-         for update of r, rt skip locked
+         for update of r, rt, org skip locked
          limit 1
       ), workflow_guard as (
         -- Le run est déjà verrouillé. Verrouiller ensuite son workflow garde le

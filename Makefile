@@ -100,7 +100,7 @@ endif
 .PHONY: help help-all
 
 # Les cibles du quotidien, par mode ; toutes les autres restent dans help-all.
-HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down db-migrate db-reset-keep-users
+HELP_DEV     := setup fake-hermes dev stop link-dev-up link-dev-status link-dev-down connect-dev-build db-migrate db-pending db-reset-keep-users
 # Les fragments privés (plugins/make/*.mk, en fin de fichier) y ajoutent leurs cibles.
 HELP_PREPROD :=
 HELP_PROD    := link-prod
@@ -140,7 +140,7 @@ env-prod-list: ## Prints the production template (no production file is versione
 	@bun scripts/env.ts --template --print-production
 
 # ─── Dev: database and services ──────────────────────────────────────────────
-.PHONY: db-up infra-up mailpit-up fake-hermes db-migrate db-seed db-reset db-reset-keep-users runtime-token-rotate
+.PHONY: db-up infra-up mailpit-up fake-hermes db-migrate db-pending db-seed db-reset db-reset-keep-users runtime-token-rotate
 
 db-up: ## [DB] Checks the development PostgreSQL (restarted when stopped; created from compose.dev.yml only with OPENEDBOT_DEV_INFRA=compose); never Hermes.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --up
@@ -158,6 +158,12 @@ fake-hermes: ## [FAKE] Serves the fake Hermes gateway on 127.0.0.1:18642 in the 
 
 db-migrate: ## [DB] Applies the migrations; requires the infrastructure to be running already.
 	$(LOAD_ENV_OPT) bash scripts/db.sh --migrate
+
+# Prerequisite of dev, dev-api and dev-worker: an API started on a database
+# that lacks a migration only fails later, request by request, with an opaque
+# 500. Read-only: the database changes only through make db-migrate.
+db-pending: ## [DB] Fails when a migration is pending (names it); silent otherwise. Writes nothing.
+	@$(LOAD_ENV_OPT) bash scripts/db.sh --pending
 
 db-seed: db-migrate env-check ## Creates the development account, organization, subscription and Hermes.
 	$(LOAD_ENV) ENV_FILE="$(abspath $(ENV_FILE))" OPENEDBOT_DEV_PROFILE="$(MODE)" bun run --filter api seed
@@ -197,7 +203,7 @@ runtime-token-rotate: db-migrate env-check ## Atomically re-encrypts the tokens 
 
 # format_dev_logs ignore INT/TERM/HUP et lit jusqu'à la fin du tuyau : mort
 # le premier sur Ctrl-C, il cassait le tuyau sous les apps en plein arrêt.
-dev: env-check ## [API + CONSOLE + WORKER] Validates .env.local then starts the apps, without the desktop app (`make desktop` separately, DESKTOP=1 to add it); no infrastructure, no migration. MODE=fake|bundled|external forces the profile.
+dev: env-check db-pending ## [API + CONSOLE + WORKER] Validates .env.local then starts the apps, without the desktop app (`make desktop` separately, DESKTOP=1 to add it); no infrastructure; refuses while a migration is pending (make db-migrate). MODE=fake|bundled|external forces the profile.
 	@set -eo pipefail; $(LOAD_ENV) \
 	format_dev_logs() { \
 		local line label color payload; \
@@ -220,13 +226,13 @@ dev: env-check ## [API + CONSOLE + WORKER] Validates .env.local then starts the 
 	ENV_FILE="$(ENV_FILE)" bun scripts/dev-accounts.ts; \
 	$(DEV_COMMAND) 2>&1 | format_dev_logs
 
-dev-api: env-check ## [API] Starts the API only; infrastructure already running.
+dev-api: env-check db-pending ## [API] Starts the API only; infrastructure already running, no migration pending.
 	$(LOAD_ENV) $(DEV_API_COMMAND)
 
 dev-console: ## [CONSOLE] Starts Vite only, on :1420.
 	$(LOAD_ENV_OPT) $(DEV_CONSOLE_COMMAND)
 
-dev-worker: env-check ## [WORKER] Processes runs/workflows; API and infrastructure separately.
+dev-worker: env-check db-pending ## [WORKER] Processes runs/workflows; API and infrastructure separately, no migration pending.
 	$(LOAD_ENV) $(DEV_WORKER_COMMAND)
 
 
@@ -348,6 +354,15 @@ link-dev-verify: ## [DEV] Browser pass of /settings/runtime in a throwaway Chrom
 link-gateway-install: ## [HERMES] Installs the systemd user service without starting it or enabling it at boot.
 	@bun scripts/runtime-link-service.ts --install
 
+# ─── Dev: local agents ───────────────────────────────────────────────────────
+.PHONY: connect-dev-build
+
+connect-dev-build: ## [AGENTS] Builds edge-setup at edge-setup/dist/edge-setup, for `edge-setup connect` (Codex, Claude Code, Grok, Gemini, OpenCode).
+	@$(MAKE) --no-print-directory -C edge-setup build
+	@printf '%b[make]%b Binaire local prêt. Depuis la racine du dépôt :\n' '$(C_OK)' '$(C_RESET)'
+	@printf '%s\n' 'export PATH="$$PWD/edge-setup/dist:$$PATH"'
+	@printf '%b[make]%b Agents trouvés sans rien appairer : %bedge-setup connect --probe%b. La commande d’appairage vient de Réglages, « Connecter les agents d’une machine ».\n' '$(C_OK)' '$(C_RESET)' '$(C_TARGET)' '$(C_RESET)'
+
 # ─── Quality ─────────────────────────────────────────────────────────────────
 .PHONY: typecheck deps-check license-check test-unit test-dual solo-check pro-check bundle-budget test-integration test-trace-legacy test check
 
@@ -414,6 +429,7 @@ test-unit: ## Unit tests of API, worker, web, contracts, platform, modules and s
 	bun tests/scripts/code-structure-contract.ts
 	bash tests/scripts/migration-record-contract.sh
 	bash tests/scripts/pro-migrations-contract.sh
+	bash tests/scripts/db-pending-contract.sh
 	bash tests/scripts/css-backdrop-order-contract.sh
 	bash tests/scripts/policies-claims-contract.sh
 	bash tests/scripts/console-build-guard-contract.sh
@@ -555,6 +571,10 @@ test-integration: $(if $(INTEGRATION_DATABASE_URL),,db-up) ## Disposable Postgre
 	bun tests/integration/text-array-binds.ts
 	bun tests/integration/provider-fallback-stream.ts
 	bun tests/integration/run-stop-cause.ts
+	bun tests/integration/engine-run-contract.ts
+	bun tests/integration/engine-profile-contract.ts
+	# Bots on a dedicated machine: machine ticket (one place per agent), moving a bot between machines.
+	bun tests/integration/engine-profile-contract.ts --assigned-runtime
 	# S7 : un run suivi de bout en bout par un seul trace-id (API, worker, passerelle, connecteur Go réel, Hermes) ; exige go.
 	bun tests/integration/run-trace-correlation.ts
 	# Derniers : ils exigent SQL.listen (Bun >= 1.4, le packageManager épinglé) et disent pourquoi s'il manque.
@@ -676,6 +696,8 @@ EDGE_SETUP_DIR ?= $(CURDIR)/edge-setup
 CONTRACT_GO  := $(EDGE_SETUP_DIR)
 CONTRACT_TS  := platform/hermes
 CONTRACT_COPIES := \
+	$(CONTRACT_GO)/test/golden/run-contract/routes.json=protocol/connector/fixtures/run-contract.routes.json \
+	$(CONTRACT_GO)/test/golden/run-contract/vectors.json=protocol/connector/fixtures/run-contract.vectors.json \
 	$(CONTRACT_GO)/test/golden/relay-frames/vectors.json=$(CONTRACT_TS)/tests/fixtures/relay-frames.vectors.json \
 	$(CONTRACT_GO)/test/golden/relay-allowlist/allowlist.json=$(CONTRACT_TS)/tests/fixtures/relay-allowlist.json \
 	$(CONTRACT_GO)/test/golden/forbidden-toolsets/forbidden-toolsets.json=modules/runtimes/tests/fixtures/forbidden-toolsets.json \

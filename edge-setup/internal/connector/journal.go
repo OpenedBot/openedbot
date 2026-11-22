@@ -207,8 +207,9 @@ func (j *Journal) Wait(runID string, since uint64, done <-chan struct{}) bool {
 	j.mu.Lock()
 	s := j.state(runID)
 	if s.seq > since || s.terminal || s.truncated {
+		ready := s.seq > since
 		j.mu.Unlock()
-		return s.seq > since
+		return ready
 	}
 	w := make(chan struct{})
 	s.waiters = append(s.waiters, w)

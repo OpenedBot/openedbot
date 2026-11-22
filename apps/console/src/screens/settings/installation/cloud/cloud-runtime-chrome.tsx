@@ -1,5 +1,4 @@
 import { type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
 import { IconHelp } from "@tabler/icons-react";
 import { cn, Popover, Skeleton, useIsMobile } from "@openedbot/browser-ui-kit";
 import { useT } from "../../../../lib/i18n";
@@ -120,17 +119,8 @@ export function RuntimeSectionRail({
   onChange: (section: RuntimeSection) => void;
   children: ReactNode;
 }) {
-  const { t } = useT();
   const isMobile = useIsMobile();
   const panelId = "runtime-section-panel";
-  const agentsLink = (
-    <Link
-      to="/settings/agents"
-      className={cn(RUNTIME_RAIL_ITEM, "text-muted-foreground hover:bg-accent/60 hover:text-foreground")}
-    >
-      {t("settingsSidebar.agents")}
-    </Link>
-  );
   if (isMobile) {
     return (
       <>
@@ -148,7 +138,6 @@ export function RuntimeSectionRail({
             idPrefix="runtime-section"
           />
         </div>
-        <div className="px-4">{agentsLink}</div>
         <div id={panelId} role="tabpanel" aria-labelledby={`runtime-section-${current}`} className="flex flex-col gap-2">
           {children}
         </div>
@@ -188,7 +177,6 @@ export function RuntimeSectionRail({
             );
           })}
         </div>
-        {agentsLink}
       </nav>
       <div id={panelId} role="tabpanel" aria-labelledby={`runtime-section-${current}`} className="flex min-w-0 flex-col gap-4">
         {children}

@@ -31,6 +31,7 @@ export function ModelCatalogPanel({
   onModelChange,
   trailing,
   onClose,
+  notice = null,
   listRef,
   className,
 }: {
@@ -53,6 +54,8 @@ export function ModelCatalogPanel({
   /** Placed at the end of the checked row (the composer's effort chip). */
   trailing?: ReactNode;
   onClose: () => void;
+  /** Shown instead of the list when the catalogue cannot be read (loading, machine unavailable). */
+  notice?: string | null;
   listRef?: RefObject<HTMLDivElement | null>;
   /** The panel's size. */
   className?: string;
@@ -178,11 +181,13 @@ export function ModelCatalogPanel({
         <div className={cn("relative flex min-h-0 flex-1 flex-col", flat ? "px-1.5 pt-1.5" : "mt-1")}>
           <div
             ref={listRef}
-            role={showNotConnected ? undefined : "radiogroup"}
-            aria-label={showNotConnected ? undefined : t("composer.model")}
+            role={showNotConnected || notice ? undefined : "radiogroup"}
+            aria-label={showNotConnected || notice ? undefined : t("composer.model")}
             className="bui-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-1"
           >
-            {showNotConnected ? (
+            {notice ? (
+              <p role="status" className="px-2 py-3 text-body-2-medium text-text-tertiary">{notice}</p>
+            ) : showNotConnected ? (
               <ProviderNotConnectedPanel provider={activeProvider.slug} name={activeProvider.name} onClose={onClose} />
             ) : (
               <>

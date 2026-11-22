@@ -5,6 +5,7 @@ import { countFoldableRoomMessages } from "./compact-thread";
 
 export type RoomCompactionSpeaker = {
   botId: string;
+  runtimeId: string | null;
   /** Profil Hermes du membre (relais uniquement ; un runtime direct l'ignore). */
   profile: string | null;
   model: string | null;
@@ -62,10 +63,9 @@ export async function readRoomCompactionTarget(
       ) as active
     `;
     if (active[0]?.active) return { kind: "run_active" as const };
-    const speakers = await tx<Array<{
-      botId: string; profile: string | null; model: string | null; reasoningEffort: string | null;
-    }>>`
-      select b.id as "botId", b.hermes_profile as profile, b.model, b.reasoning_effort as "reasoningEffort"
+    const speakers = await tx<RoomCompactionSpeaker[]>`
+      select b.id as "botId", b.runtime_id as "runtimeId",
+             b.hermes_profile as profile, b.model, b.reasoning_effort as "reasoningEffort"
         from bots b
        where b.organization_id = ${organizationId} and b.archived_at is null and b.deleted_at is null
          and b.id in (

@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { segmentMentions } from "@openedbot/roster/domain/mentions";
@@ -31,11 +31,14 @@ export function ProviderAuthNotice({
   provider,
   findTargetId,
   findActive = false,
+  children,
 }: {
   name: string;
   provider: string;
   findTargetId: string;
   findActive?: boolean;
+  /** The failed turn's footer (`RunFailureFooter`): retry and reference. */
+  children?: ReactNode;
 }) {
   const { t } = useT();
   const openSettings = useOpenSettings();
@@ -58,6 +61,7 @@ export function ProviderAuthNotice({
       >
         {t("threadTimeline.providerAuthRequiredAction", { provider: label })}
       </button>
+      {children}
     </div>
   );
 }
@@ -74,12 +78,15 @@ export function ModelUnavailableNotice({
   botId,
   findTargetId,
   findActive = false,
+  children,
 }: {
   name: string;
   model: string | null;
   botId: string | null;
   findTargetId: string;
   findActive?: boolean;
+  /** The failed turn's footer (`RunFailureFooter`): retry and reference. */
+  children?: ReactNode;
 }) {
   const { t } = useT();
   return (
@@ -99,6 +106,7 @@ export function ModelUnavailableNotice({
           {t("threadTimeline.modelUnavailableAction")}
         </Link>
       ) : null}
+      {children}
     </div>
   );
 }
@@ -148,12 +156,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   const markdown = streaming || text !== targetText
     ? stabilizeStreamingMarkdown(text)
     : text;
-  // An answer this view saw stream: its action row rises in once (the reference app
-  // `.stream-enter`); one read back from history just sits there.
-  const streamed = useRef(false);
-  if (streaming) streamed.current = true;
   // the reference app's agent bubble (fill, sheen and edge in `thread-theme.css`):
-  // radius 18, padding 7 / 12, at most min(80 %, 560 px, 100 % − 82 px).
+  // Radius 18, padding 7 / 12; the action shell bounds the available width.
   // Inside, the reference app's `Answer` typography (`data-assistant-layout="stream"`);
   // every streamed word blurs in (`.stream-w`).
   const surface = (
@@ -161,7 +165,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       data-thread-find-target={author || hover ? undefined : findTargetId}
       data-assistant-layout="stream"
       tabIndex={-1}
-      className={`w-full min-w-0 self-start ${findActive ? "ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
+      className={`w-full min-w-0 self-start rounded-[18px] px-3 py-[7px] ${findActive ? "ring-2 ring-border-focus-ring ring-offset-2" : ""}`}
     >
       {/* `wrap-anywhere`: an endless URL (Google News RSS links…) must
           break inside the reply, never widen the thread into a horizontal scroll. */}
@@ -174,9 +178,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     <MessageInteractionShell
       surface="card"
       width="fill"
-      actions="below"
-      persistentActions
-      actionsReveal={streamed.current}
+      actions="side"
       messageId={hover.messageId}
       align="start"
       labels={hover.labels}
@@ -185,7 +187,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       onReply={hover.onReply}
       onReaction={hover.onReaction}
       speaker={hover.speakerFor?.("body", hover.copyText ?? markdown)}
-      // On the action row, never a line of its own: dev and prod keep the same height.
+      // Keep timing inside the hover actions so it is hidden with them.
       footerEnd={showTiming && timing ? <span data-run-timing=""><RunTimingBadge timing={timing} /></span> : undefined}
     >
       {surface}

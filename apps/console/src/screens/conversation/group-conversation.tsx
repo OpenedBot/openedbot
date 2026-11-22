@@ -1,5 +1,3 @@
-import { ConversationDiagnostic } from "../../components/conversation-diagnostic";
-import { ConversationFiles } from "../../components/conversation-files";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
@@ -10,9 +8,10 @@ import { toast, useIsMobile } from "@openedbot/browser-ui-kit";
 import type { MessageAuthorBot } from "@openedbot/contracts-api";
 import { replyPreviewSnippet, replyQuoteText } from "@openedbot/conversation/domain/message-reply";
 import { useMessageReactionToggle } from "../../lib/thread/use-message-reaction-toggle";
-import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
+import { api, queryKeys, userFacingError } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
+import { threadReadFailureMessage } from "../../lib/thread/thread-read-failure";
 import {
   threadContainsOutgoingUserInput,
 } from "../../lib/thread/thread-anchor";
@@ -27,7 +26,7 @@ import { WorkflowOverview } from "../../components/workflow-overview";
 import { GroupContextTab } from "../../components/group-context-tab";
 import { AttachmentCanvas, AttachmentCanvasProvider } from "../../components/attachment-canvas";
 import { SiteHeader } from "../../components/dashboard/site-header";
-import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
+import { ConversationPending, ThreadLoading } from "../../components/thread-skeleton";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { useT } from "../../lib/i18n";
@@ -198,10 +197,7 @@ export function GroupConversationScreen() {
     : undefined;
   const threadLoading = loading || thread.data?.id !== group?.threadId;
   const threadFailed = thread.isError && thread.data?.id !== group?.threadId;
-  const threadFailureMessage = thread.error instanceof ApiError &&
-    thread.error.code === "DATABASE_MIGRATION_REQUIRED"
-    ? t("conversation.migrationRequired")
-    : t("conversation.loadFailed");
+  const threadFailureMessage = threadReadFailureMessage(t, thread.error);
 
   // A room turn that fails deserves more than a chip in the thread: a toast,
   // ONCE per run: the same "failed" comes back on every refetch.
@@ -328,7 +324,6 @@ export function GroupConversationScreen() {
                 band pinned above the thread (see `WorkflowOverview`). */}
             {!threadLoading && thread.data ? (
               <>
-                <ConversationFiles key={thread.data.id} threadId={thread.data.id} />
                 <WorkflowOverview
                   threadId={thread.data.id}
                   workflows={thread.data.workflows}
@@ -363,7 +358,6 @@ export function GroupConversationScreen() {
             docks and composer stretched across the whole window. */}
         <div data-thread-column="" className="flex min-h-0 min-w-0 flex-1 flex-col">
           {isMobile ? null : header}
-          {activeRun?.status === "failed" ? <ConversationDiagnostic code={activeRun.errorCode} reference={activeRun.id} onRetry={()=>void thread.refetch()} retrying={thread.isFetching} /> : null}
           {group.needsYou ? (
             <p data-thread-lane="" className="w-full shrink-0 px-4 sm:px-6 pt-2 text-xs text-muted-foreground">
               {t("groups.needsYou")}
@@ -383,7 +377,7 @@ export function GroupConversationScreen() {
               </button>
             </div>
           ) : threadLoading ? (
-            <ThreadSkeleton />
+            <ThreadLoading />
           ) : (
             <div
               className="relative flex min-h-0 flex-1 flex-col"

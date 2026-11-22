@@ -4,7 +4,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
 usage() {
-  printf 'usage: scripts/db.sh --up | --migrate | --reset [--yes] [--dry-run]\n' >&2
+  printf 'usage: scripts/db.sh --up | --migrate | --pending | --reset [--yes] [--dry-run]\n' >&2
   exit 2
 }
 
@@ -74,15 +74,37 @@ database_of_url() {
   printf '%s' "${rest:-openedbot}"
 }
 
+# --migrate applies the pending migrations. --pending (check_only=1) walks the
+# same applied and pending computation but writes nothing: no role, no
+# database, no migration. It is silent when nothing is pending, and otherwise
+# names each pending version and fails, so that make dev, dev-api and
+# dev-worker refuse to start an API against a schema it does not expect.
 db_migrate() {
+  check_only="${1:-0}"
   container="${OPENEDBOT_POSTGRES_CONTAINER:-infra-postgres}"
   database="$(database_of_url "${API_DATABASE_URL:-}")"
 
   if ! docker inspect "$container" >/dev/null 2>&1; then
-    printf 'PostgreSQL container %s is not available. Run make infra-up first.\n' "$container" >&2
+    if [ "$check_only" = 1 ]; then
+      printf 'Cannot check pending migrations: PostgreSQL container %s is not available. Run make db-up first.\n' "$container" >&2
+    else
+      printf 'PostgreSQL container %s is not available. Run make infra-up first.\n' "$container" >&2
+    fi
     exit 1
   fi
 
+  migration_options=""
+  if [ "$check_only" = 1 ]; then
+    # read_applied below reads a failure as "no schema_migrations", so every
+    # migration would look pending: an unreachable database is reported here.
+    if ! probe_error="$(docker exec "$container" sh -ceu 'psql -At -U "$POSTGRES_USER" -d "$1" -c "select 1"' -- "$database" 2>&1 >/dev/null)"; then
+      printf 'Cannot check pending migrations: database %s in container %s is unreachable (%s). Run make db-up, then make db-migrate.\n' \
+        "$database" "$container" "$(printf '%s' "$probe_error" | head -n 1)" >&2
+      exit 1
+    fi
+  else
+  # --migrate only, left unindented: the inner SQL heredocs end on a column 0
+  # terminator.
   docker exec "$container" sh -ceu '
     psql -v ON_ERROR_STOP=1 -v database_name="$1" -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<SQL
 do \$\$
@@ -119,9 +141,9 @@ SQL
 select pg_get_userbyid(datdba) from pg_database where datname = :'\''database_name'\'';
 SQL
 ' -- "$database")"
-  migration_options=""
   if [ "$owner" = "openedbot_migrator" ]; then
     migration_options="-c role=openedbot_migrator"
+  fi
   fi
 
   # The applied set is read once, then again after each applied file only:
@@ -134,7 +156,22 @@ SQL
   read_applied() {
     docker exec "$container" sh -ceu 'psql -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations" 2>/dev/null || true' -- "$database"
   }
-  applied="$(read_applied)"
+  if [ "$check_only" = 1 ]; then
+    # --pending must not read an unreadable registry (connection lost after
+    # the probe, no privilege) as an empty one: only an absent
+    # schema_migrations reads as empty, any other failure stops the check.
+    read_applied() {
+      docker exec "$container" sh -ceu '
+        exists="$(psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1" -c "select to_regclass(\$\$public.schema_migrations\$\$) is not null")"
+        [ "$exists" = t ] || exit 0
+        psql -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$1" -c "select version from schema_migrations"
+      ' -- "$database"
+    }
+  fi
+  if ! applied="$(read_applied)"; then
+    printf 'Cannot check pending migrations: the migration registry of database %s could not be read. Run make db-up, then start again.\n' "$database" >&2
+    exit 1
+  fi
 
   # A literal newline, so a version is matched delimited on both sides:
   # `0055_x` must not answer for `0055_x_bis`. Command substitution would eat
@@ -142,6 +179,10 @@ SQL
   newline='
 '
   skipped=0
+  # Only --pending fills it. Its applied set is not re-read after each file, so
+  # on a database migrated by the former files (no schema_migrations yet) it
+  # lists every file, not just 0001: the verdict, pending, stays right.
+  pending=""
   for migration in "$root"/db/migrations/*.sql; do
     version="$(basename "$migration" .sql)"
     case "$newline$applied$newline" in
@@ -150,6 +191,10 @@ SQL
         continue
         ;;
     esac
+    if [ "$check_only" = 1 ]; then
+      pending="$pending  $version$newline"
+      continue
+    fi
     docker exec -i -e PGOPTIONS="$migration_options" "$container" sh -ceu 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' -- "$database" < "$migration"
     printf 'Migration %s applied to %s.\n' "$version" "$database"
     applied="$(read_applied)"
@@ -174,6 +219,10 @@ SQL
           continue
           ;;
       esac
+      if [ "$check_only" = 1 ]; then
+        pending="$pending  $version$newline"
+        continue
+      fi
       {
         cat "$migration"
         printf "\ninsert into schema_migrations(version) values ('%s') on conflict (version) do nothing;\n" "$version"
@@ -182,6 +231,13 @@ SQL
     done <<EOF_PRO_PLAN
 $pro_plan
 EOF_PRO_PLAN
+  fi
+  if [ "$check_only" = 1 ]; then
+    if [ -n "$pending" ]; then
+      printf 'Database %s has pending migrations:\n%sRun make db-migrate, then start again.\n' "$database" "$pending" >&2
+      exit 1
+    fi
+    return 0
   fi
   printf '%s migration(s) already applied.\n' "$skipped"
 }
@@ -304,6 +360,7 @@ SQL
 case "$1" in
   --up) [ "$#" -eq 1 ] || usage; db_up ;;
   --migrate) [ "$#" -eq 1 ] || usage; db_migrate ;;
+  --pending) [ "$#" -eq 1 ] || usage; db_migrate 1 ;;
   --reset) shift; db_reset "$@" ;;
   *) usage ;;
 esac

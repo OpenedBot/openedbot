@@ -28,6 +28,7 @@ export const BOT_SPEECH_RATES = [0.75, 1, 1.25, 1.5] as const;
 export type BotSpeechRate = (typeof BOT_SPEECH_RATES)[number];
 
 export type BotDto = {
+  runtimeId?: string | null;
   id: string;
   threadId: string;
   name: string;

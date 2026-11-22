@@ -1,11 +1,10 @@
 import { ThreadInitialLayout } from "./thread-initial-layout";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { CircleHelp, ListChecks } from "lucide-react";
 import { AgentProgress, TrailItem, type AgentStep } from "@openedbot/browser-ui-kit";
 import type { BotSettingProposalDto, MessageAuthorBot } from "@openedbot/contracts-api";
 import { isTodoTool } from "@openedbot/execution/domain/agent-tool-call";
 import type { ToolCall } from "@openedbot/conversation/domain/thread-tools";
-import { isServiceStepKind } from "@openedbot/execution/domain/run-step";
 import {
   HANDOFF_NOTICE_KIND,
   splitHandoff,
@@ -20,7 +19,7 @@ import {
   MessageInteractionShell,
   type MessageCardHover,
 } from "./message-interactions";
-import { useThreadEditAvailability } from "../lib/thread/thread-edit-availability";
+import { usePublishEditAvailability } from "../lib/thread/thread-edit-availability";
 import { dismissComposerKeyboardFromThread } from "../lib/composer/composer-keyboard";
 import {
   nextThreadPin,
@@ -48,9 +47,9 @@ import {
 } from "../lib/thread/thread-timeline-model";
 import { authorRenderKey, entryDayIso, entryRunId, entrySignature } from "../lib/thread/thread-timeline-signature";
 import { AssistantAuthor, TurnAuthorHeader } from "./thread-author";
-import { AssistantMessage, BotInboundMessage, ModelUnavailableNotice, ProviderAuthNotice, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
-import { isModelUnavailableCode } from "../lib/run/model-unavailable";
-import { isProviderAuthRequiredCode, providerAuthRequiredSlug } from "../lib/runtime/provider-auth";
+import { RunErrorEntry } from "./thread-run-error";
+import { questionsByRun, shownThreadEvents } from "../lib/thread/failed-turns";
+import { AssistantMessage, BotInboundMessage, RoomAnswerCard, RoutineStamp, UserMessage } from "./thread-messages";
 import { ToolActivity } from "./thread-tool-activity";
 import { callsHaveCards, ToolCallCards } from "./cards/run-card-view";
 import { PendingThinking } from "./thread-thinking-status";
@@ -111,6 +110,7 @@ function ThreadTimelineView({
   onEditMessage,
   onRegenerateMessage,
   canEditMessages = true,
+  editBlockedReason,
   hiddenAssistantRunIds = "",
   onSelectMessageVersion,
   onReaction,
@@ -131,17 +131,15 @@ function ThreadTimelineView({
   olderError = false,
   onLoadOlder,
   onOpenBotErrors,
+  onOpenBotApprovals,
   liveText = null,
 }: ThreadTimelineProps) {
-  // SERVICE runs (persona draft, compaction, and the old
-  // memory extraction) share the bot's thread but have no bubble:
-  // their output is consumed by the worker. Without this filter, their
-  // `agent.message` formed an empty assistant bubble under the avatar,
-  // seen on screen on 04-09.
-  const events = useMemo(() => {
-    const serviceRunIds = new Set(runs.filter((run) => isServiceStepKind(run.stepKind)).map((run) => run.id));
-    return serviceRunIds.size === 0 ? allEvents : allEvents.filter((event) => !serviceRunIds.has(event.runId));
-  }, [allEvents, runs]);
+  // Without service runs (their `agent.message` formed an empty assistant bubble
+  // under the avatar, seen on screen on 04-09), with failed turns made whole.
+  const events = useMemo(
+    () => shownThreadEvents(allEvents, runs, userInputs, hasOlderHistory),
+    [allEvents, runs, userInputs, hasOlderHistory],
+  );
   const { t, locale, formatNumber, plural } = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -176,11 +174,7 @@ function ThreadTimelineView({
   const runLines = useRef<RunLineTracker | null>(null);
   // Edit availability goes through the store (`thread-edit-availability`),
   // outside the turn signatures: its switch re-renders only the message shells.
-  const setCanEdit = useThreadEditAvailability((state) => state.setCanEdit);
-  useLayoutEffect(() => {
-    setCanEdit(canEditMessages);
-    return () => setCanEdit(true);
-  }, [canEditMessages, setCanEdit]);
+  usePublishEditAvailability(canEditMessages, editBlockedReason);
   /** Last list of "stable" dependencies seen by the cache above. */
   const contextEpochRef = useRef<unknown[] | null>(null);
   // Stable set (same identity for as long as `mentionables` does not change): otherwise
@@ -212,6 +206,8 @@ function ThreadTimelineView({
     nextVersion: t("threadTimeline.nextVersion"),
     versionCount: (current: number, total: number) => t("threadTimeline.versionCount", { current, total }),
   }), [t]);
+
+  const questionByRun = useMemo(() => questionsByRun(userInputs), [userInputs]);
 
   // A bot's thread: the sent message brings its « Réflexion » line in the same paint, not 70 ms later.
   const outgoingThinks = Boolean(outgoing && !outgoing.failed && defaultAuthor);
@@ -773,46 +769,20 @@ function ThreadTimelineView({
 
           const { event } = entry;
           switch (event.type) {
-            case "run.error": {
-              // The code comes from the event (direct), otherwise from the run (reread).
-              const failedRun = runsById.get(event.runId);
-              const code = typeof event.payload.errorCode === "string" ? event.payload.errorCode : failedRun?.errorCode;
-              const authProvider = isProviderAuthRequiredCode(code) ? providerAuthRequiredSlug(event.payload) : null;
-              if (authProvider) {
-                const author = runAuthors?.get(event.runId) ?? defaultAuthor;
-                return (
-                  <ProviderAuthNotice
-                    key={entry.key}
-                    name={author?.name ?? author?.slug ?? t("threadTimeline.unknownBot")}
-                    provider={authProvider}
-                    findTargetId={entry.targetId}
-                    findActive={entry.targetId === activeFindTargetId}
-                  />
-                );
-              }
-              if (isModelUnavailableCode(code)) {
-                const author = runAuthors?.get(event.runId) ?? defaultAuthor;
-                return (
-                  <ModelUnavailableNotice
-                    key={entry.key}
-                    name={author?.name ?? author?.slug ?? t("threadTimeline.unknownBot")}
-                    model={failedRun?.model ?? (typeof event.payload.model === "string" ? event.payload.model : null)}
-                    botId={author?.id ?? null}
-                    findTargetId={entry.targetId}
-                    findActive={entry.targetId === activeFindTargetId}
-                  />
-                );
-              }
+            case "run.error":
               return (
-                <p
+                <RunErrorEntry
                   key={entry.key}
-                  data-thread-find-target={entry.targetId}
-                  className={`max-w-[85%] self-start rounded-2xl rounded-bl-md bg-destructive px-3.5 py-2.5 text-sm font-medium text-white ${entry.targetId === activeFindTargetId ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                >
-                  {eventText(event) || t("threadTimeline.runtimeErrorFallback")}
-                </p>
+                  event={event}
+                  run={runsById.get(event.runId)}
+                  author={runAuthors?.get(event.runId) ?? defaultAuthor}
+                  question={questionByRun.get(event.runId)}
+                  onRegenerate={onRegenerateMessage}
+                  onPermissions={onOpenBotApprovals}
+                  findTargetId={entry.targetId}
+                  findActive={entry.targetId === activeFindTargetId}
+                />
               );
-            }
             case "run.provider_fallback": {
               const from = typeof event.payload.from === "string" ? event.payload.from : "-";
               const to = typeof event.payload.to === "string" ? event.payload.to : "-";
@@ -971,6 +941,10 @@ function ThreadTimelineView({
             version: entry.kind === "user" ? messageVersionFamilies?.get(entry.key) ?? null : null,
             planHidden: entry.kind === "assistant" && hiddenAssistantRunIds.length > 0
               && hiddenAssistantRunIds.split(",").includes(entry.runId),
+            // A failed turn: its run's code can land after the event, its question names and replays it.
+            failure: entry.kind === "event" && entry.event.type === "run.error"
+              ? [turnRun?.errorCode ?? null, questionByRun.get(entry.event.runId)?.id ?? null]
+              : null,
           };
           return `${entrySignature(entry)}${JSON.stringify(ctx)}`;
         };
@@ -992,7 +966,7 @@ function ThreadTimelineView({
         const defaultAuthorKey = authorRenderKey(defaultAuthor);
         const contextEpochDeps = [
           interactionLabels, onReply, onReaction, onEditMessage, onRegenerateMessage, onAskUserPick,
-          onSelectMessageVersion, mentionKey, activeFindTargetId,
+          onSelectMessageVersion, onOpenBotApprovals, mentionKey, activeFindTargetId,
           defaultAuthorKey, operatorUsername, speechDisabled,
           speechAdapter, speechState, playSpeech, t, plural, formatNumber,
         ];
@@ -1286,6 +1260,8 @@ function ThreadTimelineView({
           onEditMessage,
           onRegenerateMessage,
           onSelectMessageVersion,
+          onOpenBotApprovals,
+          questionByRun,
           mentionSlugs,
           activeFindTargetId,
           authorLabelEntryKeys,

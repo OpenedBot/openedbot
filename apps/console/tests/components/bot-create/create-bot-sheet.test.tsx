@@ -117,6 +117,9 @@ function serve(extra: Route = () => null) {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? "GET").toUpperCase();
+    // The machine registry the sheet reads before it lets Créer go (ExecutionHostField):
+    // no dedicated machine here, so the bot goes to the workspace's runtime.
+    if (url.includes("/api/runtime/list")) return Response.json({ runtimes: [] });
     const answered = await extra(url, method, init);
     if (answered) return answered;
     if (url.includes("/api/runtime/profiles")) return Response.json({ profiles: [] });
@@ -492,7 +495,10 @@ describe("the desktop home creates a bot on the page (the reference app's home)"
     fireEvent.click(red);
     expect(red.getAttribute("aria-pressed")).toBe("true");
     const create = screen.getByRole("button", { name: "Créer le bot" }) as HTMLButtonElement;
-    expect(create.disabled).toBe(false);
+    // The name starts empty (d61b4eca): Créer waits for one, and for the machine registry.
+    expect(create.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/^Nom/), { target: { value: "Rubis" } });
+    await waitFor(() => expect(create.disabled).toBe(false));
     fireEvent.change(screen.getByLabelText(/^Nom/), { target: { value: "   " } });
     expect(create.disabled).toBe(true);
   });

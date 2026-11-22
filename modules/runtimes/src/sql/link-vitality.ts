@@ -20,26 +20,22 @@ export const LINK_VERDICT_GRACE_SECONDS = 30;
 export type LinkVitality = { live: boolean; validUntil: Date | null };
 
 /**
- * A relation `(organization_id uuid)`: the organizations whose active runtime
- * is a connector the run queue would not serve now. The queue claims for a
+ * Connector runtimes that the run queue would not serve now. The queue claims for a
  * connector only on a sign of life within `LINK_SILENT_SECONDS`
  * (`execution/application/queue.ts`); a link never seen, silent past that,
  * or closed (`disconnected`, by a clean close or the worker's sweep) is held
  * here too. `markLinkConnected` and `markLinkSeen` both write a fresh sign of
- * life and lift `disconnected`, which brings the organization back. At most
- * one row per organization (`runtimes_one_active_per_org`), and every bot and
- * room of an organization runs on that runtime. A SQL fragment for a
- * set-based query to `left join`, built from the caller's `tx`: never `await`
- * it alone. A direct runtime, or an organization without an active runtime,
- * never appears here.
+ * life and lift `disconnected`. Join the bot's assignment, or the active
+ * runtime when the bot has no assignment. This SQL fragment is built
+ * from the caller's transaction and is used as a relation.
  */
-export function disconnectedHostOrganizations(tx: Bun.SQL | Bun.TransactionSQL): Bun.SQL.Query<unknown> {
+export function disconnectedHosts(tx: Bun.SQL | Bun.TransactionSQL): Bun.SQL.Query<unknown> {
   return tx`(
-    select rt.organization_id
+    select rt.organization_id, rt.id as runtime_id, rt.is_active
       from runtimes rt
-     where rt.is_active and rt.revoked_at is null
-       and rt.reachability = 'connector'
-       and (rt.link_last_seen_at is null
+     where rt.reachability = 'connector'
+       and (rt.revoked_at is not null
+         or rt.link_last_seen_at is null
          or rt.link_last_seen_at <= now() - (${LINK_SILENT_SECONDS} * interval '1 second')
          or rt.last_health_status = 'disconnected')
   )`;

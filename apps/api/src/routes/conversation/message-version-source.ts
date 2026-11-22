@@ -1,5 +1,7 @@
 import type { MessageContent } from "@openedbot/contracts-api";
 import type { TransactionDb } from "@openedbot/platform-db";
+import { documentAttachment, imageAttachment, type MessageAttachmentInput } from "@openedbot/conversation/domain/attachments";
+import type { BlobStore } from "../../infrastructure/blob-store";
 import { HttpError } from "../../interfaces/http/http-error";
 
 /** The operator message a variant is created from, with the restrictions of its turn. */
@@ -7,6 +9,7 @@ export type SourceRow = {
   threadId: string;
   threadTitle: string;
   botId: string | null;
+  runtimeId: string | null;
   botName: string | null;
   botSlug: string | null;
   messageId: string;
@@ -29,7 +32,7 @@ export async function readSource(
   const rows = lock
     ? await tx<SourceRow[]>`
         select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
+               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug", bot.runtime_id as "runtimeId",
                message.id as "messageId", message.role, message.content,
                message.author_bot_id as "authorBotId",
                coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",
@@ -48,7 +51,7 @@ export async function readSource(
       `
     : await tx<SourceRow[]>`
         select thread.id as "threadId", thread.title as "threadTitle",
-               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug",
+               thread.bot_id as "botId", bot.name as "botName", bot.slug as "botSlug", bot.runtime_id as "runtimeId",
                message.id as "messageId", message.role, message.content,
                message.author_bot_id as "authorBotId",
                coalesce(workflow.initiator_user_id, message_run.initiator_user_id) as "initiatorUserId",
@@ -80,6 +83,62 @@ export function assertSourceEligible(source: SourceRow | null, userId: string): 
       403,
       "MESSAGE_VERSION_AUTHOR_REQUIRED",
       "Seul l’auteur de ce message peut en créer une variante.",
+    );
+  }
+}
+
+/** The source message's attachments, reread from their files for the variant's run. */
+export async function loadSourceAttachments(
+  tx: TransactionDb,
+  blobs: BlobStore,
+  organizationId: string,
+  content: MessageContent,
+): Promise<MessageAttachmentInput[]> {
+  const parts = content.filter((part): part is Extract<MessageContent[number], { type: "attachment" }> =>
+    part.type === "attachment");
+  if (!parts.length) return [];
+  if (parts.some((part) => !part.id)) {
+    throw new HttpError(
+      409,
+      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
+      "Une pièce jointe historique n’a plus de fichier relisible; la variante n’a pas été créée.",
+    );
+  }
+  const ids = parts.map((part) => part.id!);
+  const rows = await tx<Array<{
+    id: string;
+    objectKey: string;
+    name: string;
+    contentType: string;
+    kind: "image" | "document"; driver: "file" | "r2";
+  }>>`
+    select id, object_key as "objectKey", name, content_type as "contentType", kind, driver
+      from attachments
+     where organization_id = ${organizationId} and id in ${tx(ids)} and deleted_at is null
+  `;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  if (byId.size !== ids.length) {
+    throw new HttpError(
+      409,
+      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
+      "Une pièce jointe du message n’est plus disponible; la variante n’a pas été créée.",
+    );
+  }
+  try {
+    return await Promise.all(parts.map(async (part) => {
+      const row = byId.get(part.id!)!;
+      const blob = await blobs.get(row.objectKey, row.driver);
+      if (row.kind === "document") {
+        return documentAttachment(row.name, row.contentType, await blob.text());
+      }
+      const base64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+      return imageAttachment(row.name, row.contentType, `data:${row.contentType};base64,${base64}`);
+    }));
+  } catch {
+    throw new HttpError(
+      409,
+      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
+      "Une pièce jointe du message ne peut pas être relue; la variante n’a pas été créée.",
     );
   }
 }

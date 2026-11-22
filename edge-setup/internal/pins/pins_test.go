@@ -83,3 +83,22 @@ func TestForbiddenToolsetsMatchTheSharedManifest(t *testing.T) {
 		t.Fatalf("ProfileRestrictedToolsets = %v, manifest = %v", ProfileRestrictedToolsets, manifest.ProfileRestricted)
 	}
 }
+
+func TestOpenCodeHasOfficialReleasePinForEveryLinuxArchitecture(t *testing.T) {
+	if OpenCodeVersion != "1.19.6" {
+		t.Fatal("review the official asset digests when updating OpenCode")
+	}
+	want := map[string]OpenCodeRelease{
+		"amd64": {"x64-baseline", "8443113b3f3dfebf8b0fa91c4377e5519a62b9231732d9344a5df001e4a852b3"},
+		"arm64": {"arm64", "5b68c1f4c5e75b4134e664cc8f36d634d64208d4fcfe5bcf3b48bab699c2dbac"},
+	}
+	for arch := range Arches {
+		pin, ok := OpenCodeArches[arch]
+		if !ok || pin != want[arch] {
+			t.Fatalf("missing official OpenCode pin for %s", arch)
+		}
+		if !strings.HasPrefix(OpenCodeArchiveURL(pin), "https://github.com/anomalyco/opencode/releases/download/v1.19.6/") {
+			t.Fatal("not an official release asset URL")
+		}
+	}
+}

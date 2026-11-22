@@ -240,6 +240,9 @@ export const mcpCatalog = {
 export const connectorsPage = {
   tabsLabel: "Connector sections",
   tabConnectors: "Connectors",
+  /** The rail's « Connecteurs » pill (`RailConnectorsPill`). */
+  railManage: "Manage connectors",
+  railAdd: "Add a connector",
   tabSkills: "Skills",
   tabTools: "Tools",
   skillCategoryAgents: "Autonomous agents",

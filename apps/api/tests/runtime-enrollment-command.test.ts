@@ -3,6 +3,7 @@ import {
   connectorLinkCommand,
   connectorLinkPublicOrigin,
   connectorOpenedbotOrigin,
+  machineConnectCommand,
   readEnrollmentReachability,
 } from "../src/routes/runtimes/runtime-enrollment-routes";
 
@@ -60,5 +61,15 @@ describe("connector enrollment command", () => {
     const config = { environment: "production" as const, publicUrl: "https://api.openedbot.example" };
 
     expect(connectorOpenedbotOrigin(config, "https://attacker.example")).toBe(config.publicUrl);
+  });
+
+  test("a machine gets the one connect command for all its agents, ticket off argv", () => {
+    const workspace = "939e0d88-e07f-4a0a-a4d7-8466dff5a8ec";
+    expect(machineConnectCommand("http://localhost:8790/", workspace))
+      .toBe(`edge-setup connect --openedbot 'http://127.0.0.1:8790' --workspace-id ${workspace} --workspace "$PWD"`);
+    expect(machineConnectCommand("https://api.example.com/it's", workspace)).toContain(`'https://api.example.com/it'\\''s'`);
+    // Development names the checkout's own build, quoted: an installed release may predate `connect`.
+    expect(machineConnectCommand("http://localhost:8790", workspace, "/home/me/my repo/edge-setup/dist/edge-setup"))
+      .toStartWith("'/home/me/my repo/edge-setup/dist/edge-setup' connect --openedbot 'http://127.0.0.1:8790'");
   });
 });

@@ -30,10 +30,10 @@ pub const MAIN_WINDOW: &str = "main";
 pub const START_PATH: &str = "/";
 pub const LOGIN_PATH: &str = "/login";
 const BLANK: &str = "about:blank";
-/// The console's frame surface (light #e8e8eb, dark #0d0d0d): painted behind
+/// The console's frame surface (light #ffffff, dark #121212): painted behind
 /// the page so a launch never flashes white in dark mode.
-const FRAME_LIGHT: tauri::window::Color = tauri::window::Color(232, 232, 235, 255);
-const FRAME_DARK: tauri::window::Color = tauri::window::Color(13, 13, 13, 255);
+const FRAME_LIGHT: tauri::window::Color = tauri::window::Color(255, 255, 255, 255);
+const FRAME_DARK: tauri::window::Color = tauri::window::Color(18, 18, 18, 255);
 const ZOOM_STEP: f64 = 1.1;
 const ZOOM_RANGE: (f64, f64) = (0.5, 3.0);
 /// How long a purge may wait for the console to unload and the store to clear.

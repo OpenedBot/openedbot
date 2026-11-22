@@ -94,11 +94,12 @@ export function BoardFrame({ children, overlay, sidebar }: {
               `agent/*`) mask the trace trunk with this background. Without it, they
               took `--color-background` (white) and formed a white square
               on the grey card.
-              As in BoardUI, the card has neither border nor shadow: the grey on the
-              frame's white is enough. Its left margin (12 px) is the gap with the
-              conversations card, or with the window edge when collapsed. */}
+              As in boardui.com's Dashboard (2026-11-17), the main area is the
+              page itself, not a grey card: only the sidebar island is grey.
+              Its left margin (12 px) is the gap with the conversations card,
+              or with the window edge when collapsed. */}
           <div className="flex min-h-0 min-w-0 flex-1 ps-3 pe-3 pb-3">
-            <main data-board-floating-thread={floatingThread ? "" : undefined} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-clip rounded-3xl bg-background-secondary-default [--agent-glyph-mask:var(--bui-background-secondary-default)]">
+            <main data-board-floating-thread={floatingThread ? "" : undefined} className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-clip rounded-3xl bg-background-full [--agent-glyph-mask:var(--bui-background-full)]">
               {/* The collapse, left of the breadcrumb; card collapsed, the card's
                   start (logo or traffic lights) comes along, at its head-row height. */}
               {railShell ? <BoardTopBar surface floating={floatingThread} slotRef={setHeaderSlot} lead={<RailLead collapsed={collapsed} />} /> : null}

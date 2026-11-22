@@ -28,14 +28,15 @@ const baseJob: ProfileProvisionRow = {
 };
 
 /** Each statement answers by its role: lease renewal, terminal update, or row lookup. */
-function scriptedDb(options: { leaseHeld?: boolean; finishOwned?: boolean; rowExists?: boolean; permissionMode?: "manual" | "plan" | "auto" | "bypass" } = {}) {
-  const { leaseHeld = true, finishOwned = true, rowExists = true, permissionMode = "manual" } = options;
+function scriptedDb(options: { leaseHeld?: boolean; finishOwned?: boolean; rowExists?: boolean; ownProfile?: boolean; permissionMode?: "manual" | "plan" | "auto" | "bypass" } = {}) {
+  const { leaseHeld = true, finishOwned = true, rowExists = true, ownProfile = false, permissionMode = "manual" } = options;
   const statements: Array<{ sql: string; values: unknown[] }> = [];
   const db = ((parts: TemplateStringsArray, ...values: unknown[]) => {
     const sql = [...parts].join(" ");
     statements.push({ sql, values });
     if (sql.includes("host_create_attempted = host_create_attempted or")) return Promise.resolve(leaseHeld ? [{ bot_id: "bot-1" }] : []);
     if (sql.includes("select bot_id from bot_profile_provisions")) return Promise.resolve(rowExists ? [{ bot_id: "bot-1" }] : []);
+    if (sql.includes("select bot_id from bot_host_profiles")) return Promise.resolve(ownProfile ? [{ bot_id: "bot-1" }] : []);
     if (sql.includes("select b.permission_mode, o.permission_pipeline")) return Promise.resolve([{ permission_mode: permissionMode, permission_pipeline: "legacy" }]);
     return Promise.resolve(finishOwned ? [{ bot_id: "bot-1" }] : []);
   }) as unknown as SQL;
@@ -345,13 +346,24 @@ describe("durable bot profile provisioning", () => {
     expect(statuses).toEqual(["queued", "queued", "failed"]);
   });
 
-  test("never adopts a profile already present before any create call", async () => {
+  test("never adopts a profile already present that this bot did not create on this machine", async () => {
     const { db, statements } = scriptedDb();
     const client = scriptedClient({ inventory: [true] });
     await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
     expect(client.calls).toEqual(["capabilities", "inventory"]);
     expect(statements.at(-1)?.values[0]).toBe("failed");
     expect(JSON.stringify(statements.at(-1)?.values)).toContain("PROFILE_SLUG_TAKEN");
+  });
+
+  test("takes back the profile this bot created on this machine, without creating it again", async () => {
+    const { db, statements } = scriptedDb({ ownProfile: true });
+    const client = scriptedClient({ inventory: [true, true], served: ["isolated"] });
+    await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
+    expect(client.calls.some((call) => call.startsWith("create:"))).toBe(false);
+    const lease = statements.find((statement) => statement.sql.includes("host_create_attempted = host_create_attempted or"))!;
+    // Not marked attempted (a retry lists and takes it back again), recorded as ours at once.
+    expect(lease.values).toEqual(expect.arrayContaining([false, true]));
+    expect(statements.at(-1)?.values[0]).toBe("succeeded");
   });
 
   test("an unreadable inventory is not absence: no create, retry later", async () => {
@@ -460,6 +472,16 @@ describe("durable bot profile provisioning", () => {
     const last = statements.at(-1)!;
     expect(last.values[0]).toBe("failed");
     expect(JSON.stringify(last.values)).toContain("PROFILE_NAME_REFUSED");
+  });
+
+  test("a refused creation body fails at once, without blaming the name", async () => {
+    const { db, statements } = scriptedDb();
+    const client = scriptedClient({ inventory: [false], createError: "BODY_INVALID" as HermesClientErrorCode });
+    await executeProfileProvision(db, { ...baseJob, host_create_attempted: false }, { client: () => client });
+    const last = statements.at(-1)!;
+    expect(last.values[0]).toBe("failed");
+    expect(JSON.stringify(last.values)).toContain("PROFILE_REQUEST_REFUSED");
+    expect(JSON.stringify(last.values)).not.toContain("PROFILE_NAME_REFUSED");
   });
 
   test("restoring a never-created profile requires the name to be free on the host", async () => {

@@ -12,7 +12,7 @@ import { StepRuntime } from "../../src/screens/onboarding/steps/step-runtime";
 
 const runtime: RuntimePublicDto = {
   id: "runtime-onboarding",
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: "https://hermes.example.test",
   // Runtime joined by the LINK: it is the only path where onboarding offers to
   // configure a provider from openedbot (`step-runtime.tsx` reserves the
@@ -204,8 +204,11 @@ describe("onboarding du fournisseur et du modèle", () => {
     expect(screen.queryByLabelText("Ajouter un fournisseur d’IA")).toBeNull();
     expect(screen.queryByRole("button", { name: "Ouvrir la configuration" })).toBeNull();
     expect(labels.indexOf("Fournisseur d’IA")).toBeLessThan(labels.indexOf("Modèle"));
-    expect(providerSelect.getAttribute("data-slot")).toBe("select-trigger");
-    expect(modelSelect.getAttribute("data-slot")).toBe("select-trigger");
+    // Searchable fields, the Models settings comboboxes (802f802c), each bound to its label.
+    for (const field of [providerSelect, modelSelect]) {
+      expect(field.getAttribute("role")).toBe("combobox");
+      expect(field.getAttribute("aria-haspopup")).toBe("listbox");
+    }
     expect(providerSelect.textContent).toContain("OpenAI API");
     expect(modelSelect.textContent).toContain("gpt-5.6-luna");
 

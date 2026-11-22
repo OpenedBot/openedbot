@@ -167,18 +167,23 @@ renvoie l’historique.
 
 ### Carte : un plateau et sa carte
 
-Décision opérateur du 2026-11-08 (elle remplace « une seule surface ») : une
-carte des Réglages est faite de **deux couches**. Le **plateau**, en creux d’un
-cran sous la page, porte le titre et sa phrase ; la **carte**, blanche, posée
-dedans avec une marge de 6 px, porte le contenu, ses lignes et son pied. Trois
-paliers de surface (page, plateau, carte) gardent la carte lisible en sombre,
-là où l’ancien panneau unique `bg-card` se fondait dans la page.
+Décision opérateur du 2026-11-17 (elle remplace le plateau bordé du
+2026-11-08 et le cadre gris du 2026-11-02) : on suit les sections du Dashboard
+de boardui.com. Une carte des Réglages est faite de **deux couches**. Le
+**plateau**, gris sans bord, porte le titre et sa phrase ; la **carte**,
+posée dedans avec une marge de 6 px, porte le contenu, ses lignes et son pied.
+En clair il n’y a que **deux surfaces** : la page blanche (cadre et zone
+principale, qui n’est plus une carte grise) et le gris `#F7F7F7` (îlot du menu,
+plateaux). Le contraste plateau/carte fait le bord : pas de bordure, une ombre
+de 1 px seulement. En sombre, chaque couche est plus claire que celle qui la
+porte.
 
 | Rôle | Clair | Sombre |
 | --- | --- | --- |
-| Fond de page (carte principale) | `#F7F7F7` | `#121212` |
-| Plateau (`SETTINGS_SHELL`, et celui des fenêtres) | `bg-surface-sunken` `#EDEDEE`, fond plein, bord `border-border/60`, rayon 20 px | `#171717` |
-| Carte (`SETTINGS_INSET`, `bg-card`) | `#FFFFFF`, bord `border-border/60`, rayon 14 px, `shadow-sm` | `#262626` |
+| Page (cadre, zone principale, `background-full`) | `#FFFFFF` | `#121212` |
+| Îlot du menu (`background-secondary-default`) | `#F7F7F7` | `#171717` |
+| Plateau (`SETTINGS_SHELL`) | `bg-surface-sunken` `#F7F7F7`, sans bord, rayon 16 px | `#171717` |
+| Carte (`SETTINGS_INSET`, `bg-card`) | `#FFFFFF`, sans bord, ombre `0 1px 1px` à 5 %, rayon 10 px | `#262626`, ombre à 14 % |
 | Bande d’en-tête de tableau | `bg-background-secondary-default` | `white/5` sur la carte |
 
 - Titre de carte : 15 px semi-gras (`CARD_TITLE`), phrase 13 px atténuée
@@ -197,13 +202,13 @@ là où l’ancien panneau unique `bg-card` se fondait dans la page.
   modèle.
 - Les fenêtres (`Dialog`, bureau) suivent le même modèle, calqué sur le
   `LayerDialog` de Cloudflare (Kumo, `cloudflare/kumo`) : un plateau opaque
-  `bg-surface-sunken` (rayon 20 px, marge 6 px), la carte blanche dedans avec
+  `bg-surface-sunken` (rayon 20 px, marge 6 px, bordé car il flotte sur le voile), la carte blanche dedans avec
   le titre (15 px), la description et le corps, puis les actions **sur le
   plateau, sous la carte**, sans filet, à droite, l'action principale en
   dernier. Le téléphone garde sa feuille et ses groupes iOS (plus haut).
 
 ```
-  page #F7F7F7
+  page #FFFFFF
   ╭─ plateau (surface-sunken) ────────────────────────────╮
   │  Titre                                     [ action ] │
   │  Phrase qui explique le groupe                        │

@@ -11,6 +11,7 @@ import { api } from "../../lib/api";
  */
 export type BotCreationRequest = {
   clientRequestId: string;
+  runtimeId?: string;
   name: string;
   /** The few words under the name; also the persona role and the roster description. */
   role: string;
@@ -48,6 +49,7 @@ export async function sendBotCreation(request: BotCreationRequest): Promise<BotD
   return api.createBot({
     ...request.copied,
     name: request.name,
+    ...(request.runtimeId ? { runtimeId: request.runtimeId } : {}),
     ...(request.hermesProfile ? { hermesProfile: request.hermesProfile } : {}),
     ...(request.provider ? { provider: request.provider } : {}),
     face: request.face,

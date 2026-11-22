@@ -4,6 +4,7 @@ export * from "./enrollment";
 export * from "./exposures";
 export * from "./integrations";
 export * from "./link";
+export * from "./local-engines";
 export * from "./memory";
 export * from "./model-context";
 export * from "./models";

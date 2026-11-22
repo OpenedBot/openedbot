@@ -92,15 +92,17 @@
   --bui-status-rose-fg: var(--color-rose-800);
   --bui-status-blue-bg: var(--color-blue-200);
   --bui-status-blue-fg: var(--color-blue-800);
-  /* the reference app's light frame and canvas (`--ref-bg-frame` / `-canvas`). */
-  --bui-background-full: #e8e8eb;
+  /* Two surfaces, as boardui.com's Dashboard (2026-11-17): the white page
+     (frame and main area) and the #f7f7f7 grey (sidebar island, settings
+     trays). The grey frame of 02-11 stacked four greys under the content. */
+  --bui-background-full: #fff;
   --bui-background-primary-default: #fff;
   /* Hover on a white surface (menus, model picker, card):
      #f7f7f7 was only 3 points from white, and it is now the frame's
      grey. #ececec matches the dark gap (about 7 points). */
   --bui-background-primary-hover: #ececec;
   --bui-background-primary-active: #ebebeb;
-  --bui-background-secondary-default: #f5f5f6;
+  --bui-background-secondary-default: #f7f7f7;
   --bui-background-secondary-hover: #ebebeb;
   --bui-background-tertiary-default: #ebebeb;
   --bui-background-tertiary-hover: lab(84.92% 0 0);
@@ -157,14 +159,13 @@
   --bui-status-rose-fg: var(--color-rose-500);
   --bui-status-blue-bg: color-mix(in srgb, var(--color-blue-950) 60%, transparent);
   --bui-status-blue-fg: var(--color-blue-300);
-  /* the reference app's frame (`--ref-bg-frame`, 02-11-2026): the top bar and the
-     rail read black, a step under the sidebar and main cards. */
-  --bui-background-full: #0d0d0d;
+  /* boardui.com's Dashboard in dark: the page (frame and main area) #121212,
+     the sidebar island and the settings trays one step above it. */
+  --bui-background-full: #121212;
   --bui-background-primary-default: lab(15.204% 0 0);
   --bui-background-primary-hover: color-mix(in srgb, lab(27.036% 0 0) 60%, transparent);
   --bui-background-primary-active: lab(15.204% 0 0);
-  /* The cards on the frame (sidebar, main): the reference app's canvas (`--ref-bg-canvas`). */
-  --bui-background-secondary-default: #1a1a1a;
+  --bui-background-secondary-default: #171717;
   --bui-background-secondary-hover: lab(15.204% 0 0);
   --bui-background-tertiary-default: lab(15.204% 0 0);
   --bui-background-tertiary-hover: lab(27.036% 0 0);
@@ -335,7 +336,7 @@
   background-color: transparent;
 }
 
-/* The model picker and its effort panel (`composer-model-picker.tsx`,
+/* The model picker and its effort panel (`composer-model-picker-view.tsx`,
    a clone of boardui.com « Multi-agent Chat »): the same entry as above but
    on the template's ease-out curve, a symmetric exit (Radix waits for the
    animation to end before unmounting), and the zoom origin on the

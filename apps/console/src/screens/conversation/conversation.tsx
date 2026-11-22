@@ -1,5 +1,4 @@
-import { ConversationFiles } from "../../components/conversation-files";
-import { ConversationDiagnostic } from "../../components/conversation-diagnostic";
+import { ConversationErrorPage } from "../../components/conversation-diagnostic";
 import { isRestoredQueryData } from "../../lib/query-persister";
 import { useWorkspaceConversationDraft } from "../../lib/workspace/workspace-draft";
 import { usePublishRunInProgress } from "../../lib/run/run-in-progress";
@@ -15,26 +14,32 @@ import { conversationHref } from "../../lib/thread/conversation-href";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconSettings, IconShieldLock, IconX } from "@tabler/icons-react";
 import { Button, Dialog, useIsMobile } from "@openedbot/browser-ui-kit";
-import { ApiError, api, queryKeys, userFacingError, runtimesQueryOptions } from "../../lib/api";
+import { ApiError, api, queryKeys, userFacingError } from "../../lib/api";
 import { applySendAcceptedToCaches } from "../../lib/thread/apply-send-accepted";
 import { useThreadMessageSend } from "../../lib/thread/use-thread-message-send";
+import { threadReadFailureMessage } from "../../lib/thread/thread-read-failure";
 import { randomId } from "../../lib/random-id";
 import { displayedRuntimeHealth, isRuntimeUnavailableError, runtimeBlocksConversation } from "../../lib/runtime/runtime-health";
+import { useBotRuntime } from "../../lib/runtime/use-bot-runtime";
+import { conversationBlockedMessage } from "../../lib/runtime/conversation-blocked-message";
 import {
   threadContainsOutgoingUserInput,
 } from "../../lib/thread/thread-anchor";
 import { useThreadStream } from "../../lib/stream/use-thread-stream";
 import { useConnectedMcpPlugins } from "../../lib/runtime/use-mcp-plugins";
 import { rememberBotThread } from "../../lib/thread/conversation-prefetch";
+import { rememberBootBot } from "../../lib/session/boot-bots";
+import { readCloudSession } from "../../lib/session/cloud-session";
 import { BotFace } from "../../components/bot-face";
 import { useBotDialogs } from "../../lib/bots/bot-dialogs";
 import { settledBotModelSaves } from "../../lib/bots/bot-model-saves";
 import { Composer } from "../../components/composer";
 import { ConversationAvailability } from "../../components/conversation-availability";
-import { useRunFailureAtOpen } from "../../lib/run/run-failure-at-open";
-import { RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
+import { useProfileRereadOnRunFailure } from "../../lib/run/run-failure-at-open";
+import { NoMachineNotice, RuntimeOfflineBadge, useRuntimeOfflineNotice } from "../../components/runtime-offline-notice";
 import { BotProfileRepair, useBotProfileStatus } from "../../components/bot-profile-repair";
 import { ComposerArrival, ThreadArrival, ThreadStartStage, threadStartShown } from "../../components/thread-start-stage";
+import { BotMoveStrip } from "../../components/bot-arrival-stage";
 import { ThreadTimeline } from "../../components/thread-timeline";
 import { ThreadTurnRail } from "../../components/thread-turn-rail";
 import { buildThreadRailTurns } from "../../lib/thread/thread-turn-rail";
@@ -49,13 +54,11 @@ import { useAgentEditor } from "../../lib/bots/agent-editor";
 import { useThreadGoal, withThreadGoal } from "../../lib/thread/thread-goal";
 import { PermissionModeBadge } from "../../components/boardui/permission-picker";
 import { GoalDialog } from "../../components/boardui/goal-dialog";
-import { ConversationPending, ThreadSkeleton } from "../../components/thread-skeleton";
+import { ConversationPending, ThreadLoading } from "../../components/thread-skeleton";
 import { parseAskUser } from "@openedbot/roster/domain/ask-user";
 import { useDismissedAskUserRuns } from "../../lib/run/ask-user-dismissals";
 import { visibleRosterItems } from "@/lib/thread/thread-visibility";
 import { useT } from "../../lib/i18n";
-import { readableRunFailure, runFailureExplainedInThread } from "../../lib/run/model-unavailable";
-import { runProviderAuthLabel } from "../../lib/runtime/provider-auth";
 import { latestRunFallback, sameRunFallback } from "../../lib/run/run-fallback";
 import { currentThreadRun } from "../../lib/thread/current-thread-run";
 import { useMarkThreadRead } from "../../lib/thread/use-mark-thread-read";
@@ -85,8 +88,9 @@ import { RunActivityDock } from "../../components/run-activity-dock";
 import { DevRenderProfiler } from "../../components/dev/dev-render-profiler";
 import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/hooks/use-content-stable";
 import { BUTTON } from "../../components/settings/primitives";
+import { useMessageVersionFamilies } from "./use-message-version-families";
 export function ConversationScreen() {
-  const { t } = useT();
+  const { t, locale } = useT();
   const isMobile = useIsMobile();
   const [standalone] = useState(isStandaloneDisplay);
   const { botId } = useParams({ strict: false }) as { botId?: string };
@@ -168,6 +172,11 @@ export function ConversationScreen() {
   useEffect(() => {
     if (bot?.id && bot.threadId) rememberBotThread(bot.id, bot.threadId);
   }, [bot?.id, bot?.threadId]);
+  // Its name, for the header pill and the composer the next refresh paints
+  // before the roster is read (`lib/session/boot-bots.ts`).
+  useEffect(() => {
+    if (bot?.id && bot.name) rememberBootBot(readCloudSession()?.userId, bot.id, { name: bot.name });
+  }, [bot?.id, bot?.name]);
 
   const { thread, streaming, loading, loadOlder, loadingOlder, olderError, liveText } = useThreadStream(activeThreadId);
   // Opening another bot closes the editor instead of carrying its canvas over.
@@ -183,42 +192,50 @@ export function ConversationScreen() {
   const [submissionError, setSubmissionError] = useState<unknown>(null);
   const [dismissedError, setDismissedError] = useState<unknown>(null);
   const [retrying, setRetrying] = useState(false);
-  const runtimes = useQuery({
-    ...runtimesQueryOptions(),
-    refetchOnWindowFocus: true,
-  });
-  const runtime = runtimes.data?.runtimes[0];
+  const host = useBotRuntime(bot?.runtimeId);
+  const { runtime } = host;
   const runtimeHealth = displayedRuntimeHealth(runtime);
-  const runtimeUnavailable = runtimeBlocksConversation(runtime, runtimes.isSuccess);
+  const runtimeUnavailable = runtimeBlocksConversation(runtime, host.isSuccess);
   // Link known to be closed: both reads below can only answer 503, so they do
   // not refetch on their own (focus, remount). The offline banner's retry
   // still calls `refetch()`, which ignores `enabled`.
   const linkClosed = runtimeHealth === "disconnected";
   // Observe the same catalogue as the picker, including in standalone mode.
+  const catalogEnabled = Boolean(bot && runtime?.id);
   const runtimeModels = useQuery({
     queryKey: queryKeys.runtimeModels(runtime?.id ?? "none"),
     queryFn: () => api.runtimeModels(runtime!.id!),
-    enabled: Boolean(bot && runtime?.id) && !linkClosed,
+    enabled: catalogEnabled && !linkClosed,
     refetchOnWindowFocus: true,
   });
   // Runtime replaced: the profile named by the bot no longer exists on the host.
   const profileStatus = useBotProfileStatus(bot, !linkClosed);
   const profileMissing = profileStatus.data?.state === "missing";
-  const blockingError = roster.error ?? me.error ?? thread.error ??
-    runtimes.error ?? runtimeModels.error ?? submissionError;
+  const readError = roster.error ?? me.error ?? thread.error ??
+    host.error ?? (catalogEnabled ? runtimeModels.error : null);
+  const blockingError = readError ?? submissionError;
   const conversationBlocked = (Boolean(blockingError) && blockingError !== dismissedError) || runtimeUnavailable || retrying;
-  const conversationErrorMessage = runtimeUnavailable && !runtime ? t("mvp.noMachine") : runtimeUnavailable && runtimeHealth === "disconnected"
-    ? t("conversation.linkUnavailable")
-    : blockingError instanceof ApiError &&
-    blockingError.code === "RUNTIME_LINK_UNAVAILABLE"
-    ? t("conversation.linkUnavailable")
-    : userFacingError(blockingError, t("conversation.loadFailed"));
+  const conversationErrorMessage = conversationBlockedMessage(t, locale, { runtime, runtimeUnavailable, error: blockingError });
   const hostUnavailable = isRuntimeUnavailableError(blockingError);
   const runtimeOffline =
     (runtimeUnavailable &&
       (runtimeHealth === "disconnected" || runtimeHealth === "unreachable") &&
       (!blockingError || hostUnavailable || blockingError === dismissedError)) ||
     (hostUnavailable && blockingError !== dismissedError);
+  // A failed read stops the whole screen: the error page replaces the thread and
+  // the composer (the runtime-offline treatment keeps its own). The page holds
+  // through its own retry, until every read is back: otherwise the thread would
+  // reappear while the other reads still run, under the « indisponible » dialog.
+  // It keeps the error that opened it: a read that never had data is pending
+  // again during its refetch, without its error.
+  const [heldReadError, setHeldReadError] = useState<unknown>(null);
+  const readRetryError = retrying ? heldReadError : null;
+  const pageError = readRetryError ?? readError;
+  const readFailed = Boolean(readRetryError) || (!runtimeOffline && Boolean(readError));
+  const retryReads = () => {
+    setHeldReadError(readError);
+    void retryConversation().finally(() => setHeldReadError(null));
+  };
   const openRuntimeSettings = () => openSettings("/settings/runtime");
   const requireRuntime = () => {
     if (blockingError) throw blockingError;
@@ -229,9 +246,9 @@ export function ConversationScreen() {
     setRetrying(true);
     try {
       await Promise.all([
-        roster.refetch(), me.refetch(), runtimes.refetch(),
+        roster.refetch(), me.refetch(), host.refetch(),
         ...(activeThreadId ? [thread.refetch()] : []),
-        ...(runtime?.id ? [runtimeModels.refetch()] : []),
+        ...(catalogEnabled ? [runtimeModels.refetch()] : []),
       ]);
       setSubmissionError(null);
     } finally {
@@ -252,15 +269,7 @@ export function ConversationScreen() {
     field?.blur();
   }, [conversationBlocked]);
 
-  const versions = useQuery({
-    queryKey: queryKeys.messageVersions(activeThreadId ?? "none"),
-    queryFn: () => api.messageVersions(activeThreadId!),
-    enabled: Boolean(activeThreadId),
-  });
-  const versionFamilyByMessage = useMemo(
-    () => new Map((versions.data?.families ?? []).map((family) => [family.currentMessageId, family] as const)),
-    [versions.data?.families],
-  );
+  const versionFamilyByMessage = useMessageVersionFamilies(activeThreadId);
   useMarkThreadRead(
     activeThreadId,
     thread.data?.id === activeThreadId ? thread.data : null,
@@ -551,34 +560,7 @@ export function ConversationScreen() {
     if (!running && cancel.isError) cancel.reset();
   }, [cancel.isError, running]);
 
-  // Surface asynchronous runtime failures once per run, including failures
-  // reported after the message POST succeeded (SSE + polling).
-  const notifiedFailedRunId = useRef<string | null>(null);
-  // Read when the failure fires, never a dependency: a streaming delta
-  // rebuilds the events and must not re-run this once-per-run effect.
-  const failureEventsRef = useRef(thread.data?.events);
-  failureEventsRef.current = thread.data?.events;
-  // A failure older than this visit is told by its notice in the thread.
-  const failedRunAtOpen = useRunFailureAtOpen(activeThreadId, Boolean(thread.data) && !isRestoredQueryData(thread.data), activeRun);
-  useEffect(() => {
-    if (activeRun?.status !== "failed" || activeRun.id === notifiedFailedRunId.current) return;
-    if (activeRun.id === failedRunAtOpen) return;
-    notifiedFailedRunId.current = activeRun.id;
-    if (bot?.id) void queryClient.invalidateQueries({ queryKey: queryKeys.botProfileStatus(bot.id) });
-    // Profile missing from the runtime: the repair notice already says what to do.
-    if (profileMissing) return;
-    // A refused model or provider login: its notice in the thread names the
-    // fix and carries the action. A blocking modal would hide it.
-    if (runFailureExplainedInThread(activeRun, failureEventsRef.current)) return;
-    setDismissedError(null);
-    setSubmissionError(new ApiError(
-      502,
-      readableRunFailure(t, activeRun, bot?.name ?? t("threadTimeline.unknownBot"), runProviderAuthLabel(failureEventsRef.current, activeRun.id))
-        ?? activeRun.error
-        ?? t("threadTimeline.runtimeErrorFallback"),
-      "RUNTIME_RUN_FAILED",
-    ));
-  }, [activeRun?.id, activeRun?.status, activeRun?.error, activeRun?.errorCode, failedRunAtOpen, t, bot?.id, profileMissing, queryClient]);
+  useProfileRereadOnRunFailure(activeThreadId, Boolean(thread.data) && !isRestoredQueryData(thread.data), activeRun, bot?.id);
 
   // A pending gate blocks the composer: letting one type while a
   // decision is due would give the illusion that the bot can continue without it.
@@ -634,7 +616,7 @@ export function ConversationScreen() {
   // Data passed to the thread, not a conditional callback: see the comment
   // on `onEditMessage`/`onRegenerateMessage` below.
   const canEditMessages = me.data?.session.canWrite === true && !running && !pendingGate &&
-    !createVersion.isPending;
+    !createVersion.isPending && !conversationBlocked;
 
   // ask_user: the question that ENDS the last completed turn. The run's
   // output is the source (not the timeline): as soon as the operator answers, the
@@ -658,10 +640,7 @@ export function ConversationScreen() {
   // can never flash during a bot switch.
   const threadLoading = loading || thread.data?.id !== activeThreadId;
   const threadFailed = thread.isError && thread.data?.id !== activeThreadId;
-  const threadFailureMessage = thread.error instanceof ApiError &&
-    thread.error.code === "DATABASE_MIGRATION_REQUIRED"
-    ? t("conversation.migrationRequired")
-    : t("conversation.loadFailed");
+  const threadFailureMessage = threadReadFailureMessage(t, thread.error);
 
   // The lab stays readable even while the thread is working: the
   // header button always opens the box, but the CTA explains why
@@ -682,11 +661,12 @@ export function ConversationScreen() {
   };
 
   if (!bot) {
-    if (roster.isPending) return <ConversationPending />;
+    if (roster.isPending && !readRetryError) return <ConversationPending botId={botId} />;
     if (botUnavailable) return null;
+    if (roster.error || readRetryError) return <ConversationErrorPage error={readRetryError ?? roster.error} retrying={retrying} onRetry={retryReads} />;
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {roster.error ? userFacingError(roster.error, t("conversation.loadFailed")) : t("conversation.botGone")}
+        {t("conversation.botGone")}
       </div>
     );
   }
@@ -699,7 +679,12 @@ export function ConversationScreen() {
   // BOT_PROFILE_PREPARING) and the next message would leave on the old one. The
   // picker therefore waits for preparation to finish (the roster is reread every 0.6 s).
   const provisioning = bot.profileProvisionStatus === "preparing";
-  const starting = threadStartShown({ provisioning, runs: timelineRuns });
+  // While the thread loads its runs are not known yet: a bot that already
+  // spoke (its roster preview) is changing machine, not arriving.
+  const starting = threadStartShown({ provisioning, runs: timelineRuns }) && !(threadLoading && bot.preview);
+  // A bot changing machine keeps its thread and its composer in place: no
+  // arrival for them to make (`ThreadArrival`, `ComposerArrival`).
+  const arrivalStatus = provisioning && !starting ? null : bot.profileProvisionStatus;
   const threadView = thread.data?.id === activeThreadId ? thread.data : undefined;
   const threadMessages = threadView?.messages ?? [];
   const planAnchor = threadMessages.at(-1)?.id ?? null;
@@ -811,7 +796,6 @@ export function ConversationScreen() {
                 runs={thread.data.runs}
               />
             ) : null}
-            {thread.data ? <ConversationFiles key={thread.data.id} threadId={thread.data.id} botId={bot.id} /> : null}
             {/* Gear: this bot's config, in a sectioned modal. */}
             {isMobile ? (
               <ChromeIconButton
@@ -952,7 +936,6 @@ export function ConversationScreen() {
                   {/* A mode out of the ordinary (Plan mode, Full
                       access) shows here, read-only: it is changed in the
                       bot's profile. On a phone, in the subtitle. */}
-                  {thread.data ? <ConversationFiles key={thread.data.id} threadId={thread.data.id} botId={bot.id} /> : null}
                   <PermissionModeBadge bot={bot} onOpen={openBotApprovals} />
                   {!threadLoading && thread.data ? (
                     <WorkflowOverview
@@ -977,8 +960,7 @@ export function ConversationScreen() {
               )}
             /></DevRenderProfiler>
           )}
-{(runtimeUnavailable && !runtimeOffline) || Boolean(blockingError) || activeRun?.status === "failed" ? ( <ConversationDiagnostic floating code={blockingError instanceof ApiError ? blockingError.code : runtimeUnavailable ? "RUNTIME_MISSING" : activeRun?.errorCode} reference={activeRun?.id ?? thread.data?.id} onRetry={()=>void retryConversation()} retrying={retrying} onPermissions={openBotApprovals} /> ) : null}
-        <ConversationAvailability
+        {readFailed ? <ConversationErrorPage error={pageError} retrying={retrying} onRetry={retryReads} onPermissions={openBotApprovals} /> : <ConversationAvailability
           modal
           onDismiss={() => {
             setDismissedError(blockingError);
@@ -990,7 +972,6 @@ export function ConversationScreen() {
           retrying={retrying}
           onRetry={() => void retryConversation()}
         >
-{thread.data && !timelineMessages.some(m=>m.role==="user") && !draft.trim() && attachments.length === 0 && !conversationBlocked && !provisioning && !starting ? ( <button type="button" className={`${BUTTON.small} mx-auto my-2`} onClick={()=>setDraft(t("mvp.firstPrompt"))}>{t("mvp.firstPromptAction")}</button> ) : null}
           <div data-thread-lane="" className="w-full px-4 pt-2 empty:hidden sm:px-6">
             {threadFind.bar}
           </div>
@@ -1005,8 +986,8 @@ export function ConversationScreen() {
               </button>
             </div>
           ) : threadLoading && !starting ? (
-            <ThreadSkeleton />
-          ) : <ThreadArrival bot={bot} status={bot.profileProvisionStatus}>{starting ? <ThreadStartStage bot={bot} /> : <div
+            <ThreadLoading />
+          ) : <ThreadArrival bot={bot} status={arrivalStatus}>{starting ? <ThreadStartStage bot={bot} /> : <div
             className="relative flex min-h-0 flex-1 flex-col"
             data-turn-rail={turnRailShown ? "" : undefined}
           >
@@ -1046,11 +1027,13 @@ export function ConversationScreen() {
             onSelectMessageVersion={selectMessageVersion}
             onReaction={onReaction}
             onOpenBotErrors={openBotErrors}
+            onOpenBotApprovals={openBotApprovals}
             speechScope={bot.id}
             speechVoiceByBotId={speechVoiceByBotId}
             resnap={askUser !== null}
             scrollToBottomOnThreadKey={activeThreadId ?? null}
             canEditMessages={canEditMessages}
+            editBlockedReason={conversationBlocked ? conversationErrorMessage : pendingGate ? t("conversation.pendingDecision") : undefined}
             hiddenAssistantRunIds={hiddenAssistantRunIds}
           /></DevRenderProfiler>
           {isMobile ? null : <ThreadTurnRail turns={railTurns} />}
@@ -1085,9 +1068,12 @@ export function ConversationScreen() {
               </button>
             </div>
           ) : null}
+          {provisioning && !starting ? (
+            <BotMoveStrip name={bot.name} host={host.runtime?.name ?? null} progress={bot.profileProvisionProgress} />
+          ) : null}
           {/* Profile being prepared: the center screen says so alone, with no thread
-              and no composer (ThreadArrival, ComposerArrival); the dock stays quiet
-              until the profile is ready. */}
+              and no composer (ThreadArrival, ComposerArrival), or the strip above for
+              a bot changing machine; the dock stays quiet until the profile is ready. */}
           {provisioning ? null : <DevRenderProfiler id="run-activity-dock">
             <RunActivityDock
               runs={timelineRuns}
@@ -1110,7 +1096,7 @@ export function ConversationScreen() {
               onLaunch={launchPlan}
             />
           ) : null}
-          <ComposerArrival bot={bot} status={bot.profileProvisionStatus}><DevRenderProfiler id="composer"><Composer
+          <ComposerArrival bot={bot} status={arrivalStatus}><DevRenderProfiler id="composer"><Composer
             attachmentScope={draftScope}
             draftUnpersisted={unpersisted}
             value={draft}
@@ -1119,7 +1105,9 @@ export function ConversationScreen() {
               setDraft(next);
             }}
             onSubmit={() => {
-              if (send.isPending || conversationBlocked) return;
+              // The composer stays usable while the thread loads (one can
+              // start typing at once); the send waits for the thread.
+              if (send.isPending || conversationBlocked || threadLoading || host.isPending) return;
               // Planifier d'abord: this field corrects the plan. Lancer is the
               // only send that allows execution; until then, the server
               // decides the turn's gates as in Plan mode (0155).
@@ -1133,16 +1121,19 @@ export function ConversationScreen() {
             }}
             onCancel={() => cancel.mutate()}
             botName={bot.name}
-            disabled={threadLoading || pendingGate || runtimes.isPending || conversationBlocked || !!bot.profileImportStatus || profileMissing}
+            disabled={pendingGate || conversationBlocked || !!bot.profileImportStatus || profileMissing || provisioning}
             // Gate: one says why. An in-flight send no longer grays the field
             // : the iOS keyboard must stay open.
-            notice={runtimeNotice}
+            // No usable machine: its tab is the one explanation, with « Vérifier la machine ».
+            notice={runtimeUnavailable && !runtimeOffline
+              ? <NoMachineNotice message={conversationErrorMessage} onOpenRuntime={openRuntimeSettings} />
+              : runtimeNotice}
             // Offline, the status tab carries the sentence: the field only
             // says what it waits for, short enough not to be truncated.
             disabledReason={runtimeOffline
               ? t("runtimeOffline.composer")
-              : runtimeUnavailable
-              ? conversationErrorMessage
+              : provisioning
+                ? t("botProfileProvision.movingComposer", { name: bot.name })
               : pendingGate
                 ? t("conversation.pendingDecision")
                 : undefined}
@@ -1188,9 +1179,9 @@ export function ConversationScreen() {
             onClose={() => setGoalOpen(false)}
             onSave={(next) => { setGoal(next); setGoalOpen(false); }}
           />
-        </ConversationAvailability>
+        </ConversationAvailability>}
         {/* A missing profile blocks sending, but the operator can still return home. */}
-        {profileMissing && profileStatus.data ? <BotProfileRepair bot={bot} status={profileStatus.data} onClose={closeConversation} /> : null}
+        {!readFailed && profileMissing && profileStatus.data ? <BotProfileRepair bot={bot} status={profileStatus.data} onClose={closeConversation} /> : null}
         </div>
         <AttachmentCanvas />
       </div>

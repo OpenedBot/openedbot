@@ -1,9 +1,6 @@
 import {
-  type DOMAttributes,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -42,6 +39,7 @@ import {
   useCoarsePointer,
 } from "@openedbot/browser-ui-kit";
 import { haptics } from "../lib/platform/haptics";
+import { useLongPress } from "../lib/hooks/use-long-press";
 import { reactedByMe, sortReactions } from "../lib/thread/message-reactions";
 import { RiFileCopyLine, RiMoreFill } from "@remixicon/react";
 import { BUI_MENU_ITEM, BUI_POPOVER, BuiContextMenu, BuiContextMenuContent, BuiContextMenuItem, BuiContextMenuTrigger } from "./boardui/menu";
@@ -104,71 +102,6 @@ const ACTION =
 const BELOW_ACTION =
   "grid size-8 shrink-0 place-items-center rounded-full text-[var(--stream-fg2)] outline-none transition-colors hover:bg-[var(--stream-hover)] hover:text-[var(--stream-fg)] data-[state=open]:bg-[var(--stream-hover)] data-[state=open]:text-[var(--stream-fg)] focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-50 aria-pressed:text-[var(--stream-fg)] motion-reduce:transition-none";
 
-/** Duration of a long press: that of `Pressable` / the iOS context menu. */
-const LONG_PRESS_MS = 450;
-/** Past that, the finger scrolls the list: it is no longer a press. */
-const LONG_PRESS_SLOP = 10;
-/** Window during which the click synthesized by the finger lifting is ignored. */
-const GHOST_CLICK_MS = 700;
-
-/**
- * The long press that replaces hover on a touch screen.
- *
- * On a phone, the hover icon row was forced visible
- * permanently: three 28 px chips stuck to EVERY bubble, which stole
- * 5.5 rem of width from the text and misaligned the column. No native
- * messenger does that: a message's actions are obtained there by holding it
- * pressed, and arrive in a sheet anchored at the bottom.
- */
-function useLongPress(onLongPress: () => void, enabled: boolean): Partial<DOMAttributes<HTMLElement>> {
-  const timer = useRef<number | null>(null);
-  const origin = useRef<{ x: number; y: number } | null>(null);
-
-  const clear = useCallback(() => {
-    if (timer.current !== null) window.clearTimeout(timer.current);
-    timer.current = null;
-    origin.current = null;
-  }, []);
-
-  useEffect(() => clear, [clear]);
-
-  if (!enabled) return {};
-
-  return {
-    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-      // The mouse keeps hover; only the finger (or the stylus) triggers it.
-      if (!event.isPrimary || event.pointerType === "mouse") return;
-      origin.current = { x: event.clientX, y: event.clientY };
-      timer.current = window.setTimeout(() => {
-        timer.current = null;
-        // The finger is still down: on lifting it, the engine synthesizes a
-        // `click` at the same coordinates, which would land on the veil of the
-        // sheet just mounted and close it at once. That
-        // ghost click is swallowed: the same trap as iOS's « ghost click ».
-        const swallow = (event: MouseEvent) => {
-          event.preventDefault();
-          event.stopPropagation();
-        };
-        document.addEventListener("click", swallow, true);
-        window.setTimeout(() => document.removeEventListener("click", swallow, true), GHOST_CLICK_MS);
-        onLongPress();
-      }, LONG_PRESS_MS);
-    },
-    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
-      const start = origin.current;
-      if (!start) return;
-      if (
-        Math.abs(event.clientX - start.x) > LONG_PRESS_SLOP ||
-        Math.abs(event.clientY - start.y) > LONG_PRESS_SLOP
-      ) clear();
-    },
-    onPointerUp: clear,
-    onPointerCancel: clear,
-    // Without that, WebKit opens ITS selection callout over the sheet.
-    onContextMenu: (event) => event.preventDefault(),
-  };
-}
-
 /**
  * The right click keeps the browser menu where it is useful: a text
  * selection (copy, search), a link, an image, a field. Stopped in capture,
@@ -213,7 +146,7 @@ export function MessageInteractionShell({
   children: ReactNode;
   /** `below` bar: what precedes the actions on the same line (the author). */
   footerStart?: ReactNode;
-  /** `below` bar: meta after the actions on the same line, centred on them (the dev run timing). */
+  /** Meta after the actions on the same line (the dev run timing). */
   footerEnd?: ReactNode;
   /** Visual context placed above the message, outside the zone that anchors
    * the hover actions. An answered question must not widen the bubble. */
@@ -372,6 +305,7 @@ export function MessageInteractionShell({
         className={cn(
           "group/message flex",
           below ? "w-full flex-col items-start" : "items-end gap-1.5",
+          side && surface === "card" && "items-center",
           !below && (width === "fill"
             ? "w-full"
             : side
@@ -563,8 +497,8 @@ export function MessageInteractionShell({
             className={cn(
               "flex shrink-0 items-center gap-1 transition-opacity duration-150",
               align === "end" && "order-first",
-              "opacity-0 group-hover/message:opacity-100 focus-within:opacity-100",
-              (pickerOpen || menuOpen) && "opacity-100",
+              "pointer-events-none opacity-0 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100",
+              (pickerOpen || menuOpen) && "pointer-events-auto opacity-100",
             )}
           >
             {canReact && messageId ? (
@@ -657,6 +591,7 @@ export function MessageInteractionShell({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
+            {footerEnd ? <span data-message-actions-trailing="" className="flex shrink-0 items-center">{footerEnd}</span> : null}
           </div>
         ) : null}
       </div>

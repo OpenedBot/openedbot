@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRefresh } from "@tabler/icons-react";
 import { cn, Dialog, toast } from "@openedbot/browser-ui-kit";
-import { api, queryKeys } from "../../../../lib/api";
+import { api, errorMessage, queryKeys } from "../../../../lib/api";
 import { useT } from "../../../../lib/i18n";
-import type { RuntimeEnrollmentTicketDto } from "@openedbot/contracts-api";
+import { isLocalEngine, LOCAL_ENGINES, type RuntimeEnrollmentTicketDto } from "@openedbot/contracts-api";
 import { BUTTON } from "../../../../components/settings/primitives";
 
 /**
@@ -140,12 +140,36 @@ export function RuntimeEnrollmentDialog({
     queryFn: () => api.runtimeEnrollmentStatus(ticket.enrollmentId),
     refetchInterval: expired ? false : 3_000,
   });
+  // One last read at expiry: an agent paired after the previous poll still shows.
+  useEffect(() => {
+    if (expired) void status.refetch();
+  }, [expired]);
+  // A machine ticket pairs every agent CLI of the machine, one by one, until it
+  // expires: the agents show up here as they connect.
+  const machine = ticket.command.includes(" connect --openedbot ");
+  // Development names the checkout's own build; anywhere else the installed
+  // `edge-setup`, which may predate `connect`: the dialog installs or updates it first.
+  const devBuild = machine && !ticket.command.startsWith("edge-setup ");
+  const firstStep = machine ? 2 : 1;
+  const engines = status.data?.engines ?? [];
   const completed = status.data?.state === "completed";
   // Claimed records the operator's organization, not a connection from the host.
-  const enrollmentProgress = completed ? 100 : 25;
+  const enrollmentProgress = completed || engines.length > 0 ? 100 : 25;
+  const connected = engines.map((engine) => isLocalEngine(engine) ? LOCAL_ENGINES[engine].label : engine).join(", ");
   const enrollmentStatus = completed
     ? "Appairage terminé"
-    : "En attente de la connexion de l’hôte…";
+    : engines.length > 0
+      ? expired
+        ? `Agents connectés : ${connected}. Le ticket a expiré : un autre agent demandera un nouveau ticket.`
+        : `Agents connectés : ${connected}`
+      : machine ? "En attente des agents de la machine…" : "En attente de la connexion de l’hôte…";
+  // Waiting, the screen polls; once the ticket expired with agents, nothing moves.
+  const waiting = !completed && !expired;
+  useEffect(() => {
+    if (engines.length === 0) return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.runtimeList });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.runtimes });
+  }, [engines.length, queryClient]);
   useEffect(() => {
     if (!completed) return;
     toast.success(`${ticket.runtimeName} est connecté.`);
@@ -161,7 +185,9 @@ export function RuntimeEnrollmentDialog({
       open
       onClose={onCancel}
       title={`Appairer ${ticket.runtimeName}`}
-      description="La machine ouvre elle-même la connexion vers openedbot : le token du gateway est lu sur place et prouvé par le lien. Ni cette fenêtre ni votre presse-papiers ne le voient."
+      description={machine
+        ? "Chaque agent (Codex, Claude Code, Grok, Gemini, OpenCode) utilise le compte déjà connecté sur la machine. Le ticket autorise uniquement le lien avec openedbot."
+        : "La machine ouvre elle-même la connexion vers openedbot : le token du gateway est lu sur place et prouvé par le lien. Ni cette fenêtre ni votre presse-papiers ne le voient."}
       className={ENROLLMENT_DIALOG_WIDTH}
       bodyClassName="p-0"
       // The cross and the foot's button do the same thing: two identical
@@ -169,7 +195,19 @@ export function RuntimeEnrollmentDialog({
       // « Fermer » twice without saying which is which.
       closeLabel="Fermer la fenêtre"
       footerClassName="sm:justify-between"
-      footer={expired ? (
+      footer={status.isError ? (
+        <>
+          <p role="alert" className="min-w-0 text-xs leading-5 text-destructive-text">
+            {errorMessage(status.error, "L’état de l’appairage est illisible pour l’instant.")}{" "}
+            <button type="button" className="font-medium underline underline-offset-2" onClick={() => void status.refetch()}>
+              Réessayer
+            </button>
+          </p>
+          <button type="button" className={BUTTON.secondary} onClick={onCancel}>
+            Fermer
+          </button>
+        </>
+      ) : expired && engines.length === 0 ? (
         <>
           <p role="alert" className="min-w-0 text-xs leading-5 text-destructive-text">
             Ticket expiré. Fermez, puis relancez « Appairer depuis le serveur » pour en obtenir un autre.
@@ -181,7 +219,7 @@ export function RuntimeEnrollmentDialog({
       ) : (
         <>
           <p role="status" className="flex min-w-0 items-center gap-2 text-xs leading-5 text-muted-foreground">
-            <IconRefresh aria-hidden className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+            {waiting ? <IconRefresh aria-hidden className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
             {enrollmentStatus}
           </p>
           <button type="button" className={BUTTON.secondary} onClick={onCancel}>
@@ -234,18 +272,35 @@ export function RuntimeEnrollmentDialog({
         />
       </div>
       <ol className={cn("space-y-5 px-5 py-4", expired && "opacity-50")}>
+        {machine ? (
+          <EnrollmentStep
+            index={1}
+            title={devBuild ? "Compiler edge-setup depuis le dépôt" : "Installer ou mettre à jour edge-setup"}
+            value={devBuild ? "make connect-dev-build" : EDGE_SETUP_INSTALL_STEPS[0]!.value}
+            copyLabel="La commande"
+            prefix="$"
+          >
+            <p>
+              {devBuild
+                ? "À la racine du dépôt openedbot : la commande suivante lance ce binaire, pas celui installé sur le système."
+                : "Remplace un edge-setup déjà installé par la version qui connaît « connect ». Sans risque si elle est déjà à jour."}
+            </p>
+          </EnrollmentStep>
+        ) : null}
         <EnrollmentStep
-          index={1}
+          index={firstStep}
           title={`Lancer la commande sur ${ticket.runtimeName}`}
           value={ticket.command}
           copyLabel="La commande"
           prefix="$"
         >
-          <p>
+          {machine ? (
+            <p>Dans le dossier de travail, exécutez cette commande avec votre compte habituel. Elle trouve les agents installés, installe l’adaptateur de Claude Code si besoin, puis les garde connectés en service utilisateur.</p>
+          ) : <p>
             Suppose <code>edge-setup</code> installé et <code>sudo edge-setup up --yes</code> déjà joué sur{" "}
             {ticket.runtimeName}. Sinon, fermez : la fenêtre précédente donne ces commandes.
-          </p>
-          {isDevelopmentLinkCommand(ticket.command) ? (
+          </p>}
+          {!machine && isDevelopmentLinkCommand(ticket.command) ? (
             <p role="note" className="text-warn-700">
               Mode développement : {ticket.runtimeName} joint cette API par un tunnel SSH inverse. Lancez{" "}
               <code>make link-dev-up HOST=hermes-admin@&lt;vps&gt;</code> dans un terminal du poste : cette cible
@@ -257,7 +312,7 @@ export function RuntimeEnrollmentDialog({
           ) : null}
         </EnrollmentStep>
         <EnrollmentStep
-          index={2}
+          index={firstStep + 1}
           title={t("cloudRuntimeSettings.enrollmentTicketStepTitle")}
           value={ticket.ticket}
           copyLabel="Le ticket"

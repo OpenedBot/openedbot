@@ -22,6 +22,7 @@ import {
 } from "@openedbot/runtimes/domain/runtime/openai-free-tier";
 import { isKeylessProvider } from "@openedbot/runtimes/domain/runtime/keyless-providers";
 import {
+  HERMES_REASONING_EFFORTS,
   isHermesReasoningEffort,
   type HermesReasoningEffort,
 } from "@openedbot/contracts-api";
@@ -39,7 +40,7 @@ import {
   publicRuntimeWithBots,
   type RuntimeRow,
 } from "./runtime-routes";
-import { readRuntimeRowById, readRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
+import { readRuntimeRowById } from "@openedbot/runtimes/application/runtime-rows";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { cancelModelSelectionProof, enqueueModelSelectionProof } from "@openedbot/runtimes/application/model-selection-proof";
 import { readProvenRuntimeModel } from "@openedbot/runtimes/application/model-selection-proof";
@@ -145,6 +146,8 @@ export function runtimeModelCatalog(
         id: model.id,
         fast: model.fast,
         reasoning: model.reasoning,
+        // Weakest first, whatever the host's order: the slider reads it left to right.
+        ...(model.efforts ? { efforts: HERMES_REASONING_EFFORTS.filter((effort) => model.efforts?.includes(effort)) } : {}),
         isRuntimeDefault: provider.slug === catalog.provider && model.id === catalog.model,
         freeTier: provider.slug === OPENAI_FREE_TIER_PROVIDER
           ? { tokensPerDay: openAiFreeTokensPerDay(model.id) }
@@ -350,7 +353,8 @@ export function runtimeModelRoutes(db: Db, config: ApiConfig, dependencies: { sn
             token_tag as "tokenTag", token_key_id as "tokenKeyId", edge_auth_ciphertext as "edgeAuthCiphertext",
             edge_auth_nonce as "edgeAuthNonce", edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId",
             link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt", link_generation::text as "linkGeneration",
-            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion", link_origin as "linkOrigin",
+            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+            link_engine as "linkEngine", link_engine_version as "linkEngineVersion", link_origin as "linkOrigin",
             link_features as "linkFeatures", link_token_rotated_at as "linkRotatedAt",
             (select max(e.occurred_at) from runtime_link_events e where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'replaced') as "linkLastReplacedAt",
             (select max(e.occurred_at) from runtime_link_events e where e.organization_id = runtimes.organization_id and e.runtime_id = runtimes.id and e.kind = 'hijack_suspected') as "linkHijackSuspectedAt",
@@ -368,7 +372,7 @@ export function runtimeModelRoutes(db: Db, config: ApiConfig, dependencies: { sn
         const candidates = await withTenant(db, auth.organizationId, (tx) => tx<Array<{ botId: string; profile: string }>>`
           select b.id as "botId", b.hermes_profile as "profile" from bots b
            where b.organization_id = ${auth.organizationId} and b.hermes_profile_managed = true
-             and b.hermes_profile is not null and b.deleted_at is null
+             and b.hermes_profile is not null and b.deleted_at is null and b.runtime_id is null
              and coalesce((select p.status from bot_profile_provisions p
                             where p.organization_id = b.organization_id and p.bot_id = b.id), 'succeeded') = 'succeeded'
         `);
@@ -437,12 +441,10 @@ export async function resolveRuntime(
   organizationId: string,
   runtimeId: string,
 ): Promise<{ row: RuntimeRow; client: RuntimeAdminClient; clientConfig: HermesClientConfig }> {
-  const row = await withTenant(db, organizationId, async (tx) => {
-    const rows = await readRuntimeRows(tx, organizationId);
-    return rows.find((entry) => entry.id === runtimeId) ?? null;
-  });
+  // By id, not the active runtime only: a bot can run on a machine's dedicated agent.
+  const row = await withTenant(db, organizationId, async (tx) => (await readRuntimeRowById(tx, organizationId, runtimeId))[0] ?? null);
   if (!row) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
-  const secret = await readRuntimeSecret(db, config, organizationId);
+  const secret = await readRuntimeSecret(db, config, organizationId, undefined, undefined, runtimeId);
   if (!secret || secret.id !== runtimeId) throw new HttpError(404, "RUNTIME_NOT_FOUND", "Runtime introuvable.");
   return { row, client: runtimeAdminClient(secret.client), clientConfig: secret.client };
 }

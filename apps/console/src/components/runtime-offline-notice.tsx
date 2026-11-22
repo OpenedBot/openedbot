@@ -149,6 +149,23 @@ export function useRuntimeOfflineNotice({
   );
 }
 
+/**
+ * No usable machine (none linked, or one that fails its checks without being
+ * offline): the composer's one explanation, on the same status tab, with the
+ * gesture that fixes it. A setup state, not an outage: the tab stays grey.
+ */
+export function NoMachineNotice({ message, onOpenRuntime }: { message: string; onOpenRuntime: () => void }) {
+  const { t } = useT();
+  return (
+    <div role="status" data-runtime-notice="missing" className={`${TAB} bg-background-tertiary-default text-text-primary`}>
+      <p className="min-w-0 flex-1">{message}</p>
+      <button type="button" className={`${TAB_ACTION} focus-visible:ring-border-focus-ring`} onClick={onOpenRuntime}>
+        {t("mvp.runtimeAction")}
+      </button>
+    </div>
+  );
+}
+
 /** The one signal left in the top bar while the runtime is away, on every thread. */
 export function RuntimeOfflineBadge({
   since,

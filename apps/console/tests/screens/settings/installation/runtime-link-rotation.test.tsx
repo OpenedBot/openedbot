@@ -94,6 +94,11 @@ function renderSettings() {
   );
 }
 
+/** The link and its actions live in « Machine par défaut »; the screen opens on « Machines » (d61b4eca). */
+async function openDefaultMachine() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Machine par défaut" }));
+}
+
 function setViewportWidth(width: number) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
 }
@@ -114,6 +119,7 @@ describe("rotation du jeton de lien", () => {
   test("sans soupçon : aucune rotation manuelle n'est proposée", async () => {
     stubFetch(connectorRuntime());
     renderSettings();
+    await openDefaultMachine();
     expect(await screen.findByText("Runtime actif")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Faire tourner le jeton" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Faire tourner le jeton et couper le lien" })).toBeNull();
@@ -127,7 +133,9 @@ describe("rotation du jeton de lien", () => {
     expect(screen.getByText(/Lien remplacé depuis une autre adresse le .+faites tourner le jeton/)).toBeTruthy();
     expect(screen.getByText(/Le lien actuel sera coupé immédiatement/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Faire tourner le jeton" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Faire tourner le jeton et couper le lien" }));
+    // The banner shows on every section; the emergency rotation sits with the default machine's link.
+    await openDefaultMachine();
+    fireEvent.click(await screen.findByRole("button", { name: "Faire tourner le jeton et couper le lien" }));
     await waitFor(() => expect(screen.getByText(NEW_TOKEN)).toBeTruthy());
     expect(rotations).toEqual(["POST /api/runtime/runtime-2/link/rotate emergency"]);
     expect(screen.getByText(/Le lien a été coupé/)).toBeTruthy();
@@ -136,6 +144,7 @@ describe("rotation du jeton de lien", () => {
   test("la boîte du jeton d'urgence se ferme et le jeton disparaît de l'écran", async () => {
     stubFetch(connectorRuntime({ hijackSuspectedAt: "2026-09-02T08:30:00.000Z" }));
     renderSettings();
+    await openDefaultMachine();
     fireEvent.click(await screen.findByRole("button", { name: "Faire tourner le jeton et couper le lien" }));
     await waitFor(() => expect(screen.getByText(NEW_TOKEN)).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "J’ai copié le jeton" }));
@@ -146,6 +155,7 @@ describe("rotation du jeton de lien", () => {
     setViewportWidth(390);
     stubFetch(connectorRuntime({ hijackSuspectedAt: "2026-09-02T08:30:00.000Z" }));
     renderSettings();
+    await openDefaultMachine();
     const button = await screen.findByRole("button", { name: "Faire tourner le jeton et couper le lien" });
     expect(button.closest("[data-mobile-action-footer]")).not.toBeNull();
     expect(button.className).toContain("min-h-11");

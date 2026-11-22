@@ -13,7 +13,8 @@ import type { MessageKey } from "@openedbot/browser-i18n";
 import { cn, useIsMobile } from "@openedbot/browser-ui-kit";
 import { ApiError } from "../lib/api";
 import { useFallbackT } from "../lib/i18n";
-import { BUTTON, CopyButton } from "./settings/primitives";
+import { BUTTON } from "./settings/primitives";
+import { CopyButton } from "./settings/copy-button";
 
 /** The code set when the request never reached the API (`api.ts`). */
 const API_UNAVAILABLE = "API_UNAVAILABLE";
@@ -195,6 +196,7 @@ export type FailureFact = { label: string; value: string; status?: boolean };
 export function FailureState({
   error,
   fallback,
+  description,
   title,
   icon,
   facts: extraFacts = [],
@@ -206,6 +208,8 @@ export function FailureState({
   error: unknown;
   /** The screen's sentence, when the error carries none that can be read. */
   fallback: string;
+  /** The screen's sentence in place of the error's, when the screen knows the cause and the next gesture better. */
+  description?: string;
   /** The screen's title, when it knows more than the error's nature. */
   title?: string;
   icon?: ComponentType<IconProps>;
@@ -236,7 +240,7 @@ export function FailureState({
     <FailureSurface
       icon={icon ?? look.icon}
       title={title ?? t(look.titleKey)}
-      description={detail.message || fallback}
+      description={description ?? (detail.message || fallback)}
       tone={look.tone}
       path={shape && look.pathKey ? { shape, label: t(look.pathKey) } : null}
       facts={[...extraFacts, ...facts]}
@@ -369,8 +373,8 @@ type FailureToneClasses = (typeof TONES)[FailureTone];
 /**
  * The screen that gave way, full frame.
  *
- * The title is the only strong element: a sentence, on the left, at the width
- * of a thread message. The gesture comes right after. The journey, the reference
+ * The title is the only strong element: a sentence, centred in the frame
+ * (operator request of 17-11-2026). The gesture comes right after. The journey, the reference
  * and the technical line form the receipt, below. No card: the void
  * around it is the conversation that is no longer there.
  */
@@ -401,7 +405,7 @@ function FailurePage({
     <section
       role="alert"
       className={cn(
-        "flex w-full min-h-0 flex-1 flex-col items-start justify-center",
+        "flex w-full min-h-0 flex-1 flex-col items-center justify-center",
         // With an illustration the text keeps its column and the art takes
         // the right of the page on a wide screen, above the text on a phone.
         art ? "gap-8 md:flex-row-reverse md:items-center md:justify-center md:gap-16" : undefined,
@@ -410,8 +414,8 @@ function FailurePage({
       )}
     >
       {art ?? null}
-      <div className="flex w-full max-w-[26rem] flex-col items-start gap-5">
-        <div className="flex flex-col gap-3">
+      <div className="flex w-full max-w-[26rem] flex-col items-center gap-5 text-center">
+        <div className="flex flex-col items-center gap-3">
           <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
           <p className="max-w-[34ch] text-base leading-6 text-muted-foreground">{description}</p>
         </div>
@@ -419,16 +423,16 @@ function FailurePage({
           <div
             className={cn(
               "flex gap-2",
-              isMobile ? "w-full flex-col [&>*]:w-full" : "flex-row flex-wrap",
+              isMobile ? "w-full flex-col [&>*]:w-full" : "flex-row flex-wrap justify-center",
             )}
           >
             {action}
           </div>
         ) : null}
         {path || reference || facts.length > 0 ? (
-          <div className="flex flex-col items-start gap-3">
+          <div className="flex flex-col items-center gap-3">
             {path ? <FailurePath shape={path.shape} label={path.label} accent={tone.accent} /> : null}
-            {reference ? <Reference value={reference} button={BUTTON.secondary} align="start" /> : null}
+            {reference ? <Reference value={reference} button={BUTTON.secondary} /> : null}
             {facts.length > 0 ? <FailureFacts facts={facts} tone={tone} /> : null}
           </div>
         ) : null}
@@ -439,7 +443,7 @@ function FailurePage({
 
 function FailureFacts({ facts, tone }: { facts: ReadonlyArray<FailureFact>; tone: FailureToneClasses }) {
   return (
-    <dl className="flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[11px] text-muted-foreground">
+    <dl className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-mono text-[11px] text-muted-foreground">
       {facts.map(({ label, value, status }) => (
         <div
           key={label}
@@ -525,20 +529,17 @@ function PathSegment({ crossed }: { crossed: boolean }) {
 function Reference({
   value,
   button,
-  align = "center",
 }: {
   value: string;
   button: string;
-  align?: "start" | "center";
 }) {
   const { t } = useFallbackT();
-  const start = align === "start";
   return (
-    <div className={cn("flex w-full flex-col gap-2 pt-1", start ? "items-start" : "items-center")}>
-      <p className={cn("max-w-[46ch] text-xs leading-5 text-muted-foreground", start ? "text-left" : "text-center")}>
+    <div className="flex w-full flex-col items-center gap-2 pt-1">
+      <p className="max-w-[46ch] text-center text-xs leading-5 text-muted-foreground">
         {t("errorState.transmit")}
       </p>
-      <div className={cn("flex max-w-full flex-wrap gap-2", start ? "items-center justify-start" : "items-center justify-center")}>
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
         <code className="min-w-0 max-w-full select-all truncate rounded-md border border-border bg-surface-sunken/60 px-2.5 py-1.5 font-mono text-xs leading-5">
           {value}
         </code>

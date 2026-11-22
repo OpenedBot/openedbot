@@ -17,7 +17,7 @@ import {
 import { readSectionName, readSectionOrder, readSectionPatch, readSectionsOrder } from "@openedbot/roster/domain/section-input";
 import { readSectionId } from "@openedbot/roster/domain/section-id";
 import { readToolErrorCursor, readToolErrorLimit } from "@openedbot/roster/domain/tool-errors";
-import { createBot, deleteBot, listRoster, resolveBotDeps, updateBot, type BotRouteDeps } from "@openedbot/roster/application/bots";
+import { createBot, deleteBot, listRoster, moveBotToRuntime, resolveBotDeps, updateBot, type BotRouteDeps } from "@openedbot/roster/application/bots";
 import { botRuns } from "@openedbot/execution/application/bot-runs";
 import {
   createBotProfile,
@@ -46,7 +46,7 @@ import { retryBotHostCleanup } from "@openedbot/roster/application/bot-host-clea
 import { readBotToolPoliciesView, setBotToolPolicies } from "@openedbot/roster/application/tool-policies";
 import { readToolPolicyWrites } from "@openedbot/roster/domain/tool-policy-input";
 import type { ApiConfig } from "../../infrastructure/config";
-import { jsonBody } from "../../interfaces/http/http-error";
+import { HttpError, jsonBody } from "../../interfaces/http/http-error";
 
 /** `?purge=1`, `?purge=true`, `?purge`: everything else is false. */
 function isTruthyFlag(raw: string | undefined): boolean {
@@ -247,6 +247,28 @@ export function botRoutes(db: Db, config: ApiConfig, routeDeps: BotRouteDeps = {
     requireOperator(auth);
     const body = await jsonBody(context.req.raw);
     return context.json(await updateBot(db, deps, auth.organizationId, context.req.param("botId"), readUpdateBotInput(body)));
+  });
+
+  // The machine a bot runs on: `null` is the organization's default one. An
+  // optional `model` (and its `provider`) of that machine's catalogue moves
+  // the bot onto that model rather than the machine's default.
+  routes.put("/:botId/runtime", async (context) => {
+    const auth = context.get("auth");
+    requireOperator(auth);
+    const body = await jsonBody(context.req.raw);
+    const runtimeId = body.runtimeId;
+    if (runtimeId !== null && (typeof runtimeId !== "string"
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runtimeId))) {
+      throw new HttpError(400, "INVALID_RUNTIME", "La machine sélectionnée est invalide.");
+    }
+    const model = body.model ?? null;
+    const provider = body.provider ?? null;
+    if ((model !== null && (typeof model !== "string" || !model.trim() || model.length > 200))
+      || (provider !== null && (typeof provider !== "string" || provider.length > 200))) {
+      throw new HttpError(400, "INVALID_MODEL", "Le modèle sélectionné est invalide.");
+    }
+    const choice = model === null ? null : { model: model.trim(), provider: provider?.trim() || null };
+    return context.json(await moveBotToRuntime(db, deps, auth.organizationId, context.req.param("botId"), runtimeId, choice));
   });
 
   routes.delete("/:botId", async (context) => {

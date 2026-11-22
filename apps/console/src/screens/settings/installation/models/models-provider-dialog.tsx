@@ -8,7 +8,8 @@ import type { RuntimeModelProviderDto, RuntimeProviderOauthDto, RuntimePublicDto
 import { api, queryKeys } from "../../../../lib/api";
 import { useT } from "../../../../lib/i18n";
 import { isKeylessProvider } from "@openedbot/runtimes/domain/runtime/keyless-providers";
-import { ACTIONS, BUTTON, CopyButton, Note } from "../../../../components/settings/primitives";
+import { ACTIONS, BUTTON, Note } from "../../../../components/settings/primitives";
+import { CopyButton } from "../../../../components/settings/copy-button";
 
 function cancelOauthIfOpen(
   runtimeId: string,

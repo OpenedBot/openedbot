@@ -46,6 +46,10 @@ await withDisposablePostgres("openedbot258_runtime_notify", async ({ owner, conn
   await expectNotifications("the same features written again", 0, () => worker`update runtimes set link_features = '{approval_policy}'::text[] where id = ${RUNTIME}`);
   await expectNotifications("new features", 1, () => worker`update runtimes set link_features = '{approval_policy,profile_management}'::text[] where id = ${RUNTIME}`);
 
+  await expectNotifications("engine announced", 1, () => worker`update runtimes set link_engine = 'acp:opencode' where id = ${RUNTIME}`);
+  await expectNotifications("engine version announced", 1, () => worker`update runtimes set link_engine_version = 'preview 1' where id = ${RUNTIME}`);
+  await expectNotifications("same engine declaration", 0, () => worker`update runtimes set link_engine = 'acp:opencode', link_engine_version = 'preview 1' where id = ${RUNTIME}`);
+
   // The worker's sweep: a silent link becomes disconnected.
   await expectNotifications("the sweep disconnects", 1, () => worker`
     update runtimes set last_health_status = 'disconnected', link_instance_id = null, link_connected_at = null where id = ${RUNTIME}`);

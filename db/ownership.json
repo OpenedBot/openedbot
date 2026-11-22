@@ -38,6 +38,7 @@
     ]
   },
   "bot_host_cleanups": "roster",
+  "bot_host_profiles": "roster",
   "bot_permission_grants": "roster",
   "bot_permission_rules": {
     "owner": "permissions",

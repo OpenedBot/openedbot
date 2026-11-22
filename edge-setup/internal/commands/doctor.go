@@ -8,31 +8,45 @@ import (
 	"time"
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/account"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/egress"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/exec"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/fsx"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/gateway"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hardening"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/hermes"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/layout"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/render"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/systemd"
 )
+
+var doctorGateway = gateway.Loopback
+var doctorToken = hermes.Token
 
 // doctor checks the running runtime and returns the problems found. It is
 // read-only and reads the bearer only to present it to the loopback.
 func doctor(ctx context.Context) ([]string, []string) {
 	var problems, warnings []string
-	sd := systemd.Client{Runner: runner}
-	if active, _ := sd.IsActive(ctx, layout.GatewayUnit); !active {
-		problems = append(problems, layout.GatewayUnit+".service is not active")
+	st, err := loadHostState()
+	if err != nil {
+		return []string{"state: " + err.Error()}, nil
 	}
-	c := gateway.Loopback("")
+	isACP := st.EngineName() == state.EngineOpenCode
+	unit := layout.GatewayUnit
+	if isACP {
+		unit = layout.ACPBridgeUnit
+	}
+	sd := systemd.Client{Runner: runner}
+	if active, _ := sd.IsActive(ctx, unit); !active {
+		problems = append(problems, unit+".service is not active")
+	}
+	c := doctorGateway("")
 	if st, err := c.Health(ctx); err != nil || (st != 200 && st != 401 && st != 403) {
 		problems = append(problems, fmt.Sprintf("loopback /health: %v (HTTP %d)", err, st))
 	}
 	if ss, err := exec.Output(ctx, runner, "/usr/bin/ss", "-H", "-ltn"); err == nil {
 		if hardening.PublicListener(ss, layout.GatewayPort) {
-			problems = append(problems, fmt.Sprintf("Hermes listens publicly on :%d", layout.GatewayPort))
+			problems = append(problems, fmt.Sprintf("%s listens publicly on :%d", map[bool]string{true: "ACP bridge", false: "Hermes"}[isACP], layout.GatewayPort))
 		}
 		if !hardening.LoopbackListener(ss, layout.GatewayPort) {
 			problems = append(problems, fmt.Sprintf("no loopback listener on :%d", layout.GatewayPort))
@@ -40,20 +54,20 @@ func doctor(ctx context.Context) ([]string, []string) {
 	} else {
 		problems = append(problems, "ss: "+err.Error())
 	}
-	if !multiplexProfilesConfigured(ctx, runner) {
+	if !isACP && !multiplexProfilesConfigured(ctx, runner) {
 		problems = append(problems, "gateway.multiplex_profiles = true is not configured")
 	}
-	if st, _ := state.Load(); st != nil && st.Features.Firewall {
+	if st, _ := loadHostState(); st != nil && st.Features.Firewall {
 		if problem := loopbackGuardProblem(ctx, runner, uidOf(ctx)); problem != "" {
 			problems = append(problems, problem)
 		}
 	}
-	token, err := hermes.Token()
+	token, err := doctorToken()
 	if err != nil {
 		problems = append(problems, err.Error())
 		return problems, warnings
 	}
-	c = gateway.Loopback(token)
+	c = doctorGateway(token)
 	if err := c.RequireUnauthorizedWithoutBearer(ctx); err != nil {
 		problems = append(problems, err.Error())
 	}
@@ -63,9 +77,17 @@ func doctor(ctx context.Context) ([]string, []string) {
 	} else if err := gateway.RequireToolsetPolicy(names); err != nil {
 		problems = append(problems, err.Error())
 	}
-	st, _ := state.Load()
-	if warning := gatewayUnitWarning(ctx, account.New(runner), st, layout.GatewayUnitPath, layout.ResolvConf); warning != "" {
-		warnings = append(warnings, warning)
+	if isACP {
+		want, e := render.ACPBridgeUnit(egress.ResolverAllowFrom(layout.ResolvConf, "", nil))
+		installed, readErr := os.ReadFile(layout.ACPBridgeUnitPath)
+		if e == nil && readErr == nil && string(installed) != want {
+			warnings = append(warnings, "ACP bridge unit is stale; run up or upgrade")
+		}
+	}
+	if !isACP {
+		if warning := gatewayUnitWarning(ctx, account.New(runner), st, layout.GatewayUnitPath, layout.ResolvConf); warning != "" {
+			warnings = append(warnings, warning)
+		}
 	}
 	if st != nil && st.DockerEnabled {
 		res, err := runner.Run(ctx, exec.Cmd{Path: "/usr/sbin/runuser", Args: []string{"-u", layout.ServiceUser, "--", "/usr/bin/env", "DOCKER_HOST=unix:///run/user/" + fmt.Sprint(uidOf(ctx)) + "/docker.sock", "docker", "info", "--format", "{{.SecurityOptions}}"}, Timeout: 30 * time.Second})

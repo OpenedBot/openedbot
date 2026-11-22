@@ -9,6 +9,7 @@ import {
   autonomousStepLimitsLine,
   buildAutonomousStepInstructions,
 } from "@openedbot/roster/domain/autonomous-workflow";
+import { LOCAL_ENGINES, isLocalEngine } from "@openedbot/contracts-api";
 import { withTenant } from "@openedbot/platform-db";
 import { handoffEligible, handoffRoster, simpleDmStep } from "./handoff";
 import type { RunContext } from "./types";
@@ -115,6 +116,24 @@ export async function dmInstructions(
       webToolsEnabled: context.webToolsEnabled,
   });
   return { instructions: withBotModeInstructions(context.instructions, block), limitsLine: null };
+}
+
+/**
+ * Where this run executes. A bot can change machine mid-conversation: the
+ * new engine reads a history where earlier replies came from another one,
+ * and without this line it cannot tell the user where it runs now. Stable
+ * from one turn to the next on the same machine, so it stays in the cached
+ * instructions; the model, which can change every turn, is left out.
+ */
+export function machineBlock(machine: { name: string; engine: string | null }): string {
+  const engine = machine.engine === null ? "Hermes"
+    : isLocalEngine(machine.engine) ? LOCAL_ENGINES[machine.engine].label
+    : machine.engine;
+  return [
+    "## Machine",
+    "",
+    `You run on the machine "${machine.name}", through ${engine}. This conversation may have started on another machine or engine: earlier replies in the history may come from it. When asked where you run, answer with this machine and engine.`,
+  ].join("\n");
 }
 
 export async function loadAssignedPlaybooks(

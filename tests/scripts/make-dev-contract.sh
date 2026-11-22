@@ -164,6 +164,14 @@ for target in dev dev-api dev-worker; do
   assert_literal_count "$target" "$(dry_run "$target")" "scripts/env.ts --check" 1
 done
 
+# They also refuse to start while a migration is pending (read-only check,
+# never --migrate). The console needs no database. The real runs below skip
+# it with -o db-pending: it needs the development PostgreSQL.
+for target in dev dev-api dev-worker; do
+  assert_literal_count "$target" "$(dry_run "$target")" "scripts/db.sh --pending" 1
+done
+assert_literal_count dev-console "$console_plan" "scripts/db.sh --pending" 0
+
 # Profiles. The default profile is `fake`: the apps run against
 # tests/fake-hermes, and nothing pulls the Hermes image.
 assert_literal_count "db-seed" "$(dry_run db-seed)" 'OPENEDBOT_DEV_PROFILE="fake"' 1
@@ -308,7 +316,7 @@ sentinel_env="$sentinel_dir/env"
 } > "$sentinel_env"
 for target in dev dev-api dev-worker; do
   sentinel_output="$sentinel_dir/$target.out"
-  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check -o db-pending \
     ENV_FILE="$sentinel_env" DEV_COMMAND=true DEV_API_COMMAND=true DEV_WORKER_COMMAND=true \
     "$target" >"$sentinel_output" 2>&1 </dev/null; then
     fail "make $target with a stubbed launcher exited non-zero (output withheld: it may hold env values)."
@@ -327,11 +335,36 @@ printf '#!/bin/sh\n[ -n "${OPENEDBOT_TEST_SENTINEL_SECRET:-}" ]\n' > "$sentinel_
 chmod +x "$sentinel_dir/bin/require-env"
 require_env="$sentinel_dir/bin/require-env"
 for target in dev dev-api dev-worker; do
-  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+  if ! PATH="$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check -o db-pending \
     ENV_FILE="$sentinel_env" DEV_COMMAND="$require_env" DEV_API_COMMAND="$require_env" \
     DEV_WORKER_COMMAND="$require_env" "$target" >/dev/null 2>&1 </dev/null; then
     fail "make $target must export the env file to the app it starts."
   fi
+done
+
+# A pending migration stops each launcher before it starts: a fake docker
+# answers the reachability probe and an empty migration registry, so every
+# migration is pending; the launcher would leave a marker if it ran.
+pending_bin="$contract_tmpdir/pending-bin"
+mkdir -p "$pending_bin"
+printf '#!/bin/sh\nexit 0\n' > "$pending_bin/docker"
+chmod +x "$pending_bin/docker"
+launch_marker="$contract_tmpdir/launched"
+printf '#!/bin/sh\ntouch "%s"\n' "$launch_marker" > "$pending_bin/launch"
+chmod +x "$pending_bin/launch"
+pending_output="$contract_tmpdir/pending.out"
+for target in dev dev-api dev-worker; do
+  rm -f "$launch_marker"
+  if PATH="$pending_bin:$sentinel_dir/bin:$PATH" NO_COLOR=1 make --no-print-directory -o env-check \
+    ENV_FILE="$sentinel_env" DEV_COMMAND="$pending_bin/launch" DEV_API_COMMAND="$pending_bin/launch" \
+    DEV_WORKER_COMMAND="$pending_bin/launch" "$target" >"$pending_output" 2>&1 </dev/null; then
+    fail "make $target must fail while a migration is pending."
+  fi
+  [ ! -e "$launch_marker" ] || fail "make $target started its app while a migration is pending."
+  # The refusal must be the pending check's, not any other failure (output
+  # withheld: it may hold env values).
+  grep -qF "has pending migrations" "$pending_output" && grep -qF "make db-migrate" "$pending_output" ||
+    fail "make $target must refuse because a migration is pending and name make db-migrate."
 done
 
 printf 'make dev dry-run contract passed.\n'

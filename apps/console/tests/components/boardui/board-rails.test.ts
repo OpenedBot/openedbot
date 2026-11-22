@@ -12,10 +12,11 @@ describe("le rail d'icônes", () => {
     }
   });
 
-  test("le quota LLM restant se pose juste au-dessus du runtime (demande du 04-11-2026)", () => {
+  test("le quota LLM et le runtime tiennent dans une seule pilule « Modèles », avant le séparateur (demande du 17-11-2026)", () => {
     const rails = read("src/components/boardui/board-rails.tsx");
-    expect(rails.indexOf("<RailLlmQuotas")).toBeGreaterThan(-1);
-    expect(rails.indexOf("<RailLlmQuotas")).toBeLessThan(rails.indexOf("<RailRuntimeHealth"));
+    expect(rails.indexOf("<RailModelsPill")).toBeGreaterThan(-1);
+    expect(rails.indexOf("<RailModelsPill")).toBeLessThan(rails.indexOf("<div aria-hidden className={RAIL_DIVIDER} />"));
+    expect(rails).not.toContain("<RailRuntimeHealth");
   });
 
   test("la mise à jour de l'app de bureau se pose juste au-dessus de Réglages, sous le séparateur", () => {

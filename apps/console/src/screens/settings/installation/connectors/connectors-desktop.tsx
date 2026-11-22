@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { isReservedMcpServerName } from "@openedbot/execution/domain/routine-tool-names";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import { Input, cn } from "@openedbot/browser-ui-kit";
@@ -456,9 +457,10 @@ function ConnectedSection({
     });
 
   // The servers added by hand: neither a bot nor the catalog, they live at the root.
+  // openedbot's own servers (`openedbot_routines`...) are plumbing, not connectors: not listed.
   const oauth = mcp?.data?.available ? mcp.data.capabilities.oauth : false;
   const customRows = (mcp?.data?.available ? mcp.data.servers : [])
-    .filter((server) => catalogEntryOfServer(server) === null)
+    .filter((server) => catalogEntryOfServer(server) === null && !isReservedMcpServerName(server.name))
     .filter((server) => matchesQuery({ name: server.name, description: server.endpoint ?? server.command ?? "" }, query))
     .map((server) => {
       const state = serverState(server);

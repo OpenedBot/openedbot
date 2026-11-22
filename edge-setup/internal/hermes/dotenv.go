@@ -630,3 +630,16 @@ func serviceOwner() (fsx.Owner, error) {
 	}
 	return fsx.Owner{UID: uid, GID: gid}, nil
 }
+
+// ReadPrivateEnv reads a root-controlled agent credential file without exposing
+// its contents through errors. Values use the existing dotenv parser.
+func ReadPrivateEnv(path string, owner fsx.Owner) (map[string]string, error) {
+	data, err := fsx.ReadRegular(path, 0o600, owner)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("agent credentials must be a private regular file: %w", err)
+	}
+	return parseDotEnv(data), nil
+}

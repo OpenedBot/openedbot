@@ -25,9 +25,10 @@ import { readRuntimeRowById, readRuntimeRows, type RuntimeRow } from "../sql/run
 export async function readRegisteredRuntimeForCleanup(
   db: Db,
   organizationId: string,
+  runtimeId?: string,
 ): Promise<{ id: string; linkFeatures: string[] } | null> {
   return withTenant(db, organizationId, async (tx) => {
-    const runtime = (await readRuntimeRows(tx, organizationId))[0];
+    const runtime = (runtimeId ? await readRuntimeRowById(tx, organizationId, runtimeId) : await readRuntimeRows(tx, organizationId))[0];
     return runtime ? { id: runtime.id, linkFeatures: runtime.reachability === "connector" ? runtime.linkFeatures : [] } : null;
   });
 }
@@ -52,6 +53,8 @@ export async function readRuntimeSecret(
   name: string;
   capacity: number;
   linkFeatures: string[];
+  /** The engine its host declared (`local:*` for an agent CLI); `null` for Hermes or a direct runtime. */
+  engine?: string | null;
   client: HermesClientConfig;
   selectedProvider: string | null;
   selectedModel: string | null;
@@ -71,6 +74,7 @@ export async function readRuntimeSecret(
     name: runtime.name,
     capacity: runtime.capacity,
     linkFeatures: runtime.reachability === "connector" ? runtime.linkFeatures : [],
+    engine: runtime.linkEngine ?? null,
     client: runtimeClientConfig(runtime, config, links),
     selectedProvider: runtime.selectedProvider,
     selectedModel: runtime.selectedModel,

@@ -1,7 +1,6 @@
 import type { WorkflowStatus } from "@openedbot/contracts-api";
 import { UUID_LOOSE_RE, isUuid, isoOrNull } from "@openedbot/contracts-primitives";
 import { Hono } from "hono";
-import { createHash } from "node:crypto";
 import type { RoutineExecutionOutcome } from "@openedbot/contracts-api";
 import { ROUTINE_LIMITS, nextOccurrence, routineFireText } from "@openedbot/execution/domain/routines";
 import { AUTONOMY_DEFAULTS, normalizeAutonomyPolicy } from "@openedbot/roster/domain/autonomous-workflow";
@@ -19,14 +18,21 @@ import type {
   RoutineExecutionDto,
   RoutineRunAcceptedDto,
 } from "@openedbot/contracts-api";
+import {
+  canonicalRoutineRunHash,
+  readRoutineRunIngress,
+  readRoutineRunRoutineId,
+  replayRoutineRun,
+  routineRunInProgress,
+} from "./routine-run-ingress";
 import { assertEntitled } from "@openedbot/identity/domain/entitlement";
 import { readIdempotencyKey } from "@openedbot/conversation/application/message-ingress";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
 import { readRoutines } from "@openedbot/execution/application/routines";
-import { disconnectedHostOrganizations } from "@openedbot/runtimes/application/link-vitality";
+import { disconnectedHosts } from "@openedbot/runtimes/application/link-vitality";
 import { editedClock, validatedRoutineInput } from "./routine-input";
 
-export { validatedRoutineInput };
+export { canonicalRoutineRunHash, validatedRoutineInput };
 
 const ROUTINE_ADMIN_MESSAGE = "Les routines sont réservées aux administrateurs de l’organisation.";
 const ROUTINE_HOST_OFFLINE_MESSAGE = "L’hôte de ce bot est hors ligne : relancez la routine une fois qu’il est reconnecté.";
@@ -89,17 +95,6 @@ type RunnableRoutineRow = {
   autonomyTokenBudget: string | number | null;
   neverWait: boolean;
   hostOffline: boolean;
-};
-
-type RoutineRunIngressRow = {
-  id: string;
-  requestHash: string;
-  state: "reserved" | "completed" | "abandoned";
-  messageId: string;
-  runId: string;
-  workflowId: string;
-  responseStatus: number | null;
-  responseBody: unknown;
 };
 
 /**
@@ -309,9 +304,10 @@ export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variable
                  bot.autonomy_token_budget as "autonomyTokenBudget",
                  offline.organization_id is not null as "hostOffline"
             from routines r
-            left join ${disconnectedHostOrganizations(tx)} offline on offline.organization_id = r.organization_id
             left join bots bot on bot.organization_id = r.organization_id and bot.id = r.bot_id
               and bot.archived_at is null
+            left join ${disconnectedHosts(tx)} offline on offline.organization_id = r.organization_id
+              and (offline.runtime_id = bot.runtime_id or (bot.runtime_id is null and offline.is_active))
             left join bot_groups g on g.organization_id = r.organization_id and g.id = r.group_id
             join threads thread on thread.organization_id = r.organization_id
               and (
@@ -524,83 +520,6 @@ export function routineRoutes(db: Db, billingEnforced: boolean): Hono<{ Variable
   });
 
   return routes;
-}
-
-export function canonicalRoutineRunHash(routineId: string): string {
-  return createHash("sha256")
-    .update(JSON.stringify({ operation: "routine.run.create", routineId }))
-    .digest("hex");
-}
-
-function readRoutineRunRoutineId(value: string): string {
-  if (!isUuid(value)) {
-    throw new HttpError(400, "ROUTINE_ID_INVALID", "L’identifiant de routine est invalide.");
-  }
-  return value.toLowerCase();
-}
-
-function readRoutineRunIngress(
-  tx: TransactionDb,
-  organizationId: string,
-  userId: string,
-  key: string,
-  lock: boolean,
-): Promise<RoutineRunIngressRow | null> {
-  const query = lock
-    ? tx<RoutineRunIngressRow[]>`
-        select id, request_hash as "requestHash", state, message_id as "messageId",
-               run_id as "runId", workflow_id as "workflowId",
-               response_status as "responseStatus", response_body as "responseBody"
-          from message_ingress
-         where organization_id = ${organizationId} and user_id = ${userId}
-           and operation = 'routine.run.create' and idempotency_key = ${key}
-         for update
-      `
-    : tx<RoutineRunIngressRow[]>`
-        select id, request_hash as "requestHash", state, message_id as "messageId",
-               run_id as "runId", workflow_id as "workflowId",
-               response_status as "responseStatus", response_body as "responseBody"
-          from message_ingress
-         where organization_id = ${organizationId} and user_id = ${userId}
-           and operation = 'routine.run.create' and idempotency_key = ${key}
-      `;
-  return query.then((rows) => rows[0] ?? null);
-}
-
-function replayRoutineRun(
-  row: RoutineRunIngressRow | null,
-  requestHash: string,
-): RoutineRunAcceptedDto | null {
-  if (!row) return null;
-  if (row.requestHash !== requestHash) {
-    throw new HttpError(409, "IDEMPOTENCY_KEY_REUSED", "Cette clé a déjà lancé une autre routine.");
-  }
-  if (row.state !== "completed") return null;
-  if (row.responseStatus !== 202 || !isRoutineRunAccepted(row.responseBody)) {
-    throw new HttpError(409, "IDEMPOTENCY_RESPONSE_INVALID", "L’accusé mémorisé est incomplet.");
-  }
-  return { ...row.responseBody, duplicate: true };
-}
-
-function routineRunInProgress(state: RoutineRunIngressRow["state"]): HttpError {
-  return new HttpError(
-    409,
-    state === "abandoned" ? "IDEMPOTENCY_KEY_EXPIRED" : "IDEMPOTENCY_IN_PROGRESS",
-    state === "abandoned"
-      ? "Ce lancement a expiré; utilisez une nouvelle clé."
-      : "Cette routine est déjà en cours de lancement.",
-    state === "reserved" ? { "Retry-After": "2" } : {},
-  );
-}
-
-function isRoutineRunAccepted(value: unknown): value is RoutineRunAcceptedDto {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const body = value as Partial<RoutineRunAcceptedDto>;
-  return body.accepted === true && typeof body.duplicate === "boolean" &&
-    typeof body.routineId === "string" && typeof body.workflowId === "string" &&
-    typeof body.runId === "string" && typeof body.threadId === "string" &&
-    body.status === "queued" && typeof body.notificationEligible === "boolean" &&
-    typeof body.workflowUpdatedAt === "string";
 }
 
 /** `archived`: its routines are held by the tick whatever the host. */

@@ -265,9 +265,11 @@ export function HostProfilesTable({
                   className={cn("px-3", header.id === "select" && "w-10", header.id === "actions" && "w-[1%]")}
                 >
                   {header.id === "select" ? (
-                    <Checkbox
+                    visibleImportable.length === 0 ? (
+                      // Nothing left to select: no ghost checkbox, the same spacer as the rows.
+                      <span className="block w-4" aria-hidden />
+                    ) : <Checkbox
                       checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
-                      disabled={visibleImportable.length === 0}
                       onCheckedChange={(value) =>
                         onToggleAll(visibleImportable.map((profile) => profile.name), value === true)
                       }

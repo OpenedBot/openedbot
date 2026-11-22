@@ -16,9 +16,10 @@ export const runtimeIntegrationsApi = {
   /**
    * The host's MCP servers and the approved catalog.
    *
-   * A route separate from the inventory: it starts an interpreter on the host, and
-   * only the connectors panel needs it. It is therefore read only when
-   * that panel is mounted.
+   * A route separate from the inventory: a live read starts an interpreter on
+   * the host. This one serves the API's snapshot (warmed on the host's
+   * `inventory.changed`), read by Réglages › Connecteurs and the rail's
+   * « Connecteurs » pill; only the admin panel rereads live (`runtimeMcpFresh`).
    */
   runtimeMcp: () => request<RuntimeIntegrationMcpDto>("/api/runtime/integrations/mcp"),
   /** The admin panel proves its writes by rereading: it skips the 30 s server cache. */

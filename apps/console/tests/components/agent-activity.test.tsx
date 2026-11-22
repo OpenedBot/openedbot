@@ -89,7 +89,7 @@ describe("TurnActivity (a run's status row and its folded log)", () => {
     expect(block.hasAttribute("data-live")).toBe(true);
     expect(block.getAttribute("aria-busy")).toBe("true");
     const head = block.querySelector<HTMLButtonElement>("[data-activity-head]")!;
-    expect(head.hasAttribute("aria-expanded")).toBe(false);
+    expect(head.getAttribute("aria-expanded")).toBe("false");
     // Every call done, no text: the generic thinking line.
     expect(head.querySelector("[data-activity-summary]")?.textContent).toBe("Réfléchit…");
     expect(block.querySelector("[data-agent-feed]")).toBeNull();

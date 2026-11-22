@@ -67,6 +67,7 @@ function source(overrides: Record<string, unknown> = {}) {
 
 function mount(db: SQL, options: { runtime?: boolean; blobs?: BlobStore } = {}) {
   let runtimeReads = 0;
+  let selectedRuntime: string | undefined;
   const app = new Hono<{ Variables: AppVariables }>();
   app.use("*", async (context, next) => {
     context.set("auth", auth);
@@ -76,13 +77,14 @@ function mount(db: SQL, options: { runtime?: boolean; blobs?: BlobStore } = {}) 
     ? context.json({ error: { code: error.code } }, error.status as 400)
     : context.json({ error: { code: "UNEXPECTED", message: String(error) } }, 500));
   app.route("/", messageVersionRoutes(db, options.blobs ?? blobs, { billingEnforced: false } as ApiConfig, {
-    readRuntime: (async () => {
+    readRuntime: async (_db, _config, _organizationId, _links, _locator, runtimeId) => {
       runtimeReads += 1;
+      selectedRuntime = runtimeId;
       return options.runtime === false ? null : { id: "runtime", client: {} } as never;
-    }) as never,
+    },
     clientFactory: () => ({ toolsets: async () => [] }),
   }));
-  return { app, runtimeReads: () => runtimeReads };
+  return { app, runtimeReads: () => runtimeReads, selectedRuntime: () => selectedRuntime };
 }
 
 function request(app: Hono<{ Variables: AppVariables }>, input: Record<string, unknown>) {
@@ -125,13 +127,16 @@ describe("message version persistence contract", () => {
     expect(await divergent.json()).toEqual({ error: { code: "IDEMPOTENCY_KEY_REUSED" } });
   });
 
-  test("fails closed at the PVE gate before creating a thread or run", async () => {
-    const fake = fakeDb(() => []);
-    const response = await request(mount(fake.db, { runtime: false }).app, {
+  test("fails closed when the assigned runtime is unavailable before creating a thread or run", async () => {
+    const runtimeId = "88888888-8888-4888-8888-888888888888";
+    const fake = fakeDb((sql) => sql.includes("join messages message") ? [source({ runtimeId })] : []);
+    const mounted = mount(fake.db, { runtime: false });
+    const response = await request(mounted.app, {
       mode: "regenerate", expectedVersionCount: 1,
     });
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: { code: "RUNTIME_REQUIRED" } });
+    expect(mounted.selectedRuntime()).toBe(runtimeId);
     expect(fake.calls.some(({ sql }) => /insert into (?:threads|runs|messages|message_versions)/u.test(sql))).toBe(false);
   });
 

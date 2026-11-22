@@ -6,6 +6,7 @@ import (
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/cli"
 	"github.com/OpenedBot/openedbot/edge-setup/internal/reset"
+	"github.com/OpenedBot/openedbot/edge-setup/internal/state"
 )
 
 // resetFlags declares the options reset and uninstall share.
@@ -48,7 +49,12 @@ func runReset(env cli.Env, args []string) int {
 func runLinuxReset(env cli.Env, o reset.Options, verb, done string) int {
 	ctx, cancel := ctxWithSignals()
 	defer cancel()
+	st, err := loadHostState()
+	if err != nil {
+		return fail(env, cli.ExitFailure, "%s: state: %v", verb, err)
+	}
 	r := reset.New(runner, func(f string, a ...any) { printf(env.Stdout, f, a...) })
+	r.Engine = st.EngineName()
 	if err := r.Run(ctx, o); err != nil {
 		return fail(env, cli.ExitFailure, "%s: %v", verb, err)
 	}
@@ -64,6 +70,9 @@ func runLinuxReset(env cli.Env, o reset.Options, verb, done string) int {
 			printf(env.Stdout, "residue: %s", x)
 		}
 		return cli.ExitFailure
+	}
+	if r.Engine == state.EngineOpenCode && !o.PurgeData {
+		printf(env.Stdout, "ACP runtime data retained at %v", r.DataInventory())
 	}
 	printf(env.Stdout, "%s", done)
 	return cli.ExitOK

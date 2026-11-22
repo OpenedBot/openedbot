@@ -1,0 +1,60 @@
+---
+title: Moteur ACP expérimental
+description: Exécuter OpenCode sur une machine Linux, avec moins de fonctions openedbot.
+icon: FlaskConical
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Le moteur ACP expérimental exécute OpenCode à la place d’Hermes. Il fonctionne **uniquement sous Linux**, avec systemd, sur `amd64` ou `arm64`. Hermes reste le moteur par défaut et de référence.
+
+<Aside type="caution" title="Machine partagée, sans isolation entre les bots">
+Chaque bot possède son répertoire de profil, mais tous les agents utilisent le même compte de service. Deux bots sur la même machine ne sont pas isolés l’un de l’autre : l’un peut accéder aux fichiers de l’autre. Utilisez une machine dédiée, sans autres services ni fichiers privés.
+</Aside>
+
+## Installer et relier
+
+Suivez [Relier une machine](/fr/docs/machine) pour télécharger `edge-setup`. À l’étape d’installation, choisissez le moteur explicitement :
+
+```sh
+sudo edge-setup up --engine acp:opencode --yes
+```
+
+Appairez ensuite la machine avec la console à l’aide de la commande `edge-setup link` qui y est affichée. Répétez `--engine acp:opencode` à chaque nouvelle exécution de `up`. Une machine installée ne peut pas changer de moteur : désinstallez-le d’abord. L’option `--sandbox` n’est pas disponible avec ACP.
+
+Créer un bot dans openedbot crée son répertoire de profil sur la machine. Ses exécutions utilisent ce profil. Supprimer le bot programme la suppression de ce répertoire. Le bridge supprime les sessions et les journaux d’exécution du profil supprimé à son démarrage, lors de son nettoyage horaire ou avant de traiter une requête pour ce profil. Les exécutions actives sont d’abord arrêtées.
+
+L’historique de conversation propre à l’agent reste sur la machine dans le répertoire de données partagé de l’agent (`XDG_DATA_HOME`, `/srv/hermes/data/acp-home/data`). Supprimer un bot n’efface pas cet historique. Un reset ou une désinstallation avec `--purge-data --i-understand-data-loss` le supprime.
+
+## Identifiant du fournisseur
+
+Un administrateur place la clé du fournisseur dans `/etc/hermes/opencode.env` sur la machine. Ce fichier ordinaire doit appartenir à `root:root`, avec les permissions `0600`. L’installation ne le crée pas. Utilisez la variable de votre fournisseur, par exemple `OPENAI_API_KEY` ou `ANTHROPIC_API_KEY`. Ne collez jamais la clé dans une conversation ou une ligne de commande.
+
+Les noms acceptés sont `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GEMINI_API_KEY`, `OPENCODE_API_KEY`, `OPENROUTER_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` et `AWS_REGION`. Les autres noms sont refusés. Redémarrez `openedbot-acp-bridge.service` après une modification de ce fichier. openedbot ne peut pas gérer ces clés depuis les écrans de fournisseurs.
+
+## Ce qui fonctionne
+
+Vous pouvez converser, approuver chaque modification de fichier et chaque commande, puis arrêter une exécution. Les salons et les routines utilisent le même chemin d’exécution. La machine impose à l’agent de demander l’autorisation ; openedbot transmet ces demandes à l’utilisateur.
+
+## Ce qui n’est pas disponible
+
+Ce moteur ne propose pas :
+
+- Le choix du modèle ou la gestion des fournisseurs dans openedbot.
+- Les écrans MCP et skills.
+- La politique d’approbation propre à chaque bot.
+- Le suivi des jetons. Le budget de jetons du workflow n’est donc pas appliqué.
+- Le plan d’exécution ou l’affichage des recherches web.
+- Les fichiers livrés en pièces jointes.
+- Steer, pour modifier les instructions pendant une exécution.
+
+## Ce qui reste à prouver sur une vraie machine Linux
+
+Les tests automatisés utilisent des agents et des commandes simulés. Aucun véritable agent OpenCode n’a été installé ou exécuté pour cette validation. Les points suivants n’ont pas été prouvés sur une vraie machine :
+
+- Le comportement des espaces de noms systemd et des montages d’identifiants.
+- Le comportement de `runuser` et de PAM dans le bac à sable.
+- La compatibilité du JIT OpenCode avec le filtre d’appels système.
+- Le démarrage et l’arrêt sur une machine Linux.
+- L’authentification auprès d’un vrai fournisseur.
+- Une véritable demande OpenCode de modification de fichier ou de commande shell en attente d’approbation.

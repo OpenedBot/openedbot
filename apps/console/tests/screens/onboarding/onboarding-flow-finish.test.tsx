@@ -39,7 +39,7 @@ const STATE: OnboardingStateDto = {
 const RUNTIME: RuntimePublicDto = {
   id: "rt-1",
   name: "VPS",
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: null,
   transport: "connector",
   reachability: "connector",

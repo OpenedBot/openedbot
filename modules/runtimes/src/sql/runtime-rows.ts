@@ -31,6 +31,9 @@ export type RuntimeRow = {
   linkAgent?: string | null;
   /** `hello.hermesVersion` de la même déclaration (0162), brut ; absent des projections qui ne le lisent pas. */
   linkHermesVersion?: string | null;
+  /** Engine identity from the last admitted hello; null means Hermes. */
+  linkEngine?: string | null;
+  linkEngineVersion?: string | null;
   /** Origine signée à la dernière preuve (0110). Absente des projections qui ne la lisent pas. */
   linkOrigin?: string | null;
   linkAgentSeenAt?: Date | null;
@@ -55,6 +58,7 @@ export type RuntimeRow = {
   lastHealthError: string | null;
   lastProbedAt: Date | null;
   isActive: boolean;
+  dedicated?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -72,12 +76,13 @@ export function readRuntimeRows(tx: Bun.TransactionSQL, organizationId: string) 
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",
@@ -100,12 +105,13 @@ export function readAllRuntimeRows(tx: Bun.TransactionSQL, organizationId: strin
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",
@@ -127,12 +133,13 @@ export function readRuntimeRowById(tx: Bun.TransactionSQL, organizationId: strin
            edge_auth_tag as "edgeAuthTag", edge_auth_key_id as "edgeAuthKeyId", capacity, last_health_status as "lastHealthStatus",
            last_health_error as "lastHealthError", last_probed_at as "lastProbedAt",
            selected_provider as "selectedProvider", selected_model as "selectedModel",
-           reasoning_effort as "reasoningEffort", is_active as "isActive",
+           reasoning_effort as "reasoningEffort", is_active as "isActive", dedicated,
            created_at as "createdAt", updated_at as "updatedAt",
            reachability, link_connected_at as "linkConnectedAt", link_last_seen_at as "linkLastSeenAt",
            link_generation::text as "linkGeneration",
            link_features as "linkFeatures",
            link_agent as "linkAgent", link_agent_seen_at as "linkAgentSeenAt", link_hermes_version as "linkHermesVersion",
+           link_engine as "linkEngine", link_engine_version as "linkEngineVersion",
            link_origin as "linkOrigin",
            link_token_rotated_at as "linkRotatedAt",
            inventory_changed_at as "inventoryChangedAt",

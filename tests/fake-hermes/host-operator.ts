@@ -104,6 +104,9 @@ const CONTROL = /[\u0000-\u001F\u007F]/u;
 const SKILLS_HUB_IDENTIFIER = /^[a-z0-9][a-z0-9._-]{0,63}\/[A-Za-z0-9][A-Za-z0-9._/-]{0,190}$/;
 
 export type FakeHostOptions = {
+  /** ACP host contract: profile lifecycle only, with every host request recorded. */
+  profileManagementOnly?: boolean;
+  requests?: Array<{ method: string; path: string; status: number }>;
   /** Reads of a running restart job before it settles to ok/done (minimum 1). */
   restartReads?: number;
   /** Clock, for tests that pin timestamps. */
@@ -575,11 +578,17 @@ export function createFakeHost(options: FakeHostOptions = {}): FakeHost {
 
   async function handleProfiles(request: Request, rest: string): Promise<Response | null> {
     const method = request.method;
-    if (rest === "" && method === "GET") return json({ profiles: [...profiles.values()].map(profileView) });
+    if (rest === "" && method === "GET") return json({ ...(options.profileManagementOnly ? { multiplex: true } : {}), profiles: [...profiles.values()].map(profileView) });
     if (rest === "" && method === "POST") {
       const body = await readBody(request) ?? {};
       const name = String(body.name ?? "");
       if (!PROFILE_SLUG.test(name) || name === "default") return refuse(400, "PROFILE_INVALID", "Invalid profile");
+      // As the real ACP host (`edge-setup/internal/operator/acp.go`), the body
+      // before the name's presence: its model comes with each run, so a model
+      // at creation is refused.
+      if (options.profileManagementOnly && (body.provider !== undefined || body.model !== undefined || body.bundledSkills === true)) {
+        return refuse(400, "BODY_INVALID", "ACP does not support model or bundled skill selection");
+      }
       if (profiles.has(name)) return refuse(409, "PROFILE_EXISTS", "Existing profile");
       // A profile clones the root config (toolsets) and the bundled skills;
       // `memory` is on, as on a profile `edge-setup` isolates.
@@ -591,8 +600,8 @@ export function createFakeHost(options: FakeHostOptions = {}): FakeHost {
           description: null,
           soul: null,
           model: {
-            provider: typeof body.provider === "string" ? body.provider : "fake",
-            default: typeof body.model === "string" ? body.model : "fake/hermes",
+            provider: options.profileManagementOnly ? null : typeof body.provider === "string" ? body.provider : "fake",
+            default: options.profileManagementOnly ? null : typeof body.model === "string" ? body.model : "fake/hermes",
           },
           uiMeta: null,
           hasAvatar: false,
@@ -604,8 +613,14 @@ export function createFakeHost(options: FakeHostOptions = {}): FakeHost {
         tokens: new Set(),
         approvalPolicy: null,
       };
+      if (options.profileManagementOnly) {
+        if (body.provider !== undefined || body.model !== undefined || body.bundledSkills === true) return refuse(400, "BODY_INVALID", "ACP does not support model or bundled skill selection");
+        profile.row.displayName = name;
+        profile.toolsets.clear();
+        profile.skills.clear();
+      }
       profiles.set(name, profile);
-      return json({ profile: profileView(profile) }, 201);
+      return json({ profile: profileView(profile), ...(options.profileManagementOnly ? { readBack: "profile" } : {}) }, 201);
     }
     const scoped = /^\/([^/]+)(?:\/(.*))?$/.exec(rest);
     if (!scoped) return null;
@@ -713,6 +728,20 @@ export function createFakeHost(options: FakeHostOptions = {}): FakeHost {
 
   return {
     async handleHostRoute(request, path) {
+      if (options.profileManagementOnly) {
+        let response: Response;
+        if (path === "/hermes-setup/capabilities" && request.method === "GET") {
+          response = json({ features: ["profile_management"] });
+        } else if ((path === "/hermes-setup/profiles" && ["GET", "POST"].includes(request.method))
+          || (/^\/hermes-setup\/profiles\/[a-z0-9][a-z0-9_-]{0,62}$/.test(path) && request.method === "DELETE")) {
+          response = await handleProfiles(request, path.slice("/hermes-setup/profiles".length))
+            ?? refuse(404, "ROUTE_NOT_FOUND", "route absent");
+        } else {
+          response = refuse(404, "ROUTE_NOT_FOUND", "route absent");
+        }
+        options.requests?.push({ method: request.method, path, status: response.status });
+        return response;
+      }
       const route = /^\/hermes-setup(\/[a-z-]+)(.*)$/.exec(path);
       if (!route) return null;
       const [, family, rest = ""] = route;

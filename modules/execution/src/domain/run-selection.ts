@@ -17,7 +17,7 @@ export type RunSelectionCatalog = {
   providers: ReadonlyArray<{
     slug: string;
     authenticated: boolean;
-    models: ReadonlyArray<{ id: string; reasoning: boolean; fast?: boolean }>;
+    models: ReadonlyArray<{ id: string; reasoning: boolean; fast?: boolean; efforts?: readonly string[] }>;
   }>;
 };
 
@@ -69,12 +69,18 @@ export function resolveRunnableSelection(
   const runnable = authenticated.filter((provider) =>
     !blocked.has(provider.slug) && !isVirtualAggregateProvider(provider.slug),
   );
-  const resolved = (provider: string | null, model: { id: string; reasoning: boolean; fast?: boolean }): ResolvedRunSelection => ({
+  type CatalogModel = RunSelectionCatalog["providers"][number]["models"][number];
+  // `asked`: the model is the one the bot runs on by choice, or the runtime
+  // default when nothing is chosen (what the composer shows); never a fallback.
+  const resolved = (provider: string | null, model: CatalogModel, asked = model.id === selection.model): ResolvedRunSelection => ({
     provider,
     model: model.id,
-    // L’effort de raisonnement n’est conservé que si le modèle résolu raisonne.
-    reasoningEffort: model.reasoning ? selection.reasoningEffort : null,
-    ...(selection.fastMode === true && model.fast === true && model.id === selection.model ? { fastMode: true } : {}),
+    // L’effort n’est conservé que si le modèle résolu raisonne et l’accepte
+    // (un hôte qui liste ses efforts, Codex local, refuse les autres).
+    reasoningEffort: model.reasoning && (!model.efforts || model.efforts.includes(selection.reasoningEffort ?? ""))
+      ? selection.reasoningEffort
+      : null,
+    ...(selection.fastMode === true && model.fast === true && asked ? { fastMode: true } : {}),
   });
 
   if (selection.model) {
@@ -107,7 +113,7 @@ export function resolveRunnableSelection(
   if (catalog.provider && catalog.model) {
     const current = runnable.find((candidate) => candidate.slug === catalog.provider);
     const model = current?.models.find((candidate) => candidate.id === catalog.model);
-    if (current && model) return resolved(current.slug, model);
+    if (current && model) return resolved(current.slug, model, selection.model === null || model.id === selection.model);
   }
   // Sinon la sélection du runtime dans openedbot, si son fournisseur est utilisable :
   // mesuré le 04-09, le premier modèle d'un fournisseur gratuit n'est pas

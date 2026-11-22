@@ -114,6 +114,12 @@ export function createTauriBridge(): OpenedbotNativeBridge | null {
   return {
     updates: createUpdatesBridge(),
     notch: createNotchBridge(),
+    ...(shell.platform !== "windows" ? {
+      localMachine: {
+        start: async (ticket: string, workspaceId: string) => unwrap(await commands.startLocalMachine(ticket, workspaceId)),
+        stop: async () => { unwrap(await commands.stopLocalMachine()); },
+      },
+    } : {}),
     readAccessToken: async () => unwrap(await commands.readAccessToken()),
     refresh: async () => unwrap(await commands.refresh()),
     openExternal: async (url) => {

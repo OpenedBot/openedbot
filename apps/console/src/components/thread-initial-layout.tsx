@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ThreadSkeleton } from "./thread-skeleton";
+import { ThreadLoading } from "./thread-skeleton";
 
 const MAX_WAIT_MS = 2_000;
 
@@ -55,7 +55,7 @@ export function ThreadInitialLayout({ threadKey, children }: { threadKey: string
       <div ref={content} inert={!ready} aria-hidden={!ready || undefined} className="relative flex min-h-0 flex-1 flex-col" style={{ visibility: ready ? undefined : "hidden" }}>
         {children}
       </div>
-      {ready ? null : <div className="absolute inset-0 flex min-h-0 flex-col"><ThreadSkeleton /></div>}
+      {ready ? null : <div className="absolute inset-0 flex min-h-0 flex-col"><ThreadLoading /></div>}
     </div>
   );
 }

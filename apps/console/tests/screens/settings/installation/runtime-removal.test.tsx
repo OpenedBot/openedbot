@@ -74,10 +74,9 @@ function renderSettings() {
   );
 }
 
-/** The rail's « Remplacer » section, where the declared replacement waits. */
-async function openReplacement() {
-  fireEvent.click(await screen.findByRole("tab", { name: /^Remplacer/ }));
-  await waitFor(() => expect(screen.getByRole("heading", { name: "Remplacer le runtime" })).toBeTruthy());
+/** « Machine par défaut », where the active runtime's card and its actions live (d61b4eca). */
+async function openDefaultMachine() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Machine par défaut" }));
 }
 
 beforeEach(() => {
@@ -94,12 +93,13 @@ afterEach(() => {
 });
 
 describe("retrait d’un runtime", () => {
-  // The « Runtime actif » card is what one reads on arriving at the screen:
-  // relegating removal into the « Hermes externe » modal amounted to hiding it.
-  test("le runtime actif offre « Retirer » sur l’écran, sans ouvrir le registre", async () => {
+  // The « Runtime actif » card of « Machine par défaut » carries removal:
+  // relegating it into the « Hermes externe » modal amounted to hiding it.
+  test("le runtime actif offre « Retirer » sur sa carte, sans ouvrir le registre", async () => {
     active = runtime({ id: "runtime-9", name: "Boîtier atelier", isActive: true });
     stubFetch();
     renderSettings();
+    await openDefaultMachine();
 
     fireEvent.click(await screen.findByRole("button", { name: "Retirer Boîtier atelier" }));
     await waitFor(() => expect(screen.getByRole("alertdialog")).toBeTruthy());
@@ -115,6 +115,7 @@ describe("retrait d’un runtime", () => {
     active = runtime({ id: "runtime-9", name: "Boîtier atelier", isActive: true });
     stubFetch();
     renderSettings();
+    await openDefaultMachine();
 
     fireEvent.click(await screen.findByRole("button", { name: "Retirer Boîtier atelier" }));
     await waitFor(() => expect(screen.getByRole("alertdialog")).toBeTruthy());
@@ -131,8 +132,8 @@ describe("retrait d’un runtime", () => {
     active = runtime({ id: "runtime-9", name: "Boîtier atelier", isActive: true });
     declared = [active, runtime({ id: "runtime-1", name: "VPS production", isActive: false })];
     stubFetch();
+    // The waiting replacement is a card of « Machines », where the screen opens.
     renderSettings();
-    await openReplacement();
 
     fireEvent.click(await screen.findByRole("button", { name: "Retirer VPS production" }));
     await waitFor(() => expect(deletes).toHaveLength(1));
