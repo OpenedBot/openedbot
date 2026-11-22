@@ -1,5 +1,7 @@
 # Security policy
 
+**This project is no longer maintained (hosted service shut down on 2026-11-22): reports may get no answer and no fix will be released.**
+
 ## Reporting a vulnerability
 
 Please **do not open a public issue, discussion or pull request** for a

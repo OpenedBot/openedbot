@@ -1,5 +1,7 @@
 # Contributing to openedbot
 
+**This project is no longer maintained (hosted service shut down on 2026-11-22): issues and pull requests are not reviewed.**
+
 Thanks for your interest. Pull requests are welcome everywhere in this
 repository: the core (`apps/`, `modules/`, `platform/`, `contracts/`,
 `browser/`), `edge-setup/`, `protocol/` and `docs/`. For anything larger than

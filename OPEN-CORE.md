@@ -1,5 +1,7 @@
 # Open core
 
+**This project is no longer maintained: the hosted service and the openedbot.app accounts were shut down on 2026-11-22.**
+
 Status as of 2026-11-13.
 
 ## The promise
