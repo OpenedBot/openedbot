@@ -1,3 +1,8 @@
+> [!WARNING]
+> **This project is no longer maintained.** The hosted openedbot service (console, API, link
+> gateway and desktop app downloads) was shut down on 2026-11-22. The code stays here as is,
+> under its licenses, with no support: issues and pull requests are not reviewed.
+
 <div align="center">
 
 <img src="apps/console/public/brand/openedbot-icon.webp" width="72" height="72" alt="">
@@ -26,7 +31,7 @@ tell them, run routines on a schedule, work together in rooms, and ask for your 
 a sensitive action.
 
 The agent and its data stay on your host. The console never connects into it: the host opens
-one outbound link to the cloud, and only an allowlist of gateway routes may cross it.
+one outbound link to the openedbot server, and only an allowlist of gateway routes may cross it.
 
 This repository is the open core: the API, the worker, the link gateway, the web console, the
 desktop app, the host installer (`edge-setup`), the connector protocol and the documentation
@@ -34,10 +39,10 @@ source.
 
 ## How it fits
 
-The host dials out; the cloud answers on that link and nothing else.
+The host dials out; the server answers on that link and nothing else.
 
 ```
-  YOUR HOST (VPS or homelab)                     OPENEDBOT CLOUD
+  YOUR HOST (VPS or homelab)                     OPENEDBOT SERVER
 
   ┌──────────────────────────────┐               ┌──────────────────────────────┐
   │                              │               │                              │
@@ -228,9 +233,9 @@ work to the project are entitled to license: the third-party components listed i
 promise: no core feature ever becomes paid; only new things and services are sold. The name and
 logo are covered by [`TRADEMARKS.md`](TRADEMARKS.md).
 
-**Contributing.** Pull requests are welcome everywhere (core, `edge-setup/`, `protocol/`,
-`docs/`), on the `develop` branch. Sign every commit with `git commit -s` (Developer Certificate of
-Origin). By contributing you license your contribution to the project under the Apache License
+**Contributing.** The project is unmaintained: issues and pull requests are no longer reviewed.
+Past contributions were signed with `git commit -s` (Developer Certificate of
+Origin). By contributing you licensed your contribution to the project under the Apache License
 2.0, while the core stays distributed under AGPL-3.0-only; this lets the maintainer also offer
 the commercial license. See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the
 [Code of Conduct](CODE_OF_CONDUCT.md).
