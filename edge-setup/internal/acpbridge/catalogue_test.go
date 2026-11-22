@@ -86,6 +86,9 @@ func decodeOptions(t *testing.T) []configOption {
 func configCalls(t *testing.T, f *fixture, run string) string {
 	t.Helper()
 	chunk := f.await(run, "message.delta")
+	// The turn ends before the next one is sent: the session takes one turn
+	// at a time, and the reply's first delta comes before its end.
+	f.await(run, "run.completed")
 	var answer struct {
 		Trace []rpcMessage `json:"trace"`
 	}
