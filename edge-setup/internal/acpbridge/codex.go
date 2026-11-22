@@ -20,7 +20,7 @@ func initializeCodex(ctx context.Context, client *rpcClient) error {
 	if err := client.call(ctx, "initialize", map[string]any{
 		"clientInfo": map[string]string{"name": "openedbot", "version": "1"},
 	}, &result); err != nil {
-		return errors.New("Codex App Server did not initialize")
+		return errors.New("the Codex App Server did not initialize")
 	}
 	return client.notify(ctx, "initialized", nil)
 }
@@ -100,7 +100,7 @@ func codexModels(ctx context.Context, client *rpcClient) ([]AgentModel, error) {
 		cursor = *result.NextCursor
 	}
 	if len(models) == 0 {
-		return nil, errors.New("Codex offers no model to this account")
+		return nil, errors.New("the Codex account offers no model")
 	}
 	return models, nil
 }
@@ -139,7 +139,7 @@ func (b *Bridge) codexThread(client *rpcClient, threadID string) (string, error)
 		} `json:"thread"`
 	}
 	if err := b.setupCall(client, method, params, &result); err != nil || result.Thread.ID == "" {
-		return "", errors.New("Codex could not open the conversation")
+		return "", errors.New("the Codex conversation could not open")
 	}
 	return result.Thread.ID, nil
 }
@@ -169,7 +169,7 @@ func (b *Bridge) codexPrompt(ctx context.Context, r *run, client *rpcClient, blo
 		params[name] = value
 	}
 	if err := b.setupCall(client, "turn/start", params, &result); err != nil || result.Turn.ID == "" {
-		return "", errors.New("Codex could not start the turn")
+		return "", errors.New("the Codex turn could not start")
 	}
 	b.mu.Lock()
 	if r.codexTurn == "" {
@@ -284,7 +284,7 @@ func (b *Bridge) codexEventLocked(client *rpcClient, m rpcMessage) {
 		case "interrupted":
 			reply.result = []byte("cancelled")
 		default:
-			reply.err = errors.New("Codex turn failed")
+			reply.err = errors.New("the Codex turn failed")
 		}
 		select {
 		case r.codexDone <- reply:

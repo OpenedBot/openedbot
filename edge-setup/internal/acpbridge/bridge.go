@@ -399,7 +399,7 @@ type approvalInput struct {
 
 func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if subtle.ConstantTimeCompare([]byte(req.Header.Get("Authorization")), []byte("Bearer "+b.opts.Bearer)) != 1 {
-		http.Error(w, "unauthorized", 401)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
@@ -441,7 +441,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Timeout() {
-				http.Error(w, "request body timeout", 408)
+				http.Error(w, "request body timeout", http.StatusRequestTimeout)
 			} else {
 				http.Error(w, "invalid request body", 400)
 			}
@@ -472,7 +472,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	b.mu.Lock()
 	defer b.unlockAndSend()
 	if b.closed || b.diskErr != nil {
-		http.Error(w, "bridge unavailable", 503)
+		http.Error(w, "bridge unavailable", http.StatusServiceUnavailable)
 		return
 	}
 

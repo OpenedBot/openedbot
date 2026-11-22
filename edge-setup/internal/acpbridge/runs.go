@@ -41,7 +41,7 @@ func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug 
 		return
 	}
 	if s.active != "" {
-		http.Error(w, "session has an active turn", 409)
+		http.Error(w, "session has an active turn", http.StatusConflict)
 		return
 	}
 	count := 0
@@ -51,7 +51,7 @@ func (b *Bridge) createRunLocked(w http.ResponseWriter, req *http.Request, slug 
 		}
 	}
 	if count >= b.opts.Limits.MaxConcurrentRuns {
-		http.Error(w, "run capacity reached", 429)
+		http.Error(w, "run capacity reached", http.StatusTooManyRequests)
 		return
 	}
 	r := &run{ID: uniqueID(), Profile: slug, SessionID: s.ID, Key: key, Status: "queued", Generation: 1, Events: []Event{}, permissions: map[string]permission{}, tools: map[string]string{}}
