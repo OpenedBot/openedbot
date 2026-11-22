@@ -150,7 +150,7 @@ func (b *Bridge) approveLocked(w http.ResponseWriter, r *run, body approvalInput
 	id, choice, gen := body.RequestID, body.Choice, body.Generation
 	p, ok := r.permissions[id]
 	if !ok || gen != r.Generation || terminal(r.Status) || r.Cancel {
-		http.Error(w, "approval is no longer pending", 409)
+		http.Error(w, "approval is no longer pending", http.StatusConflict)
 		return
 	}
 	option, ok := p.options[choice]
@@ -169,7 +169,7 @@ func (b *Bridge) approveLocked(w http.ResponseWriter, r *run, body approvalInput
 	err := b.unlockAndSend()
 	b.mu.Lock()
 	if err != nil {
-		http.Error(w, "agent unavailable", 502)
+		http.Error(w, "agent unavailable", http.StatusBadGateway)
 		return
 	}
 	if b.diskErr != nil {
