@@ -494,7 +494,7 @@ pub fn specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             notch_state,
             set_notch_mode,
             play_notch_demo,
-            local_machine::start_local_machine::<R>,
+            local_machine::start_local_machine::<tauri::Wry>,
             local_machine::stop_local_machine,
         ])
         .events(tauri_specta::collect_events![SigninStateChanged, NotificationClicked, UpdateStateChanged, UpdateMenuChosen, NotchStateChanged])
