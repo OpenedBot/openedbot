@@ -49,7 +49,7 @@ export type AgentBudgetGroup = {
 export type AgentPlanLimit = {
   id: string;
   label: string;
-  /** Consommé, entre 0 et 1. */
+  /** La part que montre la jauge, entre 0 et 1 : consommée, ou restante pour un quota de fournisseur. */
   used: number;
   /** Quand la fenêtre se rouvre, déjà mis en forme par l'appelant. */
   resets: string | null;

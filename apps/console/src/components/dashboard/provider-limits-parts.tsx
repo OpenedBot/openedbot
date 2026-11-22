@@ -19,6 +19,15 @@ import { BotFace } from "../bot-face";
  */
 export const ALERT_PERCENT = 80;
 
+/**
+ * What remains of a window, the figure every quota surface shows (rail,
+ * panel, thread card, menu): showing « 24 % » used next to « 76 % restant »
+ * read as two different quotas.
+ */
+export function remainingPercent(usedPercent: number): number {
+  return Math.max(0, Math.min(100, 100 - usedPercent));
+}
+
 export type ProviderBot = {
   id: string;
   name: string;

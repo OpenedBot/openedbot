@@ -31,6 +31,7 @@ import { useT } from "../lib/i18n";
 import {
   ProviderLimitsPanel,
   providerLimitsWorthShowing,
+  remainingPercent,
   resetLabel,
   useProviderLimits,
   type ProviderLimits,
@@ -234,7 +235,8 @@ export function planLimits(limits: ProviderLimits, t: Translate): { label: strin
     return {
       id: `${provider.slug}:${index}`,
       label: single ? window.label : `${provider.name} · ${window.label}`,
-      used: (window.usedPercent ?? 0) / 100,
+      // The gauge empties like the rail ring: full = everything remains.
+      used: remainingPercent(window.usedPercent ?? 0) / 100,
       resets: reset ? t("providerLimits.resetIn", { reset }) : null,
     };
   }));
@@ -471,7 +473,7 @@ export function ThreadContextTab({
           formatPercent={(value) => t("threadContext.inline", {
             percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
           })}
-          formatLimitPercent={(value) => t("providerLimits.usedPercentValue", { percent: Math.round(value) })}
+          formatLimitPercent={(value) => t("providerLimits.remainingPercentValue", { percent: Math.round(value) })}
           freeLabel={t("threadContext.free")}
           expandLabel={t("threadContext.expand")}
           collapseLabel={t("threadContext.collapse")}
@@ -504,7 +506,7 @@ export function ThreadContextTab({
               contains without one having to open it. */}
           {limits.servicePeak !== null ? (
             <span className="rounded-full bg-muted-foreground/15 px-1.5 text-[11px] leading-4 tabular-nums">
-              {t("providerLimits.usedPercentValue", { percent: Math.round(limits.servicePeak) })}
+              {t("providerLimits.remainingPercentValue", { percent: Math.round(remainingPercent(limits.servicePeak)) })}
             </span>
           ) : null}
         </TabsTrigger>

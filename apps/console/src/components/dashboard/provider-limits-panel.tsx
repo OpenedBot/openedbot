@@ -12,9 +12,9 @@ import { UsageBar } from "../usage-bar";
 import { countPendingPolls, providerUsagePollMs, providerUsageStaleMs } from "../../lib/runtime/provider-usage-poll";
 import {
   ALERT_PERCENT, BotUsageList, BotsDisclosure, LIMIT_GRID, PanelSkeleton, StatusBanner, elapsedMinutes, peakUsedPercent,
-  primaryWindow, statusMessage, unavailableSnapshot, unmeasuredNotice, percentTone, resetLabel, type ProviderBot, type ProviderRowKind,
+  primaryWindow, statusMessage, unavailableSnapshot, unmeasuredNotice, percentTone, remainingPercent, resetLabel, type ProviderBot, type ProviderRowKind,
 } from "./provider-limits-parts";
-export { percentTone, resetLabel } from "./provider-limits-parts";
+export { percentTone, remainingPercent, resetLabel } from "./provider-limits-parts";
 
 /**
  * The reading of the provider subscriptions, and that alone.
@@ -377,16 +377,17 @@ export function ProviderLimitsPanel({ limits, onNavigate }: { limits: ProviderLi
         <div className={LIMIT_GRID}>
           {row.snapshot.windows.filter((window) => window.usedPercent !== null).map((window, index) => {
             const used = window.usedPercent!;
+            const remaining = remainingPercent(used);
             const reset = resetLabel(window.resetAt, t);
             return (
               <Fragment key={`${window.label}-${index}`}>
                 <span className="min-w-0 truncate text-xs text-muted-foreground" title={window.label}>{window.label}</span>
                 <UsageBar
-                  value={used}
-                  label={t("providerLimits.usedLabel", { percent: Math.round(used), reset: reset ?? t("providerLimits.resetUnknown") })}
+                  remaining={remaining}
+                  label={t("providerLimits.remainingLabel", { percent: Math.round(remaining), reset: reset ?? t("providerLimits.resetUnknown") })}
                 />
                 <span className={cn("text-end text-xs font-medium tabular-nums", percentTone(used))}>
-                  {t("providerLimits.usedPercentValue", { percent: Math.round(used) })}
+                  {t("providerLimits.remainingPercentValue", { percent: Math.round(remaining) })}
                 </span>
                 <span className="text-end text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                   {reset ? t("providerLimits.resetIn", { reset }) : null}

@@ -5,7 +5,7 @@ import { Dialog, cn } from "@openedbot/browser-ui-kit";
 import { api, queryKeys } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import { ProviderIcon } from "../provider-icon";
-import { ProviderLimitsPanel, providerLimitsAlerting, useProviderLimits, type ProviderLimits } from "./provider-limits-panel";
+import { ProviderLimitsPanel, providerLimitsAlerting, remainingPercent, useProviderLimits, type ProviderLimits } from "./provider-limits-panel";
 import { BUTTON } from "../settings/primitives";
 
 /**
@@ -78,7 +78,7 @@ export function ProviderLimitsCard({ compact = false }: { compact?: boolean }) {
   // of an account no bot uses any more.
   const peakLabel = limits.servicePeak === null
     ? t("providerLimits.unavailable")
-    : t("providerLimits.peak", { percent: Math.round(limits.servicePeak) });
+    : t("providerLimits.remainingPercentValue", { percent: Math.round(remainingPercent(limits.servicePeak)) });
   // Only providers that carry a reading enter the pill:
   // a « non mesurable » icon adds nothing to an alert.
   const marks = limits.providers.filter((provider) => {

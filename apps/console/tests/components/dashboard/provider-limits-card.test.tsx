@@ -108,10 +108,10 @@ test("a first HTTP quota failure remains visible with an action to retry", async
   renderCard();
   await openLimitsDialog();
   expect(await screen.findByText("Les données des fournisseurs ne sont pas disponibles pour le moment. Réessayez.")).toBeTruthy();
-  expect(screen.queryByText("97 % max")).toBeNull();
+  expect(within(screen.getByRole("dialog")).queryByText("3 % restant")).toBeNull();
   quotaHttpFailure = false;
   fireEvent.click(screen.getByRole("button", { name: "Actualiser les limites" }));
-  await screen.findByText("97 % max");
+  await within(screen.getByRole("dialog")).findByText("3 % restant");
   await waitFor(() => expect(screen.queryByText("Les données des fournisseurs ne sont pas disponibles pour le moment. Réessayez.")).toBeNull());
 });
 
@@ -122,7 +122,7 @@ test("a failed catalog read cannot hide the provider error as an empty catalogue
   expect(await screen.findByText("Les données des fournisseurs ne sont pas disponibles pour le moment. Réessayez.")).toBeTruthy();
   catalogHttpFailure = false;
   fireEvent.click(screen.getByRole("button", { name: "Actualiser les limites" }));
-  await screen.findByText("97 % max");
+  await within(screen.getByRole("dialog")).findByText("3 % restant");
   await waitFor(() => expect(screen.queryByText("Les données des fournisseurs ne sont pas disponibles pour le moment. Réessayez.")).toBeNull());
 });
 
@@ -134,16 +134,16 @@ test("a quota read failure preserves the last value with a stale response date",
     await clients[0]!.refetchQueries({ queryKey: queryKeys.runtimeProviderUsage("runtime-1") });
   });
   expect(await screen.findByText(/Ces valeurs sont périmées/)).toBeTruthy();
-  expect(screen.getByText("97 % max")).toBeTruthy();
+  expect(within(screen.getByRole("dialog")).getByText("3 % restant")).toBeTruthy();
 });
 
 test("affiche la fenêtre hebdomadaire, puis les bots du fournisseur au dépli", async () => {
   renderCard();
   const trigger = await screen.findByRole("button", { name: /Voir les limites des fournisseurs/ });
   expect(trigger.className).toContain("bg-warn-soft");
-  expect(screen.getByText("97 % max")).toBeTruthy();
+  expect(screen.getByText("3 % restant")).toBeTruthy();
   // The peak is part of the accessible name: without it, the card announces no figure.
-  expect(trigger.getAttribute("aria-label")).toBe("Voir les limites des fournisseurs · 97 % max");
+  expect(trigger.getAttribute("aria-label")).toBe("Voir les limites des fournisseurs · 3 % restant");
   // The brand pills are decorative inside a button that is already named.
   expect(trigger.querySelectorAll("[aria-hidden='true']").length).toBeGreaterThan(0);
   expect(screen.queryByRole("dialog")).toBeNull();
@@ -158,10 +158,10 @@ test("affiche la fenêtre hebdomadaire, puis les bots du fournisseur au dépli",
   fireEvent.click(trigger);
   expect(await screen.findByRole("dialog")).toBeTruthy();
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  expect(await screen.findByText("97 %")).toBeTruthy();
+  expect(await within(screen.getByRole("dialog")).findByText("3 % restant")).toBeTruthy();
   expect(screen.getByText("Réinit. dans 2 j")).toBeTruthy();
   // The composite stays the accessible name: a screen reader hears one sentence.
-  expect(screen.getByRole("progressbar", { name: "97 % · 2 j" })).toBeTruthy();
+  expect(screen.getByRole("progressbar", { name: "3 % restant · 2 j" })).toBeTruthy();
   // The header says when the reading happened; the reread button stays active.
   expect(screen.getByText("Lu il y a 1 min")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Actualiser les limites" }) as HTMLButtonElement).disabled).toBe(false);
@@ -241,8 +241,8 @@ test("« Actualiser » affiche le relevé rendu par la sonde forcée, pas l'anci
   const refresh = await screen.findByRole("button", { name: "Actualiser les limites" });
   fireEvent.click(refresh);
   await waitFor(() => expect(seen.some((url) => url.includes("provider-usage?refresh=1"))).toBe(true));
-  expect(await screen.findByText("42 %")).toBeTruthy();
-  expect(screen.queryByText("97 %")).toBeNull();
+  expect(await within(screen.getByRole("dialog")).findByText("58 % restant")).toBeTruthy();
+  expect(within(screen.getByRole("dialog")).queryByText("3 % restant")).toBeNull();
 });
 
 test("lien fermé : affiche chaque fournisseur authentifié, ses bots dépliés, et le bouton vers les réglages du lien", async () => {
@@ -306,7 +306,7 @@ test("un fournisseur intégré n'est pas un accès posé : il ne compte dans auc
   expect(trigger.querySelectorAll("svg").length).toBe(2); // 1 brand + the chevron
   fireEvent.click(trigger);
   const dialog = await screen.findByRole("dialog");
-  expect(await within(dialog).findByText("97 %")).toBeTruthy();
+  expect(await within(dialog).findByText("3 % restant")).toBeTruthy();
   expect(within(dialog).queryByText("Mixture of Agents")).toBeNull();
   // And no « Sans relevé » group mounted for it alone.
   expect(within(dialog).queryByText("Sans relevé")).toBeNull();

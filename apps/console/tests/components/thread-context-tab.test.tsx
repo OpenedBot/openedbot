@@ -210,7 +210,7 @@ test("le détail ouvre la ventilation et le relevé fournisseur complet", async 
   // Radix switches on pointer, not on a synthetic `click` alone.
   fireEvent.mouseDown(await screen.findByRole("tab", { name: /Quotas/ }));
   expect(await screen.findByText("Anthropic")).toBeTruthy();
-  expect(screen.getByText("38 %")).toBeTruthy();
+  expect(screen.getByText("62 % restant")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Actualiser les limites" })).toBeTruthy();
 });
 

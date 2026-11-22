@@ -6,7 +6,7 @@ import type { RuntimeHealthReading } from "../../lib/runtime/use-runtime-health"
 import { BRAND_MARKS, type BrandMarkKey } from "../brand-marks";
 import { ProviderLimitsDialog } from "../dashboard/provider-limits-card";
 import { useProviderLimits, type ProviderLimits } from "../dashboard/provider-limits-panel";
-import { elapsedMinutes, resetLabel, statusMessage } from "../dashboard/provider-limits-parts";
+import { elapsedMinutes, remainingPercent, resetLabel, statusMessage } from "../dashboard/provider-limits-parts";
 import { RailRuntimeDot, RailRuntimeHealth, railRuntimeIcon, railRuntimeLines, railRuntimeState } from "./rail-runtime-health";
 
 type Translate = ReturnType<typeof useT>["t"];
@@ -75,7 +75,7 @@ export function railQuotaFamilies(limits: Pick<ProviderLimits, "providers" | "sn
       ) measured = candidate;
     }
     if (measured) {
-      const remaining = Math.max(0, Math.min(100, 100 - measured.used));
+      const remaining = remainingPercent(measured.used);
       return { key, name, mark, reading: { state: "measured", provider: measured.provider, remaining, resetAt: measured.resetAt } };
     }
     const apiKey = slugs.find((slug) => limits.snapshots.get(slug)?.source === "api_key");
