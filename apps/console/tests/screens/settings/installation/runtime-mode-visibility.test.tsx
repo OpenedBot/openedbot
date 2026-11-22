@@ -73,12 +73,23 @@ function stubFetch(
 }
 
 /**
- * Replacement is the « Remplacer » section of the rail, not a modal. The
- * rail label and the card title look alike: aim for the title.
+ * Since d61b4eca the screen opens on « Machines », the list of machines, where a
+ * runtime waiting to replace the default one sits as its own card. « Machine par
+ * défaut » holds what « État » held: the default machine's link and its facts.
  */
-async function openReplacementSection() {
-  fireEvent.click(await screen.findByRole("tab", { name: /^Remplacer/ }));
-  await waitFor(() => expect(screen.getByRole("heading", { name: "Remplacer le runtime" })).toBeTruthy());
+async function openMachines() {
+  await waitFor(() => expect(screen.getByRole("tab", { name: /^Machines/ }).getAttribute("aria-selected")).toBe("true"));
+}
+
+async function openDefaultMachine() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Machine par défaut" }));
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Machine par défaut" }).getAttribute("aria-selected")).toBe("true"));
+}
+
+/** « Ajouter une machine » first asks which kind: the Hermes server is the linked runtime. */
+function openHermesForm() {
+  fireEvent.click(screen.getByRole("button", { name: "Ajouter une machine" }));
+  fireEvent.click(screen.getByRole("button", { name: /Un serveur Hermes/ }));
 }
 
 function renderSettings() {
@@ -110,60 +121,60 @@ afterEach(() => {
 });
 
 describe("écran runtime en mode externe", () => {
-  // The screen opens on the active runtime's state; replacement is a
-  // rail section, one tab further: never stacked under the card. With a
-  // runtime that is serving, the action is no longer « ajouter » but « remplacer ».
-  test("ouvre le remplacement dans la section Remplacer, pas sur l’état", async () => {
+  // The screen opens on the machines: the default one is a card, and with no
+  // runtime waiting there is nothing to replace. Adding is « Ajouter une machine »,
+  // never the old « Ajouter un runtime ».
+  test("ouvre sur la liste des machines, la machine par défaut en carte, sans remplacement en attente", async () => {
     stubFetch("external", "disabled");
     renderSettings();
 
-    await waitFor(() => expect(screen.getByRole("tab", { name: "État" })).toBeTruthy());
-    expect(screen.queryByRole("heading", { name: "Remplacer le runtime" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Remplacer le runtime" })).toBeNull();
-    await openReplacementSection();
-    expect(screen.getByRole("button", { name: "Remplacer le runtime" })).toBeTruthy();
+    await openMachines();
+    const card = await screen.findByRole("region", { name: "Gateway direct" });
+    expect(within(card).getByText("Par défaut")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remplacer" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Ajouter une machine" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Ajouter un runtime" })).toBeNull();
     expect(screen.queryByText(/Token géré côté serveur/)).toBeNull();
   });
 
-  // The counter no longer counts runtimes: it signals the replacement that is waiting,
-  // visible without opening the section. With no replacement, no counter.
+  // The counter signals the replacement that is waiting, visible without
+  // opening the section. With no replacement, no counter.
   test("le rail annonce le remplaçant en attente, et lui seul", async () => {
     stubFetch("external", "disabled", [runtime, pendingConnector]);
     renderSettings();
 
-    await waitFor(() => expect(screen.getByRole("tab", { name: /^Remplacer/ }).textContent).toBe("Remplacer1"));
+    await waitFor(() => expect(screen.getByRole("tab", { name: /^Machines/ }).textContent).toBe("Machines1"));
+    expect(screen.getByRole("button", { name: "Remplacer" })).toBeTruthy();
     cleanup();
 
     stubFetch("external", "disabled", [runtime]);
     renderSettings();
-    await waitFor(() => expect(screen.getByRole("tab", { name: "État" })).toBeTruthy());
-    expect(screen.getByRole("tab", { name: /^Remplacer/ }).textContent).toBe("Remplacer");
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Machine par défaut" })).toBeTruthy());
+    expect(screen.getByRole("tab", { name: /^Machines/ }).textContent).toBe("Machines");
   });
 
   test("présente l’accès direct et ses limites en mode external", async () => {
     stubFetch("external", "disabled"); renderSettings();
+    await openDefaultMachine();
     expect(await screen.findByText("Profil par défaut partagé")).toBeTruthy();
     expect(screen.getByText("Capacités gérées sur l’hôte")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Modifier les accès" })).toBeTruthy();
     expect(screen.queryByRole("tab", { name: "Mode" })).toBeNull();
-    await openReplacementSection();
   });
 
-  // With no runtime, the screen opens on adding and offers ONLY ONE path of
-  // creation: the « Ajouter un runtime » button, once (the rail tab
-  // carries the same name but is only navigation). The lead card says it,
-  // it does not double it with a second button or a form.
+  // With no runtime, the screen offers ONLY ONE path of creation: the
+  // « Ajouter une machine » button, once. It does not double it with a
+  // second button or a form.
   test("n’ouvre qu’un seul chemin de création quand aucun runtime n’existe", async () => {
     stubFetch("external", "disabled", []);
     renderSettings();
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter un runtime" })).toBeTruthy());
-    expect(screen.getAllByRole("button", { name: "Ajouter un runtime" })).toHaveLength(1);
-    expect(screen.getByRole("tab", { name: "Ajouter un runtime" }).getAttribute("aria-selected")).toBe("true");
-    // With no runtime, « État » has no fact to show: the rail does not offer it.
-    expect(screen.queryByRole("tab", { name: "État" })).toBeNull();
-    expect(screen.getAllByText("Aucune machine reliée").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter une machine" })).toBeTruthy());
+    expect(screen.getAllByRole("button", { name: "Ajouter une machine" })).toHaveLength(1);
+    await openMachines();
+    // With no runtime, the default machine has no fact to show: the rail does not offer it.
+    expect(screen.queryByRole("tab", { name: "Machine par défaut" })).toBeNull();
+    expect(screen.getByText("Aucune machine")).toBeTruthy();
     expect(screen.queryByLabelText("Nom")).toBeNull();
     expect(screen.queryByLabelText("URL Hermes")).toBeNull();
     expect(screen.queryByRole("button", { name: "Enregistrer et vérifier" })).toBeNull();
@@ -179,7 +190,7 @@ describe("écran runtime en mode externe, runtime connector", () => {
     stubFetch("external", "disabled", [connectorRuntime, pendingConnector]);
     renderSettings();
 
-    await openReplacementSection();
+    await openMachines();
     const card = await waitFor(() => {
       const found = document.querySelector<HTMLElement>('[data-pending-runtime="runtime-3"]');
       expect(found).toBeTruthy();
@@ -200,7 +211,8 @@ describe("écran runtime en mode externe, runtime connector", () => {
     stubFetch("external", "disabled", [connectorRuntime]);
     renderSettings();
 
-    await openReplacementSection();
+    await openMachines();
+    await screen.findByRole("region", { name: "Boîtier atelier" });
     expect(screen.queryByRole("button", { name: "Ouvrir le runtime actif" })).toBeNull();
     expect(screen.queryByLabelText("URL Hermes")).toBeNull();
     expect(screen.queryByLabelText("Nom")).toBeNull();
@@ -214,15 +226,14 @@ describe("écran runtime en mode externe, runtime connector", () => {
 
 describe("aide au token, placement", () => {
   // The manual path and the token help have left the registry: connector-only
-  // pairing no longer exposes a bearer to go read on the host. With no
-  // runtime, the screen opens directly on adding.
+  // pairing no longer exposes a bearer to go read on the host.
   test("n’offre plus d’aide token depuis le registre ni depuis l’ajout", async () => {
     stubFetch("external", "disabled", []);
     renderSettings();
 
-    await screen.findByRole("button", { name: "Ajouter un runtime" });
+    await screen.findByRole("button", { name: "Ajouter une machine" });
     expect(screen.queryByRole("button", { name: "Où trouver le token ?" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un runtime" }));
+    openHermesForm();
     await waitFor(() => expect(screen.getByLabelText("Nom")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "J’ai déjà le token" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Où trouver le token ?" })).toBeNull();
@@ -232,28 +243,30 @@ describe("aide au token, placement", () => {
     stubFetch("external", "disabled");
     renderSettings();
 
+    await openDefaultMachine();
     await waitFor(() => expect(screen.getByText("URL Hermes")).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Où trouver le token ?" })).toBeNull();
   });
 });
 
 describe("carte de tête", () => {
-  test("les champs d’ajout restent dans la section Runtimes, pas sur l’état", async () => {
+  test("les champs d’ajout restent dans la section Machines, pas sur la machine par défaut", async () => {
     stubFetch("external", "disabled");
     renderSettings();
 
-    await waitFor(() => expect(screen.getByRole("tab", { name: "État" })).toBeTruthy());
+    await openDefaultMachine();
     expect(screen.queryByLabelText("Nom")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Remplacer le runtime" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ajouter une machine" })).toBeNull();
   });
 
-  // The link's thread carries the state: it is read without opening a section.
+  // The link's thread carries the state: it is read without opening a dialog.
   test("dit l’état du lien sur la carte de tête", async () => {
     stubFetch("external", "disabled", [connectorRuntime]);
     renderSettings();
 
+    await openDefaultMachine();
     expect(await screen.findByText("Runtime actif")).toBeTruthy();
-    expect(screen.getByText("Boîtier atelier")).toBeTruthy();
+    expect(screen.getAllByText("Boîtier atelier").length).toBeGreaterThan(0);
     expect(screen.getByText("lien connecteur fermé")).toBeTruthy();
     expect(screen.getByText(/dernier signe de vie/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeTruthy();
@@ -268,6 +281,7 @@ describe("carte de tête", () => {
   test("aucune carte n’ouvre un canal vers l’hôte du client", async () => {
     stubFetch("external", "disabled");
     renderSettings();
+    await openDefaultMachine();
     await screen.findByText("Profil par défaut partagé");
     expect(screen.queryByRole("button", { name: /canal d’administration/i })).toBeNull();
     expect(screen.queryByLabelText("Hôte")).toBeNull();

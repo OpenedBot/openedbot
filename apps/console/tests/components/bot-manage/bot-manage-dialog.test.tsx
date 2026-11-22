@@ -263,12 +263,14 @@ describe("les pages du bot", () => {
     expect(scroller!.className).toContain("scrollbar-subtle");
   });
 
-  test("Serveur monte l'écran /settings/runtime, sans pied propre au bot", async () => {
+  test("Machine dit où le bot tourne et renvoie à la gestion des machines (d61b4eca)", async () => {
     await renderDialog("runtime");
-    expect(await screen.findByRole("tablist", { name: "Sections du runtime" })).toBeTruthy();
-    // With no runtime declared (stub), the screen's rail opens on add.
-    expect(screen.getByRole("tab", { name: "Ajouter un runtime" }).getAttribute("aria-selected")).toBe("true");
-    expect(document.querySelector("[data-bot-manage-scroll]")).toBeNull();
+    // The bot's own page replaced the embedded /settings/runtime screen.
+    expect(await screen.findByText(/La machine qui exécute les demandes de ce bot/)).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Sections du runtime" })).toBeNull();
+    const manage = screen.getByRole("link", { name: "Gérer les machines" });
+    expect(manage.getAttribute("href")).toContain("/settings/runtime");
+    expect(manage.getAttribute("href")).toContain("section=runtimes");
   });
 
   test("Skills et Connecteurs MCP sont deux pages distinctes", async () => {

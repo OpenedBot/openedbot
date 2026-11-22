@@ -76,13 +76,19 @@ function renderSettings() {
 }
 
 async function openExternalDialog() {
-  // With no runtime declared, the screen opens on the « Runtimes » section.
-  await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter un runtime" })).toBeTruthy());
+  // With no runtime declared, the screen opens on the « Machines » section.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter une machine" })).toBeTruthy());
+}
+
+/** « Ajouter une machine » first asks which kind: the Hermes server is the linked runtime. */
+function openHermesForm() {
+  fireEvent.click(screen.getByRole("button", { name: "Ajouter une machine" }));
+  fireEvent.click(screen.getByRole("button", { name: /Un serveur Hermes/ }));
 }
 
 async function openDraft() {
   await openExternalDialog();
-  fireEvent.click(screen.getByRole("button", { name: "Ajouter un runtime" }));
+  openHermesForm();
   await waitFor(() => expect(screen.getByLabelText("Nom")).toBeTruthy());
   fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "VPS production" } });
 }
@@ -124,10 +130,10 @@ describe("appairage par lien openedbot d’un runtime", () => {
     stubFetch();
     renderSettings();
     await openExternalDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un runtime" }));
+    openHermesForm();
 
     await waitFor(() => expect(screen.getByLabelText("Nom")).toBeTruthy());
-    const enrollButton = screen.getByRole("button", { name: "Appairer depuis le serveur" }) as HTMLButtonElement;
+    const enrollButton = screen.getByRole("button", { name: "Appairer Hermes" }) as HTMLButtonElement;
     expect(enrollButton.disabled).toBe(true);
     expect(opened).toBe(0);
   });
@@ -138,14 +144,14 @@ describe("appairage par lien openedbot d’un runtime", () => {
     stubFetch();
     renderSettings();
     await openExternalDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un runtime" }));
+    openHermesForm();
     await waitFor(() => expect(screen.getByLabelText("Nom")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Boîtier atelier" } });
 
     expect(screen.queryByLabelText("URL Hermes")).toBeNull();
     expect(screen.queryByRole("button", { name: "J’ai déjà le token" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
     await waitFor(() => expect(opened).toBe(1));
     expect(openedBodies[0]).toEqual({ name: "Boîtier atelier" });
     expect(openedBodies[0]?.url).toBeUndefined();
@@ -164,7 +170,7 @@ describe("appairage par lien openedbot d’un runtime", () => {
     stubFetch(DEV_CONNECTOR_TICKET);
     renderSettings();
     await openDraft();
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
 
     await waitFor(() => expect(screen.getByText("Ticket à coller à l’invite masquée")).toBeTruthy());
     const dialogText = screen.getByRole("dialog").textContent ?? "";
@@ -180,10 +186,10 @@ describe("appairage par lien openedbot d’un runtime", () => {
     stubFetch();
     renderSettings();
     await openExternalDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Ajouter un runtime" }));
+    openHermesForm();
     await waitFor(() => expect(screen.getByLabelText("Nom")).toBeTruthy());
     fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Boîtier atelier" } });
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
 
     const timer = await waitFor(() => screen.getByRole("timer"));
     expect(timer.textContent).toMatch(/^0[45]:\d{2}$/);
@@ -204,7 +210,7 @@ describe("l’appairage est une boîte modale", () => {
     stubFetch();
     renderSettings();
     await openDraft();
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
 
     // Wait for the TITLE, not `role="dialog"`: the name window already
     // carries one, and the assertion would pass even before the content switches.
@@ -227,14 +233,14 @@ describe("l’appairage est une boîte modale", () => {
     stubFetch();
     renderSettings();
     await openDraft();
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
     await waitFor(() => expect(screen.getByRole("timer")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.queryByRole("timer")).toBeNull();
-    expect(screen.getByRole("button", { name: "Ajouter un runtime" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ajouter une machine" })).toBeTruthy();
   });
 });
 
@@ -246,10 +252,10 @@ describe("fin d’appairage", () => {
     stubFetch();
     renderSettings();
     await openDraft();
-    fireEvent.click(screen.getByRole("button", { name: "Appairer depuis le serveur" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appairer Hermes" }));
 
     await waitFor(() => expect(statusCalls).toBeGreaterThan(0));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter un runtime" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ajouter une machine" })).toBeTruthy());
     expect(screen.queryByText("Commande d’appairage")).toBeNull();
   });
 });
