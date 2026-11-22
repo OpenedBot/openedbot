@@ -88,6 +88,7 @@ import { RunActivityDock } from "../../components/run-activity-dock";
 import { DevRenderProfiler } from "../../components/dev/dev-render-profiler";
 import { sameAuthorList, sameAuthorMap, sameValueMap, useContentStable } from "../../lib/hooks/use-content-stable";
 import { BUTTON } from "../../components/settings/primitives";
+import { useMessageVersionFamilies } from "./use-message-version-families";
 export function ConversationScreen() {
   const { t, locale } = useT();
   const isMobile = useIsMobile();
@@ -268,15 +269,7 @@ export function ConversationScreen() {
     field?.blur();
   }, [conversationBlocked]);
 
-  const versions = useQuery({
-    queryKey: queryKeys.messageVersions(activeThreadId ?? "none"),
-    queryFn: () => api.messageVersions(activeThreadId!),
-    enabled: Boolean(activeThreadId),
-  });
-  const versionFamilyByMessage = useMemo(
-    () => new Map((versions.data?.families ?? []).map((family) => [family.currentMessageId, family] as const)),
-    [versions.data?.families],
-  );
+  const versionFamilyByMessage = useMessageVersionFamilies(activeThreadId);
   useMarkThreadRead(
     activeThreadId,
     thread.data?.id === activeThreadId ? thread.data : null,
