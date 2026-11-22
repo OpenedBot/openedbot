@@ -133,6 +133,31 @@ export function BotArrivalStage({ bot, progress }: {
   );
 }
 
+/**
+ * A bot that changes machine keeps its conversation: the same preparation,
+ * said in one line above the composer (the step in progress), instead of the
+ * arrival screen that would hide the thread.
+ */
+export function BotMoveStrip({ name, host, progress }: {
+  name: string;
+  host: string | null;
+  progress: BotProfileProvisionProgress | null | undefined;
+}) {
+  const { t } = useT();
+  const active = STEPS[Math.max(0, arrivalStepStates(progress).indexOf("active"))]!;
+  return (
+    <div role="status" aria-live="polite" data-thread-lane="" data-bot-move="" className="flex w-full min-w-0 items-center gap-2.5 px-4 text-sm sm:px-6">
+      <StepMark state="active" />
+      <p className="min-w-0 truncate">
+        <span className="text-text-primary">
+          {host ? t("botProfileProvision.moving", { name, host }) : t("botProfileProvision.movingComposer", { name })}
+        </span>
+        <span className="text-text-tertiary"> · {t(active.label)}</span>
+      </p>
+    </div>
+  );
+}
+
 function StepMark({ state }: { state: StepState }) {
   if (state === "done") {
     return (

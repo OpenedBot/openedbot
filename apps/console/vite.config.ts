@@ -74,19 +74,20 @@ export default defineConfig(({ command, mode, isPreview }) => {
   define: {
     __OPENEDBOT_BUILD_ID__: JSON.stringify(buildId(fileURLToPath(new URL("../../", import.meta.url)), mode, loadEnv(mode, fileURLToPath(new URL("./", import.meta.url)), "VITE_"))),
   },
+  // Loopback only: the console is served on http://localhost:1420 and
+  // nowhere else (listening on every interface printed one URL per Docker
+  // bridge at start).
   server: {
-    host: true,
+    host: "localhost",
     port: PORT,
     strictPort: true,
-    allowedHosts: true,
     proxy: apiProxy,
   },
   // Same origin as `make dev`. Cannot run alongside Vite (`strictPort`).
   preview: {
-    host: true,
+    host: "localhost",
     port: PORT,
     strictPort: true,
-    allowedHosts: true,
     proxy: apiProxy,
   },
   build: {

@@ -1,7 +1,8 @@
 import { cn } from "@openedbot/browser-ui-kit";
 
 /**
- * Usage gauge of a measured provider.
+ * Quota gauge of a measured provider: it shows what remains and empties
+ * like the rail ring (full = everything remains).
  *
  * The tint carries the information: graphite at rest, amber then red when the
  * wall approaches; the brand blue stays reserved for actions. A usage
@@ -9,16 +10,16 @@ import { cn } from "@openedbot/browser-ui-kit";
  * « zéro consommé », and a dotted rule reads as a separator.
  */
 export function UsageBar({
-  value,
+  remaining,
   label,
   className,
 }: {
-  value: number;
+  remaining: number;
   label: string;
   className?: string;
 }) {
-  const safe = Math.max(0, Math.min(100, value));
-  const tone = safe > 95 ? "bg-destructive" : safe > 80 ? "bg-amber-500" : "bg-foreground/70";
+  const safe = Math.max(0, Math.min(100, remaining));
+  const tone = safe < 5 ? "bg-destructive" : safe < 20 ? "bg-amber-500" : "bg-foreground/70";
   return (
     <div
       role="progressbar"

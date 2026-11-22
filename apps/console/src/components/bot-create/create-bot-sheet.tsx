@@ -8,6 +8,7 @@ import { Dialog, Input, Label, useIsMobile } from "@openedbot/browser-ui-kit";
 import { randomFace } from "@openedbot/browser-face/presets";
 import { randomBotArtwork } from "@openedbot/browser-face/artworks";
 import { api, queryKeys, runtimesQueryOptions } from "../../lib/api";
+import { ExecutionHostField, useBotCreationHosts } from "./execution-host-field";
 import { useT, type MessageKey } from "../../lib/i18n";
 import { shownPermissionMode, useAutoReviewAvailable } from "../boardui/permission-picker";
 import { creationAttempts } from "../../lib/bots/creation-attempts";
@@ -149,7 +150,9 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   const idPrefix = useId();
   const isMobile = useIsMobile();
   const runtimeQuery = useQuery({ ...runtimesQueryOptions(), enabled: open });
-  const runtime = runtimeQuery.data?.runtimes[0] ?? null;
+  const [runtimeId, setRuntimeId] = useState("");
+  const { selectedHost: selectedMachine, requiresHost, ...executionHosts } = useBotCreationHosts(runtimeId, open);
+  const runtime = selectedMachine ?? runtimeQuery.data?.runtimes[0] ?? null;
   const profileManagement = runtime?.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT) === true;
   // Same cache entry as the model picker: the organization's assignment mode.
   // While the runtime's new model is still being proven, read it again so the
@@ -188,8 +191,8 @@ export function CreateBotSheet({ open, onClose, source = null }: {
     if (open && !isMobile) nameInput.current?.focus({ preventScroll: true });
   }, [open, isMobile]);
   // A duplicate waits for the runtime: whether it needs a profile depends on it.
-  const cloneRuntimePending = source !== null && runtimeQuery.isPending;
-  const profileRequired = source !== null && !cloneRuntimePending && !profileManagement;
+  const cloneRuntimePending = source !== null && !selectedMachine && runtimeQuery.isPending;
+  const profileRequired = source !== null && !selectedMachine && !cloneRuntimePending && !profileManagement;
   const profileError = profileRequired ? cloneProfileError(source, draft.options.profile) : null;
   // The model the copy will actually run: its source's, else the runtime's.
   // Under global assignment the runner ignores a bot's own model whenever the
@@ -199,17 +202,22 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   const creationOptions: CreationOptionsValue = draft.permissionModeChosen
     ? draft.options
     : { ...draft.options, permissionMode: shownPermissionMode(assignment.data?.defaultPermissionMode ?? "manual", autoReview) };
-  const ownModel = globalModel ? null : draft.copied?.model ?? null;
+  const copied = selectedMachine && draft.copied
+    ? { ...draft.copied, model: undefined, reasoningEffort: undefined }
+    : draft.copied;
+  const ownModel = globalModel ? null : copied?.model ?? null;
   // A bot that follows the runtime runs the runtime's CURRENT model: until the
   // new one is proven (and promoted), that is still the previous model.
   const proof = assignment.data?.runtime?.id === runtime?.id ? assignment.data?.runtime?.modelSelection ?? null : null;
   const pendingModel = !ownModel && modelProofPending(proof) ? proof?.model ?? null : null;
   const canCreate = trimmedName.length > 0 && draft.cloneError === null
-    && !cloneRuntimePending && profileError === null;
+    && executionHosts.registryReady && !cloneRuntimePending && profileError === null
+    && (selectedMachine !== null || (!requiresHost && runtimeId === ""));
 
   const close = () => {
     onClose();
     setFaceEditing(false);
+    setRuntimeId("");
   };
 
   // The request is frozen at the click: the sheet resets before the answer.
@@ -218,16 +226,17 @@ export function CreateBotSheet({ open, onClose, source = null }: {
   const freeze = (): BotCreationRequest => {
     const content: Omit<BotCreationRequest, "clientRequestId"> = {
       name: trimmedName,
+      ...(selectedMachine?.id ? { runtimeId: selectedMachine.id } : {}),
       role: draft.role.trim(),
       mission: draft.mission.trim(),
       instructions: displayedPersona,
-      hermesProfile: profileManagement ? null : draft.options.profile.trim() || null,
+      hermesProfile: selectedMachine || profileManagement ? null : draft.options.profile.trim() || null,
       face: draft.face,
       permissionMode: creationOptions.permissionMode,
       notifyOnFinish: draft.options.notifyOnFinish,
       greet: draft.options.greet,
       locale,
-      copied: draft.copied,
+      copied,
       presetLabel: draft.presetLabel,
     };
     return { clientRequestId: attempts.current.idFor(content), ...content };
@@ -315,6 +324,7 @@ export function CreateBotSheet({ open, onClose, source = null }: {
           />
         </div>
         <div className="space-y-1.5">
+          <ExecutionHostField id={`${idPrefix}-runtime`} {...executionHosts} value={runtimeId} onChange={setRuntimeId} onOpenMachines={close} />
           <Label htmlFor={`${idPrefix}-role`}>{t("newBotDialog.roleLabel")}</Label>
           <Input
             id={`${idPrefix}-role`}

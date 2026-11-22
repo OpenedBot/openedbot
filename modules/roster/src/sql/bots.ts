@@ -21,7 +21,7 @@ export function readRosterBots(
                b.reasoning_effort as "reasoningEffort", b.fast_mode as "fastMode", b.section_id as "sectionId", b.position,
                b.pinned, b.pin_position as "pinPosition", b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
                b.notify_on_finish as "notifyOnFinish", b.speech_rate as "speechRate", b.permission_mode as "permissionMode",
-               b.hermes_profile as "hermesProfile",
+               b.hermes_profile as "hermesProfile", b.runtime_id as "runtimeId",
                b.approval_policy_mode as "approvalPolicyMode", b.approval_policy_effective_at as "approvalPolicyEffectiveAt",
                b.hermes_profile_managed as "hermesProfileManaged", (select case when j.status = 'needs_attention' then 'needs_attention' else 'configuring' end
                  from profile_import_items i join profile_import_jobs j on j.id = i.job_id and j.organization_id = i.organization_id
@@ -120,7 +120,7 @@ export function readBotRows(tx: TransactionDb, organizationId: string, id: strin
            b.reasoning_effort as "reasoningEffort", b.fast_mode as "fastMode", b.section_id as "sectionId", b.position,
            b.pinned, b.pin_position as "pinPosition", b.face, b.voice_id as "voiceId", b.label, b.reply_language as "replyLanguage",
                b.notify_on_finish as "notifyOnFinish", b.speech_rate as "speechRate", b.permission_mode as "permissionMode",
-               b.hermes_profile as "hermesProfile",
+               b.hermes_profile as "hermesProfile", b.runtime_id as "runtimeId",
            b.approval_policy_mode as "approvalPolicyMode", b.approval_policy_effective_at as "approvalPolicyEffectiveAt",
            b.hermes_profile_managed as "hermesProfileManaged", (select case when j.status = 'needs_attention' then 'needs_attention' else 'configuring' end
                  from profile_import_items i join profile_import_jobs j on j.id = i.job_id and j.organization_id = i.organization_id
@@ -202,6 +202,7 @@ export async function insertBotWithThread(
     /** Absent fields keep the column defaults of 0099 (`manual`, `auto`, notify on). */
     editor?: EditorSettings;
     creationRequestId?: string | null;
+    runtimeId?: string;
     /** SHA-256 hex of the request the id was minted for (0136). */
     creationRequestDigest?: string | null;
   },
@@ -213,7 +214,7 @@ export async function insertBotWithThread(
       reasoning_effort, hermes_profile, hermes_profile_managed, position, face, voice_id, autonomy_enabled, autonomy_max_depth,
       autonomy_max_steps, autonomy_max_handoffs, autonomy_timeout_seconds, autonomy_token_budget,
       label, reply_language, notify_on_finish, speech_rate, permission_mode, creation_request_id,
-      creation_request_digest
+      creation_request_digest, runtime_id
     ) values (
       ${input.id}, ${input.organizationId}, ${input.sectionId}, ${input.name}, ${input.slug},
       ${input.description || null},
@@ -228,7 +229,7 @@ export async function insertBotWithThread(
       coalesce(${editor.speechRate ?? null}, 1),
       coalesce(${editor.permissionMode ?? null}, 'manual'),
       ${input.creationRequestId ?? null},
-      ${input.creationRequestDigest ?? null}
+      ${input.creationRequestDigest ?? null}, ${input.runtimeId ?? null}
     )
   `;
   await insertBotDefaultThread(tx, {
@@ -363,30 +364,17 @@ export async function writeBotApprovalPolicyProof(
   `;
 }
 
-/** Le profil Hermes d'un bot : seule colonne dont les routes de capacités ont besoin. */
+/** Le profil et la machine du bot pour les routes de capacités. */
 export async function readBotCapabilityTarget(
   tx: TransactionDb,
   organizationId: string,
   botId: string,
-): Promise<{ profile: string | null } | null> {
-  const rows = await tx<Array<{ profile: string | null }>>`
-    select hermes_profile as "profile" from bots
+): Promise<{ profile: string | null; runtimeId: string | null } | null> {
+  const rows = await tx<Array<{ profile: string | null; runtimeId: string | null }>>`
+    select hermes_profile as "profile", runtime_id as "runtimeId" from bots
      where organization_id = ${organizationId} and id = ${botId}
   `;
   return rows[0] ?? null;
-}
-
-/** Même lecture, sous l'alias du panneau de capacités. */
-export async function readBotHermesProfile(
-  tx: TransactionDb,
-  organizationId: string,
-  botId: string,
-): Promise<{ hermesProfile: string | null } | null> {
-  const bots = await tx<Array<{ hermesProfile: string | null }>>`
-    select hermes_profile as "hermesProfile" from bots
-     where organization_id = ${organizationId} and id = ${botId}
-  `;
-  return bots[0] ?? null;
 }
 
 /** Ce qu'il faut pour (re)créer le profil hôte d'un bot qui n'est pas supprimé. */
@@ -394,9 +382,9 @@ export async function readProfileRepairTarget(
   tx: TransactionDb,
   organizationId: string,
   botId: string,
-): Promise<{ name: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"] } | null> {
-  const rows = await tx<Array<{ name: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"] }>>`
-    select name, hermes_profile as "profile", model, permission_mode as "permissionMode" from bots
+): Promise<{ name: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"]; runtimeId: string | null } | null> {
+  const rows = await tx<Array<{ name: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"]; runtimeId: string | null }>>`
+    select name, hermes_profile as "profile", model, permission_mode as "permissionMode", runtime_id as "runtimeId" from bots
      where organization_id = ${organizationId} and id = ${botId} and deleted_at is null
   `;
   return rows[0] ?? null;
@@ -407,7 +395,7 @@ export async function lockBotForProfile(
   tx: TransactionDb,
   organizationId: string,
   botId: string,
-): Promise<{ id: string; name: string; slug: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"] } | null> {
+): Promise<{ id: string; name: string; slug: string; profile: string | null; model: string | null; permissionMode: BotRow["permissionMode"]; runtimeId: string | null } | null> {
   const rows = await tx<Array<{
     id: string;
     name: string;
@@ -415,8 +403,9 @@ export async function lockBotForProfile(
     profile: string | null;
     model: string | null;
     permissionMode: BotRow["permissionMode"];
+    runtimeId: string | null;
   }>>`
-    select id, name, slug, hermes_profile as "profile", model, permission_mode as "permissionMode"
+    select id, name, slug, hermes_profile as "profile", model, permission_mode as "permissionMode", runtime_id as "runtimeId"
       from bots
      where organization_id = ${organizationId} and id = ${botId}
      for update
@@ -544,6 +533,7 @@ export async function hasPendingBotIngress(
 }
 
 export type BotDeletionScope = {
+  runtimeId?: string | null;
   deletedAt: Date | null;
   profile: string | null;
   profileManaged: boolean;
@@ -561,8 +551,8 @@ export async function readBotDeletionScope(
   organizationId: string,
   botId: string,
 ): Promise<BotDeletionScope | null> {
-  const bots = await tx<Array<{ deletedAt: Date | null; profile: string | null; profileManaged: boolean }>>`
-    select deleted_at as "deletedAt", hermes_profile as "profile", hermes_profile_managed as "profileManaged" from bots
+  const bots = await tx<Array<{ deletedAt: Date | null; profile: string | null; profileManaged: boolean; runtimeId: string | null }>>`
+    select deleted_at as "deletedAt", hermes_profile as "profile", hermes_profile_managed as "profileManaged", runtime_id as "runtimeId" from bots
      where organization_id = ${organizationId} and id = ${botId}
   `;
   if (!bots[0]) return null;
@@ -575,7 +565,7 @@ export async function readBotDeletionScope(
      where organization_id = ${organizationId} and workflow_id is not null
        and (bot_id = ${botId} or caller_bot_id = ${botId} or handoff_target_bot_id = ${botId})
   `;
-  return { deletedAt: bots[0].deletedAt, profile: bots[0].profile, profileManaged: bots[0].profileManaged, threads, workflows };
+  return { runtimeId: bots[0].runtimeId, deletedAt: bots[0].deletedAt, profile: bots[0].profile, profileManaged: bots[0].profileManaged, threads, workflows };
 }
 
 /** Soft delete : la corbeille (`deleted_at`) est toujours archivée aussi (invariant 0031). `false` si le bot n'existe pas. */
@@ -613,7 +603,7 @@ export function clearBotModelOverrides(tx: TransactionDb, organizationId: string
     update bots b
        set model = null, reasoning_effort = null, fast_mode = false, updated_at = now()
      where b.organization_id = ${organizationId}
-       and b.archived_at is null and b.deleted_at is null
+       and b.archived_at is null and b.deleted_at is null and b.runtime_id is null
        and (b.model is not null or b.reasoning_effort is not null or b.fast_mode)
     returning b.id as "botId", b.hermes_profile as "profile", b.hermes_profile_managed as "profileManaged",
               coalesce((select p.status from bot_profile_provisions p
@@ -631,7 +621,7 @@ export async function botsFollowingRuntimeModel(tx: TransactionDb, organizationI
     select b.id from bots b
       join organizations o on o.id = b.organization_id
      where b.organization_id = ${organizationId} and b.id = any(${pgTextArray(botIds)}::text[]::uuid[])
-       and b.deleted_at is null
+       and b.deleted_at is null and b.runtime_id is null
        and (o.model_assignment_mode = 'global' or b.model is null)
   `;
   return rows.map((row) => row.id);

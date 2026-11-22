@@ -1,7 +1,7 @@
 import type { TransactionDb } from "@openedbot/platform-db";
 
 /** What other packages call here; the SQL file stays private to the module. */
-export { consumeRuntimeEnrollment, purgeStaleRuntimeEnrollments } from "../sql/runtime-enrollments";
+export { claimMachineEnrollment, consumeRuntimeEnrollment, purgeStaleRuntimeEnrollments } from "../sql/runtime-enrollments";
 
 /**
  * Historical rows may still say `direct` while an old migration drains. No
@@ -12,6 +12,8 @@ export type EnrollmentRow = {
   reachability: "direct" | "connector";
   endpoint: string | null;
   runtimeName: string;
+  dedicated: boolean;
+  claimedEngines: string[];
   verificationCode: string;
   organizationId: string | null;
   claimedAt: Date | null;
@@ -23,7 +25,8 @@ export type EnrollmentRow = {
 /** Migration-compatible reader used by the connector WebSocket handshake. */
 export function readEnrollmentRow(tx: TransactionDb, secretHash: string) {
   return tx<EnrollmentRow[]>`
-    select id, reachability, endpoint, runtime_name as "runtimeName", verification_code as "verificationCode",
+    select id, reachability, endpoint, runtime_name as "runtimeName", verification_code as "verificationCode", dedicated,
+           claimed_engines as "claimedEngines",
            organization_id as "organizationId", claimed_at as "claimedAt", consumed_at as "consumedAt",
            runtime_id as "runtimeId", expires_at as "expiresAt"
       from runtime_enrollments

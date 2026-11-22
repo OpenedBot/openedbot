@@ -2,6 +2,7 @@ import { experimental_createQueryPersister, type AsyncStorage, type PersistedQue
 import { clear, createStore, del, get, set } from "idb-keyval";
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { clearAppAccessHint } from "./session/app-access-hint";
+import { clearBootBots } from "./session/boot-bots";
 import { clearBootIdentity } from "./session/boot-identity";
 import { readCloudSession } from "./session/cloud-session";
 
@@ -120,5 +121,6 @@ export async function clearPersistedQueries(): Promise<void> {
   purgeGeneration += 1;
   clearAppAccessHint();
   clearBootIdentity();
+  clearBootBots();
   if (store) await clear(store).catch(() => undefined);
 }

@@ -22,7 +22,7 @@ done
 
 packages=(
   # Toolchain and the Tauri 2 prerequisites (https://v2.tauri.app/start/prerequisites/#linux).
-  build-essential pkg-config curl wget file unzip ca-certificates git xz-utils
+  build-essential pkg-config curl wget file unzip ca-certificates git xz-utils golang-go
   libwebkit2gtk-4.1-dev libsoup-3.0-dev libgtk-3-dev libayatana-appindicator3-dev
   librsvg2-dev libssl-dev libxdo-dev
   # keyring's Secret Service backend links libdbus.

@@ -49,7 +49,7 @@ export type AgentBudgetGroup = {
 export type AgentPlanLimit = {
   id: string;
   label: string;
-  /** Consommé, entre 0 et 1. */
+  /** La part que montre la jauge, entre 0 et 1 : consommée, ou restante pour un quota de fournisseur. */
   used: number;
   /** Quand la fenêtre se rouvre, déjà mis en forme par l'appelant. */
   resets: string | null;
@@ -176,12 +176,12 @@ function Collapsible({ open, children, id }: { open: boolean; children: React.Re
   return (
     <div
       id={id}
-      className="grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none"
+      className="-mx-2 grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none"
       style={{ gridTemplateRows: open ? "1fr" : "0fr", opacity: open ? 1 : 0 }}
       // Replié, le contenu ne doit pas recevoir le focus clavier.
       inert={!open}
     >
-      <div className="min-h-0 overflow-hidden">{children}</div>
+      <div className="min-h-0 overflow-hidden px-2">{children}</div>
     </div>
   );
 }
@@ -290,7 +290,7 @@ function BudgetGroupRow({
         aria-controls={empty ? undefined : id}
         disabled={empty}
         onClick={() => setOpen((previous) => !previous)}
-        className="group col-span-4 -mx-2 grid grid-cols-subgrid items-center rounded-md px-2 py-0.5 text-left outline-none transition-colors duration-150 enabled:cursor-pointer enabled:hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring"
+        className="group col-span-4 -mx-2 grid grid-cols-subgrid items-center rounded-lg px-2 py-0.5 text-left outline-none transition-colors duration-150 enabled:cursor-pointer enabled:hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Chevron
           direction="right"

@@ -149,17 +149,51 @@ async function devSession(api: string): Promise<Record<string, string>> {
  * Un lien vivant côté VPS ne prouve rien côté openedbot : après « Repartir de zéro »
  * ou un `make db-reset`, la base locale a pu oublier le runtime que ce lien
  * sert, et le connecteur se présente avec un jeton qu'elle refuse. Vrai quand
- * l'espace du compte de dev n'a plus aucun runtime en service ; `null` quand
+ * l'espace du compte de dev n'a plus de runtime connector à son nom (un autre
+ * runtime actif, comme celui du faux Hermes, ne compte pas) ; `null` quand
  * on ne peut pas le savoir (API ou compte indisponible).
  */
-async function localRuntimeForgotten(api: string): Promise<boolean | null> {
+async function localRuntimeForgotten(api: string, runtimeName: string): Promise<boolean | null> {
   try {
-    const current = await fetch(`${api}/api/runtimes`, { headers: await devSession(api) });
-    if (!current.ok) return null;
-    return ((await current.json()) as { runtime?: unknown }).runtime == null;
+    const headers = await devSession(api);
+    return await instanceRuntime(api, headers, runtimeName) === null;
   } catch {
     return null;
   }
+}
+
+/** Le runtime connector non révoqué de cette instance dans la base locale, l'actif d'abord puis le plus récent. */
+async function instanceRuntime(api: string, headers: Record<string, string>, runtimeName: string) {
+  const listed = await fetch(`${api}/api/runtime/list`, { headers });
+  if (!listed.ok) throw new Error(`Liste des runtimes refusée (${listed.status}).`);
+  const { runtimes } = (await listed.json()) as { runtimes: Array<{ id: string; name: string; isActive: boolean; reachability: string }> };
+  return runtimes.find((runtime) => runtime.reachability === "connector" && runtime.name === runtimeName) ?? null;
+}
+
+/**
+ * Update or create : en local, `link-dev-up` laisse le runtime de cette instance
+ * en service, quel que soit l'actif d'avant (faux Hermes, runtime direct ou
+ * connector mort). Le remplacement révoque l'ancien actif.
+ */
+async function activateInstanceRuntime(api: string, headers: Record<string, string>, runtimeId: string): Promise<void> {
+  const current = await fetch(`${api}/api/runtime`, { headers });
+  const active = current.ok ? ((await current.json()) as { runtime?: { id: string; name: string } | null }).runtime ?? null : null;
+  if (active?.id === runtimeId) return;
+  // Juste après `completed` ou un redémarrage du connecteur, le lien rouvre sa
+  // session : le remplacement sonde par le tuyau et répond 503
+  // HERMES_UNREACHABLE pendant ces quelques secondes (mesuré).
+  let activated = await fetch(`${api}/api/runtime/${runtimeId}/replace`, { method: "POST", headers });
+  for (let attempt = 0; attempt < 15 && activated.status === 503; attempt += 1) {
+    await sleep(2_000);
+    activated = await fetch(`${api}/api/runtime/${runtimeId}/replace`, { method: "POST", headers });
+  }
+  if (!activated.ok) {
+    warn(`Activation du runtime ${runtimeId} refusée (${activated.status}) : ${(await activated.text()).slice(0, 300)}.${active ? ` L'actif reste « ${active.name} » (${active.id}).` : ""}`);
+    return;
+  }
+  say(active
+    ? `Runtime ${runtimeId} en service à la place de « ${active.name} » (${active.id}), révoqué.`
+    : `Runtime ${runtimeId} en service.`);
 }
 
 async function main(): Promise<void> {
@@ -185,7 +219,7 @@ async function main(): Promise<void> {
       const status = await remoteStatus(options.ssh, options.host);
       const state = remoteLinkState(status, plan);
       // Lié sur le VPS mais oublié par la base locale : à réenrôler, comme absent.
-      const forgotten = state === "linked" && await localRuntimeForgotten(`http://127.0.0.1:${plan.apiPort}`) === true;
+      const forgotten = state === "linked" && await localRuntimeForgotten(`http://127.0.0.1:${plan.apiPort}`, plan.runtimeName) === true;
       const stopped = state === "linked" && !forgotten && remoteConnectorStopped(status, plan);
       console.log(forgotten ? "forgotten" : stopped ? "stopped" : state);
       process.exit(state !== "linked" || forgotten ? 3 : stopped ? 4 : 0);
@@ -338,7 +372,7 @@ async function main(): Promise<void> {
   // Le VPS tient le lien, mais la base locale a pu oublier son runtime (remise
   // à zéro de dev) : le connecteur serait refusé à chaque reconnexion. On
   // réenrôle alors, sans attendre un geste.
-  const forgotten = state === "linked" && !consoleTicket && await localRuntimeForgotten(api) === true;
+  const forgotten = state === "linked" && !consoleTicket && await localRuntimeForgotten(api, plan.runtimeName) === true;
   if (forgotten) warn(`Instance ${plan.instance} liée sur le VPS, mais la base locale ne connaît plus son runtime (remise à zéro ?) : réenrôlement automatique.`);
 
   if (state === "linked" && !consoleTicket && !forgotten) {
@@ -349,6 +383,13 @@ async function main(): Promise<void> {
       say(`Instance ${plan.instance} déjà liée à ${plan.remoteOrigin} : connecteur redémarré pour se reconnecter tout de suite, aucun ticket consommé.`);
     } else {
       warn(`Instance ${plan.instance} déjà liée à ${plan.remoteOrigin} ; redémarrage du connecteur refusé (${restarted.stderr.trim() || `code ${restarted.code}`}) : il se reconnecte seul, jusqu'à 60 s.`);
+    }
+    try {
+      const headers = await devSession(api);
+      const runtime = await instanceRuntime(api, headers, plan.runtimeName);
+      if (runtime) await activateInstanceRuntime(api, headers, runtime.id);
+    } catch (error) {
+      warn(`Runtime de l'instance ${plan.instance} non activé : ${error instanceof Error ? error.message : String(error)}`);
     }
   } else if (consoleTicket) {
     // Ticket de la console : pas de connexion au compte dev, pas de sondage
@@ -402,39 +443,8 @@ async function main(): Promise<void> {
       die(`edge-setup link a échoué sur le VPS (code ${linked.code}) : ${linked.stderr.trim()}`);
     }
 
-    /**
-     * L'enrôlement n'active le nouveau runtime que si aucun autre ne l'est
-     * (gateway.ts, enrollConnectorRuntime). Après une VM revenue à son
-     * snapshot, l'actif est l'ancien runtime de ce même lien, mort : la PWA
-     * resterait dessus. On remplace l'ancien par le nouveau seulement dans ce
-     * cas, un lien connector fermé ; un runtime actif encore servant n'est
-     * jamais pris. Le remplacement révoque l'ancien.
-     */
-    const takeOverDeadActiveRuntime = async (runtimeId: string) => {
-      const current = await fetch(`${api}/api/runtimes`, { headers });
-      const active = current.ok
-        ? ((await current.json()) as { runtime?: { id: string; name: string; isActive: boolean; reachability: string; link?: { connected?: boolean } | null } | null }).runtime ?? null
-        : null;
-      if (!active?.isActive || active.id === runtimeId) return;
-      if (active.reachability !== "connector" || active.link?.connected !== false) {
-        warn(`Le runtime actif reste « ${active.name} » (${active.id}), encore servant : le nouveau n'est pas activé. Pour le remplacer : PWA, Réglages, Edge, Remplacer.`);
-        return;
-      }
-      // Juste après `completed`, le connecteur rouvre sa session avec le jeton
-      // de lien qu'il vient de recevoir : le remplacement sonde par le tuyau et
-      // répond 503 HERMES_UNREACHABLE pendant ces quelques secondes (mesuré).
-      let activated = await fetch(`${api}/api/runtimes/${runtimeId}/replace`, { method: "POST", headers });
-      for (let attempt = 0; attempt < 15 && activated.status === 503; attempt += 1) {
-        await sleep(2_000);
-        activated = await fetch(`${api}/api/runtimes/${runtimeId}/replace`, { method: "POST", headers });
-      }
-      if (!activated.ok) {
-        warn(`Remplacement par le nouveau runtime refusé (${activated.status}) : ${(await activated.text()).slice(0, 300)}. L'actif reste ${active.id}, déconnecté.`);
-        return;
-      }
-      say(`Runtime ${runtimeId} en service à la place de ${active.id}, dont le lien était fermé ; l'ancien est révoqué.`);
-    };
-
+    // L'enrôlement n'active le nouveau runtime que si aucun autre ne l'est
+    // (connector-enrollment.ts, enrollConnectorRuntime) : `activateInstanceRuntime` le met en service.
     let completed = false;
     for (let attempt = 0; attempt < 30 && !completed; attempt += 1) {
       const poll = await fetch(`${api}/api/runtime-enrollments/${enrollment.enrollmentId}/status`, { headers });
@@ -442,7 +452,7 @@ async function main(): Promise<void> {
       if (body.state === "completed") {
         completed = true;
         say(`Enrôlement terminé : runtime ${body.runtimeId} dans l'openedbot local.`);
-        if (body.runtimeId) await takeOverDeadActiveRuntime(body.runtimeId);
+        if (body.runtimeId) await activateInstanceRuntime(api, headers, body.runtimeId);
       } else if (body.state === "expired") {
         stop();
         die("Le ticket a expiré avant que le VPS ne se présente.");

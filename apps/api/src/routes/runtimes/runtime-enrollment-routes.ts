@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import type { ApiConfig } from "../../infrastructure/config";
 import { withCredential, withTenant } from "@openedbot/platform-db";
@@ -37,6 +38,23 @@ export function connectorLinkCommand(apiPublicUrl: string): string {
   const origin = connectorLinkOrigin(apiPublicUrl);
   return `edge-setup link --openedbot ${origin} --yes${isLoopbackHttpOrigin(origin) ? " --insecure-openedbot" : ""}`;
 }
+
+/**
+ * One command for every agent CLI of the machine where it runs: the folder it
+ * runs in is the agents' working directory. The ticket goes to the prompt.
+ */
+export function machineConnectCommand(apiPublicUrl: string, workspaceId: string, binary = "edge-setup"): string {
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  const executable = binary === "edge-setup" ? binary : quote(binary);
+  return `${executable} connect --openedbot ${quote(connectorLinkOrigin(apiPublicUrl))} --workspace-id ${workspaceId} --workspace "$PWD"`;
+}
+
+/**
+ * In development, the edge-setup built from this checkout (`make
+ * connect-dev-build`): an installed release may predate `connect`. Production
+ * names `edge-setup`, which the console has the operator install or update first.
+ */
+const DEV_EDGE_SETUP = fileURLToPath(new URL("../../../../../edge-setup/dist/edge-setup", import.meta.url));
 
 function connectorLinkOrigin(apiPublicUrl: string): string {
   const origin = apiPublicUrl.replace(/\/+$/, "");
@@ -114,10 +132,16 @@ export function runtimeEnrollmentClaimRoutes(db: Db, config: ApiConfig): Hono<{ 
     const body = await jsonBody(context.req.raw);
     const runtimeName = assertString(body.name, "Le nom du runtime", { max: 100 });
     const reachability = readEnrollmentReachability(body.reachability);
+    if (body.machine !== undefined && typeof body.machine !== "boolean") {
+      throw new HttpError(400, "RUNTIME_MACHINE_INVALID", "Le type d’appairage est invalide.");
+    }
+    // A machine ticket pairs every agent CLI of the machine (`edge-setup
+    // connect`), each as a dedicated runtime; otherwise it links a host.
+    const dedicated = body.machine === true;
     await assertSubscriptionAllowsRuntime(db, auth.organizationId, config.billingEnforced);
     // The refusal lands here, at the click, rather than at enrollment: the host would
     // already have installed and started `edge-setup link` for nothing.
-    await withTenant(db, auth.organizationId, (tx) => assertNoPendingReplacement(tx, auth.organizationId));
+    if (!dedicated) await withTenant(db, auth.organizationId, (tx) => assertNoPendingReplacement(tx, auth.organizationId));
 
     const secret = randomCredential(32);
     const id = crypto.randomUUID();
@@ -126,22 +150,26 @@ export function runtimeEnrollmentClaimRoutes(db: Db, config: ApiConfig): Hono<{ 
       await tx`
         insert into runtime_enrollments (
           id, secret_hash, reachability, endpoint, runtime_name, verification_code, expires_at,
-          organization_id, claimed_by, claimed_at
+          organization_id, claimed_by, claimed_at, dedicated
         ) values (
           ${id}, ${hashCredential(secret)}, ${reachability}, ${null}, ${runtimeName}, ${verificationCode()},
-          ${expiresAt}, ${auth.organizationId}, ${auth.userId}, now()
+          ${expiresAt}, ${auth.organizationId}, ${auth.userId}, now(), ${dedicated}
         )
       `;
     });
 
     const ticket = `${id}.${secret}`;
+    const origin = connectorLinkPublicOrigin(config, context.req.header("origin"));
     return context.json({
       enrollmentId: id,
       reachability,
       endpoint: null,
       runtimeName,
+      ...(dedicated ? { workspaceId: auth.organizationId } : {}),
       ticket,
-      command: connectorLinkCommand(connectorLinkPublicOrigin(config, context.req.header("origin"))),
+      command: dedicated
+        ? machineConnectCommand(origin, auth.organizationId, config.environment === "development" ? DEV_EDGE_SETUP : "edge-setup")
+        : connectorLinkCommand(origin),
       expiresAt: expiresAt.toISOString(),
     }, 201);
   });
@@ -151,9 +179,9 @@ export function runtimeEnrollmentClaimRoutes(db: Db, config: ApiConfig): Hono<{ 
     requireOperator(auth);
     const enrollmentId = assertString(context.req.param("enrollmentId"), "L’identifiant d’enrôlement", { max: 64 });
     const row = await withTenant(db, auth.organizationId, async (tx) => {
-      const rows = await tx<Array<Pick<EnrollmentRow, "id" | "reachability" | "claimedAt" | "consumedAt" | "runtimeId" | "expiresAt">>>`
+      const rows = await tx<Array<Pick<EnrollmentRow, "id" | "reachability" | "claimedAt" | "consumedAt" | "runtimeId" | "expiresAt" | "claimedEngines">>>`
         select id, reachability, claimed_at as "claimedAt", consumed_at as "consumedAt",
-               runtime_id as "runtimeId", expires_at as "expiresAt"
+               runtime_id as "runtimeId", expires_at as "expiresAt", claimed_engines as "claimedEngines"
           from runtime_enrollments
          where id = ${enrollmentId} and organization_id = ${auth.organizationId}
          limit 1
@@ -169,6 +197,7 @@ export function runtimeEnrollmentClaimRoutes(db: Db, config: ApiConfig): Hono<{ 
       reachability: "connector" as const,
       state: enrollmentState(row),
       runtimeId: row.runtimeId,
+      engines: row.claimedEngines,
       expiresAt: row.expiresAt.toISOString(),
     });
   });

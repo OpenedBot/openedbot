@@ -54,7 +54,7 @@ export const SIDEBAR_SECTIONS: readonly { label: string; labelFr: string; pages:
   {
     label: 'Reference',
     labelFr: 'Référence',
-    pages: ['prerequisites', 'getting-started', 'edge-setup', 'commands', 'operations', 'troubleshooting', 'reset'],
+    pages: ['prerequisites', 'getting-started', 'edge-setup', 'acp-engine', 'commands', 'operations', 'troubleshooting', 'reset'],
   },
   {
     // Direct access (Cloudflare managed tunnel, Tailscale Funnel): not
@@ -78,6 +78,7 @@ export const PUBLIC_PAGES: ReadonlySet<string> = new Set([
   'confiance',
   'support',
   'edge-setup',
+  'acp-engine',
   'commands',
 ]);
 

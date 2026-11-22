@@ -27,9 +27,36 @@ une autre origine openedbot.
 Si cette origine ne répond pas, l'installation et `upgrade` échouent sans rien
 installer, sans repli vers GitHub.
 
+## Utiliser les agents de votre machine
+
+Une seule commande connecte chaque CLI d’agent installé sous votre compte :
+Codex, Claude Code, Grok, Gemini CLI et OpenCode. Connectez-vous d’abord à
+chaque CLI. Sur Linux ou macOS, installez le binaire `edge-setup` seul. Dans
+**Installation → Machines → Ajouter une machine**, choisissez
+**Connecter les agents d’une machine**. Depuis le dossier de travail, exécutez
+la commande `edge-setup connect` affichée et saisissez le ticket au prompt.
+
+La commande liste ce qu’elle trouve et appaire chaque agent avec le même
+ticket. Si Claude Code est installé, elle installe aussi son adaptateur ACP
+(`@agentclientprotocol/claude-agent-acp`) avec Bun. Elle démarre ensuite un
+service utilisateur (`systemd --user` sur Linux, un LaunchAgent sur macOS) qui
+garde les agents connectés après une déconnexion ou un redémarrage. Hermes
+n’est pas installé par cette commande : `sudo edge-setup up` le fait sur un
+serveur. Pour lister les agents sans rien appairer, lancez
+`edge-setup connect --probe`.
+
+Dans l’application desktop, choisissez **Ajouter cet ordinateur**, puis
+sélectionnez le dossier de travail. Fermer la fenêtre laisse les agents
+connectés. Quitter l’application, ou choisir
+**Arrêter les agents de cet ordinateur**, les déconnecte.
+
+À la création du bot, sélectionnez **Machine d’exécution** : chaque agent de
+chaque machine y figure, par exemple « ubuntu-server · Grok ». Dans la
+conversation, le composer propose les modèles et efforts de cet agent.
+
 <Aside type="note" title="Sans sudo à taper">
 `up` et `upgrade` posent le lien `/usr/local/bin/edge-setup`. Seuls
-`version`, `help` et `self-verify` s'exécutent tels quels ; toute autre
+`version`, `help`, `self-verify` et `connect` s'exécutent tels quels. Toute autre
 commande, lancée non-root, se ré-exécute via `sudo` (stdin conservé).
 `EDGE_SETUP_NO_SUDO=1` désactive ; sans `sudo` installé → « must run as
 root » (code 77). Les exemples n'écrivent `sudo` que pour les premières

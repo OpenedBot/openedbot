@@ -28,4 +28,6 @@ pub const COMMANDS: &[&str] = &[
     "notch_state",
     "set_notch_mode",
     "play_notch_demo",
+    "start_local_machine",
+    "stop_local_machine",
 ];

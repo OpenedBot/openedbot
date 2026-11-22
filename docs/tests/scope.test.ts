@@ -41,21 +41,21 @@ describe('DOCS_SCOPE', () => {
 
   test('public pages are the former PUBLIC_PAGE_FILES, in sidebar order', () => {
     for (const page of PUBLIC_PAGES) expect(ALL_PAGES).toContain(page);
-    expect(visiblePages('public')).toHaveLength(12);
+    expect(visiblePages('public')).toHaveLength(13);
     expect(visiblePages('all')).toEqual(ALL_PAGES);
     expect(visibleSections('public').map((s) => [s.label, s.labelFr, s.pages])).toEqual([
       ['Using openedbot', 'Utiliser openedbot', ['index', 'compte', 'machine', 'bot', 'conversation', 'reglages']],
       ['Help', 'Aide', ['depannage', 'faq', 'confiance', 'support']],
-      ['Reference', 'Référence', ['edge-setup', 'commands']],
+      ['Reference', 'Référence', ['edge-setup', 'acp-engine', 'commands']],
     ]);
   });
 
   test('the developer reference is built only with DOCS_SCOPE=all', () => {
-    const reference = ['prerequisites', 'getting-started', 'edge-setup', 'commands', 'operations', 'troubleshooting', 'reset'];
-    expect(visiblePages('all')).toHaveLength(20);
+    const reference = ['prerequisites', 'getting-started', 'edge-setup', 'acp-engine', 'commands', 'operations', 'troubleshooting', 'reset'];
+    expect(visiblePages('all')).toHaveLength(21);
     expect(visibleSections('all').map((s) => s.label)).toEqual(['Using openedbot', 'Help', 'Reference', 'In development']);
     expect(visibleSections('all')[2].pages).toEqual(reference);
-    for (const page of reference.filter((p) => p !== 'edge-setup' && p !== 'commands')) expect(visiblePages('public')).not.toContain(page);
+    for (const page of reference.filter((p) => p !== 'edge-setup' && p !== 'acp-engine' && p !== 'commands')) expect(visiblePages('public')).not.toContain(page);
   });
 
   test('deleted pages are gone from the sidebar', () => {

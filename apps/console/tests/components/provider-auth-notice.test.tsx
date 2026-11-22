@@ -86,9 +86,10 @@ describe("PROVIDER_AUTH_REQUIRED in the thread", () => {
     expect((await screen.findByTestId("requested-provider")).textContent).toBe("xai-oauth");
   });
 
-  test("without a valid provider the raw message stays, without an action", async () => {
+  test("without a valid provider the models diagnostic speaks, with its action", async () => {
     renderTimeline(failure({ errorCode: PROVIDER_AUTH_REQUIRED, provider: "../x" }));
-    expect(await screen.findByText("xai-oauth a refusé l’authentification de ce bot.")).toBeTruthy();
+    expect(await screen.findByText("Le fournisseur ou le modèle empêche cette réponse. Vérifiez sa configuration avant de renvoyer votre demande.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Vérifier le fournisseur et le modèle" })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 

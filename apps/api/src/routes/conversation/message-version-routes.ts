@@ -3,12 +3,7 @@ import type { SQL } from "bun";
 import { Hono } from "hono";
 import type { HermesClient, HermesClientConfig } from "@openedbot/hermes";
 import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
-import {
-  composeRunInput,
-  documentAttachment,
-  imageAttachment,
-  type MessageAttachmentInput,
-} from "@openedbot/conversation/domain/attachments";
+import { composeRunInput } from "@openedbot/conversation/domain/attachments";
 import {
   HANDOFF_NOTICE_KIND,
   attributedInput,
@@ -33,7 +28,7 @@ import { readIdempotencyKey } from "@openedbot/conversation/application/message-
 import { dmHandoffMention } from "@openedbot/roster/domain/dm-handoff";
 import { readRuntimeSecret } from "@openedbot/runtimes/application/runtime-access";
 import { subscriptionPort } from "@openedbot/platform-db/subscription-port";
-import { assertSourceEligible, readSource } from "./message-version-source";
+import { assertSourceEligible, loadSourceAttachments, readSource } from "./message-version-source";
 
 const OPERATION = "thread.message.version.create";
 const MAX_INPUT_CHARS = 100_000;
@@ -114,17 +109,18 @@ export function messageVersionRoutes(
       return context.json(publicCreated(existing, sourceThreadId, sourceMessageId, true), 200);
     }
 
-    await assertPveReady(db, config, auth.organizationId, dependencies);
-
     // Message rows are append-only. Read the immutable attachment manifest
     // and payload outside the write transaction, then re-check the source and
     // all stateful gates under locks below. A missing legacy blob fails
     // explicitly; it is never silently dropped from the regenerated prompt.
-    const sourceAttachments = await withTenant(db, auth.organizationId, async (tx) => {
+    const source = await withTenant(db, auth.organizationId, async (tx) => {
       const source = await readSource(tx, auth.organizationId, sourceThreadId, sourceMessageId, false);
       assertSourceEligible(source, auth.userId);
-      return loadSourceAttachments(tx, blobs, auth.organizationId, source.content);
+      return source;
     });
+    await assertPveReady(db, config, auth.organizationId, dependencies, source.runtimeId ?? undefined);
+    const sourceAttachments = await withTenant(db, auth.organizationId, (tx) =>
+      loadSourceAttachments(tx, blobs, auth.organizationId, source.content));
 
     try {
       const created = await withTenant(db, auth.organizationId, async (tx) => {
@@ -397,16 +393,17 @@ async function assertPveReady(
   config: ApiConfig,
   organizationId: string,
   dependencies: { readRuntime?: RuntimeReader; clientFactory?: (clientConfig: HermesClientConfig) => ToolsetClient },
+  runtimeId?: string,
 ): Promise<void> {
-  const runtime = await (dependencies.readRuntime ?? readRuntimeSecret)(db, config, organizationId);
-  if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Aucun runtime Hermes actif n’est configuré.");
+  const runtime = await (dependencies.readRuntime ?? readRuntimeSecret)(db, config, organizationId, undefined, undefined, runtimeId);
+  if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "La machine d’exécution de ce bot est indisponible.");
   try {
     const client = (dependencies.clientFactory ?? runtimeAdminClient)(runtime.client);
     const violation = runtimeToolsetContractViolation(await client.toolsets());
     if (violation) throw new HttpError(409, violation.code, runtimeToolsetContractMessage(violation));
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(502, "RUNTIME_UNREACHABLE", "Le runtime Hermes n’est pas joignable.");
+    throw new HttpError(502, "RUNTIME_UNREACHABLE", "La machine d’exécution de ce bot n’est pas joignable.");
   }
 }
 
@@ -468,61 +465,6 @@ async function readVersionByKey(
        and version.idempotency_key = ${key}
   `;
   return rows[0] ?? null;
-}
-
-async function loadSourceAttachments(
-  tx: TransactionDb,
-  blobs: BlobStore,
-  organizationId: string,
-  content: MessageContent,
-): Promise<MessageAttachmentInput[]> {
-  const parts = content.filter((part): part is Extract<MessageContent[number], { type: "attachment" }> =>
-    part.type === "attachment");
-  if (!parts.length) return [];
-  if (parts.some((part) => !part.id)) {
-    throw new HttpError(
-      409,
-      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
-      "Une pièce jointe historique n’a plus de fichier relisible; la variante n’a pas été créée.",
-    );
-  }
-  const ids = parts.map((part) => part.id!);
-  const rows = await tx<Array<{
-    id: string;
-    objectKey: string;
-    name: string;
-    contentType: string;
-    kind: "image" | "document"; driver: "file" | "r2";
-  }>>`
-    select id, object_key as "objectKey", name, content_type as "contentType", kind, driver
-      from attachments
-     where organization_id = ${organizationId} and id in ${tx(ids)} and deleted_at is null
-  `;
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  if (byId.size !== ids.length) {
-    throw new HttpError(
-      409,
-      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
-      "Une pièce jointe du message n’est plus disponible; la variante n’a pas été créée.",
-    );
-  }
-  try {
-    return await Promise.all(parts.map(async (part) => {
-      const row = byId.get(part.id!)!;
-      const blob = await blobs.get(row.objectKey, row.driver);
-      if (row.kind === "document") {
-        return documentAttachment(row.name, row.contentType, await blob.text());
-      }
-      const base64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
-      return imageAttachment(row.name, row.contentType, `data:${row.contentType};base64,${base64}`);
-    }));
-  } catch {
-    throw new HttpError(
-      409,
-      "MESSAGE_VERSION_ATTACHMENT_UNAVAILABLE",
-      "Une pièce jointe du message ne peut pas être relue; la variante n’a pas été créée.",
-    );
-  }
 }
 
 function versionDisplayContent(text: string, source: MessageContent): MessageContent {

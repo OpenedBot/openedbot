@@ -103,7 +103,19 @@ export function threadCompactRoutes(
         submitted = { command: replay, replayed: true };
       } else {
         const target = await readRoomCompactionTarget(db, auth.organizationId, threadId);
-        if (target.kind !== "ready") {
+        if (target.kind === "ready") {
+          const runtime = await readRuntimeSecret(db, config, auth.organizationId, links, locator, target.speaker.runtimeId ?? undefined);
+          if (!runtime) {
+            throw new HttpError(409, "RUNTIME_REQUIRED", "Connectez la machine de ce bot avant de résumer l’historique.");
+          }
+          submitted = await commands.submit(db, {
+            organizationId: auth.organizationId,
+            threadId,
+            runtimeId: runtime.id,
+            userId: auth.userId,
+            idempotencyKey,
+          });
+        } else {
           // A concurrent request under the same key may have recorded (and
           // finished) the compaction since the replay read: it answers.
           const late = idempotencyKey
@@ -112,19 +124,6 @@ export function threadCompactRoutes(
           if (!late) throw refusal(target.kind);
           submitted = { command: late, replayed: true };
         }
-      }
-      if (!submitted) {
-        const runtime = await readRuntimeSecret(db, config, auth.organizationId, links, locator);
-        if (!runtime) {
-          throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de résumer l’historique.");
-        }
-        submitted = await commands.submit(db, {
-          organizationId: auth.organizationId,
-          threadId,
-          runtimeId: runtime.id,
-          userId: auth.userId,
-          idempotencyKey,
-        });
       }
     } catch (error) {
       throw submitError(error);
@@ -190,7 +189,7 @@ function commandFailure(command: ExecutionCommandRow, threadId: string): HttpErr
     case "RUN_IN_PROGRESS": return refusal("run_active");
     case "COMPACTION_BELOW_THRESHOLD": return refusal("below_threshold");
     case "RUNTIME_REQUIRED":
-      return new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de résumer l’historique.");
+      return new HttpError(409, "RUNTIME_REQUIRED", "Connectez la machine de ce bot avant de résumer l’historique.");
     case "COMMAND_CANCELLED":
       return new HttpError(409, "COMPACTION_CANCELLED", "Le résumé de ce salon a été arrêté.");
     case "COMMAND_NOT_STARTED":

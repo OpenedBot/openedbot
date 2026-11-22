@@ -7,6 +7,9 @@ import { cn, Command, CommandEmpty, CommandInput, CommandList } from "@openedbot
 const PANEL_MIN_WIDTH = 448;
 /** Distance kept between the panel and the window's edges, in px. */
 const VIEWPORT_MARGIN = 8;
+/** The closed field, and in `inline` mode the open one: a `Select`'s box. */
+const FIELD_BOX =
+  "flex h-11 w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 text-sm text-foreground shadow-[var(--shadow-xs)] transition-colors outline-none";
 
 /**
  * The filterable list field of the Models settings (provider, model): a
@@ -18,6 +21,10 @@ const VIEWPORT_MARGIN = 8;
  *
  * `children` receives `pick`, which closes then forwards the choice: these are
  * `CommandGroup` / `CommandItem` placed by the caller.
+ *
+ * `inline`: the search takes the field's place on click (no second box), and
+ * the list drops exactly under it, same left edge and same width. For a field
+ * that owns its column (the onboarding); a settings row keeps the wide panel.
  */
 export function SearchCombobox({
   id,
@@ -26,6 +33,7 @@ export function SearchCombobox({
   disabled,
   searchPlaceholder,
   emptyText,
+  inline = false,
   children,
 }: {
   id: string;
@@ -35,6 +43,7 @@ export function SearchCombobox({
   disabled?: boolean;
   searchPlaceholder: string;
   emptyText: string;
+  inline?: boolean;
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -45,7 +54,12 @@ export function SearchCombobox({
     width: 0,
   });
 
-  const close = () => setOpen(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const close = () => {
+    setOpen(false);
+    // The inline search replaced the field: give it its focus back.
+    if (inline) requestAnimationFrame(() => buttonRef.current?.focus());
+  };
 
   const stopEscape = (event: { key: string; preventDefault: () => void; stopPropagation: () => void }) => {
     if (event.key !== "Escape") return;
@@ -63,8 +77,8 @@ export function SearchCombobox({
     // cut every provider name and Hermes' reason. The panel is at least
     // PANEL_MIN_WIDTH, grows to the left from the trigger's right edge (where
     // the eye already is), and never leaves the window.
-    const width = Math.min(Math.max(rect.width, PANEL_MIN_WIDTH), vw - 2 * VIEWPORT_MARGIN);
-    const left = Math.min(
+    const width = inline ? rect.width : Math.min(Math.max(rect.width, PANEL_MIN_WIDTH), vw - 2 * VIEWPORT_MARGIN);
+    const left = inline ? rect.left : Math.min(
       Math.max(rect.right - width, VIEWPORT_MARGIN),
       vw - VIEWPORT_MARGIN - width,
     );
@@ -94,7 +108,7 @@ export function SearchCombobox({
       const target = event.target as Node;
       if (rootRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
-      close();
+      setOpen(false);
     };
     const onReposition = () => place();
     document.addEventListener("keydown", onKeyDown, true);
@@ -109,9 +123,63 @@ export function SearchCombobox({
     };
   }, [open]);
 
+  const chevron = (
+    <IconChevronDown
+      aria-hidden
+      className={cn(
+        "size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
+        open && "rotate-180",
+      )}
+    />
+  );
+  const list = (
+    <CommandList scrollbar="subtle" className={inline ? "max-h-72" : "mt-2 max-h-60 pr-1 md:max-h-80"}>
+      <CommandEmpty>{emptyText}</CommandEmpty>
+      {children(close)}
+    </CommandList>
+  );
+  const panel = (content: ReactNode) => createPortal(
+    <div
+      ref={panelRef}
+      style={{ position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width }}
+      className="z-[115]"
+      data-portal-panel=""
+      onKeyDown={stopEscape}
+    >
+      {content}
+    </div>,
+    document.body,
+  );
+
+  if (inline && open) {
+    // ONE cmdk root for the field and its list: the list is portaled, but
+    // stays in the root's React tree, so arrows and Enter drive it from the input.
+    return (
+      <div ref={rootRef} className={cn(FIELD_BOX, "border-ring ring-2 ring-ring/20")}>
+        <Command
+          className={cn(
+            "flex-row items-center gap-2 overflow-visible rounded-none! bg-transparent p-0",
+            "[&_[data-slot=command-input-wrapper]]:h-full [&_[data-slot=command-input-wrapper]]:flex-1 [&_[data-slot=command-input-wrapper]]:gap-2.5 [&_[data-slot=command-input-wrapper]]:border-0 [&_[data-slot=command-input-wrapper]]:bg-transparent [&_[data-slot=command-input-wrapper]]:px-0",
+            "[&_[data-slot=command-input]]:min-h-0 [&_[data-slot=command-input]]:text-sm",
+          )}
+          onKeyDown={stopEscape}
+        >
+          <CommandInput autoFocus aria-controls={`${id}-list`} placeholder={searchPlaceholder} onKeyDown={stopEscape} />
+          {chevron}
+          {panel(
+            <div id={`${id}-list`} className="overflow-hidden rounded-[12px] border border-border/70 bg-card p-1.5 shadow-[var(--shadow-elevated)]">
+              {list}
+            </div>,
+          )}
+        </Command>
+      </div>
+    );
+  }
+
   return (
     <div ref={rootRef}>
       <button
+        ref={buttonRef}
         type="button"
         id={id}
         role="combobox"
@@ -120,41 +188,24 @@ export function SearchCombobox({
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-2 rounded-[10px] border border-input bg-card px-3 text-sm text-foreground shadow-[var(--shadow-xs)] transition-colors outline-none select-none",
+          FIELD_BOX,
+          "justify-between select-none",
           "hover:border-border focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20",
           "disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-foreground disabled:[-webkit-text-fill-color:currentColor]",
         )}
       >
         <span className={cn("min-w-0 flex-1 truncate text-left whitespace-nowrap", triggerClassName)}>{triggerLabel}</span>
-        <IconChevronDown
-          aria-hidden
-          className={cn(
-            "size-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
+        {chevron}
       </button>
       {open
-        ? createPortal(
-            <div
-              ref={panelRef}
-              style={{ position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width }}
-              className="z-[115]"
-              data-portal-panel=""
+        ? panel(
+            <Command
+              className="h-auto overflow-hidden rounded-lg border border-border bg-card p-2 shadow-[var(--shadow-elevated)]"
               onKeyDown={stopEscape}
             >
-              <Command
-                className="h-auto overflow-hidden rounded-lg border border-border bg-card p-2 shadow-[var(--shadow-elevated)]"
-                onKeyDown={stopEscape}
-              >
-                <CommandInput placeholder={searchPlaceholder} onKeyDown={stopEscape} />
-                <CommandList scrollbar="subtle" className="mt-2 max-h-60 pr-1 md:max-h-80">
-                  <CommandEmpty>{emptyText}</CommandEmpty>
-                  {children(close)}
-                </CommandList>
-              </Command>
-            </div>,
-            document.body,
+              <CommandInput placeholder={searchPlaceholder} onKeyDown={stopEscape} />
+              {list}
+            </Command>,
           )
         : null}
     </div>

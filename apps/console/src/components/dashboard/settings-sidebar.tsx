@@ -16,6 +16,7 @@ import {
   IconShield,
   IconShieldCheck,
   IconUserCircle,
+  IconUserPlus,
 } from "@tabler/icons-react";
 import { SHOW_DEV_SETTINGS } from "../../lib/shell/dev-settings-ui";
 import type { MessageKey } from "../../lib/i18n";
@@ -28,9 +29,8 @@ import { useProFeature } from "../../pro-console/registry";
  * Ordered by what one comes to find (31-10) rather than by technical
  * layer: Me (account, appearance), the Workspace (activity,
  * archives), the Bots and their runtime (runtime, models, connectors),
- * Control (policies, decisions, security). « Importer des agents » is a
- * tab of Runtime (its column of sections), not a section: its route
- * stays, and it lights Runtime (`also`). Notifications include personal email preferences.
+ * Control (policies, decisions, security). « Importer des agents » is its
+ * own entry, under Connectors. Notifications include personal email preferences.
  *
  * A last group, « Développement », gathers EVERYTHING that shows only
  * under `make dev` (Billing, Dev tools). Before, these surfaces were
@@ -93,9 +93,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     labelKey: "settingsSidebar.groupBots",
     items: [
-      { titleKey: "settingsSidebar.runtime", url: "/settings/runtime", icon: IconServerBolt, also: ["/settings/agents"] },
+      { titleKey: "settingsSidebar.runtime", url: "/settings/runtime", icon: IconServerBolt },
       { titleKey: "settingsSidebar.models", url: "/settings/models", icon: IconBrain },
       { titleKey: "settingsSidebar.connectors", url: "/settings/connectors", icon: IconPlugConnected },
+      { titleKey: "settingsSidebar.agents", url: "/settings/agents", icon: IconUserPlus },
     ],
   },
   {

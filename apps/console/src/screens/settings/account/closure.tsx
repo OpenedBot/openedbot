@@ -6,7 +6,7 @@ import { formatDate } from "../../../lib/format";
 import { BUTTON, FIELD, ListSection, Note } from "../../../components/settings/primitives";
 
 /** Identity-scoped: available without a workspace and never sends its header. */
-export function AccountClosureSection() {
+export function AccountClosureSection({ bare = false }: { bare?: boolean } = {}) {
   const { t, locale } = useT();
   const client = useQueryClient();
   const [confirmationDraft, setConfirmationDraft] = useState({ planKey: "", value: "" });
@@ -37,9 +37,8 @@ export function AccountClosureSection() {
   if (confirmationDraft.planKey !== planKey) setConfirmationDraft({ planKey, value: "" });
   const hasGracePeriod = typeof graceDays === "number" && Number.isInteger(graceDays) && graceDays >= 0;
   const canSchedule = data?.eligible === true && hasGracePeriod && !pending && confirmation === "DELETE";
-  return (
-    <ListSection title={t("settingsAccount.closureTitle")}>
-      <div className="flex flex-col gap-3 p-4">
+  const body = (
+      <div className={bare ? "flex flex-col gap-3" : "flex flex-col gap-3 p-4"}>
         <p className="text-sm text-muted-foreground">{t("settingsAccount.closureDescription")}</p>
         {error ? <Note tone="warning">{errorMessage(error, t("settingsAccount.closureRetry"))}</Note> : null}
         {state.isError ? <button type="button" className={BUTTON.secondary} onClick={() => void state.refetch()}>{t("settingsAccount.closureRetry")}</button> : null}
@@ -67,10 +66,10 @@ export function AccountClosureSection() {
               : <Note tone="warning">{t("settingsAccount.closureGraceUnavailable")}</Note>}
             <label htmlFor="account-closure-confirmation" className="text-sm">{t("settingsAccount.closureConfirmation")}</label>
             <input id="account-closure-confirmation" className={FIELD} autoComplete="off" value={confirmation} disabled={!data.eligible || !hasGracePeriod || pending} onChange={(event) => setConfirmationDraft({ planKey, value: event.target.value })} />
-            <button type="submit" className={BUTTON.secondary} disabled={!canSchedule}>{t("settingsAccount.closureSubmit")}</button>
+            <button type="submit" className={`${bare ? BUTTON.danger : BUTTON.secondary} self-end`} disabled={!canSchedule}>{t("settingsAccount.closureSubmit")}</button>
           </form>}
         </> : null}
       </div>
-    </ListSection>
   );
+  return bare ? body : <ListSection title={t("settingsAccount.closureTitle")}>{body}</ListSection>;
 }

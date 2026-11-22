@@ -9,13 +9,15 @@ import { BotArrivalStage } from "./bot-arrival-stage";
  * move. The welcome waits for that profile (the worker's queue holds it):
  * profile ready, the empty thread and the composer arrive, then the welcome writes itself
  * there live with the usual indicators. A failed run hands back to the
- * thread, which knows how to say the failure.
+ * thread, which knows how to say the failure. A thread that already ran (a
+ * bot changing machine) stays in view: the preparation is said above its
+ * composer (`BotMoveStrip`).
  */
 export function threadStartShown(input: {
   provisioning: boolean;
   runs: ReadonlyArray<{ status: string }>;
 }): boolean {
-  if (input.runs.some((run) => run.status === "failed")) return false;
+  if (input.runs.some((run) => run.status !== "queued")) return false;
   return input.provisioning;
 }
 

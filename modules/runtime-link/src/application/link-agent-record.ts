@@ -20,18 +20,19 @@ export type LinkAgentRecordDeps = {
  * seulement ; ce signalement ne ferme jamais le lien. Un `hello` sans `agent`
  * ne touche à rien : la déclaration précédente reste. Sans `hermesVersion`,
  * la colonne repasse à null : la console ne compare alors rien.
+ * Exception : même sans `agent`, les colonnes moteur sont écrites ou remises
+ * à null si les champs sont absents ; la déclaration agent reste inchangée.
  */
 export async function recordLinkAgent(
   deps: LinkAgentRecordDeps,
   connection: LinkConnection,
   identity: LinkIdentity,
-  hello: { peerIp: string | null; hermesVersion: string | null },
+  hello: { peerIp: string | null; hermesVersion: string | null; engine?: string | null; engineVersion?: string | null },
 ): Promise<void> {
   const { db, config, broker, log } = deps;
   const agent = connection.agent?.slice(0, 256);
-  if (agent === undefined) return;
   const hermesVersion = hello.hermesVersion?.slice(0, HERMES_VERSION_MAX) ?? null;
-  const connector = runtimeConnector(agent, null, config.connectorVersions);
+  const connector = agent === undefined ? null : runtimeConnector(agent, null, config.connectorVersions);
   if (connector?.outdated && connector.minimumVersion) {
     const meta = { ip: hello.peerIp, agent, minimum: connector.minimumVersion };
     broker.journal(identity, "agent_outdated", meta);
@@ -39,13 +40,14 @@ export async function recordLinkAgent(
   }
   try {
     const capabilitiesMarked = await withCredential(db, identity.tokenHash, (tx) =>
-      writeLinkAgent(tx, identity, { agent, hermesVersion, generation: connection.link?.generation ?? null }));
+      writeLinkAgent(tx, identity, { agent: agent ?? null, hermesVersion, engine: hello.engine, engineVersion: hello.engineVersion, generation: connection.link?.generation ?? null }));
     // A new agent version: every thread of this runtime opens a fresh Hermes
     // session at its next run (see writeLinkAgent).
     if (capabilitiesMarked) log("runtime_link.agent_changed_sessions_rotate", { runtimeId: identity.runtimeId, agent });
   } catch (error) {
     log("runtime_link.agent_write_failed", { runtimeId: identity.runtimeId, error: String(error) });
   }
+  if (agent === undefined) return;
   if (connector?.outdated && connector.version && connector.minimumVersion) {
     // Once per (runtime, installed, target): a reconnect loop finds the
     // notice already written. A failure is logged and never ends the link.

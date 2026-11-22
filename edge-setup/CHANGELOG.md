@@ -16,6 +16,19 @@ v1.5.6 (première étiquette du nouvel historique : v1.5.7).
 
 ## Non publié
 
+## v1.5.13 - 2026-11-22
+
+### Ajouté
+
+- `edge-setup connect` relie les agents de code déjà installés sur votre compte (Codex, Claude Code, Grok, Gemini CLI et OpenCode) à openedbot, avec un seul ticket saisi au prompt. La commande liste ce qu'elle trouve, appaire chaque agent, installe l'adaptateur de Claude Code s'il est présent, puis démarre un service utilisateur qui garde les agents connectés. Sous Linux, ils restent connectés après une déconnexion seulement si la machine autorise les services utilisateur à tourner sans session ouverte ; sinon la commande l'indique et donne la commande à faire lancer par un administrateur. Sous macOS, ils tournent tant que votre session est ouverte. Chaque agent devient une machine d'exécution que vous choisissez à la création d'un bot, avec ses propres modèles et niveaux d'effort. `edge-setup connect --probe` liste les agents sans rien appairer. Hermes n'est pas installé par cette commande.
+- Un moteur expérimental exécute OpenCode à la place d'Hermes, sous Linux avec systemd : `sudo edge-setup up --engine acp:opencode --yes`. Chaque bot y reçoit son propre profil, créé et supprimé avec lui. Ce moteur offre moins de fonctions qu'Hermes (pas de choix de modèle depuis openedbot, pas d'écrans MCP ni skills, pas de suivi des jetons) et n'isole pas les bots d'une même machine : réservez-lui une machine dédiée. Hermes reste le moteur par défaut.
+- La machine annonce son moteur et sa version à openedbot, qui les affiche dans ses réglages.
+
+### Corrigé
+
+- Le suivi en direct d'une exécution reste cohérent quand de nouveaux événements arrivent au même moment.
+- `reset` et `uninstall` sans effacement des données gardent seulement les identifiants des fournisseurs du moteur expérimental ; avec effacement, ils retirent aussi ses données.
+
 ## v1.5.12 - 2026-11-16
 
 ### Ajouté

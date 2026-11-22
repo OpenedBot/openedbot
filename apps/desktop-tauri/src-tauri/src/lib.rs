@@ -163,6 +163,7 @@ fn setup<R: Runtime>(app: &mut tauri::App<R>) -> Result<(), Box<dyn std::error::
 
     let prefs = Arc::new(PreferenceStore::open(data_dir.as_deref()));
     app.manage(WindowState::new(prefs.clone()));
+    app.manage(bridge::local_machine::LocalMachine::default());
     app.manage(notch::NotchSession::default());
     app.manage(shell::Purging::default());
     let update_status = Arc::new(update_state::UpdateStatus::new(prefs.get().auto_install_updates, {
@@ -393,6 +394,9 @@ fn on_run_event<R: Runtime>(app: &AppHandle<R>, event: tauri::RunEvent) {
                 state.quitting.store(true, Ordering::SeqCst);
             }
             window::save_placement(app);
+            if let Some(agents) = app.try_state::<bridge::local_machine::LocalMachine>() {
+                let _ = agents.stop();
+            }
             if let Some(popup) = app.try_state::<PopupHandle>() {
                 // Closing its stdin is enough: the popup quits on EOF.
                 popup.0.stop();

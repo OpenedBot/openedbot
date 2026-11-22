@@ -66,6 +66,9 @@ export type RunContext = {
   operator: OperatorIdentity;
   sessionId: string;
   runtimeId: string;
+  /** The machine's name and engine (`runtimes.link_engine`, null for Hermes), told to the model. */
+  runtimeName: string;
+  runtimeEngine: string | null;
   /** Sélection posée sur le runtime, distincte du modèle résolu du run. */
   runtimeSelectedProvider: string | null;
   runtimeSelectedModel: string | null;

@@ -19,7 +19,7 @@ const realFetch = globalThis.fetch;
 function runtime(overrides: Partial<RuntimePublicDto> = {}): RuntimePublicDto {
   return {
     id: "6f0a1b2c-3d4e-4f50-9a1b-2c3d4e5f6071",
-    configured: true,
+    configured: true, engine: "hermes", engineVersion: null,
     baseUrl: null,
     reachability: "connector",
     transport: "connector",
@@ -60,7 +60,7 @@ function renderRail(value: RuntimeHealthReading, onOpenSettings: (to: string) =>
   return render(
     <I18nProvider>
       <TooltipProvider delayDuration={0}>
-        <RailRuntimeHealth reading={value} buttonClassName="rail" onOpenSettings={onOpenSettings} />
+        <RailRuntimeHealth reading={value} className="rail" onOpenSettings={onOpenSettings} />
       </TooltipProvider>
     </I18nProvider>,
   );
@@ -79,15 +79,14 @@ afterEach(() => {
 });
 
 describe("rail runtime health", () => {
-  test("connected: the tooltip names the runtime and says connected", async () => {
+  test("connected: the row names the runtime and says connected", () => {
     renderRail(reading(runtime()));
     expect(button().getAttribute("data-rail-runtime-health")).toBe("connected");
     expect(button().getAttribute("aria-label")).toBe("Runtime “Acme lab”: connected");
-    fireEvent.pointerMove(button());
-    expect((await screen.findByRole("tooltip")).textContent).toContain("Runtime “Acme lab”: connected");
+    expect(button().textContent).toBe("Runtime “Acme lab”: connected");
   });
 
-  test("KO: link closed, says since when and what to do", async () => {
+  test("KO: link closed, says since when and what to do", () => {
     const down = runtime({ link: { ...runtime().link!, connected: false } });
     renderRail(reading(down));
     expect(button().getAttribute("data-rail-runtime-health")).toBe("ko");
@@ -95,10 +94,8 @@ describe("rail runtime health", () => {
     expect(label).toContain("Runtime “Acme lab”: KO, connector link closed");
     expect(label).toContain("Last seen:");
     expect(label).toContain("Open the runtime settings to restore it.");
-    fireEvent.pointerMove(button());
-    const tip = await screen.findByRole("tooltip");
-    expect(tip.textContent).toContain("KO, connector link closed");
-    expect(tip.textContent).toContain("Last seen:");
+    expect(button().textContent).toContain("KO, connector link closed");
+    expect(button().textContent).toContain("Last seen:");
   });
 
   test("KO without a known last sign of life does not invent one", () => {

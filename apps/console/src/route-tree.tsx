@@ -1,6 +1,6 @@
 import { internalWorkspacePath, isWorkspacePath, workspaceHref, workspaceRewriteInput } from "./lib/workspace/workspace-location";
 import { activeOrganizationId, readCloudSession } from "./lib/session/cloud-session";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense } from "react";
 import {
   createRootRoute,
   createRoute,
@@ -13,7 +13,6 @@ import {
   useNavigate,
   useSearch,
 } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { SkeletonRegion, useIsMobile } from "@openedbot/browser-ui-kit";
 import { AppErrorScreen } from "./components/app-error-boundary";
 import { clearAppAccessHint, hasAppAccessHint, markAppAccess } from "./lib/session/app-access-hint";
@@ -22,7 +21,7 @@ import { AppFrameSkeleton } from "./components/skeletons/frame-skeletons";
 import { proConsole, proFeatureEntitled } from "./pro-console/registry";
 import { Shell } from "./components/shell";
 import { mobileTransition } from "./lib/shell/mobile-navigation";
-import { consumeMobileLanding, firstRosterBotId, isMobileLandingConsumed } from "./lib/shell/mobile-landing";
+import { firstRosterBotId } from "./lib/shell/mobile-landing";
 import { SiteHeader } from "./components/dashboard/site-header";
 import { api, queryKeys } from "./lib/api";
 import { queryClient } from "./lib/query-client";
@@ -31,7 +30,6 @@ import { prefetchConversation, prefetchConversationForPath, restoreConversationF
 import { conversationSearch, inboxSearch, loginSearch, onboardingSearch } from "./lib/shell/route-search";
 import { groupRoutes } from "./group-routes";
 import { SHOW_DEV_SETTINGS } from "./lib/shell/dev-settings-ui";
-import { needsOnboarding } from "./lib/session/onboarding-gate";
 import { needsPasswordChange, PASSWORD_CHANGE_PATH } from "./lib/session/password-change-gate";
 import { resolveAppFrameEntry, rootRewriteInput, rootRewriteOutput } from "./lib/session/public-landing-gate";
 import { ensureAuthStatus, isAppAuthenticated } from "./lib/session/auth-status";
@@ -48,6 +46,7 @@ import { nativeAuth, nativeBridge } from "./lib/platform";
 import { COMPACT_PATH, primeNativeSession, readCompactLastBot } from "./lib/shell/compact-shell";
 import { CloudSessionGate, OrganizationFrame, requireAppAccess, warmAppAccess, requireAuth, resolveWorkspaceLocation } from "./lib/session/route-guards";
 import { LoginRoute } from "./screens/auth/login-route";
+import { IndexPending, IndexRoute } from "./screens/home/index-route";
 import { AppFrame } from "./components/frames/app-frame";
 import { CompactFrameEntry } from "./components/frames/compact-frame-entry";
 import { SettingsFrame } from "./components/frames/settings-frame";
@@ -63,7 +62,6 @@ const InboxScreen = lazyRouteComponent(() => import("./screens/conversation/inbo
 const MemberInvitationScreen = lazyRouteComponent(() => import("./screens/auth/member-invitation"), "MemberInvitationScreen");
 const ChangePasswordScreen = lazyRouteComponent(() => import("./screens/auth/change-password"), "ChangePasswordScreen");
 const OnboardingScreen = lazyRouteComponent(() => import("./screens/onboarding"), "OnboardingScreen");
-const OverviewScreen = lazyRouteComponent(() => import("./screens/home/overview"), "OverviewScreen");
 const ModeLanding = lazyRouteComponent(() => import("./screens/public/landing"), "ModeLanding");
 const LegalScreen = lazyRouteComponent(() => import("./screens/public/legal"), "LegalScreen");
 const CloudRuntimeSettings = lazyRouteComponent(() => import("./screens/settings/installation/cloud"), "CloudRuntimeSettings");
@@ -224,10 +222,15 @@ const appFrameRoute = createRoute({
     // session that expired in the meantime is still caught by the 401 (`lib/api.ts`).
     if (cause === "stay" && guardedAppPath === location.pathname) return;
     guardedAppPath = null;
+    // The conversation screen's code, now rather than once the guards and
+    // the cache restore are done: the composer it draws is then the real one
+    // sooner, and its stand-in shows less.
+    if (/\/bot\/[^/]+\/?$/u.test(location.pathname)) void ConversationScreen.preload?.();
     // Not awaited: the guard reads and the conversation reads start together,
     // instead of the loader waiting for session, organization and onboarding.
     warmAppAccess();
-    // The cached conversation first, so the frame never paints it as skeletons.
+    // The cached roster first (and the thread, on a conversation), so the
+    // frame never paints them as skeletons.
     await restoreConversationForPath(location.pathname, location.search);
     prefetchConversationForPath(location.pathname, location.search);
     // Guards already passed for this user on this browser: open the frame on
@@ -274,76 +277,6 @@ const indexRoute = createRoute({
   // promises the scene below.
   pendingComponent: IndexPending,
 });
-
-/** The Salon header, the same as `OverviewScreen`'s, without the scene. */
-function IndexPending() {
-  const { t } = useT();
-  const isMobile = useIsMobile();
-  return (
-    <div className="openedbot-salon-shell relative flex min-h-0 flex-1 flex-col">
-      <SiteHeader title={t("overviewPlaceholder.nav")} heading={isMobile} align="center" root />
-    </div>
-  );
-}
-
-function IndexRoute() {
-  const navigate = useNavigate();
-  const isMobile = useIsMobile();
-  const onboarding = useQuery({ queryKey: queryKeys.onboarding, queryFn: api.onboarding });
-  // Neither while loading, nor on error: a read that did not succeed (cloud API not
-  // ready yet) proves nothing, and redirecting on it would send the user to redo a
-  // flow already done on every slow cloud API restart. `false`
-  // STRICTLY is the cloud API saying "this field exists and this person
-  // has not left yet"; `undefined`: a cloud API from before the flag: says nothing.
-  const toOnboarding =
-    !onboarding.isPending && !onboarding.error && needsOnboarding(onboarding.data);
-
-  // SAME key as the panel: on a phone the drawer mounts the roster in the
-  // same frame, arrival reads its cache and adds no request.
-  const roster = useQuery({
-    queryKey: queryKeys.roster,
-    queryFn: api.roster,
-    enabled: isMobile && !toOnboarding,
-  });
-  /**
-   * A conversation app opens on a thread, not on a dashboard:
-   * on ARRIVAL (the first `/` of the load), a non-empty registry selects
-   * the first bot in the panel. Empty registry: or a failed read: and we
-   * stay on the overview, which carries « Nouveau bot ».
-   *
-   * The latch is read once on mount: « Aperçu » in the operator menu
-   * must stay reachable afterwards, and a switch during render would
-   * change what this component returns.
-   */
-  const isArrival = useRef(!isMobileLandingConsumed()).current;
-  const autoBotId = isMobile && isArrival && roster.isSuccess ? firstRosterBotId(roster.data.bots) : null;
-  const awaitingArrival = isMobile && isArrival && !toOnboarding && (onboarding.isPending || roster.isPending);
-
-  useEffect(() => {
-    if (toOnboarding) {
-      void navigate({ to: "/onboarding", replace: true });
-      return;
-    }
-    if (!isMobile || !isArrival || awaitingArrival) return;
-    // Decided once: a roster that fails at launch stays on
-    // the overview, it does not arm a jump on the next success.
-    if (!consumeMobileLanding()) return;
-    if (autoBotId) void navigate({ to: "/bot/$botId", params: { botId: autoBotId }, search: {}, replace: true });
-  }, [toOnboarding, isMobile, isArrival, awaitingArrival, autoBotId, navigate]);
-
-  if (toOnboarding) return null;
-  // Nothing rather than an overview that jumps: the scene is already under the
-  // drawer header, and the redirect lands right after.
-  if (awaitingArrival || autoBotId) return null;
-
-  // The header lives in the screen: on a phone it carries the "+" that opens the
-  // same « Nouveau bot » sheet as the scene, and it reads that scene's scroll.
-  return (
-    <div className="openedbot-salon-shell relative flex min-h-0 flex-1 flex-col">
-      <OverviewScreen />
-    </div>
-  );
-}
 
 /** The welcome flow, outside the `appFrameRoute` frame: no sidebar while there is nothing to put in it. */
 const onboardingRoute = createRoute({
@@ -429,7 +362,7 @@ const botConversationRoute = createRoute({
 /** A bot being created (`lib/bots/pending-bot-creations.ts`) does not have a thread yet. */
 function BotConversationEntry() {
   const { botId } = botConversationRoute.useParams();
-  return <Suspense fallback={<ConversationPending />}>{isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />}</Suspense>;
+  return <Suspense fallback={<ConversationPending botId={botId} />}>{isPendingBotId(botId) ? <BotCreatingScreen botId={botId} /> : <ConversationScreen />}</Suspense>;
 }
 
 /**

@@ -7,7 +7,7 @@
   radius of 14 px and a 1 px hairline instead of a border.
 */
 .openedbot-manage {
-  --openedbot-manage-canvas: #f5f5f6;
+  --openedbot-manage-canvas: #f7f7f7;
   --openedbot-manage-card: #ffffff;
   --openedbot-manage-hover: #f0f0f2;
   --openedbot-manage-divider: rgba(20, 20, 20, 0.07);

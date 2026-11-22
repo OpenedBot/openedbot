@@ -39,9 +39,11 @@ test("the stored width is read back, and garbage falls back to the default", () 
   expect(window.localStorage.getItem(KEY)).toBeNull();
 });
 
+// A file, not a panel: the context and quota panel keeps its own session width
+// and never stores it (858168c2); the stored width is the file canvas's.
 function Opener() {
   const canvas = useAttachmentCanvas();
-  return <button type="button" onClick={() => canvas?.openPanel({ id: "context", label: "Contexte" })}>open</button>;
+  return <button type="button" onClick={() => canvas?.open({ name: "notes.txt", contentType: "text/plain", kind: "document", bytes: 5, content: [{ type: "text", text: "notes" }] })}>open</button>;
 }
 
 function renderCanvas() {

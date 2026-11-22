@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { HermesClientError } from "@openedbot/hermes";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
+import { isLocalEngine } from "@openedbot/contracts-api";
 import { withBotProfileLock, withProfileNamesLock } from "./profile-import-guard";
 import { applyHostProfileModel } from "./host-profile-model";
 import { readOrganizationCursor } from "@openedbot/conversation/application/organization-cursor";
@@ -13,18 +14,12 @@ import { applyHostApprovalPolicy, applyTighteningPolicyBeforeMutation, approvalP
 import { publicBot, type BotRow } from "../domain/bot-dto";
 import { assertPermissionModeUnderCeiling } from "./permission-ceiling";
 import type { CreateBotInput, UpdateBotInput } from "../domain/bot-input";
-import type { BotRuns } from "./bot-runs";
 import { chooseBotSlug } from "./bot-slug";
 import {
   deleteBotRow,
-  hasPendingBotIngress,
   insertBotWithThread,
-  isBotInGroup,
-  lockActiveBotRuns,
-  lockBotRow,
   nextBotPosition,
   nextBotPositionExcluding,
-  readActiveBotRuns,
   readBotCreationReplay,
   readBotDeletionScope,
   readBotRestoreTarget,
@@ -44,7 +39,8 @@ import { insertProfileProvision } from "../sql/profile-provisions";
 import { insertBotHostCleanup } from "../sql/bot-host-cleanups";
 import { readBlockedToolsTx } from "../sql/tool-policies";
 import { lockBotHostCleanupForRestore } from "./bot-host-cleanups";
-import { assertBotProfileReady, assertBotProfileSettled, assertProvisionRestorable, cancelProfileProvision, closeProvisionAfterRestore } from "./profile-provisions";
+import { assertBotDeletable, assertBotQuiescent } from "./bot-guards";
+import { assertBotProfileReady, assertProvisionRestorable, cancelProfileProvision, closeProvisionAfterRestore } from "./profile-provisions";
 import {
   createManagedProfile,
   ensureHostProfileForRestore,
@@ -164,7 +160,7 @@ export async function createBot(
   }
   // PERM2-8: refused before any host call, so a refusal leaves nothing behind.
   await assertPermissionModeUnderCeiling(db, organizationId, input.editor.permissionMode ?? "manual", null);
-  const runtime = await readRuntime(db, organizationId);
+  const runtime = await readRuntime(db, organizationId, input.runtimeId);
   if (!runtime) throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de créer un bot.");
   const managedProfile = profile === null && runtime.linkFeatures?.includes(RELAY_FEATURE_PROFILE_MANAGEMENT) === true;
   const provisionLater = managedProfile && (options.profileProvisioning ?? "async") === "async";
@@ -195,11 +191,14 @@ export async function createBot(
     }
   }
 
-  const profileSelection = await resolvedHostProfileModel(
+  const checkedSelection = await resolvedHostProfileModel(
     { model: input.model, provider: input.provider },
     { selectedProvider: runtime.selectedProvider, selectedModel: runtime.selectedModel },
     () => clientFactory(runtime.client).modelOptions(),
   );
+  // An agent host (ACP) takes its model with each run and refuses one at
+  // profile creation (BODY_INVALID): the model stays checked, and on the bot.
+  const profileSelection = isLocalEngine(runtime.engine) ? null : checkedSelection;
   let profileModel: { applied: boolean } | undefined;
   let approvalPolicy: Awaited<ReturnType<typeof createManagedProfile>>["approvalPolicy"];
   if (managedProfile && !provisionLater) {
@@ -241,6 +240,7 @@ export async function createBot(
       editor: input.editor,
       creationRequestId: input.clientRequestId,
       creationRequestDigest: requestDigest,
+      runtimeId: input.runtimeId,
     });
     if (approvalPolicy) await writeBotApprovalPolicyProof(tx, organizationId, id, approvalPolicy.mode, approvalPolicy.effective);
     if (provisionLater) {
@@ -323,7 +323,7 @@ export async function updateBot(
   const managedPermissionProfile = permissionModeChanged
     && priorRows[0]?.hermesProfileManaged === true
     && Boolean(priorRows[0].hermesProfile);
-  const runtime = (input.modelChanged || input.restoring || managedPermissionProfile) ? await readRuntime(db, organizationId) : null;
+  const runtime = (input.modelChanged || input.restoring || managedPermissionProfile) ? await readRuntime(db, organizationId, currentRows[0]?.runtimeId ?? undefined) : null;
   const pipeline = runtime ? await withTenant(db, organizationId, (tx) => readPermissionPipeline(tx, organizationId)) : "legacy";
   // PERM2-5: every host policy write carries the stored blocked keys.
   const blockedTools = runtime && (input.restoring || managedPermissionProfile) ? await withTenant(db, organizationId, (tx) => readBlockedToolsTx(tx, organizationId, botId)) : [];
@@ -471,82 +471,81 @@ export async function updateBot(
 }
 
 /**
- * Les conditions communes au soft delete et à la purge : inchangées depuis la
- * suppression en un temps, et rejouées à CHAQUE transaction de la purge :
- * entre la lecture des sessions et l'effacement de la ligne, il y a un aller
- * réseau vers le runtime, largement de quoi qu'un run démarre.
- *
- * Ne dit rien du bot inexistant : l'appelant le distingue par le nombre de
- * lignes que sa propre requête renvoie. `detachGroups` : la purge forcée détache
- * ses salons dans la même transaction ; leurs missions, lues avant, restent gardées.
+ * Moves a bot to another machine: the organization's default one (`null`)
+ * or a dedicated agent of a machine. Its model goes back to the new
+ * machine's default, since the catalogues differ, unless `choice` names a
+ * model of the new machine's catalogue: it is checked there, then stored on
+ * the bot in the same move (a model update right after the move would wait
+ * for the queued profile). The profile itself is queued without a model: an
+ * agent host (ACP) refuses one at creation, and every run sends the bot's
+ * model anyway. The conversation is rebuilt on the new host from its history
+ * at the next turn (`ensureSession`).
  */
-export async function assertBotDeletable(
-  tx: TransactionDb,
-  runs: BotRuns,
+export async function moveBotToRuntime(
+  db: Db,
+  deps: BotDeps,
   organizationId: string,
   botId: string,
-  options: { detachGroups?: boolean } = {},
-): Promise<void> {
-  await assertBotProfileSettled(tx, organizationId, botId);
-  await assertBotQuiescent(tx, runs, organizationId, botId, {
-    code: "CANCELLED_BY_DELETE",
-    message: "Passe de maintenance annulée : le bot est supprimé.",
-  }, "Ce bot exécute encore une mission. Arrêtez-la avant de supprimer le bot.", options.detachGroups === true);
-}
-
-/**
- * Un membre ne peut pas disparaître sous un salon : cela pourrait laisser un
- * groupe sous sa taille minimale et, surtout, un `default_responder` pilote
- * pointant vers un bot inactif. Le verrou fort du bot est déjà acquis par les
- * deux appelants. Les ajouts de membres prennent `FOR KEY SHARE` sur ce même
- * bot ; une création concurrente est donc soit visible ici, soit revalidée
- * après notre commit et refusée parce que le bot est désormais archivé.
- */
-async function assertBotNotInGroup(
-  tx: TransactionDb,
-  organizationId: string,
-  botId: string,
-): Promise<void> {
-  if (await isBotInGroup(tx, organizationId, botId)) {
-    throw new HttpError(
-      409,
-      "BOT_IN_GROUP",
-      "Retirez ce bot de ses salons ou choisissez un autre pilote avant de l’archiver ou de le supprimer.",
+  runtimeId: string | null,
+  choice: { model: string; provider: string | null } | null = null,
+): Promise<ReturnType<typeof publicBot>> {
+  const target = await deps.readRuntime(db, organizationId, runtimeId ?? undefined);
+  if (!target) {
+    throw new HttpError(404, "RUNTIME_NOT_FOUND", runtimeId ? "Cette machine n’existe plus." : "Aucune machine par défaut n’est enregistrée.");
+  }
+  const selection = choice
+    ? await resolvedHostProfileModel(choice, target, () => deps.clientFactory(target.client).modelOptions())
+    : null;
+  return withBotProfileLock(db, organizationId, botId, async (db) => withTenant(db, organizationId, async (tx) => {
+    const current = (await readBotRows(tx, organizationId, botId))[0];
+    if (!current) throw new HttpError(404, "BOT_NOT_FOUND", "Bot introuvable.");
+    if ((current.runtimeId ?? null) === runtimeId) return publicBot(current);
+    await assertBotQuiescent(
+      tx,
+      deps.runs,
+      organizationId,
+      botId,
+      { code: "CANCELLED_BY_RUNTIME_MOVE", message: "Passe de maintenance annulée : le bot change de machine." },
+      "Ce bot exécute encore une demande : attendez la fin, puis changez de machine.",
+      true,
     );
-  }
-}
-
-/**
- * Un run racine ou de salon en cours bloque l'archivage et la purge. Une passe
- * de maintenance (`memory`, `compaction`) est annulée, puis on continue.
- */
-async function assertBotQuiescent(
-  tx: TransactionDb,
-  runs: BotRuns,
-  organizationId: string,
-  botId: string,
-  maintenanceReason: { code: string; message: string },
-  busyMessage: string,
-  allowGroups = false,
-): Promise<boolean> {
-  const active = await lockActiveBotRuns(tx, organizationId, botId);
-  if (!(await lockBotRow(tx, organizationId, botId))) return false;
-  const remaining = await runs.stopMaintenanceRuns(tx, organizationId, active, maintenanceReason);
-  const blocking = remaining[0] ?? (await readActiveBotRuns(tx, organizationId, botId))[0];
-  if (blocking) {
-    throw new HttpError(
-      409,
-      "BOT_BUSY",
-      busyMessage,
-      {},
-      { runId: blocking.id, stepKind: blocking.stepKind ?? null },
-    );
-  }
-  if (!allowGroups) await assertBotNotInGroup(tx, organizationId, botId);
-  if (await hasPendingBotIngress(tx, organizationId, botId)) {
-    throw new HttpError(409, "BOT_SUBMISSION_IN_PROGRESS", "Un message idempotent est encore en cours ou en quarantaine.");
-  }
-  return true;
+    // A worker creating its profile right now holds a lease on the row: a
+    // requeue would take it away mid-call and leave that profile untracked.
+    // Locked: a worker claim (`for update skip locked`) cannot slip in
+    // between this check and the requeue below.
+    const [provision] = await tx<Array<{ busy: boolean }>>`
+      select status = 'running' and lease_expires_at > now() as busy from bot_profile_provisions
+       where organization_id = ${organizationId} and bot_id = ${botId}
+       for update
+    `;
+    if (provision?.busy) {
+      throw new HttpError(409, "BOT_PROFILE_PREPARING", "Ce bot prépare encore son profil sur sa machine. Réessayez dans quelques secondes.");
+    }
+    await tx`
+      update bots
+         set runtime_id = ${runtimeId}, model = ${selection?.model ?? null}, reasoning_effort = null, fast_mode = false, updated_at = now()
+       where organization_id = ${organizationId} and id = ${botId}
+    `;
+    if (current.hermesProfileManaged && current.hermesProfile) {
+      const requeued = await tx`
+        update bot_profile_provisions
+           set runtime_id = ${target.id}, status = 'queued', attempts = 0, host_create_attempted = false,
+               host_profile_ownership = 'unknown', next_attempt_at = now(), error = null, lease_owner = null,
+               lease_expires_at = null, lease_generation = lease_generation + 1, finished_at = null,
+               provider = null, model = null, updated_at = now()
+         where organization_id = ${organizationId} and bot_id = ${botId}
+        returning bot_id
+      `;
+      if (requeued.length === 0) {
+        await insertProfileProvision(tx, {
+          botId, organizationId, runtimeId: target.id, slug: current.hermesProfile,
+          displayName: current.name, provider: null, model: null,
+        });
+      }
+    }
+    const rows = await readBotRows(tx, organizationId, botId);
+    return publicBot(rows[0]!);
+  }));
 }
 
 /**
@@ -581,7 +580,7 @@ export async function deleteBot(
       // supprimé : il peut appartenir à quelqu'un d'autre sous ce nom.
       const { hostProfileOwned } = await cancelProfileProvision(db, organizationId, botId);
 
-      const runtime = await readRuntimeForDeletion(db, organizationId);
+      const runtime = await readRuntimeForDeletion(db, organizationId, scope.runtimeId ?? undefined);
       const slug = hostProfileOwned && scope.profileManaged ? namedHostProfileSlug(scope.profile) : null;
       const sessions = hostProfileOwned ? botRuntimeSessionIds(organizationId, botId, scope) : [];
       if (sessions.length && !runtime) {
@@ -640,7 +639,7 @@ export async function deleteBot(
     const { hostProfileOwned } = await cancelProfileProvision(db, organizationId, botId);
     const sessions = hostProfileOwned ? botRuntimeSessionIds(organizationId, botId, scope) : [];
 
-    const runtime = await readRuntimeForDeletion(db, organizationId);
+    const runtime = await readRuntimeForDeletion(db, organizationId, scope.runtimeId ?? undefined);
     const cleanupProfile = hostProfileOwned && scope.profileManaged ? namedHostProfileSlug(scope.profile) : null;
     if ((sessions.length > 0 || cleanupProfile) && !runtime) {
       throw new HttpError(409, "RUNTIME_REQUIRED", "Enregistrez Hermes avant de supprimer un bot : son nettoyage doit être enregistré sur le runtime.");

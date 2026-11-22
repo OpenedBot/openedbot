@@ -52,6 +52,8 @@ type Client struct {
 	// Agent and HermesVersion go into hello.
 	Agent         string
 	HermesVersion string
+	Engine        string
+	EngineVersion string
 	// Gateway is the loopback base URL; Bearer is added to every request.
 	Gateway string
 	Bearer  string
@@ -98,6 +100,9 @@ type Client struct {
 	// times in a row and slows down to RefusedRetryInterval; the daemon writes
 	// its refusal marker there.
 	OnLinkRefused func(error)
+	// StopOnInvalidCredential lets an interactive connector ask for a new
+	// ticket if the broker explicitly rejects its saved credential.
+	StopOnInvalidCredential bool
 	// Dial overrides the WebSocket dialer (tests).
 	Dial func(ctx context.Context, url string, opts *websocket.DialOptions) (*websocket.Conn, *http.Response, error)
 
@@ -449,6 +454,9 @@ const RefusedRetryInterval = 30 * time.Minute
 // The daemon exits with a status systemd does not restart.
 var ErrLinkRefused = errors.New("link refused by openedbot")
 
+// ErrLinkCredentialInvalid is a broker rejection of the saved link identity.
+var ErrLinkCredentialInvalid = errors.New("link credential invalid")
+
 // errHandshakeRefused marks a WebSocket upgrade answered 401 or 403.
 var errHandshakeRefused = errors.New("handshake refused")
 
@@ -563,6 +571,9 @@ func (c *Client) Run(ctx context.Context) error {
 		})
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+		if c.StopOnInvalidCredential && errors.Is(err, ErrLinkCredentialInvalid) {
+			return err
 		}
 		if !confirmedAt.IsZero() {
 			backoff = reconnectBackoff(backoff, c.now().Sub(confirmedAt))
@@ -933,13 +944,22 @@ func (c *Client) session(ctx context.Context, onConfirmed func()) error {
 	})
 	if err != nil {
 		if resp != nil && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) {
+			if resp.StatusCode == http.StatusUnauthorized && c.StopOnInvalidCredential && resp.Body != nil {
+				defer resp.Body.Close()
+				var body struct {
+					Error struct{ Code string }
+				}
+				if json.NewDecoder(io.LimitReader(resp.Body, 1024)).Decode(&body) == nil && body.Error.Code == "LINK_AUTH_INVALID" {
+					return ErrLinkCredentialInvalid
+				}
+			}
 			err = fmt.Errorf("%w (HTTP %d): %w", errHandshakeRefused, resp.StatusCode, err)
 		}
 		return reportableError(fmt.Errorf("dial: %w", err), "LINK_DIAL_FAILED")
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "bye")
 	conn.SetReadLimit(MaxResponseBody + 4)
-	hello, err := EncodeText(Text{T: THello, Protocol: Protocol, Agent: c.Agent, HermesVersion: c.HermesVersion, Features: announced, DevicePublicKey: c.devicePublicKey()})
+	hello, err := EncodeText(Text{T: THello, Protocol: Protocol, Agent: c.Agent, HermesVersion: c.HermesVersion, Engine: c.Engine, EngineVersion: c.EngineVersion, Features: announced, DevicePublicKey: c.devicePublicKey()})
 	if err != nil {
 		return err
 	}

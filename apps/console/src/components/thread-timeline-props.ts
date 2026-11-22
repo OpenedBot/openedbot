@@ -50,6 +50,8 @@ export type ThreadTimelineProps = {
   workflowId?: string | null;
     stepKind?: string | null;
     errorCode?: string | null;
+    /** The run's own failure text: a failed turn without its `run.error` tells it. */
+    error?: string | null;
     model?: string | null;
     usage?: { totalTokens?: number; outputTokens?: number } | null;
     /** ISO: the run's bounds, for the real duration shown under the reply. */
@@ -74,6 +76,11 @@ export type ThreadTimelineProps = {
   onLoadOlder?: (beforeMerge?: () => void) => Promise<boolean>;
   /** Opens the bot's failures section in its settings. */
   onOpenBotErrors?: () => void;
+  /**
+   * Opens the bot's approvals: the gesture of a turn that failed on its
+   * permissions. Without it (rooms), that turn opens the policies settings.
+   */
+  onOpenBotApprovals?: () => void;
   /** The operator's handle: `@elodie` then reads as `@user` in the ask_user blocks. */
   operatorUsername?: string | null;
   /**
@@ -103,6 +110,8 @@ export type ThreadTimelineProps = {
    * thread on every run start/end.
    */
   canEditMessages?: boolean;
+  /** Why editing is refused when the conversation cannot send (the composer's sentence). */
+  editBlockedReason?: string;
   /**
    * Turns whose prose is a plan card (dock), not a bubble.
    * Run identifiers separated by a comma. A string, so the `memo`

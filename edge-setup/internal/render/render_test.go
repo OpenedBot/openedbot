@@ -624,3 +624,20 @@ func TestConnectorTemplateUnitKeysPathsByInstance(t *testing.T) {
 		}
 	}
 }
+
+func TestACPBridgeGolden(t *testing.T) {
+	unit := must(t)(ACPBridgeUnit(nil))
+	golden(t, "openedbot-acp-bridge.service", unit)
+	for _, line := range []string{"LoadCredential=runtime.env:", "CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_KILL\n", "StateDirectoryMode=0700\n", "RuntimeDirectoryMode=0700\n", "InaccessiblePaths=/run/credentials\n", "BindReadOnlyPaths=%d:/run/openedbot-acp-bridge/credentials\n", "ExecStart=" + layout.ToolInstalledPath + " internal acp-bridge\n"} {
+		if !strings.Contains(unit, line) {
+			t.Error("missing", line)
+		}
+	}
+	for _, line := range []string{"User=", "EnvironmentFile=", "MemoryDenyWriteExecute=true", "CAP_DAC_OVERRIDE"} {
+		if strings.Contains(unit, line) {
+			t.Error("unexpected", line)
+		}
+	}
+	golden(t, "acp-connector.service", ACPConnectorUnit(must(t)(ConnectorUnit(998, nil))))
+	golden(t, "acp-operator.service", must(t)(ACPOperatorUnit(nil)))
+}

@@ -6,7 +6,8 @@ import type { ProviderUsageSnapshotDto, RuntimeModelProviderDto } from "@openedb
 import { TooltipProvider } from "@openedbot/browser-ui-kit";
 import { I18nProvider } from "../../../src/lib/i18n";
 import { openSecondaryReads } from "../../../src/lib/shell/after-first-paint";
-import { RailLlmQuotas, bindingWindow, railQuotaFamilies, remainingTone } from "../../../src/components/boardui/rail-llm-quotas";
+import { RailModelsPill, bindingWindow, railQuotaFamilies, remainingTone } from "../../../src/components/boardui/rail-llm-quotas";
+import type { RuntimeHealthReading } from "../../../src/lib/runtime/use-runtime-health";
 
 const realFetch = globalThis.fetch;
 const clients: QueryClient[] = [];
@@ -14,6 +15,14 @@ let role = "owner";
 let usageStatus = "ok";
 let providers: Array<{ slug: string; name: string }> = [];
 let snapshots: ProviderUsageSnapshotDto[] = [];
+let opened: string[] = [];
+// The runtime row is covered by `rail-runtime-health.test.tsx`: a configured, healthy one here.
+const runtimeReading = {
+  runtime: { configured: true, name: "VPS", management: { kind: "host" }, link: null },
+  error: null,
+  status: "healthy",
+  pending: false,
+} as unknown as RuntimeHealthReading;
 
 function provider(slug: string): RuntimeModelProviderDto {
   return { slug, name: slug, isCurrent: false, authenticated: true, alwaysAuthenticated: false, provesInference: true, authType: "oauth", acceptsApiKey: false, acceptsOauth: true, sdkInstalled: true, sdkInstallable: false, warning: null, authCommand: null, models: [{ id: `${slug}-m`, fast: false, reasoning: false, isRuntimeDefault: false, freeTier: null }] } as RuntimeModelProviderDto;
@@ -80,7 +89,7 @@ describe("railQuotaFamilies", () => {
 });
 
 function renderRail() {
-  const rootRoute = createRootRoute({ component: () => <TooltipProvider><RailLlmQuotas buttonClassName="rail" /></TooltipProvider> });
+  const rootRoute = createRootRoute({ component: () => <TooltipProvider><RailModelsPill runtime={runtimeReading} onOpenSettings={(to) => opened.push(to)} /></TooltipProvider> });
   const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory({ initialEntries: ["/"] }) });
   const queryClient = new QueryClient();
   clients.push(queryClient);
@@ -94,6 +103,7 @@ function renderRail() {
 beforeEach(() => {
   openSecondaryReads();
   role = "owner";
+  opened = [];
   usageStatus = "ok";
   providers = [{ slug: "openai-codex", name: "OpenAI Codex" }, { slug: "anthropic", name: "Anthropic" }];
   snapshots = [snapshot("openai-codex", [["Weekly", 42]]), snapshot("anthropic", [["Current week", 85]])];
@@ -138,26 +148,49 @@ describe("remainingTone", () => {
   });
 });
 
-describe("RailLlmQuotas", () => {
-  test("trois vrais logos empilés, GPT puis Anthropic puis Grok, chacun nommé par sa phrase", async () => {
+const pill = () => screen.findByRole("button", { name: /^Modèles/ });
+const marks = () => document.querySelector("[data-rail-llm-quotas='']");
+
+async function openPopover() {
+  await waitFor(() => expect(marks() !== null).toBe(true));
+  fireEvent.click(await pill());
+  return screen.getByRole("group", { name: "Quota LLM restant" });
+}
+
+describe("RailModelsPill", () => {
+  test("une pilule « Modèles » : trois vrais logos, GPT puis Anthropic puis Grok, puis le point du runtime", async () => {
     renderRail();
-    const group = await screen.findByRole("group", { name: "Quota LLM restant" });
-    const buttons = [...group.querySelectorAll("button[data-rail-quota]")];
-    expect(buttons.map((node) => `${node.getAttribute("data-rail-quota")}:${node.getAttribute("data-rail-quota-state")}`))
+    await waitFor(() => expect(marks() !== null).toBe(true));
+    const states = [...marks()!.querySelectorAll("[data-rail-quota]")];
+    expect(states.map((node) => `${node.getAttribute("data-rail-quota")}:${node.getAttribute("data-rail-quota-state")}`))
       .toEqual(["gpt:measured", "anthropic:measured", "grok:off"]);
-    // Each button carries a real logo (brand path), not an abstract gauge.
-    for (const button of buttons) expect(button.querySelectorAll("svg path").length).toBe(1);
+    // Each mark carries a real logo (brand path), not an abstract gauge.
+    for (const node of states) expect(node.querySelectorAll("svg path").length).toBe(1);
+    const gpt = states[0]!.querySelector("circle[stroke-dasharray]")!;
+    // The ring follows the remainder: 58 out of 100. GPT stays green; Anthropic at 15% turns to warning.
+    expect(gpt.getAttribute("stroke-dasharray")).toBe("58 100");
+    expect(gpt.getAttribute("class")).toContain("text-pos-700");
+    expect(states[1]!.querySelector("circle[stroke-dasharray]")?.getAttribute("class")).toContain("text-warn-700");
+    const button = await pill();
+    // No label on the row: « Modèles » is the tooltip and the start of the accessible name.
+    expect(button.textContent).toBe("");
+    expect(button.querySelector("[data-rail-runtime-badge='connected']")).toBeTruthy();
+    // The pill's name says every reading: touch and screen readers lose nothing.
+    expect(button.getAttribute("aria-label")).toContain("GPT : 58 % restant");
+    expect(button.getAttribute("aria-label")).toContain("VPS");
+  });
+
+  test("un clic ouvre le détail : une ligne par famille, puis le runtime", async () => {
+    renderRail();
+    const group = await openPopover();
     const gpt = screen.getByRole("button", { name: /^GPT : 58 % restant · réinit\. dans 3 h/ });
+    expect(group.contains(gpt)).toBe(true);
     expect(gpt.getAttribute("aria-label")).toContain("Lu il y a 1 min");
     expect(screen.getByRole("button", { name: /^Anthropic : 15 % restant/ })).toBeTruthy();
-    // The ring follows the remainder: 58 out of 100.
-    expect(gpt.querySelector("circle[stroke-dasharray]")?.getAttribute("stroke-dasharray")).toBe("58 100");
-    // GPT at 58% remaining stays green; Anthropic at 15% turns to warning.
-    expect(gpt.querySelector("circle[stroke-dasharray]")?.getAttribute("class")).toContain("text-pos-700");
-    expect(screen.getByRole("button", { name: /^Anthropic/ }).querySelector("circle[stroke-dasharray]")?.getAttribute("class")).toContain("text-warn-700");
+    expect(screen.getByRole("button", { name: /^Runtime.*VPS.*connecté/ })).toBeTruthy();
 
     fireEvent.click(gpt);
-    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(await screen.findByText("Limites")).toBeTruthy();
   });
 
   test("au rechargement, les trois logos tiennent leur place pendant la lecture, puis s'y remplissent", async () => {
@@ -174,64 +207,55 @@ describe("RailLlmQuotas", () => {
     const slots = [...container.querySelectorAll("[data-rail-llm-quotas='loading'] [data-rail-quota]")];
     expect(slots.map((node) => `${node.getAttribute("data-rail-quota")}:${node.getAttribute("data-rail-quota-state")}`))
       .toEqual(["gpt:loading", "anthropic:loading", "grok:loading"]);
-    // Inert: neither a button nor an accessible name before the reading.
-    expect(container.querySelector("[data-rail-llm-quotas='loading'] button") === null).toBe(true);
     release();
-    const group = await screen.findByRole("group", { name: "Quota LLM restant" });
-    expect(group.querySelectorAll("button[data-rail-quota]").length).toBe(3);
+    await waitFor(() => expect(marks()?.querySelectorAll("[data-rail-quota]").length).toBe(3));
     expect(container.querySelector("[data-rail-llm-quotas='loading']") === null).toBe(true);
   });
 
-  test("fermer la modale rend le focus au logo sans rouvrir son infobulle", async () => {
+  test("une famille sans compte efface son logo, sans anneau ni modale, et mène aux réglages des modèles", async () => {
     renderRail();
-    const gpt = await screen.findByRole("button", { name: /^GPT : 58 % restant/ });
-    // A real click focuses the button: that is the focus the modal restores.
-    gpt.focus();
-    fireEvent.click(gpt);
-    const dialog = await screen.findByRole("dialog");
-    // The modal takes focus on the next frame: the logo has indeed left it.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(document.activeElement === dialog).toBe(true);
-    fireEvent.click(screen.getAllByRole("button", { name: "Fermer" }).at(-1)!);
-    // The modal returns focus as it unmounts, after its exit fade (150 ms).
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement === gpt).toBe(true);
-    expect(screen.queryByRole("tooltip")).toBeNull();
-    // The next focus (keyboard) shows the tooltip again.
-    fireEvent.blur(gpt);
-    fireEvent.focus(gpt);
-    expect(await screen.findByRole("tooltip")).toBeTruthy();
-  });
-
-  test("une famille sans compte efface son logo, sans anneau ni modale", async () => {
-    renderRail();
-    const grok = await screen.findByRole("button", { name: /^Grok : non branché/ });
+    await openPopover();
+    const grok = screen.getByRole("button", { name: /^Grok : non branché/ });
     expect(grok.querySelector("circle")).toBeNull();
     expect(grok.getAttribute("aria-haspopup")).toBeNull();
+    fireEvent.click(grok);
+    expect(opened).toEqual(["/settings/models"]);
   });
 
-  test("un membre ne voit rien", async () => {
+  test("la ligne du runtime mène à ses réglages", async () => {
+    renderRail();
+    await openPopover();
+    fireEvent.click(screen.getByRole("button", { name: /^Runtime.*VPS/ }));
+    expect(opened).toEqual(["/settings/runtime"]);
+  });
+
+  test("un membre ne voit que le runtime", async () => {
     role = "member";
-    const { container } = renderRail();
-    await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas]") === null).toBe(true));
+    renderRail();
+    await waitFor(() => expect(document.querySelector("[data-rail-models-pill='']") !== null).toBe(true));
+    expect(document.querySelector("[data-rail-llm-quotas]") === null).toBe(true);
+    fireEvent.click(await pill());
     expect(screen.queryByRole("group", { name: "Quota LLM restant" }) === null).toBe(true);
+    expect(screen.getByRole("button", { name: /^Runtime.*VPS/ })).toBeTruthy();
   });
 
-  test("aucune des trois familles branchée : le rail ne montre rien", async () => {
+  test("aucune des trois familles branchée : la pilule garde le runtime, sans logo", async () => {
     providers = [{ slug: "openrouter", name: "OpenRouter" }];
     snapshots = [snapshot("openrouter", [["Credits", 10]])];
     const { container } = renderRail();
-    // The loading placeholder, then nothing once the catalog has been read.
+    // The loading placeholder, then no mark once the catalog has been read.
     await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas='loading']") !== null).toBe(true));
     await waitFor(() => expect(container.querySelector("[data-rail-llm-quotas]") === null).toBe(true));
+    // No mark: the runtime's own icon stands before its dot.
+    expect((await pill()).querySelector("[data-rail-quota]")).toBeNull();
     expect(clients[0]!.isFetching()).toBe(0);
   });
 
   test("lien fermé : les logos restent, en pointillés, et disent pourquoi", async () => {
     usageStatus = "disconnected";
     renderRail();
-    const gpt = await screen.findByRole("button", { name: /^GPT : relevé indisponible/ });
+    await openPopover();
+    const gpt = screen.getByRole("button", { name: /^GPT : relevé indisponible/ });
     expect(gpt.getAttribute("aria-label")).toContain("Reconnectez le lien Hermes pour lire les limites.");
     expect(gpt.getAttribute("data-rail-quota-state")).toBe("unmeasured");
   });

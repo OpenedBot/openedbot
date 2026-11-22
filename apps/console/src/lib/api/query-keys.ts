@@ -8,7 +8,6 @@ export function workspaceQueryKey<const Parts extends readonly unknown[]>(organi
 
 export const queryKeys = {
   get workspacePreferences() { return workspaceQueryKey(activeOrganizationId(), "workspace-preferences"); },
-  conversationFiles: (threadId: string, search: string) => workspaceQueryKey(activeOrganizationId(), "files", threadId, search),
   accountDeletion: ["account", "deletion"] as const,
   legalCatalog: ["legal", "catalog"] as const,
   legalDocument: (slug: LegalSlug) => ["legal", "document", slug] as const,

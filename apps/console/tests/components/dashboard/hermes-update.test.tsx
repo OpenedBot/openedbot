@@ -139,18 +139,18 @@ const connector = (over: Partial<NonNullable<RuntimeLinkDto["connector"]>> = {})
 });
 
 test("runtime screen: the version rows always say edge-setup and Hermes", () => {
-  render(<I18nProvider><RuntimeVersionRows link={link({ ...available, available: false }, connector())} /></I18nProvider>);
+  render(<I18nProvider><RuntimeVersionRows engine="hermes" engineVersion="0.22.2" link={link({ ...available, available: false }, connector())} /></I18nProvider>);
   expect(screen.getByText("1.5.3 · à jour")).toBeTruthy();
   expect(screen.getByText("0.22.2 · à jour")).toBeTruthy();
   cleanup();
-  render(<I18nProvider><RuntimeVersionRows link={link(available, connector({ latestVersion: "1.5.4", updateAvailable: true }))} /></I18nProvider>);
+  render(<I18nProvider><RuntimeVersionRows engine="hermes" engineVersion="0.22.2" link={link(available, connector({ latestVersion: "1.5.4", updateAvailable: true }))} /></I18nProvider>);
   expect(screen.getByText("1.5.3 · 1.5.4 disponible")).toBeTruthy();
   expect(screen.getByText("0.22.2 · 0.22.6 disponible")).toBeTruthy();
   cleanup();
-  render(<I18nProvider><RuntimeVersionRows link={link({ ...available, current: null, available: false }, connector({ version: null }))} /></I18nProvider>);
+  render(<I18nProvider><RuntimeVersionRows engine="hermes" engineVersion={null} link={link({ ...available, current: null, available: false }, connector({ version: null }))} /></I18nProvider>);
   expect(screen.getAllByText("version inconnue")).toHaveLength(2);
   cleanup();
-  render(<I18nProvider><RuntimeVersionRows link={link({ ...available, latest: "0.22.2", available: false, upstream: "0.23.0" }, connector())} /></I18nProvider>);
+  render(<I18nProvider><RuntimeVersionRows engine="hermes" engineVersion="0.22.2" link={link({ ...available, latest: "0.22.2", available: false, upstream: "0.23.0" }, connector())} /></I18nProvider>);
   expect(screen.getByText("0.22.2 · à jour")).toBeTruthy();
   expect(screen.getByText("0.23.0 publiée par Hermes, en cours de validation")).toBeTruthy();
 });

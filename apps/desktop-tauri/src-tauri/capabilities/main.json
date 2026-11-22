@@ -35,6 +35,8 @@
     "allow-set-update-auto-install",
     "allow-notch-state",
     "allow-set-notch-mode",
-    "allow-play-notch-demo"
+    "allow-play-notch-demo",
+    "allow-start-local-machine",
+    "allow-stop-local-machine"
   ]
 }

@@ -132,7 +132,10 @@ export function normalizeHermesModelOptions(input: unknown): HermesModelOptions 
       warning: typeof item.warning === "string" ? item.warning : null,
       models: models.map((id) => {
         const detail = record(capabilities[id]) ?? {};
-        return { id, fast: detail.fast === true, reasoning: detail.reasoning === true };
+        const efforts = Array.isArray(detail.efforts)
+          ? detail.efforts.filter((value): value is string => typeof value === "string")
+          : null;
+        return { id, fast: detail.fast === true, reasoning: detail.reasoning === true, ...(efforts ? { efforts } : {}) };
       }),
     };
   });

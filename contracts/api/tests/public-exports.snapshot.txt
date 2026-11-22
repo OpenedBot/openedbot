@@ -113,6 +113,7 @@ type InboxNeedsYouItemDto
 type LegalCatalogDto
 type LegalDocumentDto
 type LegalSlug
+type LocalEngine
 type MemberRoleChangedDto
 type MessageAuthorBot
 type MessageContent
@@ -290,6 +291,7 @@ value GROUP_MEMBERS_MIN
 value HERMES_REASONING_EFFORTS
 value HERMES_REASONING_EFFORT_LABELS
 value LEGAL_SLUGS
+value LOCAL_ENGINES
 value ONBOARDING_RESET_SCOPES
 value OPERATOR_USERNAME_MAX
 value OPERATOR_USERNAME_MIN
@@ -308,6 +310,7 @@ value effectiveBotPermission
 value isBotToolPolicyAlwaysRefused
 value isBotToolPolicyKey
 value isHermesReasoningEffort
+value isLocalEngine
 value isTransactionalEmailKind
 value normalizeCommandBlocklist
 value permissionModeRaiseRefused

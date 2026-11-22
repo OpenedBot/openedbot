@@ -1,0 +1,58 @@
+[Unit]
+Description=Experimental openedbot ACP bridge (OpenCode)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=simple
+# Implicit root retains SETUID/SETGID for runuser with NoNewPrivileges.
+WorkingDirectory={{ .RuntimeRoot }}
+LoadCredential=runtime.env:{{ .RuntimeRoot }}/runtime.env
+# Hide connector credential copies from agents sharing their uid. The bridge
+# reads its own credential through a root-only bind inside this unit.
+RuntimeDirectory={{ .BridgeUnit }}
+RuntimeDirectoryMode=0700
+BindReadOnlyPaths=%d:/run/{{ .BridgeUnit }}/credentials
+Environment=ACP_BRIDGE_CREDENTIALS_DIRECTORY=/run/{{ .BridgeUnit }}/credentials
+InaccessiblePaths=/run/credentials
+StateDirectory={{ .BridgeUnit }}
+StateDirectoryMode=0700
+ExecStart={{ .ToolPath }} internal acp-bridge
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+# SETUID/SETGID drop agent privileges; KILL lets runuser and the bridge
+# terminate those service-user descendants on cancellation or shutdown.
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_KILL
+AmbientCapabilities=
+RestrictNamespaces=true
+# OpenCode embeds Bun and needs executable JIT memory.
+ProtectProc=invisible
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ .ProfilesRoot }} {{ .RuntimeRoot }}/acp-home
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+PrivateDevices=true
+ProtectClock=true
+ProtectKernelLogs=true
+ProtectHostname=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+{{- template "egress-allow" .EgressAllow }}
+{{- range .EgressDeny }}
+IPAddressDeny={{ . }}
+{{- end }}
+
+[Install]
+WantedBy=multi-user.target

@@ -70,6 +70,7 @@ describe("relay frames: golden vectors shared with edge-setup", () => {
 describe("relay frames: validation identical to Go DecodeText", () => {
   test("round-trips every frame type", () => {
     const frames: RelayTextFrame[] = [
+      { t: "hello", protocol: 1, engine: "acp:opencode", engineVersion: "preview 1" },
       { t: "hello", protocol: 1, agent: "edge-setup/1.0", hermesVersion: "0.20.5" },
       { t: "capabilities", features: ["provider_management"] },
       { t: "link.issued", runtimeId: "rt", linkToken: "tok" },
@@ -201,4 +202,14 @@ describe("relay bounds and close codes", () => {
     expect(RELAY_CLOSE_RECONNECT).toBe(4005);
     expect(RELAY_CLOSE_UNAUTHORIZED).toBe(4401);
   });
+});
+
+
+test("hello engine validation rejects invalid names and bounds free version text", () => {
+  for (const engine of ["", "Hermes", "acp/opencode", "a".repeat(65), "hermes\n", 1]) {
+    expect(() => decodeTextFrame(JSON.stringify({ t: "hello", protocol: 1, engine }))).toThrow(RelayFrameError);
+  }
+  expect(decodeTextFrame(JSON.stringify({ t: "hello", protocol: 1, engine: "hermes", engineVersion: "é".repeat(64) })))
+    .toMatchObject({ engine: "hermes", engineVersion: "é".repeat(64) });
+  expect(() => decodeTextFrame(JSON.stringify({ t: "hello", protocol: 1, engineVersion: "é".repeat(65) }))).toThrow(RelayFrameError);
 });

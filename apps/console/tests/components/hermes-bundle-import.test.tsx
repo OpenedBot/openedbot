@@ -20,16 +20,18 @@ function mount() {
 }
 test("recovers completed report after remount; network failure retains it until Continue", async () => {
   const fetchJobs = spyOn(api, "hermesImportJobs").mockResolvedValue({ jobs: [job], nextCursor: null }); mocks.push(fetchJobs);
+  // The imported agent's settings row: its name, its slug in mono under it.
+  const scoutRow = () => screen.queryAllByText("scout", { selector: "[data-settings-row] .font-mono" }).find((slug) => slug.closest("[data-settings-row]")?.textContent?.includes("Scout")) ?? null;
   const first = mount();
-  await waitFor(() => expect(screen.getByText(/Scout · scout/)).toBeTruthy());
+  await waitFor(() => expect(scoutRow()).not.toBeNull());
   first.unmount(); const second = mount();
-  await waitFor(() => expect(screen.getByText(/Scout · scout/)).toBeTruthy());
+  await waitFor(() => expect(scoutRow()).not.toBeNull());
   fetchJobs.mockRejectedValue(new Error("offline"));
   await second.client.refetchQueries({ queryKey: queryKeys.hermesImportJobs });
   await waitFor(() => expect(screen.getByText(/Le suivi est indisponible/)).toBeTruthy());
-  expect(screen.getByText(/Scout · scout/)).toBeTruthy();
+  expect(scoutRow()).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
-  expect(screen.queryByText(/Scout · scout/)).toBeNull();
+  expect(scoutRow()).toBeNull();
   expect(screen.getByLabelText("Agents depuis une archive Hermes", { selector: "input" })).toBeTruthy();
 });
 test("acknowledgement requires explicit verification and displays uncertain names", async () => {

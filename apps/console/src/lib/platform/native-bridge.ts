@@ -36,6 +36,7 @@ export type OpenedbotNativeBridge = {
   updates?: NativeUpdatesBridge;
   /** The notch (Tauri shell only, `native-notch.ts`; it exists only on Mac). */
   notch?: NativeNotchBridge;
+  localMachine?: { start(ticket: string, workspaceId: string): Promise<boolean>; stop(): Promise<void> };
 };
 
 /** The sign-in state pushed by the shell (the bridge's `SigninState`, `@openedbot/contracts-native-bridge`). */

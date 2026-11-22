@@ -6,7 +6,8 @@ import { canOperateWorkspace, type ConnectorReleaseDto, type RuntimePublicDto } 
 import { api, queryKeys, runtimeQueryOptions } from "../lib/api";
 import { connectorUpgradeLevel, type ConnectorUpgradeLevel } from "../lib/runtime/connector-upgrade";
 import { useT } from "../lib/i18n";
-import { BUTTON, CopyButton } from "./settings/primitives";
+import { BUTTON } from "./settings/primitives";
+import { CopyButton } from "./settings/copy-button";
 import { hasAutoUpgrade } from "../lib/runtime/auto-upgrade";
 
 /** A release does not move from hour to hour: the API already rereads it every hour. */

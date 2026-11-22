@@ -250,11 +250,29 @@
   .openedbot-fade-up {
     animation: none;
   }
+  .openedbot-thread-loading {
+    animation: none;
+  }
 }
 
 /* Match the composer and reading gutters on narrow screens as well. */
 @media (max-width: 39.999rem) {
   [data-thread-column] :is([role="log"], [data-thread-composer]) {
     padding-inline: 1rem;
+  }
+}
+
+/* `ThreadLoading` (thread-skeleton.tsx) and the `index.html` silhouette: the
+   spinner shows only past 300 ms, so a thread read back from the cache
+   replaces it before it ever appears. */
+.openedbot-thread-loading {
+  animation: openedbot-thread-loading-in 200ms ease-out 300ms both;
+}
+@keyframes openedbot-thread-loading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

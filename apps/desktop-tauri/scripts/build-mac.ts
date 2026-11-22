@@ -26,6 +26,7 @@
  *     (`OPENEDBOT_UPDATER_KEY_DIR`).
  */
 import { $ } from "bun";
+import { stageEdgeSetup } from "./stage-edge-setup";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -129,10 +130,13 @@ await $`codesign --force --options runtime --timestamp --sign ${popupIdentity} $
 // 3. The Tauri build: version, popup and update public key come from here,
 // never from the committed config. The local feed is plain http on loopback
 // (`config.rs` refuses http anywhere else), hence the transport flag.
+const edgeSetup = await stageEdgeSetup(ROOT, staging);
+await $`codesign --force --options runtime --timestamp --sign ${popupIdentity} ${edgeSetup}`.quiet();
 const overlay = mergeConfig(identityOverlay(APP_DIR, bundle), {
   version,
   bundle: {
     createUpdaterArtifacts: true,
+    resources: { [edgeSetup]: "edge-setup" },
     macOS: {
       signingIdentity: sign === "developer-id" ? identity : "-",
       files: { "Helpers/OpenedbotPopup.app": popup },

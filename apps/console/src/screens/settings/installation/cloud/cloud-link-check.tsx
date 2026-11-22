@@ -7,7 +7,8 @@ import { connectorUpgradeLevel, hermesUpdate } from "../../../../lib/runtime/con
 import { AUTO_UPGRADE_COMMAND } from "../../../../lib/runtime/auto-upgrade";
 import { useT } from "../../../../lib/i18n";
 import type { RuntimeEnrollmentTicketDto, RuntimeLinkVerifyDto, RuntimeConnectorDto, RuntimeLinkDto, RuntimePublicDto } from "@openedbot/contracts-api";
-import { ACTIONS, BUTTON, CopyButton, Note } from "../../../../components/settings/primitives";
+import { ACTIONS, BUTTON, Note } from "../../../../components/settings/primitives";
+import { CopyButton } from "../../../../components/settings/copy-button";
 import { RuntimeEnrollmentDialog } from "./cloud-enrollment";
 
 /**

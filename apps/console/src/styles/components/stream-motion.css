@@ -75,21 +75,23 @@
 
 /*
  * The run's status row (`run-status-line.tsx`). Pending: the bot's avatar
- * fades in 500 ms after the send (200 ms), then gives way at 1 s to the
+ * shows on the first frame after the send, then gives way at 0.9 s to the
  * typing dots, in place. Then the dots give way to the agents and the step.
+ * (It used to stay empty for 0.7 s, which read as a late indicator.)
  */
 @keyframes run-status-avatar {
-  0%, 50% { opacity: 0; }
-  70%, 80% { opacity: 1; transform: none; }
+  0%, 45% { opacity: 1; transform: none; }
   to { opacity: 0; transform: scale(0.8); }
 }
 @keyframes run-status-dots {
-  0%, 80% { opacity: 0; transform: scale(0.6); }
+  0%, 45% { opacity: 0; transform: scale(0.6); }
   to { opacity: 1; transform: none; }
 }
 @keyframes run-status-dot { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-.openedbot-run-status-avatar { animation: run-status-avatar 1.2s linear both; }
-.openedbot-run-status-dots { animation: run-status-dots 1.2s var(--stream-ease) both; }
+.openedbot-run-status-avatar { animation: run-status-avatar 0.9s linear both; }
+/* Pending, the face is there on the first frame: no spring pop-in under it. */
+.openedbot-run-status-avatar > [data-stream-agent] { animation: none; }
+.openedbot-run-status-dots { animation: run-status-dots 0.9s var(--stream-ease) both; }
 .openedbot-run-status-mark-in { animation: stream-swap-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .openedbot-run-status-mark-out { animation: stream-fade-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .openedbot-run-status .openedbot-thinking-dots > i { animation: run-status-dot 1.2s ease-in-out infinite; }

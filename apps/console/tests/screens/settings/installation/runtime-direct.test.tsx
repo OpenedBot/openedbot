@@ -275,7 +275,9 @@ test("sans runtime qui sert, l’ajout met le runtime en service sans autre gest
   mount(<RuntimeReplacement activeId={null} />);
   // Adding is offered only once the list has been read (empty here): during the
   // read, the screen does not know whether a replacement is already waiting.
-  fireEvent.click(await screen.findByRole("button", { name: "Ajouter un runtime" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Ajouter une machine" }));
+  // « Ajouter une machine » first asks which kind (d61b4eca): direct access is a Hermes server.
+  fireEvent.click(screen.getByRole("button", { name: /Un serveur Hermes/ }));
   fireEvent.click(screen.getByRole("radio", { name: /Accès direct/ }));
   await publish(...PATHS[0]!.slice(0, 3) as [string, RegExp, readonly (readonly [string, string])[]]);
   fireEvent.change(screen.getByLabelText("Nom"), { target: { value: "Mon gateway" } });

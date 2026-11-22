@@ -94,17 +94,19 @@ export function prefetchConversationForPath(pathname: string, search: Record<str
 const RESTORE_BUDGET_MS = 300;
 
 /**
- * Before the conversation's first render: the roster and the thread this path
- * opens, read back from IndexedDB into the cache, so the frame paints them
- * at once from the boot silhouette. Bounded: past the budget the screen
- * renders its skeletons as before, and the reads land when they land.
+ * Before the frame's first render: the roster, and on a conversation path the
+ * thread it opens, read back from IndexedDB into the cache, so the frame paints
+ * them at once from the boot silhouette. The roster is restored on every frame
+ * path: the sidebar that shows it is on all of them, and restored only on its
+ * first fetch it painted its skeleton first. Bounded: past the budget the
+ * screen renders its skeletons as before, and the reads land when they land.
  */
 export async function restoreConversationForPath(pathname: string, search: Record<string, unknown>): Promise<void> {
   if (!readCloudSession() || !activeOrganizationId()) return;
   const bot = /^\/bot\/([^/]+)\/?$/u.exec(pathname);
   const group = /^\/g\/([^/]+)\/?$/u.exec(pathname);
   // Only on a refresh: once the roster is in memory, navigation never waits.
-  if ((!bot?.[1] && !group?.[1]) || queryClient.getQueryData(queryKeys.roster) !== undefined) return;
+  if (queryClient.getQueryData(queryKeys.roster) !== undefined) return;
   const restore = (async () => {
     const roster = await restorePersistedQuery(queryClient, queryKeys.roster) as RosterDto | undefined;
     let threadId: string | null | undefined;

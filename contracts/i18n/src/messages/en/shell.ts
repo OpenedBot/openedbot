@@ -135,7 +135,7 @@ export const navUser = {
   settings: "Settings",
   /** The most-used provider quota, in the account menu. */
   usage: "Quotas",
-  usageValue: "{percent}% used",
+  usageValue: "{percent}% left",
   newGroup: "New group",
   lightTheme: "Light theme",
   darkTheme: "Dark theme",

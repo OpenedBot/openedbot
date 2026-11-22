@@ -67,8 +67,7 @@ const UNHEALTHY_DIRECT_MESSAGE = "Le runtime en accès direct n’a pas répondu
 export async function failRunsOnUnhealthyDirectRuntimes(db: SQL, timeoutMs: number): Promise<number> {
   return db.begin(async (tx) => {
     const sql = tx as unknown as SQL;
-    // Queued, never sent to Hermes: no lease to hold. Every run of an
-    // organization with a stale runtime, as the join on the organization did.
+    // Queued, never dispatched: only the runtime selected for this run matters.
     const failed = await transitionRuns(sql, {
       target: { sweep: true }, fence: "unleased",
       transition: { from: ["queued"], to: { status: "failed", externalState: "settled" } },
@@ -77,10 +76,13 @@ export async function failRunsOnUnhealthyDirectRuntimes(db: SQL, timeoutMs: numb
         endedAt: NOW, ...RELEASE_LEASE, nextAttemptAt: null,
       },
       where: sqlExpr`hermes_run_id is null and created_at < now() - (${timeoutMs} * interval '1 millisecond')
-        and organization_id in (
-          select rt.organization_id
+        and exists (
+          select 1
             from runtimes rt
-           where rt.reachability = 'direct' and rt.revoked_at is null and rt.is_active
+            left join bots b on b.organization_id = runs.organization_id and b.id = runs.bot_id
+           where rt.organization_id = runs.organization_id
+             and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active))
+             and rt.reachability = 'direct' and rt.revoked_at is null
              and (rt.last_health_status <> 'healthy' or rt.last_probed_at is null
                or rt.last_probed_at <= now() - interval '90 seconds')
         )`,

@@ -44,7 +44,7 @@ const RUNTIME_ID = "runtime-1";
 
 const runtime: RuntimePublicDto = {
   id: RUNTIME_ID,
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: "https://hermes.example",
   transport: "connector",
   reachability: "connector",

@@ -5,8 +5,8 @@ import { useT } from "../../lib/i18n";
 import { useOpenSettings } from "../../lib/shell/settings-overlay";
 import { useRuntimeHealth } from "../../lib/runtime/use-runtime-health";
 import packageJson from "../../../package.json";
-import { RailLlmQuotas } from "./rail-llm-quotas";
-import { RailRuntimeHealth } from "./rail-runtime-health";
+import { RailModelsPill } from "./rail-llm-quotas";
+import { RailConnectorsPill } from "./rail-connectors-pill";
 import { DesktopUpdateRailButton } from "../desktop-update/entry";
 import { SidebarToggle } from "./board-chrome";
 
@@ -15,9 +15,10 @@ import { SidebarToggle } from "./board-chrome";
  * shell, in the console as on the desktop. No icon rail any more: the
  * conversations card carries it, on two rows. At its head, after the logo (web)
  * or the macOS traffic lights, search and the « + »; at its
- * foot, the remaining LLM quota (GPT, Anthropic, Grok), runtime and
- * Settings (`RailFooter`). No popover, no avatar: theme and language are set in
- * Settings > Appearance, no longer in the rail (decision of 04-11-2026).
+ * foot, one row: the « Modèles » pill (LLM quota left at GPT, Anthropic,
+ * Grok, and the runtime), the « Connecteurs » pill, then Settings (`RailFooter`). No avatar:
+ * theme and language are set in Settings > Appearance, no longer in the rail
+ * (decision of 04-11-2026).
  */
 
 /** A vertical hairline between two groups of the foot row. */
@@ -76,9 +77,9 @@ export function RailLead({ collapsed }: { collapsed: boolean }) {
 }
 
 /**
- * The foot of the conversations card, one row: the LLM quotas and the runtime
- * on the left; on the right, past a hairline, the desktop update when one is
- * ready and Settings.
+ * The foot of the conversations card, one row: the « Modèles » pill (LLM
+ * quotas and runtime) on the left; on the right the « Connecteurs » pill,
+ * then past a hairline the desktop update when one is ready and Settings.
  */
 export function RailFooter() {
   const { t } = useT();
@@ -88,9 +89,10 @@ export function RailFooter() {
 
   return (
     <nav data-rail-footer="" aria-label={t("boardui.accountMenu", { name: t("navUser.operator") })} className="flex shrink-0 items-center gap-1">
-      <RailLlmQuotas buttonClassName={RAIL_BUTTON} />
-      <RailRuntimeHealth reading={runtimeHealth} buttonClassName={RAIL_BUTTON} onOpenSettings={openSettings} />
+      <RailModelsPill runtime={runtimeHealth} onOpenSettings={openSettings} />
+      {/* Right-aligned: either pill changing width on load moves nothing but free room. */}
       <div className="ms-auto flex shrink-0 items-center gap-1">
+        <RailConnectorsPill onOpenSettings={openSettings} />
         <div aria-hidden className={RAIL_DIVIDER} />
         {/* Desktop app: the update ready, just before Settings (nothing on the web). */}
         {DesktopUpdateRailButton ? <Suspense fallback={null}><DesktopUpdateRailButton /></Suspense> : null}

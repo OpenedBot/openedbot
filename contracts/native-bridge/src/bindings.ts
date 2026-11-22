@@ -100,6 +100,8 @@ export const commands = {
 	 *  the saved choice, which this does not change.
 	 */
 	playNotchDemo: () => typedError<NotchState, BridgeError>(__TAURI_INVOKE("play_notch_demo")),
+	startLocalMachine: (ticket: string, workspaceId: string) => typedError<boolean, BridgeError>(__TAURI_INVOKE("start_local_machine", { ticket, workspaceId })),
+	stopLocalMachine: () => typedError<null, BridgeError>(__TAURI_INVOKE("stop_local_machine")),
 };
 
 /** Events */

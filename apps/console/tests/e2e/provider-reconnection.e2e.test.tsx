@@ -28,7 +28,7 @@ const RUNTIME_NAME = "Hermes du VPS";
 
 const runtime: RuntimePublicDto = {
   id: RUNTIME_ID,
-  configured: true,
+  configured: true, engine: "hermes", engineVersion: null,
   baseUrl: null,
   transport: "connector",
   reachability: "connector",

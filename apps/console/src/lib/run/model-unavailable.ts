@@ -37,8 +37,8 @@ export function modelUnavailableMessage(t: TranslateFn, name: string, model: str
 }
 
 /**
- * The text of a failed run for a toast or the composer banner, in the
- * operator's language: a refused model (`MODEL_UNAVAILABLE`) or a refused
+ * The text of a failed run for the room's toast, in the operator's
+ * language: a refused model (`MODEL_UNAVAILABLE`) or a refused
  * provider login (`PROVIDER_AUTH_REQUIRED`). `null` for any other code (the
  * caller then keeps the run's raw text, unchanged).
  *
@@ -61,28 +61,6 @@ export function readableRunFailure(
       : t("threadTimeline.providerAuthRequiredGeneric", { name });
   }
   return null;
-}
-
-type RunErrorEventLike = { runId: string; type: string; payload: Readonly<Record<string, unknown>> };
-
-/**
- * A failed run the thread already explains in place, with the action that
- * fixes it (`ModelUnavailableNotice`, `ProviderAuthNotice`). The bot screen
- * must not also raise the blocking "Conversation indisponible" modal for it:
- * the modal blurs the thread, hides that notice and offers only "Fermer",
- * while the conversation itself is fine and the next send may succeed.
- *
- * The code is read on the run, else on its `run.error` event (same fallback
- * as the timeline): the run status can land before its `errorCode`.
- */
-export function runFailureExplainedInThread(
-  run: Pick<RunDto, "id"> & Partial<Pick<RunDto, "errorCode">>,
-  events: readonly RunErrorEventLike[] | undefined,
-): boolean {
-  const explained = (code: unknown) => isModelUnavailableCode(code) || isProviderAuthRequiredCode(code);
-  if (explained(run.errorCode)) return true;
-  return (events ?? []).some((event) =>
-    event.runId === run.id && event.type === "run.error" && explained(event.payload.errorCode));
 }
 
 export type ModelUnavailableState = { runId: string; model: string | null };

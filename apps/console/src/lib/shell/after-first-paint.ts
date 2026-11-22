@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 /**
- * Secondary reads (inbox count, MCP plugin names, provider usage, model
- * context) wait for the conversation to be on screen: each of
- * their answers re-rendered the frame while the thread was still loading.
+ * Secondary reads (inbox count, MCP plugin names, model context) wait for
+ * the conversation to be on screen: each of their answers re-rendered the
+ * frame while the thread was still loading.
  *
  * `ThreadTimeline` opens the gate once its first messages are painted. Screens
  * without a thread open it after `FALLBACK_MS`, so nothing waits forever.

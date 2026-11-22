@@ -18,7 +18,7 @@ import { haptics } from "../../lib/platform/haptics";
 import { useT } from "../../lib/i18n";
 import { useMobileDrawer } from "../mobile/mobile-drawer-shell";
 import { OperatorBlob } from "../operator-blob";
-import { percentTone, useProviderLimits } from "../dashboard/provider-limits-panel";
+import { percentTone, remainingPercent, useProviderLimits } from "../dashboard/provider-limits-panel";
 import { BUI_PANEL_ITEM, BuiPopover, BuiPopoverContent, BuiPopoverTrigger } from "./menu";
 import packageJson from "../../../package.json";
 import { DesktopUpdateMenuRow, DesktopUpdatePill } from "../desktop-update/entry";
@@ -86,15 +86,15 @@ function UsageMenuItem({ mobileDrawer, onSelect }: { mobileDrawer: boolean; onSe
   const limits = useProviderLimits(false);
   const peak = limits.servicePeak ?? limits.peak;
   if (!limits.canView || peak === null) return null;
-  const percent = Math.round(peak);
+  const used = Math.round(peak);
   return (
     <MenuItem
       mobileDrawer={mobileDrawer}
       icon={RiDashboard3Line}
       label={t("navUser.usage")}
       value={
-        <span className={cn("shrink-0 text-body-regular tabular-nums", percent > 80 ? percentTone(percent) : "text-text-secondary")}>
-          {t("navUser.usageValue", { percent })}
+        <span className={cn("shrink-0 text-body-regular tabular-nums", used > 80 ? percentTone(used) : "text-text-secondary")}>
+          {t("navUser.usageValue", { percent: Math.round(remainingPercent(peak)) })}
         </span>
       }
       onSelect={onSelect}

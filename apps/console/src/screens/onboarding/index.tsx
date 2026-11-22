@@ -34,7 +34,7 @@ export function OnboardingScreen() {
   /**
    * Onboarding is PER PERSON (`users.onboarding_completed`, exposed as
    * `completed`): whoever has already finished theirs is sent back to `/`, even if
-   * the workspace itself is not dated yet. The gate in `route-tree.tsx` only
+   * the workspace itself is not dated yet. The gate in `home/index-route.tsx` only
    * protects the automatic entry: this guard protects the route
    * ITSELF (direct link, return from login). `?review=1` is the only
    * exception: the overview's voluntary gesture.

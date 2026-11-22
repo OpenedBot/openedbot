@@ -16,15 +16,12 @@ import {
   AgentLimitsCard,
   cn,
   Dialog,
-  Skeleton,
-  SkeletonRegion,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
   type AgentBudgetGroup,
   type AgentBudgetSegment,
-  type AgentPlanLimit,
   useCoarsePointer,
   useIsMobile,
 } from "@openedbot/browser-ui-kit";
@@ -33,12 +30,15 @@ import { useT } from "../lib/i18n";
 import {
   ProviderLimitsPanel,
   providerLimitsWorthShowing,
-  resetLabel,
+  remainingPercent,
   useProviderLimits,
   type ProviderLimits,
 } from "./dashboard/provider-limits-panel";
 import { useSecondaryReadsReady } from "../lib/shell/after-first-paint";
 import { canvasChromeButton, useAttachmentCanvas } from "./attachment-canvas";
+import { SETTINGS_INSET, SETTINGS_SHELL } from "./settings/primitives";
+import { ThreadContextSkeleton } from "./thread-context-skeleton";
+import { planLimits } from "./thread-plan-limits";
 
 /**
  * The status tab hooked to the composer's top edge, and its detail.
@@ -211,39 +211,6 @@ export function contextBudget({
   preambleSegment("memory", t("threadContext.segmentMemory"), t("threadContext.segmentMemory"), t("threadContext.groupMemory"));
   preambleSegment("mcp", t("threadContext.segmentMcp"), t("threadContext.segmentMcp"), t("threadContext.groupMcp"));
   return { segments, groups };
-}
-
-/**
- * The plan limits of the providers IN SERVICE, one line per window
- * (5 h, week, ...), like the bottom of the BoardUI card. A connected account
- * that nothing uses stays in the Quotas tab: it is not this thread's wall.
- */
-export function planLimits(limits: ProviderLimits, t: Translate): { label: string; rows: AgentPlanLimit[] } | null {
-  const serviced = limits.providers
-    .filter((provider) => limits.inService.has(provider.slug))
-    .map((provider) => {
-      const snapshot = limits.snapshots.get(provider.slug);
-      const windows = (snapshot?.windows ?? []).filter((window) => window.usedPercent !== null);
-      return { provider, plan: snapshot?.plan ?? null, windows };
-    })
-    .filter((entry) => entry.windows.length > 0);
-  if (serviced.length === 0) return null;
-  const single = serviced.length === 1 ? serviced[0]! : null;
-  const rows = serviced.flatMap(({ provider, windows }) => windows.map((window, index): AgentPlanLimit => {
-    const reset = resetLabel(window.resetAt, t);
-    return {
-      id: `${provider.slug}:${index}`,
-      label: single ? window.label : `${provider.name} · ${window.label}`,
-      used: (window.usedPercent ?? 0) / 100,
-      resets: reset ? t("providerLimits.resetIn", { reset }) : null,
-    };
-  }));
-  return {
-    label: single
-      ? t("threadContext.planLimits", { plan: single.plan ?? single.provider.name })
-      : t("threadContext.planLimitsAll"),
-    rows,
-  };
 }
 
 /**
@@ -450,30 +417,33 @@ export function ThreadContextTab({
 
   const contextBody = (
     <>
-      <AgentLimitsCard
-        defaultExpanded
-        budget={window > 0 ? {
-          label: t("threadContext.windowLabel"),
-          readout,
-          max: window,
-          segments: budget.segments,
-          groups: budget.groups,
-          formatValue: (value) => formatNumber(value),
-        } : null}
-        // The bottom of the card: the windows of the plan in service. The
-        // arrow opens the full statement (every account, reread).
-        limits={plan ? {
-          ...plan,
-          action: showQuotas ? { label: t("threadContext.planLimitsOpen"), onClick: () => setTab("quotas") } : undefined,
-        } : null}
-        formatPercent={(value) => t("threadContext.inline", {
-          percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-        })}
-        formatLimitPercent={(value) => t("providerLimits.usedPercentValue", { percent: Math.round(value) })}
-        freeLabel={t("threadContext.free")}
-        expandLabel={t("threadContext.expand")}
-        collapseLabel={t("threadContext.collapse")}
-      />
+      <div className={SETTINGS_SHELL}>
+        <AgentLimitsCard
+          className={SETTINGS_INSET}
+          defaultExpanded
+          budget={window > 0 ? {
+            label: t("threadContext.windowLabel"),
+            readout,
+            max: window,
+            segments: budget.segments,
+            groups: budget.groups,
+            formatValue: (value) => formatNumber(value),
+          } : null}
+          // The bottom of the card: the windows of the plan in service. The
+          // arrow opens the full statement (every account, reread).
+          limits={plan ? {
+            ...plan,
+            action: showQuotas ? { label: t("threadContext.planLimitsOpen"), onClick: () => setTab("quotas") } : undefined,
+          } : null}
+          formatPercent={(value) => t("threadContext.inline", {
+            percent: formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+          })}
+          formatLimitPercent={(value) => t("providerLimits.remainingPercentValue", { percent: Math.round(value) })}
+          freeLabel={t("threadContext.free")}
+          expandLabel={t("threadContext.expand")}
+          collapseLabel={t("threadContext.collapse")}
+        />
+      </div>
       {/* The last turn's cost is read apart: it is not a share
           of the window, it is what the call billed. */}
       <p className="mt-3 text-xs leading-snug text-muted-foreground">
@@ -501,7 +471,7 @@ export function ThreadContextTab({
               contains without one having to open it. */}
           {limits.servicePeak !== null ? (
             <span className="rounded-full bg-muted-foreground/15 px-1.5 text-[11px] leading-4 tabular-nums">
-              {t("providerLimits.usedPercentValue", { percent: Math.round(limits.servicePeak) })}
+              {t("providerLimits.remainingPercentValue", { percent: Math.round(remainingPercent(limits.servicePeak)) })}
             </span>
           ) : null}
         </TabsTrigger>
@@ -681,48 +651,3 @@ export function ThreadContextTab({
     </>
   );
 }
-
-/**
- * The detail's silhouette, at the result's geometry: the tab bar, the
- * window card (title, gauge, one line per item), the plan
- * limits, then the card footnotes. Heights close to the real
- * content: nothing jumps when the figures arrive.
- */
-function ThreadContextSkeleton({ label }: { label: string }) {
-  return (
-    <SkeletonRegion label={label} className="flex flex-col gap-3" data-thread-context-skeleton="">
-      <Skeleton className="h-9 w-full rounded-lg" />
-      <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 [--skeleton:var(--muted)] dark:[--skeleton:#404040]">
-        <div className="flex items-center justify-between gap-4">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-4 w-1/4" />
-        </div>
-        <Skeleton className="h-1.5 w-full rounded-full" />
-        <div className="flex flex-col gap-2.5 pt-1">
-          {SKELETON_ROWS.map((width, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Skeleton className="size-2 shrink-0 rounded-full" />
-              <Skeleton className="h-3.5" style={{ width }} />
-              <Skeleton className="ms-auto h-3.5 w-12" />
-              <Skeleton className="h-3.5 w-10" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-1 flex flex-col gap-2.5 border-t border-border pt-4">
-          <Skeleton className="h-4 w-2/5" />
-          <div className="flex items-center justify-between gap-4">
-            <Skeleton className="h-4 w-1/5" />
-            <Skeleton className="h-3.5 w-1/4" />
-          </div>
-          <Skeleton className="h-1.5 w-full rounded-full" />
-        </div>
-      </div>
-      <Skeleton className="h-3 w-3/4" />
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-2/3" />
-    </SkeletonRegion>
-  );
-}
-
-/** One width per window line, irregular like the real labels. */
-const SKELETON_ROWS = ["42%", "50%", "38%", "34%", "46%", "40%", "24%", "36%", "20%"];

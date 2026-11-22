@@ -9,6 +9,7 @@ import (
 	"embed"
 	"fmt"
 	"net/netip"
+	"strings"
 	"text/template"
 
 	"github.com/OpenedBot/openedbot/edge-setup/internal/egress"
@@ -231,4 +232,34 @@ func DockerModulesLoad() (string, error) { return render("docker-modules-load.co
 // DockerSources renders the deb822 apt source for Docker CE.
 func DockerSources(codename, debArch string) (string, error) {
 	return render("docker.sources.tmpl", map[string]any{"Codename": codename, "Arch": debArch})
+}
+
+// ACPBridgeUnit renders the root supervisor that drops agent privileges.
+func ACPBridgeUnit(resolvers []netip.Addr) (string, error) {
+	allow, err := resolverPrefixes(resolvers)
+	if err != nil {
+		return "", err
+	}
+	return render("openedbot-acp-bridge.service.tmpl", map[string]any{
+		"RuntimeRoot": layout.RuntimeRoot, "BridgeUnit": layout.ACPBridgeUnit,
+		"ProfilesRoot": layout.ACPProfilesRoot, "ToolPath": layout.ToolInstalledPath,
+		"EgressDeny": layout.EgressDenyNetworks, "EgressAllow": allow,
+	})
+}
+
+// ACPOperatorUnit retains the connector socket service without Hermes wiring.
+func ACPOperatorUnit(resolvers []netip.Addr) (string, error) {
+	unit, err := OperatorUnit(resolvers)
+	if err != nil {
+		return "", err
+	}
+	unit = strings.ReplaceAll(unit, layout.GatewayUnit+".service", layout.ACPBridgeUnit+".service")
+	return strings.Replace(unit, "Description=Hermes provider operator for the openedbot link", "Description=openedbot operator for the experimental ACP engine", 1), nil
+}
+
+// ACPConnectorUnit uses the same loopback contract and supervisor-provided
+// engine identity, without changing the default Hermes rendering.
+func ACPConnectorUnit(unit string) string {
+	unit = strings.ReplaceAll(unit, layout.GatewayUnit+".service", layout.ACPBridgeUnit+".service")
+	return strings.Replace(unit, "[Service]\n", "[Service]\nEnvironment=OPENEDBOT_ENGINE=acp:opencode\n", 1)
 }

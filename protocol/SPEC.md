@@ -2,11 +2,15 @@
 
 | | |
 |---|---|
-| Specification version | **1.0.0** (2026-10-28) |
+| Specification version | **1.1.1** (2026-11-17) |
 | Wire protocol | `protocol: 1` in the `hello` frame (`RELAY_PROTOCOL` in `connector/src/relay-frames.ts`) |
 | Status | Stable. Changes are listed in [CHANGELOG.md](CHANGELOG.md). |
 | Reference implementations | Host: `edge-setup` (Go, `internal/connector`). Cloud: openedbot (TypeScript, this package). |
-| Normative test vectors | [`connector/fixtures/relay-frames.vectors.json`](connector/fixtures/relay-frames.vectors.json), [`connector/fixtures/relay-allowlist.json`](connector/fixtures/relay-allowlist.json) |
+| Normative test vectors | [`connector/fixtures/relay-frames.vectors.json`](connector/fixtures/relay-frames.vectors.json), [`connector/fixtures/relay-allowlist.json`](connector/fixtures/relay-allowlist.json), [`run-contract.vectors.json`](connector/fixtures/run-contract.vectors.json) |
+
+API deployment must precede host deployment for `hello.engine` and
+`hello.engineVersion`. Invalid engine names or engine versions longer than
+64 characters are frame errors. Older peers ignore these optional fields.
 
 ## Versioning
 
@@ -71,7 +75,7 @@ par le lien ».
  link (ticket sur stdin)
    ├─ GET wss://<openedbot>/api/runtime-links/ws
    │    Authorization: Bearer enrollment:<id>.<secret>   (ticket 5 min, usage unique)
-   ├─ hello {protocol:1, agent, hermesVersion, features:[…], devicePublicKey}
+   ├─ hello {protocol:1, agent, hermesVersion, engine?, engineVersion?, features:[…], devicePublicKey}
    │  ◄── link.challenge {nonce}                  (preuve de possession, avant toute req)
    │  ──► link.proof {signature}
    │                                              connexion « provisional »
@@ -110,7 +114,7 @@ Trames **texte** (JSON, un objet par message) :
 
 | `t` | Sens | Champs | Notes |
 |---|---|---|---|
-| `hello` | hôte → openedbot | `protocol` (1), `agent` (`edge-setup/<ver>`), `hermesVersion?` (la version de Hermes installée sur l'hôte, omise si l'hôte ne la connaît pas ; jamais la version qu'épingle `agent`), `features?`, `devicePublicKey?` (base64, 32 octets Ed25519) | obligatoire en premier ; toute autre première trame → fermeture 4401. `features` : tableau d'au plus 64 chaînes `^[a-z0-9_]{1,64}$` (la borne que l'API annonce dans `link.context`, 16 tant que l'hôte n'en connaît pas d'autre : voir « Borne des features »), inconnues ignorées ; `provider_management` annonce les routes d'identification hôte, `provider_usage` la sonde de quotas, `profile_inventory` la lecture nommée des profils déjà présents, `profile_management` la création/suppression, `profile_credentials` la clé fournisseur d'un profil, `profile_capabilities` les toolsets/MCP/skills et le modèle par profil, `profile_bundled_skills` l'activation groupée des skills Hermes fournies avec le runtime, `sessions_inventory` la lecture bornée des identifiants de session par profil, et `skills_inventory` la liste des skills de la racine lue par l'opérateur (repli de `/v1/skills`). `profile_toolsets_batch` l'écriture groupée des toolsets d'un profil (`POST /hermes-setup/profiles/{slug}/toolsets`) ; sans elle, openedbot écrit un toolset par requête. `auto_upgrade` est un état, pas une route : le timer de mise à jour automatique de l'hôte est actif (la console ne propose alors plus de l'activer). `creation_audit_v2` est une feature du **lien**, annoncée dans `hello` seulement (jamais dans `capabilities` ni `/v1/capabilities`) : l'hôte tient un audit de création scellé et attend `audit.key` |
+| `hello` | hôte → openedbot | `protocol` (1), `agent` (`edge-setup/<ver>`), `engine?` (`^[a-z][a-z0-9_.:-]{0,63}$`, absent signifie Hermes), `engineVersion?` (texte libre, au plus 64 caractères comme `hermesVersion`), `hermesVersion?` (la version de Hermes installée sur l'hôte, omise si l'hôte ne la connaît pas ; jamais la version qu'épingle `agent`), `features?`, `devicePublicKey?` (base64, 32 octets Ed25519) | obligatoire en premier ; toute autre première trame → fermeture 4401. `features` : tableau d'au plus 64 chaînes `^[a-z0-9_]{1,64}$` (la borne que l'API annonce dans `link.context`, 16 tant que l'hôte n'en connaît pas d'autre : voir « Borne des features »), inconnues ignorées ; `provider_management` annonce les routes d'identification hôte, `provider_usage` la sonde de quotas, `profile_inventory` la lecture nommée des profils déjà présents, `profile_management` la création/suppression, `profile_credentials` la clé fournisseur d'un profil, `profile_capabilities` les toolsets/MCP/skills et le modèle par profil, `profile_bundled_skills` l'activation groupée des skills Hermes fournies avec le runtime, `sessions_inventory` la lecture bornée des identifiants de session par profil, et `skills_inventory` la liste des skills de la racine lue par l'opérateur (repli de `/v1/skills`). `profile_toolsets_batch` l'écriture groupée des toolsets d'un profil (`POST /hermes-setup/profiles/{slug}/toolsets`) ; sans elle, openedbot écrit un toolset par requête. `auto_upgrade` est un état, pas une route : le timer de mise à jour automatique de l'hôte est actif (la console ne propose alors plus de l'activer). `creation_audit_v2` est une feature du **lien**, annoncée dans `hello` seulement (jamais dans `capabilities` ni `/v1/capabilities`) : l'hôte tient un audit de création scellé et attend `audit.key` |
 | `link.issued` | openedbot → hôte | `runtimeId`, `linkToken` | une fois, après commit |
 | `link.context` | openedbot → hôte | `environment` (`dev` \| `prod`), `openedbot` (origine publique), `organization?` (`{id, name, slug}`), `owner?` (`{email, displayName?}`), `limits?` (`{features?}`), `accepts?` (types de trame) | optionnelle, juste après la liaison (après `audit.key`, avant `link.issued` à l'enrôlement) : quel openedbot et quel propriétaire sont derrière ce lien. Données d'affichage (alertes Discord, `status`), chaque texte ≤ 256 caractères, jamais un secret ; un hôte plus ancien ignore la trame (« ignoring frame: unknown frame type »). `limits` fait exception : `features` (entier ≥ 1, 64 aujourd'hui) est le nombre maximal de noms que l'API accepte dans `hello` et `capabilities`, que l'hôte retient et persiste (voir « Borne des features »). Un hôte plus ancien ignore ce champ, comme les seuils de version `latestVersion` et `minimumVersion` : `DecodeText` ne rejette pas les champs inconnus. `accepts` (au plus 16 types `^[a-z][a-z0-9_.]{0,63}$`) nomme les trames facultatives hôte → openedbot que cette API comprend : une API plus ancienne ferme le lien sur un type inconnu, l'hôte n'envoie donc une telle trame (aujourd'hui `inventory.changed`) que si elle y figure |
 | `link.challenge` | openedbot → hôte | `nonce` (base64, 32 octets) | juste après `hello`, avant la liaison ; voir « Preuve de possession » |
@@ -1083,6 +1087,186 @@ callback `{code, state}` sont deux lignes JSON sur stdin, et stdout rend des
 jeu fermé. Le flux OAuth lui-même (découverte, enregistrement dynamique,
 PKCE, `state`, échange et stockage du jeton) reste celui de l'amont
 (`tools.mcp_oauth`, `tools.mcp_dashboard_oauth`).
+
+## Contrat d'exécution
+
+Ce contrat décrit les appels du cloud actuel, sans ajouter de route au fil ni
+changer le comportement de production (version PATCH). Les jeux
+[`run-contract.vectors.json`](connector/fixtures/run-contract.vectors.json)
+sont dérivés des champs lus par le client et des réponses de
+`tests/fake-hermes/server.ts`, sans capture sur un Hermes vivant.
+Les validateurs de `connector/src/run-contract.ts` vérifient ces formes,
+pas toutes les formes permissives que les lecteurs historiques acceptent.
+La liste de méthodes et chemins est
+[`run-contract.routes.json`](connector/fixtures/run-contract.routes.json).
+
+### Routes obligatoires
+
+Les chemins ci-dessous sont ceux du gateway, avant le préfixe de profil.
+Les corps indiqués sont JSON, sauf le flux SSE. Une réponse de mutation est
+2xx, sauf les exceptions explicites. Les champs supplémentaires des réponses
+sont ignorés par les lecteurs cités.
+
+| Méthode et chemin | Requête et réponse consommées | Consommateur |
+|---|---|---|
+| `GET /health` | Sans corps ; réponse JSON, aucun champ imposé par le cloud ; 404 pour un profil inexistant | `modules/runtimes/src/application/runtime-probe.ts`, `platform/hermes/src/client/capabilities.ts` (`probe`, `probeProfileIsolation`) |
+| `GET /v1/capabilities` | Objet JSON ; `features` et `endpoints` sont des objets facultatifs ; capacité concurrente dans `max_concurrent_runs` ou `features.max_concurrent_runs` (défaut 4, bornée de 1 à 4) | `modules/runtimes/src/application/runtime-probe.ts` (`runtimeCapacity`), `platform/hermes/src/client/capabilities.ts` |
+| `GET /v1/toolsets` | `{data:[{name,label?,description?,enabled?,configured?,tools?:string[]}]}` ; liste vide admise. Les toolsets activés sont soumis à la politique du cloud, sans toolset exigé | `platform/hermes/src/parsers/capabilities.ts` (`normalizeHermesToolsets`), `modules/runtimes/src/domain/runtime-contract.ts`, `modules/execution/src/application/runner/preflight.ts` |
+| `POST /api/sessions` | `{id,title}` ; l'identifiant est choisi par le cloud. 2xx ou 409 si la session existe ; aucun champ de réponse lu (le faux rend `{id}`) | `platform/hermes/src/client/sessions.ts` (`ensureSession`), `modules/execution/src/application/runner/preflight.ts` |
+| `POST /v1/runs` | `Idempotency-Key` et corps décrit ci-dessous ; réponse `{run_id:string}` non vide | `platform/hermes/src/client/runs.ts:16`, `modules/execution/src/application/runner/creation.ts:173` |
+| `GET /v1/runs/{id}` | Sans corps ; `status` obligatoire, `run_id?`, `output?`, `usage?`, `pending_steer?`, `admission_id?`, `execution_generation?` ; `output` chaîne obligatoire pour réconcilier `completed` ; 404 signifie run manquant | `platform/hermes/src/parsers/runs.ts`, `modules/execution/src/application/runner/reconcile.ts:94` |
+| `GET /v1/runs/{id}/events` | `Accept: text/event-stream` ; réponse `Content-Type: text/event-stream`, trames `data: <objet JSON>` séparées par une ligne vide | `platform/hermes/src/client/runs.ts` (`events`), `platform/hermes/src/sse.ts` |
+| `POST /v1/runs/{id}/stop` | Sans corps ; 2xx suffit, corps ignoré. Le statut doit ensuite permettre de confirmer la fin | `platform/hermes/src/client/runs.ts` (`stopRun`), `modules/execution/src/application/runner/cancel.ts`, `runner/reconcile.ts` |
+| `POST /v1/runs/{id}/approval` | `{request_id,execution_generation,choice}` lorsque la demande porte une génération ; corps exact, sans autre clé. 2xx suffit, corps ignoré | `platform/hermes/src/client/runs.ts` (`approvalBody`, `respondApproval`), `modules/execution/src/application/runner/approval-forwarding.ts` |
+
+Le corps de création porte `input`, `instructions`, `session_id`, puis,
+quand renseignés, `model`, `provider`, `model_options` (`reasoning_effort`,
+`fast`, `prompt_cache_ttl`) et `conversation_history:[{role,content}]`.
+`input` est une chaîne ou, avec images, une liste de messages utilisateur
+`{role:"user",content:[{type:"text",text},{type:"image_url",image_url:{url}}]}`.
+Les instructions et l'historique voyagent avec le tour ; ils ne sont pas une
+mutation de configuration du moteur
+(`platform/hermes/src/client/run-body.ts`, `modules/execution/src/application/runner/creation.ts`).
+Une répétition de création avec la même `Idempotency-Key` désigne le même
+run, comme le suppose la reprise du cloud et le démontre le faux
+(`modules/execution/src/application/runner/creation.ts:166`,
+`tests/fake-hermes/server.ts`, table `idempotentRuns`).
+
+Les états lus sont `queued`, `started`, `running`, `stopping`,
+`waiting_for_approval`, `completed`, `failed`, `interrupted`, `cancelled`,
+`unknown`. `unknown` signale une exécution perdue, pas une reprise autorisée ;
+le cloud tente `resolve-unknown` avec l'identité d'admission et journalise
+son échec sans inventer une réussite
+(`platform/hermes/src/contracts.ts`,
+`modules/execution/src/application/runner/reconcile.ts:126,225`).
+
+### Routes facultatives et limites actuelles
+
+Une fonction facultative se décrit dans les `features` et `endpoints` de
+`/v1/capabilities` lorsqu'elle a une annonce connue du client. Aujourd'hui,
+seul le steer exige à la fois son flag et son endpoint. Les autres lectures
+ci-dessous sont encore sondées sans annonce préalable et leur 404 est toléré ;
+ce contrat ne leur invente pas de nouveau nom de capacité.
+
+| Méthode et chemin | Champs lus, annonce et conséquence de l'absence | Consommateur |
+|---|---|---|
+| `GET /api/model/options` | `{provider?,model?,providers:[{slug,name,is_current?,authenticated?,auth_type?,warning?,models?:string[],capabilities?:{[model]:{fast?,reasoning?}}}]}`. Sans catalogue, un modèle déjà enregistré peut être exécuté ; la sélection automatique sans modèle enregistré échoue. Aucune annonce vérifiée | `platform/hermes/src/parsers/models.ts`, `modules/execution/src/application/runner/preflight.ts:61`, `runner/provider-recovery.ts:330,346` |
+| `GET /api/sessions/{id}` | `{session:{input_tokens?,output_tokens?,cache_read_tokens?,cache_write_tokens?}}` ; compteurs cumulatifs, nombres non négatifs. Lecture best-effort des workflows ; absence de ventilation du cache. Aucune annonce vérifiée | `platform/hermes/src/parsers/sessions.ts`, `modules/execution/src/application/runner/workflows.ts:470` |
+| `GET /api/sessions/{id}/messages` | Query `limit=128&order=latest`, `{data:unknown[]}` dans l'ordre chronologique. Sans transcript : perte des projections du plan, des recherches web, des fichiers issus des écritures et du détail des outils qui en dépend. Les informations déjà présentes dans les événements restent utilisables. Aucune annonce vérifiée | `platform/hermes/src/client/sessions.ts:94`, `modules/execution/src/application/runner/transcript.ts:24`, `runner/frame-events.ts` |
+| `DELETE /api/sessions/{id}` | Sans corps ; corps de réponse ignoré, 404 traité comme session déjà absente ; facultatif pour le run, sert à l'effacement distant. L'endpoint `session_delete` est décrit par le client, sans garde locale sur l'annonce | `platform/hermes/src/client/sessions.ts` (`deleteSession`) |
+| `POST /v1/runs/{id}/steer` | `{text}` non vide, au plus 65 536 caractères ; `Idempotency-Key` si fourni ; ACK 2xx. Exige `features.run_steer:true` ET `endpoints.run_steer:{method:"POST",path:"/v1/runs/{run_id}/steer"}`. Sinon les consignes restent dans le chemin de suivi du cloud | `platform/hermes/src/client/capabilities.ts:86`, `platform/hermes/src/client/runs.ts` (`steerRun`), `modules/execution/src/application/runner/supervision.ts:195` |
+| `POST /v1/runs/{id}/resolve-unknown` | Exactement `{admission_id,execution_generation}`, lus sur le statut ; ACK 2xx. Appelé pour `unknown` si les deux champs sont présents, sans vérifier un flag ; échec toléré, fermeture distante non prouvée | `platform/hermes/src/client/runs.ts` (`resolveUnknownRun`), `modules/execution/src/application/runner/reconcile.ts:225` |
+| `GET /v1/models` | `{data:[{id}]}` ; catalogue simple, pas utilisé par le préflight courant | `platform/hermes/src/client/capabilities.ts` (`models`) |
+| `GET /v1/skills` | `{data:[{name,description?,category?}]}` ; 404 accepté, inventaire de skills absent | `platform/hermes/src/client/capabilities.ts` (`optionalSkills`) |
+| `GET /api/mcp/servers` | `{servers:unknown[]}` (seul le nombre est lu) ; 404 accepté, inventaire absent | `platform/hermes/src/client/capabilities.ts` (`connectorManagementProbe`) |
+| `GET /hermes-setup/workspace/files/{file}` et `GET /hermes-setup/profiles/{slug}/workspace/files/{file}` | Corps binaire non vide, au plus 1 MiB, `Content-Type` image, PDF ou type de l'extension texte (grammaire du nom dans `WORKSPACE_FILE_NAME_PATTERN`). 404 toléré : référence conservée dans le texte, récupération possible via le transcript. Pas de flag exigé | `platform/hermes/src/client/workspace-files.ts:48`, `modules/execution/src/application/runner/output-media-fetch.ts:21`, `runner/cited-workspace-files.ts:34` |
+| `POST /hermes-setup/profiles/{slug}/model` | `{provider,model}` ; réponse `{profile,provider,model}`, qui doit correspondre à la sélection. Capacité hôte `profile_management` du lien ; échec toléré sauf si le profil sert un autre fournisseur, auquel cas le run est refusé pour éviter un faux routage | `platform/hermes/src/client/profiles.ts:161`, `platform/hermes/src/parsers/profiles.ts:341`, `modules/execution/src/application/provider-fallback.ts:418`, `runner/provider-recovery.ts:378` |
+| `GET /hermes-setup/capabilities` | `{features:string[]}` ; 404 accepté, opérateur absent. Route de l'hôte, toujours à la racine, pas une obligation du moteur | `platform/hermes/src/client/capabilities.ts` (`hostCapabilities`), `platform/hermes/src/client/context.ts` (`hostRequest`) |
+
+`usage` est facultatif sur le statut et `run.completed` :
+`{input_tokens?,output_tokens?,total_tokens?}`, nombres finis non négatifs.
+Le normaliseur rend `usage:null` en son absence
+(`modules/execution/src/domain/hermes-events.ts`, normalisation de `run.completed`).
+Chaque workflow a un budget de jetons obligatoire (`db/migrations/0003_tables.sql`,
+`workflows.token_budget`). Si le moteur ne rapporte aucun usage (notamment le
+pont ACP), ce budget n'est pas appliqué : l'usage absent compte comme zéro
+(`modules/execution/src/application/runner/workflows.ts`, `usageTotal`).
+Aucun workflow n'est refusé pour absence d'usage. Il reste borné par les étapes,
+les délégations, la profondeur et l'échéance :
+`modules/roster/src/domain/autonomous-workflow.ts`, `canDelegate`, vérifie
+`maxSteps`, `maxHandoffs`, `maxDepth` et `deadlineAt` avant une délégation ;
+`modules/execution/src/application/runner/workflows.ts`,
+`createWorkflowContinuationTx`, borne les reprises par `maxSteps`, et
+`advanceWorkflowCompletionTx` vérifie aussi l'échéance à la fin d'une étape.
+Pour les salons, `modules/execution/src/application/runner/rooms.ts`,
+`groupWorkflowLimitOutcome`, vérifie les étapes et l'échéance entre les tours.
+`modules/execution/src/application/queue-sweeps.ts`, `sweepExpiredRunsTx`,
+applique également l'échéance aux runs en attente ou en cours.
+
+### Événements et identités
+
+Chaque événement porte `event`, `run_id` égal à l'identifiant demandé et
+`timestamp` fini, en secondes depuis l'époque Unix. Un autre `run_id` ou un
+timestamp non fini fait refuser le flux
+(`platform/hermes/src/client/runs.ts`, fonction `events`). Les types suivants
+doivent être servis quand le comportement correspondant a lieu, sans exiger
+un appel d'outil ou une approbation à chaque tour.
+
+| Événement | Champs lus en plus de l'enveloppe | Consommateur |
+|---|---|---|
+| `message.delta` | `delta`, texte coalescé en `agent.message` | `modules/execution/src/domain/hermes-events.ts:340` |
+| `tool.started` | `tool`, `tool_call_id?`, `preview?` | `modules/execution/src/domain/hermes-events.ts:350` |
+| `tool.completed` | `tool`, `tool_call_id?`, `duration?` en secondes (zéro signifie non mesuré), `error?` booléen ou texte ; extraits via `preview` (texte, ou JSON avec `status`, `success`, `user_summary`, `error`, `message`), `result` (texte ou objet avec `error`), `error_message`, `errorMessage`, `message` | `modules/execution/src/domain/hermes-events.ts:90,109,370` |
+| `approval.request` | `command`, `description`, `choices` parmi `once,session,always,deny` ; identité `prompt_id` ou `request_id`, `execution_generation?`, `pattern_key?`, `pattern_keys?` ; le descripteur plugin éventuel se trouve dans `description` | `modules/execution/src/domain/hermes-events.ts:410`, `modules/execution/src/domain/gate-identity.ts` |
+| `approval.responded` | `choice` du même vocabulaire, `resolved?` numérique | `modules/execution/src/domain/hermes-events.ts:436` |
+| `run.completed` | `output?`, `usage?`, `messages?` (transcript du tour), `pending_steer?` (consignes jamais lues) | `modules/execution/src/domain/hermes-events.ts:452`, `modules/execution/src/application/runner/event-stream.ts`, `runner/reconcile.ts:189` |
+| `run.failed` ou `run.error` | `message?`, sinon `error?`, texte assaini ; le second nom est un alias consommé | `modules/execution/src/domain/hermes-events.ts:156,477` |
+| `run.interrupted` | Aucun autre champ requis ; devient une erreur de redémarrage | `modules/execution/src/domain/hermes-events.ts:485` |
+| `run.cancelled` | Aucun autre champ requis ; devient un avis d'annulation | `modules/execution/src/domain/hermes-events.ts:500` |
+
+`message.interim` et `reasoning.available` sont ignorés par le normaliseur,
+sans champ de corps consommé. Ils ne sont pas obligatoires et ont un jeu
+chacun pour figer cette absence d'affichage
+(`modules/execution/src/domain/hermes-events.ts:497,515`).
+
+`tool_call_id`, lorsqu'il est fourni, identifie le même appel au début et à
+la fin (chaîne non vide d'au plus 200 caractères) et permet des fins hors
+ordre. Le lecteur accepte encore son absence et apparie alors par FIFO du
+nom d'outil ; cette forme ne distingue pas les fins hors ordre d'un même
+outil (`modules/execution/src/domain/hermes-events.ts:350-407`).
+`run_id` reste stable dans création, statut et événements du même run
+(`platform/hermes/src/client/runs.ts`, `platform/hermes/src/parsers/runs.ts`).
+
+Une réponse d'approbation nomme la demande par `request_id` (au plus 256
+caractères) et sa `execution_generation` entière non négative si présente.
+Le lecteur privilégie `prompt_id` sur l'événement et le renvoie sous le nom
+`request_id`. Une demande sans génération utilise encore le corps historique
+`{request_id,choice,approved}` (`approved` faux pour `deny`). Ces deux formes
+existent dans les jeux ; aucune compatibilité nouvelle n'est ajoutée
+(`modules/execution/src/domain/gate-identity.ts:121`,
+`platform/hermes/src/client/runs.ts`, fonction `approvalBody`). Le moteur ne
+propose que les `choices` qu'il peut appliquer ; le normaliseur retire les
+choix hors vocabulaire et le cloud ne transmet actuellement que `once` ou
+`deny` (`hermes-events.ts:422`, `runner/approval-forwarding.ts`).
+
+### Flux, reprise et transport local
+
+Un abonnement gateway à `/v1/runs/{id}/events` reçoit les événements depuis
+le premier, y compris un abonnement tardif. Le connecteur reprend ainsi un
+journal incomplet en se réabonnant et déduplique le préfixe déjà enregistré
+(`edge-setup/internal/connector/client.go`, `startTail`, et section « Rejeu
+des événements » ci-dessous). Les réponses et le statut restent disponibles
+pour cette reprise après la fin ; le code ne prouve aucune durée minimale
+de rétention, donc ce texte n'en fixe pas.
+
+Une fin explicite est `run.completed`, `run.failed`/`run.error`,
+`run.interrupted` ou `run.cancelled`. Une fermeture de connexion sans fin
+ne prouve pas la réussite : le worker réconcilie par le statut. Un
+redémarrage qui perd l'exécution doit rendre l'interruption observable :
+`run.interrupted`/état `interrupted`, ou l'état `unknown` avec
+`admission_id` et `execution_generation` pour la fermeture 0.23. Le cloud
+traite ces deux états comme une interruption, pas comme une exécution à
+rejouer (`modules/execution/src/application/runner/event-stream.ts`,
+`runner/reconcile.ts:126-156`, `platform/hermes/src/contracts.ts`).
+
+Le rejeu numéroté du connecteur est distinct : annoncé par
+`features.event_replay:true`, il accepte `?since=n` et `Last-Event-ID:n` et
+ajoute `id: <sequence>` aux trames. Le gateway local n'a pas à annoncer ce
+journal (`platform/hermes/src/client/runs.ts`, `platform/hermes/src/sse.ts`,
+`modules/execution/src/application/runner/event-stream.ts:47`). Les limites
+lues sont 1 MiB par trame, 64 KiB par delta, 4 MiB et 10 000 événements par
+flux (`platform/hermes/src/sse.ts`).
+
+Le connecteur garde `/p/<slug>` jusqu'au gateway et ajoute le bearer ; le
+gateway refuse une requête protégée sans bearer par 401. Le faux en mode
+contrat applique ce refus aussi à `/health`. Le profil inconnu rend 404,
+y compris pour la sonde de contrôle d'isolation. `/v1/capabilities` rend un
+objet JSON afin que le connecteur puisse y injecter ses features
+(`edge-setup/internal/connector/client.go:1367,1380,1429`,
+`platform/hermes/src/client/context.ts:67`,
+`platform/hermes/src/client/capabilities.ts:118`,
+`tests/fake-hermes/server.ts`). Les routes hôte `/hermes-setup/*` gardent
+leur traitement séparé à la racine (`platform/hermes/src/client/context.ts`).
 
 ## Rejeu des événements
 

@@ -614,7 +614,7 @@
   --panel: #ffffff; /* the content panel, white, like the cards it holds */
   --surface: #f7f7f7; /* neutral-100 */
   --surface-hover: #ebebeb; /* neutral-200 */
-  --surface-sunken: #ededee; /* inset-layout frame */
+  --surface-sunken: #f7f7f7; /* settings and dialog trays: the one grey under the white cards */
 
   --control: #f7f7f7; /* segmented-control track */
   --control-active: #ffffff; /* …and its selected pill */
@@ -831,7 +831,7 @@
   /*
     Inset chrome (layout 02): the rail the transparent-or-sidebar panel sits on.
     Must stay background-secondary (neutral-900), NOT background-full, otherwise
-    the sidebar collapses into the dark canvas. Light analogue is #ededee.
+    the sidebar collapses into the dark canvas. Light analogue is #f7f7f7.
   */
   --surface-sunken: #171717; /* neutral-900, background-secondary-default */
 

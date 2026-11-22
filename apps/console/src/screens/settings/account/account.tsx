@@ -67,9 +67,6 @@ export function AccountSettings() {
   const canManage = session?.session.canWrite === true && canManageWorkspaceMembers(session.session.role);
   const assisted = session?.session.impersonation != null;
 
-  // The sections are direct children of the panel: they take its full
-  // width (like the reference app's settings) and its spacing, on desktop as well as
-  // on the phone. A capped column left a gap on the right of the modal.
   return (
     <SettingsPane>
       <SectionHeading
@@ -82,9 +79,11 @@ export function AccountSettings() {
         <ConnectionSection />
         <WorkspaceSection />
       </SettingsCardGrid>
-      <MembersCard canManage={canManage} viewerEmail={session?.user.email ?? null} />
-      {canManage && !assisted ? <MemberInvitations /> : null}
-      {!assisted ? <AccountClosureSection /> : null}
+      <SettingsCardGrid trio>
+        <MembersCard canManage={canManage} viewerEmail={session?.user.email ?? null} />
+        {canManage && !assisted ? <MemberInvitations /> : null}
+        {!assisted ? <AccountClosureSection /> : null}
+      </SettingsCardGrid>
     </SettingsPane>
   );
 }

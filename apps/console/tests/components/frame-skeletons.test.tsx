@@ -70,8 +70,8 @@ describe("silhouettes du cadre", () => {
   });
 
   // Rail shell: no icon rail any more; the conversations card carries its
-  // head (logo or traffic lights, then the collapse) and its foot (the three
-  // LLM quotas loading, the runtime, Réglages), as `RailHead` / `RailFooter`.
+  // head (logo or traffic lights, then the collapse) and its foot (the
+  // « Modèles » pill loading, Réglages), as `RailHead` / `RailFooter`.
   test("la carte des conversations porte la tête et le pied du rail, sans avatar", () => {
     setAccountLayout("c");
     document.documentElement.classList.add("dark");
@@ -84,12 +84,14 @@ describe("silhouettes du cadre", () => {
     expect(head.querySelectorAll("svg")).toHaveLength(2);
     expect(document.querySelector("[data-board-surface-header] [data-rail-lead] svg")).toBeTruthy();
     const foot = document.querySelector("[data-rail-footer]")!;
-    // Neither theme nor language: they are set in Réglages > Apparence.
+    // Neither theme nor language (set in Réglages > Apparence), and no label: the pills speak in marks.
+    const pill = foot.querySelector('[data-rail-models-pill="loading"]')!;
     expect(foot.textContent).toBe("");
-    expect(foot.querySelector(".tabler-icon-server-bolt")).toBeTruthy();
-    const quotas = foot.querySelector('[data-rail-llm-quotas="loading"]')!;
+    expect(foot.querySelector('[data-rail-connectors-pill="loading"]')).toBeTruthy();
+    expect(pill.querySelector('[data-rail-runtime-badge="pending"]')).toBeTruthy();
+    const quotas = pill.querySelector('[data-rail-llm-quotas="loading"]')!;
     expect(quotas.children).toHaveLength(3);
-    // Runtime and Réglages.
+    // The connectors' plug and Réglages.
     expect([...foot.querySelectorAll("svg")].filter((icon) => !quotas.contains(icon))).toHaveLength(2);
     expect(foot.querySelector('[data-slot="skeleton"]')).toBeNull();
   });
@@ -102,8 +104,9 @@ describe("silhouettes du cadre", () => {
     renderGuardedFrame("/o/dev/settings/agents");
     expect(await screen.findByText("Quitter les réglages")).toBeTruthy();
     expect(document.querySelectorAll('[data-slot="skeleton-list-row"]')).toHaveLength(0);
-    // Agent import is filed under Runtime, as in the menu.
-    expect(screen.getAllByText("Runtime").length).toBeGreaterThan(1);
+    // Agent import is its own entry, as in the menu: the breadcrumb names it, not Machines.
+    expect(screen.getAllByText("Importer des agents").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Machines")).toHaveLength(1);
     expect(screen.getByText("Salon")).toBeTruthy();
   });
 

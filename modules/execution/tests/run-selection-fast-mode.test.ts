@@ -49,6 +49,22 @@ describe("resolveRunnableSelection and the fast mode", () => {
     expect(resolved && "fastMode" in resolved).toBe(false);
   });
 
+  test("kept on the runtime default when the bot chose no model", () => {
+    // The composer shows Fast on for the default it names: the run must match.
+    expect(resolveRunnableSelection(catalog, { ...wish, model: null }))
+      .toEqual({ provider: "openai-codex", model: "gpt-6-sol", reasoningEffort: "low", fastMode: true });
+  });
+
+  test("an effort the model does not list falls back to the model default", () => {
+    // Local Codex lists its efforts and refuses the others: « minimal » would fail the turn.
+    const codex: RunSelectionCatalog = {
+      ...catalog,
+      providers: [{ slug: "openai-codex", authenticated: true, models: [{ id: "gpt-6-sol", reasoning: true, efforts: ["low", "high"] }] }],
+    };
+    expect(resolveRunnableSelection(codex, { ...wish, model: "gpt-6-sol", reasoningEffort: "minimal" })?.reasoningEffort).toBeNull();
+    expect(resolveRunnableSelection(codex, { ...wish, model: "gpt-6-sol", reasoningEffort: "high" })?.reasoningEffort).toBe("high");
+  });
+
   test("never added without the wish", () => {
     const resolved = resolveRunnableSelection(catalog, { provider: null, model: "gpt-6-sol", reasoningEffort: null });
     expect(resolved && "fastMode" in resolved).toBe(false);

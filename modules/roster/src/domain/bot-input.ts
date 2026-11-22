@@ -158,6 +158,7 @@ export type EditorSettings = ReturnType<typeof readEditorSettings>;
 
 /** Un `POST /api/bots` lu et validé : le cas d'usage ne revoit plus le corps brut. */
 export type CreateBotInput = {
+  runtimeId?: string;
   name: string;
   /** Le profil Hermes explicite demandé, ou `null` (profil géré si l'hôte l'annonce). */
   profile: string | null;
@@ -249,11 +250,17 @@ export function readCreateBotInput(body: Record<string, unknown>): CreateBotInpu
   const autonomy = readAutonomy(body.autonomy, true);
   const editor = readEditorSettings(body);
   const clientRequestId = readClientRequestId(body.clientRequestId);
+  const runtimeId = body.runtimeId;
+  if (runtimeId !== undefined && (typeof runtimeId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runtimeId))) {
+    throw new HttpError(400, "INVALID_RUNTIME", "La machine sélectionnée est invalide.");
+  }
   return {
     name,
     profile,
     slug,
     slugFromName: typeof body.slug !== "string",
+    ...(runtimeId !== undefined ? { runtimeId } : {}),
     description,
     mission,
     instructions,

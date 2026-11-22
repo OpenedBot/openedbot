@@ -5,7 +5,7 @@
  * new organization, and an in-flight request contradicted the next render.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { I18nProvider } from "../../../../src/lib/i18n";
@@ -96,10 +96,10 @@ describe("registre des runtimes : lecture, échec, vide", () => {
 
     await waitFor(() => expect(screen.getByRole("status", { name: "Lecture du runtime" })).toBeTruthy());
     // The lie to avoid: asserting an empty registry before the API's response.
-    expect(screen.queryByText("Aucun runtime déclaré")).toBeNull();
+    expect(screen.queryByText("Aucune machine")).toBeNull();
     // Until the read has said whether a replacement is waiting,
     // the screen does not offer to pair one (the API would refuse it).
-    expect(screen.queryByRole("button", { name: "Ajouter un runtime" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ajouter une machine" })).toBeNull();
   });
 
   test("dit qu’il n’a pas su lire le parc, et n’offre pas d’en déclarer un par-dessus", async () => {
@@ -112,21 +112,21 @@ describe("registre des runtimes : lecture, échec, vide", () => {
     expect(alert.textContent).toContain("cet écran ne montre donc pas son état réel.");
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeTruthy();
     // The lie to avoid: « vous n'avez aucun runtime » when one does not know.
-    expect(screen.queryByText("Aucun runtime déclaré")).toBeNull();
+    expect(screen.queryByText("Aucune machine")).toBeNull();
     // An organization has only one runtime: without the list, the screen knows neither
     // whether a replacement is already waiting (the API would refuse the second,
     // RUNTIME_REPLACEMENT_PENDING) nor whether this is adding or replacing.
     // It therefore offers no pairing on top; « Réessayer » is the way out.
-    expect(screen.queryByRole("button", { name: "Ajouter un runtime" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Remplacer le runtime" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ajouter une machine" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remplacer" })).toBeNull();
   });
 
   test("un parc réellement vide porte son état et un seul geste", async () => {
     stubFetch({ runtimes: [] });
     renderSettings();
 
-    await waitFor(() => expect(screen.getByText("Aucun runtime déclaré")).toBeTruthy());
-    expect(screen.getAllByRole("button", { name: "Ajouter un runtime" })).toHaveLength(1);
+    await waitFor(() => expect(screen.getByText("Aucune machine")).toBeTruthy());
+    expect(screen.getAllByRole("button", { name: "Ajouter une machine" })).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -142,7 +142,7 @@ describe("registre des runtimes : lecture, échec, vide", () => {
     // The character is written escaped: the repository forbids its
     // literal presence, including in the test that proves it is not displayed.
     expect(document.body.textContent ?? "").not.toContain("\u2014");
-    expect(screen.queryByText("Aucun runtime déclaré")).toBeNull();
+    expect(screen.queryByText("Aucune machine")).toBeNull();
   });
 });
 
@@ -180,6 +180,8 @@ describe("l’écran runtime relit ses faits", () => {
       });
     }) as typeof fetch;
     renderSettings();
+    // The link's words live with the default machine (d61b4eca: the screen opens on « Machines »).
+    fireEvent.click(await screen.findByRole("tab", { name: "Machine par défaut" }));
 
     await waitFor(() => expect(screen.getAllByText("lien connecteur fermé").length).toBeGreaterThan(0));
 

@@ -18,11 +18,15 @@ describe("menu des réglages, rangé par besoin", () => {
     expect(items().some((item) => item.url === "/settings/notifications")).toBe(true);
   });
 
-  test("« Importer des agents » n'est pas une entrée, sa page allume Runtime", () => {
-    expect(items().some((item) => item.url === "/settings/agents")).toBe(false);
-    const runtime = items().find((item) => item.url === "/settings/runtime");
-    expect(runtime?.also).toContain("/settings/agents");
-    expect(runtime?.also?.some((url) => isSettingsEntryActive("/settings/agents", url))).toBe(true);
+  test("« Importer des agents » est sa propre entrée, sous Connecteurs, et n'allume plus Runtime", () => {
+    const bots = SETTINGS_GROUPS.find((group) => group.labelKey === "settingsSidebar.groupBots");
+    expect(bots?.items.map((item) => item.url).slice(-2)).toEqual(["/settings/connectors", "/settings/agents"]);
+    const lit = items().filter(
+      (item) =>
+        isSettingsEntryActive("/settings/agents", item.url, item.exact) ||
+        item.also?.some((url) => isSettingsEntryActive("/settings/agents", url)),
+    );
+    expect(lit.map((item) => item.url)).toEqual(["/settings/agents"]);
   });
 
   test("chaque rubrique n'apparaît qu'une fois", () => {

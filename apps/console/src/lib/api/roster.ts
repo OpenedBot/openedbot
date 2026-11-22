@@ -24,6 +24,10 @@ export const rosterApi = {
     request<BotProfileRepairDto>(`/api/bots/${botId}/profile/${mode}`, { method: "POST", body: JSON.stringify(input) }),
   updateBot: (botId: string, input: UpdateBotInput) =>
     request<BotDto>(`/api/bots/${botId}`, { method: "PATCH", body: JSON.stringify(input) }),
+  /** Moves a bot to another machine: `null` is the organization's default one. */
+  /** `choice`: a model of the new machine's catalogue, set in the same move. */
+  moveBot: (botId: string, runtimeId: string | null, choice?: { model: string; provider: string | null }) =>
+    request<BotDto>(`/api/bots/${botId}/runtime`, { method: "PUT", body: JSON.stringify({ runtimeId, ...choice }) }),
   /** Puts every bot back on the global model in the database; host profiles align afterwards (`botProfileModelSync`). */
   resetBotModelOverrides: () =>
     request<BotModelResetDto>("/api/bots/model-overrides/reset", { method: "POST" }),

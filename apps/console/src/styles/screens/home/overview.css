@@ -6,7 +6,7 @@
 
 .openedbot-salon-shell,
 .openedbot-salon {
-  --salon-paper: #f5f5f6;
+  --salon-paper: #fff;
   --salon-hole: #f9f9f9;
   --salon-ink: #17203a;
   --salon-muted: #6e7382;
@@ -24,8 +24,8 @@
 
 .dark .openedbot-salon-shell,
 .dark .openedbot-salon {
-  /* The main card's grey (the reference app's canvas): the home is not a darker hole in it. */
-  --salon-paper: #1a1a1a;
+  /* The main area's page (`--bui-background-full`): the home is not a hole in it. */
+  --salon-paper: #121212;
   --salon-hole: #f5f4ef;
   --salon-ink: #f5f4ef;
   --salon-muted: #a6a39a;

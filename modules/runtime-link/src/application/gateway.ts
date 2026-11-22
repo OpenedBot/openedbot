@@ -1,4 +1,3 @@
-import { createRelayTransport } from "@openedbot/hermes";
 import {
   decodeTextFrame,
   RELAY_ACCEPTED_HOST_FRAMES,
@@ -10,23 +9,21 @@ import {
   type RelayLinkContextFrame,
   type RelayTextFrame,
 } from "@openedbot/contracts-connector";
+import { isLocalEngine } from "@openedbot/contracts-api";
 import type { ApiConfig } from "@openedbot/platform-config/api-config";
 import type { Db } from "@openedbot/platform-db";
 import { withCredential, withTenant } from "@openedbot/platform-db";
-import { constantTimeEqual, hashCredential, randomCredential } from "@openedbot/platform-db/credential";
-import { consumeRuntimeEnrollment, enrollmentState, readEnrollmentRow } from "@openedbot/runtimes/application/runtime-enrollment";
+import { constantTimeEqual, hashCredential } from "@openedbot/platform-db/credential";
+import { enrollmentState, readEnrollmentRow } from "@openedbot/runtimes/application/runtime-enrollment";
 import {
-  insertConnectorRuntime,
   registerLinkDevicePublicKey,
   writeLinkOrigin,
 } from "@openedbot/runtimes/application/runtime-link-rows";
-import { enrolledRuntimeActivation } from "./enroll-activation";
-import { insertRuntimeLinkEvent } from "./link-persistence";
+import { enrollConnectorRuntime } from "./connector-enrollment";
 import {
   type LinkConnection,
   type LinkIdentity,
   type LinkLogger,
-  type LinkPeer,
   type RuntimeLinkBroker,
 } from "./broker";
 import { auditKeyFrame, ensureAuditKey } from "./audit-keys";
@@ -40,10 +37,6 @@ import {
 } from "./instances";
 import { HttpError } from "@openedbot/contracts-errors/http-error";
 import { API_RATE_RULES, createRateLimitGate, requestClientIp, RUNTIME_LINK_UPGRADE_RULE, type RateLimitGate } from "@openedbot/platform-config/rate-limit";
-import { probeRuntimeCapacityWith } from "@openedbot/runtimes/application/runtime-probe";
-import { runtimeAdminClient } from "@openedbot/runtimes/application/runtime-admin-client";
-import { readAllRuntimeRows } from "@openedbot/runtimes/application/runtime-rows";
-import { lockRuntimeDeclarations } from "@openedbot/runtimes/application/runtime-replacement";
 import { logEvent } from "@openedbot/platform-observability";
 
 /**
@@ -83,51 +76,8 @@ export const RUNTIME_LINK_WEBSOCKET_OPTIONS = {
   sendPings: true,
 } as const;
 
-export type LinkEnrollment = {
-  id: string;
-  organizationId: string;
-  runtimeName: string;
-};
-
-export type LinkCredential =
-  | {
-      kind: "link";
-      identity: LinkIdentity;
-      /** `runtimes.link_device_pubkey` : présente, la session doit prouver la possession de la clé. */
-      registeredDeviceKey?: string | null;
-    }
-  | { kind: "enrollment"; enrollment: LinkEnrollment };
-
-/** Le défi de possession en cours : le nonce, la clé attendue, et si elle est à inscrire. */
-export type LinkPopState = {
-  nonce: string;
-  devicePublicKey: string;
-  firstKey: boolean;
-  timer: ReturnType<typeof setTimeout> | null;
-};
-
-export type LinkSocketData = {
-  credential: LinkCredential;
-  /** L'adresse vue à la montée (celle du rate limit) et le `User-Agent` : journal du lien, règle hijack. */
-  peer: LinkPeer;
-  state: "awaiting_hello" | "awaiting_proof" | "provisional" | "binding" | "bound";
-  connection: LinkConnection | null;
-  helloTimer: ReturnType<typeof setTimeout> | null;
-  pop?: LinkPopState | null;
-  /** `hello.hermesVersion`, écrit avec l'agent au `bind` (0162). */
-  hermesVersion?: string | null;
-  /** Hors production : `ws://127.0.0.1:<port>` du tunnel composé (en-tête `Host`), voir devTunnelWsUrl. */
-  devTunnelWsUrl?: string | null;
-};
-
-/** Ce qu'un enrôlement réussi produit : l'identité liée ET le jeton, remis une seule fois à l'hôte. */
-export type IssuedLink = { identity: LinkIdentity; linkToken: string };
-
-export type LinkEnroller = (
-  connection: LinkConnection,
-  enrollment: LinkEnrollment,
-  signal: AbortSignal,
-) => Promise<IssuedLink>;
+import type { IssuedLink, LinkCredential, LinkEnroller, LinkEnrollment, LinkSocketData } from "./gateway-types";
+export type { IssuedLink, LinkCredential, LinkEnroller, LinkEnrollment, LinkPopState, LinkSocketData } from "./gateway-types";
 
 export type RuntimeLinkGatewayDependencies = {
   db: Db;
@@ -287,7 +237,7 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       }
       credential = {
         kind: "enrollment",
-        enrollment: { id: row.id, organizationId: row.organizationId, runtimeName: row.runtimeName },
+        enrollment: { id: row.id, organizationId: row.organizationId, runtimeName: row.runtimeName, dedicated: row.dedicated },
       };
     }
 
@@ -340,7 +290,10 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
       log("runtime_link.audit_key_sent", { runtimeId: identity.runtimeId, keyId: keys.current.keyId, previous: keys.previous.length });
     }
     if (ws.data.credential.kind === "link") {
-      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, { peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null });
+      await recordLinkAgent({ db, config, broker, log }, connection, connection.link!, {
+        peerIp: ws.data.peer.ip, hermesVersion: ws.data.hermesVersion ?? null,
+        engine: ws.data.engine ?? null, engineVersion: ws.data.engineVersion ?? null,
+      });
     }
     await sendLinkContext(connection, identity);
   }
@@ -543,6 +496,8 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
         const connection = broker.open(ws);
         connection.agent = frame.agent ?? null;
         ws.data.hermesVersion = frame.hermesVersion ?? null;
+        ws.data.engine = frame.engine ?? null;
+        ws.data.engineVersion = frame.engineVersion ?? null;
         // Ce que l'hôte sait faire, tel qu'il l'a dit : rien de plus.
         connection.features = frame.features ?? [];
         connection.devicePublicKey = frame.devicePublicKey ?? null;
@@ -562,7 +517,16 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
             connection.close(1012, "LINK_ADMISSION_FAILED");
           });
         }
-        else void beginProvisional(ws, connection, ws.data.credential.enrollment);
+        else {
+          const enrollment = ws.data.credential.enrollment;
+          // A machine ticket pairs only the agent CLIs of `edge-setup connect`;
+          // a host ticket never pairs one of them.
+          if (Boolean(enrollment.dedicated) !== isLocalEngine(frame.engine)) {
+            connection.close(RELAY_CLOSE_UNAUTHORIZED, "ENROLLMENT_ENGINE_MISMATCH");
+            return;
+          }
+          void beginProvisional(ws, connection, { ...enrollment, engine: frame.engine ?? null });
+        }
         return;
       }
       const connection = ws.data.connection;
@@ -612,92 +576,4 @@ export function createRuntimeLinkGateway(deps: RuntimeLinkGatewayDependencies): 
   };
 
   return { handleUpgrade, websocket };
-}
-
-/**
- * L'enrôlement par le lien : sonde À TRAVERS le tuyau, puis une seule
- * transaction : insertion du runtime `connector`, ticket brûlé, organisation
- * en `external`. Le jeton de lien naît ici et ne sort que par `link.issued`.
- */
-export async function enrollConnectorRuntime(
-  context: { db: Db; config: ApiConfig; instanceId: string },
-  connection: LinkConnection,
-  enrollment: LinkEnrollment,
-  signal: AbortSignal,
-): Promise<IssuedLink> {
-  const client = runtimeAdminClient({
-    transport: createRelayTransport({
-      runtimeId: `enrollment:${enrollment.id}`,
-      dial: (request, requestSignal) => connection.dispatch(request, anySignal(signal, requestSignal)),
-    }),
-  });
-  const capacity = await probeRuntimeCapacityWith(client);
-  if (signal.aborted) throw new HttpError(504, "LINK_PROBE_TIMEOUT", "La sonde d'enrôlement a dépassé son délai.");
-
-  const linkToken = randomCredential(32);
-  const tokenHash = hashCredential(linkToken);
-  const runtimeId = crypto.randomUUID();
-  const organizationId = enrollment.organizationId;
-  await withTenant(context.db, organizationId, async (tx) => {
-    // Même verrou que les autres déclarations : le ticket a pu être ouvert
-    // avant qu'un autre remplaçant soit déclaré.
-    await lockRuntimeDeclarations(tx, organizationId);
-    const existing = await readAllRuntimeRows(tx, organizationId);
-    let { active, retireId } = enrolledRuntimeActivation(existing);
-    if (retireId) {
-      // Le WHERE rejoue la condition : un lien rouvert entre la lecture et
-      // l'écriture n'est pas retiré, et le nouveau runtime reste en attente
-      // de remplacement. L'ancien est RÉVOQUÉ, pas seulement désactivé : une
-      // organisation n'a qu'un runtime, et un connecteur mort gardé vivant
-      // devenait un second runtime que plus aucune bascule ne rattrape.
-      const cleared = await tx`
-        update runtimes set revoked_at = now(), is_active = false, updated_at = now()
-         where organization_id = ${organizationId} and id = ${retireId}
-           and is_active and reachability = 'connector' and link_connected_at is null
-        returning id
-      `;
-      if (cleared.length === 0) active = false;
-      else await insertRuntimeLinkEvent(tx, organizationId, retireId, "revoked");
-    }
-    // Une organisation n'a qu'un runtime : un remplaçant de plus ne s'ajoute
-    // pas à celui qui attend déjà. Le rollback laisse le ticket intact.
-    if (!active && existing.some((row) => !row.isActive)) {
-      throw new HttpError(409, "RUNTIME_REPLACEMENT_PENDING", "Un runtime attend déjà de remplacer l’actuel : terminez ce remplacement ou retirez-le d’abord.");
-    }
-    // La clé device annoncée dans `hello` est enregistrée avec le runtime :
-    // dès la session suivante, le jeton seul ne suffit plus.
-    await insertConnectorRuntime(tx, {
-      runtimeId,
-      organizationId,
-      name: enrollment.runtimeName,
-      tokenHash,
-      instanceId: context.instanceId,
-      features: connection.features,
-      capacity,
-      active,
-      devicePublicKey: connection.devicePublicKey,
-    });
-    // Le secret est effacé en même temps que l'enrôlement est consommé : la
-    // ligne reste pour l'audit, mais plus rien ne la rouvre.
-    const burned = await consumeRuntimeEnrollment(tx, { enrollmentId: enrollment.id, organizationId, runtimeId });
-    if (!burned) {
-      throw new HttpError(409, "ENROLLMENT_CONSUMED", "Cet enrôlement a déjà été utilisé.");
-    }
-    await tx`
-      update organizations set runtime_mode = 'external', updated_at = now()
-       where id = ${organizationId}
-    `;
-  });
-  return { identity: { runtimeId, organizationId, tokenHash, expiresAt: null }, linkToken };
-}
-
-function anySignal(primary: AbortSignal, secondary?: AbortSignal): AbortSignal {
-  if (!secondary) return primary;
-  const controller = new AbortController();
-  const forward = (signal: AbortSignal) => () => controller.abort(signal.reason);
-  if (primary.aborted) controller.abort(primary.reason);
-  else primary.addEventListener("abort", forward(primary), { once: true });
-  if (secondary.aborted) controller.abort(secondary.reason);
-  else secondary.addEventListener("abort", forward(secondary), { once: true });
-  return controller.signal;
 }

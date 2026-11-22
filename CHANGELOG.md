@@ -8,6 +8,60 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+## 0.1.6 - 2026-11-22
+
+### Ajouté
+
+- **Les agents de votre machine deviennent des machines d’exécution.**
+  Codex, Claude Code, Grok, Gemini CLI et OpenCode se relient avec
+  `edge-setup connect` (edge-setup v1.5.13 ou plus récent), depuis
+  **Installation → Machines → Ajouter une machine**. À la création d’un bot,
+  **Machine d’exécution** liste chaque agent de chaque machine, et le
+  composer propose ses modèles et niveaux d’effort.
+- **Un bot change de machine sans perdre sa conversation.** Le sélecteur de
+  modèle du composer choisit la machine puis le modèle. Le fil et le composer
+  restent affichés pendant le déplacement. Une machine où le bot a déjà créé
+  son profil le reprend au retour. Le modèle sait sur quelle machine et quel
+  moteur il tourne.
+- **Moteur ACP expérimental.** Une machine Linux peut exécuter OpenCode à la
+  place d’Hermes ; la console affiche le moteur de chaque machine et sa
+  version. Voir la page « Moteur ACP expérimental » de la documentation.
+- **Une lecture échouée de la conversation affiche une page d’erreur** avec
+  sa phrase et un bouton pour réessayer, au lieu d’un écran vide.
+- **Fournisseur et modèle se choisissent dans des champs avec recherche** à
+  l’accueil, avec un squelette pendant que la machine répond.
+
+### Modifié
+
+- **Un tour échoué dit son échec à la place de sa réponse**, un envoi échoué
+  le dit dans sa boîte de dialogue, et une machine absente est expliquée une
+  seule fois, sur le composer. La bannière de diagnostic disparaît.
+- **Les quotas affichent partout ce qui reste** : la fenêtre Limites,
+  l’onglet Quotas du fil, la pastille d’alerte et le menu du compte disent
+  « 76 % restant », comme le rail.
+- **Une réponse d’agent a sa propre bulle**, avec ses actions à côté ; le
+  thème clair passe à deux surfaces ; les notifications perdent leur bouton
+  de fermeture et leur barre de décompte.
+- **Un rafraîchissement dessine le vrai composer et le bot mémorisé**, et les
+  anneaux de quota du rail gardent leur place.
+- **Réglages** : « Importer des agents » devient une entrée sous Connecteurs,
+  et la fenêtre du compte n’offre plus que la fermeture du compte.
+
+### Corrigé
+
+- Une exécution échouée sans événement d’erreur, ou un tour de salon échoué
+  sans message, s’affichent quand même ; un service échoué ne devient plus un
+  tour du fil ; « Réessayer » attend que la conversation puisse envoyer.
+- Une case à cocher vide a un contour visible sur fond blanc.
+- Le bouton « Préparer ma première demande » est retiré.
+
+### Migrations
+
+- `0011_runtime_link_engine`, `0012_bot_runtime` et `0013_bot_host_profiles`
+  enregistrent le moteur annoncé par une machine, la machine d’un bot et les
+  profils qu’un bot a créés sur chaque machine. Déployer l’API avant de
+  mettre à jour les machines.
+
 ## 0.1.5 - 2026-11-17
 
 ### Modifié

@@ -93,7 +93,7 @@ export async function reconcileCapabilityBaselines(
            rt.link_features @> array[${RELAY_FEATURE_APPROVAL_POLICY}]::text[] as host_holds_policy,
            rt.link_features @> array[${RELAY_FEATURE_PROFILE_TOOLSETS_BATCH}]::text[] as toolsets_batch
       from bots b
-      join runtimes rt on rt.organization_id = b.organization_id and rt.is_active and rt.revoked_at is null
+      join runtimes rt on rt.organization_id = b.organization_id and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active)) and rt.revoked_at is null
      where b.hermes_profile_managed
        and b.hermes_profile is not null
        and b.deleted_at is null
@@ -371,7 +371,7 @@ export async function provisionCapabilityBaseline(
            rt.link_features @> array[${RELAY_FEATURE_PROFILE_TOOLSETS_BATCH}]::text[] as toolsets_batch
       from bots b
       join runtimes rt on rt.organization_id = b.organization_id and rt.id = ${job.runtime_id}
-                      and rt.is_active and rt.revoked_at is null
+                      and (rt.id = b.runtime_id or (b.runtime_id is null and rt.is_active)) and rt.revoked_at is null
      where b.organization_id = ${job.organization_id} and b.id = ${job.bot_id}
        and b.hermes_profile_managed
        and b.hermes_profile is not null

@@ -142,7 +142,9 @@ export async function claimProfileProvision(db: SQL, workerId: string): Promise<
 /**
  * Un passage sur une demande réclamée. Quatre règles, issues de la revue :
  * 1. un profil déjà présent sous ce nom avant tout appel de création n'est
- *    jamais adopté (`PROFILE_SLUG_TAKEN`) ; un inventaire illisible ne vaut
+ *    jamais adopté (`PROFILE_SLUG_TAKEN`), sauf celui que ce bot y a lui-même
+ *    créé puis laissé en changeant de machine (`bot_host_profiles`) ; un
+ *    inventaire illisible ne vaut
  *    pas absence : on réessaie plus tard, sans rien créer ;
  * 2. `PROFILE_EXISTS` au tout premier appel veut dire qu'un autre l'a créé
  *    entre-temps : même refus. Après une interruption (`host_create_attempted`
@@ -160,11 +162,12 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
   const passStartedAt = Date.now();
   const timings: Record<string, number> = {};
   if (job.created_at && job.updated_at) timings.claimedAfterMs = Math.max(0, job.updated_at.getTime() - job.created_at.getTime());
-  const holdLease = async (extra: { markAttempted: boolean }): Promise<boolean> => {
+  const holdLease = async (extra: { markAttempted: boolean; adopted?: boolean }): Promise<boolean> => {
     const rows = await db<Array<{ bot_id: string }>>`
       update bot_profile_provisions
          set lease_expires_at = now() + (${PROFILE_PROVISION_LEASE_SECONDS} * interval '1 second'),
              host_create_attempted = host_create_attempted or ${extra.markAttempted},
+             host_profile_ownership = case when ${extra.adopted === true} then 'ours' else host_profile_ownership end,
              updated_at = now()
        where bot_id = ${job.bot_id} and status = 'running' and lease_owner = ${job.lease_owner}
          and lease_generation = ${job.lease_generation} and lease_expires_at > now()
@@ -176,7 +179,10 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
     const failedNow = outcome === "failed" || (outcome === "retry" && job.attempts + 1 >= 3);
     const status = outcome === "succeeded" ? "succeeded" : failedNow ? "failed" : "queued";
     const finalError = outcome === "succeeded" ? null : failedNow ? (error ?? PROVISION_FAILED) : null;
+    // A success records the machine in the same statement: the bot can come
+    // back to it and take this profile back (`bot_host_profiles`, 0013).
     const rows = await db<Array<{ bot_id: string }>>`
+      with closed as (
       update bot_profile_provisions
          set status = ${status},
              attempts = case when ${outcome === "succeeded"} then attempts else attempts + 1 end,
@@ -192,7 +198,13 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
              lease_owner = null, lease_expires_at = null, updated_at = now()
        where bot_id = ${job.bot_id} and status = 'running' and lease_owner = ${job.lease_owner}
          and lease_generation = ${job.lease_generation} and lease_expires_at > now()
-       returning bot_id
+       returning bot_id, organization_id, runtime_id, slug
+      ), recorded as (
+        insert into bot_host_profiles (organization_id, bot_id, runtime_id, slug)
+        select organization_id, bot_id, runtime_id, slug from closed where ${outcome === "succeeded"}
+        on conflict do nothing
+      )
+      select bot_id from closed
     `;
     if (rows.length) {
       const event = outcome === "succeeded" ? "succeeded" : status === "failed" ? (finalError?.code === "PROFILE_SLUG_TAKEN" ? "slug_taken" : "failed") : "retry";
@@ -252,14 +264,29 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
     (features) => ({ features, error: null }),
     (error: unknown) => ({ features: null, error }),
   );
+  let adopted = false;
   if (!resumed) {
     const present = await listed();
     if (present === null) { await finish("retry", null); return; }
-    if (present) { await finish("failed", SLUG_TAKEN); return; }
+    if (present) {
+      // A bot that comes back to a machine finds the profile it left there (a
+      // move does not delete it): taken back only if this bot created it here.
+      const [own] = await db<Array<{ bot_id: string }>>`
+        select bot_id from bot_host_profiles
+         where organization_id = ${job.organization_id} and bot_id = ${job.bot_id}
+           and runtime_id = ${job.runtime_id} and slug = ${job.slug}
+      `;
+      if (!own) { await finish("failed", SLUG_TAKEN); return; }
+      adopted = true;
+      console.info(JSON.stringify({ event: "profile_provision.adopted", botId: job.bot_id, organizationId: job.organization_id, runtimeId: job.runtime_id }));
+    }
   }
   // Noté et bail prolongé AVANT l'appel : s'il aboutit puis que le worker
   // tombe, l'essai suivant sait que le profil trouvé peut être le sien.
-  if (!(await holdLease({ markAttempted: true }))) return;
+  // An adopted profile is not marked attempted: a retry lists it and takes it
+  // back again, rather than sending it through creation. It is recorded as
+  // ours at once, so a deletion before success still cleans it from the host.
+  if (!(await holdLease({ markAttempted: !adopted, adopted }))) return;
 
   // A new bot's baseline turns the bundled skills off: when it will run, the
   // creation does it in the same host process (one interpreter less). A host
@@ -270,42 +297,47 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
   let created = false;
   let readBackByHost = false;
   let bundledSkillsOff = false;
-  try {
-    const result = await client.hostCreateProfile(job.slug, {
-      displayName: job.display_name,
-      ...(job.provider && job.model ? { provider: job.provider, model: job.model } : {}),
-      ...(bundledAtCreation ? { bundledSkills: false as const } : {}),
-    });
-    created = true;
-    bundledSkillsOff = bundledAtCreation && result?.bundledSkills?.applied === true && result.bundledSkills.profile === job.slug;
-    // The host re-read the profile it wrote (listed under this name, requested
-    // model present): the same proof as the inventory, one probe cheaper. A
-    // host that does not say so (older edge-setup) is proven below as before.
-    readBackByHost = result?.readBack === "profile" && result.name === job.slug;
-  } catch (error) {
-    // Un refus net de l'hôte (4xx) dit que cet appel n'a rien créé : la
-    // présomption « le profil trouvé peut être le nôtre » retombe. Seul un
-    // résultat incertain (délai, 5xx, réseau) la garde.
-    const refused = error instanceof HermesClientError && error.status >= 400 && error.status < 500;
-    if (error instanceof HermesClientError) {
-      console.info(JSON.stringify({ event: "profile_provision.create_refused", botId: job.bot_id, organizationId: job.organization_id, status: error.status, code: error.code }));
-    }
-    // Le nom ou le corps refusés par l'hôte ne changeront pas d'un essai à
-    // l'autre : réessayer ne ferait que retarder l'échec (un nom réservé en
-    // amont, par exemple, voir `HERMES_RESERVED_PROFILE_NAMES`).
-    if (refused && (error.code === "PROFILE_INVALID" || error.code === "BODY_INVALID")) {
-      await finish("failed", NAME_REFUSED, true);
-      return;
-    }
-    if (refused && error.code === "PROFILE_EXISTS" && !resumed) {
-      await finish("failed", SLUG_TAKEN, true);
-      return;
-    }
-    // En reprise, `PROFILE_EXISTS` signale le plus souvent notre propre appel
-    // précédent : la relecture ci-dessous tranche. Tout autre refus réessaie.
-    if (refused && !(resumed && error.code === "PROFILE_EXISTS")) {
-      await finish("retry", null, !resumed);
-      return;
+  // An adopted profile already exists: nothing to create, the proof follows.
+  if (!adopted) {
+    try {
+      const result = await client.hostCreateProfile(job.slug, {
+        displayName: job.display_name,
+        ...(job.provider && job.model ? { provider: job.provider, model: job.model } : {}),
+        ...(bundledAtCreation ? { bundledSkills: false as const } : {}),
+      });
+      created = true;
+      bundledSkillsOff = bundledAtCreation && result?.bundledSkills?.applied === true && result.bundledSkills.profile === job.slug;
+      // The host re-read the profile it wrote (listed under this name, requested
+      // model present): the same proof as the inventory, one probe cheaper. A
+      // host that does not say so (older edge-setup) is proven below as before.
+      readBackByHost = result?.readBack === "profile" && result.name === job.slug;
+    } catch (error) {
+      // Un refus net de l'hôte (4xx) dit que cet appel n'a rien créé : la
+      // présomption « le profil trouvé peut être le nôtre » retombe. Seul un
+      // résultat incertain (délai, 5xx, réseau) la garde.
+      const refused = error instanceof HermesClientError && error.status >= 400 && error.status < 500;
+      if (error instanceof HermesClientError) {
+        console.info(JSON.stringify({ event: "profile_provision.create_refused", botId: job.bot_id, organizationId: job.organization_id, status: error.status, code: error.code }));
+      }
+      // Le nom ou le corps refusés par l'hôte ne changeront pas d'un essai à
+      // l'autre : réessayer ne ferait que retarder l'échec (un nom réservé en
+      // amont, par exemple, voir `HERMES_RESERVED_PROFILE_NAMES`).
+      // Only PROFILE_INVALID is about the name: a refused body (a model an
+      // agent host does not take at creation, for example) says so instead.
+      if (refused && (error.code === "PROFILE_INVALID" || error.code === "BODY_INVALID")) {
+        await finish("failed", error.code === "PROFILE_INVALID" ? NAME_REFUSED : REQUEST_REFUSED, true);
+        return;
+      }
+      if (refused && error.code === "PROFILE_EXISTS" && !resumed) {
+        await finish("failed", SLUG_TAKEN, true);
+        return;
+      }
+      // En reprise, `PROFILE_EXISTS` signale le plus souvent notre propre appel
+      // précédent : la relecture ci-dessous tranche. Tout autre refus réessaie.
+      if (refused && !(resumed && error.code === "PROFILE_EXISTS")) {
+        await finish("retry", null, !resumed);
+        return;
+      }
     }
   }
 
@@ -378,6 +410,7 @@ export async function executeProfileProvision(db: SQL, job: ProfileProvisionRow,
 
 const PROVISION_FAILED = { code: "PROFILE_PROVISION_FAILED", message: "Son profil n’a pas pu être créé sur votre serveur." } as const;
 const NAME_REFUSED = { code: "PROFILE_NAME_REFUSED", message: "Votre serveur refuse ce nom de profil. Créez le bot sous un autre nom." } as const;
+const REQUEST_REFUSED = { code: "PROFILE_REQUEST_REFUSED", message: "Votre serveur refuse la demande de création de ce profil. Mettez edge-setup à jour sur cette machine, puis réessayez." } as const;
 const SLUG_TAKEN = { code: "PROFILE_SLUG_TAKEN", message: "Un profil Hermes porte déjà ce nom sur votre serveur. Renommez le bot, puis relancez sa création." } as const;
 
 /**
@@ -457,9 +490,16 @@ export async function assertProvisionRestorable(db: Db, organizationId: string, 
 }
 
 export async function closeProvisionAfterRestore(db: Db, organizationId: string, botId: string): Promise<void> {
+  // The restore recreated the profile on this machine: recorded as the bot's own.
   await withTenant(db, organizationId, (tx) => tx`
-    update bot_profile_provisions
-       set status = 'succeeded', host_profile_ownership = 'ours', error = null, finished_at = now(), updated_at = now()
-     where organization_id = ${organizationId} and bot_id = ${botId} and status = 'cancelled'
+    with closed as (
+      update bot_profile_provisions
+         set status = 'succeeded', host_profile_ownership = 'ours', error = null, finished_at = now(), updated_at = now()
+       where organization_id = ${organizationId} and bot_id = ${botId} and status = 'cancelled'
+      returning organization_id, bot_id, runtime_id, slug
+    )
+    insert into bot_host_profiles (organization_id, bot_id, runtime_id, slug)
+    select organization_id, bot_id, runtime_id, slug from closed
+    on conflict do nothing
   `);
 }

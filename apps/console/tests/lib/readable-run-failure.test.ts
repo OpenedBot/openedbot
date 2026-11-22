@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { t } from "@openedbot/browser-i18n";
 import type { Locale, MessageKey } from "@openedbot/browser-i18n";
-import { MODEL_UNAVAILABLE, readableRunFailure, runFailureExplainedInThread } from "../../src/lib/run/model-unavailable";
+import { MODEL_UNAVAILABLE, readableRunFailure } from "../../src/lib/run/model-unavailable";
 import { PROVIDER_AUTH_REQUIRED, runProviderAuthLabel, runProviderAuthSlug } from "../../src/lib/runtime/provider-auth";
 
 // The run's stored `error` is the worker's French-only text with a raw slug:
@@ -50,28 +50,5 @@ describe("runProviderAuthSlug", () => {
 
   test("the label is the provider's readable name", () => {
     expect(runProviderAuthLabel([error("r1", "anthropic")], "r1")).toBe("Anthropic");
-  });
-});
-
-describe("runFailureExplainedInThread", () => {
-  // REA (2026-10-24): a PROVIDER_AUTH_REQUIRED run also raised the blocking
-  // "Conversation indisponible" modal, which blurred the thread and hid the
-  // "Reconnecter xAI" notice behind a lone "Fermer".
-  test("a refused login or model is explained in the thread, on the run or its run.error event", () => {
-    expect(runFailureExplainedInThread({ id: "r1", errorCode: PROVIDER_AUTH_REQUIRED }, [])).toBe(true);
-    expect(runFailureExplainedInThread({ id: "r1", errorCode: MODEL_UNAVAILABLE }, undefined)).toBe(true);
-    // The run status landed before its code: the event says it.
-    expect(runFailureExplainedInThread(
-      { id: "r1", errorCode: null },
-      [{ runId: "r1", type: "run.error", payload: { errorCode: PROVIDER_AUTH_REQUIRED, provider: "xai-oauth" } }],
-    )).toBe(true);
-  });
-
-  test("any other failure still opens the modal", () => {
-    expect(runFailureExplainedInThread({ id: "r1", errorCode: "HERMES_RUN_FAILED" }, [])).toBe(false);
-    expect(runFailureExplainedInThread({ id: "r1" }, [
-      { runId: "r2", type: "run.error", payload: { errorCode: PROVIDER_AUTH_REQUIRED } },
-      { runId: "r1", type: "run.provider_fallback", payload: { errorCode: MODEL_UNAVAILABLE } },
-    ])).toBe(false);
   });
 });
