@@ -1,5 +1,7 @@
 # Commercial license
 
+**This project is no longer maintained: the hosted cloud was shut down on 2026-11-22 and the pro extensions are no longer offered.**
+
 The openedbot core is distributed under the
 [GNU AGPL v3.0 only](LICENSE). If the AGPL does not fit your use, a commercial
 license is available.

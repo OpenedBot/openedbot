@@ -8,6 +8,14 @@ connecteur hôte et le protocole tiennent le leur :
 
 ## Non publié
 
+### Arrêt du projet
+
+- **openedbot n'est plus maintenu.** Le service hébergé (console, API,
+  passerelle de liaison et téléchargements de l'application de bureau) a été
+  arrêté le 2026-11-22. Seul le site openedbot.app reste en ligne. Le code
+  reste public, tel quel, sous ses licences, sans support : les issues et les
+  pull requests ne sont plus examinées.
+
 ## 0.1.6 - 2026-11-22
 
 ### Ajouté
